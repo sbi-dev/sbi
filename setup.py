@@ -7,7 +7,7 @@ setup(
     version=__version__,
     description="Simulation-based inference",
     url="https://github.com/mackelab/sbi",
-    author="Conor Durkan",
+    author="Conor Durkan, George Papamakarios, Artur Bekasov",
     packages=find_packages(exclude=["tests"]),
     license="GPLv3",
     install_requires=[
