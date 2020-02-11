@@ -1,6 +1,6 @@
 import torch
 
-from .simulator import Simulator
+from sbi.simulators.simulator import Simulator
 
 
 class LinearGaussianSimulator(Simulator):

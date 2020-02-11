@@ -1,2 +1,2 @@
-from .slice_numpy import SliceSampler
-from .slice import Slice
+from sbi.mcmc.slice_numpy import SliceSampler
+from sbi.mcmc.slice import Slice

@@ -4,7 +4,7 @@
 import numpy as np
 import torch
 
-import lfi.utils as utils
+import sbi.utils as utils
 
 from matplotlib import pyplot as plt
 from torch import distributions, nn

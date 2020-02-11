@@ -1,3 +1,3 @@
-from .apt import APT
-from .sre import SRE
-from .snl import SNL
+from sbi.inference.apt import APT
+from sbi.inference.sre import SRE
+from sbi.inference.snl import SNL

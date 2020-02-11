@@ -1,3 +1,2 @@
-from .mlp import MLP
-
-from .resnet import ResidualNet, ConvResidualNet
+from sbi.nn_.nets.mlp import MLP
+from sbi.nn_.nets.resnet import ResidualNet, ConvResidualNet

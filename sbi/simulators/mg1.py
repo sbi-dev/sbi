@@ -3,11 +3,11 @@ import os
 import pickle
 import torch
 
-import lfi.utils as utils
+import sbi.utils as utils
 
 from matplotlib import pyplot as plt
 
-from .simulator import Simulator
+from sbi.simulators.simulator import Simulator
 
 
 class SimulatorModel:

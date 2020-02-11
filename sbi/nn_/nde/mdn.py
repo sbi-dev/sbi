@@ -5,7 +5,7 @@ C. M. Bishop, "Mixture Density Networks", NCRG Report (1994)
 
 import numpy as np
 import torch
-import lfi.utils as utils
+import sbi.utils as utils
 
 from torch import nn
 from torch.nn import functional as F

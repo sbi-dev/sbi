@@ -1,2 +1,2 @@
-from .made import MixtureOfGaussiansMADE
-from .mdn import MultivariateGaussianMDN
+from sbi.nn_.nde.made import MixtureOfGaussiansMADE
+from sbi.nn_.nde.mdn import MultivariateGaussianMDN

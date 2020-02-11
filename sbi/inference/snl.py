@@ -1,8 +1,8 @@
 import os
 import torch
 
-import lfi.simulators as simulators
-import lfi.utils as utils
+import sbi.simulators as simulators
+import sbi.utils as utils
 
 from copy import deepcopy
 from pyro.infer.mcmc import HMC, NUTS
@@ -14,13 +14,13 @@ from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from lfi.mcmc import Slice, SliceSampler
+from sbi.mcmc import Slice, SliceSampler
 
 if torch.cuda.is_available():
     device = torch.device("cuda")
     torch.set_default_tensor_type("torch.cuda.FloatTensor")
 else:
-    #input("CUDA not available, do you wish to continue?")
+    # input("CUDA not available, do you wish to continue?")
     device = torch.device("cpu")
     torch.set_default_tensor_type("torch.FloatTensor")
 
