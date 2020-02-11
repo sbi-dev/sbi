@@ -10,8 +10,7 @@ setup(
     author="Conor Durkan",
     packages=find_packages(exclude=["tests"]),
     license="GPLv3",
-    test_requires=["pytest", "deepdiff", "torchtestcase"],
-    install_requires=[
+q    install_requires=[
         "matplotlib",
         "numpy",
         "pyro-ppl",
@@ -20,6 +19,17 @@ setup(
         "torch",
         "tqdm",
     ],
-    extras_requires={"dev": ["autoflake", "black", "flake8", "isort", "pytest"]},
+    extras_requires={
+        "dev": [
+            "autoflake",
+            "black",
+            "deepdiff",
+            "flake8",
+            "isort",
+            "pytest",
+            "pyyaml",
+            "torchtestcase",
+        ]
+    },
     dependency_links=[],
 )

@@ -15,14 +15,7 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from sbi.mcmc import Slice, SliceSampler
-
-if torch.cuda.is_available():
-    device = torch.device("cuda")
-    torch.set_default_tensor_type("torch.cuda.FloatTensor")
-else:
-    # input("CUDA not available, do you wish to continue?")
-    device = torch.device("cpu")
-    torch.set_default_tensor_type("torch.FloatTensor")
+from sbi.utils.torchutils import get_default_device
 
 
 class SNL:
@@ -42,6 +35,7 @@ class SNL:
         neural_likelihood,
         mcmc_method="slice-np",
         summary_writer=None,
+        device=None,
     ):
         """
 
@@ -57,6 +51,9 @@ class SNL:
         :param summary_writer: SummaryWriter
             Optionally pass summary writer. A way to change the log file location.
             If None, will create one internally, saving logs to cwd/logs.
+        :param device: torch.device
+            Optionally pass device
+            If None, will infer it
         """
 
         self._simulator = simulator
@@ -64,6 +61,7 @@ class SNL:
         self._true_observation = true_observation
         self._neural_likelihood = neural_likelihood
         self._mcmc_method = mcmc_method
+        self._device = get_default_device() if device is None else device
 
         # Defining the potential function as an object means Pyro's MCMC scheme
         # can pickle it to be used across multiple chains in parallel, even if
@@ -214,7 +212,7 @@ class SNL:
                 -1, self._simulator.parameter_dim
             )
 
-            samples = samples[:num_samples].to(device)
+            samples = samples[:num_samples].to(self._device)
             assert samples.shape[0] == num_samples
 
         # Back to training mode.
@@ -289,7 +287,7 @@ class SNL:
             self._neural_likelihood.train()
             for batch in train_loader:
                 optimizer.zero_grad()
-                inputs, context = batch[0].to(device), batch[1].to(device)
+                inputs, context = batch[0].to(self._device), batch[1].to(self._device)
                 log_prob = self._neural_likelihood.log_prob(inputs, context=context)
                 loss = -torch.mean(log_prob)
                 loss.backward()
@@ -303,7 +301,7 @@ class SNL:
             log_prob_sum = 0
             with torch.no_grad():
                 for batch in val_loader:
-                    inputs, context = batch[0].to(device), batch[1].to(device)
+                    inputs, context = batch[0].to(self._device), batch[1].to(self._device)
                     log_prob = self._neural_likelihood.log_prob(inputs, context=context)
                     log_prob_sum += log_prob.sum().item()
             validation_log_prob = log_prob_sum / num_validation_examples
