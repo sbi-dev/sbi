@@ -15,7 +15,7 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from sbi.mcmc import Slice, SliceSampler
-
+from sbi.utils.torchutils import get_default_device
 
 
 class SNL:
@@ -58,11 +58,7 @@ class SNL:
         self._true_observation = true_observation
         self._neural_likelihood = neural_likelihood
         self._mcmc_method = mcmc_method
-
-        if device is None:
-            self._device = torch.ones((1,)).device
-        else:
-            self._device = device
+        self._device = get_default_device() if device is None else device
 
         # Defining the potential function as an object means Pyro's MCMC scheme
         # can pickle it to be used across multiple chains in parallel, even if

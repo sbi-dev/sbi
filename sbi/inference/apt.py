@@ -16,6 +16,7 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from sbi.mcmc import Slice, SliceSampler
+from sbi.utils.torchutils import get_default_device
 
 
 class APT:
@@ -84,12 +85,8 @@ class APT:
         self._prior = prior
         self._true_observation = true_observation
         self._neural_posterior = neural_posterior
-
-        if device is None:
-            self._device = torch.ones((1,)).device
-        else:
-            self._device = device
-
+        self._device = get_default_device() if device is None else device
+        
         assert isinstance(num_atoms, int), "Number of atoms must be an integer."
         self._num_atoms = num_atoms
 

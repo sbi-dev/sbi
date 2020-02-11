@@ -16,7 +16,7 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from sbi.mcmc import Slice, SliceSampler
-
+from sbi.utils.torchutils import get_default_device
 
 
 class SRE:
@@ -65,11 +65,7 @@ class SRE:
         self._true_observation = true_observation
         self._classifier = classifier
         self._prior = prior
-
-        if device is None:
-            self._device = torch.ones((1,)).device
-        else:
-            self._device = device
+        self._device = get_default_device() if device is None else device
 
         assert isinstance(num_atoms, int), "Number of atoms must be an integer."
         self._num_atoms = num_atoms
