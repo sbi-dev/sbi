@@ -19,8 +19,6 @@ Clone the repo and install all the dependencies using the `environment.yml` file
 
 Alternatively, you can install via `setup.py` using `pip install -e.` To install development and testing dependencies, if you use bash use `pip install -e .[dev]` while if you use zsh do `pip install -e .\[dev\]`.
 
-Also uses <https://github.com/bayesiains/nsf> for general density estimation, but that directory is included here so you don't need to get it separately (will hopefully be a pip installable package soon, and in PyTorch master some day).  
-
 ## Examples
 
 Examples are collected in notebooks in `examples/`.
