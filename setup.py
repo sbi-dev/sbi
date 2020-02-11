@@ -10,7 +10,7 @@ setup(
     author="Conor Durkan",
     packages=find_packages(exclude=["tests"]),
     license="GPLv3",
-q    install_requires=[
+    install_requires=[
         "matplotlib",
         "numpy",
         "pyro-ppl",
