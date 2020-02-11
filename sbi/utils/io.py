@@ -1,7 +1,6 @@
 """Utility functions for Input/Output."""
 
 import os
-import socket
 import time
 
 
@@ -15,7 +14,7 @@ def get_project_root():
 
 
 def get_log_root():
-    return os.path.join(get_project_root(), "log")
+    return os.path.join(os.getcwd(), "log")
 
 
 def get_data_root():

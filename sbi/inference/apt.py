@@ -48,7 +48,7 @@ class APT:
         summary_net=None,
         retrain_from_scratch_each_round=False,
         discard_prior_samples=False,
-        summary_writer=None,
+        summary_writer=None
     ):
         """
         :param simulator:
@@ -81,8 +81,8 @@ class APT:
         :param discard_prior_samples: bool
             Whether to discard prior samples from round two onwards.
         :param summary_writer: SummaryWriter
-            Optionally pass summary writer.
-            If None, will create one internally.
+            Optionally pass summary writer. A way to change the log file location.
+            If None, will create one internally, saving logs to cwd/logs.
         """
 
         self._simulator = simulator

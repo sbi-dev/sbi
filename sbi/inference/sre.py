@@ -62,6 +62,9 @@ class SRE:
         f(x) for high-dimensional observations.
         :param retrain_from_scratch_each_round: Whether to retrain the conditional density
         estimator for the posterior from scratch each round.
+        :param summary_writer: SummaryWriter
+            Optionally pass summary writer. A way to change the log file location.
+            If None, will create one internally, saving logs to cwd/logs.
         """
 
         self._simulator = simulator
