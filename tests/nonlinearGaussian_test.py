@@ -1,17 +1,14 @@
 import sys
 import os
 
-sys.path.append('../inference/')
-sys.path.append('../../')
-os.environ['LFI_PROJECT_DIR'] = os.getcwd()
-
 import torch
 import sbi.simulators as simulators
 import sbi.utils as utils
 from torch import distributions
-if torch.cuda.is_available(): torch.set_default_tensor_type("torch.cuda.FloatTensor")
-else: torch.set_default_tensor_type("torch.FloatTensor")
-from apt import APT
+from sbi.inference.apt import APT
+
+# use cpu by default 
+torch.set_default_tensor_type("torch.FloatTensor")
 
 # seed the simulations
 torch.manual_seed(0)
