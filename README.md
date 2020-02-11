@@ -12,7 +12,7 @@ Features neural likelihood-free methods from
 
 ## Setup
 
-Clone the repo and install all the dependencies using the `environment.yaml` file to create a conda environment: `conda env create -f environment.yaml`
+Clone the repo and install all the dependencies using the `environment.yml` file to create a conda environment: `conda env create -f environment.yml`
 
 Alternatively, you can install via `setup.py` using `pip install -e.`
 
