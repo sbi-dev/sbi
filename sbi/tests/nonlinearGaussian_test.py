@@ -40,7 +40,7 @@ apt = APT(
 )
 
 # run inference
-num_rounds, num_simulations_per_round = 1, 1000
+num_rounds, num_simulations_per_round = 2, 1000
 apt.run_inference(
     num_rounds=num_rounds, num_simulations_per_round=num_simulations_per_round
 )
@@ -51,7 +51,7 @@ samples = utils.tensor2numpy(samples)
 samples = torch.from_numpy(samples)
 
 import numpy as np
-np.save('target_data/nonlinearGaussianSamples', samples)
+np.save('target_data/nonlinearGaussianSamples_20000sims', samples)
 
 # define target distribution (analytically tractable) and sample from it
 target_dist = torch.distributions.Normal(torch.tensor([0.0]), torch.tensor([0.5]))
