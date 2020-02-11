@@ -16,14 +16,7 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from sbi.mcmc import Slice, SliceSampler
-
-if torch.cuda.is_available():
-    device = torch.device("cuda")
-    torch.set_default_tensor_type("torch.cuda.FloatTensor")
-else:
-    # input("CUDA not available, do you wish to continue?")
-    device = torch.device("cpu")
-    torch.set_default_tensor_type("torch.FloatTensor")
+from sbi.utils.torchutils import get_default_device
 
 
 class APT:
@@ -49,6 +42,7 @@ class APT:
         retrain_from_scratch_each_round=False,
         discard_prior_samples=False,
         summary_writer=None,
+        device=None,
     ):
         """
         :param simulator:
@@ -83,13 +77,16 @@ class APT:
         :param summary_writer: SummaryWriter
             Optionally pass summary writer.
             If None, will create one internally.
+        :param device: torch.device
+            Optionally pass device
+            If None, will infer it
         """
-
         self._simulator = simulator
         self._prior = prior
         self._true_observation = true_observation
         self._neural_posterior = neural_posterior
-
+        self._device = get_default_device() if device is None else device
+        
         assert isinstance(num_atoms, int), "Number of atoms must be an integer."
         self._num_atoms = num_atoms
 
@@ -535,9 +532,9 @@ class APT:
             for batch in train_loader:
                 optimizer.zero_grad()
                 inputs, context, masks = (
-                    batch[0].to(device),
-                    batch[1].to(device),
-                    batch[2].to(device),
+                    batch[0].to(self._device),
+                    batch[1].to(self._device),
+                    batch[2].to(self._device),
                 )
                 summarized_context = self._summary_net(context)
                 log_prob_proposal_posterior = _get_log_prob_proposal_posterior(
@@ -557,9 +554,9 @@ class APT:
             with torch.no_grad():
                 for batch in val_loader:
                     inputs, context, masks = (
-                        batch[0].to(device),
-                        batch[1].to(device),
-                        batch[2].to(device),
+                        batch[0].to(self._device),
+                        batch[1].to(self._device),
+                        batch[2].to(self._device),
                     )
                     log_prob = _get_log_prob_proposal_posterior(inputs, context, masks)
                     log_prob_sum += log_prob.sum().item()

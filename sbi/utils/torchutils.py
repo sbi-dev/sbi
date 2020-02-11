@@ -6,6 +6,11 @@ import torch
 import sbi.utils as utils
 
 
+def get_default_device():
+    """Returns default device by creating a tensor for testing"""
+    return torch.ones((1,)).device
+
+
 def tile(x, n):
     if not utils.is_positive_int(n):
         raise TypeError("Argument 'n' must be a positive integer.")

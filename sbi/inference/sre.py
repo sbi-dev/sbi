@@ -16,14 +16,7 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from sbi.mcmc import Slice, SliceSampler
-
-
-if torch.cuda.is_available():
-    device = torch.device("cuda")
-    torch.set_default_tensor_type("torch.cuda.FloatTensor")
-else:
-    device = torch.device("cpu")
-    torch.set_default_tensor_type("torch.FloatTensor")
+from sbi.utils.torchutils import get_default_device
 
 
 class SRE:
@@ -46,6 +39,7 @@ class SRE:
         summary_net=None,
         retrain_from_scratch_each_round=False,
         summary_writer=None,
+        device=None,
     ):
         """
         :param simulator: Python object with 'simulate' method which takes a torch.Tensor
@@ -62,12 +56,16 @@ class SRE:
         f(x) for high-dimensional observations.
         :param retrain_from_scratch_each_round: Whether to retrain the conditional density
         estimator for the posterior from scratch each round.
+        :param device: torch.device
+            Optionally pass device
+            If None, will infer it
         """
 
         self._simulator = simulator
         self._true_observation = true_observation
         self._classifier = classifier
         self._prior = prior
+        self._device = get_default_device() if device is None else device
 
         assert isinstance(num_atoms, int), "Number of atoms must be an integer."
         self._num_atoms = num_atoms
