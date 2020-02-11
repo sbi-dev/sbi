@@ -1,12 +1,12 @@
 from torch import nn
 from torch.nn import functional as F
 
-from sbi.nn_ import nets as nn_
+from pyknos.nn import nets
 
-from nsf import distributions as distributions_, flows, transforms
-from sbi.nn_.nde import MixtureOfGaussiansMADE, MultivariateGaussianMDN
+from pyknos import distributions as distributions_, flows, transforms
+from pyknos.nn.nde import MixtureOfGaussiansMADE, MultivariateGaussianMDN
 
-from .torchutils import create_alternating_binary_mask
+from sbi.utils.torchutils import create_alternating_binary_mask
 
 
 def get_neural_posterior(model, parameter_dim, observation_dim, simulator):
@@ -90,7 +90,7 @@ def get_neural_posterior(model, parameter_dim, observation_dim, simulator):
                             mask=create_alternating_binary_mask(
                                 features=parameter_dim, even=(i % 2 == 0)
                             ),
-                            transform_net_create_fn=lambda in_features, out_features: nn_.ResidualNet(
+                            transform_net_create_fn=lambda in_features, out_features: nets.ResidualNet(
                                 in_features=in_features,
                                 out_features=out_features,
                                 hidden_features=50,
@@ -139,7 +139,7 @@ def get_classifier(model, parameter_dim, observation_dim):
         )
 
     elif model == "resnet":
-        classifier = nn_.ResidualNet(
+        classifier = nets.ResidualNet(
             in_features=parameter_dim + observation_dim,
             out_features=1,
             hidden_features=50,
@@ -229,7 +229,7 @@ def get_neural_likelihood(model, parameter_dim, observation_dim):
                             mask=create_alternating_binary_mask(
                                 features=observation_dim, even=(i % 2 == 0)
                             ),
-                            transform_net_create_fn=lambda in_features, out_features: nn_.ResidualNet(
+                            transform_net_create_fn=lambda in_features, out_features: nets.ResidualNet(
                                 in_features=in_features,
                                 out_features=out_features,
                                 hidden_features=50,

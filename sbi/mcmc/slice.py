@@ -156,7 +156,7 @@ def test_():
     #     parameters = next(iter(inputs_dict.values()))
     #     return -(likelihood.log_prob(parameters) + prior.log_prob(parameters).sum())
     prior = distributions.Uniform(low=-5 * torch.ones(4), high=2 * torch.ones(4))
-    from nsf import distributions as distributions_
+    from pyknos import distributions as distributions_
 
     likelihood = distributions_.LotkaVolterraOscillating()
     potential_function = PotentialFunction(likelihood, prior)

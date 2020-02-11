@@ -14,6 +14,7 @@ setup(
         "matplotlib",
         "numpy",
         "pyro-ppl",
+        "pyknos@git+https://github.com/mackelab/pyknos",
         "scipy",
         "tensorboard",
         "torch",
