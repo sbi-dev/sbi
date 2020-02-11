@@ -68,5 +68,5 @@ def test_compute(num_dim):
 
     # check if mmd is larger than expected
     if num_dim == 1:   max_mmd = 0.07
-    elif num_dim == 3: max_mmd = 0.05
+    elif num_dim == 3: max_mmd = 0.06
     assert mmd < max_mmd, "MMD was larger than expected."
