@@ -541,27 +541,10 @@ def test_():
 
     samples = ratio_estimator.sample_posterior(num_samples=2500)
     samples = utils.tensor2numpy(samples)
-    figure = utils.plot_hist_marginals(
-        data=samples,
-        ground_truth=utils.tensor2numpy(
-            simulator.get_ground_truth_parameters()
-        ).reshape(-1),
-        lims=[-4, 4],
-    )
-    figure.savefig(os.path.join(utils.get_output_root(), "corner-posterior-ratio.pdf"))
 
     mmds = ratio_estimator.summary["mmds"]
-    if mmds:
-        figure, axes = plt.subplots(1, 1)
-        axes.plot(
-            np.arange(
-                0, num_rounds * num_simulations_per_round, num_simulations_per_round
-            ),
-            np.array(mmds),
-            "-o",
-            linewidth=2,
-        )
-        figure.savefig(os.path.join(utils.get_output_root(), "mmd-ratio.pdf"))
+    # TODO: add test for quality of samples
+    # TODO: move to test file
 
 
 def main():

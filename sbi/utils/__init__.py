@@ -28,8 +28,6 @@ from sbi.utils.io import (
     get_project_root,
     get_data_root,
     get_log_root,
-    get_checkpoint_root,
-    get_output_root,
     get_timestamp
 )
 

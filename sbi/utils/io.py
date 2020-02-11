@@ -20,11 +20,3 @@ def get_log_root():
 
 def get_data_root():
     return os.path.join(get_project_root(), "data")
-
-
-def get_output_root():
-    return os.path.join(get_project_root(), "out")
-
-
-def get_checkpoint_root():
-    return os.path.join(get_project_root(), "checkpoint")
