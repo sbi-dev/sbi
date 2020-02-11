@@ -1,10 +1,10 @@
 from torch import nn
 from torch.nn import functional as F
 
-from lfi.nn_ import nets as nn_
+from sbi.nn_ import nets as nn_
 
 from nsf import distributions as distributions_, flows, transforms
-from lfi.nn_.nde import MixtureOfGaussiansMADE, MultivariateGaussianMDN
+from sbi.nn_.nde import MixtureOfGaussiansMADE, MultivariateGaussianMDN
 
 from .torchutils import create_alternating_binary_mask
 

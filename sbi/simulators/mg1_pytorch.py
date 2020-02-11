@@ -3,9 +3,9 @@ import os
 import pickle
 import torch
 
-import lfi.utils as utils
+import sbi.utils as utils
 
-from .simulator import Simulator
+from sbi.simulators.simulator import Simulator
 from summarizers import MG1Summarizer
 
 

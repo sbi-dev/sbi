@@ -1,6 +1,6 @@
 import torch
 
-import lfi.utils as utils
+import sbi.utils as utils
 
 from matplotlib import pyplot as plt
 from pyro.infer.mcmc.api import MCMC

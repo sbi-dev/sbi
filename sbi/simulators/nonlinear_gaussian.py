@@ -3,12 +3,12 @@ import scipy.stats
 import os
 import torch
 
-import lfi.utils as utils
+import sbi.utils as utils
 
 from matplotlib import pyplot as plt
 
-from lfi.mcmc import SliceSampler
-from .simulator import Simulator
+from sbi.mcmc import SliceSampler
+from sbi.simulators.simulator import Simulator
 
 parameter_dim = 5
 observation_dim = 8

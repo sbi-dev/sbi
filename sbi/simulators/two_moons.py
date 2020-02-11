@@ -1,11 +1,11 @@
 import numpy as np
 import torch
 
-import lfi.utils as utils
+import sbi.utils as utils
 
 from matplotlib import pyplot as plt
 
-from .simulator import Simulator
+from sbi.simulators.simulator import Simulator
 
 
 class TwoMoonsSimulator(Simulator):

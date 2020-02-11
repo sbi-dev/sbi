@@ -3,11 +3,11 @@ import os
 import pickle
 import torch
 
-import lfi.utils as utils
+import sbi.utils as utils
 
 from summarizers import LotkaVolterraSummarizer
-from .simulator import Simulator
-from .markov_jump_process import MarkovJumpProcess, SimTooLongException
+from sbi.simulators.simulator import Simulator
+from sbi.simulators.markov_jump_process import MarkovJumpProcess, SimTooLongException
 
 observation_dim = 9
 parameter_dim = 4

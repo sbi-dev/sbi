@@ -1,6 +1,6 @@
 import torch
 
-import lfi.simulators as simulators
+import sbi.simulators as simulators
 
 from torch import distributions
 
