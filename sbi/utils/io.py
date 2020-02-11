@@ -2,7 +2,7 @@
 
 import os
 import time
-
+from pathlib import Path
 
 def get_timestamp():
     formatted_time = time.strftime("%d-%b-%y||%H:%M:%S")
@@ -10,7 +10,7 @@ def get_timestamp():
 
 
 def get_project_root():
-    return Path(__file__).parent.parent.absolute()
+    return Path(__file__).parent.parent.parent.absolute()
 
 
 def get_log_root():
