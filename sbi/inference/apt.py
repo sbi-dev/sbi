@@ -75,8 +75,8 @@ class APT:
         :param discard_prior_samples: bool
             Whether to discard prior samples from round two onwards.
         :param summary_writer: SummaryWriter
-            Optionally pass summary writer.
-            If None, will create one internally.
+            Optionally pass summary writer. A way to change the log file location.
+            If None, will create one internally, saving logs to cwd/logs.
         :param device: torch.device
             Optionally pass device
             If None, will infer it
@@ -798,27 +798,12 @@ def test_():
 
     samples = apt.sample_posterior(2500)
     samples = utils.tensor2numpy(samples)
-    figure = utils.plot_hist_marginals(
-        data=samples,
-        ground_truth=utils.tensor2numpy(
-            simulator.get_ground_truth_parameters()
-        ).reshape(-1),
-        lims=simulator.parameter_plotting_limits,
-    )
-    figure.savefig(os.path.join(utils.get_output_root(), "corner-posterior-apt.pdf"))
 
-    samples = apt.sample_posterior_mcmc(num_samples=1000)
-    samples = utils.tensor2numpy(samples)
-    figure = utils.plot_hist_marginals(
-        data=samples,
-        ground_truth=utils.tensor2numpy(
-            simulator.get_ground_truth_parameters()
-        ).reshape(-1),
-        lims=simulator.parameter_plotting_limits,
-    )
-    figure.savefig(
-        os.path.join(utils.get_output_root(), "corner-posterior-apt-mcmc.pdf")
-    )
+    samples_mcmc = apt.sample_posterior_mcmc(num_samples=1000)
+    samples_mcmc = utils.tensor2numpy(samples_mcmc)
+
+    # TODO: add test for quality of samples
+    # TODO: move to test file
 
 
 def main():

@@ -252,29 +252,9 @@ def sample_true_posterior():
     sampler = SliceSampler(x=true_parameters, lp_f=potential_function, thin=10)
     sampler.gen(200)
     samples = sampler.gen(2500)
-    # figure = corner.corner(
-    #     samples,
-    #     truths=true_parameters,
-    #     truth_color='C1',
-    #     bins=25,
-    #     color='black',
-    #     labels=[r'$ \theta_{1} $', r'$ \theta_{2} $', r'$ \theta_{3} $',
-    #             r'$ \theta_{4} $', r'$ \theta_{5} $'],
-    #     show_titles=True,
-    #     hist_kwargs={'color': 'grey', 'fill': True},
-    #     title_fmt='.2f',
-    #     plot_contours=True,
-    #     quantiles=[0.5]
-    # )
-    # plt.tight_layout()
-    figure = utils.plot_hist_marginals(
-        samples, ground_truth=true_parameters, lims=[-4, 4]
-    )
-    np.save(
-        os.path.join(utils.get_output_root(), "./true-posterior-samples-gaussian.npy"),
-        samples,
-    )
-    plt.show()
+    # TODO: add test for quality of samples
+    # TODO: move to test file
+
 
 
 def main():

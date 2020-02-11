@@ -56,6 +56,9 @@ class SRE:
         f(x) for high-dimensional observations.
         :param retrain_from_scratch_each_round: Whether to retrain the conditional density
         estimator for the posterior from scratch each round.
+        :param summary_writer: SummaryWriter
+            Optionally pass summary writer. A way to change the log file location.
+            If None, will create one internally, saving logs to cwd/logs.
         :param device: torch.device
             Optionally pass device
             If None, will infer it
@@ -539,27 +542,10 @@ def test_():
 
     samples = ratio_estimator.sample_posterior(num_samples=2500)
     samples = utils.tensor2numpy(samples)
-    figure = utils.plot_hist_marginals(
-        data=samples,
-        ground_truth=utils.tensor2numpy(
-            simulator.get_ground_truth_parameters()
-        ).reshape(-1),
-        lims=[-4, 4],
-    )
-    figure.savefig(os.path.join(utils.get_output_root(), "corner-posterior-ratio.pdf"))
 
     mmds = ratio_estimator.summary["mmds"]
-    if mmds:
-        figure, axes = plt.subplots(1, 1)
-        axes.plot(
-            np.arange(
-                0, num_rounds * num_simulations_per_round, num_simulations_per_round
-            ),
-            np.array(mmds),
-            "-o",
-            linewidth=2,
-        )
-        figure.savefig(os.path.join(utils.get_output_root(), "mmd-ratio.pdf"))
+    # TODO: add test for quality of samples
+    # TODO: move to test file
 
 
 def main():

@@ -186,14 +186,8 @@ def test_():
     x = np.zeros(2)
     sampler = SliceSampler(x=x, lp_f=lp_f)
     samples = sampler.gen(1000)
-    utils.plot_hist_marginals(samples, lims=[-4, 4])
-    plt.savefig(
-        os.path.join(
-            utils.get_output_root(),
-            "slice-test.pdf"
-        )
-    )
-    # plt.show()
+    # TODO: add test for quality of samples
+    # TODO: move to test file
 
 
 def main():

@@ -48,6 +48,9 @@ class SNL:
         nets.Module. Must have 'log_prob' and 'sample' methods.
         :param mcmc_method: MCMC method to use for posterior sampling. Must be one of
         ['slice', 'hmc', 'nuts'].
+        :param summary_writer: SummaryWriter
+            Optionally pass summary writer. A way to change the log file location.
+            If None, will create one internally, saving logs to cwd/logs.
         :param device: torch.device
             Optionally pass device
             If None, will infer it
