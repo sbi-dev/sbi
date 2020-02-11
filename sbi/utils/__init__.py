@@ -30,8 +30,7 @@ from sbi.utils.io import (
     get_log_root,
     get_checkpoint_root,
     get_output_root,
-    get_timestamp,
-    is_on_cluster,
+    get_timestamp
 )
 
 from sbi.utils.plot import plot_hist_marginals, plot_hist_marginals_pair
