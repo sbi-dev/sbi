@@ -19,7 +19,7 @@ def pytest_generate_tests(metafunc):
     metafunc.parametrize("num_dim", [1, 3])
 
 
-def test_compute(num_dim):
+def test_linearGaussian_based_on_mmd(num_dim):
 
     dim, std = num_dim, 1.0
     simulator = simulators.LinearGaussianSimulator(dim=dim, std=std)
@@ -52,19 +52,17 @@ def test_compute(num_dim):
 
     # draw samples from posterior
     samples = apt.sample_posterior(1000)
-    samples = utils.tensor2numpy(samples)
-    samples = torch.from_numpy(samples)
-
+    
     # define target distribution (analytically tractable) and sample from it
-    if num_dim == 1:    target_dist = torch.distributions.Normal(torch.tensor([0.0]), torch.tensor([0.5]))
-    elif num_dim == 3:  target_dist = torch.distributions.MultivariateNormal(torch.tensor([0.0, 0.0, 0.0]), 0.5*torch.eye(3))
-    target_samples = target_dist.sample([1000])
+    target_samples = simulator.get_ground_truth_posterior_samples(1000)
 
     # compute the mmd
     mmd = utils.unbiased_mmd_squared(target_samples, samples)
-    mmd = utils.tensor2numpy(mmd)
-
+    
     # check if mmd is larger than expected
-    if num_dim == 1:   max_mmd = 0.07
-    elif num_dim == 3: max_mmd = 0.06
-    assert mmd < max_mmd, "MMD was larger than expected."
+    if num_dim == 1:   
+        max_mmd = 0.07
+    elif num_dim == 3: 
+        max_mmd = 0.06
+
+    assert mmd < max_mmd, f"MMD={mmd} is more than 2 stds above the average performance."
