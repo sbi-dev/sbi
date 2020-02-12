@@ -1,21 +1,21 @@
 import os
-import torch
+from copy import deepcopy
 
 import sbi.simulators as simulators
 import sbi.utils as utils
-
-from copy import deepcopy
+import torch
 from pyro.infer.mcmc import HMC, NUTS
 from pyro.infer.mcmc.api import MCMC
-from torch import distributions, multiprocessing as mp, optim
+from sbi.mcmc import Slice, SliceSampler
+from sbi.utils.torchutils import get_default_device
+from torch import distributions
+from torch import multiprocessing as mp
+from torch import optim
 from torch.nn.utils import clip_grad_norm_
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
-
-from sbi.mcmc import Slice, SliceSampler
-from sbi.utils.torchutils import get_default_device
 
 
 class SNL:
@@ -165,7 +165,9 @@ class SNL:
             )
 
             # Update TensorBoard and summary dict.
-            self._summarize(round_)
+            self._summary_writer, self._summary = utils.summarize(
+                self._summary_writer, self._summary, round_, self
+            )
 
     def sample_posterior(self, num_samples, thin=1):
         """
@@ -301,7 +303,10 @@ class SNL:
             log_prob_sum = 0
             with torch.no_grad():
                 for batch in val_loader:
-                    inputs, context = batch[0].to(self._device), batch[1].to(self._device)
+                    inputs, context = (
+                        batch[0].to(self._device),
+                        batch[1].to(self._device),
+                    )
                     log_prob = self._neural_likelihood.log_prob(inputs, context=context)
                     log_prob_sum += log_prob.sum().item()
             validation_log_prob = log_prob_sum / num_validation_examples
@@ -326,86 +331,6 @@ class SNL:
     @property
     def summary(self):
         return self._summary
-
-    def _summarize(self, round_):
-
-        # Update summaries.
-        try:
-            mmd = utils.unbiased_mmd_squared(
-                self._parameter_bank[-1],
-                self._simulator.get_ground_truth_posterior_samples(num_samples=1000),
-            )
-            print(mmd.item())
-            self._summary["mmds"].append(mmd.item())
-        except:
-            pass
-
-        median_observation_distance = torch.median(
-            torch.sqrt(
-                torch.sum(
-                    (self._observation_bank[-1] - self._true_observation.reshape(1, -1))
-                    ** 2,
-                    dim=-1,
-                )
-            )
-        )
-        self._summary["median-observation-distances"].append(
-            median_observation_distance.item()
-        )
-
-        negative_log_prob_true_parameters = -utils.gaussian_kde_log_eval(
-            samples=self._parameter_bank[-1],
-            query=self._simulator.get_ground_truth_parameters().reshape(1, -1),
-        )
-        self._summary["negative-log-probs-true-parameters"].append(
-            negative_log_prob_true_parameters.item()
-        )
-
-        # Plot most recently sampled parameters in TensorBoard.
-        parameters = utils.tensor2numpy(self._parameter_bank[-1])
-        figure = utils.plot_hist_marginals(
-            data=parameters,
-            ground_truth=utils.tensor2numpy(
-                self._simulator.get_ground_truth_parameters()
-            ).reshape(-1),
-            lims=self._simulator.parameter_plotting_limits,
-        )
-        self._summary_writer.add_figure(
-            tag="posterior-samples", figure=figure, global_step=round_ + 1
-        )
-
-        self._summary_writer.add_scalar(
-            tag="epochs-trained",
-            scalar_value=self._summary["epochs"][-1],
-            global_step=round_ + 1,
-        )
-
-        self._summary_writer.add_scalar(
-            tag="median-observation-distance",
-            scalar_value=self._summary["median-observation-distances"][-1],
-            global_step=round_ + 1,
-        )
-
-        self._summary_writer.add_scalar(
-            tag="negative-log-prob-true-parameters",
-            scalar_value=self._summary["negative-log-probs-true-parameters"][-1],
-            global_step=round_ + 1,
-        )
-
-        self._summary_writer.add_scalar(
-            tag="best-validation-log-prob",
-            scalar_value=self._summary["best-validation-log-probs"][-1],
-            global_step=round_ + 1,
-        )
-
-        if self._summary["mmds"]:
-            self._summary_writer.add_scalar(
-                tag="mmd",
-                scalar_value=self._summary["mmds"][-1],
-                global_step=round_ + 1,
-            )
-
-        self._summary_writer.flush()
 
 
 class NeuralPotentialFunction:
