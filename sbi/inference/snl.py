@@ -166,7 +166,13 @@ class SNL:
 
             # Update TensorBoard and summary dict.
             self._summary_writer, self._summary = utils.summarize(
-                self._summary_writer, self._summary, round_, self
+                summary_writer=self._summary_writer,
+                summary=self._summary,
+                round_=round_,
+                true_observation=self._true_observation,
+                parameter_bank=self._parameter_bank,
+                observation_bank=self._observation_bank,
+                simulator=self._simulator,
             )
 
     def sample_posterior(self, num_samples, thin=1):

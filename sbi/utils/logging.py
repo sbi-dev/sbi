@@ -2,14 +2,21 @@ import sbi.utils as utils
 import torch
 
 
-def summarize(summary_writer, summary, round_, inference_object):
+def summarize(
+    summary_writer,
+    summary,
+    round_,
+    true_observation,
+    parameter_bank,
+    observation_bank,
+    simulator,
+    estimate_acceptance_rate=None,
+):
     # Update summaries.
     try:
         mmd = utils.unbiased_mmd_squared(
-            inference_object._parameter_bank[-1],
-            inference_object._simulator.get_ground_truth_posterior_samples(
-                num_samples=1000
-            ),
+            parameter_bank[-1],
+            simulator.get_ground_truth_posterior_samples(num_samples=1000),
         )
         summary["mmds"].append(mmd.item())
     except:
@@ -20,11 +27,7 @@ def summarize(summary_writer, summary, round_, inference_object):
         median_observation_distance = torch.median(
             torch.sqrt(
                 torch.sum(
-                    (
-                        inference_object._observation_bank[-1]
-                        - inference_object._true_observation.reshape(1, -1)
-                    )
-                    ** 2,
+                    (observation_bank[-1] - true_observation.reshape(1, -1)) ** 2,
                     dim=-1,
                 )
             )
@@ -46,10 +49,8 @@ def summarize(summary_writer, summary, round_, inference_object):
         # KDE estimate of negative log prob true parameters using
         # parameters from most recent round.
         negative_log_prob_true_parameters = -utils.gaussian_kde_log_eval(
-            samples=inference_object._parameter_bank[-1],
-            query=inference_object._simulator.get_ground_truth_parameters().reshape(
-                1, -1
-            ),
+            samples=parameter_bank[-1],
+            query=simulator.get_ground_truth_parameters().reshape(1, -1),
         )
         summary["negative-log-probs-true-parameters"].append(
             negative_log_prob_true_parameters.item()
@@ -65,9 +66,7 @@ def summarize(summary_writer, summary, round_, inference_object):
 
     try:
         # Rejection sampling acceptance rate
-        rejection_sampling_acceptance_rate = (
-            inference_object._estimate_acceptance_rate()
-        )
+        rejection_sampling_acceptance_rate = estimate_acceptance_rate()
         summary["rejection-sampling-acceptance-rates"].append(
             rejection_sampling_acceptance_rate
         )
@@ -82,13 +81,13 @@ def summarize(summary_writer, summary, round_, inference_object):
 
     try:
         # Plot most recently sampled parameters.
-        parameters = utils.tensor2numpy(inference_object._parameter_bank[-1])
+        parameters = utils.tensor2numpy(parameter_bank[-1])
         figure = utils.plot_hist_marginals(
             data=parameters,
             ground_truth=utils.tensor2numpy(
-                inference_object._simulator.get_ground_truth_parameters()
+                simulator.get_ground_truth_parameters()
             ).reshape(-1),
-            lims=inference_object._simulator.parameter_plotting_limits,
+            lims=_simulator.parameter_plotting_limits,
         )
         summary_writer.add_figure(
             tag="posterior-samples", figure=figure, global_step=round_ + 1
