@@ -163,7 +163,7 @@ class APT:
             "rejection-sampling-acceptance-rates": [],
         }
 
-    def run_inference(self, num_rounds, num_simulations_per_round):
+    def run_inference(self, num_rounds, num_simulations_per_round, **kwargs):
         """
         This runs APT for num_rounds rounds, using num_simulations_per_round calls to
         the simulator per round.
@@ -210,7 +210,7 @@ class APT:
             )
 
             # Fit posterior using newly aggregated data set.
-            self._fit_posterior(round_=round_)
+            self._fit_posterior(round_=round_, **kwargs)
 
             # Store models at end of each round.
             self._model_bank.append(deepcopy(self._neural_posterior))

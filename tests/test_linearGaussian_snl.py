@@ -58,10 +58,7 @@ def test_snl_on_linearGaussian_based_on_mmd(num_dim):
     mmd = utils.unbiased_mmd_squared(target_samples, samples)
 
     # check if mmd is larger than expected
-    if num_dim == 1:
-        max_mmd = 0.07
-    elif num_dim == 3:
-        max_mmd = 0.06
+    max_mmd = 0.02
 
     assert (
         mmd < max_mmd
