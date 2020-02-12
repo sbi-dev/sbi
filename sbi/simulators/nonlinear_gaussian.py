@@ -1,12 +1,10 @@
-import numpy as np
-import scipy.stats
 import os
-import torch
 
+import numpy as np
 import sbi.utils as utils
-
+import scipy.stats
+import torch
 from matplotlib import pyplot as plt
-
 from sbi.mcmc import SliceSampler
 from sbi.simulators.simulator import Simulator
 
@@ -222,19 +220,11 @@ class NonlinearGaussianSimulator(Simulator):
 
     @property
     def normalization_parameters(self):
-        # mean = torch.zeros(5)
-        # std = ((36 / 12) ** 0.5) * torch.ones(5)
         mean = torch.zeros(5)
         std = torch.ones(5)
         return mean, std
 
     def _get_observation_normalization_parameters(self):
-        # mean = torch.Tensor(
-        #     [-0.0055, 0.0013, 0.0030, 0.0054, -0.0074, -0.0003, -0.0007, -0.0042]
-        # )
-        # std = torch.Tensor(
-        #     [4.3816, 4.3758, 4.3808, 4.3718, 4.3789, 4.3727, 4.3801, 4.3822]
-        # )
         mean = torch.zeros(8)
         std = torch.ones(8)
         return mean, std
@@ -252,30 +242,5 @@ def sample_true_posterior():
     sampler = SliceSampler(x=true_parameters, lp_f=potential_function, thin=10)
     sampler.gen(200)
     samples = sampler.gen(2500)
-    # TODO: add test for quality of samples
-    # TODO: move to test file
 
-
-
-def main():
-    pass
-
-
-# if __name__ == "__main__":
-#     simulator = NonlinearGaussian()
-#     samples = simulator.get_ground_truth_posterior_samples()
-#     samples = utils.tensor2numpy(samples)
-#     figure = utils.plot_hist_marginals(
-#         data=samples,
-#         ground_truth=utils.tensor2numpy(
-#             simulator.get_ground_truth_parameters()
-#         ).reshape(-1),
-#         lims=[-4, 4],
-#     )
-#     plt.show()
-# true_parameters, true_observation = simulator.get_ground_truth()
-# log_prob = simulator.log_prob(true_observation, true_parameters)
-# print(log_prob)
-# import torch
-# from torch import distributions
-# import utils
+    return samples
