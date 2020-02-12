@@ -74,7 +74,7 @@ class LinearGaussianSimulator(Simulator):
         :return: torch.Tensor [num_samples, observation_dim]
             Batch of posterior samples.
         """
-        mean = self.get_ground_truth_parameters()
+        mean = self.get_ground_truth_observation()
         std = torch.sqrt(torch.Tensor([self._std ** 2 / (self._std ** 2 + 1)]))
         c = torch.Tensor([1 / (self._std ** 2 + 1)])
         return c * mean + std * torch.randn(num_samples, self._dim)
