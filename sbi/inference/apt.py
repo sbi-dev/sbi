@@ -1,22 +1,22 @@
-import numpy as np
 import os
-import torch
+from copy import deepcopy
 
+import numpy as np
 import sbi.simulators as simulators
 import sbi.utils as utils
-
-from copy import deepcopy
+import torch
 from pyro.infer.mcmc import HMC, NUTS
 from pyro.infer.mcmc.api import MCMC
-from torch import distributions, multiprocessing as mp, nn, optim
+from sbi.mcmc import Slice, SliceSampler
+from sbi.utils.torchutils import get_default_device
+from torch import distributions
+from torch import multiprocessing as mp
+from torch import nn, optim
 from torch.nn.utils import clip_grad_norm_
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
-
-from sbi.mcmc import Slice, SliceSampler
-from sbi.utils.torchutils import get_default_device
 
 
 class APT:
@@ -86,7 +86,7 @@ class APT:
         self._true_observation = true_observation
         self._neural_posterior = neural_posterior
         self._device = get_default_device() if device is None else device
-        
+
         assert isinstance(num_atoms, int), "Number of atoms must be an integer."
         self._num_atoms = num_atoms
 
@@ -226,7 +226,16 @@ class APT:
             )
 
             # Update tensorboard and summary dict.
-            self._summarize(round_)
+            self._summary_writer, self._summary = utils.summarize(
+                summary_writer=self._summary_writer,
+                summary=self._summary,
+                round_=round_,
+                true_observation=self._true_observation,
+                parameter_bank=self._parameter_bank,
+                observation_bank=self._observation_bank,
+                simulator=self._simulator,
+                estimate_acceptance_rate=self._estimate_acceptance_rate,
+            )
 
     def sample_posterior(self, num_samples, true_observation=None):
         """
@@ -627,102 +636,6 @@ class APT:
     def summary(self):
         return self._summary
 
-    def _summarize(self, round_):
-
-        # Update summaries.
-        try:
-            mmd = utils.unbiased_mmd_squared(
-                self._parameter_bank[-1],
-                self._simulator.get_ground_truth_posterior_samples(num_samples=1000),
-            )
-            self._summary["mmds"].append(mmd.item())
-        except:
-            pass
-
-        # Median |x - x0| for most recent round.
-        median_observation_distance = torch.median(
-            torch.sqrt(
-                torch.sum(
-                    (self._observation_bank[-1] - self._true_observation.reshape(1, -1))
-                    ** 2,
-                    dim=-1,
-                )
-            )
-        )
-        self._summary["median-observation-distances"].append(
-            median_observation_distance.item()
-        )
-
-        # KDE estimate of negative log prob true parameters using
-        # parameters from most recent round.
-        negative_log_prob_true_parameters = -utils.gaussian_kde_log_eval(
-            samples=self._parameter_bank[-1],
-            query=self._simulator.get_ground_truth_parameters().reshape(1, -1),
-        )
-        self._summary["negative-log-probs-true-parameters"].append(
-            negative_log_prob_true_parameters.item()
-        )
-
-        # Rejection sampling acceptance rate
-        rejection_sampling_acceptance_rate = self._estimate_acceptance_rate()
-        self._summary["rejection-sampling-acceptance-rates"].append(
-            rejection_sampling_acceptance_rate
-        )
-
-        # Plot most recently sampled parameters.
-        parameters = utils.tensor2numpy(self._parameter_bank[-1])
-        figure = utils.plot_hist_marginals(
-            data=parameters,
-            ground_truth=utils.tensor2numpy(
-                self._simulator.get_ground_truth_parameters()
-            ).reshape(-1),
-            lims=self._simulator.parameter_plotting_limits,
-        )
-
-        # Write quantities using SummaryWriter.
-        self._summary_writer.add_figure(
-            tag="posterior-samples", figure=figure, global_step=round_ + 1
-        )
-
-        self._summary_writer.add_scalar(
-            tag="epochs-trained",
-            scalar_value=self._summary["epochs"][-1],
-            global_step=round_ + 1,
-        )
-
-        self._summary_writer.add_scalar(
-            tag="best-validation-log-prob",
-            scalar_value=self._summary["best-validation-log-probs"][-1],
-            global_step=round_ + 1,
-        )
-
-        self._summary_writer.add_scalar(
-            tag="median-observation-distance",
-            scalar_value=self._summary["median-observation-distances"][-1],
-            global_step=round_ + 1,
-        )
-
-        self._summary_writer.add_scalar(
-            tag="negative-log-prob-true-parameters",
-            scalar_value=self._summary["negative-log-probs-true-parameters"][-1],
-            global_step=round_ + 1,
-        )
-
-        self._summary_writer.add_scalar(
-            tag="rejection-sampling-acceptance-rate",
-            scalar_value=self._summary["rejection-sampling-acceptance-rates"][-1],
-            global_step=round_ + 1,
-        )
-
-        if self._summary["mmds"]:
-            self._summary_writer.add_scalar(
-                tag="mmd",
-                scalar_value=self._summary["mmds"][-1],
-                global_step=round_ + 1,
-            )
-
-        self._summary_writer.flush()
-
 
 class NeuralPotentialFunction:
     """
@@ -764,51 +677,3 @@ class NeuralPotentialFunction:
         potential *= log_prob_prior
 
         return potential
-
-
-def test_():
-    task = "nonlinear-gaussian"
-    simulator, prior = simulators.get_simulator_and_prior(task)
-    parameter_dim, observation_dim = (
-        simulator.parameter_dim,
-        simulator.observation_dim,
-    )
-    true_observation = simulator.get_ground_truth_observation()
-    neural_posterior = utils.get_neural_posterior(
-        "maf", parameter_dim, observation_dim, simulator
-    )
-    apt = APT(
-        simulator=simulator,
-        true_observation=true_observation,
-        prior=prior,
-        neural_posterior=neural_posterior,
-        num_atoms=-1,
-        use_combined_loss=False,
-        train_with_mcmc=False,
-        mcmc_method="slice-np",
-        summary_net=None,
-        retrain_from_scratch_each_round=False,
-        discard_prior_samples=False,
-    )
-
-    num_rounds, num_simulations_per_round = 20, 1000
-    apt.run_inference(
-        num_rounds=num_rounds, num_simulations_per_round=num_simulations_per_round
-    )
-
-    samples = apt.sample_posterior(2500)
-    samples = utils.tensor2numpy(samples)
-
-    samples_mcmc = apt.sample_posterior_mcmc(num_samples=1000)
-    samples_mcmc = utils.tensor2numpy(samples_mcmc)
-
-    # TODO: add test for quality of samples
-    # TODO: move to test file
-
-
-def main():
-    test_()
-
-
-if __name__ == "__main__":
-    main()
