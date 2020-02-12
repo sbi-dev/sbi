@@ -5,6 +5,7 @@ import time
 from pathlib import Path
 
 def get_timestamp():
+    # TODO make time stamp iso format
     formatted_time = time.strftime("%d-%b-%y||%H:%M:%S")
     return formatted_time
 
@@ -14,7 +15,7 @@ def get_project_root():
 
 
 def get_log_root():
-    return os.path.join(os.getcwd(), "log")
+    return os.path.join(os.getcwd(), "sbi-logs")
 
 
 def get_data_root():
