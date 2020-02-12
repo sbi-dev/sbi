@@ -1,44 +1,10 @@
-import torch
-
 import sbi.simulators as simulators
-
-from torch import distributions
-
+import torch
 from pyknos import distributions as distributions_
+from torch import distributions
 
 
 def simulation_wrapper(simulator, parameter_sample_fn, num_samples):
-
-    # if (
-    #     isinstance(simulator, simulators.LotkaVolterraSimulator)
-    #     and not simulator._has_been_used
-    # ):
-    #     # if False:
-    #     parameters, observations = simulator._get_prior_parameters_observations()
-    #     return (
-    #         torch.Tensor(parameters)[:num_samples],
-    #         torch.Tensor(observations)[:num_samples],
-    #     )
-    #
-    # else:
-    #     num_remaining_samples = num_samples
-    #     parameters, observations = [], []
-    #
-    #     while num_remaining_samples > 0:
-    #
-    #         proposed_parameters = parameter_sample_fn(num_remaining_samples)
-    #         proposed_observations = simulator.simulate(proposed_parameters)
-    #
-    #         for parameter, observation in zip(
-    #             proposed_parameters, proposed_observations
-    #         ):
-    #             if observation is not None:
-    #                 parameters.append(parameter.reshape(1, -1))
-    #                 observations.append(observation.reshape(1, -1))
-    #
-    #         num_remaining_samples = num_samples - len(parameters)
-    #
-    #     return torch.cat(parameters), torch.cat(observations)
 
     if isinstance(simulator, simulators.LotkaVolterraSimulator):
 
@@ -84,7 +50,7 @@ def get_simulator_and_prior(task):
             high=3 * torch.ones(simulator.parameter_dim),
         )
 
-    elif task == "nonlinear-gaussian-gaussian":
+    elif task == "nonlinear-gaussian":
         simulator = simulators.NonlinearGaussianSimulator()
         prior = distributions.MultivariateNormal(
             loc=torch.zeros(5), covariance_matrix=torch.eye(5)
