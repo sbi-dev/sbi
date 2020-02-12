@@ -17,7 +17,7 @@ Features neural likelihood-free methods from
 
 Clone the repo and install all the dependencies using the `environment.yml` file to create a conda environment: `conda env create -f environment.yml`
 
-Alternatively, you can install via `setup.py` using `pip install -e.` To install development and testing dependencies, if you use bash use `pip install -e .[dev]` while if you use zsh do `pip install -e .\[dev\]`.
+Alternatively, you can install via `setup.py` using `pip install -e ".[dev]"` (the dev flag installs development and testing dependencies).
 
 ## Examples
 
