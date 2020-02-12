@@ -1,63 +1,63 @@
-import sys
 import os
+import sys
 
-import torch
+import numpy as np
 import sbi.simulators as simulators
 import sbi.utils as utils
-from torch import distributions
+import torch
 from sbi.inference.apt import APT
+from torch import distributions
 
-# use cpu by default 
+# use cpu by default
 torch.set_default_tensor_type("torch.FloatTensor")
 
 # seed the simulations
 torch.manual_seed(0)
 
 
-task = "nonlinear-gaussian"
-simulator, prior = simulators.get_simulator_and_prior(task)
+def test_nonlinearGaussian_based_on_mmd():
+    task = "nonlinear-gaussian"
+    simulator, prior = simulators.get_simulator_and_prior(task)
 
-parameter_dim, observation_dim = (simulator.parameter_dim, simulator.observation_dim)
-true_observation = simulator.get_ground_truth_observation()
+    parameter_dim, observation_dim = (
+        simulator.parameter_dim,
+        simulator.observation_dim,
+    )
+    true_observation = simulator.get_ground_truth_observation()
 
-# define nn for inference
-neural_posterior = utils.get_neural_posterior("maf", parameter_dim, observation_dim, simulator)
-apt = APT(
-    simulator=simulator,
-    true_observation=true_observation,
-    prior=prior,
-    neural_posterior=neural_posterior,
-    num_atoms=-1,
-    use_combined_loss=False,
-    train_with_mcmc=False,
-    mcmc_method="slice-np",
-    summary_net=None,
-    retrain_from_scratch_each_round=False,
-    discard_prior_samples=False,
-)
+    # define nn for inference
+    neural_posterior = utils.get_neural_posterior(
+        "maf", parameter_dim, observation_dim, simulator
+    )
+    apt = APT(
+        simulator=simulator,
+        true_observation=true_observation,
+        prior=prior,
+        neural_posterior=neural_posterior,
+        num_atoms=-1,
+        use_combined_loss=False,
+        train_with_mcmc=False,
+        mcmc_method="slice-np",
+        summary_net=None,
+        retrain_from_scratch_each_round=False,
+        discard_prior_samples=False,
+    )
 
-# run inference
-num_rounds, num_simulations_per_round = 2, 1000
-apt.run_inference(
-    num_rounds=num_rounds, num_simulations_per_round=num_simulations_per_round
-)
+    # run inference
+    num_rounds, num_simulations_per_round = 2, 1000
+    apt.run_inference(
+        num_rounds=num_rounds, num_simulations_per_round=num_simulations_per_round
+    )
 
-# draw samples from posterior
-samples = apt.sample_posterior(1000)
-samples = utils.tensor2numpy(samples)
-samples = torch.from_numpy(samples)
+    # draw samples from posterior
+    samples = apt.sample_posterior(1000)
 
-import numpy as np
-np.save('target_data/nonlinearGaussianSamples_20000sims', samples)
+    # define target distribution (analytically tractable) and sample from it
+    target_samples = simulator.get_ground_truth_posterior_samples(num_samples=1000)
 
-# define target distribution (analytically tractable) and sample from it
-target_dist = torch.distributions.Normal(torch.tensor([0.0]), torch.tensor([0.5]))
-target_samples = target_dist.sample([1000])
+    # compute the mmd
+    mmd = utils.unbiased_mmd_squared(target_samples, samples)
 
-# compute the mmd
-mmd = utils.unbiased_mmd_squared(target_samples, samples)
-mmd = utils.tensor2numpy(mmd)
-
-# check if mmd is larger than expected
-max_mmd = 0.07
-#assert mmd < max_mmd, "MMD was larger than expected."
+    # check if mmd is larger than expected
+    max_mmd = 0.0
+    assert mmd < max_mmd, f"MMD={mmd} no mmd thresold calculated yet."
