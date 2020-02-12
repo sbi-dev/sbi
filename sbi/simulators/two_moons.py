@@ -95,7 +95,13 @@ class TwoMoonsSimulator(Simulator):
 
     @property
     def parameter_plotting_limits(self):
-        return [-2, 2]
+        return [-1, 1]
+
+    @property
+    def normalization_parameters(self):
+        mean = torch.zeros(2)
+        std = torch.ones(2)
+        return mean, std
 
 
 def test_():
