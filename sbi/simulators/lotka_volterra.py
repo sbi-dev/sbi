@@ -406,9 +406,6 @@ class LotkaVolterraSimulator(Simulator):
     """
 
     def __init__(self, summarize_observations=True, gaussian_prior=False):
-
-        super().__init__()
-
         super().__init__()
         self._simulator = Model()
         self._summarizer = Stats()
@@ -442,10 +439,8 @@ class LotkaVolterraSimulator(Simulator):
 
     @property
     def observation_dim(self):
-        if self._summarize_observations:
-            return 9
-        else:
-            return 32
+        # summary statistics are calculated by default
+        return 9
 
     @property
     def parameter_plotting_limits(self):
