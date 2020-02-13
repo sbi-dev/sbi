@@ -21,11 +21,8 @@ def test_apt_on_linearGaussian_based_on_mmd(num_dim):
         loc=torch.zeros(dim), covariance_matrix=torch.eye(dim)
     )
 
-    parameter_dim, observation_dim = (
-        simulator.parameter_dim,
-        simulator.observation_dim,
-    )
-    true_observation = simulator.get_ground_truth_observation()
+    parameter_dim, observation_dim = dim, dim
+    true_observation = torch.zeros(dim)
 
     # define nn for inference
     neural_posterior = utils.get_neural_posterior(

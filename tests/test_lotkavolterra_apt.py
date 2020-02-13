@@ -14,13 +14,21 @@ else:
 def test_lotkavolterra_based_on_gtparams():
 
     # get simulator and prior
-    simulator, prior = simulators.get_simulator_and_prior("lotka-volterra")
+    (
+        simulator,
+        prior,
+        ground_truth_parameters,
+        ground_truth_observation,
+    ) = simulators.get_simulator_prior_and_groundtruth("lotka-volterra")
+
+    parameter_dim = ground_truth_parameters.shape[0]
+    observation_dim = ground_truth_observation.shape[0]
 
     # get neural posterior (here a MAF)
     neural_posterior = utils.get_neural_posterior(
         "maf",
-        parameter_dim=simulator.parameter_dim,
-        observation_dim=simulator.observation_dim,
+        parameter_dim=parameter_dim,
+        observation_dim=observation_dim,
         simulator=simulator,
     )
 
@@ -28,7 +36,7 @@ def test_lotkavolterra_based_on_gtparams():
     inference_method = inference.APT(
         simulator=simulator,
         prior=prior,
-        true_observation=simulator.get_ground_truth_observation(),
+        true_observation=ground_truth_observation,
         neural_posterior=neural_posterior,
         num_atoms=-1,
     )
@@ -38,8 +46,6 @@ def test_lotkavolterra_based_on_gtparams():
 
     # sample posterior
     samples = inference_method.sample_posterior(num_samples=10000)
-
-    ground_truth_parameters = simulator.get_ground_truth_parameters()
 
     posterior_sample_mean = samples.mean(axis=0)
     posterior_sample_std = samples.std(axis=0)

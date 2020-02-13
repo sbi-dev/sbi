@@ -23,11 +23,8 @@ def test_snl_on_linearGaussian_based_on_mmd(num_dim):
         loc=torch.zeros(dim), covariance_matrix=torch.eye(dim)
     )
 
-    parameter_dim, observation_dim = (
-        simulator.parameter_dim,
-        simulator.observation_dim,
-    )
-    true_observation = simulator.get_ground_truth_observation()
+    parameter_dim, observation_dim = dim, dim
+    true_observation = torch.zeros(dim)
 
     # get neural likelihood
     neural_likelihood = utils.get_neural_likelihood(
@@ -40,7 +37,7 @@ def test_snl_on_linearGaussian_based_on_mmd(num_dim):
     inference_method = inference.SNL(
         simulator=simulator,
         prior=prior,
-        true_observation=simulator.get_ground_truth_observation(),
+        true_observation=true_observation,
         neural_likelihood=neural_likelihood,
         mcmc_method="slice-np",
     )

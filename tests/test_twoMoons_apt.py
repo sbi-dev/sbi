@@ -1,10 +1,9 @@
-import torch
+import numpy as np
 import sbi.simulators as simulators
 import sbi.utils as utils
-
-from torch import distributions
+import torch
 from sbi.inference.apt import APT
-import numpy as np
+from torch import distributions
 
 # use cpu by default
 torch.set_default_tensor_type("torch.FloatTensor")
@@ -12,17 +11,18 @@ torch.set_default_tensor_type("torch.FloatTensor")
 # seed the simulations
 torch.manual_seed(0)
 
-
-dim, std = 3, 0.5
 simulator = simulators.TwoMoonsSimulator()
 a = 1
-prior = distributions.Uniform(low=-a * torch.ones(simulator.parameter_dim), high=a * torch.ones(simulator.parameter_dim))
+parameter_dim, observation_dim = 2, 2
+prior = distributions.Uniform(
+    low=-a * torch.ones(parameter_dim), high=a * torch.ones(parameter_dim),
+)
 
 
-parameter_dim, observation_dim = (simulator.parameter_dim, simulator.observation_dim)
-
-true_observation = simulator.get_ground_truth_observation()
-neural_posterior = utils.get_neural_posterior("maf", parameter_dim, observation_dim, simulator)
+true_observation = torch.Tensor([0, 0])
+neural_posterior = utils.get_neural_posterior(
+    "maf", parameter_dim, observation_dim, simulator
+)
 
 apt = APT(
     simulator=simulator,
@@ -41,11 +41,14 @@ apt = APT(
 
 num_rounds, num_simulations_per_round = 2, 500
 apt.run_inference(
-    num_rounds=num_rounds, num_simulations_per_round=num_simulations_per_round, batch_size=20)
+    num_rounds=num_rounds,
+    num_simulations_per_round=num_simulations_per_round,
+    batch_size=20,
+)
 
 samples = apt.sample_posterior(10000)
 samples = utils.tensor2numpy(samples)
-target_samples = np.load('target_samples_twoMoons/samples_gt.npy')
+target_samples = np.load("target_samples_twoMoons/samples_gt.npy")
 
 num_samples = 1000
 t1 = torch.tensor([target_samples], dtype=torch.float32)[0, :num_samples]

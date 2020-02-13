@@ -23,11 +23,8 @@ def test_sre_on_linearGaussian_based_on_mmd(num_dim):
         loc=torch.zeros(dim), covariance_matrix=torch.eye(dim)
     )
 
-    parameter_dim, observation_dim = (
-        simulator.parameter_dim,
-        simulator.observation_dim,
-    )
-    true_observation = simulator.get_ground_truth_observation()
+    parameter_dim, observation_dim = dim, dim
+    true_observation = torch.zeros(dim)
 
     # get classifier
     classifier = utils.get_classifier(
@@ -40,7 +37,7 @@ def test_sre_on_linearGaussian_based_on_mmd(num_dim):
     inference_method = inference.SRE(
         simulator=simulator,
         prior=prior,
-        true_observation=simulator.get_ground_truth_observation(),
+        true_observation=true_observation,
         classifier=classifier,
         mcmc_method="slice-np",
     )
