@@ -33,12 +33,14 @@ class APT:
         simulator,
         prior,
         true_observation,
-        neural_posterior,
         num_atoms=-1,
+        num_pilot_samples=100,
+        density_estimator='maf',
         use_combined_loss=False,
         train_with_mcmc=False,
         mcmc_method="slice-np",
         summary_net=None,
+        z_score_obs=True,
         retrain_from_scratch_each_round=False,
         discard_prior_samples=False,
         summary_writer=None,
@@ -53,11 +55,13 @@ class APT:
             Distribution object with 'log_prob' and 'sample' methods.
         :param true_observation: torch.Tensor [observation_dim] or [1, observation_dim]
             True observation x0 for which to perform inference on the posterior p(theta | x0).
-        :param neural_posterior: nets.Module
-            Conditional density estimator q(theta | x) with 'log_prob' and 'sample' methods.
         :param num_atoms: int
             Number of atoms to use for classification.
             If -1, use all other parameters in minibatch.
+        :param num_pilot_samples: int
+            Number of simulations that are run when instantiating an object.
+            Used to z-score the observations.
+        :param density_estimator: string. What density estimator to use. E.g. 'maf', 'nsf'
         :param use_combined_loss: bool
             Whether to jointly train prior samples using maximum likelihood.
             Useful to prevent density leaking when using box uniform priors.
@@ -69,6 +73,8 @@ class APT:
         :param summary_net: nets.Module
             Optional network which may be used to produce feature vectors
             f(x) for high-dimensional observations.
+        :param z_score_obs: bool
+            Whether to z-score (=normalize) the data features x
         :param retrain_from_scratch_each_round: bool
             Whether to retrain the conditional density estimator for the posterior
             from scratch each round.
@@ -84,22 +90,48 @@ class APT:
         self._simulator = simulator
         self._prior = prior
         self._true_observation = true_observation
-        self._neural_posterior = neural_posterior
         self._device = get_default_device() if device is None else device
-        self.obs_mean = torch.zeros(self._true_observation.shape)
-        self.obs_std  = torch.ones(self._true_observation.shape)
+        self.z_score_obs = z_score_obs
+        self.num_pilot_samples = num_pilot_samples
+
+        # run prior samples
+        self.pilot_parameters, self.pilot_observations = simulators.simulation_wrapper(
+            simulator=self._simulator,
+            parameter_sample_fn=lambda num_samples: self._prior.sample(
+                (num_samples,)
+            ),
+            num_samples=num_pilot_samples,
+        )
+
+        # We may want to summarize high-dimensional observations.
+        # This may be either a fixed or learned transformation.
+        if summary_net is None:
+            self._embedding = nn.Identity()
+        else:
+            self._embedding = summary_net
+
+        # obtain z-score for observations and define embedding net
+        if self.z_score_obs:
+            self.obs_mean = torch.mean(self.pilot_observations, dim=0)
+            self.obs_std = torch.std(self.pilot_observations, dim=0)
+        else:
+            self.obs_mean = torch.zeros(self._true_observation.shape)
+            self.obs_std = torch.ones(self._true_observation.shape)
+        self._embedding = nn.Sequential(utils.Normalize(self.obs_mean, self.obs_std), self._embedding)
+
+        # create the deep neural density estimator
+        self._neural_posterior = utils.get_neural_posterior(
+            model=density_estimator,
+            embedding=self._embedding,
+            parameter_dim=self._simulator.parameter_dim,
+            observation_dim=self._simulator.observation_dim,
+            prior=self._prior
+        )
 
         assert isinstance(num_atoms, int), "Number of atoms must be an integer."
         self._num_atoms = num_atoms
 
         self._use_combined_loss = use_combined_loss
-
-        # We may want to summarize high-dimensional observations.
-        # This may be either a fixed or learned transformation.
-        if summary_net is None:
-            self._summary_net = nn.Identity()
-        else:
-            self._summary_net = summary_net
 
         self._mcmc_method = mcmc_method
         self._train_with_mcmc = train_with_mcmc
@@ -110,7 +142,7 @@ class APT:
         # the potential function requires evaluating a neural likelihood as is the
         # case here.
         self._potential_function = NeuralPotentialFunction(
-            neural_posterior, prior, self._true_observation
+            self._neural_posterior, prior, self._true_observation
         )
 
         # Axis-aligned slice sampling implementation in NumPy
@@ -133,7 +165,7 @@ class APT:
         self._retrain_from_scratch_each_round = retrain_from_scratch_each_round
         # If we're retraining from scratch each round,
         # keep a copy of the original untrained model for reinitialization.
-        self._untrained_neural_posterior = deepcopy(neural_posterior)
+        self._untrained_neural_posterior = deepcopy(self._neural_posterior)
 
         self._discard_prior_samples = discard_prior_samples
 
@@ -171,9 +203,12 @@ class APT:
         the simulator per round.
 
         :param num_rounds: Number of rounds to run.
-        :param num_simulations_per_round: Number of simulator calls per round.
+        :param num_simulations_per_round: list or int: Number of simulator calls per round.
         :return: None
         """
+
+        if isinstance(num_simulations_per_round, int):
+            num_simulations_per_round = [num_simulations_per_round]*num_rounds
 
         round_description = ""
         tbar = tqdm(range(num_rounds))
@@ -189,8 +224,10 @@ class APT:
                     parameter_sample_fn=lambda num_samples: self._prior.sample(
                         (num_samples,)
                     ),
-                    num_samples=num_simulations_per_round,
+                    num_samples=num_simulations_per_round[round_]-self.num_pilot_samples,
                 )
+                parameters = torch.cat((parameters, self.pilot_parameters), dim=0)
+                observations = torch.cat((observations, self.pilot_observations), dim=0)
             else:
                 parameters, observations = simulators.simulation_wrapper(
                     simulator=self._simulator,
@@ -199,22 +236,16 @@ class APT:
                     )
                     if self._train_with_mcmc
                     else self.sample_posterior(num_samples),
-                    num_samples=num_simulations_per_round,
+                    num_samples=num_simulations_per_round[round_],
                 )
-
-            # z-score observations
-            if round_ == 0:
-                self.obs_mean = torch.mean(observations, dim=0)
-                self.obs_std = torch.std(observations, dim=0)
-                self._summary_net = nn.Sequential(utils.Normalize(self.obs_mean, self.obs_std), self._summary_net)
 
             # Store (parameter, observation) pairs.
             self._parameter_bank.append(torch.Tensor(parameters))
             self._observation_bank.append(torch.Tensor(observations))
             self._prior_masks.append(
-                torch.ones(num_simulations_per_round, 1)
+                torch.ones(num_simulations_per_round[round_], 1)
                 if round_ == 0
-                else torch.zeros(num_simulations_per_round, 1)
+                else torch.zeros(num_simulations_per_round[round_], 1)
             )
 
             # Fit posterior using newly aggregated data set.
@@ -437,8 +468,7 @@ class APT:
         )
 
         optimizer = optim.Adam(
-            list(self._neural_posterior.parameters())
-            + list(self._summary_net[1].parameters()),  # [0] is just the z-scoring
+            list(self._neural_posterior.parameters()),
             lr=learning_rate,
         )
         # Keep track of best_validation log_prob seen so far.
@@ -556,9 +586,9 @@ class APT:
                     batch[1].to(self._device),
                     batch[2].to(self._device),
                 )
-                summarized_context = self._summary_net(context)
+                #summarized_context = self._embedding(context)
                 log_prob_proposal_posterior = _get_log_prob_proposal_posterior(
-                    inputs, summarized_context, masks
+                    inputs, context, masks
                 )
                 loss = -torch.mean(log_prob_proposal_posterior)
                 loss.backward()
@@ -578,6 +608,7 @@ class APT:
                         batch[1].to(self._device),
                         batch[2].to(self._device),
                     )
+                    #summarized_context = self._embedding(context)
                     log_prob = _get_log_prob_proposal_posterior(inputs, context, masks)
                     log_prob_sum += log_prob.sum().item()
             validation_log_prob = log_prob_sum / num_validation_examples

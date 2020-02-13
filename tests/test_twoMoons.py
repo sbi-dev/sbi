@@ -22,15 +22,15 @@ prior = distributions.Uniform(low=-a * torch.ones(simulator.parameter_dim), high
 parameter_dim, observation_dim = (simulator.parameter_dim, simulator.observation_dim)
 
 true_observation = simulator.get_ground_truth_observation()
-neural_posterior = utils.get_neural_posterior("maf", parameter_dim, observation_dim, simulator)
 
 apt = APT(
     simulator=simulator,
     true_observation=true_observation,
     prior=prior,
-    neural_posterior=neural_posterior,
     num_atoms=10,
     use_combined_loss=False,
+    density_estimator='maf',
+    z_score_obs=True,
     train_with_mcmc=False,
     mcmc_method="slice-np",
     summary_net=None,
