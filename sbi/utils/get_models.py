@@ -9,11 +9,11 @@ from pyknos.nn.nde import MixtureOfGaussiansMADE, MultivariateGaussianMDN
 from sbi.utils.torchutils import create_alternating_binary_mask
 
 
-def get_neural_posterior(model, parameter_dim, observation_dim, simulator):
+def get_neural_posterior(model, embedding, parameter_dim, observation_dim, prior):
 
     # Everything is a flow because we need to normalize parameters based on prior.
 
-    mean, std = simulator.normalization_parameters
+    mean, std = (prior.mean, prior.stddev)
     normalizing_transform = transforms.AffineTransform(shift=-mean / std, scale=1 / std)
 
     if model == "mdn":
@@ -51,7 +51,7 @@ def get_neural_posterior(model, parameter_dim, observation_dim, simulator):
             use_batch_norm=False,
             custom_initialization=True,
         )
-        neural_posterior = flows.Flow(transform, distribution)
+        neural_posterior = flows.Flow(transform, distribution, embedding)
 
     elif model == "maf":
         transform = transforms.CompositeTransform(
@@ -79,7 +79,7 @@ def get_neural_posterior(model, parameter_dim, observation_dim, simulator):
         transform = transforms.CompositeTransform([normalizing_transform, transform,])
 
         distribution = distributions_.StandardNormal((parameter_dim,))
-        neural_posterior = flows.Flow(transform, distribution)
+        neural_posterior = flows.Flow(transform, distribution, embedding)
 
     elif model == "nsf":
         transform = transforms.CompositeTransform(
@@ -113,7 +113,7 @@ def get_neural_posterior(model, parameter_dim, observation_dim, simulator):
         )
 
         distribution = distributions_.StandardNormal((parameter_dim,))
-        neural_posterior = flows.Flow(transform, distribution)
+        neural_posterior = flows.Flow(transform, distribution, embedding)
 
     else:
         raise ValueError
