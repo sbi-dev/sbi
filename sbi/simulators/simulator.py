@@ -6,13 +6,19 @@ class Simulator:
     def __init__(self):
         self.num_total_simulations = 0
 
-    def simulate(self, parameters):
-        """
+    def __call__(self, parameters):
+        """Simualte a batch of parameters. 
+        
         Core method which returns a torch.Tensor batch of observations given a
-        torch.Tensor batch of parameters.
+        torch.Tensor batch of parameters. 
 
-        :param parameters: torch.Tensor batch of parameters.
-        :return: torch.Tensor batch of observations.
+        Set up to be called as function because we want the simulator to be function at some point.  
+
+        Arguments:
+            parameters {torch.Tensor} -- batch of parameters.
+        
+        Raises:
+            NotImplementedError: [description]
         """
         raise NotImplementedError
 

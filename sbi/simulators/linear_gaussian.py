@@ -27,9 +27,9 @@ class LinearGaussianSimulator(Simulator):
             num_samples=10000
         )
 
-    def simulate(self, parameters):
+    def __call__(self, parameters):
         """Generate noisy observations of the given batch of parameters.
-        
+
         Arguments:
             parameters {torch.Tensor} -- Batch of parameters.
         

@@ -37,7 +37,7 @@ def simulation_wrapper(simulator, parameter_sample_fn, num_samples):
 
     else:
         parameters = parameter_sample_fn(num_samples)
-        observations = simulator.simulate(parameters)
+        observations = simulator(parameters)
         return torch.Tensor(parameters), torch.Tensor(observations)
 
 
@@ -50,7 +50,7 @@ def get_simulator_and_prior(task):
             high=3 * torch.ones(simulator.parameter_dim),
         )
 
-    elif task == "nonlinear-gaussian":
+    elif task == "nonlinear-gaussian-gaussian":
         simulator = simulators.NonlinearGaussianSimulator()
         prior = distributions.MultivariateNormal(
             loc=torch.zeros(5), covariance_matrix=torch.eye(5)
