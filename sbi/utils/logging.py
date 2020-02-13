@@ -1,3 +1,4 @@
+import sbi.simulators as simulators
 import sbi.utils as utils
 import torch
 
@@ -12,7 +13,18 @@ def summarize(
     simulator,
     estimate_acceptance_rate=None,
 ):
+    # get ground truth if available
+    try:
+        (
+            _,
+            prior,
+            ground_truth_parameters,
+            ground_truth_observation,
+        ) = simulators.get_simulator_prior_and_groundtruth(simulator.name)
     # Update summaries.
+    except:
+        pass
+
     try:
         mmd = utils.unbiased_mmd_squared(
             parameter_bank[-1],
@@ -48,9 +60,9 @@ def summarize(
     try:
         # KDE estimate of negative log prob true parameters using
         # parameters from most recent round.
+
         negative_log_prob_true_parameters = -utils.gaussian_kde_log_eval(
-            samples=parameter_bank[-1],
-            query=simulator.get_ground_truth_parameters().reshape(1, -1),
+            samples=parameter_bank[-1], query=ground_truth_parameters.reshape(1, -1),
         )
         summary["negative-log-probs-true-parameters"].append(
             negative_log_prob_true_parameters.item()
@@ -84,10 +96,8 @@ def summarize(
         parameters = utils.tensor2numpy(parameter_bank[-1])
         figure = utils.plot_hist_marginals(
             data=parameters,
-            ground_truth=utils.tensor2numpy(
-                simulator.get_ground_truth_parameters()
-            ).reshape(-1),
-            lims=_simulator.parameter_plotting_limits,
+            ground_truth=utils.tensor2numpy(ground_truth_parameters).reshape(-1),
+            lims=simulator.parameter_plotting_limits,
         )
         summary_writer.add_figure(
             tag="posterior-samples", figure=figure, global_step=round_ + 1

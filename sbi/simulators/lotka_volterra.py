@@ -414,22 +414,6 @@ class LotkaVolterraSimulator(Simulator):
         observations = self._summarizer.calc(self._simulator.sim(parameters))
         return observations
 
-    def get_ground_truth_parameters(self):
-        """
-        Ground truth parameters as given in
-        'Fast epsilon-free Inference of Simulation Models with Bayesian Conditional
-        Density Estimation'
-
-        :return:
-        """
-        return torch.log(torch.Tensor([0.01, 0.5, 1.0, 0.01]))
-
-    def get_ground_truth_observation(self):
-        path = os.path.join(utils.get_data_root(), "lotka-volterra", "obs_stats.pkl")
-        with open(path, "rb") as file:
-            true_observation = pickle.load(file, encoding="bytes")
-        return torch.Tensor(true_observation)
-
     @property
     def parameter_dim(self):
         return 4

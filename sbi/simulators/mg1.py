@@ -145,15 +145,6 @@ class MG1Simulator(Simulator):
         observations = self._summarizer.calc(self._simulator.sim(parameters))
         return torch.Tensor(observations)
 
-    def get_ground_truth_parameters(self):
-        return torch.Tensor([1.0, 5.0, 0.2])
-
-    def get_ground_truth_observation(self):
-        path = os.path.join(utils.get_data_root(), "mg1", "observed_data.pkl")
-        with open(path, "rb") as file:
-            _, true_observation = pickle.load(file, encoding="bytes")
-        return torch.Tensor(true_observation)
-
     @property
     def parameter_dim(self):
         return 3
