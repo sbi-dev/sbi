@@ -1,3 +1,4 @@
+import pytest
 import sbi.simulators as simulators
 import sbi.utils as utils
 import torch
@@ -10,11 +11,10 @@ torch.set_default_tensor_type("torch.FloatTensor")
 # seed the simulations
 torch.manual_seed(0)
 
-# will be called by pytest. Then runs test_compute(num_dim) for 1D and 3D
-def pytest_generate_tests(metafunc):
-    metafunc.parametrize("num_dim", [1, 3])
+# will be called by pytest. Then runs test_*(num_dim) for 1D and 3D
 
 
+@pytest.mark.parametrize("num_dim", [1, 3])
 def test_sre_on_linearGaussian_based_on_mmd(num_dim):
 
     dim, std = num_dim, 1.0

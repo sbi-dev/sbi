@@ -59,5 +59,5 @@ def test_nonlinearGaussian_based_on_mmd():
     mmd = utils.unbiased_mmd_squared(target_samples, samples)
 
     # check if mmd is larger than expected
-    max_mmd = 0.0
-    assert mmd < max_mmd, f"MMD={mmd} no mmd thresold calculated yet."
+    max_mmd = 0.16  # mean mmd plus 2 stds.
+    assert mmd < max_mmd, f"MMD={mmd} larger than mean plus 2 stds."
