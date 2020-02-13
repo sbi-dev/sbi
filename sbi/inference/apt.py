@@ -86,6 +86,8 @@ class APT:
         self._true_observation = true_observation
         self._neural_posterior = neural_posterior
         self._device = get_default_device() if device is None else device
+        self.obs_mean = torch.zeros(self._true_observation.shape)
+        self.obs_std  = torch.ones(self._true_observation.shape)
 
         assert isinstance(num_atoms, int), "Number of atoms must be an integer."
         self._num_atoms = num_atoms
@@ -199,6 +201,12 @@ class APT:
                     else self.sample_posterior(num_samples),
                     num_samples=num_simulations_per_round,
                 )
+
+            # z-score observations
+            if round_ == 0:
+                self.obs_mean = torch.mean(observations, dim=0)
+                self.obs_std = torch.std(observations, dim=0)
+                self._summary_net = nn.Sequential(utils.Normalize(self.obs_mean, self.obs_std), self._summary_net)
 
             # Store (parameter, observation) pairs.
             self._parameter_bank.append(torch.Tensor(parameters))
@@ -394,6 +402,9 @@ class APT:
         # Get total number of training examples.
         num_examples = torch.cat(self._parameter_bank[ix:]).shape[0]
 
+        if round_ > 0:
+            assert validation_fraction * num_examples >= batch_size, 'There are fewer samples in the validation set than the batchsize.'
+
         # Select random train and validation splits from (parameter, observation) pairs.
         permuted_indices = torch.randperm(num_examples)
         num_training_examples = int((1 - validation_fraction) * num_examples)
@@ -421,13 +432,13 @@ class APT:
             dataset,
             batch_size=min(batch_size, num_examples - num_training_examples),
             shuffle=False,
-            drop_last=False,
+            drop_last=True,
             sampler=SubsetRandomSampler(val_indices),
         )
 
         optimizer = optim.Adam(
             list(self._neural_posterior.parameters())
-            + list(self._summary_net.parameters()),
+            + list(self._summary_net[1].parameters()),  # [0] is just the z-scoring
             lr=learning_rate,
         )
         # Keep track of best_validation log_prob seen so far.
