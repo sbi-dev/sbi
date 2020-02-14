@@ -35,7 +35,7 @@ class APT:
         true_observation,
         num_atoms=-1,
         num_pilot_samples=100,
-        density_estimator="maf",
+        density_estimator='maf',
         use_combined_loss=False,
         train_with_mcmc=False,
         mcmc_method="slice-np",
@@ -97,7 +97,9 @@ class APT:
         # run prior samples
         self.pilot_parameters, self.pilot_observations = simulators.simulation_wrapper(
             simulator=self._simulator,
-            parameter_sample_fn=lambda num_samples: self._prior.sample((num_samples,)),
+            parameter_sample_fn=lambda num_samples: self._prior.sample(
+                (num_samples,)
+            ),
             num_samples=num_pilot_samples,
         )
 
@@ -115,9 +117,7 @@ class APT:
         else:
             self.obs_mean = torch.zeros(self._true_observation.shape)
             self.obs_std = torch.ones(self._true_observation.shape)
-        self._embedding = nn.Sequential(
-            utils.Normalize(self.obs_mean, self.obs_std), self._embedding
-        )
+        self._embedding = nn.Sequential(utils.Normalize(self.obs_mean, self.obs_std), self._embedding)
 
         # create the deep neural density estimator
         self._neural_posterior = utils.get_neural_posterior(
@@ -125,7 +125,7 @@ class APT:
             embedding=self._embedding,
             parameter_dim=self._simulator.parameter_dim,
             observation_dim=self._simulator.observation_dim,
-            prior=self._prior,
+            prior=self._prior
         )
 
         assert isinstance(num_atoms, int), "Number of atoms must be an integer."
@@ -208,7 +208,7 @@ class APT:
         """
 
         if isinstance(num_simulations_per_round, int):
-            num_simulations_per_round = [num_simulations_per_round] * num_rounds
+            num_simulations_per_round = [num_simulations_per_round]*num_rounds
 
         round_description = ""
         tbar = tqdm(range(num_rounds))
@@ -224,8 +224,7 @@ class APT:
                     parameter_sample_fn=lambda num_samples: self._prior.sample(
                         (num_samples,)
                     ),
-                    num_samples=num_simulations_per_round[round_]
-                    - self.num_pilot_samples,
+                    num_samples=num_simulations_per_round[round_]-self.num_pilot_samples,
                 )
                 parameters = torch.cat((parameters, self.pilot_parameters), dim=0)
                 observations = torch.cat((observations, self.pilot_observations), dim=0)
@@ -435,9 +434,7 @@ class APT:
         num_examples = torch.cat(self._parameter_bank[ix:]).shape[0]
 
         if round_ > 0:
-            assert (
-                validation_fraction * num_examples >= batch_size
-            ), "There are fewer samples in the validation set than the batchsize."
+            assert validation_fraction * num_examples >= batch_size, 'There are fewer samples in the validation set than the batchsize.'
 
         # Select random train and validation splits from (parameter, observation) pairs.
         permuted_indices = torch.randperm(num_examples)
@@ -471,7 +468,8 @@ class APT:
         )
 
         optimizer = optim.Adam(
-            list(self._neural_posterior.parameters()), lr=learning_rate,
+            list(self._neural_posterior.parameters()),
+            lr=learning_rate,
         )
         # Keep track of best_validation log_prob seen so far.
         best_validation_log_prob = -1e100
@@ -588,7 +586,7 @@ class APT:
                     batch[1].to(self._device),
                     batch[2].to(self._device),
                 )
-                # summarized_context = self._embedding(context)
+                #summarized_context = self._embedding(context)
                 log_prob_proposal_posterior = _get_log_prob_proposal_posterior(
                     inputs, context, masks
                 )
@@ -610,7 +608,7 @@ class APT:
                         batch[1].to(self._device),
                         batch[2].to(self._device),
                     )
-                    # summarized_context = self._embedding(context)
+                    #summarized_context = self._embedding(context)
                     log_prob = _get_log_prob_proposal_posterior(inputs, context, masks)
                     log_prob_sum += log_prob.sum().item()
             validation_log_prob = log_prob_sum / num_validation_examples
