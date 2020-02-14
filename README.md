@@ -1,5 +1,7 @@
 [![Build Status](https://travis-ci.org/mackelab/sbi.svg?branch=master)](https://travis-ci.org/mackelab/sbi)
 
+![Tests](https://github.com/mackelab/sbi/workflows/Tests/badge.svg?branch=master)
+
 ## Description
 Building on code for "On Contrastive Learning for Likelihood-free Inference" in <https://github.com/conormdurkan/lfi.>
 
