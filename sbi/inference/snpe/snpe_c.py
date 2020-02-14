@@ -21,6 +21,7 @@ class APT(base_snpe):
         num_atoms=-1,
         num_pilot_samples=100,
         density_estimator='maf',
+        calibration_kernel=None,
         use_combined_loss=False,
         train_with_mcmc=False,
         mcmc_method="slice-np",
@@ -40,26 +41,26 @@ class APT(base_snpe):
                 If -1, use all other parameters in minibatch.
         """
 
-        super(APT, self).__init__(simulator=simulator,
-                                  prior=prior,
-                                  true_observation=true_observation,
-                                  num_pilot_samples=num_pilot_samples,
-                                  density_estimator=density_estimator,
-                                  use_combined_loss=use_combined_loss,
-                                  train_with_mcmc=train_with_mcmc,
-                                  mcmc_method=mcmc_method,
-                                  summary_net=summary_net,
-                                  z_score_obs=z_score_obs,
-                                  retrain_from_scratch_each_round=retrain_from_scratch_each_round,
-                                  discard_prior_samples=discard_prior_samples,
-                                  summary_writer=summary_writer,
-                                  device=device,
-                                  )
+        super(APT, self).__init__(
+            simulator=simulator,
+            prior=prior,
+            true_observation=true_observation,
+            num_pilot_samples=num_pilot_samples,
+            density_estimator=density_estimator,
+            calibration_kernel=calibration_kernel,
+            use_combined_loss=use_combined_loss,
+            train_with_mcmc=train_with_mcmc,
+            mcmc_method=mcmc_method,
+            summary_net=summary_net,
+            z_score_obs=z_score_obs,
+            retrain_from_scratch_each_round=retrain_from_scratch_each_round,
+            discard_prior_samples=discard_prior_samples,
+            summary_writer=summary_writer,
+            device=device,
+            )
 
         assert isinstance(num_atoms, int), "Number of atoms must be an integer."
         self._num_atoms = num_atoms
-
-
 
     def _get_log_prob_proposal_posterior(self, inputs, context, masks):
         """
@@ -80,10 +81,6 @@ class APT(base_snpe):
         Returns: torch.Tensor [1] log_prob_proposal_posterior
 
         """
-
-        log_prob_posterior_non_atomic = self._neural_posterior.log_prob(
-            inputs, context
-        )
 
         batch_size = inputs.shape[0]
 
@@ -138,16 +135,21 @@ class APT(base_snpe):
         )
 
         # Normalize proposal posterior across discrete set of atoms.
-        log_prob_proposal_posterior = unnormalized_log_prob_proposal_posterior[
+        log_prob_proposal_posterior = self.calibration_kernel(context) * \
+                                      unnormalized_log_prob_proposal_posterior[
                                       :, 0
                                       ] - torch.logsumexp(unnormalized_log_prob_proposal_posterior, dim=-1)
         assert utils.notinfnotnan(
             log_prob_proposal_posterior
         ), "NaN/inf detected in proposal posterior eval."
 
+        # todo: this implementation is not perfect: it evaluates the posterior
+        # todo:     at all prior samples
         if self._use_combined_loss:
+            log_prob_posterior_non_atomic = self._neural_posterior.log_prob(
+                inputs, context
+            )
             masks = masks.reshape(-1)
-
             log_prob_proposal_posterior = (
                     masks * log_prob_posterior_non_atomic + log_prob_proposal_posterior
             )

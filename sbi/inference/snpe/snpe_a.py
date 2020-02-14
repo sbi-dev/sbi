@@ -7,10 +7,11 @@ from torch import distributions
 class SNPE_A(base_snpe):
     """
     Implementation of
-    'Automatic Posterior Transformation for Likelihood-free Inference'
-    Greenberg et al.
-    ICML 2019
-    https://arxiv.org/abs/1905.07488
+    'Fast epsilon-free Inference of Simulation Models
+        with Bayesian Conditional Density Estimation'
+    Papamakarios et al.
+    NeurIPS 2016
+    https://arxiv.org/abs/1605.06376
     """
 
     def __init__(

@@ -7,28 +7,30 @@ from torch import distributions
 class SNPE_B(base_snpe):
     """
     Implementation of
-    'Automatic Posterior Transformation for Likelihood-free Inference'
-    Greenberg et al.
-    ICML 2019
-    https://arxiv.org/abs/1905.07488
+    'Flexible statistical inference for mechanistic
+        models of neural dynamics'
+    Lueckmann et al.
+    NeurIPS 2017
+    https://arxiv.org/abs/1711.01861
     """
 
     def __init__(
-        self,
-        simulator,
-        prior,
-        true_observation,
-        num_pilot_samples=100,
-        density_estimator='maf',
-        use_combined_loss=False,
-        train_with_mcmc=False,
-        mcmc_method="slice-np",
-        summary_net=None,
-        z_score_obs=True,
-        retrain_from_scratch_each_round=False,
-        discard_prior_samples=False,
-        summary_writer=None,
-        device=None,
+            self,
+            simulator,
+            prior,
+            true_observation,
+            num_pilot_samples=100,
+            density_estimator='maf',
+            calibration_kernel=None,
+            use_combined_loss=False,
+            train_with_mcmc=False,
+            mcmc_method="slice-np",
+            summary_net=None,
+            z_score_obs=True,
+            retrain_from_scratch_each_round=False,
+            discard_prior_samples=False,
+            summary_writer=None,
+            device=None,
     ):
         """
         See base_snpe for docstring.
@@ -39,26 +41,23 @@ class SNPE_B(base_snpe):
                 If -1, use all other parameters in minibatch.
         """
 
-        super(SNPE_B, self).__init__(simulator=simulator,
-                                  prior=prior,
-                                  true_observation=true_observation,
-                                  num_pilot_samples=num_pilot_samples,
-                                  density_estimator=density_estimator,
-                                  use_combined_loss=use_combined_loss,
-                                  train_with_mcmc=train_with_mcmc,
-                                  mcmc_method=mcmc_method,
-                                  summary_net=summary_net,
-                                  z_score_obs=z_score_obs,
-                                  retrain_from_scratch_each_round=retrain_from_scratch_each_round,
-                                  discard_prior_samples=discard_prior_samples,
-                                  summary_writer=summary_writer,
-                                  device=device,
-                                  )
-
-        raise NameError('Not implemented yet')
-
-
-
+        super(SNPE_B, self).__init__(
+            simulator=simulator,
+            prior=prior,
+            true_observation=true_observation,
+            num_pilot_samples=num_pilot_samples,
+            density_estimator=density_estimator,
+            calibration_kernel=calibration_kernel,
+            use_combined_loss=use_combined_loss,
+            train_with_mcmc=train_with_mcmc,
+            mcmc_method=mcmc_method,
+            summary_net=summary_net,
+            z_score_obs=z_score_obs,
+            retrain_from_scratch_each_round=retrain_from_scratch_each_round,
+            discard_prior_samples=discard_prior_samples,
+            summary_writer=summary_writer,
+            device=device,
+            )
 
     def _get_log_prob_proposal_posterior(self, inputs, context, masks):
         """
@@ -80,76 +79,50 @@ class SNPE_B(base_snpe):
 
         """
 
-        log_prob_posterior_non_atomic = self._neural_posterior.log_prob(
-            inputs, context
-        )
-
         batch_size = inputs.shape[0]
 
-        num_atoms = self._num_atoms if self._num_atoms > 0 else batch_size
-
-        # Each set of parameter atoms is evaluated using the same observation,
-        # so we repeat rows of the context.
-        # e.g. [1, 2] -> [1, 1, 2, 2]
-        repeated_context = utils.repeat_rows(context, num_atoms)
-
-        # To generate the full set of atoms for a given item in the batch,
-        # we sample without replacement num_atoms - 1 times from the rest
-        # of the parameters in the batch.
-        assert 0 < num_atoms - 1 < batch_size
-        probs = (
-                (1 / (batch_size - 1))
-                * torch.ones(batch_size, batch_size)
-                * (1 - torch.eye(batch_size))
-        )
-        choices = torch.multinomial(
-            probs, num_samples=num_atoms - 1, replacement=False
-        )
-        contrasting_inputs = inputs[choices]
-
-        # We can now create our sets of atoms from the contrasting parameter sets
-        # we have generated.
-        atomic_inputs = torch.cat(
-            (inputs[:, None, :], contrasting_inputs), dim=1
-        ).reshape(batch_size * num_atoms, -1)
-
-        # Evaluate large batch giving (batch_size * num_atoms) log prob posterior evals.
+        # Evaluate posterior
         log_prob_posterior = self._neural_posterior.log_prob(
-            atomic_inputs, repeated_context
+            inputs, context
         )
         assert utils.notinfnotnan(
             log_prob_posterior
         ), "NaN/inf detected in posterior eval."
-        log_prob_posterior = log_prob_posterior.reshape(batch_size, num_atoms)
+        log_prob_posterior = log_prob_posterior.reshape(batch_size)
 
-        # Get (batch_size * num_atoms) log prob prior evals.
+        # Evaluate prior
         if isinstance(self._prior, distributions.Uniform):
-            log_prob_prior = self._prior.log_prob(atomic_inputs).sum(-1)
-            # log_prob_prior = torch.zeros(log_prob_prior.shape)
+            log_prob_prior = self._prior.log_prob(inputs).sum(-1)
         else:
-            log_prob_prior = self._prior.log_prob(atomic_inputs)
-        log_prob_prior = log_prob_prior.reshape(batch_size, num_atoms)
-        assert utils.notinfnotnan(log_prob_prior), "NaN/inf detected in prior eval."
-
-        # Compute unnormalized proposal posterior.
-        unnormalized_log_prob_proposal_posterior = (
-                log_prob_posterior - log_prob_prior
-        )
-
-        # Normalize proposal posterior across discrete set of atoms.
-        log_prob_proposal_posterior = unnormalized_log_prob_proposal_posterior[
-                                      :, 0
-                                      ] - torch.logsumexp(unnormalized_log_prob_proposal_posterior, dim=-1)
+            log_prob_prior = self._prior.log_prob(inputs)
+        log_prob_prior = log_prob_prior.reshape(batch_size)
         assert utils.notinfnotnan(
-            log_prob_proposal_posterior
+            log_prob_prior
+        ), "NaN/inf detected in prior eval."
+
+        # evaluate proposal
+        log_prob_proposal = self._model_bank[-1].log_prob(
+            inputs, context
+        )
+        assert utils.notinfnotnan(
+            log_prob_proposal
         ), "NaN/inf detected in proposal posterior eval."
 
-        if self._use_combined_loss:
-            masks = masks.reshape(-1)
+        # Compute log prob with importance weights
+        log_prob = self.calibration_kernel(context) * (
+                log_prob_posterior + log_prob_prior - log_prob_proposal
+        )
 
-            log_prob_proposal_posterior = (
-                    masks * log_prob_posterior_non_atomic + log_prob_proposal_posterior
+        # todo: this implementation is not perfect: it evaluates the posterior
+        # todo:     at all prior samples
+        if self._use_combined_loss:
+            log_prob_posterior_non_atomic = self._neural_posterior.log_prob(
+                inputs, context
+            )
+            masks = masks.reshape(-1)
+            log_prob = (
+                    masks * log_prob_posterior_non_atomic + log_prob
             )
 
-        return log_prob_proposal_posterior
+        return log_prob
 

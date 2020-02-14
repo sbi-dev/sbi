@@ -174,7 +174,7 @@ def _estimate_acceptance_rate(
         neural_posterior,
         prior,
         true_observation,
-        num_samples=int(1e5)
+        num_samples=int(1e4)
     ):
     """
     Estimates rejection sampling acceptance rates.

@@ -23,6 +23,7 @@ class base_snpe():
                  true_observation,
                  num_pilot_samples=100,
                  density_estimator='maf',
+                 calibration_kernel=None,
                  train_with_mcmc=False,
                  mcmc_method="slice-np",
                  summary_net=None,
@@ -112,6 +113,11 @@ class base_snpe():
             prior=self._prior
         )
 
+        if calibration_kernel is None:
+            self.calibration_kernel = lambda context_input: torch.ones([len(context_input)])
+        else:
+            self.calibration_kernel = calibration_kernel
+
         self._mcmc_method = mcmc_method
         self._train_with_mcmc = train_with_mcmc
 
@@ -150,6 +156,7 @@ class base_snpe():
 
     def run_inference(self, num_rounds, num_simulations_per_round, **kwargs):
         """
+        Runs a round of inference
 
         Args:
             num_rounds: int
@@ -205,7 +212,18 @@ class base_snpe():
                 ),
             )
 
-    def _sample(self, num_samples, observation=None):
+    def sample(self, num_samples, observation=None):
+        """
+        Sample posterior distribution.
+
+        Args:
+            num_samples: int, number of samples
+            observation: torch.tensor
+                Provide observation/context/condition.
+                Will be _true_observation if None
+
+        Returns: torch.tensor, samples from posterior
+        """
 
         if observation is None:
             observation = self._true_observation
@@ -226,7 +244,44 @@ class base_snpe():
                 num_samples=num_samples
             )
 
+    def evaluate(self, point, observation=None):
+        """
+        Evaluate posterior distribution at datapoint
+
+        Args:
+            point: torch.tensor()
+                Where to evaluate posterior
+            observation: torch.tensor()
+                What should the context be
+
+        Returns: log-probability
+        """
+        if observation is None:
+            observation = self._true_observation
+
+        if len(point.shape) == 1:
+            point = point[None, ]  # append a dimension
+
+        with torch.no_grad():
+            self._neural_posterior.eval()
+            return self._neural_posterior.log_prob(
+                point,
+                context=observation.reshape(1, -1)
+            )
+
     def _get_log_prob_proposal_posterior(self, inputs, context, masks):
+        """
+        Evaluate the log-probability used for the loss. Depending on
+        the algorithm, this evaluates a different term.
+
+        Args:
+            inputs: torch.tensor(), parameters theta
+            context: torch.tensor(), data x
+            masks: torch.tensor(), binary, indicates whether to
+                use prior samples
+
+        Returns: log-probability
+        """
         pass
 
     def _run_sims(
@@ -262,7 +317,7 @@ class base_snpe():
         else:
             parameters, observations = simulators.simulation_wrapper(
                 simulator=self._simulator,
-                parameter_sample_fn=lambda num_samples: self._sample(
+                parameter_sample_fn=lambda num_samples: self.sample(
                     num_samples),
                 num_samples=num_simulations_per_round
             )
@@ -372,6 +427,8 @@ class base_snpe():
 
         epochs = 0
         while True:
+
+            print('new epoch')
 
             # Train for a single epoch.
             self._neural_posterior.train()
