@@ -24,20 +24,12 @@ def test_lotkavolterra_based_on_gtparams():
     parameter_dim = ground_truth_parameters.shape[0]
     observation_dim = ground_truth_observation.shape[0]
 
-    # get neural posterior (here a MAF)
-    neural_posterior = utils.get_neural_posterior(
-        "maf",
-        parameter_dim=parameter_dim,
-        observation_dim=observation_dim,
-        simulator=simulator,
-    )
-
     # create inference method
     inference_method = inference.APT(
         simulator=simulator,
         prior=prior,
         true_observation=ground_truth_observation,
-        neural_posterior=neural_posterior,
+        density_estimator="maf",
         num_atoms=-1,
     )
 

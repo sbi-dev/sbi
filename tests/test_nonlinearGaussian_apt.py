@@ -28,15 +28,11 @@ def test_nonlinearGaussian_based_on_mmd():
     parameter_dim = ground_truth_parameters.shape[0]
     observation_dim = ground_truth_observation.shape[0]
 
-    # define nn for inference
-    neural_posterior = utils.get_neural_posterior(
-        "maf", parameter_dim, observation_dim, simulator
-    )
     apt = APT(
         simulator=simulator,
         true_observation=ground_truth_observation,
         prior=prior,
-        neural_posterior=neural_posterior,
+        density_estimator="maf",
         num_atoms=-1,
         use_combined_loss=False,
         train_with_mcmc=False,

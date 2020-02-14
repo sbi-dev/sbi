@@ -24,16 +24,13 @@ def test_apt_on_linearGaussian_based_on_mmd(num_dim):
     parameter_dim, observation_dim = dim, dim
     true_observation = torch.zeros(dim)
 
-    # define nn for inference
-    neural_posterior = utils.get_neural_posterior(
-        "maf", parameter_dim, observation_dim, simulator
-    )
     apt = APT(
         simulator=simulator,
         true_observation=true_observation,
         prior=prior,
-        neural_posterior=neural_posterior,
         num_atoms=-1,
+        density_estimator='maf',
+        z_score_obs=True,
         use_combined_loss=False,
         train_with_mcmc=False,
         mcmc_method="slice-np",
