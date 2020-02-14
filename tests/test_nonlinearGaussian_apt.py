@@ -17,23 +17,22 @@ torch.manual_seed(0)
 
 def test_nonlinearGaussian_based_on_mmd():
     task = "nonlinear-gaussian"
-    simulator, prior = simulators.get_simulator_and_prior(task)
+    (
+        simulator,
+        prior,
+        ground_truth_parameters,
+        ground_truth_observation,
+    ) = simulators.get_simulator_prior_and_groundtruth(task)
 
-    parameter_dim, observation_dim = (
-        simulator.parameter_dim,
-        simulator.observation_dim,
-    )
-    true_observation = simulator.get_ground_truth_observation()
+    # assume batch dims
+    parameter_dim = ground_truth_parameters.shape[0]
+    observation_dim = ground_truth_observation.shape[0]
 
-    # define nn for inference
-    neural_posterior = utils.get_neural_posterior(
-        "maf", parameter_dim, observation_dim, simulator
-    )
     apt = APT(
         simulator=simulator,
-        true_observation=true_observation,
+        true_observation=ground_truth_observation,
         prior=prior,
-        neural_posterior=neural_posterior,
+        density_estimator="maf",
         num_atoms=-1,
         use_combined_loss=False,
         train_with_mcmc=False,
@@ -59,5 +58,5 @@ def test_nonlinearGaussian_based_on_mmd():
     mmd = utils.unbiased_mmd_squared(target_samples, samples)
 
     # check if mmd is larger than expected
-    max_mmd = 0.0
-    assert mmd < max_mmd, f"MMD={mmd} no mmd thresold calculated yet."
+    max_mmd = 0.16  # mean mmd plus 2 stds.
+    assert mmd < max_mmd, f"MMD={mmd} larger than mean plus 2 stds."

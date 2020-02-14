@@ -1,3 +1,4 @@
+import pytest
 import sbi.simulators as simulators
 import sbi.utils as utils
 import torch
@@ -10,11 +11,8 @@ torch.set_default_tensor_type("torch.FloatTensor")
 # seed the simulations
 torch.manual_seed(0)
 
-# will be called by pytest. Then runs test_compute(num_dim) for 1D and 3D
-def pytest_generate_tests(metafunc):
-    metafunc.parametrize("num_dim", [1, 3])
 
-
+@pytest.mark.parametrize("num_dim", [1, 3])
 def test_apt_on_linearGaussian_based_on_mmd(num_dim):
 
     dim, std = num_dim, 1.0
@@ -23,11 +21,8 @@ def test_apt_on_linearGaussian_based_on_mmd(num_dim):
         loc=torch.zeros(dim), covariance_matrix=torch.eye(dim)
     )
 
-    parameter_dim, observation_dim = (
-        simulator.parameter_dim,
-        simulator.observation_dim,
-    )
-    true_observation = simulator.get_ground_truth_observation()
+    parameter_dim, observation_dim = dim, dim
+    true_observation = torch.zeros(dim)
 
     apt = APT(
         simulator=simulator,

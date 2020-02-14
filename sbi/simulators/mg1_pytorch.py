@@ -1,11 +1,11 @@
-import numpy as np
 import os
 import pickle
-import torch
 
+import numpy as np
 import sbi.utils as utils
-
+import torch
 from sbi.simulators.simulator import Simulator
+
 from summarizers import MG1Summarizer
 
 
@@ -57,15 +57,6 @@ class MG1Simulator(Simulator):
             idts = self._summarizer(idts)
 
         return torch.Tensor(idts)
-
-    def get_ground_truth_parameters(self):
-        return torch.Tensor([1.0, 5.0, 0.2])
-
-    def get_ground_truth_observation(self):
-        path = os.path.join(utils.get_data_root(), "mg1", "observed_data.pkl")
-        with open(path, "rb") as file:
-            _, true_observation = pickle.load(file, encoding="bytes")
-        return torch.Tensor(true_observation)
 
     @property
     def parameter_dim(self):

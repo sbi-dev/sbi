@@ -1,13 +1,13 @@
-import numpy as np
 import os
 import pickle
-import torch
 
+import numpy as np
 import sbi.utils as utils
+import torch
+from sbi.simulators.markov_jump_process import MarkovJumpProcess, SimTooLongException
+from sbi.simulators.simulator import Simulator
 
 from summarizers import LotkaVolterraSummarizer
-from sbi.simulators.simulator import Simulator
-from sbi.simulators.markov_jump_process import MarkovJumpProcess, SimTooLongException
 
 observation_dim = 9
 parameter_dim = 4
@@ -96,22 +96,6 @@ class LotkaVolterraSimulator(Simulator):
             return self._summarizer(observations)
 
         return observations
-
-    def get_ground_truth_parameters(self):
-        """
-        Ground truth parameters as given in
-        'Fast epsilon-free Inference of Simulation Models with Bayesian Conditional
-        Density Estimation'
-
-        :return:
-        """
-        return torch.log(torch.Tensor([0.01, 0.5, 1.0, 0.01]))
-
-    def get_ground_truth_observation(self):
-        path = os.path.join(utils.get_data_root(), "lotka-volterra", "obs_stats.pkl")
-        with open(path, "rb") as file:
-            true_observation = pickle.load(file, encoding="bytes")
-        return torch.Tensor(true_observation)
 
     @property
     def parameter_dim(self):

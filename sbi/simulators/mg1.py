@@ -1,12 +1,9 @@
-import numpy as np
 import os
 import pickle
-import torch
 
+import numpy as np
 import sbi.utils as utils
-
-from matplotlib import pyplot as plt
-
+import torch
 from sbi.simulators.simulator import Simulator
 
 
@@ -143,19 +140,10 @@ class MG1Simulator(Simulator):
         self._simulator = Model()
         self._summarizer = Stats()
 
-    def simulate(self, parameters):
+    def __call__(self, parameters):
         parameters = utils.tensor2numpy(parameters)
         observations = self._summarizer.calc(self._simulator.sim(parameters))
         return torch.Tensor(observations)
-
-    def get_ground_truth_parameters(self):
-        return torch.Tensor([1.0, 5.0, 0.2])
-
-    def get_ground_truth_observation(self):
-        path = os.path.join(utils.get_data_root(), "mg1", "observed_data.pkl")
-        with open(path, "rb") as file:
-            _, true_observation = pickle.load(file, encoding="bytes")
-        return torch.Tensor(true_observation)
 
     @property
     def parameter_dim(self):
@@ -178,23 +166,3 @@ class MG1Simulator(Simulator):
         mean = torch.Tensor([5.0160, 10.0126, 0.1667])
         std = torch.Tensor([2.8934, 4.0788, 0.0961])
         return mean, std
-
-
-def test_():
-    true_parameters = np.array([1.0, 5.0, 0.2])
-    num_simulations = 1000
-    parameters = np.tile(true_parameters, num_simulations).reshape(-1, 3)
-    observations = Stats().calc(Model().sim(parameters))
-    print(parameters.shape, observations.shape)
-    utils.plot_hist_marginals(
-        observations, ground_truth=get_ground_truth_observation(), show_xticks=True
-    )
-    plt.show()
-
-
-def main():
-    test_()
-
-
-if __name__ == "__main__":
-    main()

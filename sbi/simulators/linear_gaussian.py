@@ -1,5 +1,4 @@
 import torch
-
 from sbi.simulators.simulator import Simulator
 
 
@@ -11,13 +10,12 @@ class LinearGaussianSimulator(Simulator):
     """
 
     def __init__(self, dim=2, std=1, use_zero_ground_truth=True):
-        """
-        :param dim: int
-            Dimension of the parameters and observations.
-        :param std: positive float
-            Standard deviation of diagonal Gaussian shared across dimensions.
-        :param use_zero_ground_truth: bool
-            Use the zero vector as a ground truth observation.
+        """Set up linear Gaussian simulator.
+
+        Keyword Arguments:
+            dim {int} -- Dimension of the parameters and observations. (default: {2})
+            std {int} -- Standard deviation of diagonal Gaussian shared across dimensions. (default: {1})
+            use_zero_ground_truth {bool} -- Use the zero vector as a ground truth observation. (default: {True})
         """
         super().__init__()
         self._std = std
@@ -29,36 +27,33 @@ class LinearGaussianSimulator(Simulator):
             num_samples=10000
         )
 
-    def simulate(self, parameters):
-        """
-        Generates noisy observations of the given batch of parameters.
+    def __call__(self, parameters):
+        """Generate noisy observations of the given batch of parameters.
 
-        :param parameters: torch.Tensor
-            Batch of parameters.
-        :return: torch.Tensor
-            Parameters with diagonal Gaussian noise with shared variance across dimensions
-            added.
+        Arguments:
+            parameters {torch.Tensor} -- Batch of parameters.
+        
+        Returns:
+            torch.Tensor -- Parameters plus diagonal Gaussian noise with shared variance across dimensions.
         """
         if parameters.ndim == 1:
             parameters = parameters[None, :]
         return parameters + self._std * torch.randn_like(parameters)
 
     def get_ground_truth_parameters(self):
-        """
-        True parameters always the zero vector.
-
-        :return: torch.Tensor
-            Ground truth parameters.
+        """True parameters always the zero vector.
+        
+        Returns:
+            torch.Tensor -- Ground truth parameters.
         """
         return torch.zeros(self._dim)
 
     def get_ground_truth_observation(self):
-        """
-        Ground truth observation is either the zero vector, or a noisy observation of the
+        """Ground truth observation is either the zero vector, or a noisy observation of the
         zero vector.
-
-        :return: torch.Tensor
-            Ground truth observation.
+        
+        Returns:
+            torch.Tensor -- Ground truth observation.
         """
         if self._use_zero_ground_truth:
             return torch.zeros(self._dim)
@@ -66,13 +61,13 @@ class LinearGaussianSimulator(Simulator):
             return self._std * torch.randn(self._dim)
 
     def _sample_ground_truth_posterior(self, num_samples=1000):
-        """
-        Samples from ground truth posterior assuming prior is standard normal.
-
-        :param num_samples: int
-            Number of samples to draw.
-        :return: torch.Tensor [num_samples, observation_dim]
-            Batch of posterior samples.
+        """Sample from ground truth posterior assuming prior is standard normal.
+        
+        Keyword Arguments:
+            num_samples {int} -- Number of samples to draw. (default: {1000})
+        
+        Returns:
+            torch.Tensor [num_samples, observation_dim] -- Batch of posterior samples.
         """
         mean = self.get_ground_truth_observation()
         std = torch.sqrt(torch.Tensor([self._std ** 2 / (self._std ** 2 + 1)]))
@@ -80,14 +75,14 @@ class LinearGaussianSimulator(Simulator):
         return c * mean + std * torch.randn(num_samples, self._dim)
 
     def get_ground_truth_posterior_samples(self, num_samples=1000):
-        """
-        Returns first num_samples samples we have stored if there are enough,
-        otherwise generates sufficiently many and returns those.
+        """Return first num_samples samples we have stored if there are enough,
+        otherwise generate sufficiently many and returns those.
 
-        :param num_samples: int
-            Number of samples to generate.
-        :return: torch.Tensor [batch_size, observation_dim]
-            Batch of posterior samples.
+        Keyword Arguments:
+            num_samples {int} -- Number of samples to generate. (default: {1000})
+        
+        Returns:
+            torch.Tensor [batch_size, observation_dim] -- Batch of posterior samples.
         """
         if num_samples < self._ground_truth_samples.shape[0]:
             return self._ground_truth_samples[:num_samples]
@@ -99,10 +94,14 @@ class LinearGaussianSimulator(Simulator):
 
     @property
     def parameter_dim(self):
+        """Number of dimensions of parameter vector.
+        """
         return self._dim
 
     @property
     def observation_dim(self):
+        """Number of dimensions data vector.
+        """
         return self._dim
 
     @property
@@ -110,11 +109,9 @@ class LinearGaussianSimulator(Simulator):
         return "linear-gaussian"
 
     @property
-    def parameter_plotting_limits(self):
-        return [-4, 4]
-
-    @property
     def normalization_parameters(self):
+        """Mean and std for normalizing simulated data.
+        """
         mean = torch.zeros(self._dim)
         std = torch.ones(self._dim)
         return mean, std

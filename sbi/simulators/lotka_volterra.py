@@ -1,12 +1,9 @@
-import numpy as np
 import os
 import pickle
-import torch
 
+import numpy as np
 import sbi.utils as utils
-
-from matplotlib import pyplot as plt
-
+import torch
 from sbi.simulators.simulator import Simulator
 
 
@@ -412,26 +409,10 @@ class LotkaVolterraSimulator(Simulator):
         self._has_been_used = False
         self._gaussian_prior = gaussian_prior
 
-    def simulate(self, parameters):
+    def __call__(self, parameters):
         parameters = utils.tensor2numpy(parameters)
         observations = self._summarizer.calc(self._simulator.sim(parameters))
         return observations
-
-    def get_ground_truth_parameters(self):
-        """
-        Ground truth parameters as given in
-        'Fast epsilon-free Inference of Simulation Models with Bayesian Conditional
-        Density Estimation'
-
-        :return:
-        """
-        return torch.log(torch.Tensor([0.01, 0.5, 1.0, 0.01]))
-
-    def get_ground_truth_observation(self):
-        path = os.path.join(utils.get_data_root(), "lotka-volterra", "obs_stats.pkl")
-        with open(path, "rb") as file:
-            true_observation = pickle.load(file, encoding="bytes")
-        return torch.Tensor(true_observation)
 
     @property
     def parameter_dim(self):
@@ -484,25 +465,3 @@ class LotkaVolterraSimulator(Simulator):
         ix = np.random.permutation(range(parameters.shape[0]))
 
         return parameters[ix], observations[ix]
-
-
-def test_():
-
-    num_simulations = 250
-    true_parameters = np.log([0.01, 0.5, 1.0, 0.01])
-
-    parameters, observations = sim_data(
-        gen_params=lambda num_simulations, rng: np.tile(
-            true_parameters, num_simulations
-        ).reshape(-1, 4),
-        sim_model=lambda parameters, rng: Stats().calc(
-            Model().sim(parameters, rng=rng)
-        ),
-        n_samples=num_simulations,
-    )
-    print(parameters.shape, observations.shape)
-    # utils.plot_hist_marginals(parameters, ground_truth=np.log([0.01, 0.5, 1.0, 0.01]))
-    utils.plot_hist_marginals(
-        observations, show_xticks=True, ground_truth=get_ground_truth_observation()
-    )
-    plt.show()
