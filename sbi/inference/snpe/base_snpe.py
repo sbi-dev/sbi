@@ -12,8 +12,6 @@ from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
-import sbi.inference.snpe.sample_utils as samplers
-
 
 class base_snpe():
 
@@ -105,12 +103,15 @@ class base_snpe():
         self._embedding = nn.Sequential(utils.Normalize(self.obs_mean, self.obs_std), self._embedding)
 
         # create the deep neural density estimator
-        self._neural_posterior = utils.get_neural_posterior(
+        self._neural_posterior = utils.get_sbi_posterior(
             model=density_estimator,
             embedding=self._embedding,
             parameter_dim=self._simulator.parameter_dim,
             observation_dim=self._simulator.observation_dim,
-            prior=self._prior
+            prior=self._prior,
+            context=self._true_observation,
+            train_with_mcmc=train_with_mcmc,
+            mcmc_method=mcmc_method
         )
 
         if calibration_kernel is None:
@@ -205,68 +206,9 @@ class base_snpe():
                 parameter_bank=self._parameter_bank,
                 observation_bank=self._observation_bank,
                 simulator=self._simulator,
-                estimate_acceptance_rate=samplers._estimate_acceptance_rate(
-                    neural_posterior=self._neural_posterior,
-                    prior=self._prior,
-                    true_observation=self._true_observation,
+                estimate_acceptance_rate=self._neural_posterior.estimate_acceptance_rate(
+                    context=self._true_observation,
                 ),
-            )
-
-    def sample(self, num_samples, observation=None):
-        """
-        Sample posterior distribution.
-
-        Args:
-            num_samples: int, number of samples
-            observation: torch.tensor
-                Provide observation/context/condition.
-                Will be _true_observation if None
-
-        Returns: torch.tensor, samples from posterior
-        """
-
-        if observation is None:
-            observation = self._true_observation
-
-        if self._train_with_mcmc:
-            return samplers.sample_posterior_mcmc(
-                neural_posterior=self._neural_posterior,
-                prior=self._prior,
-                true_observation=observation,
-                num_samples=num_samples,
-                mcmc_method=self._mcmc_method
-                )
-        else:
-            return samplers.sample_posterior(
-                neural_posterior=self._neural_posterior,
-                prior=self._prior,
-                true_observation=observation,
-                num_samples=num_samples
-            )
-
-    def evaluate(self, point, observation=None):
-        """
-        Evaluate posterior distribution at datapoint
-
-        Args:
-            point: torch.tensor()
-                Where to evaluate posterior
-            observation: torch.tensor()
-                What should the context be
-
-        Returns: log-probability
-        """
-        if observation is None:
-            observation = self._true_observation
-
-        if len(point.shape) == 1:
-            point = point[None, ]  # append a dimension
-
-        with torch.no_grad():
-            self._neural_posterior.eval()
-            return self._neural_posterior.log_prob(
-                point,
-                context=observation.reshape(1, -1)
             )
 
     def _get_log_prob_proposal_posterior(self, inputs, context, masks):
@@ -317,8 +259,10 @@ class base_snpe():
         else:
             parameters, observations = simulators.simulation_wrapper(
                 simulator=self._simulator,
-                parameter_sample_fn=lambda num_samples: self.sample(
-                    num_samples),
+                parameter_sample_fn=lambda num_samples: self._neural_posterior._sample(
+                    num_samples,
+                    context=self._true_observation,
+                ),
                 num_samples=num_simulations_per_round
             )
 
@@ -364,7 +308,6 @@ class base_snpe():
 
         Returns: None
         """
-
         if self._discard_prior_samples and (round_ > 0):
             ix = 1
         else:
@@ -428,14 +371,12 @@ class base_snpe():
         epochs = 0
         while True:
 
-            print('new epoch')
-
             # Train for a single epoch.
             self._neural_posterior.train()
             for batch in train_loader:
                 optimizer.zero_grad()
                 inputs, context, masks = (
-                    batch[0].to(self._device),
+                    batch[0].to(self._device),  # can we drop indices
                     batch[1].to(self._device),
                     batch[2].to(self._device),
                 )
