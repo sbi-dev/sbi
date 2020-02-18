@@ -22,7 +22,7 @@ dependencies:
   - pip
   - pip:
     - pyro-ppl
-    - "pyknos@git+https://github.com/mackelab/pyknos"
+    - "nflows@git+https://github.com/mackelab/nflows"
     - torchtestcase
     - -e .  # install package in development mode
   - pytest

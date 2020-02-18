@@ -4,7 +4,7 @@ import pickle
 import sbi.simulators as simulators
 import sbi.utils as utils
 import torch
-from pyknos import distributions as distributions_
+from nflows import distributions as distributions_
 from torch import distributions
 
 

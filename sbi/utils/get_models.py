@@ -2,10 +2,10 @@ from sbi.utils.torchutils import create_alternating_binary_mask
 from torch import nn
 from torch.nn import functional as F
 
-from pyknos import distributions as distributions_
-from pyknos import flows, transforms
-from pyknos.nn import nets
-from pyknos.nn.nde import MixtureOfGaussiansMADE, MultivariateGaussianMDN
+from nflows import distributions as distributions_
+from nflows import flows, transforms
+from nflows.nn import nets
+from nflows.nn.nde import MixtureOfGaussiansMADE, MultivariateGaussianMDN
 
 
 def get_neural_posterior(model, embedding, parameter_dim, observation_dim, prior):
