@@ -13,25 +13,26 @@ from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-class base_snpe():
 
-    def __init__(self,
-                 simulator,
-                 prior,
-                 true_observation,
-                 num_pilot_samples=100,
-                 density_estimator='maf',
-                 calibration_kernel=None,
-                 train_with_mcmc=False,
-                 mcmc_method="slice-np",
-                 summary_net=None,
-                 z_score_obs=True,
-                 use_combined_loss=False,
-                 retrain_from_scratch_each_round=False,
-                 discard_prior_samples=False,
-                 summary_writer=None,
-                 device=None,
-                 ):
+class base_snpe:
+    def __init__(
+        self,
+        simulator,
+        prior,
+        true_observation,
+        num_pilot_samples=100,
+        density_estimator="maf",
+        calibration_kernel=None,
+        train_with_mcmc=False,
+        mcmc_method="slice-np",
+        summary_net=None,
+        z_score_obs=True,
+        use_combined_loss=False,
+        retrain_from_scratch_each_round=False,
+        discard_prior_samples=False,
+        summary_writer=None,
+        device=None,
+    ):
         """
         Args:
             simulator: Python object with 'simulate' method which takes a torch.Tensor
@@ -80,9 +81,7 @@ class base_snpe():
         # run prior samples
         self.pilot_parameters, self.pilot_observations = simulators.simulation_wrapper(
             simulator=self._simulator,
-            parameter_sample_fn=lambda num_samples: self._prior.sample(
-                (num_samples,)
-            ),
+            parameter_sample_fn=lambda num_samples: self._prior.sample((num_samples,)),
             num_samples=num_pilot_samples,
         )
 
@@ -100,7 +99,9 @@ class base_snpe():
         else:
             self.obs_mean = torch.zeros(self._true_observation.shape)
             self.obs_std = torch.ones(self._true_observation.shape)
-        self._embedding = nn.Sequential(utils.Normalize(self.obs_mean, self.obs_std), self._embedding)
+        self._embedding = nn.Sequential(
+            utils.Normalize(self.obs_mean, self.obs_std), self._embedding
+        )
 
         # create the deep neural density estimator
         self._neural_posterior = utils.get_sbi_posterior(
@@ -111,11 +112,13 @@ class base_snpe():
             prior=self._prior,
             context=self._true_observation,
             train_with_mcmc=train_with_mcmc,
-            mcmc_method=mcmc_method
+            mcmc_method=mcmc_method,
         )
 
         if calibration_kernel is None:
-            self.calibration_kernel = lambda context_input: torch.ones([len(context_input)])
+            self.calibration_kernel = lambda context_input: torch.ones(
+                [len(context_input)]
+            )
         else:
             self.calibration_kernel = calibration_kernel
 
@@ -170,7 +173,7 @@ class base_snpe():
         """
 
         if isinstance(num_simulations_per_round, int):
-            num_simulations_per_round = [num_simulations_per_round]*num_rounds
+            num_simulations_per_round = [num_simulations_per_round] * num_rounds
 
         round_description = ""
         tbar = tqdm(range(num_rounds))
@@ -227,9 +230,7 @@ class base_snpe():
         pass
 
     def _run_sims(
-            self,
-            round_,
-            num_simulations_per_round,
+        self, round_, num_simulations_per_round,
     ):
         """
         Runs the simulations at the beginning of each round.
@@ -252,18 +253,24 @@ class base_snpe():
                 parameter_sample_fn=lambda num_samples: self._prior.sample(
                     (num_samples,)
                 ),
-                num_samples=np.maximum(0, num_simulations_per_round - self.num_pilot_samples)
+                num_samples=np.maximum(
+                    0, num_simulations_per_round - self.num_pilot_samples
+                ),
             )
-            parameters = torch.cat((parameters, self.pilot_parameters[:num_simulations_per_round]), dim=0)
-            observations = torch.cat((observations, self.pilot_observations[:num_simulations_per_round]), dim=0)
+            parameters = torch.cat(
+                (parameters, self.pilot_parameters[:num_simulations_per_round]), dim=0
+            )
+            observations = torch.cat(
+                (observations, self.pilot_observations[:num_simulations_per_round]),
+                dim=0,
+            )
         else:
             parameters, observations = simulators.simulation_wrapper(
                 simulator=self._simulator,
-                parameter_sample_fn=lambda num_samples: self._neural_posterior._sample(
-                    num_samples,
-                    context=self._true_observation,
+                parameter_sample_fn=lambda num_samples: self._neural_posterior.sample(
+                    num_samples, context=self._true_observation,
                 ),
-                num_samples=num_simulations_per_round
+                num_samples=num_simulations_per_round,
             )
 
         # Store (parameter, observation) pairs.
@@ -276,13 +283,13 @@ class base_snpe():
         )
 
     def _train(
-            self,
-            round_,
-            batch_size=100,
-            learning_rate=5e-4,
-            validation_fraction=0.1,
-            stop_after_epochs=20,
-            clip_grad_norm=True,
+        self,
+        round_,
+        batch_size=100,
+        learning_rate=5e-4,
+        validation_fraction=0.1,
+        stop_after_epochs=20,
+        clip_grad_norm=True,
     ):
         """
         Trains the conditional density estimator for the posterior by maximizing the
@@ -308,17 +315,17 @@ class base_snpe():
 
         Returns: None
         """
-        if self._discard_prior_samples and (round_ > 0):
-            ix = 1
-        else:
-            ix = 0
+
+        # get the start index for what training set to use. Either 0 or 1
+        ix = int(self._discard_prior_samples and (round_ > 0))
 
         # Get total number of training examples.
         num_examples = torch.cat(self._parameter_bank[ix:]).shape[0]
 
         if round_ > 0:
-            assert validation_fraction * num_examples >= batch_size, \
-                'There are fewer samples in the validation set than the batchsize.'
+            assert (
+                validation_fraction * num_examples >= batch_size
+            ), "There are fewer samples in the validation set than the batchsize."
 
         # Select random train and validation splits from (parameter, observation) pairs.
         permuted_indices = torch.randperm(num_examples)
@@ -352,8 +359,7 @@ class base_snpe():
         )
 
         optimizer = optim.Adam(
-            list(self._neural_posterior.parameters()),
-            lr=learning_rate,
+            list(self._neural_posterior.parameters()), lr=learning_rate,
         )
         # Keep track of best_validation log_prob seen so far.
         best_validation_log_prob = -1e100
@@ -376,7 +382,7 @@ class base_snpe():
             for batch in train_loader:
                 optimizer.zero_grad()
                 inputs, context, masks = (
-                    batch[0].to(self._device),  # can we drop indices
+                    batch[0].to(self._device),
                     batch[1].to(self._device),
                     batch[2].to(self._device),
                 )
@@ -384,10 +390,12 @@ class base_snpe():
                 # just do maximum likelihood in the first round
                 if round_ == 0:
                     log_prob = self._neural_posterior.log_prob(
-                        inputs, context)
+                        inputs, context, normalize=False
+                    )
                 else:  # or call the APT loss
                     log_prob = self._get_log_prob_proposal_posterior(
-                        inputs, context, masks)
+                        inputs, context, masks
+                    )
                 loss = -torch.mean(log_prob)
                 loss.backward()
                 if clip_grad_norm:
@@ -409,10 +417,12 @@ class base_snpe():
                     # just do maximum likelihood in the first round
                     if round_ == 0:
                         log_prob = self._neural_posterior.log_prob(
-                            inputs, context)
+                            inputs, context, normalize=False
+                        )
                     else:
                         log_prob = self._get_log_prob_proposal_posterior(
-                            inputs, context, masks)
+                            inputs, context, masks
+                        )
                     log_prob_sum += log_prob.sum().item()
             validation_log_prob = log_prob_sum / num_validation_examples
 

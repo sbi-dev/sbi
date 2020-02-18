@@ -9,10 +9,9 @@ from torch import multiprocessing as mp
 
 from nflows import flows
 from sbi.mcmc import SliceSampler
-from nflows.nn.nde import MultivariateGaussianMDN
 
 
-class flowPosterior(flows.Flow):
+class FlowPosterior(flows.Flow):
     def __init__(
         self,
         transform,
@@ -24,27 +23,86 @@ class flowPosterior(flows.Flow):
         mcmc_method="slice-np",
     ):
 
-        super(flowPosterior, self).__init__(transform, distribution, embedding)
+        super().__init__(transform, distribution, embedding)
         self.prior = prior
         self.context = context
         self._train_with_mcmc = train_with_mcmc
         self._mcmc_method = mcmc_method
 
-    def evaluate(self, point, context=None, normalize=True):
-        """
-        Evaluate normalized posterior distribution at datapoint
+    def log_prob(
+        self, inputs: torch.tensor, context: torch.tensor = None, normalize: bool = True
+    ):
+        """Calculate log probability under the distribution.
 
         Args:
-            point: torch.tensor()
-                Where to evaluate posterior
-            context: torch.tensor()
-                What should the context be
-            normalize: bool
+            inputs: Tensor, input variables.
+            context: Tensor or None, conditioning variables. If a Tensor, it must have the same
+                number or rows as the inputs. If None, the context is ignored.
+            normalize:
                 If True, we normalize the output density
                 by drawing samples, estimating the acceptance
-                ratio, and then scale the probability with it
+                ratio, and then scaling the probability with it
 
-        Returns: normalized log-probability
+        Returns:
+            A Tensor of shape [input_size], the log probability of the inputs given the context.
+        """
+
+        # format inputs and context into the correct shape
+        inputs, context = utils.build_inputs_and_contexts(
+            inputs, context, self.context, normalize
+        )
+
+        # go into evaluation mode
+        self.eval()
+
+        # compute the unnormalized log probability by evaluating the MDN
+        unnormalized_log_prob = self._log_prob(inputs, context)
+
+        # find the acceptance rate
+        if normalize:
+            acceptance_prob = self.estimate_acceptance_rate(context=context[0])
+        else:
+            acceptance_prob = 1.0
+
+        return np.log(acceptance_prob) + unnormalized_log_prob
+
+    def _log_prob(self, inputs: torch.tensor, context: torch.tensor = None):
+        """
+        Evaluate posterior distribution at datapoint
+
+        Args:
+            inputs: where to evaluate posterior
+            context: context/conditioning/observation
+
+        Returns: log-probability
+        """
+        if context is None:
+            context = self.context[
+                None,
+            ]
+
+        if len(inputs.shape) == 1:
+            inputs = inputs[
+                None,
+            ]  # append a dimension
+
+        self.eval()
+
+        return super()._log_prob(inputs, context=context)
+
+    def estimate_acceptance_rate(
+        self, num_samples: int = int(1e4), context: torch.tensor = None
+    ):
+        """
+        Estimates rejection sampling acceptance rates.
+
+        Args:
+            context: Observation on which to condition.
+                If None, use true observation given at initialization.
+            num_samples: Number of samples to use.
+
+        Returns: float in [0, 1]
+            Fraction of accepted samples.
         """
 
         if context is None:
@@ -52,27 +110,45 @@ class flowPosterior(flows.Flow):
                 None,
             ]
 
-        if len(point.shape) == 1:
-            point = point[
-                None,
-            ]  # append a dimension
+        # Always sample in eval mode.
+        self.eval()
 
-        unnormalized_log_prob = self.log_prob(point, context)
+        total_num_accepted_samples, total_num_generated_samples = 0, 0
+        while total_num_generated_samples < num_samples:
 
-        if normalize:
-            acceptance_prob = self.estimate_acceptance_rate(context=context)
-        else:
-            acceptance_prob = 1
+            # Generate samples from posterior.
+            candidate_samples = (
+                super()
+                ._sample(  # sample from unbounded flow
+                    10000, context=context.reshape(1, -1)
+                )
+                .squeeze(0)
+            )
 
-        return np.log(acceptance_prob) + unnormalized_log_prob
+            # Evaluate posterior samples under the prior.
+            prior_log_prob = self.prior.log_prob(candidate_samples)
+            if isinstance(self.prior, distributions.Uniform):
+                prior_log_prob = prior_log_prob.sum(-1)
 
-    def _sample(self, num_samples, context=None):
+            # Update remaining number of samples needed.
+            num_accepted_samples = (~torch.isinf(prior_log_prob)).sum().item()
+            total_num_accepted_samples += num_accepted_samples
+
+            # Keep track of acceptance rate
+            total_num_generated_samples += candidate_samples.shape[0]
+
+        # Back to training mode.
+        self.train()
+
+        return total_num_accepted_samples / total_num_generated_samples
+
+    def _sample(self, num_samples: int, context: torch.tensor = None):
         """
         Sample posterior distribution.
 
         Args:
-            num_samples: int, number of samples
-            context: torch.tensor
+            num_samples: number of samples
+            context:
                 Provide observation/context/condition.
                 Will be _true_observation if None
 
@@ -84,57 +160,33 @@ class flowPosterior(flows.Flow):
 
         if self._train_with_mcmc:
             return self._sample_posterior_mcmc(
-                true_observation=context,
-                num_samples=num_samples,
-                mcmc_method=self._mcmc_method,
+                context=context, num_samples=num_samples, mcmc_method=self._mcmc_method,
             )
         else:
-            return self._sample_posterior(context=context, num_samples=num_samples)
+            return self._sample_posterior_rejection(
+                context=context, num_samples=num_samples
+            )
 
-    def _log_prob(self, point, context=None):
+    def _sample_posterior_rejection(
+        self, num_samples: int, context: torch.tensor = None
+    ):
         """
-        Evaluate posterior distribution at datapoint
+        Rejection sample a posterior.
 
         Args:
-            point: torch.tensor()
-                Where to evaluate posterior
-            context: torch.tensor()
-                What should the context be
-            normalize: bool
-                If True, we normalize the output density
-                by drawing samples, estimating the acceptance
-                ratio, and then scale the probability with it
-
-        Returns: log-probability
-        """
-        if context is None:
-            context = self.context[
-                None,
-            ]
-
-        if len(point.shape) == 1:
-            point = point[
-                None,
-            ]  # append a dimension
-
-        self.eval()
-
-        return super()._log_prob(point, context=context)
-
-    def _sample_posterior(self, num_samples, context):
-        """
-        Sample a posterior.
-
-        Args:
-            num_samples:  int. Number of samples to generate.
-            context: torch.Tensor [observation_dim] or [1, observation_dim]
+            num_samples: Number of samples to generate.
+            context: [observation_dim] or [1, observation_dim]
                 Pass true observation for inference.
 
         Returns:
             torch.Tensor [num_samples, parameter_dim]
             Posterior parameter samples.
-
         """
+
+        if context is None:
+            context = self.context[
+                None,
+            ]
 
         # Always sample in eval mode.
         self.eval()
@@ -185,23 +237,30 @@ class flowPosterior(flows.Flow):
         return samples
 
     def _sample_posterior_mcmc(
-        self, true_observation, num_samples, mcmc_method="slice_np", thin=10
+        self,
+        num_samples: int,
+        context: torch.tensor = None,
+        mcmc_method: str = "slice_np",
+        thin: int = 10,
     ):
         """
         Sample the posterior using MCMC
 
         Args:
-            true_observation: torch.tensor, observation/context/conditioning
-            num_samples: int, Number of samples to generate.
-            potential_function: NeuralPotentialFunction
+            context: observation/context/conditioning
+            num_samples: Number of samples to generate.
             mcmc_method: Which MCMC method to use ['metropolis-hastings', 'slice', 'hmc', 'nuts']
-            thin: thin: Generate (num_samples * thin) samples in total, then select every
+            thin: Generate (num_samples * thin) samples in total, then select every
                 'thin' sample.
 
         Returns:
             torch.Tensor of shape [num_samples, parameter_dim]
-
         """
+
+        if context is None:
+            context = self.context[
+                None,
+            ]
 
         # HMC and NUTS from Pyro.
         # Defining the potential function as an object means Pyro's MCMC scheme
@@ -209,14 +268,14 @@ class flowPosterior(flows.Flow):
         # the potential function requires evaluating a neural likelihood as is the
         # case here.
         potential_function = NeuralPotentialFunction(
-            self, self.prior, true_observation  # todo, passing self aint nice
+            self, self.prior, context  # TODO: passing self not nice
         )
 
         # Axis-aligned slice sampling implementation in NumPy
         target_log_prob = (
             lambda parameters: self.log_prob(
                 inputs=torch.Tensor(parameters).reshape(1, -1),
-                context=true_observation.reshape(1, -1),
+                context=context.reshape(1, -1),
             ).item()
             if not np.isinf(self.prior.log_prob(torch.Tensor(parameters)).sum().item())
             else -np.inf
@@ -270,57 +329,6 @@ class flowPosterior(flows.Flow):
 
         return samples
 
-    def estimate_acceptance_rate(self, context, num_samples=int(1e4)):
-        """
-        Estimates rejection sampling acceptance rates.
-
-        Args:
-            context: Observation on which to condition.
-                If None, use true observation given at initialization.
-            num_samples: int, Number of samples to use.
-
-        Returns: float in [0, 1]
-            Fraction of accepted samples.
-
-        """
-
-        # Always sample in eval mode.
-        self.eval()
-
-        total_num_accepted_samples, total_num_generated_samples = 0, 0
-        while total_num_generated_samples < num_samples:
-
-            # Generate samples from posterior.
-            candidate_samples = (
-                super()
-                ._sample(  # sample from unbounded flow
-                    10000, context=context.reshape(1, -1)
-                )
-                .squeeze(0)
-            )
-
-            # Evaluate posterior samples under the prior.
-            prior_log_prob = self.prior.log_prob(candidate_samples)
-            if isinstance(self.prior, distributions.Uniform):
-                prior_log_prob = prior_log_prob.sum(-1)
-
-            # Update remaining number of samples needed.
-            num_accepted_samples = (~torch.isinf(prior_log_prob)).sum().item()
-            total_num_accepted_samples += num_accepted_samples
-
-            # Keep track of acceptance rate
-            total_num_generated_samples += candidate_samples.shape[0]
-
-        # Back to training mode.
-        self.train()
-
-        return total_num_accepted_samples / total_num_generated_samples
-
-
-@property
-def summary(self):
-    return self._summary
-
 
 class NeuralPotentialFunction:
     """
@@ -368,16 +376,4 @@ class NeuralPotentialFunction:
         return potential
 
     def evaluate(self, point):
-        return 0
-
-
-class MDNPosterior(MultivariateGaussianMDN):
-    def __init__(self, prior):
-        super(MDNPosterior, self).__init__()
-        self.prior = prior
-
-    def sample(self, num_samples):
-        return 1
-
-    def evaluate(self, point):
-        return 0
+        raise NotImplementedError

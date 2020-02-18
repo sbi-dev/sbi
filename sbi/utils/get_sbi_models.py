@@ -3,21 +3,29 @@ from torch import nn
 from torch.nn import functional as F
 
 from nflows import distributions as distributions_
-from nflows import flows, transforms
+from nflows import transforms
 from nflows.nn import nets
-from nflows.nn.nde import MixtureOfGaussiansMADE, MultivariateGaussianMDN
-from sbi.inference.snpe.sbi_posterior import flowPosterior
+from sbi.inference.snpe.sbi_MDN_posterior import MDNPosterior
+from sbi.inference.snpe.sbi_flow_posterior import FlowPosterior
 
-def get_sbi_posterior(model, embedding, parameter_dim, observation_dim, prior, context, train_with_mcmc, mcmc_method):
 
-    # Everything is a flow because we need to normalize parameters based on prior.
+def get_sbi_posterior(
+    model,
+    embedding,
+    parameter_dim,
+    observation_dim,
+    prior,
+    context,
+    train_with_mcmc,
+    mcmc_method,
+):
 
     mean, std = (prior.mean, prior.stddev)
     normalizing_transform = transforms.AffineTransform(shift=-mean / std, scale=1 / std)
 
     if model == "mdn":
         hidden_features = 50
-        neural_posterior = MultivariateGaussianMDN(
+        neural_posterior = MDNPosterior(
             features=parameter_dim,
             context_features=observation_dim,
             hidden_features=hidden_features,
@@ -32,6 +40,10 @@ def get_sbi_posterior(model, embedding, parameter_dim, observation_dim, prior, c
             ),
             num_components=20,
             custom_initialization=True,
+            prior=prior,
+            context=context,
+            train_with_mcmc=train_with_mcmc,
+            mcmc_method=mcmc_method,
         )
 
     elif model == "made":
@@ -50,7 +62,15 @@ def get_sbi_posterior(model, embedding, parameter_dim, observation_dim, prior, c
             use_batch_norm=False,
             custom_initialization=True,
         )
-        neural_posterior = flows.Flow(transform, distribution, embedding)
+        neural_posterior = FlowPosterior(
+            transform,
+            distribution,
+            embedding,
+            prior=prior,
+            context=context,
+            train_with_mcmc=train_with_mcmc,
+            mcmc_method=mcmc_method,
+        )
 
     elif model == "maf":
         transform = transforms.CompositeTransform(
@@ -78,14 +98,14 @@ def get_sbi_posterior(model, embedding, parameter_dim, observation_dim, prior, c
         transform = transforms.CompositeTransform([normalizing_transform, transform,])
 
         distribution = distributions_.StandardNormal((parameter_dim,))
-        neural_posterior = flowPosterior(
+        neural_posterior = FlowPosterior(
             transform,
             distribution,
             embedding,
             prior=prior,
             context=context,
             train_with_mcmc=train_with_mcmc,
-            mcmc_method=mcmc_method
+            mcmc_method=mcmc_method,
         )
 
     elif model == "nsf":
@@ -120,7 +140,15 @@ def get_sbi_posterior(model, embedding, parameter_dim, observation_dim, prior, c
         )
 
         distribution = distributions_.StandardNormal((parameter_dim,))
-        neural_posterior = flows.Flow(transform, distribution, embedding)
+        neural_posterior = FlowPosterior(
+            transform,
+            distribution,
+            embedding,
+            prior=prior,
+            context=context,
+            train_with_mcmc=train_with_mcmc,
+            mcmc_method=mcmc_method,
+        )
 
     else:
         raise ValueError
