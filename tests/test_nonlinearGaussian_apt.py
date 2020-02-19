@@ -5,7 +5,7 @@ import numpy as np
 import sbi.simulators as simulators
 import sbi.utils as utils
 import torch
-from sbi.inference.apt import APT
+from sbi.inference.snpe.snpe_c import APT
 from torch import distributions
 
 # use cpu by default
@@ -49,7 +49,7 @@ def test_nonlinearGaussian_based_on_mmd():
     )
 
     # draw samples from posterior
-    samples = apt.sample_posterior(1000)
+    samples = apt._neural_posterior.sample(1000)
 
     # define target distribution (analytically tractable) and sample from it
     target_samples = simulator.get_ground_truth_posterior_samples(num_samples=1000)

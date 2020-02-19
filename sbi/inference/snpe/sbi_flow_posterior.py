@@ -106,9 +106,7 @@ class FlowPosterior(flows.Flow):
         """
 
         if context is None:
-            context = self.context[
-                None,
-            ]
+            context = self.context
 
         # Always sample in eval mode.
         self.eval()
@@ -183,11 +181,6 @@ class FlowPosterior(flows.Flow):
             Posterior parameter samples.
         """
 
-        if context is None:
-            context = self.context[
-                None,
-            ]
-
         # Always sample in eval mode.
         self.eval()
 
@@ -256,11 +249,6 @@ class FlowPosterior(flows.Flow):
         Returns:
             torch.Tensor of shape [num_samples, parameter_dim]
         """
-
-        if context is None:
-            context = self.context[
-                None,
-            ]
 
         # HMC and NUTS from Pyro.
         # Defining the potential function as an object means Pyro's MCMC scheme

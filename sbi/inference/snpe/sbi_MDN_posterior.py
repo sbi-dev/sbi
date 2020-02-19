@@ -168,11 +168,6 @@ class MDNPosterior(MultivariateGaussianMDN):
             Posterior parameter samples.
         """
 
-        if context is None:
-            context = self.context[
-                None,
-            ]
-
         # Always sample in eval mode.
         self.eval()
 
@@ -242,11 +237,6 @@ class MDNPosterior(MultivariateGaussianMDN):
             torch.Tensor of shape [num_samples, parameter_dim]
         """
 
-        if context is None:
-            context = self.context[
-                None,
-            ]
-
         # HMC and NUTS from Pyro.
         # Defining the potential function as an object means Pyro's MCMC scheme
         # can pickle it to be used across multiple chains in parallel, even if
@@ -313,3 +303,53 @@ class MDNPosterior(MultivariateGaussianMDN):
         self.train()
 
         return samples
+
+
+
+class NeuralPotentialFunction:
+    """
+    Implementation of a potential function for Pyro MCMC which uses a classifier
+    to evaluate a quantity proportional to the likelihood.
+    """
+
+    def __init__(self, posterior, prior, true_observation):
+        """
+        Args:
+            posterior: nn
+            prior: torch.distribution, Distribution object with 'log_prob' method.
+            true_observation:torch.Tensor containing true observation x0.
+        """
+
+        self.prior = prior
+        self.posterior = posterior
+        self.true_observation = true_observation
+
+    def __call__(self, parameters_dict):
+        """
+        Call method allows the object to be used as a function.
+        Evaluates the given parameters using a given neural likelhood, prior,
+        and true observation.
+
+        Args:
+            parameters_dict: dict of parameter values which need evaluation for MCMC.
+
+        Returns:
+            torch.Tensor potential ~ -[log r(x0, theta) + log p(theta)]
+
+        """
+
+        parameters = next(iter(parameters_dict.values()))
+        potential = -self.posterior.log_prob(
+            inputs=parameters, context=self.true_observation
+        )
+        if isinstance(self.prior, distributions.Uniform):
+            log_prob_prior = self.prior.log_prob(parameters).sum(-1)
+        else:
+            log_prob_prior = self.prior.log_prob(parameters)
+        log_prob_prior[~torch.isinf(log_prob_prior)] = 1
+        potential *= log_prob_prior
+
+        return potential
+
+    def evaluate(self, point):
+        raise NotImplementedError

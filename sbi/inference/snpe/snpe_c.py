@@ -20,7 +20,7 @@ class APT(base_snpe):
         true_observation,
         num_atoms=-1,
         num_pilot_samples=100,
-        density_estimator='maf',
+        density_estimator="maf",
         calibration_kernel=None,
         use_combined_loss=False,
         train_with_mcmc=False,
@@ -57,7 +57,7 @@ class APT(base_snpe):
             discard_prior_samples=discard_prior_samples,
             summary_writer=summary_writer,
             device=device,
-            )
+        )
 
         assert isinstance(num_atoms, int), "Number of atoms must be an integer."
         self._num_atoms = num_atoms
@@ -96,13 +96,11 @@ class APT(base_snpe):
         # of the parameters in the batch.
         assert 0 < num_atoms - 1 < batch_size
         probs = (
-                (1 / (batch_size - 1))
-                * torch.ones(batch_size, batch_size)
-                * (1 - torch.eye(batch_size))
+            (1 / (batch_size - 1))
+            * torch.ones(batch_size, batch_size)
+            * (1 - torch.eye(batch_size))
         )
-        choices = torch.multinomial(
-            probs, num_samples=num_atoms - 1, replacement=False
-        )
+        choices = torch.multinomial(probs, num_samples=num_atoms - 1, replacement=False)
         contrasting_inputs = inputs[choices]
 
         # We can now create our sets of atoms from the contrasting parameter sets
@@ -113,7 +111,7 @@ class APT(base_snpe):
 
         # Evaluate large batch giving (batch_size * num_atoms) log prob posterior evals.
         log_prob_posterior = self._neural_posterior.log_prob(
-            atomic_inputs, repeated_context
+            atomic_inputs, repeated_context, normalize=False
         )
         assert utils.notinfnotnan(
             log_prob_posterior
@@ -130,29 +128,31 @@ class APT(base_snpe):
         assert utils.notinfnotnan(log_prob_prior), "NaN/inf detected in prior eval."
 
         # Compute unnormalized proposal posterior.
-        unnormalized_log_prob_proposal_posterior = (
-                log_prob_posterior - log_prob_prior
-        )
+        unnormalized_log_prob_proposal_posterior = log_prob_posterior - log_prob_prior
 
         # Normalize proposal posterior across discrete set of atoms.
-        log_prob_proposal_posterior = self.calibration_kernel(context) * \
-                                      unnormalized_log_prob_proposal_posterior[
-                                      :, 0
-                                      ] - torch.logsumexp(unnormalized_log_prob_proposal_posterior, dim=-1)
+        log_prob_proposal_posterior = self.calibration_kernel(
+            context
+        ) * unnormalized_log_prob_proposal_posterior[:, 0] - torch.logsumexp(
+            unnormalized_log_prob_proposal_posterior, dim=-1
+        )
         assert utils.notinfnotnan(
             log_prob_proposal_posterior
         ), "NaN/inf detected in proposal posterior eval."
 
         # todo: this implementation is not perfect: it evaluates the posterior
-        # todo:     at all prior samples
+        # todo: at all prior samples
         if self._use_combined_loss:
             log_prob_posterior_non_atomic = self._neural_posterior.log_prob(
-                inputs, context
+                inputs, context, normalize=False
             )
             masks = masks.reshape(-1)
             log_prob_proposal_posterior = (
-                    masks * log_prob_posterior_non_atomic + log_prob_proposal_posterior
+                masks * log_prob_posterior_non_atomic + log_prob_proposal_posterior
             )
 
         return log_prob_proposal_posterior
 
+    def _get_log_prob_proposal_MoG(self, inputs, context, masks):
+
+        raise NotImplementedError

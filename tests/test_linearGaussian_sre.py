@@ -34,7 +34,7 @@ def test_sre_on_linearGaussian_based_on_mmd(num_dim):
     )
 
     # create inference method
-    inference_method = inference.SRE(
+    inference_method = inference.sre.SRE(
         simulator=simulator,
         prior=prior,
         true_observation=true_observation,

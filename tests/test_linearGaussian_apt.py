@@ -2,7 +2,7 @@ import pytest
 import sbi.simulators as simulators
 import sbi.utils as utils
 import torch
-from sbi.inference.apt import APT
+from sbi.inference.snpe.snpe_c import APT
 from torch import distributions
 
 # use cpu by default
@@ -46,7 +46,7 @@ def test_apt_on_linearGaussian_based_on_mmd(num_dim):
     )
 
     # draw samples from posterior
-    samples = apt.sample_posterior(1000)
+    samples = apt._neural_posterior.sample(1000)
 
     # define target distribution (analytically tractable) and sample from it
     target_samples = simulator.get_ground_truth_posterior_samples(1000)

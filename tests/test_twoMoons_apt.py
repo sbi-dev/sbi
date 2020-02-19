@@ -4,7 +4,7 @@ import numpy as np
 import sbi.simulators as simulators
 import sbi.utils as utils
 import torch
-from sbi.inference.apt import APT
+from sbi.inference.snpe.snpe_c import APT
 from torch import distributions
 
 # use cpu by default
@@ -46,7 +46,7 @@ def test_apt_on_twoMoons_based_on_mmd():
         batch_size=20,
     )
 
-    samples = apt.sample_posterior(10000)
+    samples = apt._neural_posterior.sample(1000)
     samples = utils.tensor2numpy(samples)
     target_samples = np.load(
         os.path.join(

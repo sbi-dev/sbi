@@ -34,7 +34,7 @@ def test_snl_on_linearGaussian_based_on_mmd(num_dim):
     )
 
     # create inference method
-    inference_method = inference.SNL(
+    inference_method = inference.snl.SNL(
         simulator=simulator,
         prior=prior,
         true_observation=true_observation,
