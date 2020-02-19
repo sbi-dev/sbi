@@ -27,5 +27,6 @@ jobs:
 
     - name: Test with pytest
       run: |
+        pip install torchtestcase
         pip install pytest
         pytest
