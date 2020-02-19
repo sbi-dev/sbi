@@ -16,9 +16,9 @@ class FlowPosterior(flows.Flow):
         self,
         transform,
         distribution,
-        embedding,
         prior,
         context,
+        embedding=None,
         train_with_mcmc=False,
         mcmc_method="slice-np",
     ):
@@ -316,6 +316,20 @@ class FlowPosterior(flows.Flow):
         self.train()
 
         return samples
+
+    def set_embedding_net(self, embedding_net):
+        """
+        Set the embedding net to encode the context
+
+        Args:
+            embedding_net: nn.Module
+                neural net to encode the context
+        """
+        assert isinstance(embedding_net, torch.nn.Module), 'embedding_net is not a nn.Module. ' \
+                                                           'If you want to use hard-coded summary features, ' \
+                                                           'please simply pass the encoded features and pass ' \
+                                                           'embedding_net=None'
+        self.embedding_net = embedding_net
 
 
 class NeuralPotentialFunction:

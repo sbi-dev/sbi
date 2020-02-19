@@ -22,7 +22,7 @@ def test_apt_on_twoMoons_based_on_mmd():
         low=-a * torch.ones(parameter_dim), high=a * torch.ones(parameter_dim),
     )
 
-    true_observation = torch.Tensor([0, 0])
+    true_observation = torch.Tensor([[0, 0]])
 
     apt = APT(
         simulator=simulator,
@@ -30,11 +30,7 @@ def test_apt_on_twoMoons_based_on_mmd():
         prior=prior,
         num_atoms=10,
         use_combined_loss=False,
-        density_estimator="maf",
         z_score_obs=True,
-        train_with_mcmc=False,
-        mcmc_method="slice-np",
-        summary_net=None,
         retrain_from_scratch_each_round=False,
         discard_prior_samples=False,
     )

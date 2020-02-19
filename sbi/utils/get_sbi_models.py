@@ -7,21 +7,22 @@ from nflows import transforms
 from nflows.nn import nets
 from sbi.inference.snpe.sbi_MDN_posterior import MDNPosterior
 from sbi.inference.snpe.sbi_flow_posterior import FlowPosterior
-
+import torch
 
 def get_sbi_posterior(
     model,
-    embedding,
-    parameter_dim,
-    observation_dim,
     prior,
     context,
-    train_with_mcmc,
-    mcmc_method,
+    embedding=None,
+    train_with_mcmc=False,
+    mcmc_method="slice_np",
 ):
 
     mean, std = (prior.mean, prior.stddev)
     normalizing_transform = transforms.AffineTransform(shift=-mean / std, scale=1 / std)
+
+    parameter_dim = prior.sample([1]).shape[1]
+    observation_dim = torch.tensor([context.shape[1]]).item()
 
     if model == "mdn":
         hidden_features = 50
@@ -65,9 +66,9 @@ def get_sbi_posterior(
         neural_posterior = FlowPosterior(
             transform,
             distribution,
-            embedding,
             prior=prior,
             context=context,
+            embedding=embedding,
             train_with_mcmc=train_with_mcmc,
             mcmc_method=mcmc_method,
         )
@@ -101,9 +102,9 @@ def get_sbi_posterior(
         neural_posterior = FlowPosterior(
             transform,
             distribution,
-            embedding,
             prior=prior,
             context=context,
+            embedding=embedding,
             train_with_mcmc=train_with_mcmc,
             mcmc_method=mcmc_method,
         )
@@ -143,9 +144,9 @@ def get_sbi_posterior(
         neural_posterior = FlowPosterior(
             transform,
             distribution,
-            embedding,
             prior=prior,
             context=context,
+            embedding=embedding,
             train_with_mcmc=train_with_mcmc,
             mcmc_method=mcmc_method,
         )

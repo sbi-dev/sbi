@@ -1,7 +1,9 @@
 import sbi.utils as utils
 from sbi.inference.snpe.base_snpe import base_snpe
 import torch
+import os
 from torch import distributions
+from torch.utils.tensorboard import SummaryWriter
 
 
 class SNPE_A(base_snpe):
@@ -22,9 +24,6 @@ class SNPE_A(base_snpe):
         num_pilot_samples=100,
         density_estimator='maf',
         use_combined_loss=False,
-        train_with_mcmc=False,
-        mcmc_method="slice-np",
-        summary_net=None,
         z_score_obs=True,
         retrain_from_scratch_each_round=False,
         discard_prior_samples=False,
@@ -41,20 +40,25 @@ class SNPE_A(base_snpe):
         """
 
         super(SNPE_A, self).__init__(simulator=simulator,
-                                  prior=prior,
-                                  true_observation=true_observation,
-                                  num_pilot_samples=num_pilot_samples,
-                                  density_estimator=density_estimator,
-                                  use_combined_loss=use_combined_loss,
-                                  train_with_mcmc=train_with_mcmc,
-                                  mcmc_method=mcmc_method,
-                                  summary_net=summary_net,
-                                  z_score_obs=z_score_obs,
-                                  retrain_from_scratch_each_round=retrain_from_scratch_each_round,
-                                  discard_prior_samples=discard_prior_samples,
-                                  summary_writer=summary_writer,
-                                  device=device,
-                                  )
+                                      prior=prior,
+                                      true_observation=true_observation,
+                                      num_pilot_samples=num_pilot_samples,
+                                      density_estimator=density_estimator,
+                                      use_combined_loss=use_combined_loss,
+                                      z_score_obs=z_score_obs,
+                                      retrain_from_scratch_each_round=retrain_from_scratch_each_round,
+                                      discard_prior_samples=discard_prior_samples,
+                                      device=device,
+                                      )
+
+        # Each APT run has an associated log directory for TensorBoard output.
+        if summary_writer is None:
+            log_dir = os.path.join(
+                utils.get_log_root(), "snpe-a", simulator.name, utils.get_timestamp()
+            )
+            self._summary_writer = SummaryWriter(log_dir)
+        else:
+            self._summary_writer = summary_writer
 
         raise NameError('Not implemented yet')
 

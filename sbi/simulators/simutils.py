@@ -8,6 +8,7 @@ from nflows import distributions as distributions_
 from torch import distributions
 
 
+# TODO: we do not want this function
 def simulation_wrapper(simulator, parameter_sample_fn, num_samples):
 
     if isinstance(simulator, simulators.LotkaVolterraSimulator):

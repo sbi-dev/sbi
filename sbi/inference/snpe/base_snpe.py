@@ -1,4 +1,3 @@
-import os
 from copy import deepcopy
 
 import numpy as np
@@ -10,8 +9,9 @@ from torch import nn, optim
 from torch.nn.utils import clip_grad_norm_
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
-from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
+import warnings
+from sbi.inference.snpe.sbi_MDN_posterior import MDNPosterior
 
 
 class base_snpe:
@@ -21,16 +21,12 @@ class base_snpe:
         prior,
         true_observation,
         num_pilot_samples=100,
-        density_estimator="maf",
+        density_estimator=None,
         calibration_kernel=None,
-        train_with_mcmc=False,
-        mcmc_method="slice-np",
-        summary_net=None,
         z_score_obs=True,
         use_combined_loss=False,
         retrain_from_scratch_each_round=False,
         discard_prior_samples=False,
-        summary_writer=None,
         device=None,
     ):
         """
@@ -45,13 +41,8 @@ class base_snpe:
             num_pilot_samples: int
                 Number of simulations that are run when instantiating an object.
                 Used to z-score the observations.
-            density_estimator: string.
-                What density estimator to use. E.g. 'maf', 'nsf'
-            train_with_mcmc: bool
-                Whether to sample using MCMC instead of i.i.d. sampling at the end of each round
-            summary_net: nets.Module
-                Optional network which may be used to produce feature vectors
-                f(x) for high-dimensional observations.
+            density_estimator: Neural density estimator
+                Density estimator to use.
             z_score_obs: bool
                 Whether to z-score (=normalize) the data features x
             use_combined_loss: bool
@@ -77,6 +68,11 @@ class base_snpe:
         self.z_score_obs = z_score_obs
         self.num_pilot_samples = num_pilot_samples
         self._use_combined_loss = use_combined_loss
+        self._discard_prior_samples = discard_prior_samples
+        # Need somewhere to store (parameter, observation) pairs from each round.
+        self._parameter_bank, self._observation_bank, self._prior_masks = [], [], []
+        self._model_bank = []
+        self._retrain_from_scratch_each_round = retrain_from_scratch_each_round
 
         # run prior samples
         self.pilot_parameters, self.pilot_observations = simulators.simulation_wrapper(
@@ -85,12 +81,15 @@ class base_snpe:
             num_samples=num_pilot_samples,
         )
 
-        # We may want to summarize high-dimensional observations.
-        # This may be either a fixed or learned transformation.
-        if summary_net is None:
-            self._embedding = nn.Identity()
+        # create the deep neural density estimator
+        if density_estimator is None:
+            self._neural_posterior = utils.get_sbi_posterior(
+                model='maf',
+                prior=self._prior,
+                context=self._true_observation,
+            )
         else:
-            self._embedding = summary_net
+            self._neural_posterior = density_estimator
 
         # obtain z-score for observations and define embedding net
         if self.z_score_obs:
@@ -99,22 +98,17 @@ class base_snpe:
         else:
             self.obs_mean = torch.zeros(self._true_observation.shape)
             self.obs_std = torch.ones(self._true_observation.shape)
-        self._embedding = nn.Sequential(
-            utils.Normalize(self.obs_mean, self.obs_std), self._embedding
-        )
 
-        # create the deep neural density estimator
-        self._neural_posterior = utils.get_sbi_posterior(
-            model=density_estimator,
-            embedding=self._embedding,
-            parameter_dim=self._simulator.parameter_dim,
-            observation_dim=self._simulator.observation_dim,
-            prior=self._prior,
-            context=self._true_observation,
-            train_with_mcmc=train_with_mcmc,
-            mcmc_method=mcmc_method,
-        )
+        # new embedding_net contains z-scoring
+        if not isinstance(self._neural_posterior, MDNPosterior):
+            embedding = nn.Sequential(
+                utils.Normalize(self.obs_mean, self.obs_std), self._neural_posterior.embedding_net
+            )
+            self._neural_posterior.set_embedding_net(embedding)
+        elif z_score_obs:
+            warnings.warn("z-scoring of observation not implemented for MDNs")
 
+        # calibration kernels proposed in Lueckmann, Goncalves et al 2017
         if calibration_kernel is None:
             self.calibration_kernel = lambda context_input: torch.ones(
                 [len(context_input)]
@@ -122,29 +116,9 @@ class base_snpe:
         else:
             self.calibration_kernel = calibration_kernel
 
-        self._mcmc_method = mcmc_method
-        self._train_with_mcmc = train_with_mcmc
-
-        self._retrain_from_scratch_each_round = retrain_from_scratch_each_round
         # If we're retraining from scratch each round,
         # keep a copy of the original untrained model for reinitialization.
         self._untrained_neural_posterior = deepcopy(self._neural_posterior)
-
-        self._discard_prior_samples = discard_prior_samples
-
-        # Need somewhere to store (parameter, observation) pairs from each round.
-        self._parameter_bank, self._observation_bank, self._prior_masks = [], [], []
-
-        self._model_bank = []
-
-        # Each APT run has an associated log directory for TensorBoard output.
-        if summary_writer is None:
-            log_dir = os.path.join(
-                utils.get_log_root(), "apt", simulator.name, utils.get_timestamp()
-            )
-            self._summary_writer = SummaryWriter(log_dir)
-        else:
-            self._summary_writer = summary_writer
 
         # Each run also has a dictionary of summary statistics which are populated
         # over the course of training.
@@ -227,7 +201,7 @@ class base_snpe:
 
         Returns: log-probability
         """
-        pass
+        raise NotImplementedError
 
     def _run_sims(
         self, round_, num_simulations_per_round,
@@ -352,7 +326,7 @@ class base_snpe:
         )
         val_loader = data.DataLoader(
             dataset,
-            batch_size=min(batch_size, num_examples - num_training_examples),
+            batch_size=min(batch_size, num_validation_examples),
             shuffle=False,
             drop_last=True,
             sampler=SubsetRandomSampler(val_indices),
@@ -371,11 +345,11 @@ class base_snpe:
         # If we're retraining from scratch each round, reset the neural posterior
         # to the untrained copy we made at the start.
         if self._retrain_from_scratch_each_round and round_ > 0:
-            # self._neural_posterior = deepcopy(self._untrained_neural_posterior)
-            self._neural_posterior = deepcopy(self._model_bank[0])
+            self._neural_posterior = deepcopy(self._untrained_neural_posterior)
+            # self._neural_posterior = deepcopy(self._model_bank[0])
 
         epochs = 0
-        while True:
+        while True:  # todo while not converged
 
             # Train for a single epoch.
             self._neural_posterior.train()
@@ -438,6 +412,7 @@ class base_snpe:
             if epochs_since_last_improvement > stop_after_epochs - 1:
                 self._neural_posterior.load_state_dict(best_model_state_dict)
                 break
+                # todo: converged = True
 
         # Update summary.
         self._summary["epochs"].append(epochs)

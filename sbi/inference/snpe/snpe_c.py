@@ -1,7 +1,9 @@
+import os
 import sbi.utils as utils
 from sbi.inference.snpe.base_snpe import base_snpe
 import torch
 from torch import distributions
+from torch.utils.tensorboard import SummaryWriter
 
 
 class APT(base_snpe):
@@ -20,12 +22,9 @@ class APT(base_snpe):
         true_observation,
         num_atoms=-1,
         num_pilot_samples=100,
-        density_estimator="maf",
+        density_estimator=None,
         calibration_kernel=None,
         use_combined_loss=False,
-        train_with_mcmc=False,
-        mcmc_method="slice-np",
-        summary_net=None,
         z_score_obs=True,
         retrain_from_scratch_each_round=False,
         discard_prior_samples=False,
@@ -49,18 +48,23 @@ class APT(base_snpe):
             density_estimator=density_estimator,
             calibration_kernel=calibration_kernel,
             use_combined_loss=use_combined_loss,
-            train_with_mcmc=train_with_mcmc,
-            mcmc_method=mcmc_method,
-            summary_net=summary_net,
             z_score_obs=z_score_obs,
             retrain_from_scratch_each_round=retrain_from_scratch_each_round,
             discard_prior_samples=discard_prior_samples,
-            summary_writer=summary_writer,
             device=device,
         )
 
         assert isinstance(num_atoms, int), "Number of atoms must be an integer."
         self._num_atoms = num_atoms
+
+        # Each APT run has an associated log directory for TensorBoard output.
+        if summary_writer is None:
+            log_dir = os.path.join(
+                utils.get_log_root(), "apt", simulator.name, utils.get_timestamp()
+            )
+            self._summary_writer = SummaryWriter(log_dir)
+        else:
+            self._summary_writer = summary_writer
 
     def _get_log_prob_proposal_posterior(self, inputs, context, masks):
         """

@@ -21,20 +21,15 @@ def test_apt_on_linearGaussian_based_on_mmd(num_dim):
         loc=torch.zeros(dim), covariance_matrix=torch.eye(dim)
     )
 
-    parameter_dim, observation_dim = dim, dim
-    true_observation = torch.zeros(dim)
+    true_observation = torch.zeros((1, dim))
 
     apt = APT(
         simulator=simulator,
         true_observation=true_observation,
         prior=prior,
         num_atoms=-1,
-        density_estimator='maf',
         z_score_obs=True,
         use_combined_loss=False,
-        train_with_mcmc=False,
-        mcmc_method="slice-np",
-        summary_net=None,
         retrain_from_scratch_each_round=False,
         discard_prior_samples=False,
     )
