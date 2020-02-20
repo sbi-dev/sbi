@@ -28,9 +28,11 @@ def test_nonlinearGaussian_based_on_mmd():
     parameter_dim = ground_truth_parameters.shape[0]
     observation_dim = ground_truth_observation.shape[0]
 
+    print('here', ground_truth_observation)
+
     apt = APT(
         simulator=simulator,
-        true_observation=ground_truth_observation,
+        true_observation=ground_truth_observation[None, ],
         prior=prior,
         num_atoms=-1,
         z_score_obs=True,
