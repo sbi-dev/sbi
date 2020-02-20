@@ -102,7 +102,7 @@ class SnpeBase:
         # new embedding_net contains z-scoring
         if not isinstance(self._neural_posterior, MDNPosterior):
             embedding = nn.Sequential(
-                utils.Normalize(self.obs_mean, self.obs_std), self._neural_posterior.embedding_net
+                utils.Normalize(self.obs_mean, self.obs_std), self._neural_posterior._embedding_net
             )
             self._neural_posterior.set_embedding_net(embedding)
         elif z_score_obs:

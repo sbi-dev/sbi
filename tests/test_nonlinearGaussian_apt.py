@@ -32,12 +32,9 @@ def test_nonlinearGaussian_based_on_mmd():
         simulator=simulator,
         true_observation=ground_truth_observation,
         prior=prior,
-        density_estimator="maf",
         num_atoms=-1,
+        z_score_obs=True,
         use_combined_loss=False,
-        train_with_mcmc=False,
-        mcmc_method="slice-np",
-        summary_net=None,
         retrain_from_scratch_each_round=False,
         discard_prior_samples=False,
     )

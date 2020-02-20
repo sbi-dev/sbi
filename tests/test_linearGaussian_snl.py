@@ -4,6 +4,7 @@ import sbi.utils as utils
 import torch
 from sbi import inference
 from torch import distributions
+from sbi.inference.snl.snl import SNL
 
 # use cpu by default
 torch.set_default_tensor_type("torch.FloatTensor")
@@ -34,7 +35,7 @@ def test_snl_on_linearGaussian_based_on_mmd(num_dim):
     )
 
     # create inference method
-    inference_method = inference.snl.SNL(
+    inference_method = SNL(
         simulator=simulator,
         prior=prior,
         true_observation=true_observation,
