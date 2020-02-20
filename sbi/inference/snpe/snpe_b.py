@@ -1,12 +1,12 @@
 import os
 import sbi.utils as utils
-from sbi.inference.snpe.base_snpe import base_snpe
+from sbi.inference.snpe.base_snpe import SnpeBase
 import torch
 from torch import distributions
 from torch.utils.tensorboard import SummaryWriter
 
 
-class SNPE_B(base_snpe):
+class SnpeB(SnpeBase):
     """
     Implementation of
     'Flexible statistical inference for mechanistic
@@ -40,7 +40,7 @@ class SNPE_B(base_snpe):
                 If -1, use all other parameters in minibatch.
         """
 
-        super(SNPE_B, self).__init__(
+        super(SnpeB, self).__init__(
             simulator=simulator,
             prior=prior,
             true_observation=true_observation,

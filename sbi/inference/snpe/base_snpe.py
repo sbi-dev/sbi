@@ -14,7 +14,7 @@ import warnings
 from sbi.inference.snpe.sbi_MDN_posterior import MDNPosterior
 
 
-class base_snpe:
+class SnpeBase:
     def __init__(
         self,
         simulator,
@@ -46,7 +46,7 @@ class base_snpe:
             z_score_obs: bool
                 Whether to z-score (=normalize) the data features x
             use_combined_loss: bool
-                Whether to jointly train prior samples using maximum likelihood.
+                Whether to jointly neural_net prior samples using maximum likelihood.
                 Useful to prevent density leaking when using box uniform priors.
             retrain_from_scratch_each_round: bool
                 Whether to retrain the conditional density estimator for the posterior
@@ -301,7 +301,7 @@ class base_snpe:
                 validation_fraction * num_examples >= batch_size
             ), "There are fewer samples in the validation set than the batchsize."
 
-        # Select random train and validation splits from (parameter, observation) pairs.
+        # Select random neural_net and validation splits from (parameter, observation) pairs.
         permuted_indices = torch.randperm(num_examples)
         num_training_examples = int((1 - validation_fraction) * num_examples)
         num_validation_examples = num_examples - num_training_examples
@@ -317,7 +317,7 @@ class base_snpe:
             torch.cat(self._prior_masks[ix:]),
         )
 
-        # Create train and validation loaders using a subset sampler.
+        # Create neural_net and validation loaders using a subset sampler.
         train_loader = data.DataLoader(
             dataset,
             batch_size=batch_size,
@@ -349,7 +349,8 @@ class base_snpe:
             # self._neural_posterior = deepcopy(self._model_bank[0])
 
         epochs = 0
-        while True:  # todo while not converged
+        converged = False
+        while not converged:
 
             # Train for a single epoch.
             self._neural_posterior.train()
@@ -411,8 +412,7 @@ class base_snpe:
             # If no validation improvement over many epochs, stop training.
             if epochs_since_last_improvement > stop_after_epochs - 1:
                 self._neural_posterior.load_state_dict(best_model_state_dict)
-                break
-                # todo: converged = True
+                converged = True
 
         # Update summary.
         self._summary["epochs"].append(epochs)

@@ -1,12 +1,12 @@
 import os
 import sbi.utils as utils
-from sbi.inference.snpe.base_snpe import base_snpe
+from sbi.inference.snpe.base_snpe import SnpeBase
 import torch
 from torch import distributions
 from torch.utils.tensorboard import SummaryWriter
 
 
-class APT(base_snpe):
+class APT(SnpeBase):
     """
     Implementation of
     'Automatic Posterior Transformation for Likelihood-free Inference'

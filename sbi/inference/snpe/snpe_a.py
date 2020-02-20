@@ -1,12 +1,12 @@
 import sbi.utils as utils
-from sbi.inference.snpe.base_snpe import base_snpe
+from sbi.inference.snpe.base_snpe import SnpeBase
 import torch
 import os
 from torch import distributions
 from torch.utils.tensorboard import SummaryWriter
 
 
-class SNPE_A(base_snpe):
+class SnpeA(SnpeBase):
     """
     Implementation of
     'Fast epsilon-free Inference of Simulation Models
@@ -39,7 +39,7 @@ class SNPE_A(base_snpe):
                 If -1, use all other parameters in minibatch.
         """
 
-        super(SNPE_A, self).__init__(simulator=simulator,
+        super(SnpeA, self).__init__(simulator=simulator,
                                       prior=prior,
                                       true_observation=true_observation,
                                       num_pilot_samples=num_pilot_samples,
@@ -60,7 +60,7 @@ class SNPE_A(base_snpe):
         else:
             self._summary_writer = summary_writer
 
-        raise NameError('Not implemented yet')
+        raise NotImplementedError
 
 
 
