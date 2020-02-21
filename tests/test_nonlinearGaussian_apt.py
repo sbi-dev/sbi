@@ -5,7 +5,7 @@ import numpy as np
 import sbi.simulators as simulators
 import sbi.utils as utils
 import torch
-from sbi.inference.apt import APT
+from sbi.inference.snpe.snpe_c import APT
 from torch import distributions
 
 # use cpu by default
@@ -28,16 +28,15 @@ def test_nonlinearGaussian_based_on_mmd():
     parameter_dim = ground_truth_parameters.shape[0]
     observation_dim = ground_truth_observation.shape[0]
 
+    print('here', ground_truth_observation)
+
     apt = APT(
         simulator=simulator,
-        true_observation=ground_truth_observation,
+        true_observation=ground_truth_observation[None, ],
         prior=prior,
-        density_estimator="maf",
         num_atoms=-1,
+        z_score_obs=True,
         use_combined_loss=False,
-        train_with_mcmc=False,
-        mcmc_method="slice-np",
-        summary_net=None,
         retrain_from_scratch_each_round=False,
         discard_prior_samples=False,
     )
@@ -49,7 +48,7 @@ def test_nonlinearGaussian_based_on_mmd():
     )
 
     # draw samples from posterior
-    samples = apt.sample_posterior(1000)
+    samples = apt._neural_posterior.sample(1000)
 
     # define target distribution (analytically tractable) and sample from it
     target_samples = simulator.get_ground_truth_posterior_samples(num_samples=1000)

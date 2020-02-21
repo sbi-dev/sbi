@@ -3,9 +3,12 @@ from sbi.utils.get_models import (
     get_neural_likelihood,
     get_neural_posterior,
 )
+from sbi.utils.get_sbi_models import (
+    get_sbi_posterior,
+)
 from sbi.utils.io import get_data_root, get_log_root, get_project_root, get_timestamp
 from sbi.utils.logging import summarize
-from sbi.utils.sbi import Normalize
+from sbi.utils.sbi import Normalize, build_inputs_and_contexts
 from sbi.utils.mmd import biased_mmd, unbiased_mmd_squared
 from sbi.utils.plot import plot_hist_marginals, plot_hist_marginals_pair
 from sbi.utils.torchutils import (

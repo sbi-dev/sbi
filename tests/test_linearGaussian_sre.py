@@ -4,6 +4,7 @@ import sbi.utils as utils
 import torch
 from sbi import inference
 from torch import distributions
+from sbi.inference.sre.sre import SRE
 
 # use cpu by default
 torch.set_default_tensor_type("torch.FloatTensor")
@@ -34,7 +35,7 @@ def test_sre_on_linearGaussian_based_on_mmd(num_dim):
     )
 
     # create inference method
-    inference_method = inference.SRE(
+    inference_method = SRE(
         simulator=simulator,
         prior=prior,
         true_observation=true_observation,

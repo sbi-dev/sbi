@@ -4,7 +4,7 @@ import numpy as np
 import sbi.simulators as simulators
 import sbi.utils as utils
 import torch
-from sbi.inference.apt import APT
+from sbi.inference.snpe.snpe_c import APT
 from torch import distributions
 
 # use cpu by default
@@ -22,7 +22,7 @@ def test_apt_on_twoMoons_based_on_mmd():
         low=-a * torch.ones(parameter_dim), high=a * torch.ones(parameter_dim),
     )
 
-    true_observation = torch.Tensor([0, 0])
+    true_observation = torch.Tensor([[0, 0]])
 
     apt = APT(
         simulator=simulator,
@@ -30,11 +30,7 @@ def test_apt_on_twoMoons_based_on_mmd():
         prior=prior,
         num_atoms=10,
         use_combined_loss=False,
-        density_estimator="maf",
         z_score_obs=True,
-        train_with_mcmc=False,
-        mcmc_method="slice-np",
-        summary_net=None,
         retrain_from_scratch_each_round=False,
         discard_prior_samples=False,
     )
@@ -46,7 +42,7 @@ def test_apt_on_twoMoons_based_on_mmd():
         batch_size=20,
     )
 
-    samples = apt.sample_posterior(10000)
+    samples = apt._neural_posterior.sample(1000)
     samples = utils.tensor2numpy(samples)
     target_samples = np.load(
         os.path.join(
@@ -66,5 +62,5 @@ def test_apt_on_twoMoons_based_on_mmd():
     mmd = utils.tensor2numpy(mmd)
 
     # check if mmd is larger than expected
-    max_mmd = 0.02
+    max_mmd = 0.03
     assert mmd < max_mmd, "MMD was larger than expected."

@@ -265,7 +265,7 @@ class SNL:
             torch.cat(self._observation_bank), torch.cat(self._parameter_bank)
         )
 
-        # Create train and validation loaders using a subset sampler.
+        # Create neural_net and validation loaders using a subset sampler.
         train_loader = data.DataLoader(
             dataset,
             batch_size=batch_size,
