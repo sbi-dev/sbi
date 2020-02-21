@@ -251,7 +251,7 @@ class SNL:
         # Get total number of training examples.
         num_examples = torch.cat(self._parameter_bank).shape[0]
 
-        # Select random neural_net and validation splits from (parameter, observation) pairs.
+        # Select random train and validation splits from (parameter, observation) pairs.
         permuted_indices = torch.randperm(num_examples)
         num_training_examples = int((1 - validation_fraction) * num_examples)
         num_validation_examples = num_examples - num_training_examples
