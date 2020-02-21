@@ -62,5 +62,5 @@ def test_apt_on_twoMoons_based_on_mmd():
     mmd = utils.tensor2numpy(mmd)
 
     # check if mmd is larger than expected
-    max_mmd = 0.02
+    max_mmd = 0.03
     assert mmd < max_mmd, "MMD was larger than expected."
