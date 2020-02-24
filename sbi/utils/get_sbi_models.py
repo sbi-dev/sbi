@@ -2,12 +2,13 @@ from sbi.utils.torchutils import create_alternating_binary_mask
 from torch import nn
 from torch.nn import functional as F
 
-from nflows import distributions as distributions_
-from nflows import transforms
-from nflows.nn import nets
+from pyknos.nflows import distributions as distributions_
+from pyknos.nflows import transforms
+from pyknos.nflows.nn import nets
 from sbi.inference.snpe.sbi_MDN_posterior import MDNPosterior
 from sbi.inference.snpe.sbi_flow_posterior import FlowPosterior
 import torch
+
 
 def get_sbi_posterior(
     model,
