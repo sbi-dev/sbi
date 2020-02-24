@@ -27,7 +27,7 @@ Examples are collected in notebooks in `examples/`.
 
 ## Git LFS
 
-We use git lfs to store binary files, e.g., example notebooks. To use git lfs follow installation instructions here https://git-lfs.github.com/. 
+We use git lfs to store binary files, e.g., example notebooks. To use git lfs follow installation instructions here https://git-lfs.github.com/. In particular, in a freshly cloned repository on a new machine, you will need both `git-lfs install` and `git-lfs pull`.
 
 ## Acknowledgements
 This code builds heavily on previous work by [Conor Durkan](https://conormdurkan.github.io/), [George Papamakarios](https://gpapamak.github.io/) and [Artur Bekasov](https://arturbekasov.github.io/).
