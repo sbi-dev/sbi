@@ -6,8 +6,12 @@
 # Notebook checkpoints
 .ipynb_checkpoints
 
+# log files 
+*sbi-logs/
+
 # System
 .DS_Store
+.vscode
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
