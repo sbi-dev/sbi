@@ -5,6 +5,7 @@ from sbi.utils.get_models import (
 )
 from sbi.utils.get_sbi_models import (
     get_sbi_posterior,
+    get_sbi_likelihood,
 )
 from sbi.utils.io import get_data_root, get_log_root, get_project_root, get_timestamp
 from sbi.utils.logging import summarize

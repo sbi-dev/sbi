@@ -34,8 +34,7 @@ class SNL:
         simulator,
         prior,
         true_observation,
-        neural_likelihood,
-        mcmc_method="slice-np",
+        density_estimator,
         summary_writer=None,
         device=None,
     ):
@@ -64,34 +63,10 @@ class SNL:
         self._simulator = simulator
         self._prior = prior
         self._true_observation = true_observation
-        self._neural_likelihood = neural_likelihood
-        self._mcmc_method = mcmc_method
+        self._neural_likelihood = density_estimator
         self._device = get_default_device() if device is None else device
 
-        # Defining the potential function as an object means Pyro's MCMC scheme
-        # can pickle it to be used across multiple chains in parallel, even if
-        # the potential function requires evaluating a neural likelihood as is the
-        # case here.
-        self._potential_function = NeuralPotentialFunction(
-            neural_likelihood=self._neural_likelihood,
-            prior=self._prior,
-            true_observation=self._true_observation,
-        )
-
-        # TODO: decide on Slice Sampling implementation
-        target_log_prob = (
-            lambda parameters: self._neural_likelihood.log_prob(
-                inputs=self._true_observation.reshape(1, -1),
-                context=torch.Tensor(parameters).reshape(1, -1),
-            ).item()
-            + self._prior.log_prob(torch.Tensor(parameters)).sum().item()
-        )
-        self._neural_likelihood.eval()
-        self.posterior_sampler = SliceSampler(
-            utils.tensor2numpy(self._prior.sample((1,))).reshape(-1),
-            lp_f=target_log_prob,
-            thin=10,
-        )
+        # switch to training mode
         self._neural_likelihood.train()
 
         # Need somewhere to store (parameter, observation) pairs from each round.
@@ -147,7 +122,7 @@ class SNL:
             else:
                 parameters, observations = simulators.simulation_wrapper(
                     simulator=self._simulator,
-                    parameter_sample_fn=lambda num_samples: self.sample_posterior(
+                    parameter_sample_fn=lambda num_samples: self._neural_likelihood.sample(
                         num_samples
                     ),
                     num_samples=num_simulations_per_round,
@@ -179,59 +154,6 @@ class SNL:
                 observation_bank=self._observation_bank,
                 simulator=self._simulator,
             )
-
-    def sample_posterior(self, num_samples, thin=1):
-        """
-        Samples from posterior for true observation q(theta | x0) ~ q(x0 | theta) p(theta)
-        using most recent likelihood estimate q(x0 | theta) with MCMC.
-
-        :param num_samples: Number of samples to generate.
-        :param thin: Generate (num_samples * thin) samples in total, then select every
-        'thin' sample.
-        :return: torch.Tensor of shape [num_samples, parameter_dim]
-        """
-
-        # Always sample in eval mode.
-        self._neural_likelihood.eval()
-
-        if self._mcmc_method == "slice-np":
-            self.posterior_sampler.gen(20)
-            samples = torch.Tensor(self.posterior_sampler.gen(num_samples))
-
-        else:
-            if self._mcmc_method == "slice":
-                kernel = Slice(potential_function=self._potential_function)
-            elif self._mcmc_method == "hmc":
-                kernel = HMC(potential_fn=self._potential_function)
-            elif self._mcmc_method == "nuts":
-                kernel = NUTS(potential_fn=self._potential_function)
-            else:
-                raise ValueError(
-                    "'mcmc_method' must be one of ['slice', 'hmc', 'nuts']."
-                )
-            num_chains = mp.cpu_count() - 1
-
-            # TODO: decide on way to initialize chain
-            initial_params = self._prior.sample((num_chains,))
-            sampler = MCMC(
-                kernel=kernel,
-                num_samples=num_samples // num_chains + num_chains,
-                warmup_steps=200,
-                initial_params={"": initial_params},
-                num_chains=num_chains,
-            )
-            sampler.run()
-            samples = next(iter(sampler.get_samples().values())).reshape(
-                -1, self._simulator.parameter_dim
-            )
-
-            samples = samples[:num_samples].to(self._device)
-            assert samples.shape[0] == num_samples
-
-        # Back to training mode.
-        self._neural_likelihood.train()
-
-        return samples
 
     def _fit_likelihood(
         self,
@@ -301,7 +223,7 @@ class SNL:
             for batch in train_loader:
                 optimizer.zero_grad()
                 inputs, context = batch[0].to(self._device), batch[1].to(self._device)
-                log_prob = self._neural_likelihood.log_prob(inputs, context=context)
+                log_prob = self._neural_likelihood.log_prob(inputs, context=context, normalize=False)
                 loss = -torch.mean(log_prob)
                 loss.backward()
                 clip_grad_norm_(self._neural_likelihood.parameters(), max_norm=5.0)
@@ -318,7 +240,7 @@ class SNL:
                         batch[0].to(self._device),
                         batch[1].to(self._device),
                     )
-                    log_prob = self._neural_likelihood.log_prob(inputs, context=context)
+                    log_prob = self._neural_likelihood.log_prob(inputs, context=context, normalize=False)
                     log_prob_sum += log_prob.sum().item()
             validation_log_prob = log_prob_sum / num_validation_examples
 
@@ -375,6 +297,7 @@ class NeuralPotentialFunction:
         log_likelihood = self._neural_likelihood.log_prob(
             inputs=self._true_observation.reshape(1, -1).to("cpu"),
             context=parameters.reshape(1, -1),
+            normalize=False
         )
 
         # If prior is uniform we need to sum across last dimension.

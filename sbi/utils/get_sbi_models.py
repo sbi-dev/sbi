@@ -5,8 +5,8 @@ from torch.nn import functional as F
 from pyknos.nflows import distributions as distributions_
 from pyknos.nflows import transforms
 from pyknos.nflows.nn import nets
-from sbi.inference.snpe.sbi_MDN_posterior import MDNPosterior
-from sbi.inference.snpe.sbi_flow_posterior import FlowPosterior
+from sbi.inference.posteriors.sbi_MDN_posterior import MDNPosterior
+from sbi.inference.posteriors.sbi_flow_posterior import FlowPosterior
 import torch
 
 
@@ -16,14 +16,17 @@ def get_sbi_posterior(
     context,
     embedding=None,
     train_with_mcmc=False,
-    mcmc_method="slice_np",
+    mcmc_method="slice-np",
 ):
 
     mean, std = (prior.mean, prior.stddev)
     normalizing_transform = transforms.AffineTransform(shift=-mean / std, scale=1 / std)
 
     parameter_dim = prior.sample([1]).shape[1]
-    observation_dim = torch.tensor([context.shape[1]]).item()
+    if context.dim() == 1:
+        observation_dim = torch.tensor([context.shape]).item()
+    else:
+        observation_dim = torch.tensor([context.shape[1]]).item()
 
     if model == "mdn":
         hidden_features = 50
@@ -65,8 +68,9 @@ def get_sbi_posterior(
             custom_initialization=True,
         )
         neural_posterior = FlowPosterior(
-            transform,
-            distribution,
+            algorithm='snpe',
+            transform=transform,
+            distribution=distribution,
             prior=prior,
             context=context,
             embedding=embedding,
@@ -101,8 +105,9 @@ def get_sbi_posterior(
 
         distribution = distributions_.StandardNormal((parameter_dim,))
         neural_posterior = FlowPosterior(
-            transform,
-            distribution,
+            algorithm='snpe',
+            transform=transform,
+            distribution=distribution,
             prior=prior,
             context=context,
             embedding=embedding,
@@ -143,8 +148,9 @@ def get_sbi_posterior(
 
         distribution = distributions_.StandardNormal((parameter_dim,))
         neural_posterior = FlowPosterior(
-            transform,
-            distribution,
+            algorithm='snpe',
+            transform=transform,
+            distribution=distribution,
             prior=prior,
             context=context,
             embedding=embedding,
@@ -156,3 +162,126 @@ def get_sbi_posterior(
         raise ValueError
 
     return neural_posterior
+
+
+def get_sbi_likelihood(
+        model,
+        prior,
+        context,
+        embedding=None,
+        mcmc_method='slice-np'
+):
+    parameter_dim = prior.sample([1]).shape[1]
+    if context.dim() == 1:
+        observation_dim = torch.tensor([context.shape]).item()
+    else:
+        observation_dim = torch.tensor([context.shape[1]]).item()
+
+    if model == "mdn":
+        hidden_features = 50
+        neural_likelihood = MultivariateGaussianMDN(
+            features=observation_dim,
+            context_features=parameter_dim,
+            hidden_features=hidden_features,
+            hidden_net=nn.Sequential(
+                nn.Linear(parameter_dim, hidden_features),
+                nn.BatchNorm1d(hidden_features),
+                nn.ReLU(),
+                nn.Dropout(p=0.0),
+                nn.Linear(hidden_features, hidden_features),
+                nn.BatchNorm1d(hidden_features),
+                nn.ReLU(),
+                nn.Linear(hidden_features, hidden_features),
+                nn.BatchNorm1d(hidden_features),
+                nn.ReLU(),
+            ),
+            num_components=20,
+            custom_initialization=True,
+        )
+
+    elif model == "made":
+        neural_likelihood = MixtureOfGaussiansMADE(
+            features=observation_dim,
+            hidden_features=50,
+            context_features=parameter_dim,
+            num_blocks=4,
+            num_mixture_components=10,
+            use_residual_blocks=True,
+            random_mask=False,
+            activation=F.relu,
+            use_batch_norm=True,
+            dropout_probability=0.0,
+            custom_initialization=True,
+        )
+
+    elif model == "maf":
+        transform = transforms.CompositeTransform(
+            [
+                transforms.CompositeTransform(
+                    [
+                        transforms.MaskedAffineAutoregressiveTransform(
+                            features=observation_dim,
+                            hidden_features=50,
+                            context_features=parameter_dim,
+                            num_blocks=2,
+                            use_residual_blocks=False,
+                            random_mask=False,
+                            activation=F.tanh,
+                            dropout_probability=0.0,
+                            use_batch_norm=True,
+                        ),
+                        transforms.RandomPermutation(features=observation_dim),
+                    ]
+                )
+                for _ in range(5)
+            ]
+        )
+        distribution = distributions_.StandardNormal((observation_dim,))
+
+        neural_likelihood = FlowPosterior(
+            algorithm='snl',
+            transform=transform,
+            distribution=distribution,
+            prior=prior,
+            context=context,
+            embedding=embedding,
+            mcmc_method=mcmc_method
+        )
+
+    elif model == "nsf":
+        transform = transforms.CompositeTransform(
+            [
+                transforms.CompositeTransform(
+                    [
+                        transforms.PiecewiseRationalQuadraticCouplingTransform(
+                            mask=create_alternating_binary_mask(
+                                features=observation_dim, even=(i % 2 == 0)
+                            ),
+                            transform_net_create_fn=lambda in_features, out_features: nets.ResidualNet(
+                                in_features=in_features,
+                                out_features=out_features,
+                                hidden_features=50,
+                                context_features=parameter_dim,
+                                num_blocks=2,
+                                activation=F.relu,
+                                dropout_probability=0.0,
+                                use_batch_norm=False,
+                            ),
+                            num_bins=10,
+                            tails="linear",
+                            tail_bound=3.0,
+                            apply_unconditional_transform=False,
+                        ),
+                        transforms.LULinear(observation_dim, identity_init=True),
+                    ]
+                )
+                for i in range(5)
+            ]
+        )
+        distribution = distributions_.StandardNormal((observation_dim,))
+        neural_likelihood = flows.Flow(transform, distribution)
+
+    else:
+        raise ValueError
+
+    return neural_likelihood
