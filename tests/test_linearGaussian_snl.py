@@ -14,7 +14,7 @@ torch.manual_seed(0)
 
 # will be called by pytest. Then runs test_*(num_dim) for 1D and 3D
 
-
+@pytest.mark.slow
 @pytest.mark.parametrize("num_dim", [1, 3])
 def test_snl_on_linearGaussian_based_on_mmd(num_dim):
 
