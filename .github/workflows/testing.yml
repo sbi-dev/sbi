@@ -23,13 +23,6 @@ jobs:
         python-version: '3.7.6'
         architecture: 'x64'
     
-    - name: Checkout private dep nflows
-      uses: actions/checkout@v2
-      with:
-        repository: mackelab/nflows
-        token: ${{ secrets.access_pyknos_nflows_private }}
-        path: nflows
-        
     - name: Checkout private dep pyknos
       uses: actions/checkout@v2
       with:
@@ -40,10 +33,7 @@ jobs:
     - name: Install private deps
       run: |
         python -m pip install --upgrade pip
-        pwd
         cd pyknos
-        pip install -e .
-        cd ../nflows
         pip install -e .
 
     - name: Install dependencies
