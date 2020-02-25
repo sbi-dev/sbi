@@ -27,14 +27,14 @@ jobs:
       uses: actions/checkout@v2
       with:
         repository: mackelab/nflows
-        token: 1ff7f862c8c0dea93deab925019fdb8df3144905
+        token: ${{ secrets.access_pyknos_nflows_private }}
         path: nflows
         
     - name: Checkout private dep pyknos
       uses: actions/checkout@v2
       with:
         repository: mackelab/pyknos
-        token: 1ff7f862c8c0dea93deab925019fdb8df3144905
+        token: ${{ secrets.access_pyknos_nflows_private }}
         path: pyknos
         
     - name: Install private deps
