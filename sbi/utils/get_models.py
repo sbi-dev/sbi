@@ -6,7 +6,8 @@ from pyknos.nflows import distributions as distributions_
 from pyknos.nflows import flows
 from pyknos.nflows import transforms
 from pyknos.nflows.nn import nets
-from pyknos.nflows.nn.nde import MixtureOfGaussiansMADE, MultivariateGaussianMDN
+from pyknos.nflows.nn.nde import MixtureOfGaussiansMADE
+from pyknos.mdn.mdn import MultivariateGaussianMDN
 
 
 def get_neural_posterior(model, embedding, parameter_dim, observation_dim, prior):
