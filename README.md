@@ -1,5 +1,3 @@
-[![Build Status](https://travis-ci.org/mackelab/sbi.svg?branch=master)](https://travis-ci.org/mackelab/sbi)
-
 ![Tests](https://github.com/mackelab/sbi/workflows/Tests/badge.svg?branch=master)
 
 ## Description
@@ -17,7 +15,7 @@ Features neural likelihood-free methods from
 
 ## Setup
 
-Clone the repo and install all the dependencies using the `environment.yml` file to create a conda environment: `conda env create -f environment.yml`
+Clone the repo and install all the dependencies using the `environment.yml` file to create a conda environment: `conda env create -f environment.yml`.
 
 Alternatively, you can install via `setup.py` using `pip install -e ".[dev]"` (the dev flag installs development and testing dependencies).
 
