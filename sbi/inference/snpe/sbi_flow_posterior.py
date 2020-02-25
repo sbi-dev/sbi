@@ -7,7 +7,7 @@ from pyro.infer.mcmc.api import MCMC
 from sbi.mcmc import Slice
 from torch import multiprocessing as mp
 
-from nflows import flows
+from pyknos.nflows import flows
 from sbi.mcmc import SliceSampler
 
 
@@ -325,10 +325,12 @@ class FlowPosterior(flows.Flow):
             embedding_net: nn.Module
                 neural net to encode the context
         """
-        assert isinstance(embedding_net, torch.nn.Module), 'embedding_net is not a nn.Module. ' \
-                                                           'If you want to use hard-coded summary features, ' \
-                                                           'please simply pass the encoded features and pass ' \
-                                                           'embedding_net=None'
+        assert isinstance(embedding_net, torch.nn.Module), (
+            "embedding_net is not a nn.Module. "
+            "If you want to use hard-coded summary features, "
+            "please simply pass the encoded features and pass "
+            "embedding_net=None"
+        )
         self.embedding_net = embedding_net
 
 

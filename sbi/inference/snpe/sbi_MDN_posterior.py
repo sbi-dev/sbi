@@ -8,7 +8,7 @@ from sbi.mcmc import Slice
 from torch import multiprocessing as mp
 
 from sbi.mcmc import SliceSampler
-from nflows.nn.nde import MultivariateGaussianMDN
+from pyknos.mdn.mdn import MultivariateGaussianMDN
 
 
 class MDNPosterior(MultivariateGaussianMDN):
@@ -303,7 +303,6 @@ class MDNPosterior(MultivariateGaussianMDN):
         self.train()
 
         return samples
-
 
 
 class NeuralPotentialFunction:

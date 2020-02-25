@@ -21,8 +21,8 @@ dependencies:
   - pillow
   - pip
   - pip:
+    - "pyknos@git+ssh://git@github.com/mackelab/pyknos.git"
     - pyro-ppl
-    - "nflows@git+https://github.com/mackelab/nflows-pr"
     - torchtestcase
     - -e .  # install package in development mode
   - pytest
