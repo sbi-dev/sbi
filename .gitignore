@@ -3,11 +3,15 @@
 /*.egg
 /*.egg-info
 
+# log files 
+*sbi-logs/
+
 # Notebook checkpoints
 .ipynb_checkpoints
 
 # System
 .DS_Store
+.vscode
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
