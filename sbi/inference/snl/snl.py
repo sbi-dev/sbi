@@ -2,16 +2,17 @@ import os
 from copy import deepcopy
 
 import torch
+from sbi.utils.torchutils import get_default_device
 from pyro.infer.mcmc import HMC, NUTS
 from pyro.infer.mcmc.api import MCMC
 from torch import distributions
-from torch import multiprocessing as mp
 from torch import optim
 from torch.nn.utils import clip_grad_norm_
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
+from sbi.inference.posteriors.sbi_posterior import Posterior
 
 import sbi.simulators as simulators
 import sbi.utils as utils
@@ -34,9 +35,10 @@ class SNL:
         simulator,
         prior,
         true_observation,
-        density_estimator,
+        density_estimator=None,
         summary_writer=None,
         device=None,
+        mcmc_method="slice-np",
     ):
         """
 
@@ -63,11 +65,25 @@ class SNL:
         self._simulator = simulator
         self._prior = prior
         self._true_observation = true_observation
-        self._neural_likelihood = density_estimator
         self._device = get_default_device() if device is None else device
 
+        # create the deep neural density estimator
+        if density_estimator is None:
+            density_estimator = utils.likelihood_nn(
+                model="maf", prior=self._prior, context=self._true_observation,
+            )
+
+        # create neural posterior which can sample()
+        self._neural_posterior = Posterior(
+            algorithm="snl",
+            neural_net=density_estimator,
+            prior=prior,
+            context=true_observation,
+            mcmc_method=mcmc_method,
+        )
+
         # switch to training mode
-        self._neural_likelihood.train()
+        self._neural_posterior.neural_net.train()
 
         # Need somewhere to store (parameter, observation) pairs from each round.
         self._parameter_bank, self._observation_bank = [], []
@@ -122,7 +138,7 @@ class SNL:
             else:
                 parameters, observations = simulators.simulation_wrapper(
                     simulator=self._simulator,
-                    parameter_sample_fn=lambda num_samples: self._neural_likelihood.sample(
+                    parameter_sample_fn=lambda num_samples: self._neural_posterior.sample(
                         num_samples
                     ),
                     num_samples=num_simulations_per_round,
@@ -154,6 +170,7 @@ class SNL:
                 observation_bank=self._observation_bank,
                 simulator=self._simulator,
             )
+        return self._neural_posterior
 
     def _fit_likelihood(
         self,
@@ -207,7 +224,9 @@ class SNL:
             sampler=SubsetRandomSampler(val_indices),
         )
 
-        optimizer = optim.Adam(self._neural_likelihood.parameters(), lr=learning_rate)
+        optimizer = optim.Adam(
+            self._neural_posterior.neural_net.parameters(), lr=learning_rate
+        )
         # Keep track of best_validation log_prob seen so far.
         best_validation_log_prob = -1e100
         # Keep track of number of epochs since last improvement.
@@ -219,20 +238,24 @@ class SNL:
         while True:
 
             # Train for a single epoch.
-            self._neural_likelihood.train()
+            self._neural_posterior.neural_net.train()
             for batch in train_loader:
                 optimizer.zero_grad()
                 inputs, context = batch[0].to(self._device), batch[1].to(self._device)
-                log_prob = self._neural_likelihood.log_prob(inputs, context=context, normalize=False)
+                log_prob = self._neural_posterior.log_prob(
+                    inputs, context=context, normalize=False
+                )
                 loss = -torch.mean(log_prob)
                 loss.backward()
-                clip_grad_norm_(self._neural_likelihood.parameters(), max_norm=5.0)
+                clip_grad_norm_(
+                    self._neural_posterior.neural_net.parameters(), max_norm=5.0
+                )
                 optimizer.step()
 
             epochs += 1
 
             # Calculate validation performance.
-            self._neural_likelihood.eval()
+            self._neural_posterior.neural_net.eval()
             log_prob_sum = 0
             with torch.no_grad():
                 for batch in val_loader:
@@ -240,7 +263,9 @@ class SNL:
                         batch[0].to(self._device),
                         batch[1].to(self._device),
                     )
-                    log_prob = self._neural_likelihood.log_prob(inputs, context=context, normalize=False)
+                    log_prob = self._neural_posterior.log_prob(
+                        inputs, context=context, normalize=False
+                    )
                     log_prob_sum += log_prob.sum().item()
             validation_log_prob = log_prob_sum / num_validation_examples
 
@@ -248,13 +273,15 @@ class SNL:
             if validation_log_prob > best_validation_log_prob:
                 best_validation_log_prob = validation_log_prob
                 epochs_since_last_improvement = 0
-                best_model_state_dict = deepcopy(self._neural_likelihood.state_dict())
+                best_model_state_dict = deepcopy(
+                    self._neural_posterior.neural_net.state_dict()
+                )
             else:
                 epochs_since_last_improvement += 1
 
             # If no validation improvement over many epochs, stop training.
             if epochs_since_last_improvement > stop_after_epochs - 1:
-                self._neural_likelihood.load_state_dict(best_model_state_dict)
+                self._neural_posterior.neural_net.load_state_dict(best_model_state_dict)
                 break
 
         # Update summary.
@@ -286,7 +313,7 @@ class NeuralPotentialFunction:
     def __call__(self, inputs_dict):
         """
         Call method allows the object to be used as a function.
-        Evaluates the given parameters using a given neural likelhood, prior,
+        Evaluates the given parameters using a given neural likelihood, prior,
         and true observation.
 
         :param inputs_dict: dict of parameter values which need evaluation for MCMC.
@@ -297,7 +324,7 @@ class NeuralPotentialFunction:
         log_likelihood = self._neural_likelihood.log_prob(
             inputs=self._true_observation.reshape(1, -1).to("cpu"),
             context=parameters.reshape(1, -1),
-            normalize=False
+            normalize=False,
         )
 
         # If prior is uniform we need to sum across last dimension.

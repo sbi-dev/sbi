@@ -2,13 +2,10 @@ import pytest
 import torch
 from torch import distributions
 
+import sbi.simulators as simulators
 import sbi.utils as utils
 from sbi import inference
 from sbi.inference.snl.snl import SNL
-from sbi.simulators.linear_gaussian import (
-    get_ground_truth_posterior_samples_linear_gaussian,
-    linear_gaussian
-)
 
 # use cpu by default
 torch.set_default_tensor_type("torch.FloatTensor")
@@ -74,8 +71,10 @@ def test_snl_on_linearGaussian_based_on_mmd(num_dim: int):
     true_observation = torch.zeros(num_dim)
 
     # get neural likelihood
-    neural_likelihood = utils.get_neural_likelihood(
-        "maf", parameter_dim=parameter_dim, observation_dim=observation_dim,
+    neural_likelihood = utils.likelihood_nn(
+        model='maf',
+        prior=prior,
+        context=true_observation,
     )
 
     # create inference method
@@ -85,13 +84,15 @@ def test_snl_on_linearGaussian_based_on_mmd(num_dim: int):
         true_observation=true_observation,
         neural_likelihood=neural_likelihood,
         mcmc_method="slice-np",
+        density_estimator=neural_likelihood,
+        mcmc_method='slice-np'
     )
 
     # run inference
-    inference_method.run_inference(num_rounds=1, num_simulations_per_round=1000)
+    posterior = inference_method.run_inference(num_rounds=1, num_simulations_per_round=1000)
 
     # draw samples from posterior
-    samples = inference_method.sample_posterior(num_samples=1000)
+    samples = posterior.sample(num_samples=100)
 
     # define target distribution (analytically tractable) and sample from it
     target_samples = get_ground_truth_posterior_samples_linear_gaussian(

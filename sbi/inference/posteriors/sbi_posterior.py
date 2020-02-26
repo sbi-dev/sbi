@@ -6,42 +6,34 @@ from pyro.infer.mcmc import HMC, NUTS
 from pyro.infer.mcmc.api import MCMC
 from sbi.mcmc import Slice
 from torch import multiprocessing as mp
-
-from pyknos.nflows import flows
 from sbi.mcmc import SliceSampler
-import sbi.inference.snpe.base_snpe as snpe
-import sbi.inference.snl as snl
-import sbi.inference.sre as sre
+import sbi.inference
 
 
-class FlowPosterior(flows.Flow):
+class Posterior:
     def __init__(
         self,
         algorithm,
-        transform,
-        distribution,
+        neural_net,
         prior,
         context,
-        embedding=None,
         train_with_mcmc=True,
         mcmc_method="slice-np",
     ):
         """
         Args:
             algorithm: string, 'snpe', 'snl', 'sre'
-            transform: neural net
-            distribution: base dist
+            neural_net: depends on algorithm: classifier for sre, density estimator for snpe and snl
             prior: prior dist
             context: Tensor or None, conditioning variables. If a Tensor, it must have the same
                 number or rows as the inputs. If None, the context is ignored.
-            embedding: neural net to encode context
             train_with_mcmc: bool. Sample rejection or MCMC?
 
         Returns:
             A Tensor of shape [input_size], the log probability of the inputs given the context.
         """
 
-        super().__init__(transform, distribution, embedding)
+        self.neural_net = neural_net
         self.prior = prior
         self.context = context
         self._train_with_mcmc = train_with_mcmc
@@ -67,7 +59,7 @@ class FlowPosterior(flows.Flow):
         """
 
         # we care about the normalized density only when we do snpe.
-        if self._algorithm != 'snpe':
+        if self._algorithm != "snpe":
             normalize = False
 
         # format inputs and context into the correct shape
@@ -76,10 +68,10 @@ class FlowPosterior(flows.Flow):
         )
 
         # go into evaluation mode
-        self.eval()
+        self.neural_net.eval()
 
-        # compute the unnormalized log probability by evaluating the MDN
-        unnormalized_log_prob = self._log_prob(inputs, context)
+        # compute the unnormalized log probability by evaluating the network
+        unnormalized_log_prob = self.neural_net.log_prob(inputs, context)
 
         # find the acceptance rate
         if normalize:
@@ -88,30 +80,6 @@ class FlowPosterior(flows.Flow):
             acceptance_prob = 1.0
 
         return np.log(acceptance_prob) + unnormalized_log_prob
-
-    def _log_prob(self, inputs: torch.tensor, context: torch.tensor = None):
-        """
-        Evaluate posterior distribution at datapoint
-
-        Args:
-            inputs: where to evaluate posterior
-            context: context/conditioning/observation
-
-        Returns: log-probability
-        """
-        if context is None:
-            context = self.context[
-                None,
-            ]
-
-        if len(inputs.shape) == 1:
-            inputs = inputs[
-                None,
-            ]  # append a dimension
-
-        self.eval()
-
-        return super()._log_prob(inputs, context=context)
 
     def estimate_acceptance_rate(
         self, num_samples: int = int(1e4), context: torch.tensor = None
@@ -132,19 +100,15 @@ class FlowPosterior(flows.Flow):
             context = self.context
 
         # Always sample in eval mode.
-        self.eval()
+        self.neural_net.eval()
 
         total_num_accepted_samples, total_num_generated_samples = 0, 0
         while total_num_generated_samples < num_samples:
 
             # Generate samples from posterior.
-            candidate_samples = (
-                super()
-                ._sample(  # sample from unbounded flow
-                    10000, context=context.reshape(1, -1)
-                )
-                .squeeze(0)
-            )
+            candidate_samples = self.neural_net.sample(  # sample from unbounded flow
+                10000, context=context.reshape(1, -1)
+            ).squeeze(0)
 
             # Evaluate posterior samples under the prior.
             prior_log_prob = self.prior.log_prob(candidate_samples)
@@ -159,11 +123,11 @@ class FlowPosterior(flows.Flow):
             total_num_generated_samples += candidate_samples.shape[0]
 
         # Back to training mode.
-        self.train()
+        self.neural_net.train()
 
         return total_num_accepted_samples / total_num_generated_samples
 
-    def _sample(self, num_samples: int, context: torch.tensor = None):
+    def sample(self, num_samples: int, context: torch.tensor = None):
         """
         Sample posterior distribution.
 
@@ -178,8 +142,6 @@ class FlowPosterior(flows.Flow):
 
         if context is None:
             context = self.context
-
-        print('self.mcmc', self._mcmc_method)
 
         if self._train_with_mcmc:
             return self._sample_posterior_mcmc(
@@ -207,7 +169,7 @@ class FlowPosterior(flows.Flow):
         """
 
         # Always sample in eval mode.
-        self.eval()
+        self.neural_net.eval()
 
         # Rejection sampling is potentially needed for the posterior.
         # This is because the prior may not have support everywhere.
@@ -219,11 +181,9 @@ class FlowPosterior(flows.Flow):
         while num_remaining_samples > 0:
 
             # Generate samples from unbounded posterior.
-            candidate_samples = (
-                super()
-                ._sample(max(10000, num_samples), context=context.reshape(1, -1))
-                .squeeze(0)
-            )
+            candidate_samples = self.neural_net.sample(
+                max(10000, num_samples), context=context.reshape(1, -1)
+            ).squeeze(0)
 
             # Evaluate posterior samples under the prior.
             prior_log_prob = self.prior.log_prob(candidate_samples)
@@ -243,7 +203,7 @@ class FlowPosterior(flows.Flow):
             _total_num_generated_examples += candidate_samples.shape[0]
 
         # Back to training mode.
-        self.train()
+        self.neural_net.train()
 
         # Aggregate collected samples.
         samples = torch.cat(samples)
@@ -275,39 +235,42 @@ class FlowPosterior(flows.Flow):
             torch.Tensor of shape [num_samples, parameter_dim]
         """
 
-        if mcmc_method == 'slice-np':
+        if mcmc_method == "slice-np":
             samples = self.slice_np_mcmc(num_samples, context, thin)
         else:
             samples = self.pyro_mcmc(num_samples, context, mcmc_method, thin)
 
         # Back to training mode.
-        self.train()
+        self.neural_net.train()
 
         return samples
 
     def slice_np_mcmc(self, num_samples, context, thin):
-        if self._algorithm == 'snpe':
-            target_log_prob = (
-                    lambda parameters: self.log_prob(
-                        inputs=context.reshape(1, -1),
-                        context=torch.Tensor(parameters).reshape(1, -1),
-                        normalize=False
-                    ).item()
-                )
-        elif self._algorithm == 'snl':
+        if self._algorithm == "snpe":
+            target_log_prob = lambda parameters: self.log_prob(
+                inputs=context.reshape(1, -1),
+                context=torch.Tensor(parameters).reshape(1, -1),
+                normalize=False,
+            ).item()
+        elif self._algorithm == "snl":
             target_log_prob = (
                 lambda parameters: self.log_prob(
                     inputs=context.reshape(1, -1),
                     context=torch.Tensor(parameters).reshape(1, -1),
-                    normalize=False
+                    normalize=False,
                 ).item()
                 + self.prior.log_prob(torch.Tensor(parameters)).sum().item()
             )
-        elif self._algorithm == 'sre':
-            raise NotImplementedError
+        elif self._algorithm == "sre":
+            target_log_prob = (
+                lambda parameters: self.neural_net(
+                    torch.cat((torch.Tensor(parameters), context)).reshape(1, -1)
+                ).item()
+                + self.prior.log_prob(torch.Tensor(parameters)).sum().item()
+            )
         else:
             raise NameError
-        self.eval()
+        self.neural_net.eval()
 
         posterior_sampler = SliceSampler(
             utils.tensor2numpy(self.prior.sample((1,))).reshape(-1),
@@ -315,9 +278,10 @@ class FlowPosterior(flows.Flow):
             thin=thin,
         )
 
-        self.eval()
+        self.neural_net.train()
 
         posterior_sampler.gen(20)
+
         samples = torch.Tensor(posterior_sampler.gen(num_samples))
 
         return samples
@@ -329,23 +293,23 @@ class FlowPosterior(flows.Flow):
         # the potential function requires evaluating a neural likelihood as is the
         # case here.
         # build potential function depending on what algorithm is used
-        if self._algorithm == 'snpe':
-            potential_function = snpe.NeuralPotentialFunction(
-                self, self.prior, context  # TODO: passing self not nice
+        if self._algorithm == "snpe":
+            potential_function = sbi.inference.snpe.base_snpe.NeuralPotentialFunction(
+                self.neural_net, self.prior, context
             )
-        elif self._algorithm == 'snl':
-            potential_function = snl.NeuralPotentialFunction(
-                self, self.prior, context
+        elif self._algorithm == "snl":
+            potential_function = sbi.inference.snl.NeuralPotentialFunction(
+                self.neural_net, self.prior, context
             )
-        elif self._algorithm == 'sre':
-            potential_function = sre.NeuralPotentialFunction(
-                self, self.prior, context
+        elif self._algorithm == "sre":
+            potential_function = sbi.inference.sre.NeuralPotentialFunction(
+                self.neural_net, self.prior, context
             )
         else:
             raise NameError
 
         # Always sample in eval mode.
-        self.eval()
+        self.neural_net.eval()
 
         if mcmc_method == "slice":
             kernel = Slice(potential_function=potential_function)
@@ -354,9 +318,7 @@ class FlowPosterior(flows.Flow):
         elif mcmc_method == "nuts":
             kernel = NUTS(potential_fn=potential_function)
         else:
-            raise ValueError(
-                "'mcmc_method' must be one of ['slice', 'hmc', 'nuts']."
-            )
+            raise ValueError("'mcmc_method' must be one of ['slice', 'hmc', 'nuts'].")
         num_chains = mp.cpu_count() - 1
 
         initial_params = self.prior.sample((num_chains,))
@@ -392,4 +354,4 @@ class FlowPosterior(flows.Flow):
             "please simply pass the encoded features and pass "
             "embedding_net=None"
         )
-        self.embedding_net = embedding_net
+        self.neural_net.embedding_net = embedding_net

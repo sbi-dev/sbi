@@ -78,8 +78,10 @@ def test_sre_on_linearGaussian_based_on_mmd(num_dim: int):
     true_observation = torch.zeros(num_dim)
 
     # get classifier
-    classifier = utils.get_classifier(
-        "resnet", parameter_dim=parameter_dim, observation_dim=observation_dim,
+    classifier = utils.classifier_nn(
+        "resnet",
+        prior=prior,
+        context=true_observation,
     )
 
     # create inference method
@@ -92,10 +94,10 @@ def test_sre_on_linearGaussian_based_on_mmd(num_dim: int):
     )
 
     # run inference
-    inference_method.run_inference(num_rounds=1, num_simulations_per_round=1000)
+    posterior = inference_method.run_inference(num_rounds=1, num_simulations_per_round=1000)
 
     # draw samples from posterior
-    samples = inference_method.sample_posterior(num_samples=1000)
+    samples = posterior.sample(num_samples=100)
 
     # define target distribution (analytically tractable) and sample from it
     target_samples = get_ground_truth_posterior_samples_linear_gaussian(
