@@ -13,6 +13,42 @@ torch.set_default_tensor_type("torch.FloatTensor")
 torch.manual_seed(0)
 
 # will be called by pytest. Then runs test_*(num_dim) for 1D and 3D
+@pytest.mark.parametrize("num_dim", [1, 3])
+def test_sre_on_linearGaussian_based_on_mmd(num_dim):
+    # test api for inference on linear Gaussian model using SNL
+    # avoids expensive computations for fast testing
+
+    dim, std = num_dim, 1.0
+    simulator = simulators.LinearGaussianSimulator(dim=dim, std=std)
+    prior = distributions.MultivariateNormal(
+        loc=torch.zeros(dim), covariance_matrix=torch.eye(dim)
+    )
+
+    parameter_dim, observation_dim = dim, dim
+    true_observation = torch.zeros(dim)
+
+    # get classifier
+    classifier = utils.get_classifier(
+        "resnet",
+        parameter_dim=simulator.parameter_dim,
+        observation_dim=simulator.observation_dim,
+    )
+
+    # create inference method
+    inference_method = SRE(
+        simulator=simulator,
+        prior=prior,
+        true_observation=true_observation,
+        classifier=classifier,
+        mcmc_method="slice-np",
+    )
+
+    # run inference
+    inference_method.run_inference(num_rounds=1, num_simulations_per_round=100)
+
+    # draw samples from posterior
+    samples = inference_method.sample_posterior(num_samples=10)
+
 
 @pytest.mark.slow
 @pytest.mark.parametrize("num_dim", [1, 3])
