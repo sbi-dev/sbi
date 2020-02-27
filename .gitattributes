@@ -1,2 +1,1 @@
-*.ipynb filter=lfs diff=lfs merge=lfs -text
-*.npy filter=lfs diff=lfs merge=lfs -text
+*_gitlfs.* filter=lfs diff=lfs merge=lfs -text
