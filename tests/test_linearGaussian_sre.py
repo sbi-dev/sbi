@@ -1,9 +1,10 @@
 import pytest
+import torch
+from torch import distributions
+
 import sbi.simulators as simulators
 import sbi.utils as utils
-import torch
 from sbi import inference
-from torch import distributions
 from sbi.inference.sre.sre import SRE
 
 # use cpu by default
@@ -13,10 +14,60 @@ torch.set_default_tensor_type("torch.FloatTensor")
 torch.manual_seed(0)
 
 # will be called by pytest. Then runs test_*(num_dim) for 1D and 3D
-
-
 @pytest.mark.parametrize("num_dim", [1, 3])
-def test_sre_on_linearGaussian_based_on_mmd(num_dim):
+def test_sre_on_linearGaussian_api(num_dim: int):
+    """Test inference api of SRE with linear gaussian model. 
+
+    Avoids intense computation for fast testing of API etc. 
+    
+    Keyword Arguments:
+        num_dim {int} -- Parameter dimension of the gaussian model (default: {3})
+    """
+    # test api for inference on linear Gaussian model using SNL
+    # avoids expensive computations for fast testing
+
+    dim, std = num_dim, 1.0
+    simulator = simulators.LinearGaussianSimulator(dim=dim, std=std)
+    prior = distributions.MultivariateNormal(
+        loc=torch.zeros(dim), covariance_matrix=torch.eye(dim)
+    )
+
+    parameter_dim, observation_dim = dim, dim
+    true_observation = torch.zeros(dim)
+
+    # get classifier
+    classifier = utils.get_classifier(
+        "resnet",
+        parameter_dim=simulator.parameter_dim,
+        observation_dim=simulator.observation_dim,
+    )
+
+    # create inference method
+    inference_method = SRE(
+        simulator=simulator,
+        prior=prior,
+        true_observation=true_observation,
+        classifier=classifier,
+        mcmc_method="slice-np",
+    )
+
+    # run inference
+    inference_method.run_inference(num_rounds=1, num_simulations_per_round=1000)
+
+    # draw samples from posterior
+    samples = inference_method.sample_posterior(num_samples=100)
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("num_dim", [1, 3])
+def test_sre_on_linearGaussian_based_on_mmd(num_dim: int):
+    """Test mmd accuracy of inference with SRE on linear gaussian model. 
+
+    NOTE: The mmd threshold is calculated based on a number of test runs and taking the mean plus 2 stds. 
+    
+    Keyword Arguments:
+        num_dim {int} -- Parameter dimension of the gaussian model (default: {3})
+    """
 
     dim, std = num_dim, 1.0
     simulator = simulators.LinearGaussianSimulator(dim=dim, std=std)

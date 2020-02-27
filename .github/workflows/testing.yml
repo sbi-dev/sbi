@@ -45,4 +45,4 @@ jobs:
       run: |
         pip install torchtestcase
         pip install pytest
-        pytest
+        pytest -m "not slow"

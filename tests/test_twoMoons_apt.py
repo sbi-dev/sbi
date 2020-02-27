@@ -6,6 +6,7 @@ import sbi.utils as utils
 import torch
 from sbi.inference.snpe.snpe_c import APT
 from torch import distributions
+import pytest
 
 # use cpu by default
 torch.set_default_tensor_type("torch.FloatTensor")
@@ -13,7 +14,7 @@ torch.set_default_tensor_type("torch.FloatTensor")
 # seed the simulations
 torch.manual_seed(0)
 
-
+@pytest.mark.slow
 def test_apt_on_twoMoons_based_on_mmd():
     simulator = simulators.TwoMoonsSimulator()
     a = 1
