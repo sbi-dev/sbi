@@ -1,10 +1,11 @@
 import pytest
+import torch
+from torch import distributions
+
 import sbi.simulators as simulators
 import sbi.utils as utils
-import torch
 from sbi import inference
 from sbi.inference.sre.sre import SRE
-from torch import distributions
 
 # use cpu by default
 torch.set_default_tensor_type("torch.FloatTensor")
@@ -14,7 +15,7 @@ torch.manual_seed(0)
 
 # will be called by pytest. Then runs test_*(num_dim) for 1D and 3D
 @pytest.mark.parametrize("num_dim", [1, 3])
-def test_sre_on_linearGaussian_api(num_dim: int = 3):
+def test_sre_on_linearGaussian_api(num_dim: int):
     """Test inference api of SRE with linear gaussian model. 
 
     Avoids intense computation for fast testing of API etc. 
@@ -51,15 +52,15 @@ def test_sre_on_linearGaussian_api(num_dim: int = 3):
     )
 
     # run inference
-    inference_method.run_inference(num_rounds=1, num_simulations_per_round=100)
+    inference_method.run_inference(num_rounds=1, num_simulations_per_round=1000)
 
     # draw samples from posterior
-    samples = inference_method.sample_posterior(num_samples=10)
+    samples = inference_method.sample_posterior(num_samples=100)
 
 
 @pytest.mark.slow
 @pytest.mark.parametrize("num_dim", [1, 3])
-def test_sre_on_linearGaussian_based_on_mmd(num_dim: int = 3):
+def test_sre_on_linearGaussian_based_on_mmd(num_dim: int):
     """Test mmd accuracy of inference with SRE on linear gaussian model. 
 
     NOTE: The mmd threshold is calculated based on a number of test runs and taking the mean plus 2 stds. 

@@ -2,11 +2,13 @@ import os
 import sys
 
 import numpy as np
+import pytest
+import torch
+from torch import distributions
+
 import sbi.simulators as simulators
 import sbi.utils as utils
-import torch
 from sbi.inference.snpe.snpe_c import APT
-from torch import distributions
 
 # use cpu by default
 torch.set_default_tensor_type("torch.FloatTensor")
@@ -15,6 +17,7 @@ torch.set_default_tensor_type("torch.FloatTensor")
 torch.manual_seed(0)
 
 
+@pytest.mark.slow
 def test_nonlinearGaussian_based_on_mmd():
     task = "nonlinear-gaussian"
     (
@@ -28,11 +31,11 @@ def test_nonlinearGaussian_based_on_mmd():
     parameter_dim = ground_truth_parameters.shape[0]
     observation_dim = ground_truth_observation.shape[0]
 
-    print('here', ground_truth_observation)
+    print("here", ground_truth_observation)
 
     apt = APT(
         simulator=simulator,
-        true_observation=ground_truth_observation[None, ],
+        true_observation=ground_truth_observation[None,],
         prior=prior,
         num_atoms=-1,
         z_score_obs=True,

@@ -1,10 +1,11 @@
 import pytest
+import torch
+from torch import distributions
+
 import sbi.simulators as simulators
 import sbi.utils as utils
-import torch
 from sbi import inference
 from sbi.inference.snl.snl import SNL
-from torch import distributions
 
 # use cpu by default
 torch.set_default_tensor_type("torch.FloatTensor")
@@ -14,7 +15,7 @@ torch.manual_seed(0)
 
 
 @pytest.mark.parametrize("num_dim", [1, 3])
-def test_snl_on_linearGaussian_api(num_dim: int = 3):
+def test_snl_on_linearGaussian_api(num_dim: int):
     """Test api for inference on linear Gaussian model using SNL.
     
     Avoids expensive computations for fast testing by using few training simulations and generating few posterior samples.
@@ -57,7 +58,7 @@ def test_snl_on_linearGaussian_api(num_dim: int = 3):
 # will be called by pytest. Then runs test_*(num_dim) for 1D and 3D
 @pytest.mark.slow
 @pytest.mark.parametrize("num_dim", [1, 3])
-def test_snl_on_linearGaussian_based_on_mmd(num_dim: int = 3):
+def test_snl_on_linearGaussian_based_on_mmd(num_dim: int):
     """Test snl inference on linear Gaussian via mmd to ground truth posterior. 
 
     NOTE: The mmd threshold is calculated based on a number of test runs and taking the mean plus 2 stds. 
