@@ -3,8 +3,8 @@ import sbi.simulators as simulators
 import sbi.utils as utils
 import torch
 from sbi import inference
-from torch import distributions
 from sbi.inference.sre.sre import SRE
+from torch import distributions
 
 # use cpu by default
 torch.set_default_tensor_type("torch.FloatTensor")
@@ -14,7 +14,14 @@ torch.manual_seed(0)
 
 # will be called by pytest. Then runs test_*(num_dim) for 1D and 3D
 @pytest.mark.parametrize("num_dim", [1, 3])
-def test_sre_on_linearGaussian_based_on_mmd(num_dim):
+def test_sre_on_linearGaussian_api(num_dim: int = 3):
+    """Test inference api of SRE with linear gaussian model. 
+
+    Avoids intense computation for fast testing of API etc. 
+    
+    Keyword Arguments:
+        num_dim {int} -- Parameter dimension of the gaussian model (default: {3})
+    """
     # test api for inference on linear Gaussian model using SNL
     # avoids expensive computations for fast testing
 
@@ -52,7 +59,14 @@ def test_sre_on_linearGaussian_based_on_mmd(num_dim):
 
 @pytest.mark.slow
 @pytest.mark.parametrize("num_dim", [1, 3])
-def test_sre_on_linearGaussian_based_on_mmd(num_dim):
+def test_sre_on_linearGaussian_based_on_mmd(num_dim: int = 3):
+    """Test mmd accuracy of inference with SRE on linear gaussian model. 
+
+    NOTE: The mmd threshold is calculated based on a number of test runs and taking the mean plus 2 stds. 
+    
+    Keyword Arguments:
+        num_dim {int} -- Parameter dimension of the gaussian model (default: {3})
+    """
 
     dim, std = num_dim, 1.0
     simulator = simulators.LinearGaussianSimulator(dim=dim, std=std)
