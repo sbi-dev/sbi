@@ -1,193 +1,196 @@
+# Copyright (c) 2017-2019 Uber Technologies, Inc.
+# SPDX-License-Identifier: Apache-2.0
+
 import torch
-
-import sbi.utils as utils
-
-from matplotlib import pyplot as plt
-from pyro.infer.mcmc.api import MCMC
 from pyro.infer.mcmc.mcmc_kernel import MCMCKernel
-from torch import distributions
+from pyro.infer.mcmc.util import initialize_model
 
 
 class Slice(MCMCKernel):
-    def __init__(self, potential_function, max_width=float("inf")):
-        self.potential_function = potential_function
+    def __init__(
+        self,
+        model=None,
+        potential_fn=None,
+        initial_width=0.01,
+        max_width=float("inf"),
+        transforms=None,
+        max_plate_nesting=None,
+        jit_compile=False,
+        jit_options=None,
+        ignore_jit_warnings=False,
+    ):
+        """
+        Slice sampling kernel [1]. 
+
+        During the warmup phase, the width of the bracket is adapted, starting from
+        the provided initial width. 
+        
+        **References**
+
+        [1] `Slice Sampling <https://doi.org/10.1214/aos/1056562461>`_, 
+            Radford M. Neal
+
+        :param model: Python callable containing Pyro primitives.
+        :param potential_fn: Python callable calculating potential energy with input
+            is a dict of real support parameters.
+        :param initial_width: Initial bracket width
+        :param max_width: Maximum bracket width
+        :param dict transforms: Optional dictionary that specifies a transform
+            for a sample site with constrained support to unconstrained space. The
+            transform should be invertible, and implement `log_abs_det_jacobian`.
+            If not specified and the model has sites with constrained support,
+            automatic transformations will be applied, as specified in
+            :mod:`torch.distributions.constraint_registry`.
+        :param int max_plate_nesting: Optional bound on max number of nested
+            :func:`pyro.plate` contexts. This is required if model contains
+            discrete sample sites that can be enumerated over in parallel.
+        :param bool jit_compile: Optional parameter denoting whether to use
+            the PyTorch JIT to trace the log density computation, and use this
+            optimized executable trace in the integrator.
+        :param dict jit_options: A dictionary contains optional arguments for
+            :func:`torch.jit.trace` function.
+        :param bool ignore_jit_warnings: Flag to ignore warnings from the JIT
+            tracer when ``jit_compile=True``. Default is False.
+        """
+        if not ((model is None) ^ (potential_fn is None)):
+            raise ValueError("Only one of `model` or `potential_fn` must be specified.")
+        # NB: deprecating args - model, transforms
+        self.model = model
+        self.transforms = transforms
+        self._max_plate_nesting = max_plate_nesting
+        self._jit_compile = jit_compile
+        self._jit_options = jit_options
+        self._ignore_jit_warnings = ignore_jit_warnings
+
+        self.potential_fn = potential_fn
+
+        self._initial_width = initial_width
         self._max_width = max_width
+
+        self._reset()
+
+        super(Slice, self).__init__()
+
+    def _reset(self):
+        self._t = 0
         self._width = None
-        self._current_parameters = None
-        super().__init__()
+        self._num_dimensions = None
+        self._initial_params = None
+        self._site_name = None
 
     def setup(self, warmup_steps, *args, **kwargs):
-        self._current_parameters = next(iter(self.initial_params.values())).clone()
-        if self._width is None:
-            self._tune_bracket_width()
+        self._warmup_steps = warmup_steps
+        if self.model is not None:
+            self._initialize_model_properties(args, kwargs)
 
-    @property
-    def features(self):
-        return next(iter(self.initial_params.values())).shape[0]
+        # TODO: Clean up required for multiple sites
+        self._site_name = next(iter(self.initial_params.keys()))
+        self._num_dimensions = next(iter(self.initial_params.values())).shape[-1]
+
+        self._width = torch.full((self._num_dimensions,), self._initial_width)
 
     @property
     def initial_params(self):
-        """
-        Returns a dict of initial params (by default, from the prior) to initiate the MCMC run.
-
-        :return: dict of parameter values keyed by their name.
-        """
-        return self._initial_parameters
+        return self._initial_params
 
     @initial_params.setter
-    def initial_params(self, parameters):
-        """
-        Sets the parameters to initiate the MCMC run. Note that the parameters must
-        have unconstrained support.
-        """
+    def initial_params(self, params):
         assert (
-            isinstance(parameters, dict) and len(parameters) == 1
-        ), "Slice sampling only implemented for a single site."
-        self._initial_parameters = parameters
+            isinstance(params, dict) and len(params) == 1
+        ), "Slice sampling only implemented for a single site."  # TODO: Implement
+        self._initial_params = params
 
-    def sample(self, parameters):
-        """
-        Samples parameters from the posterior distribution, when given existing parameters.
-
-        :param dict params: Current parameter values.
-        :param int time_step: Current time step.
-        :return: New parameters from the posterior distribution.
-        # """
-        order = torch.randperm(self.features)
-        site_name, self._current_parameters = next(iter(parameters.items()))
-        for dim in order:
-            self._current_parameters[dim], _ = self._sample_from_conditional(
-                dim, self._current_parameters[dim]
-            )
-        return {site_name: self._current_parameters}.copy()
-
-    def _tune_bracket_width(self):
-        num_tuning_samples = 50
-        order = torch.arange(self.features)
-        parameters = next(iter(self.initial_params.values())).clone()
-        self._width = torch.full((self.features,), 0.01)
-
-        for n in range(num_tuning_samples):
-
-            order = order[torch.randperm(self.features)]
-
-            for dim in order:
-                parameters[dim], width_d = self._sample_from_conditional(
-                    dim, parameters[dim]
-                )
-                self._width[dim] += (width_d.item() - self._width[dim]) / (n + 1)
-
-    def _sample_from_conditional(self, dim, parameter):
-
-        # conditional log_prob
-        a, b = self._current_parameters[:dim], self._current_parameters[dim + 1 :]
-        log_prob_d = lambda x: -self.potential_function(
-            {"": torch.cat((a, x.reshape(-1), b)).reshape(1, -1)}
+    def _initialize_model_properties(self, model_args, model_kwargs):
+        init_params, potential_fn, transforms, trace = initialize_model(
+            self.model,
+            model_args,
+            model_kwargs,
+            transforms=self.transforms,
+            max_plate_nesting=self._max_plate_nesting,
+            jit_compile=self._jit_compile,
+            jit_options=self._jit_options,
+            skip_jit_warnings=self._ignore_jit_warnings,
         )
-        bracket_width = self._width[dim]
+        self.potential_fn = potential_fn
+        self.transforms = transforms
+        if self._initial_params is None:
+            self.initial_params = init_params
+        self._prototype_trace = trace
 
-        # sample a slice uniformly
-        log_height = log_prob_d(parameter) + torch.log(torch.rand(1))
+    def cleanup(self):
+        self._reset()
 
-        # position the bracket randomly around the current sample
-        lower = parameter - bracket_width * torch.rand(1)
-        upper = lower + bracket_width
+    def sample(self, params):
+        # TODO: Indexing needs fixing, currently using squeeze, which is not ideal
+        for dim in torch.randperm(self._num_dimensions):
+            (
+                params[self._site_name].squeeze()[dim.item()],
+                width_d,
+            ) = self._sample_from_conditional(params, dim.item())
+            if self._t < self._warmup_steps:
+                # TODO: Other schemes for tuning bracket width?
+                self._width[dim.item()] += (
+                    width_d.item() - self._width[dim.item()]
+                ) / (self._t + 1)
 
-        # find lower bracket end
-        while log_prob_d(lower) >= log_height and parameter - lower < self._max_width:
-            lower -= bracket_width
+        self._t += 1
 
-        # find upper bracket end
-        while log_prob_d(upper) >= log_height and upper - parameter < self._max_width:
-            upper += bracket_width
+        return params.copy()
 
-        # sample uniformly from bracket
+    def _sample_from_conditional(self, params, dim):
+        # TODO: Flag for doubling and stepping out procedures, see Neal paper, and also:
+        # https://pints.readthedocs.io/en/latest/mcmc_samplers/slice_doubling_mcmc.html
+        # https://pints.readthedocs.io/en/latest/mcmc_samplers/slice_stepout_mcmc.html
+
+        def _log_prob_d(x):
+            return -self.potential_fn(
+                {
+                    self._site_name: torch.cat(
+                        (
+                            params[self._site_name].squeeze()[:dim],
+                            x.reshape(1),
+                            params[self._site_name].squeeze()[dim + 1 :],
+                        )
+                    ).unsqueeze(
+                        0
+                    )  # TODO: The unsqueeze seems to give a speed up, figure out when this is the case exactly
+                }
+            )
+
+        # Sample uniformly from slice
+        log_height = _log_prob_d(params[self._site_name].squeeze()[dim]) + torch.log(
+            torch.rand(1)
+        )
+
+        # Position the bracket randomly around the current sample
+        lower = params[self._site_name].squeeze()[dim] - self._width[dim] * torch.rand(
+            1
+        )
+        upper = lower + self._width[dim]
+
+        # Find lower bracket end
+        while (
+            _log_prob_d(lower) >= log_height
+            and params[self._site_name].squeeze()[dim] - lower < self._max_width
+        ):
+            lower -= self._width[dim]
+
+        # Find upper bracket end
+        while (
+            _log_prob_d(upper) >= log_height
+            and upper - params[self._site_name].squeeze()[dim] < self._max_width
+        ):
+            upper += self._width[dim]
+
+        # Sample uniformly from bracket
         new_parameter = (upper - lower) * torch.rand(1) + lower
 
-        # if outside slice, reject sample and shrink bracket
-        while log_prob_d(new_parameter) < log_height:
-            if new_parameter < parameter:
+        # If outside slice, reject sample and shrink bracket
+        while _log_prob_d(new_parameter) < log_height:
+            if new_parameter < params[self._site_name].squeeze()[dim]:
                 lower = new_parameter
             else:
                 upper = new_parameter
             new_parameter = (upper - lower) * torch.rand(1) + lower
 
         return new_parameter, upper - lower
-
-    def __call__(self, params):
-        """
-        Alias for MCMCKernel.sample() method.
-        """
-        return self.sample(params)
-
-
-class PotentialFunction:
-    def __init__(self, likelihood, prior):
-        self.likelihood = likelihood
-        self.prior = prior
-
-    def __call__(self, parameters_dict):
-        parameters = next(iter(parameters_dict.values()))
-        return -(
-            self.likelihood.log_prob(parameters) + self.prior.log_prob(parameters).sum()
-        )
-
-
-def test_():
-    # if torch.cuda.is_available():
-    #     device = torch.device("cuda")
-    #     torch.set_default_tensor_type("torch.cuda.FloatTensor")
-    # else:
-    #     input("CUDA not available, do you wish to continue?")
-    #     device = torch.device("cpu")
-    #     torch.set_default_tensor_type("torch.FloatTensor")
-
-    loc = torch.Tensor([0, 0])
-    covariance_matrix = torch.Tensor([[1, 0.99], [0.99, 1]])
-
-    likelihood = distributions.MultivariateNormal(
-        loc=loc, covariance_matrix=covariance_matrix
-    )
-    bound = 1.5
-    low, high = -bound * torch.ones(2), bound * torch.ones(2)
-    prior = distributions.Uniform(low=low, high=high)
-
-    # def potential_function(inputs_dict):
-    #     parameters = next(iter(inputs_dict.values()))
-    #     return -(likelihood.log_prob(parameters) + prior.log_prob(parameters).sum())
-    prior = distributions.Uniform(low=-5 * torch.ones(4), high=2 * torch.ones(4))
-    from pyknos.nflows import distributions as distributions_
-
-    likelihood = distributions_.LotkaVolterraOscillating()
-    potential_function = PotentialFunction(likelihood, prior)
-
-    # kernel = Slice(potential_function=potential_function)
-    from pyro.infer.mcmc import HMC, NUTS
-
-    # kernel = HMC(potential_fn=potential_function)
-    kernel = NUTS(potential_fn=potential_function)
-    num_chains = 3
-    sampler = MCMC(
-        kernel=kernel,
-        num_samples=10000 // num_chains,
-        warmup_steps=200,
-        initial_params={"": torch.zeros(num_chains, 4)},
-        num_chains=num_chains,
-    )
-    sampler.run()
-    samples = next(iter(sampler.get_samples().values()))
-
-    utils.plot_hist_marginals(
-        utils.tensor2numpy(samples), ground_truth=utils.tensor2numpy(loc), lims=[-6, 3]
-    )
-    # plt.show()
-    plt.savefig("/home/conor/Dropbox/phd/projects/lfi/out/mcmc.pdf")
-    plt.close()
-
-
-def main():
-    test_()
-
-
-if __name__ == "__main__":
-    main()
