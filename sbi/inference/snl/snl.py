@@ -1,6 +1,8 @@
 import os
 from copy import deepcopy
 
+import numpy as np
+import sbi.utils as utils
 import torch
 from sbi.utils.torchutils import get_default_device
 from pyro.infer.mcmc import HMC, NUTS
@@ -13,6 +15,7 @@ from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 from sbi.inference.posteriors.sbi_posterior import Posterior
+from typing import Optional
 
 import sbi.simulators as simulators
 import sbi.utils as utils
@@ -33,15 +36,14 @@ class SNL:
     def __init__(
         self,
         simulator,
-        prior,
-        true_observation,
-        density_estimator=None,
-        summary_writer=None,
-        device=None,
-        mcmc_method="slice-np",
+        prior: torch.distributions,
+        true_observation: torch.Tensor,
+        density_estimator: Optional[torch.nn.Module],
+        summary_writer: SummaryWriter = None,
+        device: torch.device = None,
+        mcmc_method: str = "slice-np",
     ):
         """
-
         :param simulator: Python object with 'simulate' method which takes a torch.Tensor
         of parameter values, and returns a simulation result for each parameter as a torch.Tensor.
         :param prior: Distribution object with 'log_prob' and 'sample' methods.
@@ -334,3 +336,50 @@ class NeuralPotentialFunction:
             potential = -(log_likelihood + self._prior.log_prob(parameters))
 
         return potential
+
+
+class SliceNpNeuralPotentialFunction:
+    """
+    Implementation of a potential function for Pyro MCMC which uses a classifier
+    to evaluate a quantity proportional to the likelihood.
+    """
+
+    def __init__(self, posterior, prior, true_observation):
+        """
+        Args:
+            posterior: nn
+            prior: torch.distribution, Distribution object with 'log_prob' method.
+            true_observation:torch.Tensor containing true observation x0.
+        """
+
+        self.prior = prior
+        self.posterior = posterior
+        self.true_observation = true_observation
+
+    def __call__(self, parameters):
+        """
+        Call method allows the object to be used as a function.
+        Evaluates the given parameters using a given neural likelhood, prior,
+        and true observation.
+
+        Args:
+            parameters_dict: dict of parameter values which need evaluation for MCMC.
+
+        Returns:
+            torch.Tensor potential ~ -[log r(x0, theta) + log p(theta)]
+
+        """
+
+        target_log_prob = (
+            self.posterior.log_prob(
+                inputs=self.true_observation.reshape(1, -1),
+                context=torch.Tensor(parameters).reshape(1, -1),
+                normalize=False,
+            )
+            + self.prior.log_prob(torch.Tensor(parameters)).sum()
+        )
+
+        return target_log_prob
+
+    def evaluate(self, point):
+        raise NotImplementedError

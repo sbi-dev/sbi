@@ -31,8 +31,8 @@ def test_snl_on_linearGaussian_api(num_dim: int):
     true_observation = torch.zeros(num_dim)
 
     # get neural likelihood
-    neural_likelihood = utils.get_neural_likelihood(
-        "maf", parameter_dim=parameter_dim, observation_dim=observation_dim,
+    neural_likelihood = utils.likelihood_nn(
+        model="maf", prior=prior, context=true_observation,
     )
 
     # create inference method
@@ -40,15 +40,33 @@ def test_snl_on_linearGaussian_api(num_dim: int):
         simulator=linear_gaussian,
         prior=prior,
         true_observation=true_observation,
-        neural_likelihood=neural_likelihood,
+        density_estimator=neural_likelihood,
         mcmc_method="slice-np",
     )
 
     # run inference
-    inference_method.run_inference(num_rounds=1, num_simulations_per_round=100)
+    posterior = inference_method.run_inference(
+        num_rounds=1, num_simulations_per_round=1000
+    )
 
     # draw samples from posterior
-    samples = inference_method.sample_posterior(num_samples=10)
+    samples = posterior.sample(num_samples=100)
+
+    # define target distribution (analytically tractable) and sample from it
+    target_samples = simulator.get_ground_truth_posterior_samples(100)
+
+    # compute the mmd
+    mmd = utils.unbiased_mmd_squared(target_samples, samples)
+
+    # check if mmd is larger than expected
+    # NOTE: the mmd is calculated based on a number of test runs
+    max_mmd = 0.02
+
+    print("mmd", mmd)
+
+    assert (
+        mmd < max_mmd
+    ), f"MMD={mmd} is more than 2 stds above the average performance."
 
 
 # will be called by pytest. Then runs test_*(num_dim) for 1D and 3D
@@ -72,27 +90,24 @@ def test_snl_on_linearGaussian_based_on_mmd(num_dim: int):
 
     # get neural likelihood
     neural_likelihood = utils.likelihood_nn(
-        model='maf',
-        prior=prior,
-        context=true_observation,
+        model="maf", prior=prior, context=true_observation,
     )
 
     # create inference method
     inference_method = SNL(
         simulator=linear_gaussian,
         prior=prior,
-        true_observation=true_observation,
-        neural_likelihood=neural_likelihood,
-        mcmc_method="slice-np",
         density_estimator=neural_likelihood,
-        mcmc_method='slice-np'
+        mcmc_method="slice-np",
     )
 
     # run inference
-    posterior = inference_method.run_inference(num_rounds=1, num_simulations_per_round=1000)
+    posterior = inference_method.run_inference(
+        num_rounds=1, num_simulations_per_round=1000
+    )
 
     # draw samples from posterior
-    samples = posterior.sample(num_samples=100)
+    samples = posterior.sample(num_samples=1000)
 
     # define target distribution (analytically tractable) and sample from it
     target_samples = get_ground_truth_posterior_samples_linear_gaussian(
@@ -105,6 +120,8 @@ def test_snl_on_linearGaussian_based_on_mmd(num_dim: int):
     # check if mmd is larger than expected
     # NOTE: the mmd is calculated based on a number of test runs
     max_mmd = 0.02
+
+    print("mmd", mmd)
 
     assert (
         mmd < max_mmd

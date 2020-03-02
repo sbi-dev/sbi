@@ -110,7 +110,6 @@ class SnpeBase:
 
         # new embedding_net contains z-scoring
         if not isinstance(self._neural_posterior.neural_net, MultivariateGaussianMDN):
-            print("surprise")
             embedding = nn.Sequential(
                 utils.Normalize(self.obs_mean, self.obs_std),
                 self._neural_posterior.neural_net._embedding_net,
@@ -479,6 +478,53 @@ class NeuralPotentialFunction:
         potential *= log_prob_prior
 
         return potential
+
+    def evaluate(self, point):
+        raise NotImplementedError
+
+
+class SliceNpNeuralPotentialFunction:
+    """
+    Implementation of a potential function for Pyro MCMC which uses a classifier
+    to evaluate a quantity proportional to the likelihood.
+    """
+
+    def __init__(self, posterior, prior, true_observation):
+        """
+        Args:
+            posterior: nn
+            prior: torch.distribution, Distribution object with 'log_prob' method.
+            true_observation:torch.Tensor containing true observation x0.
+        """
+
+        self.prior = prior
+        self.posterior = posterior
+        self.true_observation = true_observation
+
+    def __call__(self, parameters):
+        """
+        Call method allows the object to be used as a function.
+        Evaluates the given parameters using a given neural likelhood, prior,
+        and true observation.
+
+        Args:
+            parameters_dict: dict of parameter values which need evaluation for MCMC.
+
+        Returns:
+            torch.Tensor potential ~ -[log r(x0, theta) + log p(theta)]
+
+        """
+
+        if not np.isinf(self.prior.log_prob(torch.Tensor(parameters)).sum().item()):
+            target_log_prob = self.posterior.log_prob(
+                inputs=torch.Tensor(parameters).reshape(1, -1),
+                context=self.true_observation.reshape(1, -1),
+                normalize=False,
+            )
+        else:
+            target_log_prob = -np.inf
+
+        return target_log_prob
 
     def evaluate(self, point):
         raise NotImplementedError

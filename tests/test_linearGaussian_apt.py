@@ -25,11 +25,7 @@ def test_apt_on_linearGaussian_based_on_mmd(num_dim):
 
     true_observation = torch.zeros((1, num_dim))
 
-    neural_net = utils.posterior_nn(
-        model='maf',
-        prior=prior,
-        context=true_observation,
-    )
+    neural_net = utils.posterior_nn(model="maf", prior=prior, context=true_observation,)
 
     apt = APT(
         simulator=linear_gaussian,
@@ -41,6 +37,7 @@ def test_apt_on_linearGaussian_based_on_mmd(num_dim):
         use_combined_loss=False,
         retrain_from_scratch_each_round=False,
         discard_prior_samples=False,
+        train_with_mcmc=False,
     )
 
     # run inference
@@ -50,7 +47,7 @@ def test_apt_on_linearGaussian_based_on_mmd(num_dim):
     )
 
     # draw samples from posterior
-    samples = posterior.sample(1000)
+    samples = posterior.sample(100)
 
     # define target distribution (analytically tractable) and sample from it
     target_samples = get_ground_truth_posterior_samples_linear_gaussian(

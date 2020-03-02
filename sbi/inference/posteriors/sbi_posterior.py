@@ -13,16 +13,16 @@ import sbi.inference
 class Posterior:
     def __init__(
         self,
-        algorithm,
-        neural_net,
-        prior,
-        context,
-        train_with_mcmc=True,
-        mcmc_method="slice-np",
+        algorithm: str,
+        neural_net: torch.nn.Module,
+        prior: torch.distributions,
+        context: torch.Tensor,
+        train_with_mcmc: bool = True,
+        mcmc_method: str = "slice-np",
     ):
         """
         Args:
-            algorithm: string, 'snpe', 'snl', 'sre'
+            algorithm: 'snpe', 'snl', 'sre'
             neural_net: depends on algorithm: classifier for sre, density estimator for snpe and snl
             prior: prior dist
             context: Tensor or None, conditioning variables. If a Tensor, it must have the same
@@ -33,15 +33,29 @@ class Posterior:
             A Tensor of shape [input_size], the log probability of the inputs given the context.
         """
 
+        if (
+            algorithm == "SnpeA"
+            or algorithm == "SnpeB"
+            or algorithm == "SnpeC"
+            or algorithm == "APT"
+        ):
+            algorithm = "snpe"
+        if algorithm == "SNL":
+            algorithm = "snl"
+        if algorithm == "SRE":
+            algorithm = "sre"
+        if algorithm != "snpe" and algorithm != "snl" and algorithm != "sre":
+            raise NameError
+
         self.neural_net = neural_net
-        self.prior = prior
-        self.context = context
+        self._prior = prior
+        self._context = context
         self._train_with_mcmc = train_with_mcmc
         self._mcmc_method = mcmc_method
         self._algorithm = algorithm
 
     def log_prob(
-        self, inputs: torch.tensor, context: torch.tensor = None, normalize: bool = True
+        self, inputs: torch.Tensor, context: torch.Tensor = None, normalize: bool = True
     ):
         """Calculate log probability under the distribution.
 
@@ -64,7 +78,7 @@ class Posterior:
 
         # format inputs and context into the correct shape
         inputs, context = utils.build_inputs_and_contexts(
-            inputs, context, self.context, normalize
+            inputs, context, self._context, normalize
         )
 
         # go into evaluation mode
@@ -82,7 +96,7 @@ class Posterior:
         return np.log(acceptance_prob) + unnormalized_log_prob
 
     def estimate_acceptance_rate(
-        self, num_samples: int = int(1e4), context: torch.tensor = None
+        self, num_samples: int = int(1e4), context: torch.Tensor = None
     ):
         """
         Estimates rejection sampling acceptance rates.
@@ -97,7 +111,7 @@ class Posterior:
         """
 
         if context is None:
-            context = self.context
+            context = self._context
 
         # Always sample in eval mode.
         self.neural_net.eval()
@@ -111,8 +125,8 @@ class Posterior:
             ).squeeze(0)
 
             # Evaluate posterior samples under the prior.
-            prior_log_prob = self.prior.log_prob(candidate_samples)
-            if isinstance(self.prior, distributions.Uniform):
+            prior_log_prob = self._prior.log_prob(candidate_samples)
+            if isinstance(self._prior, distributions.Uniform):
                 prior_log_prob = prior_log_prob.sum(-1)
 
             # Update remaining number of samples needed.
@@ -127,7 +141,7 @@ class Posterior:
 
         return total_num_accepted_samples / total_num_generated_samples
 
-    def sample(self, num_samples: int, context: torch.tensor = None):
+    def sample(self, num_samples: int, context: torch.Tensor = None, **kwargs):
         """
         Sample posterior distribution.
 
@@ -136,16 +150,21 @@ class Posterior:
             context:
                 Provide observation/context/condition.
                 Will be _true_observation if None
+            **kwargs:
+                Additional parameters for MCMC. thin and warmup
 
         Returns: torch.tensor, samples from posterior
         """
 
         if context is None:
-            context = self.context
+            context = self._context
 
         if self._train_with_mcmc:
             return self._sample_posterior_mcmc(
-                context=context, num_samples=num_samples, mcmc_method=self._mcmc_method,
+                context=context,
+                num_samples=num_samples,
+                mcmc_method=self._mcmc_method,
+                **kwargs,
             )
         else:
             return self._sample_posterior_rejection(
@@ -153,7 +172,7 @@ class Posterior:
             )
 
     def _sample_posterior_rejection(
-        self, num_samples: int, context: torch.tensor = None
+        self, num_samples: int, context: torch.Tensor = None
     ):
         """
         Rejection sample a posterior.
@@ -186,8 +205,8 @@ class Posterior:
             ).squeeze(0)
 
             # Evaluate posterior samples under the prior.
-            prior_log_prob = self.prior.log_prob(candidate_samples)
-            if isinstance(self.prior, distributions.Uniform):
+            prior_log_prob = self._prior.log_prob(candidate_samples)
+            if isinstance(self._prior, distributions.Uniform):
                 prior_log_prob = prior_log_prob.sum(-1)
 
             # Keep those samples which have non-zero probability under the prior.
@@ -217,9 +236,10 @@ class Posterior:
     def _sample_posterior_mcmc(
         self,
         num_samples: int,
-        context: torch.tensor = None,
+        context: torch.Tensor = None,
         mcmc_method: str = "slice_np",
         thin: int = 10,
+        warmup: int = 20,
     ):
         """
         Sample the posterior using MCMC
@@ -236,57 +256,60 @@ class Posterior:
         """
 
         if mcmc_method == "slice-np":
-            samples = self.slice_np_mcmc(num_samples, context, thin)
+            samples = self.slice_np_mcmc(num_samples, context, thin, warmup)
         else:
-            samples = self.pyro_mcmc(num_samples, context, mcmc_method, thin)
+            samples = self.pyro_mcmc(num_samples, context, mcmc_method, thin, warmup)
 
         # Back to training mode.
         self.neural_net.train()
 
         return samples
 
-    def slice_np_mcmc(self, num_samples, context, thin):
+    def slice_np_mcmc(
+        self,
+        num_samples: int,
+        context: torch.Tensor,
+        thin: int = 10,
+        warmup_steps: int = 20,
+    ):
         if self._algorithm == "snpe":
-            target_log_prob = lambda parameters: self.log_prob(
-                inputs=context.reshape(1, -1),
-                context=torch.Tensor(parameters).reshape(1, -1),
-                normalize=False,
-            ).item()
+            potential_function = sbi.inference.snpe.base_snpe.SliceNpNeuralPotentialFunction(
+                self, self._prior, context
+            )
         elif self._algorithm == "snl":
-            target_log_prob = (
-                lambda parameters: self.log_prob(
-                    inputs=context.reshape(1, -1),
-                    context=torch.Tensor(parameters).reshape(1, -1),
-                    normalize=False,
-                ).item()
-                + self.prior.log_prob(torch.Tensor(parameters)).sum().item()
+            potential_function = sbi.inference.snl.SliceNpNeuralPotentialFunction(
+                self, self._prior, context
             )
         elif self._algorithm == "sre":
-            target_log_prob = (
-                lambda parameters: self.neural_net(
-                    torch.cat((torch.Tensor(parameters), context)).reshape(1, -1)
-                ).item()
-                + self.prior.log_prob(torch.Tensor(parameters)).sum().item()
+            potential_function = sbi.inference.sre.SliceNpNeuralPotentialFunction(
+                self, self._prior, context
             )
         else:
             raise NameError
         self.neural_net.eval()
 
         posterior_sampler = SliceSampler(
-            utils.tensor2numpy(self.prior.sample((1,))).reshape(-1),
-            lp_f=target_log_prob,
+            utils.tensor2numpy(self._prior.sample((1,))).reshape(-1),
+            lp_f=potential_function,
             thin=thin,
         )
 
         self.neural_net.train()
 
-        posterior_sampler.gen(20)
+        posterior_sampler.gen(warmup_steps)
 
         samples = torch.Tensor(posterior_sampler.gen(num_samples))
 
         return samples
 
-    def pyro_mcmc(self, num_samples, context, mcmc_method, thin):
+    def pyro_mcmc(
+        self,
+        num_samples: int,
+        context: torch.Tensor,
+        mcmc_method: str = "slice",
+        thin: int = 10,
+        warmup_steps: int = 200,
+    ):
         # HMC and NUTS from Pyro.
         # Defining the potential function as an object means Pyro's MCMC scheme
         # can pickle it to be used across multiple chains in parallel, even if
@@ -295,15 +318,15 @@ class Posterior:
         # build potential function depending on what algorithm is used
         if self._algorithm == "snpe":
             potential_function = sbi.inference.snpe.base_snpe.NeuralPotentialFunction(
-                self.neural_net, self.prior, context
+                self.neural_net, self._prior, context
             )
         elif self._algorithm == "snl":
             potential_function = sbi.inference.snl.NeuralPotentialFunction(
-                self.neural_net, self.prior, context
+                self.neural_net, self._prior, context
             )
         elif self._algorithm == "sre":
             potential_function = sbi.inference.sre.NeuralPotentialFunction(
-                self.neural_net, self.prior, context
+                self.neural_net, self._prior, context
             )
         else:
             raise NameError
@@ -321,18 +344,18 @@ class Posterior:
             raise ValueError("'mcmc_method' must be one of ['slice', 'hmc', 'nuts'].")
         num_chains = mp.cpu_count() - 1
 
-        initial_params = self.prior.sample((num_chains,))
+        initial_params = self._prior.sample((num_chains,))
         sampler = MCMC(
             kernel=kernel,
             num_samples=(thin * num_samples) // num_chains + num_chains,
-            warmup_steps=200,
+            warmup_steps=warmup_steps,
             initial_params={"": initial_params},
             num_chains=num_chains,
             # mp_context="spawn",
         )
         sampler.run()
         samples = next(iter(sampler.get_samples().values())).reshape(
-            -1, len(self.prior.mean)  # len(prior.mean) = dim of theta
+            -1, len(self._prior.mean)  # len(prior.mean) = dim of theta
         )
 
         samples = samples[::thin][:num_samples]

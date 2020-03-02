@@ -1,6 +1,6 @@
 import os
 from copy import deepcopy
-
+import numpy as np
 import sbi.simulators as simulators
 import sbi.utils as utils
 import numpy as np
@@ -393,3 +393,50 @@ class NeuralPotentialFunction:
             potential = -(log_ratio + self.prior.log_prob(parameters))
 
         return potential
+
+
+class SliceNpNeuralPotentialFunction:
+    """
+    Implementation of a potential function for Pyro MCMC which uses a classifier
+    to evaluate a quantity proportional to the likelihood.
+    """
+
+    def __init__(self, posterior, prior, true_observation):
+        """
+        Args:
+            posterior: nn
+            prior: torch.distribution, Distribution object with 'log_prob' method.
+            true_observation:torch.Tensor containing true observation x0.
+        """
+
+        self.prior = prior
+        self.posterior = posterior
+        self.true_observation = true_observation
+
+    def __call__(self, parameters):
+        """
+        Call method allows the object to be used as a function.
+        Evaluates the given parameters using a given neural likelhood, prior,
+        and true observation.
+
+        Args:
+            parameters_dict: dict of parameter values which need evaluation for MCMC.
+
+        Returns:
+            torch.Tensor potential ~ -[log r(x0, theta) + log p(theta)]
+
+        """
+
+        target_log_prob = (
+            self.posterior.neural_net(
+                torch.cat((torch.Tensor(parameters), self.true_observation)).reshape(
+                    1, -1
+                )
+            )
+            + self.prior.log_prob(torch.Tensor(parameters)).sum()
+        )
+
+        return target_log_prob
+
+    def evaluate(self, point):
+        raise NotImplementedError

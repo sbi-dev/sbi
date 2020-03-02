@@ -1,1 +1,5 @@
-from sbi.inference.sre.sre import (SRE, NeuralPotentialFunction)
+from sbi.inference.sre.sre import (
+    SRE,
+    NeuralPotentialFunction,
+    SliceNpNeuralPotentialFunction,
+)
