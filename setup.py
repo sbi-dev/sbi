@@ -12,6 +12,7 @@ setup(
     license="GPLv3",
     install_requires=[
         "matplotlib",
+        "nbstripout",
         "numpy",
         "pyro-ppl",
         "pyknos@git+ssh://git@github.com/mackelab/pyknos.git",

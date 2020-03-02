@@ -1,6 +1,6 @@
 # create:
 # conda env create --file environment.yml
-# update:
+# update (from outside of the sbi environment):
 # conda env update --file environment.yml --prune
 name: sbi
 
@@ -17,6 +17,7 @@ dependencies:
   - isort
   - jupyter
   - matplotlib
+  - nbstripout
   - numpy
   - pillow
   - pip
