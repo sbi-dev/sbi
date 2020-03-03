@@ -1,11 +1,54 @@
 import os
 import pickle
 
-import sbi.simulators as simulators
-import sbi.utils as utils
 import torch
 from pyknos.nflows import distributions as distributions_
 from torch import distributions
+
+import sbi.simulators as simulators
+import sbi.utils as utils
+
+
+def get_simulator_dimensions(simulator_fun, parameter_sample_fun):
+    """Infer simulator input output dimension from prior and simulating once. 
+    
+    Arguments:
+        simulator_fun {function} -- simulator function taking parameter batch as only argument, return data. 
+        parameter_sample_fun {function} -- prior function with kwarg 'num_samples'.
+    
+    Returns:
+        dim_input [int] -- input dimension of simulator, i.e., parameter vector dimension.
+        dim_output [int] -- output dimension of simualtor, i.e., dimension of data or summary stats.
+    """
+    # sample from prior to get parameter dimension
+    param = parameter_sample_fun(num_samples=1)
+    dim_input = param.squeeze().shape[0]
+
+    # simulate once to get simulator output dimension
+    data = simulator_fun(param)
+    dim_output = data.squeeze().shape[0]
+
+    return dim_input, dim_output
+
+
+def get_simulator_name(simulator_fun, name=None):
+    """Get or set name of the simulator. 
+    
+    Returns function name if no name is given. 
+    
+    Arguments:
+        simulator_fun {function} -- simulator function taking parameter batch as only argument, return data. 
+    
+    Keyword Arguments:
+        name {string} -- name of the simualtor, e.g., 'linearGaussian' (default: {None})
+    
+    Returns:
+        string -- Name of the simulator. 
+    """
+    if name is None:
+        return simulator_fun.__name__
+    else:
+        return name
 
 
 # TODO: we do not want this function
