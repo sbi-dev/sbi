@@ -1,15 +1,113 @@
 import os
+from typing import Optional
 
 import numpy as np
-import sbi.utils as utils
 import scipy.stats
 import torch
 from matplotlib import pyplot as plt
+
+import sbi.utils as utils
 from sbi.mcmc import SliceSampler
 from sbi.simulators.simulator import Simulator
 
+# fixed parameters for this simulator
+num_observations_per_parameter = 4
 parameter_dim = 5
 observation_dim = 8
+
+
+def non_linear_gaussian(parameters: torch.Tensor) -> torch.Tensor:
+    """Generate observations from non-linear Gaussian model for the given batch of parameters.
+        
+    Arguments:
+        parameters {torch.Tensor} -- Batch of parameters.
+    
+    Returns:
+        torch.Tensor [batch size, 2 * num_observations_per_parameter] -- Batch of observations.
+    """
+    # Run simulator in NumPy.
+    if isinstance(parameters, torch.Tensor):
+        parameters = utils.tensor2numpy(parameters)
+
+    # If we have a single parameter then view it as a batch of one.
+    if parameters.ndim == 1:
+        parameters = parameters[np.newaxis, :]
+
+    num_simulations = parameters.shape[0]
+
+    # Run simulator to generate self._num_observations_per_parameter
+    # observations from a 2D Gaussian parameterized by the 5 given parameters.
+    m0, m1, s0, s1, r = _unpack_params(parameters)
+
+    us = np.random.randn(num_simulations, num_observations_per_parameter, 2)
+    observations = np.zeros_like(us)
+
+    observations[:, :, 0] = s0 * us[:, :, 0] + m0
+    observations[:, :, 1] = (
+        s1 * (r * us[:, :, 0] + np.sqrt(1.0 - r ** 2) * us[:, :, 1]) + m1
+    )
+
+    mean = torch.zeros(observation_dim)
+    std = torch.ones(observation_dim)
+    return (
+        torch.Tensor(
+            observations.reshape([num_simulations, 2 * num_observations_per_parameter])
+        )
+        - mean.reshape(1, -1)
+    ) / std.reshape(1, -1)
+
+
+def _unpack_params(parameters):
+    """Unpack parameters parameters to m0, m1, s0, s1, r.
+    
+    Arguments:
+        parameters {np.array [batch_size, parameter_dim]} -- Batch of parameters.
+    
+    Returns:
+        tuple(np.array) -- Tuple of parameters where each np.array holds a single parameter for the batch.
+    """
+    assert parameters.shape[1] == 5, "parameter dimension must be 5"
+
+    m0 = parameters[:, [0]]
+    m1 = parameters[:, [1]]
+    s0 = parameters[:, [2]] ** 2
+    s1 = parameters[:, [3]] ** 2
+    r = np.tanh(parameters[:, [4]])
+
+    return m0, m1, s0, s1, r
+
+
+def get_ground_truth_posterior_samples_nonlinear_gaussian(
+    num_samples: Optional[int] = None,
+) -> torch.Tensor:
+    """Get pseudo ground truth posterior samples from mcmc.
+        
+    We have pre-generated posterior samples using MCMC on the product of the analytic
+    likelihood and a uniform prior on [-3, 3]^5.
+    Thus they are ground truth as long as MCMC has behaved well.
+    We load these once if samples have not been loaded before, store them for future use,
+    and return as many as are requested.
+
+    Keyword Arguments:
+        num_samples {int} -- Number of sample to return. (default: {None})
+    
+    Returns:
+        torch.Tensor [num_samples, parameter_dim] -- Batch of posterior samples.
+    """
+
+    posterior_samples = torch.tensor(
+        np.load(
+            os.path.join(
+                utils.get_data_root(),
+                "nonlinear-gaussian",
+                "true-posterior-samples.npy",
+            )
+        )
+    )
+    if num_samples is not None:
+        return posterior_samples[:num_samples]
+    else:
+        return posterior_samples
 
 
 class NonlinearGaussianSimulator(Simulator):
@@ -115,80 +213,3 @@ class NonlinearGaussianSimulator(Simulator):
         )
 
         return L
-
-    @staticmethod
-    def _unpack_params(parameters):
-        """Unpack parameters parameters to m0, m1, s0, s1, r.
-        
-        Arguments:
-            parameters {np.array [batch_size, parameter_dim]} -- Batch of parameters.
-        
-        Returns:
-            tuple(np.array) -- Tuple of parameters where each np.array holds a single parameter for the batch.
-        """
-        assert parameters.shape[1] == 5, "parameter dimension must be 5"
-
-        m0 = parameters[:, [0]]
-        m1 = parameters[:, [1]]
-        s0 = parameters[:, [2]] ** 2
-        s1 = parameters[:, [3]] ** 2
-        r = np.tanh(parameters[:, [4]])
-
-        return m0, m1, s0, s1, r
-
-    def get_ground_truth_posterior_samples(self, num_samples=None):
-        """Get pseudo ground truth posterior samples from mcmc.
-        
-        We have pre-generated posterior samples using MCMC on the product of the analytic
-        likelihood and a uniform prior on [-3, 3]^5.
-        Thus they are ground truth as long as MCMC has behaved well.
-        We load these once if samples have not been loaded before, store them for future use,
-        and return as many as are requested.
-
-        Keyword Arguments:
-            num_samples {int} -- Number of sample to return. (default: {None})
-        
-        Returns:
-            torch.Tensor [num_samples, parameter_dim] -- Batch of posterior samples.
-        """
-        if self._posterior_samples is None:
-            self._posterior_samples = torch.Tensor(
-                np.load(
-                    os.path.join(
-                        utils.get_data_root(),
-                        "nonlinear-gaussian",
-                        "true-posterior-samples.npy",
-                    )
-                )
-            )
-        if num_samples is not None:
-            return self._posterior_samples[:num_samples]
-        else:
-            return self._posterior_samples
-
-    @property
-    def parameter_dim(self):
-        return 5
-
-    @property
-    def observation_dim(self):
-        return 8
-
-    @property
-    def name(self):
-        return "nonlinear-gaussian"
-
-    @property
-    def parameter_plotting_limits(self):
-        return [-4, 4]
-
-    @property
-    def normalization_parameters(self):
-        mean = torch.zeros(5)
-        std = torch.ones(5)
-        return mean, std
-
-    def _get_observation_normalization_parameters(self):
-        mean = torch.zeros(8)
-        std = torch.ones(8)
-        return mean, std

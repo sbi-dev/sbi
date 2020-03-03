@@ -1,11 +1,85 @@
 import os
 import pickle
+from typing import Callable, Tuple
 
-import sbi.simulators as simulators
-import sbi.utils as utils
 import torch
 from pyknos.nflows import distributions as distributions_
 from torch import distributions
+
+import sbi.simulators as simulators
+import sbi.utils as utils
+
+
+def set_simulator_attributes(
+    simulator_fun: Callable, prior: torch.distributions.Distribution, name=None
+) -> Callable:
+    """Add name and input and output dimension as attributes to the simulator function.
+    
+    Arguments:
+        simulator_fun {Callable} -- simulator function taking parameters as input
+        prior {torch.distributions.Distribution} -- prior as pytorch distributions object
+    
+    Keyword Arguments:
+        name {[type]} -- name of the simulator, if None take __name__ (default: {None})
+    
+    Returns:
+        Callable -- simualtor function with attributes name, parameter_dim, observation_dim.
+    """
+
+    parameter_dim, observation_dim = get_simulator_dimensions(simulator_fun, prior)
+    if name is None:
+        name = simulator_fun.__name__
+
+    setattr(simulator_fun, "name", name)
+    setattr(simulator_fun, "parameter_dim", parameter_dim)
+    setattr(simulator_fun, "observation_dim", observation_dim)
+
+    return simulator_fun
+
+
+def get_simulator_dimensions(
+    simulator_fun, prior: torch.distributions.Distribution
+) -> Tuple[int, int]:
+    """Infer simulator input output dimension from prior and simulating once. 
+    
+    Arguments:
+        simulator_fun {function} -- simulator function taking parameter batch as only argument, return data. 
+        parameter_sample_fun {function} -- prior function with kwarg 'num_samples'.
+    
+    Returns:
+        dim_input [int] -- input dimension of simulator, i.e., parameter vector dimension.
+        dim_output [int] -- output dimension of simualtor, i.e., dimension of data or summary stats.
+    """
+    # sample from prior to get parameter dimension
+    param = prior.sample()
+    dim_input = param.shape[0]
+
+    # simulate once to get simulator output dimension
+    data = simulator_fun(param)
+    dim_output = data.shape[0]
+
+    return dim_input, dim_output
+
+
+def get_simulator_name(simulator_fun, name=None) -> str:
+    """Get or set name of the simulator. 
+    
+    Returns function name if no name is given. 
+    
+    Arguments:
+        simulator_fun {function} -- simulator function taking parameter batch as only argument, return data. 
+    
+    Keyword Arguments:
+        name {string} -- name of the simualtor, e.g., 'linearGaussian' (default: {None})
+    
+    Returns:
+        string -- Name of the simulator. 
+    """
+    if name is None:
+        return simulator_fun.__name__
+    else:
+        simulator_fun.__name__ = name
+        return name
 
 
 # TODO: we do not want this function

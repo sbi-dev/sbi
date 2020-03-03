@@ -2,10 +2,13 @@ import pytest
 import torch
 from torch import distributions
 
-import sbi.simulators as simulators
 import sbi.utils as utils
 from sbi import inference
 from sbi.inference.sre.sre import SRE
+from sbi.simulators.linear_gaussian import (
+    get_ground_truth_posterior_samples_linear_gaussian,
+    linear_gaussian,
+)
 
 # use cpu by default
 torch.set_default_tensor_type("torch.FloatTensor")
@@ -26,20 +29,17 @@ def test_sre_on_linearGaussian_api(num_dim: int):
     # test api for inference on linear Gaussian model using SNL
     # avoids expensive computations for fast testing
 
-    dim, std = num_dim, 1.0
-    simulator = simulators.LinearGaussianSimulator(dim=dim, std=std)
+    simulator = linear_gaussian
     prior = distributions.MultivariateNormal(
-        loc=torch.zeros(dim), covariance_matrix=torch.eye(dim)
+        loc=torch.zeros(num_dim), covariance_matrix=torch.eye(num_dim)
     )
 
-    parameter_dim, observation_dim = dim, dim
-    true_observation = torch.zeros(dim)
+    parameter_dim, observation_dim = num_dim, num_dim
+    true_observation = torch.zeros(num_dim)
 
     # get classifier
     classifier = utils.get_classifier(
-        "resnet",
-        parameter_dim=simulator.parameter_dim,
-        observation_dim=simulator.observation_dim,
+        "resnet", parameter_dim=parameter_dim, observation_dim=observation_dim,
     )
 
     # create inference method
@@ -69,20 +69,17 @@ def test_sre_on_linearGaussian_based_on_mmd(num_dim: int):
         num_dim {int} -- Parameter dimension of the gaussian model (default: {3})
     """
 
-    dim, std = num_dim, 1.0
-    simulator = simulators.LinearGaussianSimulator(dim=dim, std=std)
+    simulator = linear_gaussian
     prior = distributions.MultivariateNormal(
-        loc=torch.zeros(dim), covariance_matrix=torch.eye(dim)
+        loc=torch.zeros(num_dim), covariance_matrix=torch.eye(num_dim)
     )
 
-    parameter_dim, observation_dim = dim, dim
-    true_observation = torch.zeros(dim)
+    parameter_dim, observation_dim = num_dim, num_dim
+    true_observation = torch.zeros(num_dim)
 
     # get classifier
     classifier = utils.get_classifier(
-        "resnet",
-        parameter_dim=simulator.parameter_dim,
-        observation_dim=simulator.observation_dim,
+        "resnet", parameter_dim=parameter_dim, observation_dim=observation_dim,
     )
 
     # create inference method
@@ -101,7 +98,9 @@ def test_sre_on_linearGaussian_based_on_mmd(num_dim: int):
     samples = inference_method.sample_posterior(num_samples=1000)
 
     # define target distribution (analytically tractable) and sample from it
-    target_samples = simulator.get_ground_truth_posterior_samples(1000)
+    target_samples = get_ground_truth_posterior_samples_linear_gaussian(
+        true_observation
+    )
 
     # compute the mmd
     mmd = utils.unbiased_mmd_squared(target_samples, samples)

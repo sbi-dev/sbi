@@ -1,6 +1,7 @@
 import pytest
-import sbi.simulators as simulators
 import torch
+
+from sbi.simulators.linear_gaussian import linear_gaussian
 
 
 @pytest.mark.parametrize("D, N", [(1, 10000), (5, 100000)])
@@ -11,7 +12,7 @@ def test_linearGaussian_simulator(D, N):
         D {int} -- parameter dimension.
         N {int} -- number of samples. 
     """
-    simulator = simulators.LinearGaussianSimulator(dim=D)
+    simulator = linear_gaussian
 
     true_parameters = torch.zeros(D)
     num_simulations = N
