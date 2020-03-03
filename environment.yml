@@ -17,6 +17,7 @@ dependencies:
   - isort
   - jupyter
   - matplotlib
+  - nbstripout
   - numpy
   - pillow
   - pip
