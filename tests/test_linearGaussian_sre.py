@@ -2,10 +2,13 @@ import pytest
 import torch
 from torch import distributions
 
-import sbi.simulators as simulators
 import sbi.utils as utils
 from sbi import inference
 from sbi.inference.sre.sre import SRE
+from sbi.simulators.linear_gaussian import (
+    get_ground_truth_posterior_samples_linear_gaussian,
+    linear_gaussian,
+)
 
 # use cpu by default
 torch.set_default_tensor_type("torch.FloatTensor")
@@ -26,7 +29,7 @@ def test_sre_on_linearGaussian_api(num_dim: int):
     # test api for inference on linear Gaussian model using SNL
     # avoids expensive computations for fast testing
 
-    simulator = simulators.linear_gaussian
+    simulator = linear_gaussian
     prior = distributions.MultivariateNormal(
         loc=torch.zeros(num_dim), covariance_matrix=torch.eye(num_dim)
     )
@@ -66,7 +69,7 @@ def test_sre_on_linearGaussian_based_on_mmd(num_dim: int):
         num_dim {int} -- Parameter dimension of the gaussian model (default: {3})
     """
 
-    simulator = simulators.linear_gaussian
+    simulator = linear_gaussian
     prior = distributions.MultivariateNormal(
         loc=torch.zeros(num_dim), covariance_matrix=torch.eye(num_dim)
     )
@@ -95,7 +98,9 @@ def test_sre_on_linearGaussian_based_on_mmd(num_dim: int):
     samples = inference_method.sample_posterior(num_samples=1000)
 
     # define target distribution (analytically tractable) and sample from it
-    target_samples = simulator.get_ground_truth_posterior_samples(1000)
+    target_samples = get_ground_truth_posterior_samples_linear_gaussian(
+        true_observation
+    )
 
     # compute the mmd
     mmd = utils.unbiased_mmd_squared(target_samples, samples)
