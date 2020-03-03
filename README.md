@@ -24,11 +24,11 @@ Alternatively, you can install via `setup.py` using `pip install -e ".[dev]"` (t
 
 Examples are collected in notebooks in `examples/`.
 
-## Binary files and jupyter notebooks
+## Binary files and Jupyter notebooks
 
-We use git lfs to store large binary files. To use git lfs follow installation instructions here [https://git-lfs.github.com/](https://git-lfs.github.com/). In particular, in a freshly cloned repository on a new machine, you will need both `git-lfs install` and `git-lfs pull`. We use a filename filter to track lfs files. Therefore, to add a file to git lfs let the filename contain `_gitlfs_`.
+We use git lfs to store large binary files. To use git lfs follow installation instructions here [https://git-lfs.github.com/](https://git-lfs.github.com/). In particular, in a freshly cloned repository on a new machine, you will need both `git-lfs install` and `git-lfs pull`. We use a filename filter to track lfs files. Therefore, to add a file to git lfs let the filename end with `_gitlfs`.
 
-Small binary files and jupyter notebook will not be tracked by git lfs for now. Instead we are using `nbstripout` to remove output from jupyter notebooks before pushing to remote. The `nbstripout` package is downloaded automatically during installation of `sbi`, but **please make sure to install it locally** as described [here](https://github.com/kynan/nbstripout).
+Small binary files and jupyter notebook will not be tracked by git lfs for now. Instead we are using `nbstripout` to remove output from Jupyter notebooks before pushing to remote. The `nbstripout` package is downloaded automatically during installation of `sbi`, but **please make sure to install it locally** as described [here](https://github.com/kynan/nbstripout).
 
 ## Acknowledgements
 
