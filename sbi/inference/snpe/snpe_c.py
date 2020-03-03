@@ -1,9 +1,12 @@
 import os
-import sbi.utils as utils
-from sbi.inference.snpe.base_snpe import SnpeBase
+
 import torch
 from torch import distributions
 from torch.utils.tensorboard import SummaryWriter
+
+import sbi.utils as utils
+from sbi.inference.snpe.base_snpe import SnpeBase
+from sbi.simulators.simutils import set_simulator_attributes
 
 
 class APT(SnpeBase):
@@ -39,6 +42,9 @@ class APT(SnpeBase):
                 Number of atoms to use for classification.
                 If -1, use all other parameters in minibatch.
         """
+
+        # set name and dimensions of simulator
+        simulator = set_simulator_attributes(simulator, prior)
 
         super(APT, self).__init__(
             simulator=simulator,

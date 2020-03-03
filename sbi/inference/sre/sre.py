@@ -2,14 +2,10 @@ import os
 from copy import deepcopy
 
 import numpy as np
-import sbi.simulators as simulators
-import sbi.utils as utils
 import torch
 from matplotlib import pyplot as plt
 from pyro.infer.mcmc import HMC, NUTS
 from pyro.infer.mcmc.api import MCMC
-from sbi.mcmc import Slice, SliceSampler
-from sbi.utils.torchutils import get_default_device
 from torch import distributions
 from torch import multiprocessing as mp
 from torch import nn, optim
@@ -17,6 +13,12 @@ from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
+
+import sbi.simulators as simulators
+import sbi.utils as utils
+from sbi.mcmc import Slice, SliceSampler
+from sbi.simulators.simutils import set_simulator_attributes
+from sbi.utils.torchutils import get_default_device
 
 
 class SRE:
@@ -63,6 +65,9 @@ class SRE:
             Optionally pass device
             If None, will infer it
         """
+
+        # set name and dimensions of simulator
+        simulator = set_simulator_attributes(simulator, prior)
 
         self._simulator = simulator
         self._true_observation = true_observation
