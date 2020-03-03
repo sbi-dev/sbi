@@ -21,7 +21,7 @@ setup(
         "torch",
         "tqdm",
     ],
-    extras_requires={
+    extras_require={
         "dev": [
             "autoflake",
             "black",
