@@ -2,10 +2,13 @@ import pytest
 import torch
 from torch import distributions
 
-import sbi.simulators as simulators
 import sbi.utils as utils
 from sbi import inference
 from sbi.inference.snl.snl import SNL
+from sbi.simulators.linear_gaussian import (
+     get_ground_truth_posterior_samples_linear_gaussian,
+     linear_gaussian
+ )
 
 # use cpu by default
 torch.set_default_tensor_type("torch.FloatTensor")
@@ -53,7 +56,9 @@ def test_snl_on_linearGaussian_api(num_dim: int):
     samples = posterior.sample(num_samples=100)
 
     # define target distribution (analytically tractable) and sample from it
-    target_samples = simulator.get_ground_truth_posterior_samples(100)
+    target_samples = get_ground_truth_posterior_samples_linear_gaussian(
+        true_observation[None, ], num_samples=100
+    )
 
     # compute the mmd
     mmd = utils.unbiased_mmd_squared(target_samples, samples)
@@ -61,8 +66,6 @@ def test_snl_on_linearGaussian_api(num_dim: int):
     # check if mmd is larger than expected
     # NOTE: the mmd is calculated based on a number of test runs
     max_mmd = 0.02
-
-    print("mmd", mmd)
 
     assert (
         mmd < max_mmd
@@ -111,7 +114,7 @@ def test_snl_on_linearGaussian_based_on_mmd(num_dim: int):
 
     # define target distribution (analytically tractable) and sample from it
     target_samples = get_ground_truth_posterior_samples_linear_gaussian(
-        true_observation, num_samples=1000
+        true_observation[None, ], num_samples=1000
     )
 
     # compute the mmd
@@ -120,8 +123,6 @@ def test_snl_on_linearGaussian_based_on_mmd(num_dim: int):
     # check if mmd is larger than expected
     # NOTE: the mmd is calculated based on a number of test runs
     max_mmd = 0.02
-
-    print("mmd", mmd)
 
     assert (
         mmd < max_mmd

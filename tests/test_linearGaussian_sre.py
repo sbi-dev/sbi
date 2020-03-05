@@ -58,15 +58,15 @@ def test_sre_on_linearGaussian_api(num_dim: int):
     samples = posterior.sample(num_samples=100)
 
     # define target distribution (analytically tractable) and sample from it
-    target_samples = simulator.get_ground_truth_posterior_samples(100)
+    target_samples = get_ground_truth_posterior_samples_linear_gaussian(
+        true_observation[None, ], num_samples=100
+    )
 
     # compute the mmd
     mmd = utils.unbiased_mmd_squared(target_samples, samples)
 
     # check if mmd is larger than expected
     max_mmd = 0.02
-
-    print("mmd is", mmd)
 
     assert (
         mmd < max_mmd
