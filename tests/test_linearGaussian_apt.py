@@ -25,25 +25,29 @@ def test_apt_on_linearGaussian_based_on_mmd(num_dim):
 
     true_observation = torch.zeros((1, num_dim))
 
+    neural_net = utils.posterior_nn(model="maf", prior=prior, context=true_observation,)
+
     apt = APT(
         simulator=linear_gaussian,
         true_observation=true_observation,
+        density_estimator=neural_net,
         prior=prior,
         num_atoms=-1,
         z_score_obs=True,
         use_combined_loss=False,
         retrain_from_scratch_each_round=False,
         discard_prior_samples=False,
+        train_with_mcmc=False,
     )
 
     # run inference
     num_rounds, num_simulations_per_round = 1, 1000
-    apt.run_inference(
+    posterior = apt.run_inference(
         num_rounds=num_rounds, num_simulations_per_round=num_simulations_per_round
     )
 
     # draw samples from posterior
-    samples = apt._neural_posterior.sample(1000)
+    samples = posterior.sample(100)
 
     # define target distribution (analytically tractable) and sample from it
     target_samples = get_ground_truth_posterior_samples_linear_gaussian(
@@ -55,6 +59,8 @@ def test_apt_on_linearGaussian_based_on_mmd(num_dim):
 
     # check if mmd is larger than expected
     max_mmd = 0.02
+
+    print('mmd for apt is:  ', mmd)
 
     assert (
         mmd < max_mmd

@@ -1,18 +1,21 @@
 import os
 from copy import deepcopy
-
+import numpy as np
+import sbi.simulators as simulators
+import sbi.utils as utils
 import numpy as np
 import torch
+from sbi.utils.torchutils import get_default_device
 from matplotlib import pyplot as plt
 from pyro.infer.mcmc import HMC, NUTS
 from pyro.infer.mcmc.api import MCMC
 from torch import distributions
-from torch import multiprocessing as mp
 from torch import nn, optim
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
+from sbi.inference.posteriors.sbi_posterior import Posterior
 
 import sbi.simulators as simulators
 import sbi.utils as utils
@@ -71,7 +74,6 @@ class SRE:
 
         self._simulator = simulator
         self._true_observation = true_observation
-        self._classifier = classifier
         self._prior = prior
         self._device = get_default_device() if device is None else device
 
@@ -80,6 +82,21 @@ class SRE:
 
         self._mcmc_method = mcmc_method
 
+        # create the deep neural density estimator
+        if classifier is None:
+            classifier = utils.classifier_nn(
+                model="resnet", prior=self._prior, context=self._true_observation,
+            )
+
+        # create posterior object which can sample()
+        self._neural_posterior = Posterior(
+            algorithm="sre",
+            neural_net=classifier,
+            prior=prior,
+            context=true_observation,
+            mcmc_method=mcmc_method,
+        )
+
         # We may want to summarize high-dimensional observations.
         # This may be either a fixed or learned transformation.
         if summary_net is None:
@@ -87,30 +104,7 @@ class SRE:
         else:
             self._summary_net = summary_net
 
-        # Defining the potential function as an object means Pyro's MCMC scheme
-        # can pickle it to be used across multiple chains in parallel, even if
-        # the potential function requires evaluating a neural likelihood as is the
-        # case here.
-        self._potential_function = NeuralPotentialFunction(
-            classifier, prior, true_observation
-        )
-
-        # TODO: decide on Slice Sampling implementation
-        target_log_prob = (
-            lambda parameters: self._classifier(
-                torch.cat((torch.Tensor(parameters), self._true_observation)).reshape(
-                    1, -1
-                )
-            ).item()
-            + self._prior.log_prob(torch.Tensor(parameters)).sum().item()
-        )
-        self._classifier.eval()
-        self.posterior_sampler = SliceSampler(
-            utils.tensor2numpy(self._prior.sample((1,))).reshape(-1),
-            lp_f=target_log_prob,
-            thin=10,
-        )
-        self._classifier.train()
+        self._neural_posterior.neural_net.train()
 
         self._retrain_from_scratch_each_round = retrain_from_scratch_each_round
         # If we're retraining from scratch each round,
@@ -173,7 +167,7 @@ class SRE:
             else:
                 parameters, observations = simulators.simulation_wrapper(
                     simulator=self._simulator,
-                    parameter_sample_fn=lambda num_samples: self.sample_posterior(
+                    parameter_sample_fn=lambda num_samples: self._neural_posterior.sample(
                         num_samples
                     ),
                     num_samples=num_simulations_per_round,
@@ -205,60 +199,7 @@ class SRE:
                 observation_bank=self._observation_bank,
                 simulator=self._simulator,
             )
-
-    def sample_posterior(self, num_samples, thin=10):
-        """
-        Samples from posterior for true observation q(theta | x0) ~ r(x0, theta) p(theta)
-        using most recent ratio estimate r(x0, theta) with MCMC.
-
-        :param num_samples: Number of samples to generate.
-        :param mcmc_method: Which MCMC method to use ['metropolis-hastings', 'slice', 'hmc', 'nuts']
-        :param thin: Generate (num_samples * thin) samples in total, then select every
-        'thin' sample.
-        :return: torch.Tensor of shape [num_samples, parameter_dim]
-        """
-
-        # Always sample in eval mode.
-        self._classifier.eval()
-
-        if self._mcmc_method == "slice-np":
-            self.posterior_sampler.gen(20)
-            samples = torch.Tensor(self.posterior_sampler.gen(num_samples))
-
-        else:
-            if self._mcmc_method == "slice":
-                kernel = Slice(potential_function=self._potential_function)
-            elif self._mcmc_method == "hmc":
-                kernel = HMC(potential_fn=self._potential_function)
-            elif self._mcmc_method == "nuts":
-                kernel = NUTS(potential_fn=self._potential_function)
-            else:
-                raise ValueError(
-                    "'mcmc_method' must be one of ['slice', 'hmc', 'nuts']."
-                )
-            num_chains = mp.cpu_count() - 1
-
-            initial_params = self._prior.sample((num_chains,))
-            sampler = MCMC(
-                kernel=kernel,
-                num_samples=(thin * num_samples) // num_chains + num_chains,
-                warmup_steps=200,
-                initial_params={"": initial_params},
-                num_chains=num_chains,
-                mp_context="spawn",
-            )
-            sampler.run()
-            samples = next(iter(sampler.get_samples().values())).reshape(
-                -1, self._simulator.parameter_dim
-            )
-
-            samples = samples[::thin][:num_samples]
-            assert samples.shape[0] == num_samples
-
-        # Back to training mode.
-        self._classifier.train()
-
-        return samples
+        return self._neural_posterior
 
     def _fit_classifier(
         self,
@@ -314,7 +255,8 @@ class SRE:
         )
 
         optimizer = optim.Adam(
-            list(self._classifier.parameters()) + list(self._summary_net.parameters()),
+            list(self._neural_posterior.neural_net.parameters())
+            + list(self._summary_net.parameters()),
             lr=learning_rate,
         )
 
@@ -328,7 +270,7 @@ class SRE:
         # If we're retraining from scratch each round, reset the neural posterior
         # to the untrained copy we made at the start.
         if self._retrain_from_scratch_each_round:
-            self._classifier = deepcopy(self._classifier)
+            self._neural_posterior = deepcopy(self._neural_posterior)
 
         def _get_log_prob(parameters, observations):
 
@@ -356,7 +298,9 @@ class SRE:
 
             inputs = torch.cat((atomic_parameters, repeated_observations), dim=1)
 
-            logits = self._classifier(inputs).reshape(batch_size, num_atoms)
+            logits = self._neural_posterior.neural_net(inputs).reshape(
+                batch_size, num_atoms
+            )
 
             log_prob = logits[:, 0] - torch.logsumexp(logits, dim=-1)
 
@@ -366,7 +310,7 @@ class SRE:
         while True:
 
             # Train for a single epoch.
-            self._classifier.train()
+            self._neural_posterior.neural_net.train()
             for parameters, observations in train_loader:
                 optimizer.zero_grad()
                 log_prob = _get_log_prob(parameters, observations)
@@ -377,7 +321,7 @@ class SRE:
             epochs += 1
 
             # calculate validation performance
-            self._classifier.eval()
+            self._neural_posterior.neural_net.eval()
             log_prob_sum = 0
             with torch.no_grad():
                 for parameters, observations in val_loader:
@@ -387,7 +331,9 @@ class SRE:
 
             # check for improvement
             if validation_log_prob > best_validation_log_prob:
-                best_model_state_dict = deepcopy(self._classifier.state_dict())
+                best_model_state_dict = deepcopy(
+                    self._neural_posterior.neural_net.state_dict()
+                )
                 best_validation_log_prob = validation_log_prob
                 epochs_since_last_improvement = 0
             else:
@@ -395,7 +341,7 @@ class SRE:
 
             # if no validation improvement over many epochs, stop training
             if epochs_since_last_improvement > stop_after_epochs - 1:
-                self._classifier.load_state_dict(best_model_state_dict)
+                self._neural_posterior.neural_net.load_state_dict(best_model_state_dict)
                 break
 
         # Update summary.
@@ -447,3 +393,50 @@ class NeuralPotentialFunction:
             potential = -(log_ratio + self.prior.log_prob(parameters))
 
         return potential
+
+
+class SliceNpNeuralPotentialFunction:
+    """
+    Implementation of a potential function for Pyro MCMC which uses a classifier
+    to evaluate a quantity proportional to the likelihood.
+    """
+
+    def __init__(self, posterior, prior, true_observation):
+        """
+        Args:
+            posterior: nn
+            prior: torch.distribution, Distribution object with 'log_prob' method.
+            true_observation:torch.Tensor containing true observation x0.
+        """
+
+        self.prior = prior
+        self.posterior = posterior
+        self.true_observation = true_observation
+
+    def __call__(self, parameters):
+        """
+        Call method allows the object to be used as a function.
+        Evaluates the given parameters using a given neural likelhood, prior,
+        and true observation.
+
+        Args:
+            parameters_dict: dict of parameter values which need evaluation for MCMC.
+
+        Returns:
+            torch.Tensor potential ~ -[log r(x0, theta) + log p(theta)]
+
+        """
+
+        target_log_prob = (
+            self.posterior.neural_net(
+                torch.cat((torch.Tensor(parameters), self.true_observation)).reshape(
+                    1, -1
+                )
+            )
+            + self.prior.log_prob(torch.Tensor(parameters)).sum()
+        )
+
+        return target_log_prob
+
+    def evaluate(self, point):
+        raise NotImplementedError

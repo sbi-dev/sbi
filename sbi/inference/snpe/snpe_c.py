@@ -33,6 +33,8 @@ class APT(SnpeBase):
         discard_prior_samples=False,
         summary_writer=None,
         device=None,
+        train_with_mcmc=False,
+        mcmc_method="slice-np",
     ):
         """
         See base_snpe for docstring.
@@ -58,6 +60,8 @@ class APT(SnpeBase):
             retrain_from_scratch_each_round=retrain_from_scratch_each_round,
             discard_prior_samples=discard_prior_samples,
             device=device,
+            train_with_mcmc=train_with_mcmc,
+            mcmc_method=mcmc_method,
         )
 
         assert isinstance(num_atoms, int), "Number of atoms must be an integer."

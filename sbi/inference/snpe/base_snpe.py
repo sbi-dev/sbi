@@ -5,13 +5,14 @@ import sbi.simulators as simulators
 import sbi.utils as utils
 import torch
 from sbi.utils.torchutils import get_default_device
-from torch import nn, optim
+from torch import distributions, nn, optim
 from torch.nn.utils import clip_grad_norm_
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from tqdm import tqdm
 import warnings
-from sbi.inference.snpe.sbi_MDN_posterior import MDNPosterior
+from pyknos.mdn.mdn import MultivariateGaussianMDN
+from sbi.inference.posteriors.sbi_posterior import Posterior
 
 
 class SnpeBase:
@@ -28,6 +29,8 @@ class SnpeBase:
         retrain_from_scratch_each_round=False,
         discard_prior_samples=False,
         device=None,
+        train_with_mcmc=False,
+        mcmc_method="slice-np",
     ):
         """
         Args:
@@ -83,13 +86,19 @@ class SnpeBase:
 
         # create the deep neural density estimator
         if density_estimator is None:
-            self._neural_posterior = utils.get_sbi_posterior(
-                model='maf',
-                prior=self._prior,
-                context=self._true_observation,
+            density_estimator = utils.posterior_nn(
+                model="maf", prior=self._prior, context=self._true_observation,
             )
-        else:
-            self._neural_posterior = density_estimator
+
+        # create the neural posterior which can sample(), log_prob()
+        self._neural_posterior = Posterior(
+            algorithm="snpe",
+            neural_net=density_estimator,
+            prior=prior,
+            context=true_observation,
+            train_with_mcmc=train_with_mcmc,
+            mcmc_method=mcmc_method,
+        )
 
         # obtain z-score for observations and define embedding net
         if self.z_score_obs:
@@ -100,9 +109,10 @@ class SnpeBase:
             self.obs_std = torch.ones(self._true_observation.shape)
 
         # new embedding_net contains z-scoring
-        if not isinstance(self._neural_posterior, MDNPosterior):
+        if not isinstance(self._neural_posterior.neural_net, MultivariateGaussianMDN):
             embedding = nn.Sequential(
-                utils.Normalize(self.obs_mean, self.obs_std), self._neural_posterior._embedding_net
+                utils.Normalize(self.obs_mean, self.obs_std),
+                self._neural_posterior.neural_net._embedding_net,
             )
             self._neural_posterior.set_embedding_net(embedding)
         elif z_score_obs:
@@ -163,7 +173,7 @@ class SnpeBase:
 
             # Store models at end of each round.
             self._model_bank.append(deepcopy(self._neural_posterior))
-            self._model_bank[-1].eval()
+            self._model_bank[-1].neural_net.eval()
 
             # Update description for progress bar.
             round_description = (
@@ -187,6 +197,7 @@ class SnpeBase:
                     context=self._true_observation,
                 ),
             )
+        return self._neural_posterior
 
     def _get_log_prob_proposal_posterior(self, inputs, context, masks):
         """
@@ -333,7 +344,7 @@ class SnpeBase:
         )
 
         optimizer = optim.Adam(
-            list(self._neural_posterior.parameters()), lr=learning_rate,
+            list(self._neural_posterior.neural_net.parameters()), lr=learning_rate,
         )
         # Keep track of best_validation log_prob seen so far.
         best_validation_log_prob = -1e100
@@ -353,7 +364,7 @@ class SnpeBase:
         while not converged:
 
             # Train for a single epoch.
-            self._neural_posterior.train()
+            self._neural_posterior.neural_net.train()
             for batch in train_loader:
                 optimizer.zero_grad()
                 inputs, context, masks = (
@@ -374,13 +385,15 @@ class SnpeBase:
                 loss = -torch.mean(log_prob)
                 loss.backward()
                 if clip_grad_norm:
-                    clip_grad_norm_(self._neural_posterior.parameters(), max_norm=5.0)
+                    clip_grad_norm_(
+                        self._neural_posterior.neural_net.parameters(), max_norm=5.0
+                    )
                 optimizer.step()
 
             epochs += 1
 
             # Calculate validation performance.
-            self._neural_posterior.eval()
+            self._neural_posterior.neural_net.eval()
             log_prob_sum = 0
             with torch.no_grad():
                 for batch in val_loader:
@@ -405,15 +418,113 @@ class SnpeBase:
             if validation_log_prob > best_validation_log_prob:
                 best_validation_log_prob = validation_log_prob
                 epochs_since_last_improvement = 0
-                best_model_state_dict = deepcopy(self._neural_posterior.state_dict())
+                best_model_state_dict = deepcopy(
+                    self._neural_posterior.neural_net.state_dict()
+                )
             else:
                 epochs_since_last_improvement += 1
 
             # If no validation improvement over many epochs, stop training.
             if epochs_since_last_improvement > stop_after_epochs - 1:
-                self._neural_posterior.load_state_dict(best_model_state_dict)
+                self._neural_posterior.neural_net.load_state_dict(best_model_state_dict)
                 converged = True
 
         # Update summary.
         self._summary["epochs"].append(epochs)
         self._summary["best-validation-log-probs"].append(best_validation_log_prob)
+
+
+class NeuralPotentialFunction:
+    """
+    Implementation of a potential function for Pyro MCMC which uses a classifier
+    to evaluate a quantity proportional to the likelihood.
+    """
+
+    def __init__(self, posterior, prior, true_observation):
+        """
+        Args:
+            posterior: nn
+            prior: torch.distribution, Distribution object with 'log_prob' method.
+            true_observation:torch.Tensor containing true observation x0.
+        """
+
+        self.prior = prior
+        self.posterior = posterior
+        self.true_observation = true_observation
+
+    def __call__(self, parameters_dict):
+        """
+        Call method allows the object to be used as a function.
+        Evaluates the given parameters using a given neural likelhood, prior,
+        and true observation.
+
+        Args:
+            parameters_dict: dict of parameter values which need evaluation for MCMC.
+
+        Returns:
+            torch.Tensor potential ~ -[log r(x0, theta) + log p(theta)]
+
+        """
+
+        parameters = next(iter(parameters_dict.values()))
+        potential = -self.posterior.log_prob(
+            inputs=parameters, context=self.true_observation
+        )
+        if isinstance(self.prior, distributions.Uniform):
+            log_prob_prior = self.prior.log_prob(parameters).sum(-1)
+        else:
+            log_prob_prior = self.prior.log_prob(parameters)
+        log_prob_prior[~torch.isinf(log_prob_prior)] = 1
+        potential *= log_prob_prior
+
+        return potential
+
+    def evaluate(self, point):
+        raise NotImplementedError
+
+
+class SliceNpNeuralPotentialFunction:
+    """
+    Implementation of a potential function for Pyro MCMC which uses a classifier
+    to evaluate a quantity proportional to the likelihood.
+    """
+
+    def __init__(self, posterior, prior, true_observation):
+        """
+        Args:
+            posterior: nn
+            prior: torch.distribution, Distribution object with 'log_prob' method.
+            true_observation:torch.Tensor containing true observation x0.
+        """
+
+        self.prior = prior
+        self.posterior = posterior
+        self.true_observation = true_observation
+
+    def __call__(self, parameters):
+        """
+        Call method allows the object to be used as a function.
+        Evaluates the given parameters using a given neural likelhood, prior,
+        and true observation.
+
+        Args:
+            parameters_dict: dict of parameter values which need evaluation for MCMC.
+
+        Returns:
+            torch.Tensor potential ~ -[log r(x0, theta) + log p(theta)]
+
+        """
+
+        if not np.isinf(self.prior.log_prob(torch.Tensor(parameters)).sum().item()):
+            target_log_prob = self.posterior.log_prob(
+                inputs=torch.Tensor(parameters).reshape(1, -1),
+                context=self.true_observation.reshape(1, -1),
+                normalize=False,
+            )
+        else:
+            target_log_prob = -np.inf
+
+        return target_log_prob
+
+    def evaluate(self, point):
+        raise NotImplementedError

@@ -1,1 +1,5 @@
-from sbi.inference.snl.snl import SNL
+from sbi.inference.snl.snl import (
+    SNL,
+    NeuralPotentialFunction,
+    SliceNpNeuralPotentialFunction,
+)
