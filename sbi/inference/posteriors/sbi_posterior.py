@@ -11,6 +11,10 @@ import sbi.inference
 
 
 class Posterior:
+    
+    ALGORITHM_FAMILY = dict(snpe='snpe', snpea='snpe', snpeb='snpe',
+                            snpec='snpe', apt='snpe', sre='sre', snl='snl')
+    
     def __init__(
         self,
         algorithm: str,
@@ -33,26 +37,18 @@ class Posterior:
             A Tensor of shape [input_size], the log probability of the inputs given the context.
         """
 
-        if (
-            algorithm == "SnpeA"
-            or algorithm == "SnpeB"
-            or algorithm == "SnpeC"
-            or algorithm == "APT"
-        ):
-            algorithm = "snpe"
-        if algorithm == "SNL":
-            algorithm = "snl"
-        if algorithm == "SRE":
-            algorithm = "sre"
-        if algorithm != "snpe" and algorithm != "snl" and algorithm != "sre":
-            raise NameError
+        try:
+            self._alg_family = Posterior.ALGORITHM_FAMILY[algorithm.lower()]
+        except KeyError:
+            raise ValueError(f'{algorithm} not in', 
+                             '{Posterior.ALGORITHM_FAMILY.keys()}')
 
         self.neural_net = neural_net
         self._prior = prior
         self._context = context
         self._train_with_mcmc = train_with_mcmc
         self._mcmc_method = mcmc_method
-        self._algorithm = algorithm
+      
 
     def log_prob(
         self, inputs: torch.Tensor, context: torch.Tensor = None, normalize: bool = True
@@ -73,7 +69,7 @@ class Posterior:
         """
 
         # we care about the normalized density only when we do snpe.
-        if self._algorithm != "snpe":
+        if self._alg_family != "snpe":
             normalize = False
 
         # format inputs and context into the correct shape
@@ -272,15 +268,16 @@ class Posterior:
         thin: int = 10,
         warmup_steps: int = 20,
     ):
-        if self._algorithm == "snpe":
+         
+        if self._alg_family == "snpe":
             potential_function = sbi.inference.snpe.base_snpe.SliceNpNeuralPotentialFunction(
                 self, self._prior, context
             )
-        elif self._algorithm == "snl":
+        elif self._alg_family == "snl":
             potential_function = sbi.inference.snl.SliceNpNeuralPotentialFunction(
                 self, self._prior, context
             )
-        elif self._algorithm == "sre":
+        elif self._alg_family == "sre":
             potential_function = sbi.inference.sre.SliceNpNeuralPotentialFunction(
                 self, self._prior, context
             )
@@ -316,15 +313,15 @@ class Posterior:
         # the potential function requires evaluating a neural likelihood as is the
         # case here.
         # build potential function depending on what algorithm is used
-        if self._algorithm == "snpe":
+        if self._alg_family == "snpe":
             potential_function = sbi.inference.snpe.base_snpe.NeuralPotentialFunction(
                 self.neural_net, self._prior, context
             )
-        elif self._algorithm == "snl":
+        elif self._alg_family == "snl":
             potential_function = sbi.inference.snl.NeuralPotentialFunction(
                 self.neural_net, self._prior, context
             )
-        elif self._algorithm == "sre":
+        elif self._alg_family == "sre":
             potential_function = sbi.inference.sre.NeuralPotentialFunction(
                 self.neural_net, self._prior, context
             )
