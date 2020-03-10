@@ -11,10 +11,6 @@ import sbi.inference
 
 
 class Posterior:
-    
-    ALGORITHM_FAMILY = dict(snpe='snpe', snpea='snpe', snpeb='snpe',
-                            snpec='snpe', apt='snpe', sre='sre', snl='snl')
-    
     def __init__(
         self,
         algorithm: str,
@@ -37,18 +33,32 @@ class Posterior:
             A Tensor of shape [input_size], the log probability of the inputs given the context.
         """
 
-        try:
-            self._alg_family = Posterior.ALGORITHM_FAMILY[algorithm.lower()]
-        except KeyError:
-            raise ValueError(f'{algorithm} not in', 
-                             '{Posterior.ALGORITHM_FAMILY.keys()}')
-
         self.neural_net = neural_net
         self._prior = prior
         self._context = context
         self._train_with_mcmc = train_with_mcmc
         self._mcmc_method = mcmc_method
-      
+        self._alg_family = self._get_algorithm_family(algorithm)
+
+    def _get_algorithm_family(self, algorithm: str) -> str:
+        """Return the family (snpe, sre, snl) of given algorithm."""
+
+        families = dict(
+            snpe="snpe",
+            snpea="snpe",
+            snpeb="snpe",
+            snpec="snpe",
+            apt="snpe",
+            sre="sre",
+            snl="snl",
+        )
+
+        try:
+            family = families[algorithm.lower()]
+        except KeyError:
+            raise ValueError(f"{algorithm} not in {families.keys()}")
+
+        return family
 
     def log_prob(
         self, inputs: torch.Tensor, context: torch.Tensor = None, normalize: bool = True
@@ -268,7 +278,7 @@ class Posterior:
         thin: int = 10,
         warmup_steps: int = 20,
     ):
-         
+
         if self._alg_family == "snpe":
             potential_function = sbi.inference.snpe.base_snpe.SliceNpNeuralPotentialFunction(
                 self, self._prior, context
