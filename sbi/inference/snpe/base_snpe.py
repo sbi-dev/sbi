@@ -376,7 +376,7 @@ class SnpeBase:
                 # just do maximum likelihood in the first round
                 if round_ == 0:
                     log_prob = self._neural_posterior.log_prob(
-                        inputs, context, normalize=False
+                        inputs, context, normalize_snpe=False
                     )
                 else:  # or call the APT loss
                     log_prob = self._get_log_prob_proposal_posterior(
@@ -405,7 +405,7 @@ class SnpeBase:
                     # just do maximum likelihood in the first round
                     if round_ == 0:
                         log_prob = self._neural_posterior.log_prob(
-                            inputs, context, normalize=False
+                            inputs, context, normalize_snpe=False
                         )
                     else:
                         log_prob = self._get_log_prob_proposal_posterior(
@@ -519,7 +519,7 @@ class SliceNpNeuralPotentialFunction:
             target_log_prob = self.posterior.log_prob(
                 inputs=torch.Tensor(parameters).reshape(1, -1),
                 context=self.true_observation.reshape(1, -1),
-                normalize=False,
+                normalize_snpe=False,
             )
         else:
             target_log_prob = -np.inf

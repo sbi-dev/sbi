@@ -61,7 +61,10 @@ class Posterior:
         return family
 
     def log_prob(
-        self, inputs: torch.Tensor, context: torch.Tensor = None, normalize: bool = True
+        self,
+        inputs: torch.Tensor,
+        context: torch.Tensor = None,
+        normalize_snpe: bool = True,
     ):
         """Calculate log probability under the distribution.
 
@@ -69,18 +72,16 @@ class Posterior:
             inputs: Tensor, input variables.
             context: Tensor or None, conditioning variables. If a Tensor, it must have the same
                 number or rows as the inputs. If None, the context is ignored.
-            normalize:
-                If True, we normalize the output density
-                by drawing samples, estimating the acceptance
-                ratio, and then scaling the probability with it
+            normalize_snpe:
+                whether to normalize the output density when using snpe (by drawing samples, estimating the acceptance
+                ratio, and then scaling the probability with it)
 
         Returns:
             A Tensor of shape [input_size], the log probability of the inputs given the context.
         """
 
         # we care about the normalized density only when we do snpe.
-        if self._alg_family != "snpe":
-            normalize = False
+        normalize = normalize_snpe and self._alg_family == "snpe"
 
         # format inputs and context into the correct shape
         inputs, context = utils.build_inputs_and_contexts(

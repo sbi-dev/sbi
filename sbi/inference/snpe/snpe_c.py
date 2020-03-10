@@ -125,7 +125,7 @@ class APT(SnpeBase):
 
         # Evaluate large batch giving (batch_size * num_atoms) log prob posterior evals.
         log_prob_posterior = self._neural_posterior.log_prob(
-            atomic_inputs, repeated_context, normalize=False
+            atomic_inputs, repeated_context, normalize_snpe=False
         )
         assert utils.notinfnotnan(
             log_prob_posterior
@@ -158,7 +158,7 @@ class APT(SnpeBase):
         # todo: at all prior samples
         if self._use_combined_loss:
             log_prob_posterior_non_atomic = self._neural_posterior.log_prob(
-                inputs, context, normalize=False
+                inputs, context, normalize_snpe=False
             )
             masks = masks.reshape(-1)
             log_prob_proposal_posterior = (

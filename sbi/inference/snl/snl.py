@@ -245,7 +245,7 @@ class SNL:
                 optimizer.zero_grad()
                 inputs, context = batch[0].to(self._device), batch[1].to(self._device)
                 log_prob = self._neural_posterior.log_prob(
-                    inputs, context=context, normalize=False
+                    inputs, context=context, normalize_snpe=False
                 )
                 loss = -torch.mean(log_prob)
                 loss.backward()
@@ -266,7 +266,7 @@ class SNL:
                         batch[1].to(self._device),
                     )
                     log_prob = self._neural_posterior.log_prob(
-                        inputs, context=context, normalize=False
+                        inputs, context=context, normalize_snpe=False
                     )
                     log_prob_sum += log_prob.sum().item()
             validation_log_prob = log_prob_sum / num_validation_examples
@@ -374,7 +374,7 @@ class SliceNpNeuralPotentialFunction:
             self.posterior.log_prob(
                 inputs=self.true_observation.reshape(1, -1),
                 context=torch.Tensor(parameters).reshape(1, -1),
-                normalize=False,
+                normalize_snpe=False,
             )
             + self.prior.log_prob(torch.Tensor(parameters)).sum()
         )
