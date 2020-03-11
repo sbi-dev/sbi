@@ -1,3 +1,4 @@
+from typing import Union
 import numpy as np
 import torch
 from torch import distributions
@@ -11,9 +12,18 @@ import sbi.inference
 
 
 class Posterior:
+    """Posterior with evaluation and sampling methods.
+    
+    This class is used by inference algorithms as follows:
+    
+    - SNPE-family algorithms put density outside of the prior. This class uses the prior to adjust evaluation and sampling and correct for that.
+    - SNL and and SRE methods don't return posteriors directly. This class provides MCMC methods that given the prior, allow to sample from the posterior.
+    
+    """
+
     def __init__(
         self,
-        algorithm: str,
+        algorithm_family: str,
         neural_net: torch.nn.Module,
         prior: torch.distributions.Distribution,
         context: torch.Tensor,
@@ -22,16 +32,13 @@ class Posterior:
     ):
         """
         Args:
-            algorithm: 'snpe', 'snl', 'sre'
+            algorithm_family: one of 'snpe', 'snl', 'sre'
             neural_net: depends on algorithm: classifier for sre, density estimator for snpe and snl
             prior: prior dist
             context: Tensor or None, conditioning variables. If a Tensor, it must have the same
                 number or rows as the inputs. If None, the context is ignored.
             #XXX sample with MCMC ????
             train_with_mcmc: bool. Sample rejection or MCMC?
-        #XXX remove!
-        Returns:
-            A Tensor of shape [input_size], the log probability of the inputs given the context.
         """
 
         self.neural_net = neural_net
@@ -39,29 +46,8 @@ class Posterior:
         self._context = context
         self._train_with_mcmc = train_with_mcmc
         self._mcmc_method = mcmc_method
-        self._alg_family = self._get_algorithm_family(algorithm)
-
-    def _get_algorithm_family(self, algorithm: str) -> str:
-        """Return the family (snpe, sre, snl) of given algorithm."""
-
-        # XXX dispatch based on type of self.neural_net?
-        # XXX property reporting how the posterior was constructed?
-        families = dict(
-            snpe="snpe",
-            snpea="snpe",
-            snpeb="snpe",
-            snpec="snpe",
-            apt="snpe",
-            sre="sre",
-            snl="snl",
-        )
-
-        try:
-            family = families[algorithm.lower()]
-        except KeyError:
-            raise ValueError(f"{algorithm} not in {families.keys()}")
-
-        return family
+        assert algorithm_family in ["snpe", "snl", "sre"], "Not supported."
+        self._alg_family = algorithm_family
 
     def log_prob(
         self,

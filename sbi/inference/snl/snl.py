@@ -77,7 +77,7 @@ class SNL:
 
         # create neural posterior which can sample()
         self._neural_posterior = Posterior(
-            algorithm="snl",
+            algorithm_family="snl",
             neural_net=density_estimator,
             prior=prior,
             context=true_observation,

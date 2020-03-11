@@ -92,7 +92,7 @@ class SnpeBase:
 
         # create the neural posterior which can sample(), log_prob()
         self._neural_posterior = Posterior(
-            algorithm="snpe",
+            algorithm_family="snpe",
             neural_net=density_estimator,
             prior=prior,
             context=true_observation,

@@ -90,7 +90,7 @@ class SRE:
 
         # create posterior object which can sample()
         self._neural_posterior = Posterior(
-            algorithm="sre",
+            algorithm_family="sre",
             neural_net=classifier,
             prior=prior,
             context=true_observation,
