@@ -98,6 +98,7 @@ class SnpeBase:
             context=true_observation,
             train_with_mcmc=train_with_mcmc,
             mcmc_method=mcmc_method,
+            potential_function=SliceNpNeuralPotentialFunction,
         )
 
         # obtain z-score for observations and define embedding net

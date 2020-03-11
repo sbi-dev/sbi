@@ -95,6 +95,7 @@ class SRE:
             prior=prior,
             context=true_observation,
             mcmc_method=mcmc_method,
+            potential_function=SliceNpNeuralPotentialFunction,
         )
 
         # We may want to summarize high-dimensional observations.

@@ -82,6 +82,7 @@ class SNL:
             prior=prior,
             context=true_observation,
             mcmc_method=mcmc_method,
+            potential_function=SliceNpNeuralPotentialFunction,
         )
 
         # switch to training mode

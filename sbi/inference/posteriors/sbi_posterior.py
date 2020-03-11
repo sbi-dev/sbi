@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Optional, Callable
 import numpy as np
 import torch
 from torch import distributions
@@ -29,6 +29,7 @@ class Posterior:
         context: torch.Tensor,
         train_with_mcmc: bool = True,  # XXX make sure it IS True
         mcmc_method: str = "slice-np",
+        potential_function: Optional[Callable] = None,
     ):
         """
         Args:
@@ -48,6 +49,7 @@ class Posterior:
         self._mcmc_method = mcmc_method
         assert algorithm_family in ["snpe", "snl", "sre"], "Not supported."
         self._alg_family = algorithm_family
+        self._potential_function = potential_function
 
     def log_prob(
         self,
@@ -266,29 +268,16 @@ class Posterior:
         self,
         num_samples: int,
         context: torch.Tensor,
+        potential_function: Callable,
         thin: int = 10,
         warmup_steps: int = 20,
     ):
 
-        if self._alg_family == "snpe":
-            potential_function = sbi.inference.snpe.base_snpe.SliceNpNeuralPotentialFunction(
-                self, self._prior, context
-            )
-        elif self._alg_family == "snl":
-            potential_function = sbi.inference.snl.SliceNpNeuralPotentialFunction(
-                self, self._prior, context
-            )
-        elif self._alg_family == "sre":
-            potential_function = sbi.inference.sre.SliceNpNeuralPotentialFunction(
-                self, self._prior, context
-            )
-        else:
-            raise NameError
         self.neural_net.eval()
 
         posterior_sampler = SliceSampler(
             utils.tensor2numpy(self._prior.sample((1,))).reshape(-1),
-            lp_f=potential_function,
+            lp_f=self._potential_function(self, self._prior, context),
             thin=thin,
         )
 
