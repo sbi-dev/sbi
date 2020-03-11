@@ -1,7 +1,8 @@
 import torch.nn as nn
 import torch
 
-
+# XXX standardize? zscore?
+# XXX want to insert it in Sequential
 class Normalize(nn.Module):
     def __init__(self, mean, std):
         super(Normalize, self).__init__()
@@ -9,6 +10,7 @@ class Normalize(nn.Module):
         self.std = std
 
     def forward(self, tensor):
+        # XXX guard against std \sim 0 (epsilon or raise)
         return (tensor - self.mean) / self.std
 
 

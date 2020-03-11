@@ -15,9 +15,9 @@ class Posterior:
         self,
         algorithm: str,
         neural_net: torch.nn.Module,
-        prior: torch.distributions,
+        prior: torch.distributions.Distribution,
         context: torch.Tensor,
-        train_with_mcmc: bool = True,
+        train_with_mcmc: bool = True,  # XXX make sure it IS True
         mcmc_method: str = "slice-np",
     ):
         """
@@ -27,8 +27,9 @@ class Posterior:
             prior: prior dist
             context: Tensor or None, conditioning variables. If a Tensor, it must have the same
                 number or rows as the inputs. If None, the context is ignored.
+            #XXX sample with MCMC ????
             train_with_mcmc: bool. Sample rejection or MCMC?
-
+        #XXX remove!
         Returns:
             A Tensor of shape [input_size], the log probability of the inputs given the context.
         """
@@ -43,6 +44,8 @@ class Posterior:
     def _get_algorithm_family(self, algorithm: str) -> str:
         """Return the family (snpe, sre, snl) of given algorithm."""
 
+        # XXX dispatch based on type of self.neural_net?
+        # XXX property reporting how the posterior was constructed?
         families = dict(
             snpe="snpe",
             snpea="snpe",
@@ -100,7 +103,8 @@ class Posterior:
         else:
             acceptance_prob = 1.0
 
-        return np.log(acceptance_prob) + unnormalized_log_prob
+        # XXX torch.log?
+        return -np.log(acceptance_prob) + unnormalized_log_prob
 
     def estimate_acceptance_rate(
         self, num_samples: int = int(1e4), context: torch.Tensor = None
