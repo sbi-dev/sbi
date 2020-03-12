@@ -29,7 +29,7 @@ class Posterior:
         context: torch.Tensor,
         train_with_mcmc: bool = True,  # XXX make sure it IS True
         mcmc_method: str = "slice-np",
-        potential_function: Optional[Callable] = None,
+        get_potential_function: Optional[Callable] = None,
     ):
         """
         Args:
@@ -49,7 +49,7 @@ class Posterior:
         self._mcmc_method = mcmc_method
         assert algorithm_family in ["snpe", "snl", "sre"], "Not supported."
         self._alg_family = algorithm_family
-        self._potential_function = potential_function
+        self._get_potential_function = get_potential_function
 
     def log_prob(
         self,
@@ -235,7 +235,7 @@ class Posterior:
     def _sample_posterior_mcmc(
         self,
         num_samples: int,
-        context: torch.Tensor = None,
+        context: torch.Tensor,
         mcmc_method: str = "slice_np",
         thin: int = 10,
         warmup: int = 20,
@@ -250,14 +250,22 @@ class Posterior:
             thin: Generate (num_samples * thin) samples in total, then select every
                 'thin' sample.
 
-        Returns:
+        Returns:None
             torch.Tensor of shape [num_samples, parameter_dim]
         """
 
+        # XXX: maybe get whole sampler instead of just potential function?
+        potential_function = self._get_potential_function(
+            self._prior, self.neural_net, context, mcmc_method
+        )
         if mcmc_method == "slice-np":
-            samples = self.slice_np_mcmc(num_samples, context, thin, warmup)
+            samples = self.slice_np_mcmc(
+                num_samples, potential_function, context, thin, warmup
+            )
         else:
-            samples = self.pyro_mcmc(num_samples, context, mcmc_method, thin, warmup)
+            samples = self.pyro_mcmc(
+                num_samples, potential_function, context, mcmc_method, thin, warmup
+            )
 
         # Back to training mode.
         self.neural_net.train()
@@ -267,17 +275,21 @@ class Posterior:
     def slice_np_mcmc(
         self,
         num_samples: int,
-        context: torch.Tensor,
         potential_function: Callable,
+        context: torch.Tensor,
         thin: int = 10,
         warmup_steps: int = 20,
     ):
 
         self.neural_net.eval()
 
+        # potential_function = sbi.inference.snpe.base_snpe.SliceNpNeuralPotentialFunction(
+        #     self, self._prior, context
+        # )
+
         posterior_sampler = SliceSampler(
             utils.tensor2numpy(self._prior.sample((1,))).reshape(-1),
-            lp_f=self._potential_function(self, self._prior, context),
+            lp_f=potential_function,
             thin=thin,
         )
 
@@ -285,13 +297,14 @@ class Posterior:
 
         posterior_sampler.gen(warmup_steps)
 
-        samples = torch.Tensor(posterior_sampler.gen(num_samples))
+        samples = torch.tensor(posterior_sampler.gen(num_samples))
 
         return samples
 
     def pyro_mcmc(
         self,
         num_samples: int,
+        potential_function: Callable,
         context: torch.Tensor,
         mcmc_method: str = "slice",
         thin: int = 10,
@@ -304,9 +317,7 @@ class Posterior:
         # case here.
         # build potential function depending on what algorithm is used
         if self._alg_family == "snpe":
-            potential_function = sbi.inference.snpe.base_snpe.NeuralPotentialFunction(
-                self.neural_net, self._prior, context
-            )
+            potential_function = potential_function
         elif self._alg_family == "snl":
             potential_function = sbi.inference.snl.NeuralPotentialFunction(
                 self.neural_net, self._prior, context
@@ -322,7 +333,7 @@ class Posterior:
         self.neural_net.eval()
 
         if mcmc_method == "slice":
-            kernel = Slice(potential_function=potential_function)
+            kernel = Slice(potential_fn=potential_function)
         elif mcmc_method == "hmc":
             kernel = HMC(potential_fn=potential_function)
         elif mcmc_method == "nuts":

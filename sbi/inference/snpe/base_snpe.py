@@ -1,4 +1,6 @@
+from typing import Callable
 from copy import deepcopy
+from sbi import mcmc
 
 import numpy as np
 import sbi.simulators as simulators
@@ -98,7 +100,7 @@ class SnpeBase:
             context=true_observation,
             train_with_mcmc=train_with_mcmc,
             mcmc_method=mcmc_method,
-            potential_function=SliceNpNeuralPotentialFunction,
+            get_potential_function=PotentialFunctionProvider(),
         )
 
         # obtain z-score for observations and define embedding net
@@ -433,6 +435,85 @@ class SnpeBase:
         # Update summary.
         self._summary["epochs"].append(epochs)
         self._summary["best-validation-log-probs"].append(best_validation_log_prob)
+
+
+class PotentialFunctionProvider:
+    """
+    This class is initialized without arguments during the initialization of the Posterior class. When called, it specializes to the potential function appropriate to the requested mcmc_method.
+    
+   
+    NOTE: Why use a class?
+    ----------------------
+    During inference, we use deepcopy to save untrained posteriors in memory. deepcopy uses pickle which can't serialize nested functions (https://stackoverflow.com/a/12022055).
+    
+    It is important to NOT initialize attributes upon instantiation, because we need the most current trained Posterior.neural_net.
+    
+    Returns:
+        [Callable]: return potential function for either numpy or pyro
+    """
+
+    def __call__(
+        self,
+        prior: torch.distributions.Distribution,
+        posterior: torch.nn.Module,
+        observation: torch.Tensor,
+        mcmc_method: str,
+    ):
+        """Return potential function. 
+        
+        Switch on numpy or pyro potential function.
+        
+        """
+        self.posterior = posterior
+        self.prior = prior
+        self.observation = observation
+
+        if mcmc_method in ("slice", "hmc", "nuts"):
+            return self.pyro_potential
+        else:
+            return self.np_potential
+
+    # define both, numpy and pyro potential functions
+    # both expect single argument functions
+    def np_potential(self, parameters):
+        parameters = torch.FloatTensor(parameters)
+
+        # format inputs and context into the correct shape
+        parameters, observation = utils.build_inputs_and_contexts(
+            parameters.reshape(1, -1),
+            self.observation.reshape(1, -1),
+            self.observation.reshape(1, -1),
+            normalize=False,
+        )
+
+        # go into evaluation mode
+        self.posterior.eval()
+
+        if not np.isinf(self.prior.log_prob(parameters).sum().item()):
+            target_log_prob = self.posterior.log_prob(
+                inputs=parameters, context=observation,
+            )
+        else:
+            target_log_prob = -np.inf
+
+        return target_log_prob
+
+    def pyro_potential(self, parameters_dict):
+
+        parameters = next(iter(parameters_dict.values()))
+        potential = -self.posterior.log_prob(
+            inputs=parameters, context=self.observation, normalize_snpe=False,
+        )
+        if isinstance(self.prior, distributions.Uniform):
+            log_prob_prior = self.prior.log_prob(parameters).sum(-1)
+        else:
+            log_prob_prior = self.prior.log_prob(parameters)
+
+        log_prob_prior[~torch.isinf(log_prob_prior)] = 1
+
+        potential *= log_prob_prior
+
+        return potential
 
 
 class NeuralPotentialFunction:
