@@ -19,17 +19,16 @@ def build_inputs_and_contexts(inputs, context, true_context, normalize):
     Formats inputs and context into the correct shape
 
     Args:
-            inputs: Tensor, input variables.
-            context: Tensor or None, conditioning variables. If a Tensor, it must have the same
-                number or rows as the inputs. If None, the context is ignored.
-            true_context: if context=None, replace it with true_context
-            normalize:
-                If True, we normalize the output density
-                by drawing samples, estimating the acceptance
-                ratio, and then scaling the probability with it
+        inputs: Tensor, input variables.
+        context: Tensor or None, conditioning variables. If a Tensor, it must have the same number or rows as the inputs. If None, the context is ignored.
+        true_context: if context=None, replace it with true_context
+        normalize:
+            If True, we normalize the output density
+            by drawing samples, estimating the acceptance
+            ratio, and then scaling the probability with it
 
-        Returns:
-            inputs, context as torch.tensors
+    Returns:
+        inputs, context as torch.tensors
     """
     inputs = torch.as_tensor(inputs)
     if len(inputs.shape) == 1:
@@ -55,6 +54,7 @@ def build_inputs_and_contexts(inputs, context, true_context, normalize):
     if context.shape[0] != inputs.shape[0]:
         context = context.repeat(inputs.shape[0], 1)
 
+    # Ctrl-C Ctrl-V?
     if inputs.shape[0] != context.shape[0]:
         raise ValueError(
             "Number of input items must be equal to number of context items."
