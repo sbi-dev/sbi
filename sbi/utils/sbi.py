@@ -31,31 +31,41 @@ def build_inputs_and_contexts(inputs, context, true_context, normalize):
         inputs, context as torch.tensors
     """
     inputs = torch.as_tensor(inputs)
+
     if len(inputs.shape) == 1:
         inputs = inputs[
             None,
-        ]  # append a dimension
+        ]  # append batch dimension
 
     if context is not None:
+
         if len(context.shape) > 1 and context.shape[0] > 1 and normalize:
+            # if multiple observations, with snape avoid expensive leakage
+            # correction by rejection sampling
             raise ValueError(
                 "Only a single context is allowed for log-prob when normalizing the density. "
                 "Please use a for-loop over your inputs and contexts."
             )
+
         if len(context.shape) == 1:
             context = context[
                 None,
-            ]  # append a dimension
+            ]  # append batch dimension
         context = torch.as_tensor(context)
     else:
+        # if observation x1 is not provided, use the x0 used for training
         context = true_context[
             None,
         ]
+
     if context.shape[0] != inputs.shape[0]:
+        # multiple parameters, single observation:
+        # repeat the context to match the parameters
         context = context.repeat(inputs.shape[0], 1)
 
-    # Ctrl-C Ctrl-V?
     if inputs.shape[0] != context.shape[0]:
+        # catch all remaining errors after shape-mangling above
+        # THIS SHOULD NEVER HAPPEN
         raise ValueError(
             "Number of input items must be equal to number of context items."
         )
