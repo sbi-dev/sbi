@@ -1,4 +1,4 @@
-from typing import Callable
+from typing import Union
 from copy import deepcopy
 from sbi import mcmc
 
@@ -455,7 +455,7 @@ class PotentialFunctionProvider:
     def __call__(
         self,
         prior: torch.distributions.Distribution,
-        posterior: torch.nn.Module,
+        posterior_nn: torch.nn.Module,
         observation: torch.Tensor,
         mcmc_method: str,
     ):
@@ -464,7 +464,7 @@ class PotentialFunctionProvider:
         Switch on numpy or pyro potential function.
         
         """
-        self.posterior = posterior
+        self.posterior_nn = posterior_nn
         self.prior = prior
         self.observation = observation
 
@@ -473,130 +473,51 @@ class PotentialFunctionProvider:
         else:
             return self.np_potential
 
-    # define both, numpy and pyro potential functions
-    # both expect single argument functions
-    def np_potential(self, parameters):
+    def np_potential(self, parameters: np.array) -> Union[torch.Tensor, float]:
+        """Return posterior log prob. of parameters, -inf if outside prior."
+        
+        Args:
+            parameters ([np.array]): parameter vector, batch dimension 1
+        
+        Returns:
+            [tensor or inf]: posterior log probability of the parameters.
+        """
         parameters = torch.FloatTensor(parameters)
 
-        if not np.isinf(self.prior.log_prob(parameters).sum().item()):
-            target_log_prob = self.posterior.log_prob(
+        # check if any of the params outside prior
+        # this implicitly takes care of evaluating N-D Uniform prior
+        within_prior = torch.isfinite(self.prior.log_prob(parameters)).all()
+        if within_prior:
+            target_log_prob = self.posterior_nn.log_prob(
                 inputs=parameters.reshape(1, -1),
                 context=self.observation.reshape(1, -1),
             )
         else:
-            target_log_prob = -np.inf
+            target_log_prob = -float("Inf")
 
         return target_log_prob
 
-    def pyro_potential(self, parameters_dict):
+    def pyro_potential(self, parameters: dict) -> torch.Tensor:
+        """Return posterior log prob. of parameters, -inf where outside prior.
+        
+        Args:
+            parameters (dict): parameters (from pyro sampler)
+        
+        Returns:
+            torch.Tensor: posterior log probability, masked outside of prior
+        """
 
-        parameters = next(iter(parameters_dict.values()))
-        potential = -self.posterior.log_prob(
-            inputs=parameters, context=self.observation, normalize_snpe=False,
+        parameters = next(iter(parameters.values()))
+        # XXX: notice sign, check convention pyro vs. numpy
+        log_prob_posterior = -self.posterior_nn.log_prob(
+            inputs=parameters, context=self.observation,
         )
+        # XXX handle special case in specific function
         if isinstance(self.prior, distributions.Uniform):
             log_prob_prior = self.prior.log_prob(parameters).sum(-1)
         else:
             log_prob_prior = self.prior.log_prob(parameters)
 
-        log_prob_prior[~torch.isinf(log_prob_prior)] = 1
+        within_prior = torch.isfinite(log_prob_prior)
 
-        potential *= log_prob_prior
-
-        return potential
-
-
-class NeuralPotentialFunction:
-    """
-    Implementation of a potential function for Pyro MCMC which uses a classifier
-    to evaluate a quantity proportional to the likelihood.
-    """
-
-    def __init__(self, posterior, prior, true_observation):
-        """
-        Args:
-            posterior: nn
-            prior: torch.distribution, Distribution object with 'log_prob' method.
-            true_observation:torch.Tensor containing true observation x0.
-        """
-
-        self.prior = prior
-        self.posterior = posterior
-        self.true_observation = true_observation
-
-    def __call__(self, parameters_dict):
-        """
-        Call method allows the object to be used as a function.
-        Evaluates the given parameters using a given neural likelhood, prior,
-        and true observation.
-
-        Args:
-            parameters_dict: dict of parameter values which need evaluation for MCMC.
-
-        Returns:
-            torch.Tensor potential ~ -[log r(x0, theta) + log p(theta)]
-
-        """
-
-        parameters = next(iter(parameters_dict.values()))
-        potential = -self.posterior.log_prob(
-            inputs=parameters, context=self.true_observation
-        )
-        if isinstance(self.prior, distributions.Uniform):
-            log_prob_prior = self.prior.log_prob(parameters).sum(-1)
-        else:
-            log_prob_prior = self.prior.log_prob(parameters)
-        log_prob_prior[~torch.isinf(log_prob_prior)] = 1
-        potential *= log_prob_prior
-
-        return potential
-
-    def evaluate(self, point):
-        raise NotImplementedError
-
-
-class SliceNpNeuralPotentialFunction:
-    """
-    Implementation of a potential function for Pyro MCMC which uses a classifier
-    to evaluate a quantity proportional to the likelihood.
-    """
-
-    def __init__(self, posterior, prior, true_observation):
-        """
-        Args:
-            posterior: nn
-            prior: torch.distribution, Distribution object with 'log_prob' method.
-            true_observation:torch.Tensor containing true observation x0.
-        """
-
-        self.prior = prior
-        self.posterior = posterior
-        self.true_observation = true_observation
-
-    def __call__(self, parameters):
-        """
-        Call method allows the object to be used as a function.
-        Evaluates the given parameters using a given neural likelhood, prior,
-        and true observation.
-
-        Args:
-            parameters_dict: dict of parameter values which need evaluation for MCMC.
-
-        Returns:
-            torch.Tensor potential ~ -[log r(x0, theta) + log p(theta)]
-
-        """
-
-        if not np.isinf(self.prior.log_prob(torch.Tensor(parameters)).sum().item()):
-            target_log_prob = self.posterior.log_prob(
-                inputs=torch.Tensor(parameters).reshape(1, -1),
-                context=self.true_observation.reshape(1, -1),
-                normalize_snpe=False,
-            )
-        else:
-            target_log_prob = -np.inf
-
-        return target_log_prob
-
-    def evaluate(self, point):
-        raise NotImplementedError
+        return torch.where(within_prior, log_prob_posterior, log_prob_prior)
