@@ -68,8 +68,11 @@ def test_apt_on_linearGaussian_based_on_mmd(num_dim):
     ), f"MMD={mmd} is more than 2 stds above the average performance."
 
 
-@pytest.mark.parametrize("train_with_mcmc", (True, False))
-def test_apt_posterior_correction(train_with_mcmc):
+@pytest.mark.parametrize(
+    "train_with_mcmc, mcmc_method",
+    ((True, "slice-np"), (True, "slice"), (False, "rejection")),
+)
+def test_apt_posterior_correction(train_with_mcmc, mcmc_method):
     """Test that leakage correction applied to sampling works, with both MCMC and rejection."""
 
     num_dim = 2
@@ -93,6 +96,7 @@ def test_apt_posterior_correction(train_with_mcmc):
         retrain_from_scratch_each_round=False,
         discard_prior_samples=False,
         train_with_mcmc=train_with_mcmc,
+        mcmc_method=mcmc_method,
     )
 
     # run inference
@@ -104,3 +108,4 @@ def test_apt_posterior_correction(train_with_mcmc):
     # draw samples from posterior (should be corrected for leakage)
     # even if just num_rounds=1
     samples = posterior.sample(10)
+
