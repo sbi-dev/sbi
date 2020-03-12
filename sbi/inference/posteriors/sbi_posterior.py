@@ -281,11 +281,8 @@ class Posterior:
         warmup_steps: int = 20,
     ):
 
+        # go into eval mode for evaluating during sampling
         self.neural_net.eval()
-
-        # potential_function = sbi.inference.snpe.base_snpe.SliceNpNeuralPotentialFunction(
-        #     self, self._prior, context
-        # )
 
         posterior_sampler = SliceSampler(
             utils.tensor2numpy(self._prior.sample((1,))).reshape(-1),
@@ -293,11 +290,12 @@ class Posterior:
             thin=thin,
         )
 
-        self.neural_net.train()
-
         posterior_sampler.gen(warmup_steps)
 
         samples = torch.tensor(posterior_sampler.gen(num_samples))
+
+        # back to training mode
+        self.neural_net.train()
 
         return samples
 
