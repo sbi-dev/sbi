@@ -478,20 +478,10 @@ class PotentialFunctionProvider:
     def np_potential(self, parameters):
         parameters = torch.FloatTensor(parameters)
 
-        # format inputs and context into the correct shape
-        parameters, observation = utils.build_inputs_and_contexts(
-            parameters.reshape(1, -1),
-            self.observation.reshape(1, -1),
-            self.observation.reshape(1, -1),
-            normalize=False,
-        )
-
-        # go into evaluation mode
-        self.posterior.eval()
-
         if not np.isinf(self.prior.log_prob(parameters).sum().item()):
             target_log_prob = self.posterior.log_prob(
-                inputs=parameters, context=observation,
+                inputs=parameters.reshape(1, -1),
+                context=self.observation.reshape(1, -1),
             )
         else:
             target_log_prob = -np.inf
