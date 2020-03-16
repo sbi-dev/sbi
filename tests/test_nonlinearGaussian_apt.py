@@ -60,9 +60,7 @@ def test_nonlinearGaussian_based_on_mmd():
 
     # run inference
     num_rounds, num_simulations_per_round = 2, 1000
-    apt.run_inference(
-        num_rounds=num_rounds, num_simulations_per_round=num_simulations_per_round
-    )
+    apt(num_rounds=num_rounds, num_simulations_per_round=num_simulations_per_round)
 
     # draw samples from posterior
     samples = apt._neural_posterior.sample(1000)

@@ -50,16 +50,14 @@ def test_sre_on_linearGaussian_api(num_dim: int):
     )
 
     # run inference
-    posterior = inference_method.run_inference(
-        num_rounds=1, num_simulations_per_round=1000
-    )
+    posterior = inference_method(num_rounds=1, num_simulations_per_round=1000)
 
     # draw samples from posterior
     samples = posterior.sample(num_samples=100)
 
     # define target distribution (analytically tractable) and sample from it
     target_samples = get_ground_truth_posterior_samples_linear_gaussian(
-        true_observation[None, ], num_samples=100
+        true_observation[None,], num_samples=100
     )
 
     # compute the mmd
@@ -105,9 +103,7 @@ def test_sre_on_linearGaussian_based_on_mmd(num_dim: int):
     )
 
     # run inference
-    posterior = inference_method.run_inference(
-        num_rounds=1, num_simulations_per_round=1000
-    )
+    posterior = inference_method(num_rounds=1, num_simulations_per_round=1000)
 
     # draw samples from posterior
     samples = posterior.sample(num_samples=1000)

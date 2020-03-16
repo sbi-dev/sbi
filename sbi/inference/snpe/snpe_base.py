@@ -145,9 +145,9 @@ class SnpeBase:
             "rejection-sampling-acceptance-rates": [],
         }
 
-    def run_inference(self, num_rounds, num_simulations_per_round, **kwargs):
+    def __call__(self, num_rounds, num_simulations_per_round, **kwargs):
         """
-        Runs a round of inference
+        Return posterior density after inference over several rounds.
 
         Args:
             num_rounds: int
@@ -155,11 +155,15 @@ class SnpeBase:
             num_simulations_per_round: list or int
                 list or int: Number of simulator calls per round.
 
-        Returns: None
+        Returns: Posterior that can be sampled and evaluated.
 
         """
 
-        if isinstance(num_simulations_per_round, int):
+        try:
+            assert (
+                len(num_simulations_per_round) == num_rounds
+            ), "Please provide list with number of simulations per round for each round, or a single integer to be used for all rounds."
+        except TypeError:
             num_simulations_per_round = [num_simulations_per_round] * num_rounds
 
         round_description = ""

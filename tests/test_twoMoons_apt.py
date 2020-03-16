@@ -40,7 +40,7 @@ def test_apt_on_twoMoons_based_on_mmd():
     )
 
     num_rounds, num_simulations_per_round = 2, 500
-    apt.run_inference(
+    apt(
         num_rounds=num_rounds,
         num_simulations_per_round=num_simulations_per_round,
         batch_size=20,

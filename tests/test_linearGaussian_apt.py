@@ -43,7 +43,7 @@ def test_apt_on_linearGaussian_based_on_mmd(num_dim):
 
     # run inference
     num_rounds, num_simulations_per_round = 1, 1000
-    posterior = apt.run_inference(
+    posterior = apt(
         num_rounds=num_rounds, num_simulations_per_round=num_simulations_per_round
     )
 
@@ -101,7 +101,7 @@ def test_apt_posterior_correction(train_with_mcmc, mcmc_method):
 
     # run inference
     num_rounds, num_simulations_per_round = 1, 1000
-    posterior = apt.run_inference(
+    posterior = apt(
         num_rounds=num_rounds, num_simulations_per_round=num_simulations_per_round
     )
 
