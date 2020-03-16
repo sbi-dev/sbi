@@ -2,12 +2,9 @@ import os
 
 import numpy as np
 import torch
-import pytest
-from torch import distributions
 
 import pytest
-import sbi.utils as utils
-from sbi.inference.snpe.base_snpe import SnpeBase
+from sbi.inference.snpe.snpe_base import SnpeBase
 from sbi.inference.snpe.snpe_c import SnpeC
 from sbi.simulators.nonlinear_gaussian import (
     get_ground_truth_posterior_samples_nonlinear_gaussian,

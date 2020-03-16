@@ -1,9 +1,10 @@
 import os
-import sbi.utils as utils
-from sbi.inference.snpe.base_snpe import SnpeBase
-import torch
+
 from torch import distributions
 from torch.utils.tensorboard import SummaryWriter
+
+from sbi.inference.snpe.snpe_base import SnpeBase
+import sbi.utils as utils
 
 
 class SnpeB(SnpeBase):
@@ -17,22 +18,22 @@ class SnpeB(SnpeBase):
     """
 
     def __init__(
-            self,
-            simulator,
-            prior,
-            true_observation,
-            num_pilot_samples=100,
-            density_estimator='maf',
-            calibration_kernel=None,
-            use_combined_loss=False,
-            z_score_obs=True,
-            retrain_from_scratch_each_round=False,
-            discard_prior_samples=False,
-            summary_writer=None,
-            device=None,
+        self,
+        simulator,
+        prior,
+        true_observation,
+        num_pilot_samples=100,
+        density_estimator="maf",
+        calibration_kernel=None,
+        use_combined_loss=False,
+        z_score_obs=True,
+        retrain_from_scratch_each_round=False,
+        discard_prior_samples=False,
+        summary_writer=None,
+        device=None,
     ):
         """
-        See base_snpe for docstring.
+        See snpe_base.SnpeBase for docstring.
 
         Args:
             num_atoms: int
@@ -52,7 +53,7 @@ class SnpeB(SnpeBase):
             retrain_from_scratch_each_round=retrain_from_scratch_each_round,
             discard_prior_samples=discard_prior_samples,
             device=device,
-            )
+        )
 
         # Each APT run has an associated log directory for TensorBoard output.
         if summary_writer is None:
@@ -86,9 +87,7 @@ class SnpeB(SnpeBase):
         batch_size = inputs.shape[0]
 
         # Evaluate posterior
-        log_prob_posterior = self._neural_posterior.log_prob(
-            inputs, context
-        )
+        log_prob_posterior = self._neural_posterior.log_prob(inputs, context)
         assert utils.notinfnotnan(
             log_prob_posterior
         ), "NaN/inf detected in posterior eval."
@@ -100,21 +99,17 @@ class SnpeB(SnpeBase):
         else:
             log_prob_prior = self._prior.log_prob(inputs)
         log_prob_prior = log_prob_prior.reshape(batch_size)
-        assert utils.notinfnotnan(
-            log_prob_prior
-        ), "NaN/inf detected in prior eval."
+        assert utils.notinfnotnan(log_prob_prior), "NaN/inf detected in prior eval."
 
         # evaluate proposal
-        log_prob_proposal = self._model_bank[-1].log_prob(
-            inputs, context
-        )
+        log_prob_proposal = self._model_bank[-1].log_prob(inputs, context)
         assert utils.notinfnotnan(
             log_prob_proposal
         ), "NaN/inf detected in proposal posterior eval."
 
         # Compute log prob with importance weights
         log_prob = self.calibration_kernel(context) * (
-                log_prob_posterior + log_prob_prior - log_prob_proposal
+            log_prob_posterior + log_prob_prior - log_prob_proposal
         )
 
         # todo: this implementation is not perfect: it evaluates the posterior
@@ -124,9 +119,5 @@ class SnpeB(SnpeBase):
                 inputs, context
             )
             masks = masks.reshape(-1)
-            log_prob = (
-                    masks * log_prob_posterior_non_atomic + log_prob
-            )
-
+            log_prob = masks * log_prob_posterior_non_atomic + log_prob
         return log_prob
-

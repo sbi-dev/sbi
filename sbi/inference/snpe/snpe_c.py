@@ -4,7 +4,7 @@ import torch
 from torch import distributions
 from torch.utils.tensorboard import SummaryWriter
 
-from sbi.inference.snpe.base_snpe import SnpeBase
+from sbi.inference.snpe.snpe_base import SnpeBase
 from sbi.simulators.simutils import set_simulator_attributes
 import sbi.utils as utils
 
@@ -37,7 +37,7 @@ class SnpeC(SnpeBase):
         mcmc_method="slice-np",
     ):
         """
-        See base_snpe for docstring.
+        See snpe_base.SnpeBase for docstring.
 
         Args:
             num_atoms: int
