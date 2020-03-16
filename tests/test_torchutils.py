@@ -2,7 +2,7 @@
 
 import torch
 import torchtestcase
-import unittest
+import pytest
 
 from sbi.utils import torchutils
 
@@ -96,5 +96,8 @@ class TorchUtilsTest(torchtestcase.TorchTestCase):
         self.assertEqual(idx.shape, inputs.shape)
 
 
-if __name__ == "__main__":
-    unittest.main()
+def test_box_distribution():
+    bu1 = torchutils.BoxUniform(low=0.0, high=torch.Tensor([3.0, 3.0, 3.0]))
+
+    assert bu1.event_shape == torch.Size([3])
+

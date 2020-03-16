@@ -1,7 +1,9 @@
 """Various PyTorch utility functions."""
 
+from typing import Union
 import numpy as np
 import torch
+from torch.distributions import Distribution, Independent, Uniform
 
 import sbi.utils as utils
 
@@ -201,3 +203,22 @@ def get_log_prob(
     else:
         # return log prob as usual
         return dist.log_prob(values)
+
+
+def BoxUniform(
+    low: Union[torch.Tensor, float],
+    high: Union[torch.Tensor, float],
+    reinterpreted_batch_ndims: int = 1,
+) -> Distribution:
+    """Multidimensional uniform distribution defined on a box.
+    
+    Refer to torch.distributions.Uniform and torch.distributions.Independent for further documentation.
+    
+    Args:
+        low (Tensor or float): lower range (inclusive).
+        high (Tensor or float): upper range (exclusive).
+        reinterpreted_batch_ndims (int): the number of batch dims to
+reinterpret as event dims
+    """
+
+    return Independent(Uniform(low, high), reinterpreted_batch_ndims)
