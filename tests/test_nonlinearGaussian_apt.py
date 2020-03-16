@@ -1,13 +1,14 @@
 import os
-import sys
 
 import numpy as np
-import pytest
 import torch
+import pytest
 from torch import distributions
 
+import pytest
 import sbi.utils as utils
-from sbi.inference.snpe.snpe_c import APT
+from sbi.inference.snpe.base_snpe import SnpeBase
+from sbi.inference.snpe.snpe_c import SnpeC
 from sbi.simulators.nonlinear_gaussian import (
     get_ground_truth_posterior_samples_nonlinear_gaussian,
     non_linear_gaussian,
@@ -49,7 +50,7 @@ def test_nonlinearGaussian_based_on_mmd():
         low=-3 * torch.ones(parameter_dim), high=3 * torch.ones(parameter_dim),
     )
 
-    apt = APT(
+    apt = SnpeC(
         simulator=simulator,
         true_observation=ground_truth_observation[None,],
         prior=prior,

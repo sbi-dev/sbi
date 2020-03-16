@@ -4,12 +4,12 @@ import torch
 from torch import distributions
 from torch.utils.tensorboard import SummaryWriter
 
-import sbi.utils as utils
 from sbi.inference.snpe.base_snpe import SnpeBase
 from sbi.simulators.simutils import set_simulator_attributes
+import sbi.utils as utils
 
 
-class APT(SnpeBase):
+class SnpeC(SnpeBase):
     """
     Implementation of
     'Automatic Posterior Transformation for Likelihood-free Inference'
@@ -48,7 +48,7 @@ class APT(SnpeBase):
         # set name and dimensions of simulator
         simulator = set_simulator_attributes(simulator, prior)
 
-        super(APT, self).__init__(
+        super(SnpeC, self).__init__(
             simulator=simulator,
             prior=prior,
             true_observation=true_observation,

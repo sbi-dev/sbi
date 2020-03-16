@@ -3,14 +3,14 @@ import torch
 from torch import distributions
 
 import sbi.utils as utils
-from sbi.inference.snpe.snpe_c import APT
+from sbi.inference.snpe.snpe_c import SnpeC
 from sbi.simulators.linear_gaussian import (
     get_ground_truth_posterior_samples_linear_gaussian,
     linear_gaussian,
 )
 
-# use cpu by default
 torch.set_default_tensor_type("torch.FloatTensor")
+
 
 # seed the simulations
 torch.manual_seed(0)
@@ -28,7 +28,7 @@ def test_apt_on_linearGaussian_based_on_mmd(num_dim):
 
     neural_net = utils.posterior_nn(model="maf", prior=prior, context=true_observation,)
 
-    apt = APT(
+    apt = SnpeC(
         simulator=linear_gaussian,
         true_observation=true_observation,
         density_estimator=neural_net,
@@ -85,7 +85,7 @@ def test_apt_posterior_correction(train_with_mcmc, mcmc_method):
 
     neural_net = utils.posterior_nn(model="maf", prior=prior, context=true_observation,)
 
-    apt = APT(
+    apt = SnpC(
         simulator=linear_gaussian,
         true_observation=true_observation,
         density_estimator=neural_net,
@@ -108,4 +108,3 @@ def test_apt_posterior_correction(train_with_mcmc, mcmc_method):
     # draw samples from posterior (should be corrected for leakage)
     # even if just num_rounds=1
     samples = posterior.sample(10)
-

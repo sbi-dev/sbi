@@ -1,18 +1,21 @@
 import os
 
 import numpy as np
-import sbi.simulators as simulators
-import sbi.utils as utils
+import pytest
 import torch
-from sbi.inference.snpe.snpe_c import APT
+from torch import distributions
+
+import torch
 from torch import distributions
 import pytest
+import sbi.utils as utils
 
 # use cpu by default
 torch.set_default_tensor_type("torch.FloatTensor")
 
 # seed the simulations
 torch.manual_seed(0)
+
 
 @pytest.mark.slow
 def test_apt_on_twoMoons_based_on_mmd():
@@ -25,7 +28,7 @@ def test_apt_on_twoMoons_based_on_mmd():
 
     true_observation = torch.Tensor([[0, 0]])
 
-    apt = APT(
+    apt = SnpeC(
         simulator=simulator,
         true_observation=true_observation,
         prior=prior,
