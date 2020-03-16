@@ -85,7 +85,7 @@ def test_apt_posterior_correction(train_with_mcmc, mcmc_method):
 
     neural_net = utils.posterior_nn(model="maf", prior=prior, context=true_observation,)
 
-    apt = SnpC(
+    apt = SnpeC(
         simulator=linear_gaussian,
         true_observation=true_observation,
         density_estimator=neural_net,
