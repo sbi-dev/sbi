@@ -1,20 +1,21 @@
-from typing import Union
+import warnings
 from copy import deepcopy
-from sbi import mcmc
+from typing import Union
 
 import numpy as np
-import sbi.simulators as simulators
-import sbi.utils as utils
 import torch
-from sbi.utils.torchutils import get_default_device
+from pyknos.mdn.mdn import MultivariateGaussianMDN
 from torch import distributions, nn, optim
 from torch.nn.utils import clip_grad_norm_
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from tqdm import tqdm
-import warnings
-from pyknos.mdn.mdn import MultivariateGaussianMDN
+
+import sbi.simulators as simulators
+import sbi.utils as utils
+from sbi import mcmc
 from sbi.inference.posteriors.sbi_posterior import Posterior
+from sbi.utils.torchutils import get_default_device
 
 
 class SnpeBase:
@@ -200,7 +201,7 @@ class SnpeBase:
                 parameter_bank=self._parameter_bank,
                 observation_bank=self._observation_bank,
                 simulator=self._simulator,
-                estimate_acceptance_rate=self._neural_posterior.estimate_acceptance_rate(
+                estimate_acceptance_rate=self._neural_posterior.get_leakage_correction(
                     context=self._true_observation,
                 ),
             )
