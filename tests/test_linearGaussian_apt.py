@@ -108,3 +108,6 @@ def test_apt_posterior_correction(train_with_mcmc, mcmc_method):
     # draw samples from posterior (should be corrected for leakage)
     # even if just num_rounds=1
     samples = posterior.sample(10)
+
+    # evaluate the samples to check correction factor
+    densities = posterior.log_prob(samples)
