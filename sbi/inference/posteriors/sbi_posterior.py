@@ -1,5 +1,4 @@
-import time
-from typing import Callable, Optional, Tuple
+from typing import Callable, Optional
 
 import numpy as np
 import torch
@@ -38,7 +37,7 @@ class Posterior:
             algorithm_family: one of 'snpe', 'snl', 'sre'
             neural_net: depends on algorithm: classifier for sre, density estimator for snpe and snl
             prior: prior dist
-            context: Tensor or None, conditioning variables. If a Tensor, it must have the same
+            context: Tensor or None, conditioning variables, i.e., observed data. If a Tensor, it must have the same
                 number or rows as the inputs. If None, the context is ignored.
             #XXX sample with MCMC ????
             train_with_mcmc: bool. Sample rejection or MCMC?
@@ -52,6 +51,8 @@ class Posterior:
         assert algorithm_family in ["snpe", "snl", "sre"], "Not supported."
         self._alg_family = algorithm_family
         self._get_potential_function = get_potential_function
+        # correction factor for snpe leakage
+        self._leakage_density_correction_factor = None
 
     def log_prob(
         self,
@@ -64,7 +65,7 @@ class Posterior:
         Args:
             inputs: Tensor, input variables.
             context: Tensor or None, conditioning variables. If a Tensor, it must have the same
-                number or rows as the inputs. If None, the context is ignored.
+                number or rows as the inputs. If None, self._context is used.
             normalize_snpe:
                 whether to normalize the output density when using snpe (by drawing samples, estimating the acceptance
                 ratio, and then scaling the probability with it)
@@ -74,73 +75,63 @@ class Posterior:
         """
 
         # we care about the normalized density only when we do snpe.
-        normalize = normalize_snpe and self._alg_family == "snpe"
+        correct_for_leakage = normalize_snpe and self._alg_family == "snpe"
 
         # format inputs and context into the correct shape
         inputs, context = utils.build_inputs_and_contexts(
-            inputs, context, self._context, normalize
+            inputs, context, self._context, correct_for_leakage
         )
 
         # go into evaluation mode
         self.neural_net.eval()
 
         # compute the unnormalized log probability by evaluating the network
-        unnormalized_log_prob = self.neural_net.log_prob(inputs, context)
+        unnormalized_log_prob = self.neural_net.log_prob(
+            inputs.float(), context.float()
+        )
 
         # find the acceptance rate
-        if normalize:
-            acceptance_prob = self.estimate_acceptance_rate(context=context[0])
-        else:
-            acceptance_prob = 1.0
+        leakage_correction = (
+            self.get_leakage_correction(context=context) if correct_for_leakage else 1.0
+        )
 
-        # XXX torch.log?
-        return -np.log(acceptance_prob) + unnormalized_log_prob
+        # return the normalized (leakage corrected) log prob: devide by acceptance prob of rejection sampling
+        return -torch.log(torch.tensor([leakage_correction])) + unnormalized_log_prob
 
-    def estimate_acceptance_rate(
-        self, num_samples: int = int(1e4), context: torch.Tensor = None
-    ):
+    def get_leakage_correction(
+        self, context: torch.Tensor, num_rejection_samples: int = 10000
+    ) -> float:
+        """Get factor for correcting the posterior density for leakage. 
+        
+        The factor is estimated from the acceptance probability during rejection sampling from the posterior.
+        
+        NOTE: This is to avoid re-estimating the acceptance probability from scratch whenever log_prob is called and normalize_snpe is True. Here, it is estimated only once for the default context, i.e., self._context, and saved for later, and whenever a new context is passed. 
+        
+        Arguments:
+            context {torch.Tensor} -- Context to condition the posterior. If None, uses the "default" context the posterior was trained for in multi-round mode.
+        
+        Keyword Arguments:
+            num_rejection_samples {int} -- Number of samples used to estimate the factor (default: {10000})
+        
+        Returns:
+            float -- Saved or newly estimated correction factor.
         """
-        Estimates rejection sampling acceptance rates.
 
-        Args:
-            context: Observation on which to condition.
-                If None, use true observation given at initialization.
-            num_samples: Number of samples to use.
-
-        Returns: float in [0, 1]
-            Fraction of accepted samples.
-        """
-
-        if context is None:
-            context = self._context
-
-        # Always sample in eval mode.
-        self.neural_net.eval()
-
-        total_num_accepted_samples, total_num_generated_samples = 0, 0
-        while total_num_generated_samples < num_samples:
-
-            # Generate samples from posterior.
-            candidate_samples = self.neural_net.sample(  # sample from unbounded flow
-                10000, context=context.reshape(1, -1)
-            ).squeeze(0)
-
-            # Evaluate posterior samples under the prior.
-            prior_log_prob = self._prior.log_prob(candidate_samples)
-            if isinstance(self._prior, distributions.Uniform):
-                prior_log_prob = prior_log_prob.sum(-1)
-
-            # Update remaining number of samples needed.
-            num_accepted_samples = (~torch.isinf(prior_log_prob)).sum().item()
-            total_num_accepted_samples += num_accepted_samples
-
-            # Keep track of acceptance rate
-            total_num_generated_samples += candidate_samples.shape[0]
-
-        # Back to training mode.
-        self.neural_net.train()
-
-        return total_num_accepted_samples / total_num_generated_samples
+        # if new context
+        if not (context == self._context).all():
+            # estimate it for the new context and return it, without setting the new factor
+            return self.estimate_acceptance_rate(
+                context, num_samples=num_rejection_samples
+            )
+        # if correction factor not estimated yet
+        elif self._leakage_density_correction_factor is None:
+            # estimate it, set the default and return it
+            self._leakage_density_correction_factor = self.estimate_acceptance_rate(
+                context, num_samples=num_rejection_samples
+            )
+            return self._leakage_density_correction_factor
+        else:  # just return the correction for the default (actually observed) context
+            return self._leakage_density_correction_factor
 
     def sample(self, num_samples: int, context: torch.Tensor = None, **kwargs):
         """
@@ -168,10 +159,7 @@ class Posterior:
                 **kwargs,
             )
         else:
-            samples, _ = self.sample_posterior_within_prior(
-                self.neural_net, self._prior, context, num_samples=num_samples
-            )
-            return samples
+            return self._sample_posterior_rejection(context, num_samples=num_samples)
 
     def _sample_posterior_mcmc(
         self,
@@ -316,57 +304,50 @@ class Posterior:
         )
         self.neural_net.embedding_net = embedding_net
 
-    # XXX: move this to utils?
-    @staticmethod
-    def sample_posterior_within_prior(
-        posterior_nn: torch.nn.Module,
-        prior: torch.distributions.Distribution,
-        context: torch.Tensor,
-        num_samples: int = 1,
-        patience: int = 5,
-    ) -> Tuple[torch.Tensor, float]:
+    def _sample_posterior_rejection(
+        self, context: torch.Tensor, num_samples: int = 1,
+    ) -> torch.Tensor:
+        """Sample from posterior, rejecting samples outside of prior. 
+        
+        NOTE: Calls utils method that does both, sampling and estimating acceptance rate. See docstring in called utils method. 
+        
+        Arguments:
+            context {torch.Tensor} -- observed data to condition on. 
+        
+        Keyword Arguments:
+            num_samples {int} -- Number of samples (default: {1})
+        
+        Returns:
+            [torch.Tensor] -- Tensor with samples
+        """
+        return utils.sample_posterior_within_prior(
+            posterior_nn=self.neural_net,
+            prior=self._prior,
+            context=context,
+            num_samples=num_samples,
+        )[0]
 
-        # turn on nn eval mode
-        posterior_nn.eval()
-
-        samples = []
-        num_accepted = 0
-        num_sampled = 0
-        tstart = time.time()
-        time_over = time.time() - tstart > (patience * 60)
-
-        # sample until done or patience over
-        while num_accepted < num_samples and not time_over:
-
-            n_remaining = num_samples - num_accepted
-
-            sample = posterior_nn.sample(n_remaining, context=context)
-            num_sampled += n_remaining
-
-            # get mask of samples within prior
-            mask = torch.isfinite(
-                utils.get_log_prob(dist=prior, values=sample)
-            )  # log prob is inf outside of prior
-            num_valid = mask.sum()
-
-            if num_valid > 0:
-                samples.append(sample[mask,].reshape(num_valid, -1))
-                num_accepted += num_valid
-
-            # update timer
-            time_over = time.time() - tstart > (patience * 60)
-
-        # accumulate list of accepted samples in single tensor
-        samples = torch.stack(samples).reshape(num_accepted, -1)
-
-        # estimate acceptance probability
-        acceptance_prob = num_accepted / num_sampled
-
-        # turn back on training mode
-        posterior_nn.train()
-
-        assert (
-            samples.shape[0] == num_samples
-        ), f"sampling from posterior within prior with patience {patience} failed : {samples.shape} vs. {num_samples}."
-
-        return samples, acceptance_prob
+    def estimate_acceptance_rate(
+        self, context: torch.Tensor, num_samples: int = 10000, patience: int = 5,
+    ) -> float:
+        """Estimate acceptance probability of posterior samples under the prior, e.g., for leakage correction.
+        
+        NOTE: Calls utils method that does both, sampling and estimating acceptance rate. See docstring in called utils method. 
+        
+        Arguments:
+            context {torch.Tensor} -- observed data to condition the posterior on
+        
+        Keyword Arguments:
+            num_samples {int} -- Number of samples for estimating the acceptance (default: {10000})
+            patience {int} -- Patience in minutes (default: {5})
+        
+        Returns:
+            float -- Estimated acceptance probability
+        """
+        return utils.sample_posterior_within_prior(
+            posterior_nn=self.neural_net,
+            prior=self._prior,
+            context=context,
+            num_samples=num_samples,
+            patience=patience,
+        )[1]
