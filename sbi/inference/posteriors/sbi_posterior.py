@@ -1,4 +1,5 @@
-from typing import Callable, Optional
+import time
+from typing import Callable, Optional, Tuple
 
 import numpy as np
 import torch
@@ -167,71 +168,10 @@ class Posterior:
                 **kwargs,
             )
         else:
-            return self._sample_posterior_rejection(
-                context=context, num_samples=num_samples
+            samples, _ = self.sample_posterior_within_prior(
+                self.neural_net, self._prior, context, num_samples=num_samples
             )
-
-    def _sample_posterior_rejection(
-        self, num_samples: int, context: torch.Tensor = None
-    ):
-        """
-        Rejection sample a posterior.
-
-        Args:
-            num_samples: Number of samples to generate.
-            context: [observation_dim] or [1, observation_dim]
-                Pass true observation for inference.
-
-        Returns:
-            torch.Tensor [num_samples, parameter_dim]
-            Posterior parameter samples.
-        """
-
-        # Always sample in eval mode.
-        self.neural_net.eval()
-
-        # Rejection sampling is potentially needed for the posterior.
-        # This is because the prior may not have support everywhere.
-        # The posterior may also be constrained to the same support,
-        # but we don't know this a priori.
-        samples = []
-        num_remaining_samples = num_samples
-        total_num_accepted, _total_num_generated_examples = 0, 0
-        while num_remaining_samples > 0:
-
-            # Generate samples from unbounded posterior.
-            candidate_samples = self.neural_net.sample(
-                max(10000, num_samples), context=context.reshape(1, -1)
-            ).squeeze(0)
-
-            # Evaluate posterior samples under the prior.
-            prior_log_prob = self._prior.log_prob(candidate_samples)
-            if isinstance(self._prior, distributions.Uniform):
-                prior_log_prob = prior_log_prob.sum(-1)
-
-            # Keep those samples which have non-zero probability under the prior.
-            accepted_samples = candidate_samples[~torch.isinf(prior_log_prob)]
-            samples.append(accepted_samples.detach())
-
-            # Update remaining number of samples needed.
-            num_accepted = (~torch.isinf(prior_log_prob)).sum().item()
-            num_remaining_samples -= num_accepted
-            total_num_accepted += num_accepted
-
-            # Keep track of acceptance rate
-            _total_num_generated_examples += candidate_samples.shape[0]
-
-        # Back to training mode.
-        self.neural_net.train()
-
-        # Aggregate collected samples.
-        samples = torch.cat(samples)
-
-        # Make sure we have the right amount.
-        samples = samples[:num_samples, ...]
-        assert samples.shape[0] == num_samples
-
-        return samples
+            return samples
 
     def _sample_posterior_mcmc(
         self,
@@ -375,3 +315,58 @@ class Posterior:
             "embedding_net=None"
         )
         self.neural_net.embedding_net = embedding_net
+
+    # XXX: move this to utils?
+    @staticmethod
+    def sample_posterior_within_prior(
+        posterior_nn: torch.nn.Module,
+        prior: torch.distributions.Distribution,
+        context: torch.Tensor,
+        num_samples: int = 1,
+        patience: int = 5,
+    ) -> Tuple[torch.Tensor, float]:
+
+        # turn on nn eval mode
+        posterior_nn.eval()
+
+        samples = []
+        num_accepted = 0
+        num_sampled = 0
+        tstart = time.time()
+        time_over = time.time() - tstart > (patience * 60)
+
+        # sample until done or patience over
+        while num_accepted < num_samples and not time_over:
+
+            n_remaining = num_samples - num_accepted
+
+            sample = posterior_nn.sample(n_remaining, context=context)
+            num_sampled += n_remaining
+
+            # get mask of samples within prior
+            mask = torch.isfinite(
+                utils.get_log_prob(dist=prior, values=sample)
+            )  # log prob is inf outside of prior
+            num_valid = mask.sum()
+
+            if num_valid > 0:
+                samples.append(sample[mask,].reshape(num_valid, -1))
+                num_accepted += num_valid
+
+            # update timer
+            time_over = time.time() - tstart > (patience * 60)
+
+        # accumulate list of accepted samples in single tensor
+        samples = torch.stack(samples).reshape(num_accepted, -1)
+
+        # estimate acceptance probability
+        acceptance_prob = num_accepted / num_sampled
+
+        # turn back on training mode
+        posterior_nn.train()
+
+        assert (
+            samples.shape[0] == num_samples
+        ), f"sampling from posterior within prior with patience {patience} failed : {samples.shape} vs. {num_samples}."
+
+        return samples, acceptance_prob
