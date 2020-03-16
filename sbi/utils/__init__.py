@@ -1,14 +1,16 @@
+from sbi.utils.get_nn_models import classifier_nn, likelihood_nn, posterior_nn
 from sbi.utils.io import get_data_root, get_log_root, get_project_root, get_timestamp
 from sbi.utils.logging import summarize
-from sbi.utils.sbi import Normalize, build_inputs_and_contexts
 from sbi.utils.mmd import biased_mmd, unbiased_mmd_squared
 from sbi.utils.plot import plot_hist_marginals, plot_hist_marginals_pair
+from sbi.utils.sbiutils import Normalize, build_inputs_and_contexts
 from sbi.utils.torchutils import (
     cbrt,
     create_alternating_binary_mask,
     create_mid_split_binary_mask,
     create_random_binary_mask,
     gaussian_kde_log_eval,
+    get_log_prob,
     get_num_parameters,
     get_temperature,
     logabsdet,
@@ -29,4 +31,3 @@ from sbi.utils.typechecks import (
     is_positive_int,
     is_power_of_two,
 )
-from sbi.utils.get_nn_models import (posterior_nn, likelihood_nn, classifier_nn)

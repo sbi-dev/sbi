@@ -196,6 +196,8 @@ def get_log_prob(
         [torch.Tensor] -- log probs for values
     """
     if isinstance(dist, torch.distributions.Uniform):
+        # summing over last dimension to keep batch dimension
         return dist.log_prob(values).sum(dim=-1)
     else:
+        # return log prob as usual
         return dist.log_prob(values)
