@@ -69,17 +69,28 @@ def test_apt_on_linearGaussian_based_on_mmd(num_dim):
 
 
 @pytest.mark.parametrize(
-    "train_with_mcmc, mcmc_method",
-    ((True, "slice-np"), (True, "slice"), (False, "rejection")),
+    "train_with_mcmc, mcmc_method, prior",
+    (
+        (True, "slice-np", "gaussian"),
+        (True, "slice", "gaussian"),
+        # (True, "slice", "uniform"), # takes very long. fix when refactoring pyro sampling
+        (False, "rejection", "gaussian"),
+        (False, "rejection", "uniform"),
+    ),
 )
-def test_apt_posterior_correction(train_with_mcmc, mcmc_method):
+def test_apt_posterior_correction(train_with_mcmc, mcmc_method, prior):
     """Test that leakage correction applied to sampling works, with both MCMC and rejection."""
 
     num_dim = 2
 
-    prior = distributions.MultivariateNormal(
-        loc=torch.zeros(num_dim), covariance_matrix=torch.eye(num_dim)
-    )
+    if prior == "gaussian":
+        prior = distributions.MultivariateNormal(
+            loc=torch.zeros(num_dim), covariance_matrix=torch.eye(num_dim)
+        )
+    else:
+        prior = utils.BoxUniform(
+            low=-1.0 * torch.ones(num_dim), high=torch.ones(num_dim)
+        )
 
     true_observation = torch.zeros((1, num_dim))
 

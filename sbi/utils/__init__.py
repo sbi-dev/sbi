@@ -9,6 +9,7 @@ from sbi.utils.sbiutils import (
     sample_posterior_within_prior,
 )
 from sbi.utils.torchutils import (
+    BoxUniform,
     cbrt,
     create_alternating_binary_mask,
     create_mid_split_binary_mask,
