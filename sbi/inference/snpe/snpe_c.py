@@ -133,11 +133,7 @@ class SnpeC(SnpeBase):
         log_prob_posterior = log_prob_posterior.reshape(batch_size, num_atoms)
 
         # Get (batch_size * num_atoms) log prob prior evals.
-        if isinstance(self._prior, distributions.Uniform):
-            log_prob_prior = self._prior.log_prob(atomic_inputs).sum(-1)
-            # log_prob_prior = torch.zeros(log_prob_prior.shape)
-        else:
-            log_prob_prior = self._prior.log_prob(atomic_inputs)
+        log_prob_prior = self._prior.log_prob(atomic_inputs)
         log_prob_prior = log_prob_prior.reshape(batch_size, num_atoms)
         assert utils.notinfnotnan(log_prob_prior), "NaN/inf detected in prior eval."
 

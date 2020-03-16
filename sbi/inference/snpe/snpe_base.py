@@ -490,7 +490,7 @@ class PotentialFunctionProvider:
         parameters = torch.FloatTensor(parameters)
 
         # check if any of the params outside prior
-        # this implicitly takes care of evaluating N-D Uniform prior
+        # XXX: why all()?
         within_prior = torch.isfinite(self.prior.log_prob(parameters)).all()
         if within_prior:
             target_log_prob = self.posterior_nn.log_prob(
@@ -517,11 +517,7 @@ class PotentialFunctionProvider:
         log_prob_posterior = -self.posterior_nn.log_prob(
             inputs=parameters, context=self.observation,
         )
-        # XXX handle special case in specific function
-        if isinstance(self.prior, distributions.Uniform):
-            log_prob_prior = self.prior.log_prob(parameters).sum(-1)
-        else:
-            log_prob_prior = self.prior.log_prob(parameters)
+        log_prob_prior = self.prior.log_prob(parameters)
 
         within_prior = torch.isfinite(log_prob_prior)
 

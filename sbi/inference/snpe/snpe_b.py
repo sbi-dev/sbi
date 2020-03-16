@@ -3,8 +3,8 @@ import os
 from torch import distributions
 from torch.utils.tensorboard import SummaryWriter
 
-from sbi.inference.snpe.snpe_base import SnpeBase
 import sbi.utils as utils
+from sbi.inference.snpe.snpe_base import SnpeBase
 
 
 class SnpeB(SnpeBase):
@@ -94,10 +94,7 @@ class SnpeB(SnpeBase):
         log_prob_posterior = log_prob_posterior.reshape(batch_size)
 
         # Evaluate prior
-        if isinstance(self._prior, distributions.Uniform):
-            log_prob_prior = self._prior.log_prob(inputs).sum(-1)
-        else:
-            log_prob_prior = self._prior.log_prob(inputs)
+        log_prob_prior = self._prior.log_prob(inputs)
         log_prob_prior = log_prob_prior.reshape(batch_size)
         assert utils.notinfnotnan(log_prob_prior), "NaN/inf detected in prior eval."
 

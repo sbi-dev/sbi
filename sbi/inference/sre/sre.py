@@ -1,24 +1,20 @@
 import os
 from copy import deepcopy
-import numpy as np
-import sbi.simulators as simulators
-import sbi.utils as utils
+
 import numpy as np
 import torch
-from sbi.utils.torchutils import get_default_device
 from matplotlib import pyplot as plt
 from pyro.infer.mcmc import HMC, NUTS
 from pyro.infer.mcmc.api import MCMC
-from torch import distributions
-from torch import nn, optim
+from torch import distributions, nn, optim
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
-from sbi.inference.posteriors.sbi_posterior import Posterior
 
 import sbi.simulators as simulators
 import sbi.utils as utils
+from sbi.inference.posteriors.sbi_posterior import Posterior
 from sbi.mcmc import Slice, SliceSampler
 from sbi.simulators.simutils import set_simulator_attributes
 from sbi.utils.torchutils import get_default_device
@@ -387,11 +383,7 @@ class NeuralPotentialFunction:
             torch.cat((parameters, self.true_observation)).reshape(1, -1)
         )
 
-        # If prior is uniform we need to sum across last dimension.
-        if isinstance(self.prior, distributions.Uniform):
-            potential = -(log_ratio + self.prior.log_prob(parameters).sum(-1))
-        else:
-            potential = -(log_ratio + self.prior.log_prob(parameters))
+        potential = -(log_ratio + self.prior.log_prob(parameters))
 
         return potential
 
