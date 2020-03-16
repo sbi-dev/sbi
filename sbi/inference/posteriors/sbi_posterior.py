@@ -1,14 +1,15 @@
-from typing import Optional, Callable
+from typing import Callable, Optional
+
 import numpy as np
 import torch
-from torch import distributions
-import sbi.utils as utils
 from pyro.infer.mcmc import HMC, NUTS
 from pyro.infer.mcmc.api import MCMC
-from sbi.mcmc import Slice
+from torch import distributions
 from torch import multiprocessing as mp
-from sbi.mcmc import SliceSampler
+
 import sbi.inference
+import sbi.utils as utils
+from sbi.mcmc import Slice, SliceSampler
 
 
 class Posterior:
