@@ -179,3 +179,23 @@ def gaussian_kde_log_eval(samples, query):
     d = -np.log(N) - (D / 2) * np.log(2 * np.pi) - D * np.log(std)
     c += d
     return torch.logsumexp(c, dim=-1)
+
+
+def get_log_prob(
+    dist: torch.distributions.Distribution, values: torch.Tensor
+) -> torch.Tensor:
+    """Return log prob of values under pytorch distribution. 
+    
+    Wraps pytorch.distributions.log_prob to overcome pytorch.distributions.Uniform returning a vector of densities, one value per dimension. 
+    
+    Arguments:
+        dist {torch.distributions.Distribution} -- the torch distribution
+        values {torch.Tensor} -- values to get the log prob for
+    
+    Returns:
+        [torch.Tensor] -- log probs for values
+    """
+    if isinstance(dist, torch.distributions.Uniform):
+        return dist.log_prob(values).sum(dim=-1)
+    else:
+        return dist.log_prob(values)
