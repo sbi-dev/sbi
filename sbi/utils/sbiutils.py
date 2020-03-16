@@ -122,7 +122,7 @@ def sample_posterior_within_prior(
         mask = torch.isfinite(
             prior.log_prob(sample)
         )  # log prob is inf outside of prior
-        num_valid = mask.sum()
+        num_valid = mask.sum().item()
 
         if num_valid > 0:
             samples.append(sample[mask,].reshape(num_valid, -1))
@@ -131,17 +131,17 @@ def sample_posterior_within_prior(
         # update timer
         time_over = time.time() - tstart > (patience * 60)
 
+    # turn back on training mode
+    posterior_nn.train()
+
     # accumulate list of accepted samples in single tensor
-    samples = torch.stack(samples).reshape(num_accepted, -1)
+    samples = torch.cat(samples).reshape(num_accepted, -1)
 
     # estimate acceptance probability
     acceptance_prob = float(num_accepted / num_sampled)
 
-    # turn back on training mode
-    posterior_nn.train()
-
     assert (
         samples.shape[0] == num_samples
-    ), f"sampling from posterior within prior with patience {patience} failed : {samples.shape[0]} vs. {num_samples}."
+    ), f"sampling from posterior within prior with patience {patience} failed : {samples.shape} vs. {num_samples}."
 
     return samples, acceptance_prob
