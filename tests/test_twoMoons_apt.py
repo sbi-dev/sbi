@@ -4,12 +4,10 @@ import numpy as np
 import pytest
 import torch
 
-import torch
-from torch import distributions
-import pytest
 import sbi.utils as utils
+from sbi.inference import SnpeC
+from sbi.simulators import TwoMoonsSimulator
 from sbi.utils.torchutils import BoxUniform
-
 
 # use cpu by default
 torch.set_default_tensor_type("torch.FloatTensor")
@@ -20,14 +18,14 @@ torch.manual_seed(0)
 
 @pytest.mark.slow
 def test_apt_on_twoMoons_based_on_mmd():
-    simulator = simulators.TwoMoonsSimulator()
+    simulator = TwoMoonsSimulator()
     a = 1
     parameter_dim, observation_dim = 2, 2
     prior = BoxUniform(
         low=-a * torch.ones(parameter_dim), high=a * torch.ones(parameter_dim),
     )
 
-    true_observation = torch.Tensor([[0, 0]])
+    true_observation = torch.zeros((1, observation_dim))
 
     apt = SnpeC(
         simulator=simulator,

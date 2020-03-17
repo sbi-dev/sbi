@@ -4,7 +4,7 @@ from typing import Callable, Tuple
 
 import torch
 from pyknos.nflows import distributions as distributions_
-from torch import distributions
+from torch.distributions import Distribution
 
 import sbi.simulators as simulators
 import sbi.utils as utils
@@ -12,7 +12,7 @@ from sbi.utils.torchutils import BoxUniform
 
 
 def set_simulator_attributes(
-    simulator_fun: Callable, prior: torch.distributions.Distribution, name=None
+    simulator_fun: Callable, prior: Distribution, name=None
 ) -> Callable:
     """Add name and input and output dimension as attributes to the simulator function.
     
@@ -38,9 +38,7 @@ def set_simulator_attributes(
     return simulator_fun
 
 
-def get_simulator_dimensions(
-    simulator_fun, prior: torch.distributions.Distribution
-) -> Tuple[int, int]:
+def get_simulator_dimensions(simulator_fun, prior: Distribution) -> Tuple[int, int]:
     """Infer simulator input output dimension from prior and simulating once. 
     
     Arguments:

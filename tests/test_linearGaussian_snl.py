@@ -91,6 +91,7 @@ def test_snl_on_linearGaussian_based_on_mmd(num_dim: int, prior_str: str):
     inference_method = SNL(
         simulator=linear_gaussian,
         prior=prior,
+        true_observation=true_observation,
         density_estimator=neural_likelihood,
         mcmc_method="slice-np",
     )

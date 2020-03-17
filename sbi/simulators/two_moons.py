@@ -1,7 +1,8 @@
 import numpy as np
-import sbi.utils as utils
 import torch
-from matplotlib import pyplot as plt
+from torch import float32
+
+import sbi.utils as utils
 from sbi.simulators.simulator import Simulator
 
 
@@ -31,7 +32,7 @@ class TwoMoonsSimulator(Simulator):
 
         # If we have a single parameter then view it as a batch of one.
         if parameters.ndim == 1:
-            return self.simulate(parameters[None, ...])
+            return self(parameters[None, ...])
 
         num_simulations = parameters.shape[0]
 
@@ -48,7 +49,7 @@ class TwoMoonsSimulator(Simulator):
                 (-parameters[:, 0] + parameters[:, 1]),
             ]
         )
-        return torch.Tensor(p + s)
+        return torch.tensor(p + s, dtype=float32)
 
     @property
     def observation_dim(self):
