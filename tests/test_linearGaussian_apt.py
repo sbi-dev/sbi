@@ -121,4 +121,4 @@ def test_apt_posterior_correction(train_with_mcmc, mcmc_method, prior):
     samples = posterior.sample(10)
 
     # evaluate the samples to check correction factor
-    densities = posterior.log_prob(samples)
+    lob_probs = posterior.log_prob(samples)

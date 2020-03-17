@@ -99,7 +99,7 @@ class Posterior:
     def get_leakage_correction(
         self, context: torch.Tensor, num_rejection_samples: int = 10000
     ) -> float:
-        """Get factor for correcting the posterior density for leakage. 
+        """Return factor for correcting the posterior density for leakage. 
         
         The factor is estimated from the acceptance probability during rejection sampling from the posterior.
         
@@ -115,20 +115,26 @@ class Posterior:
             float -- Saved or newly estimated correction factor.
         """
 
-        # if new context
-        if not (context == self._context).all():
-            # estimate it for the new context and return it, without setting the new factor
-            return self.estimate_acceptance_rate(
-                context, num_samples=num_rejection_samples
+        # check whether context is new
+        new_context = (context != self._context).all()
+
+        if new_context:
+            _, acceptance_rate = utils.sample_posterior_within_prior(
+                self.neural_net, self._prior, context, num_samples=num_rejection_samples
             )
-        # if correction factor not estimated yet
+            return acceptance_rate
+        # if factor for default context wasnt estimated yet, estimate and set it
         elif self._leakage_density_correction_factor is None:
-            # estimate it, set the default and return it
-            self._leakage_density_correction_factor = self.estimate_acceptance_rate(
-                context, num_samples=num_rejection_samples
+            _, acceptance_rate = utils.sample_posterior_within_prior(
+                self.neural_net,
+                self._prior,
+                self._context,
+                num_samples=num_rejection_samples,
             )
+            self._leakage_density_correction_factor = acceptance_rate
             return self._leakage_density_correction_factor
-        else:  # just return the correction for the default (actually observed) context
+        # otherwise just return the saved correction factor
+        else:
             return self._leakage_density_correction_factor
 
     def sample(self, num_samples: int, context: torch.Tensor = None, **kwargs):
@@ -157,7 +163,10 @@ class Posterior:
                 **kwargs,
             )
         else:
-            return self._sample_posterior_rejection(context, num_samples=num_samples)
+            samples, _ = utils.sample_posterior_within_prior(
+                self.neural_net, self._prior, context, num_samples=num_samples
+            )
+            return samples
 
     def _sample_posterior_mcmc(
         self,
@@ -301,51 +310,3 @@ class Posterior:
             "embedding_net=None"
         )
         self.neural_net.embedding_net = embedding_net
-
-    def _sample_posterior_rejection(
-        self, context: torch.Tensor, num_samples: int = 1,
-    ) -> torch.Tensor:
-        """Sample from posterior, rejecting samples outside of prior. 
-        
-        NOTE: Calls utils method that does both, sampling and estimating acceptance rate. See docstring in called utils method. 
-        
-        Arguments:
-            context {torch.Tensor} -- observed data to condition on. 
-        
-        Keyword Arguments:
-            num_samples {int} -- Number of samples (default: {1})
-        
-        Returns:
-            [torch.Tensor] -- Tensor with samples
-        """
-        return utils.sample_posterior_within_prior(
-            posterior_nn=self.neural_net,
-            prior=self._prior,
-            context=context,
-            num_samples=num_samples,
-        )[0]
-
-    def estimate_acceptance_rate(
-        self, context: torch.Tensor, num_samples: int = 10000, patience: int = 5,
-    ) -> float:
-        """Estimate acceptance probability of posterior samples under the prior, e.g., for leakage correction.
-        
-        NOTE: Calls utils method that does both, sampling and estimating acceptance rate. See docstring in called utils method. 
-        
-        Arguments:
-            context {torch.Tensor} -- observed data to condition the posterior on
-        
-        Keyword Arguments:
-            num_samples {int} -- Number of samples for estimating the acceptance (default: {10000})
-            patience {int} -- Patience in minutes (default: {5})
-        
-        Returns:
-            float -- Estimated acceptance probability
-        """
-        return utils.sample_posterior_within_prior(
-            posterior_nn=self.neural_net,
-            prior=self._prior,
-            context=context,
-            num_samples=num_samples,
-            patience=patience,
-        )[1]

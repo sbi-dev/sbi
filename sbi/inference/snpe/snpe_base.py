@@ -201,8 +201,8 @@ class SnpeBase:
                 parameter_bank=self._parameter_bank,
                 observation_bank=self._observation_bank,
                 simulator=self._simulator,
-                estimate_acceptance_rate=self._neural_posterior.get_leakage_correction(
-                    context=self._true_observation,
+                posterior_samples_acceptance_rate=self._neural_posterior.get_leakage_correction(
+                    context=self._true_observation
                 ),
             )
         return self._neural_posterior
