@@ -1,5 +1,6 @@
 import os
 
+import torch
 from torch import distributions
 from torch.utils.tensorboard import SummaryWriter
 
@@ -64,8 +65,13 @@ class SnpeB(SnpeBase):
         else:
             self._summary_writer = summary_writer
 
-    def _get_log_prob_proposal_posterior(self, inputs, context, masks):
+    def _get_log_prob_proposal_posterior(
+        self, inputs: torch.Tensor, context: torch.Tensor, masks: torch.Tensor
+    ):
         """
+        XXX: Improve docstring here, it is not clear what log_prob refers to. isnt this the snpeB "loss"?
+        Return log prob under proposal posterior.
+        
         We have two main options when evaluating the proposal posterior.
         (1) Generate atoms from the proposal prior.
         (2) Generate atoms from a more targeted distribution,
@@ -105,8 +111,10 @@ class SnpeB(SnpeBase):
         ), "NaN/inf detected in proposal posterior eval."
 
         # Compute log prob with importance weights
-        log_prob = self.calibration_kernel(context) * (
-            log_prob_posterior + log_prob_prior - log_prob_proposal
+        log_prob = (
+            self.calibration_kernel(context)
+            * torch.exp(log_prob_prior - log_prob_proposal)
+            * log_prob_posterior
         )
 
         # todo: this implementation is not perfect: it evaluates the posterior
