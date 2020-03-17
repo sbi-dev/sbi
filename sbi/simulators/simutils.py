@@ -8,6 +8,7 @@ from torch import distributions
 
 import sbi.simulators as simulators
 import sbi.utils as utils
+from sbi.utils.torchutils import BoxUniform
 
 
 def set_simulator_attributes(
@@ -124,7 +125,7 @@ def get_simulator_prior_and_groundtruth(task):
 
     if task == "nonlinear-gaussian":
         simulator = simulators.NonlinearGaussianSimulator()
-        prior = distributions.Uniform(
+        prior = BoxUniform(
             low=-3 * torch.ones(simulator.parameter_dim),
             high=3 * torch.ones(simulator.parameter_dim),
         )
@@ -168,7 +169,7 @@ def get_simulator_prior_and_groundtruth(task):
     elif task == "two-moons":
         simulator = simulators.TwoMoonsSimulator()
         a = 2
-        prior = distributions.Uniform(
+        prior = BoxUniform(
             low=-a * torch.ones(simulator.parameter_dim),
             high=a * torch.ones(simulator.parameter_dim),
         )
@@ -189,7 +190,7 @@ def get_simulator_prior_and_groundtruth(task):
         simulator = simulators.LotkaVolterraSimulator(
             summarize_observations=True, gaussian_prior=False
         )
-        prior = distributions.Uniform(
+        prior = BoxUniform(
             low=-5 * torch.ones(simulator.parameter_dim),
             high=2 * torch.ones(simulator.parameter_dim),
         )

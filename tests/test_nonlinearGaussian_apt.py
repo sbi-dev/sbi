@@ -11,6 +11,7 @@ from sbi.simulators.nonlinear_gaussian import (
     non_linear_gaussian,
 )
 from sbi.simulators.simutils import set_simulator_attributes
+from sbi.utils.torchutils import BoxUniform
 
 # use cpu by default
 torch.set_default_tensor_type("torch.FloatTensor")
@@ -43,7 +44,7 @@ def test_nonlinearGaussian_based_on_mmd():
     parameter_dim = ground_truth_parameters.shape[0]
     observation_dim = ground_truth_observation.shape[0]
 
-    prior = distributions.Uniform(
+    prior = BoxUniform(
         low=-3 * torch.ones(parameter_dim), high=3 * torch.ones(parameter_dim),
     )
 

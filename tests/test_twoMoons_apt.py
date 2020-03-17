@@ -3,12 +3,13 @@ import os
 import numpy as np
 import pytest
 import torch
-from torch import distributions
 
 import torch
 from torch import distributions
 import pytest
 import sbi.utils as utils
+from sbi.utils.torchutils import BoxUniform
+
 
 # use cpu by default
 torch.set_default_tensor_type("torch.FloatTensor")
@@ -22,7 +23,7 @@ def test_apt_on_twoMoons_based_on_mmd():
     simulator = simulators.TwoMoonsSimulator()
     a = 1
     parameter_dim, observation_dim = 2, 2
-    prior = distributions.Uniform(
+    prior = BoxUniform(
         low=-a * torch.ones(parameter_dim), high=a * torch.ones(parameter_dim),
     )
 
