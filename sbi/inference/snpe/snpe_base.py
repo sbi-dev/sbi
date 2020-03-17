@@ -1,6 +1,6 @@
 import warnings
 from copy import deepcopy
-from typing import Union
+from typing import Callable, Union
 
 import numpy as np
 import torch
@@ -454,7 +454,7 @@ class PotentialFunctionProvider:
     It is important to NOT initialize attributes upon instantiation, because we need the most current trained Posterior.neural_net.
     
     Returns:
-        [Callable]: return potential function for either numpy or pyro
+        [Callable]: potential function for use by either numpy or pyro sampler
     """
 
     def __call__(
@@ -463,10 +463,10 @@ class PotentialFunctionProvider:
         posterior_nn: torch.nn.Module,
         observation: torch.Tensor,
         mcmc_method: str,
-    ):
+    ) -> Callable:
         """Return potential function. 
         
-        Switch on numpy or pyro potential function.
+        Switch on numpy or pyro potential function based on mcmc_method.
         
         """
         self.posterior_nn = posterior_nn
@@ -485,14 +485,12 @@ class PotentialFunctionProvider:
             parameters ([np.array]): parameter vector, batch dimension 1
         
         Returns:
-            [tensor or inf]: posterior log probability of the parameters.
+            [tensor or -inf]: posterior log probability of the parameters.
         """
         parameters = torch.FloatTensor(parameters)
 
-        # check if any of the params outside prior
-        # XXX: why all()?
-        within_prior = torch.isfinite(self.prior.log_prob(parameters)).all()
-        if within_prior:
+        is_within_prior = torch.isfinite(self.prior.log_prob(parameters))
+        if is_within_prior:
             target_log_prob = self.posterior_nn.log_prob(
                 inputs=parameters.reshape(1, -1),
                 context=self.observation.reshape(1, -1),
