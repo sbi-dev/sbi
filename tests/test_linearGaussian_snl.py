@@ -3,17 +3,13 @@ import torch
 from torch import distributions
 
 import sbi.utils as utils
-from sbi import inference
 from sbi.inference.snl.snl import SNL
 from sbi.simulators.linear_gaussian import (
-    get_ground_truth_posterior_samples_linear_gaussian,
+    get_true_posterior_samples_linear_gaussian_mvn_prior,
+    get_true_posterior_samples_linear_gaussian_uniform_prior,
     linear_gaussian,
 )
 
-# use cpu by default
-torch.set_default_tensor_type("torch.FloatTensor")
-
-# seed the simulations
 torch.manual_seed(0)
 
 
@@ -26,11 +22,12 @@ def test_snl_on_linearGaussian_api(num_dim: int):
     Keyword Arguments:
         num_dimint {int} -- Parameter dimension of the gaussian model (default: {3})
     """
+    num_samples = 100
+
     prior = distributions.MultivariateNormal(
         loc=torch.zeros(num_dim), covariance_matrix=torch.eye(num_dim)
     )
 
-    parameter_dim, observation_dim = num_dim, num_dim
     true_observation = torch.zeros(num_dim)
 
     # get neural likelihood
@@ -51,29 +48,16 @@ def test_snl_on_linearGaussian_api(num_dim: int):
     posterior = inference_method(num_rounds=1, num_simulations_per_round=1000)
 
     # draw samples from posterior
-    samples = posterior.sample(num_samples=100)
+    samples = posterior.sample(num_samples=num_samples)
 
-    # define target distribution (analytically tractable) and sample from it
-    target_samples = get_ground_truth_posterior_samples_linear_gaussian(
-        true_observation[None,], num_samples=100
-    )
-
-    # compute the mmd
-    mmd = utils.unbiased_mmd_squared(target_samples, samples)
-
-    # check if mmd is larger than expected
-    # NOTE: the mmd is calculated based on a number of test runs
-    max_mmd = 0.02
-
-    assert (
-        mmd < max_mmd
-    ), f"MMD={mmd} is more than 2 stds above the average performance."
+    # test eval
+    log_probs = posterior.log_prob(samples)
 
 
-# will be called by pytest. Then runs test_*(num_dim) for 1D and 3D
 @pytest.mark.slow
-@pytest.mark.parametrize("num_dim", [1, 3])
-def test_snl_on_linearGaussian_based_on_mmd(num_dim: int):
+@pytest.mark.parametrize("num_dim", (1, 3))
+@pytest.mark.parametrize("prior_str", ("uniform", "gaussian"))
+def test_snl_on_linearGaussian_based_on_mmd(num_dim: int, prior_str: str):
     """Test snl inference on linear Gaussian via mmd to ground truth posterior. 
 
     NOTE: The mmd threshold is calculated based on a number of test runs and taking the mean plus 2 stds. 
@@ -82,12 +66,21 @@ def test_snl_on_linearGaussian_based_on_mmd(num_dim: int):
         num_dim {int} -- Parameter dimension of the gaussian model. (default: {3})
     """
 
-    prior = distributions.MultivariateNormal(
-        loc=torch.zeros(num_dim), covariance_matrix=torch.eye(num_dim)
-    )
+    true_observation = torch.zeros((1, num_dim))
+    num_samples = 1000
 
-    parameter_dim, observation_dim = num_dim, num_dim
-    true_observation = torch.zeros(num_dim)
+    if prior_str == "gaussian":
+        prior = distributions.MultivariateNormal(
+            loc=torch.zeros(num_dim), covariance_matrix=torch.eye(num_dim)
+        )
+        target_samples = get_true_posterior_samples_linear_gaussian_mvn_prior(
+            true_observation, num_samples=num_samples
+        )
+    else:
+        prior = utils.BoxUniform(-1.0 * torch.ones(num_dim), torch.ones(num_dim))
+        target_samples = get_true_posterior_samples_linear_gaussian_uniform_prior(
+            true_observation, num_samples=num_samples, prior=prior
+        )
 
     # get neural likelihood
     neural_likelihood = utils.likelihood_nn(
@@ -106,12 +99,7 @@ def test_snl_on_linearGaussian_based_on_mmd(num_dim: int):
     posterior = inference_method(num_rounds=1, num_simulations_per_round=1000)
 
     # draw samples from posterior
-    samples = posterior.sample(num_samples=1000)
-
-    # define target distribution (analytically tractable) and sample from it
-    target_samples = get_ground_truth_posterior_samples_linear_gaussian(
-        true_observation[None,], num_samples=1000
-    )
+    samples = posterior.sample(num_samples=num_samples)
 
     # compute the mmd
     mmd = utils.unbiased_mmd_squared(target_samples, samples)
