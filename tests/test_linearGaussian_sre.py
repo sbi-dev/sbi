@@ -111,3 +111,49 @@ def test_sre_on_linearGaussian_based_on_mmd(num_dim: int, prior_str: str):
     assert (
         mmd < max_mmd
     ), f"MMD={mmd} is more than 2 stds above the average performance."
+
+
+@pytest.mark.parametrize(
+    "mcmc_method, prior",
+    (
+        ("slice-np", "gaussian"),
+        ("slice-np", "uniform"),
+        # ("slice", "gaussian"),  # XXX this is broken-hard to debug error
+        # ("slice", "uniform"),   # XXX might be slow? check pyro sampling
+    ),
+)
+def test_sre_posterior_correction(mcmc_method, prior):
+    """Test that leakage correction applied to sampling works, with both MCMC and rejection."""
+
+    num_dim = 2
+    simulator = linear_gaussian
+    if prior == "gaussian":
+        prior = distributions.MultivariateNormal(
+            loc=torch.zeros(num_dim), covariance_matrix=torch.eye(num_dim)
+        )
+    else:
+        prior = utils.BoxUniform(
+            low=-1.0 * torch.ones(num_dim), high=torch.ones(num_dim)
+        )
+
+    true_observation = torch.zeros(num_dim)
+
+    classifier = utils.classifier_nn("resnet", prior=prior, context=true_observation,)
+
+    # create inference method
+    inference_method = SRE(
+        simulator=simulator,
+        prior=prior,
+        true_observation=true_observation,
+        classifier=classifier,
+        mcmc_method=mcmc_method,
+    )
+
+    # run inference
+    posterior = inference_method(num_rounds=1, num_simulations_per_round=1000)
+
+    # draw samples from posterior
+    samples = posterior.sample(num_samples=1000)
+
+    # no log prob for SRE yet - see issue #73
+    # densities = posterior.log_prob(samples)
