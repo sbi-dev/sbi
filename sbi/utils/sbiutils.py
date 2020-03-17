@@ -1,4 +1,5 @@
 import time
+import warnings
 from typing import Tuple
 
 import torch
@@ -83,65 +84,61 @@ def sample_posterior_within_prior(
     num_samples: int = 1,
     patience: int = 5,
 ) -> Tuple[torch.Tensor, float]:
-    """Generate samples from a posterior that have support under the prior using rejection sampling. 
+    """Return samples from a posterior within the support of the prior via rejection sampling. 
     
-    This is relevant for posteriors with leakage outside the prior:
-    Sample for the posterior (torch neural net) and reject samples if outside of prior support. Estimate acceptance prob by counting accepted samples, used e.g., for correcting the posterior density for evaluation. 
+    This is relevant for snpe methods and flows for which the posterior tends to have mass outside the prior boundaries. 
+    
+    This function uses rejection sampling with samples from posterior, to do two things: 
+        1) obtain posterior samples within the prior support. 
+        2) calculate the fraction of accepted samples as a proxy for correcting the density during evaluation of the posterior. 
     
     Arguments:
-        posterior_nn {torch.nn.Module} -- neural net representing the posterio
+        posterior_nn {torch.nn.Module} -- neural net representing the posterior
         prior {torch.distributions.Distribution} -- torch distribution prior
         context {torch.Tensor} -- context for the posterior, i.e., the observed data to condition on. 
     
     Keyword Arguments:
         num_samples {int} -- number of sample to generate (default: {1})
-        patience {int} -- anker in time in case sampling takes too long due to strong leakage (default: {5})
+        patience {int} -- upper time bound in minutes, in case sampling takes too long due to strong leakage (default: {5})
     
     Returns:
         Tuple[torch.Tensor, float] -- Accepted samples, and estimated acceptance probability
     """
 
-    # turn on nn eval mode
-    posterior_nn.eval()
+    assert (
+        not posterior_nn.training
+    ), "posterior nn is in training mode, but has to be in eval mode for sampling."
 
     samples = []
-    num_accepted = 0
-    num_sampled = 0
+    num_remaining = num_samples
+    num_sampled_total = 0
     tstart = time.time()
     time_over = time.time() - tstart > (patience * 60)
 
-    # sample until done or patience over
-    while num_accepted < num_samples and not time_over:
+    while num_remaining > 0 and not time_over:
 
-        n_remaining = num_samples - num_accepted
+        sample = posterior_nn.sample(num_remaining, context=context)
+        num_sampled_total += num_remaining
 
-        sample = posterior_nn.sample(n_remaining, context=context)
-        num_sampled += n_remaining
+        is_within_prior = torch.isfinite(prior.log_prob(sample))
+        num_in_prior = is_within_prior.sum().item()
 
-        # get mask of samples within prior
-        mask = torch.isfinite(
-            prior.log_prob(sample)
-        )  # log prob is inf outside of prior
-        num_valid = mask.sum().item()
-
-        if num_valid > 0:
-            samples.append(sample[mask,].reshape(num_valid, -1))
-            num_accepted += num_valid
+        if num_in_prior > 0:
+            samples.append(sample[is_within_prior,].reshape(num_in_prior, -1))
+            num_remaining -= num_in_prior
 
         # update timer
         time_over = time.time() - tstart > (patience * 60)
 
-    # turn back on training mode
-    posterior_nn.train()
-
-    # accumulate list of accepted samples in single tensor
-    samples = torch.cat(samples).reshape(num_accepted, -1)
+    # collect all samples in the list into one tensor
+    samples = torch.cat(samples)
 
     # estimate acceptance probability
-    acceptance_prob = float(num_accepted / num_sampled)
+    acceptance_prob = float((samples.shape[0]) / num_sampled_total)
 
-    assert (
-        samples.shape[0] == num_samples
-    ), f"sampling from posterior within prior with patience {patience} failed : {samples.shape} vs. {num_samples}."
+    if num_remaining > 0:
+        warnings.warn(
+            f"Beware: Rejection sampling resulted in only {samples.shape[0]} samples within patience of {patience} min. Consider having more patience, leakage is {1-acceptance_prob}"
+        )
 
     return samples, acceptance_prob
