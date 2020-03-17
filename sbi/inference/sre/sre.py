@@ -135,7 +135,7 @@ class SRE:
             "best-validation-log-probs": [],
         }
 
-    def run_inference(self, num_rounds, num_simulations_per_round):
+    def __call__(self, num_rounds, num_simulations_per_round):
         """
         This runs SRE for num_rounds rounds, using num_simulations_per_round calls to
         the simulator per round.
