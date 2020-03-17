@@ -86,9 +86,7 @@ class Posterior:
         self.neural_net.eval()
 
         # compute the unnormalized log probability by evaluating the network
-        unnormalized_log_prob = self.neural_net.log_prob(
-            inputs.float(), context.float()
-        )
+        unnormalized_log_prob = self.neural_net.log_prob(inputs, context)
 
         # find the acceptance rate
         leakage_correction = (
@@ -208,7 +206,7 @@ class Posterior:
         context: torch.Tensor,
         thin: int = 10,
         warmup_steps: int = 20,
-    ):
+    ) -> torch.Tensor:
 
         # go into eval mode for evaluating during sampling
         self.neural_net.eval()
@@ -221,12 +219,12 @@ class Posterior:
 
         posterior_sampler.gen(warmup_steps)
 
-        samples = torch.tensor(posterior_sampler.gen(num_samples))
+        samples = posterior_sampler.gen(num_samples)
 
         # back to training mode
         self.neural_net.train()
 
-        return samples
+        return torch.tensor(samples, dtype=torch.float32)
 
     def pyro_mcmc(
         self,
