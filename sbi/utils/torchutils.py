@@ -218,7 +218,7 @@ def BoxUniform(
         low (Tensor or float): lower range (inclusive).
         high (Tensor or float): upper range (exclusive).
         reinterpreted_batch_ndims (int): the number of batch dims to
-reinterpret as event dims
+                                         reinterpret as event dims.
     """
 
     return Independent(Uniform(low, high), reinterpreted_batch_ndims)
