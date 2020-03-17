@@ -205,20 +205,21 @@ def get_log_prob(
         return dist.log_prob(values)
 
 
-def BoxUniform(
-    low: Union[torch.Tensor, float],
-    high: Union[torch.Tensor, float],
-    reinterpreted_batch_ndims: int = 1,
-) -> Distribution:
-    """Multidimensional uniform distribution defined on a box.
+class BoxUniform(Independent):
+    def __init__(
+        self,
+        low: Union[torch.Tensor, float],
+        high: Union[torch.Tensor, float],
+        reinterpreted_batch_ndims: int = 1,
+    ):
+        """Multidimensional uniform distribution defined on a box.
     
-    Refer to torch.distributions.Uniform and torch.distributions.Independent for further documentation.
+        Refer to torch.distributions.Uniform and torch.distributions.Independent for further documentation.
     
-    Args:
-        low (Tensor or float): lower range (inclusive).
-        high (Tensor or float): upper range (exclusive).
-        reinterpreted_batch_ndims (int): the number of batch dims to
-                                         reinterpret as event dims.
+       Args:
+            low (Tensor or float): lower range (inclusive).
+            high (Tensor or float): upper range (exclusive).
+            reinterpreted_batch_ndims (int): the number of batch dims to
+                                             reinterpret as event dims.
     """
-
-    return Independent(Uniform(low, high), reinterpreted_batch_ndims)
+        super().__init__(Uniform(low=low, high=high), reinterpreted_batch_ndims)
