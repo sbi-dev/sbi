@@ -1,3 +1,4 @@
+from typing import Callable, Union
 import os
 from copy import deepcopy
 
@@ -91,7 +92,7 @@ class SRE:
             prior=prior,
             context=true_observation,
             mcmc_method=mcmc_method,
-            potential_function=SliceNpNeuralPotentialFunction,
+            get_potential_function=PotentialFunctionProvider(),
         )
 
         # We may want to summarize high-dimensional observations.
@@ -350,86 +351,89 @@ class SRE:
         return self._summary
 
 
-class NeuralPotentialFunction:
+class PotentialFunctionProvider:
     """
-    Implementation of a potential function for Pyro MCMC which uses a binary classifier
-    to evaluate a quantity proportional to the likelihood.
+    This class is initialized without arguments during the initialization of the Posterior class. When called, it specializes to the potential function appropriate to the requested mcmc_method.
+    
+   
+    NOTE: Why use a class?
+    ----------------------
+    During inference, we use deepcopy to save untrained posteriors in memory. deepcopy uses pickle which can't serialize nested functions (https://stackoverflow.com/a/12022055).
+    
+    It is important to NOT initialize attributes upon instantiation, because we need the most current trained Posterior.neural_net.
+    
+    Returns:
+        [Callable]: potential function for use by either numpy or pyro sampler
     """
 
-    def __init__(self, classifier, prior, true_observation):
+    def __call__(
+        self,
+        prior: torch.distributions.Distribution,
+        classifier: torch.nn.Module,
+        observation: torch.Tensor,
+        mcmc_method: str,
+    ) -> Callable:
+        """Return potential function. 
+        
+        Switch on numpy or pyro potential function based on mcmc_method.
+        
+        Args:
+            prior: prior distribution that can be evaluated.
+            classifier: binary classifier approximating the likelihood up to a constant.
+       
+            observation: actually observed conditioning context, x_o
+            mcmc_method (str): one of slice-np, slice, hmc or nuts.
+        
+        Returns:
+            Callable: potential function for sampler.
+        """ """        
+        
+        Args: 
+        
         """
-        :param neural_likelihood: Binary classifier which has learned an approximation
-        to the likelihood up to a constant.
-        :param prior: Distribution object with 'log_prob' method.
-        :param true_observation: torch.Tensor containing true observation x0.
-        """
-
         self.classifier = classifier
         self.prior = prior
-        self.true_observation = true_observation
+        self.observation = observation
 
-    def __call__(self, parameters_dict):
-        """
-        Call method allows the object to be used as a function.
-        Evaluates the given parameters using a given neural likelhood, prior,
-        and true observation.
+        if mcmc_method in ("slice", "hmc", "nuts"):
+            return self.pyro_potential
+        else:
+            return self.np_potential
 
-        :param inputs_dict: dict of parameter values which need evaluation for MCMC.
-        :return: torch.Tensor potential ~ -[log r(x0, theta) + log p(theta)]
-        """
-
-        parameters = next(iter(parameters_dict.values()))
-        log_ratio = self.classifier(
-            torch.cat((parameters, self.true_observation)).reshape(1, -1)
-        )
-
-        potential = -(log_ratio + self.prior.log_prob(parameters))
-
-        return potential
-
-
-class SliceNpNeuralPotentialFunction:
-    """
-    Implementation of a potential function for Pyro MCMC which uses a classifier
-    to evaluate a quantity proportional to the likelihood.
-    """
-
-    def __init__(self, posterior, prior, true_observation):
-        """
+    def np_potential(self, parameters: np.array) -> Union[torch.Tensor, float]:
+        """Return posterior log prob. of parameters, -inf if outside prior."
+        
         Args:
-            posterior: nn
-            prior: torch.distribution, Distribution object with 'log_prob' method.
-            true_observation:torch.Tensor containing true observation x0.
-        """
-
-        self.prior = prior
-        self.posterior = posterior
-        self.true_observation = true_observation
-
-    def __call__(self, parameters):
-        """
-        Call method allows the object to be used as a function.
-        Evaluates the given parameters using a given neural likelhood, prior,
-        and true observation.
-
-        Args:
-            parameters_dict: dict of parameter values which need evaluation for MCMC.
-
+            parameters ([np.array]): parameter vector, batch dimension 1
+        
         Returns:
-            torch.Tensor potential ~ -[log r(x0, theta) + log p(theta)]
+            [tensor or -inf]: posterior log probability of the parameters.
+        """
+        parameters = torch.FloatTensor(parameters)
+        # import pdb; pdb.set_trace()
+        log_ratio = self.classifier(
+            torch.cat((parameters, self.observation)).reshape(1, -1)
+        )
+
+        # notice opposite sign to pyro potential
+        return log_ratio + self.prior.log_prob(parameters)
+
+    def pyro_potential(self, parameters: dict) -> torch.Tensor:
+        """Return posterior log prob. of parameters, -inf where outside prior.
+        
+        Args:
+            parameters (dict): parameters (from pyro sampler)
+        
+        Returns:
+            torch.Tensor: potential ~ -[log r(x0, theta) + log p(theta)]
+       
 
         """
 
-        target_log_prob = (
-            self.posterior.neural_net(
-                torch.cat((torch.Tensor(parameters), self.true_observation)).reshape(
-                    1, -1
-                )
-            )
-            + self.prior.log_prob(torch.Tensor(parameters)).sum()
+        parameters = next(iter(parameters.values()))
+
+        log_ratio = self.classifier(
+            torch.cat((parameters, self.observation)).reshape(1, -1)
         )
 
-        return target_log_prob
-
-    def evaluate(self, point):
-        raise NotImplementedError
+        return -(log_ratio + self.prior.log_prob(parameters))

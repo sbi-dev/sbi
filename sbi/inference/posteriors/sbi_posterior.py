@@ -257,9 +257,10 @@ class Posterior:
                 self.neural_net, self._prior, context
             )
         elif self._alg_family == "sre":
-            potential_function = sbi.inference.sre.NeuralPotentialFunction(
-                self.neural_net, self._prior, context
-            )
+            # potential_function = sbi.inference.sre.NeuralPotentialFunction(
+            #     self.neural_net, self._prior, context
+            # )
+            potential_function = potential_function
         else:
             raise NameError
 
