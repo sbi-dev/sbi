@@ -140,7 +140,7 @@ def test_slice_conjugate_gaussian(fixture,
                                  std_tol):
     pyro.get_param_store().clear()
     slice_kernel = Slice(fixture.model)
-    mcmc = MCMC(slice_kernel, num_samples, warmup_steps)
+    mcmc = MCMC(slice_kernel, num_samples, warmup_steps, num_chains=3)
     mcmc.run(fixture.data)
     samples = mcmc.get_samples()
     for i in range(1, fixture.chain_len + 1):
@@ -167,7 +167,8 @@ def test_slice_conjugate_gaussian(fixture,
 
 
 @pytest.mark.parametrize("jit", [False, mark_jit(True)], ids=jit_idfn)
-def test_logistic_regression(jit):
+@pytest.mark.parametrize("num_chains", [1, 2])
+def test_logistic_regression(jit, num_chains):
     dim = 3
     data = torch.randn(2000, dim)
     true_coefs = torch.arange(1., dim + 1.)
@@ -182,7 +183,7 @@ def test_logistic_regression(jit):
     slice_kernel = Slice(model,
                          jit_compile=jit,
                          ignore_jit_warnings=True)
-    mcmc = MCMC(slice_kernel, num_samples=500, warmup_steps=100)
+    mcmc = MCMC(slice_kernel, num_samples=500, warmup_steps=100, num_chains=num_chains)
     mcmc.run(data)
     samples = mcmc.get_samples()
     assert_equal(rmse(true_coefs, samples["beta"].mean(0)).item(), 0.0, prec=0.1)
