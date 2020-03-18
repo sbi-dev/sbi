@@ -4,10 +4,7 @@ from torch.distributions import Independent, MultivariateNormal
 import sbi.utils as utils
 
 
-def linear_gaussian(parameters: torch.Tensor) -> torch.Tensor:
-
-    # fixed variance
-    std = 1
+def linear_gaussian(parameters: torch.Tensor, std=1.0) -> torch.Tensor:
 
     if parameters.ndim == 1:
         parameters = parameters[None, :]
