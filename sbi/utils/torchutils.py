@@ -183,28 +183,6 @@ def gaussian_kde_log_eval(samples, query):
     return torch.logsumexp(c, dim=-1)
 
 
-def get_log_prob(
-    dist: torch.distributions.Distribution, values: torch.Tensor
-) -> torch.Tensor:
-    """Return log prob of values under pytorch distribution. 
-    
-    Wraps pytorch.distributions.log_prob to overcome pytorch.distributions.Uniform returning a vector of densities, one value per dimension. 
-    
-    Arguments:
-        dist {torch.distributions.Distribution} -- the torch distribution
-        values {torch.Tensor} -- values to get the log prob for
-    
-    Returns:
-        [torch.Tensor] -- log probs for values
-    """
-    if isinstance(dist, torch.distributions.Uniform):
-        # summing over last dimension to keep batch dimension
-        return dist.log_prob(values).sum(dim=-1)
-    else:
-        # return log prob as usual
-        return dist.log_prob(values)
-
-
 class BoxUniform(Independent):
     def __init__(
         self,
@@ -226,3 +204,24 @@ class BoxUniform(Independent):
         """
 
         super().__init__(Uniform(low=low, high=high), reinterpreted_batch_ndims)
+
+
+def check_prior_event_shape(prior: Distribution, event_shape: int) -> Distribution:
+    """Return the prior, assert that the event shape (parameter dimension) matches.
+    
+    Arguments:
+        prior {Distribution} -- The prior
+        event_shape {int} -- the desired event shape, e.g., the parameter dim of the simulator.
+    
+    Returns:
+        Distribution -- prior.
+        
+    Raises: 
+        Assertion error. E.g., to catch the bug in case one uses a ND Uniform in pytorch, 
+        which is in fact a univariate uniform with batch dim N. 
+    """
+    assert (
+        prior.event_shape == event_shape
+    ), f"event shape must match prior event shape, using multivariate Uniform?: {type(prior)} {prior.event_shape}, {prior.batch_shape}"
+
+    return prior
