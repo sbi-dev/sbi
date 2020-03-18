@@ -213,13 +213,16 @@ class BoxUniform(Independent):
         reinterpreted_batch_ndims: int = 1,
     ):
         """Multidimensional uniform distribution defined on a box.
+        
+        A `Uniform` distribution initialized with e.g. a parameter vector low or high of length 3 will result in a /batch/ dimension of length 3. A log_prob evaluation will then output three numbers, one for each of the independent Uniforms in the batch. Instead, a `BoxUniform` initialized in the same way has three /event/ dimensions, and returns a scalar log_prob corresponding to whether the evaluated point is in the box defined by low and high or outside. 
     
         Refer to torch.distributions.Uniform and torch.distributions.Independent for further documentation.
     
-       Args:
+        Args:
             low (Tensor or float): lower range (inclusive).
             high (Tensor or float): upper range (exclusive).
             reinterpreted_batch_ndims (int): the number of batch dims to
                                              reinterpret as event dims.
-    """
+        """
+
         super().__init__(Uniform(low=low, high=high), reinterpreted_batch_ndims)
