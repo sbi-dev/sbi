@@ -15,7 +15,6 @@ from sbi.utils.torchutils import (
     create_mid_split_binary_mask,
     create_random_binary_mask,
     gaussian_kde_log_eval,
-    get_log_prob,
     get_num_parameters,
     get_temperature,
     logabsdet,

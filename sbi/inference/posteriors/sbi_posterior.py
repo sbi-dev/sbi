@@ -243,7 +243,12 @@ class Posterior:
         mcmc_method: str = "slice",
         thin: int = 10,
         warmup_steps: int = 200,
+        num_chains: int = 1,
     ):
+
+        if num_chains is None:
+            num_chain = mp.cpu_count - 1
+
         # HMC and NUTS from Pyro.
         # Defining the potential function as an object means Pyro's MCMC scheme
         # can pickle it to be used across multiple chains in parallel, even if
@@ -275,7 +280,6 @@ class Posterior:
             kernel = NUTS(potential_fn=potential_function)
         else:
             raise ValueError("'mcmc_method' must be one of ['slice', 'hmc', 'nuts'].")
-        num_chains = mp.cpu_count() - 1
 
         initial_params = self._prior.sample((num_chains,))
         sampler = MCMC(

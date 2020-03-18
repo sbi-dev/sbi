@@ -43,7 +43,7 @@ def test_sre_on_linearGaussian_api(num_dim: int):
         prior=prior,
         true_observation=true_observation,
         classifier=classifier,
-        mcmc_method="slice-np",
+        mcmc_method="slice",
     )
 
     # run inference
