@@ -1,10 +1,11 @@
 import os
 import pickle
+from sbi.simulators.linear_gaussian import linear_gaussian
 from typing import Callable, Tuple
 
 import torch
 from pyknos.nflows import distributions as distributions_
-from torch.distributions import Distribution
+from torch.distributions import Distribution, MultivariateNormal
 
 import sbi.simulators as simulators
 import sbi.utils as utils
@@ -50,10 +51,12 @@ def get_simulator_dimensions(simulator_fun, prior: Distribution) -> Tuple[int, i
         dim_output [int] -- output dimension of simualtor, i.e., dimension of data or summary stats.
     """
     # sample from prior to get parameter dimension
+    # XXX: use prior.event_shape here
     param = prior.sample()
     dim_input = param.shape[0]
 
     # simulate once to get simulator output dimension
+    # XXX: use true_observation here
     data = simulator_fun(param)
     dim_output = data.shape[0]
 
@@ -89,8 +92,8 @@ def simulation_wrapper(simulator, parameter_sample_fn, num_samples):
         if not simulator._has_been_used:
             parameters, observations = simulator._get_prior_parameters_observations()
             return (
-                torch.Tensor(parameters)[:num_samples],
-                torch.Tensor(observations)[:num_samples],
+                torch.tensor(parameters)[:num_samples],
+                torch.tensor(observations)[:num_samples],
             )
 
         else:
@@ -107,7 +110,7 @@ def simulation_wrapper(simulator, parameter_sample_fn, num_samples):
                 ):
                     if observation is not None:
                         parameters.append(parameter.reshape(1, -1))
-                        observations.append(torch.Tensor(observation.reshape(1, -1)))
+                        observations.append(torch.tensor(observation.reshape(1, -1)))
 
                 num_remaining_samples = num_samples - len(parameters)
 
@@ -116,7 +119,7 @@ def simulation_wrapper(simulator, parameter_sample_fn, num_samples):
     else:
         parameters = parameter_sample_fn(num_samples)
         observations = simulator(parameters)
-        return torch.Tensor(parameters), torch.Tensor(observations)
+        return torch.tensor(parameters), torch.tensor(observations)
 
 
 def get_simulator_prior_and_groundtruth(task):
@@ -128,9 +131,9 @@ def get_simulator_prior_and_groundtruth(task):
             high=3 * torch.ones(simulator.parameter_dim),
         )
         # ground truth parameters as specified in 'Sequential Neural Likelihood' paper.
-        ground_truth_parameters = torch.Tensor([-0.7, -2.9, -1.0, -0.9, 0.6])
+        ground_truth_parameters = torch.tensor([-0.7, -2.9, -1.0, -0.9, 0.6])
         # ground truth observation using same seed as 'Sequential Neural Likelihood' paper.
-        ground_truth_observation = torch.Tensor(
+        ground_truth_observation = torch.tensor(
             [
                 -0.97071232,
                 -2.94612244,
@@ -145,13 +148,11 @@ def get_simulator_prior_and_groundtruth(task):
 
     elif task == "nonlinear-gaussian-gaussian":
         simulator = simulators.NonlinearGaussianSimulator()
-        prior = distributions.MultivariateNormal(
-            loc=torch.zeros(5), covariance_matrix=torch.eye(5)
-        )
+        prior = MultivariateNormal(loc=torch.zeros(5), covariance_matrix=torch.eye(5))
         # ground truth parameters as specified in 'Sequential Neural Likelihood' paper.
-        ground_truth_parameters = torch.Tensor([-0.7, -2.9, -1.0, -0.9, 0.6])
+        ground_truth_parameters = torch.tensor([-0.7, -2.9, -1.0, -0.9, 0.6])
         # ground truth observation using same seed as 'Sequential Neural Likelihood' paper.
-        ground_truth_observation = torch.Tensor(
+        ground_truth_observation = torch.tensor(
             [
                 -0.97071232,
                 -2.94612244,
@@ -172,13 +173,13 @@ def get_simulator_prior_and_groundtruth(task):
             high=a * torch.ones(simulator.parameter_dim),
         )
         # dummy ground truth parameters as none are specified in 'Automatic Posterior Transformation.'
-        ground_truth_parameters = torch.Tensor([0, 0])
-        ground_truth_observation = torch.Tensor([0, 0])
+        ground_truth_parameters = torch.zeros((1, 2))
+        ground_truth_observation = torch.zeros((1, 2))
 
     elif task == "linear-gaussian":
         dim, std = 20, 0.5
-        simulator = simulators.LinearGaussianSimulator(dim=dim, std=std)
-        prior = distributions.MultivariateNormal(
+        simulator = lambda theta: linear_gaussian(theta, std=std)
+        prior = MultivariateNormal(
             loc=torch.zeros(dim), covariance_matrix=torch.eye(dim)
         )
         ground_truth_parameters = torch.zeros(dim)
@@ -192,35 +193,35 @@ def get_simulator_prior_and_groundtruth(task):
             low=-5 * torch.ones(simulator.parameter_dim),
             high=2 * torch.ones(simulator.parameter_dim),
         )
-        ground_truth_parameters = torch.log(torch.Tensor([0.01, 0.5, 1.0, 0.01]))
+        ground_truth_parameters = torch.log(torch.tensor([0.01, 0.5, 1.0, 0.01]))
         path = os.path.join(utils.get_data_root(), "lotka-volterra", "obs_stats.pkl")
         with open(path, "rb") as file:
             true_observation = pickle.load(file, encoding="bytes")
-        ground_truth_observation = torch.Tensor(true_observation)
+        ground_truth_observation = torch.tensor(true_observation)
 
     elif task == "lotka-volterra-gaussian":
         simulator = simulators.LotkaVolterraSimulator(
             summarize_observations=True, gaussian_prior=True
         )
-        prior = distributions.MultivariateNormal(
+        prior = MultivariateNormal(
             loc=torch.zeros(4), covariance_matrix=2 * torch.eye(4)
         )
-        ground_truth_parameters = torch.log(torch.Tensor([0.01, 0.5, 1.0, 0.01]))
+        ground_truth_parameters = torch.log(torch.tensor([0.01, 0.5, 1.0, 0.01]))
         path = os.path.join(utils.get_data_root(), "lotka-volterra", "obs_stats.pkl")
         with open(path, "rb") as file:
             true_observation = pickle.load(file, encoding="bytes")
-        ground_truth_observation = torch.Tensor(true_observation)
+        ground_truth_observation = torch.tensor(true_observation)
 
     elif task == "mg1":
         simulator = simulators.MG1Simulator()
         prior = distributions_.MG1Uniform(
-            low=torch.zeros(3), high=torch.Tensor([10.0, 10.0, 1.0 / 3.0])
+            low=torch.zeros(3), high=torch.tensor([10.0, 10.0, 1.0 / 3.0])
         )
-        ground_truth_parameters = torch.Tensor([1.0, 5.0, 0.2])
+        ground_truth_parameters = torch.tensor([1.0, 5.0, 0.2])
         path = os.path.join(utils.get_data_root(), "mg1", "observed_data.pkl")
         with open(path, "rb") as file:
             _, true_observation = pickle.load(file, encoding="bytes")
-        ground_truth_observation = torch.Tensor(true_observation)
+        ground_truth_observation = torch.tensor(true_observation)
 
     else:
         raise ValueError(f"'{task}' simulator choice not understood.")

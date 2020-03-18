@@ -45,9 +45,6 @@ class SnpeC(SnpeBase):
                 If -1, use all other parameters in minibatch.
         """
 
-        # set name and dimensions of simulator
-        simulator = set_simulator_attributes(simulator, prior)
-
         super(SnpeC, self).__init__(
             simulator=simulator,
             prior=prior,

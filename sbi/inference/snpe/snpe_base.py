@@ -5,7 +5,8 @@ from typing import Callable, Union
 import numpy as np
 import torch
 from pyknos.mdn.mdn import MultivariateGaussianMDN
-from torch import distributions, nn, optim
+from torch import float32, nn, optim
+from torch.distributions import Distribution
 from torch.nn.utils import clip_grad_norm_
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
@@ -13,9 +14,9 @@ from tqdm import tqdm
 
 import sbi.simulators as simulators
 import sbi.utils as utils
-from sbi import mcmc
 from sbi.inference.posteriors.sbi_posterior import Posterior
-from sbi.utils.torchutils import get_default_device
+from sbi.utils.torchutils import get_default_device, check_prior_event_shape
+from sbi.simulators.simutils import set_simulator_attributes
 
 
 class SnpeBase:
@@ -67,8 +68,12 @@ class SnpeBase:
                 If None, will infer it
         """
 
-        self._simulator = simulator
-        self._prior = prior
+        # XXX: first check the prior by asserting batch_dim == 1, then set sim attrs
+        self._simulator = set_simulator_attributes(simulator, prior)
+        # XXX: where do we need the simulator attrs? can those be class attributes?
+        self._prior = check_prior_event_shape(
+            prior, event_shape=simulator.parameter_dim
+        )
         self._true_observation = true_observation
         self._device = get_default_device() if device is None else device
         self.z_score_obs = z_score_obs
@@ -267,8 +272,8 @@ class SnpeBase:
             )
 
         # Store (parameter, observation) pairs.
-        self._parameter_bank.append(torch.Tensor(parameters))
-        self._observation_bank.append(torch.Tensor(observations))
+        self._parameter_bank.append(torch.tensor(parameters))
+        self._observation_bank.append(torch.tensor(observations))
         self._prior_masks.append(
             torch.ones(num_simulations_per_round, 1)
             if round_ == 0
@@ -459,7 +464,7 @@ class PotentialFunctionProvider:
 
     def __call__(
         self,
-        prior: torch.distributions.Distribution,
+        prior: Distribution,
         posterior_nn: torch.nn.Module,
         observation: torch.Tensor,
         mcmc_method: str,
@@ -487,7 +492,7 @@ class PotentialFunctionProvider:
         Returns:
             [tensor or -inf]: posterior log probability of the parameters.
         """
-        parameters = torch.FloatTensor(parameters)
+        parameters = torch.tensor(parameters, dtype=float32)
 
         is_within_prior = torch.isfinite(self.prior.log_prob(parameters))
         if is_within_prior:
