@@ -305,7 +305,7 @@ class Posterior:
             warmup_steps=warmup_steps,
             initial_params={"": initial_params},
             num_chains=num_chains,
-            # mp_context="spawn",
+            mp_context="fork",
         )
         sampler.run()
         samples = next(iter(sampler.get_samples().values())).reshape(
