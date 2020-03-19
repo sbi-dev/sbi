@@ -1,12 +1,10 @@
-from typing import Callable, Union
+from typing import Callable, Union, Optional, Dict
 
 import os
 from copy import deepcopy
 
 import numpy as np
-import sbi.utils as utils
 import torch
-from sbi.utils.torchutils import get_default_device
 from pyro.infer.mcmc import HMC, NUTS
 from pyro.infer.mcmc.api import MCMC
 from torch import distributions
@@ -17,7 +15,6 @@ from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 from sbi.inference.posteriors.sbi_posterior import Posterior
-from typing import Optional
 
 import sbi.simulators as simulators
 import sbi.utils as utils
@@ -26,7 +23,7 @@ from sbi.simulators.simutils import (
     set_simulator_attributes,
     check_prior_and_data_dimensions,
 )
-from sbi.utils.torchutils import get_default_device
+from sbi.utils.torchutils import get_default_device, make_conform
 
 
 class SNL:
@@ -304,96 +301,6 @@ class SNL:
         return self._summary
 
 
-class NeuralPotentialFunction:
-    """
-    Implementation of a potential function for Pyro MCMC which uses a neural density
-    estimator to evaluate the likelihood.
-    """
-
-    def __init__(self, neural_likelihood, prior, true_observation):
-        """
-        :param neural_likelihood: Conditional density estimator with 'log_prob' method.
-        :param prior: Distribution object with 'log_prob' method.
-        :param true_observation: torch.Tensor containing true observation x0.
-        """
-
-        self._neural_likelihood = neural_likelihood
-        self._prior = prior
-        self._true_observation = true_observation
-
-    def __call__(self, inputs_dict):
-        """
-        Call method allows the object to be used as a function.
-        Evaluates the given parameters using a given neural likelihood, prior,
-        and true observation.
-
-        :param inputs_dict: dict of parameter values which need evaluation for MCMC.
-        :return: torch.Tensor potential ~ -[log q(x0 | theta) + log p(theta)]
-        """
-
-        parameters = next(iter(inputs_dict.values()))
-        log_likelihood = self._neural_likelihood.log_prob(
-            inputs=self._true_observation.reshape(1, -1).to("cpu"),
-            context=parameters.reshape(1, -1),
-            normalize=False,
-        )
-
-        # If prior is uniform we need to sum across last dimension.
-        if isinstance(self._prior, distributions.Uniform):
-            potential = -(log_likelihood + self._prior.log_prob(parameters).sum(-1))
-        else:
-            potential = -(log_likelihood + self._prior.log_prob(parameters))
-
-        return potential
-
-
-class SliceNpNeuralPotentialFunction:
-    """
-    Implementation of a potential function for Pyro MCMC which uses a classifier
-    to evaluate a quantity proportional to the likelihood.
-    """
-
-    def __init__(self, posterior, prior, true_observation):
-        """
-        Args:
-            posterior: nn
-            prior: torch.distribution, Distribution object with 'log_prob' method.
-            true_observation:torch.Tensor containing true observation x0.
-        """
-
-        self.prior = prior
-        self.posterior = posterior
-        self.true_observation = true_observation
-
-    def __call__(self, parameters):
-        """
-        Call method allows the object to be used as a function.
-        Evaluates the given parameters using a given neural likelhood, prior,
-        and true observation.
-
-        Args:
-            parameters_dict: dict of parameter values which need evaluation for MCMC.
-
-        Returns:
-            torch.Tensor potential ~ -[log r(x0, theta) + log p(theta)]
-
-        """
-
-        target_log_prob = (
-            self.posterior.log_prob(
-                inputs=self.true_observation.reshape(1, -1),
-                context=torch.Tensor(parameters).reshape(1, -1),
-                normalize_snpe=False,
-            )
-            + self.prior.log_prob(torch.Tensor(parameters)).sum()
-        )
-
-        return target_log_prob
-
-    def evaluate(self, point):
-        raise NotImplementedError
-
-
 class PotentialFunctionProvider:
     """
     This class is initialized without arguments during the initialization of the Posterior class. When called, it specializes to the potential function appropriate to the requested mcmc_method.
@@ -443,13 +350,13 @@ class PotentialFunctionProvider:
             return self.np_potential
 
     def np_potential(self, parameters: np.array) -> Union[torch.Tensor, float]:
-        """Return posterior log prob. of parameters, -inf if outside prior."
+        """Return posterior log prob. of parameters."
         
         Args:
-            parameters ([np.array]): parameter vector, batch dimension 1
+            parameters: parameter vector, batch dimension 1
         
         Returns:
-            [tensor or -inf]: posterior log probability of the parameters.
+            Posterior log probability of the parameters, -Inf if impossible under prior.
         """
         parameters = torch.FloatTensor(parameters)
         log_likelihood = self.likelihood_nn.log_prob(
@@ -459,33 +366,23 @@ class PotentialFunctionProvider:
         # notice opposite sign to pyro potential
         return log_likelihood + self.prior.log_prob(parameters)
 
-    def pyro_potential(self, parameters: dict) -> torch.Tensor:
-        """Return posterior log prob. of parameters, -inf where outside prior.
+    def pyro_potential(self, parameters: Dict[str, torch.Tensor]) -> torch.Tensor:
+        """Return posterior log prob. of parameters.
         
-        Args:
-            parameters (dict): parameters (from pyro sampler)
+         Args:
+            parameters: {name: tensor, ...} dictionary (from pyro sampler). The tensor's shape will be (1, x) if running a single chain or just (x) for multiple chains.
         
         Returns:
-            torch.Tensor: potential ~ -[log r(x0, theta) + log p(theta)]
-       
-
+            potential: -[log r(x0, theta) + log p(theta)]
         """
 
-        parameters = next(iter(parameters.values()))
+        parameter = next(iter(parameters.values()))
 
-        # When using multiple mcmc chains, the shape of parameters will (num_dim).
-        # When using just a single chain, the shape will be (1, num_dim). Therefore,
-        # in the first case, we prepend a dimension to the observation such
-        # that we can concatenate the vectors.
-        # if len(parameters.shape) == 1:
-        #     observation = self.observation
-        # else:
-        #     observation = self.observation[
-        #         None,
-        #     ]
+        # => ensure observation's shape conforms with parameter's for cat below
+        observation = make_conform(self.observation, parameter)
 
         log_likelihood = self.likelihood_nn.log_prob(
-            inputs=self.observations.reshape(1, -1), context=parameters.reshape(1, -1)
+            inputs=observation.reshape(1, -1), context=parameter.reshape(1, -1)
         )
 
-        return -(log_likelihood + self.prior.log_prob(parameters))
+        return -(log_likelihood + self.prior.log_prob(parameter))

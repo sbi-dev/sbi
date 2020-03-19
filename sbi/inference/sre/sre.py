@@ -1,4 +1,4 @@
-from typing import Callable, Union
+from typing import Callable, Union, Dict
 import os
 from copy import deepcopy
 
@@ -21,7 +21,7 @@ from sbi.simulators.simutils import (
     set_simulator_attributes,
     check_prior_and_data_dimensions,
 )
-from sbi.utils.torchutils import get_default_device
+from sbi.utils.torchutils import get_default_device, make_conform
 
 
 class SRE:
@@ -405,7 +405,7 @@ class PotentialFunctionProvider:
             return self.np_potential
 
     def np_potential(self, parameters: np.array) -> Union[torch.Tensor, float]:
-        """Return posterior log prob. of parameters, -inf if outside prior."
+        """Return potential for Numpy slice sampler."
         
         Args:
             parameters ([np.array]): parameter vector, batch dimension 1
@@ -414,7 +414,7 @@ class PotentialFunctionProvider:
             [tensor or -inf]: posterior log probability of the parameters.
         """
         parameters = torch.FloatTensor(parameters)
-        # import pdb; pdb.set_trace()
+
         log_ratio = self.classifier(
             torch.cat((parameters, self.observation)).reshape(1, -1)
         )
@@ -422,31 +422,21 @@ class PotentialFunctionProvider:
         # notice opposite sign to pyro potential
         return log_ratio + self.prior.log_prob(parameters)
 
-    def pyro_potential(self, parameters: dict) -> torch.Tensor:
-        """Return posterior log prob. of parameters, -inf where outside prior.
+    def pyro_potential(self, parameters: Dict[str, torch.Tensor]) -> torch.Tensor:
+        """Return potential for Pyro sampler.
         
         Args:
-            parameters (dict): parameters (from pyro sampler)
+            parameters: {name: tensor, ...} dictionary (from pyro sampler). The tensor's shape will be (1, x) if running a single chain or just (x) for multiple chains.
         
         Returns:
-            torch.Tensor: potential ~ -[log r(x0, theta) + log p(theta)]
-       
-
+            potential: -[log r(x0, theta) + log p(theta)]
         """
 
-        parameters = next(iter(parameters.values()))
+        parameter = next(iter(parameters.values()))
 
-        # When using multiple mcmc chains, the shape of parameters will (num_dim).
-        # When using just a single chain, the shape will be (1, num_dim). Therefore,
-        # in the first case, we append a dimension to the observation such
-        # that we can concatenate the vectors.
-        if len(parameters.shape) == 1:
-            observation = self.observation
-        else:
-            observation = self.observation[
-                None,
-            ]
+        # => ensure observation's shape conforms with parameter's for cat below
+        observation = make_conform(self.observation, parameter)
 
-        log_ratio = self.classifier(torch.cat((parameters, observation)).reshape(1, -1))
+        log_ratio = self.classifier(torch.cat((parameter, observation)).reshape(1, -1))
 
-        return -(log_ratio + self.prior.log_prob(parameters))
+        return -(log_ratio + self.prior.log_prob(parameter))
