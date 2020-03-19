@@ -113,41 +113,26 @@ def get_simulator_name(simulator_fun, name=None) -> str:
 
 
 # TODO: we do not want this function
-def simulation_wrapper(simulator, parameter_sample_fn, num_samples):
+def simulation_wrapper(
+    simulator: Callable, parameter_sample_fn: Callable, num_samples: int = 1
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    """Return parameters and simulated data given a simulator and parameters. 
 
-    if isinstance(simulator, simulators.LotkaVolterraSimulator):
+    Arguments:
+        simulator {Callable} -- simulator function taking parameters and returning data, 
+                                both as torch.Tensor 
+        parameter_sample_fn {Callable} -- prior function, wrapped such that it takes 
+                                          int argument num_samples
 
-        if not simulator._has_been_used:
-            parameters, observations = simulator._get_prior_parameters_observations()
-            return (
-                torch.tensor(parameters)[:num_samples],
-                torch.tensor(observations)[:num_samples],
-            )
+    Keyword Arguments:
+        num_samples {int} -- number of samples (default: {1})
 
-        else:
-            num_remaining_samples = num_samples
-            parameters, observations = [], []
-
-            while num_remaining_samples > 0:
-
-                proposed_parameters = parameter_sample_fn(num_remaining_samples)
-                proposed_observations = simulator(proposed_parameters)
-
-                for parameter, observation in zip(
-                    proposed_parameters, proposed_observations
-                ):
-                    if observation is not None:
-                        parameters.append(parameter.reshape(1, -1))
-                        observations.append(torch.tensor(observation.reshape(1, -1)))
-
-                num_remaining_samples = num_samples - len(parameters)
-
-            return torch.cat(parameters), torch.cat(observations)
-
-    else:
-        parameters = parameter_sample_fn(num_samples)
-        observations = simulator(parameters)
-        return torch.tensor(parameters), torch.tensor(observations)
+    Returns:
+        Tuple[torch.Tensor, torch.Tensor] -- sampled parameters, simulated data
+    """
+    parameters = parameter_sample_fn(num_samples)
+    observations = simulator(parameters)
+    return parameters, observations
 
 
 def get_simulator_prior_and_groundtruth(task):

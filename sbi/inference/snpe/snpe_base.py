@@ -272,8 +272,8 @@ class SnpeBase:
             )
 
         # Store (parameter, observation) pairs.
-        self._parameter_bank.append(torch.tensor(parameters))
-        self._observation_bank.append(torch.tensor(observations))
+        self._parameter_bank.append(parameters)
+        self._observation_bank.append(observations)
         self._prior_masks.append(
             torch.ones(num_simulations_per_round, 1)
             if round_ == 0
