@@ -204,3 +204,18 @@ class BoxUniform(Independent):
         """
 
         super().__init__(Uniform(low=low, high=high), reinterpreted_batch_ndims)
+
+
+# XXX does an in-place version (e.g. make_conform_) make sense?
+def make_conform(target: torch.Tensor, ref: torch.Tensor) -> torch.Tensor:
+    """Return target tensor matching the reference's dimensions."""
+
+    dim_gap = ref.ndim - target.ndim
+
+    if dim_gap not in (0, 1):
+        # XXX is this scenario possible at all? if not, remove check
+        # XXX if yes, consider generalizing the function
+        raise NotImplementedError(f"Dimensions differ by {dim_gap} ∉ {{0,1}}).")
+
+    return target.unsqueeze(0) if dim_gap else target
+
