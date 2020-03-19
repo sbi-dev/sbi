@@ -515,10 +515,10 @@ class PotentialFunctionProvider:
             torch.Tensor: posterior log probability, masked outside of prior
         """
 
-        parameters = next(iter(parameters.values()))
+        parameter = next(iter(parameters.values()))
         # XXX: notice sign, check convention pyro vs. numpy
         log_prob_posterior = -self.posterior_nn.log_prob(
-            inputs=parameters, context=self.observation,
+            inputs=parameter, context=self.observation,
         )
         log_prob_prior = self.prior.log_prob(parameters)
 
