@@ -32,6 +32,8 @@ def test_sre_on_linearGaussian_api(num_dim: int):
     )
 
     parameter_dim, observation_dim = num_dim, num_dim
+    # XXX this breaks the test! (and #76 doesn't seem to fix)
+    # true_observation = torch.zeros(1, num_dim)
     true_observation = torch.zeros(num_dim)
 
     # get classifier
@@ -52,8 +54,8 @@ def test_sre_on_linearGaussian_api(num_dim: int):
     # draw samples from posterior
     samples = posterior.sample(num_samples=10)
 
-    # log_prob is not implemented yet for SRE
-    #log_probs = posterior.log_prob(samples)
+    # XXX log_prob is not implemented yet for SRE
+    # log_probs = posterior.log_prob(samples)
 
 
 @pytest.mark.slow
@@ -77,12 +79,12 @@ def test_sre_on_linearGaussian_based_on_mmd(num_dim: int, prior_str: str):
             loc=torch.zeros(num_dim), covariance_matrix=torch.eye(num_dim)
         )
         target_samples = get_true_posterior_samples_linear_gaussian_mvn_prior(
-            true_observation[None, ], num_samples=num_samples
+            true_observation[None,], num_samples=num_samples
         )
     else:
         prior = utils.BoxUniform(-1.0 * torch.ones(num_dim), torch.ones(num_dim))
         target_samples = get_true_posterior_samples_linear_gaussian_uniform_prior(
-            true_observation[None, ], num_samples=num_samples, prior=prior
+            true_observation[None,], num_samples=num_samples, prior=prior
         )
 
     # get classifier
