@@ -194,7 +194,9 @@ class Posterior:
 
         # when using slice_np as mcmc sampler, we can have only a single chain.
         if mcmc_method == "slice_np" and num_chains > 1:
-            warn('slice_np does not support multiple mcmc chains. Using just a single chain.')
+            warn(
+                "slice_np does not support multiple mcmc chains. Using just a single chain."
+            )
 
         # XXX: maybe get whole sampler instead of just potential function?
         potential_function = self._get_potential_function(
@@ -206,7 +208,13 @@ class Posterior:
             )
         else:
             samples = self.pyro_mcmc(
-                num_samples, potential_function, context, mcmc_method, thin, warmup, num_chains
+                num_samples,
+                potential_function,
+                context,
+                mcmc_method,
+                thin,
+                warmup,
+                num_chains,
             )
 
         # Back to training mode.
@@ -281,9 +289,10 @@ class Posterior:
         if self._alg_family == "snpe":
             potential_function = potential_function
         elif self._alg_family == "snl":
-            potential_function = sbi.inference.snl.NeuralPotentialFunction(
-                self.neural_net, self._prior, context
-            )
+            potential_function = potential_function
+            # potential_function = sbi.inference.snl.NeuralPotentialFunction(
+            #     self.neural_net, self._prior, context
+            # )
         elif self._alg_family == "sre":
             # potential_function = sbi.inference.sre.NeuralPotentialFunction(
             #     self.neural_net, self._prior, context
