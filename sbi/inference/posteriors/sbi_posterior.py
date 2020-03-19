@@ -243,11 +243,28 @@ class Posterior:
         mcmc_method: str = "slice",
         thin: int = 10,
         warmup_steps: int = 200,
-        num_chains: int = 1,
+        num_chains: Optional[int] = 1,
     ):
+        """Return samples obtained using Pyro's HMC, NUTS or slice kernels.
 
+        Args:
+            num_samples (int): desired number of samples
+            potential_fn (Callable): dict of real support parameters mapping to a potential energy
+            context (torch.Tensor): conditioning observation
+            mcmc_method (str, optional): One of "hmc", "nuts" or "slice" (default).
+            thin (int, optional): thinning (subsampling) factor. Defaults to 10.
+            warmup_steps (int, optional): initial samples to discard. Defaults to 200.
+            num_chains (int, optional): whether to sample in parallel. Defaults to 1, will use all CPUs minus one if None.
+
+        Raises:
+            NameError: [description]
+            ValueError: [description]
+
+        Returns:
+            [type]: [description]
+        """
         if num_chains is None:
-            num_chain = mp.cpu_count - 1
+            num_chains = mp.cpu_count - 1
 
         # HMC and NUTS from Pyro.
         # Defining the potential function as an object means Pyro's MCMC scheme
