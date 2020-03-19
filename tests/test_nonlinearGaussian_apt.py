@@ -10,8 +10,8 @@ from sbi.simulators.nonlinear_gaussian import (
     get_ground_truth_posterior_samples_nonlinear_gaussian,
     non_linear_gaussian,
 )
-from sbi.simulators.simutils import set_simulator_attributes
 from sbi.utils.torchutils import BoxUniform
+import sbi.utils as utils
 
 # use cpu by default
 torch.set_default_tensor_type("torch.FloatTensor")

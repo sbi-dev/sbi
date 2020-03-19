@@ -22,7 +22,7 @@ def test_snl_on_linearGaussian_api(num_dim: int):
     Keyword Arguments:
         num_dimint {int} -- Parameter dimension of the gaussian model (default: {3})
     """
-    num_samples = 100
+    num_samples = 10
 
     prior = distributions.MultivariateNormal(
         loc=torch.zeros(num_dim), covariance_matrix=torch.eye(num_dim)

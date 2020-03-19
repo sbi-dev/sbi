@@ -50,7 +50,7 @@ def test_sre_on_linearGaussian_api(num_dim: int):
     posterior = inference_method(num_rounds=1, num_simulations_per_round=1000)
 
     # draw samples from posterior
-    samples = posterior.sample(num_samples=100)
+    samples = posterior.sample(num_samples=10)
 
     log_probs = posterior.log_prob(samples)
 
