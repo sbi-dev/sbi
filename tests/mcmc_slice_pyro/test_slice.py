@@ -183,7 +183,7 @@ def test_logistic_regression(jit, num_chains):
     slice_kernel = Slice(model,
                          jit_compile=jit,
                          ignore_jit_warnings=True)
-    mcmc = MCMC(slice_kernel, num_samples=500, warmup_steps=100, num_chains=num_chains)
+    mcmc = MCMC(slice_kernel, num_samples=500, warmup_steps=100, num_chains=num_chains, mp_context="fork")
     mcmc.run(data)
     samples = mcmc.get_samples()
     assert_equal(rmse(true_coefs, samples["beta"].mean(0)).item(), 0.0, prec=0.1)
