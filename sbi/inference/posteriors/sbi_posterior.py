@@ -60,7 +60,7 @@ class Posterior:
         inputs: torch.Tensor,
         context: torch.Tensor = None,
         normalize_snpe: bool = True,  # TODO: new variable name? This sounds as if we were 'normalizing snpe'
-    ):
+    ) -> torch.Tensor:
         """Calculate log probability under the distribution.
 
         Args:
@@ -262,8 +262,9 @@ class Posterior:
         """Return samples obtained using Pyro's HMC, NUTS or slice kernels.
 
         Args:
-            num_samples (int): desired number of samples
-            potential_fn (Callable): dict of real support parameters mapping to a potential energy
+            num_samples: desired number of samples
+            potential_fn: Defining the potential function as a callable **class** makes it picklable for Pyro's MCMC to use it across chains in parallel, even if the potential function requires evaluating a neural network.
+
             context (torch.Tensor): conditioning observation
             mcmc_method (str, optional): One of "hmc", "nuts" or "slice" (default).
             thin (int, optional): thinning (subsampling) factor. Defaults to 10.
@@ -280,27 +281,7 @@ class Posterior:
         if num_chains is None:
             num_chains = mp.cpu_count - 1
 
-        # HMC and NUTS from Pyro.
-        # Defining the potential function as an object means Pyro's MCMC scheme
-        # can pickle it to be used across multiple chains in parallel, even if
-        # the potential function requires evaluating a neural likelihood as is the
-        # case here.
-        # build potential function depending on what algorithm is used
-        if self._alg_family == "snpe":
-            potential_function = potential_function
-        elif self._alg_family == "snl":
-            potential_function = potential_function
-            # potential_function = sbi.inference.snl.NeuralPotentialFunction(
-            #     self.neural_net, self._prior, context
-            # )
-        elif self._alg_family == "sre":
-            # potential_function = sbi.inference.sre.NeuralPotentialFunction(
-            #     self.neural_net, self._prior, context
-            # )
-            potential_function = potential_function
-        else:
-            raise NameError
-
+        # XXX Move this out of the function, or remember to return to train mode
         # Always sample in eval mode.
         self.neural_net.eval()
 
@@ -311,7 +292,7 @@ class Posterior:
         elif mcmc_method == "nuts":
             kernel = NUTS(potential_fn=potential_function)
         else:
-            raise ValueError("'mcmc_method' must be one of ['slice', 'hmc', 'nuts'].")
+            raise ValueError("`mcmc_method` must be one of 'slice', 'hmc', 'nuts'].")
 
         initial_params = self._prior.sample((num_chains,))
         sampler = MCMC(
