@@ -113,7 +113,6 @@ def test_sre_on_linearGaussian_based_on_mmd(num_dim: int, prior_str: str):
         mmd < max_mmd
     ), f"MMD={mmd} is more than 2 stds above the average performance."
 
-test_sre_on_linearGaussian_based_on_mmd(3, "gaussian")
 
 @pytest.mark.slow
 @pytest.mark.parametrize(
