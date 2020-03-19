@@ -10,6 +10,7 @@ from torch.distributions import Distribution, MultivariateNormal, Uniform
 import sbi.simulators as simulators
 import sbi.utils as utils
 from sbi.utils.torchutils import BoxUniform
+import warnings
 
 
 def set_simulator_attributes(
@@ -57,8 +58,8 @@ def check_prior_and_data_dimensions(prior: Distribution, observed_data: torch.Te
 
     if isinstance(prior, Uniform) and dim_input > 1:
         warnings.warn(
-            f"The paramerer dim {dim_input}>1 and you are using a PyTorch Uniform prior, "
-            "which means that you implicitly are using a batch_shape of {dim_input} and event shape 1. "
+            f"The paramerer dim is {dim_input}>1 and you are using a PyTorch Uniform prior, "
+            "which means that you are using a batch_shape of {dim_input} implicitly and event shape 1. "
             "Consider using a BoxUniform prior instead."
         )
 
