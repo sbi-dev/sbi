@@ -58,14 +58,18 @@ def check_prior_and_data_dimensions(prior: Distribution, observed_data: torch.Te
 
     if isinstance(prior, Uniform) and dim_input > 1:
         warnings.warn(
-            f"The paramerer dim is {dim_input}>1 and you are using a PyTorch Uniform prior, "
-            "which means that you are using a batch_shape of {dim_input} implicitly and event shape 1. "
+            f"The paramerer dimension (`event_shape`) of the simualtor inferred from the "
+            "prior is D={dim_input}>1 and the prior PyTorch Uniform. Therefore, beware "
+            "that you are using a `batch_shape` of {dim_input} implicitly and "
+            "`event_shape` 1, because Pytorch does not support multivariate Uniform. "
             "Consider using a BoxUniform prior instead."
         )
 
     if observed_data.squeeze().ndim > 1:
         warnings.warn(
-            "Your are passing multidimensional observed data. Currenlty SBI supports only single observed data points."
+            "The `true_observation` Tensor has more than one dimension, i.e., it is a matrix "
+            "of observed data or batch of observed data points. " 
+            "SBI supports only single observed data points."
         )
 
 
@@ -82,13 +86,8 @@ def get_simulator_dimensions(
         dim_input [int] -- input dimension of simulator, i.e., parameter vector dimension, event shape.
         dim_output [int] -- output dimension of simualtor, i.e., dimension of data or summary stats.
     """
-    # infer parameter dim by simulating once
-    dim_input = prior.sample().numel()
-
-    # infer data dimension from observed data
-    dim_output = observed_data.numel()
-
-    return dim_input, dim_output
+    # infer parameter dim by sampling once
+    return prior.sample().numel(), observed_data.numel()
 
 
 def get_simulator_name(simulator_fun, name=None) -> str:
@@ -112,7 +111,7 @@ def get_simulator_name(simulator_fun, name=None) -> str:
         return name
 
 
-# TODO: we do not want this function
+# XXX: do we actually need this wrapper?
 def simulation_wrapper(
     simulator: Callable, parameter_sample_fn: Callable, num_samples: int = 1
 ) -> Tuple[torch.Tensor, torch.Tensor]:
