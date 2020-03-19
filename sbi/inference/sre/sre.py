@@ -26,7 +26,7 @@ from sbi.utils.torchutils import get_default_device
 
 class SRE:
     """
-    Implementation 'Sequential Ratio Estimation', as presented in
+    'Sequential Ratio Estimation', as presented in
     'Likelihood-free MCMC with Amortized Approximate Likelihood Ratios'
     Hermans et al.
     Pre-print 2019
@@ -443,10 +443,10 @@ class PotentialFunctionProvider:
         if len(parameters.shape) == 1:
             observation = self.observation
         else:
-            observation = self.observation[None, ]
+            observation = self.observation[
+                None,
+            ]
 
-        log_ratio = self.classifier(
-            torch.cat((parameters, observation)).reshape(1, -1)
-        )
+        log_ratio = self.classifier(torch.cat((parameters, observation)).reshape(1, -1))
 
         return -(log_ratio + self.prior.log_prob(parameters))
