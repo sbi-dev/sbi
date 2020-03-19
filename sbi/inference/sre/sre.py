@@ -436,8 +436,17 @@ class PotentialFunctionProvider:
 
         parameters = next(iter(parameters.values()))
 
+        # When using multiple mcmc chains, the shape of parameters will (num_dim).
+        # When using just a single chain, the shape will be (1, num_dim). Therefore,
+        # in the first case, we append a dimension to the observation such
+        # that we can concatenate the vectors.
+        if len(parameters.shape) == 1:
+            observation = self.observation
+        else:
+            observation = self.observation[None, ]
+
         log_ratio = self.classifier(
-            torch.cat((parameters, self.observation)).reshape(1, -1)
+            torch.cat((parameters, observation)).reshape(1, -1)
         )
 
         return -(log_ratio + self.prior.log_prob(parameters))

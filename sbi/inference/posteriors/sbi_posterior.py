@@ -1,4 +1,5 @@
 from typing import Callable, Optional
+from warnings import warn
 
 import numpy as np
 import torch
@@ -58,7 +59,7 @@ class Posterior:
         self,
         inputs: torch.Tensor,
         context: torch.Tensor = None,
-        normalize_snpe: bool = True,
+        normalize_snpe: bool = True,  # TODO: new variable name? This sounds as if we were 'normalizing snpe'
     ):
         """Calculate log probability under the distribution.
 
@@ -175,6 +176,7 @@ class Posterior:
         mcmc_method: str = "slice_np",
         thin: int = 10,
         warmup: int = 20,
+        num_chains: Optional[int] = 1,
     ):
         """
         Sample the posterior using MCMC
@@ -190,6 +192,10 @@ class Posterior:
             torch.Tensor of shape [num_samples, parameter_dim]
         """
 
+        # when using slice_np as mcmc sampler, we can have only a single chain.
+        if mcmc_method == "slice_np" and num_chains > 1:
+            warn('slice_np does not support multiple mcmc chains. Using just a single chain.')
+
         # XXX: maybe get whole sampler instead of just potential function?
         potential_function = self._get_potential_function(
             self._prior, self.neural_net, context, mcmc_method
@@ -200,7 +206,7 @@ class Posterior:
             )
         else:
             samples = self.pyro_mcmc(
-                num_samples, potential_function, context, mcmc_method, thin, warmup
+                num_samples, potential_function, context, mcmc_method, thin, warmup, num_chains
             )
 
         # Back to training mode.

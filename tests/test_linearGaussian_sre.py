@@ -52,7 +52,8 @@ def test_sre_on_linearGaussian_api(num_dim: int):
     # draw samples from posterior
     samples = posterior.sample(num_samples=10)
 
-    log_probs = posterior.log_prob(samples)
+    # log_prob is not implemented yet for SRE
+    #log_probs = posterior.log_prob(samples)
 
 
 @pytest.mark.slow
@@ -68,7 +69,7 @@ def test_sre_on_linearGaussian_based_on_mmd(num_dim: int, prior_str: str):
         prior_str {str} -- string for which prior to use: gaussian or uniform
     """
 
-    true_observation = torch.zeros((1, num_dim))
+    true_observation = torch.zeros(num_dim)
     num_samples = 1000
 
     if prior_str == "gaussian":
@@ -76,12 +77,12 @@ def test_sre_on_linearGaussian_based_on_mmd(num_dim: int, prior_str: str):
             loc=torch.zeros(num_dim), covariance_matrix=torch.eye(num_dim)
         )
         target_samples = get_true_posterior_samples_linear_gaussian_mvn_prior(
-            true_observation, num_samples=num_samples
+            true_observation[None, ], num_samples=num_samples
         )
     else:
         prior = utils.BoxUniform(-1.0 * torch.ones(num_dim), torch.ones(num_dim))
         target_samples = get_true_posterior_samples_linear_gaussian_uniform_prior(
-            true_observation, num_samples=num_samples, prior=prior
+            true_observation[None, ], num_samples=num_samples, prior=prior
         )
 
     # get classifier
@@ -100,7 +101,7 @@ def test_sre_on_linearGaussian_based_on_mmd(num_dim: int, prior_str: str):
     posterior = inference_method(num_rounds=1, num_simulations_per_round=1000)
 
     # draw samples from posterior
-    samples = posterior.sample(num_samples=1000)
+    samples = posterior.sample(num_samples=num_samples)
 
     # compute the mmd
     mmd = utils.unbiased_mmd_squared(target_samples, samples)
@@ -112,14 +113,16 @@ def test_sre_on_linearGaussian_based_on_mmd(num_dim: int, prior_str: str):
         mmd < max_mmd
     ), f"MMD={mmd} is more than 2 stds above the average performance."
 
+test_sre_on_linearGaussian_based_on_mmd(3, "gaussian")
 
+@pytest.mark.slow
 @pytest.mark.parametrize(
     "mcmc_method, prior",
     (
         ("slice-np", "gaussian"),
         ("slice-np", "uniform"),
-        # ("slice", "gaussian"),  # XXX this is broken-hard to debug error
-        # ("slice", "uniform"),   # XXX might be slow? check pyro sampling
+        ("slice", "gaussian"),
+        ("slice", "uniform"),
     ),
 )
 def test_sre_posterior_correction(mcmc_method, prior):
@@ -153,7 +156,7 @@ def test_sre_posterior_correction(mcmc_method, prior):
     posterior = inference_method(num_rounds=1, num_simulations_per_round=1000)
 
     # draw samples from posterior
-    samples = posterior.sample(num_samples=1000)
+    samples = posterior.sample(num_samples=50)
 
     # no log prob for SRE yet - see issue #73
     # densities = posterior.log_prob(samples)
