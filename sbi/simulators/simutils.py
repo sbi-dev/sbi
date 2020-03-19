@@ -5,7 +5,7 @@ from typing import Callable, Tuple
 
 import torch
 from pyknos.nflows import distributions as distributions_
-from torch.distributions import Distribution, MultivariateNormal
+from torch.distributions import Distribution, MultivariateNormal, Uniform
 
 import sbi.simulators as simulators
 import sbi.utils as utils
@@ -13,22 +13,23 @@ from sbi.utils.torchutils import BoxUniform
 
 
 def set_simulator_attributes(
-    simulator_fun: Callable, prior: Distribution, name=None
+    simulator_fun: Callable, prior: Distribution, observed_data: torch.Tensor, name=None
 ) -> Callable:
     """Add name and input and output dimension as attributes to the simulator function.
     
     Arguments:
         simulator_fun {Callable} -- simulator function taking parameters as input
         prior {torch.distributions.Distribution} -- prior as pytorch distributions object
+        observed_data {torch.Tensor} -- Observed data points, x0
     
     Keyword Arguments:
-        name {[type]} -- name of the simulator, if None take __name__ (default: {None})
+        name {Optional(str)} -- name of the simulator, if None take __name__ (default: {None})
     
     Returns:
         Callable -- simualtor function with attributes name, parameter_dim, observation_dim.
     """
 
-    parameter_dim, observation_dim = get_simulator_dimensions(simulator_fun, prior)
+    parameter_dim, observation_dim = get_simulator_dimensions(prior, observed_data)
     if name is None:
         name = simulator_fun.__name__
 
@@ -39,26 +40,52 @@ def set_simulator_attributes(
     return simulator_fun
 
 
-def get_simulator_dimensions(simulator_fun, prior: Distribution) -> Tuple[int, int]:
-    """Infer simulator input output dimension from prior and simulating once. 
+def check_prior_and_data_dimensions(prior: Distribution, observed_data: torch.Tensor):
+    """Check prior event shape and data dimensionality and warn. 
     
     Arguments:
-        simulator_fun {function} -- simulator function taking parameter batch as only argument, return data. 
-        parameter_sample_fun {function} -- prior function with kwarg 'num_samples'.
+        prior {Distribution} -- [description]
+        observed_data {torch.Tensor} -- [description]
+
+    Raises: 
+        warning if prior is Uniform and dim input > 1. 
+        warning if observed data is multidimensional.
+    """
+
+    # infer parameter dim by simulating once
+    dim_input = prior.sample().numel()
+
+    if isinstance(prior, Uniform) and dim_input > 1:
+        warnings.warn(
+            f"The paramerer dim {dim_input}>1 and you are using a PyTorch Uniform prior, "
+            "which means that you implicitly are using a batch_shape of {dim_input} and event shape 1. "
+            "Consider using a BoxUniform prior instead."
+        )
+
+    if observed_data.squeeze().ndim > 1:
+        warnings.warn(
+            "Your are passing multidimensional observed data. Currenlty SBI supports only single observed data points."
+        )
+
+
+def get_simulator_dimensions(
+    prior: Distribution, observed_data: torch.Tensor
+) -> Tuple[int, int]:
+    """Return simulator input output dimension from prior and observed data. 
+    
+    Arguments:
+        prior {Distribution} -- pytorch prior distribution with event and batch shapes
+        observed_data {torch.Tensor} -- Observed data point, x0
     
     Returns:
-        dim_input [int] -- input dimension of simulator, i.e., parameter vector dimension.
+        dim_input [int] -- input dimension of simulator, i.e., parameter vector dimension, event shape.
         dim_output [int] -- output dimension of simualtor, i.e., dimension of data or summary stats.
     """
-    # sample from prior to get parameter dimension
-    # XXX: use prior.event_shape here
-    param = prior.sample()
-    dim_input = param.shape[0]
+    # infer parameter dim by simulating once
+    dim_input = prior.sample().numel()
 
-    # simulate once to get simulator output dimension
-    # XXX: use true_observation here
-    data = simulator_fun(param)
-    dim_output = data.shape[0]
+    # infer data dimension from observed data
+    dim_output = observed_data.numel()
 
     return dim_input, dim_output
 
