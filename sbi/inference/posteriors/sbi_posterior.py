@@ -281,20 +281,18 @@ class Posterior:
         if num_chains is None:
             num_chains = mp.cpu_count - 1
 
-        # XXX Move this out of the function, or remember to return to train mode
+        # XXX move outside function, and assert inside; remember return to train
         # Always sample in eval mode.
         self.neural_net.eval()
 
-        if mcmc_method == "slice":
-            kernel = Slice(potential_fn=potential_function)
-        elif mcmc_method == "hmc":
-            kernel = HMC(potential_fn=potential_function)
-        elif mcmc_method == "nuts":
-            kernel = NUTS(potential_fn=potential_function)
-        else:
-            raise ValueError("`mcmc_method` must be one of 'slice', 'hmc', 'nuts'].")
+        kernels = dict(slice=Slice, hmc=HMC, nuts=NUTS)
+        try:
+            kernel = kernels[mcmc_method](potential_fn=potential_function)
+        except KeyError:
+            raise ValueError("`mcmc_method` not one of 'slice', 'hmc', 'nuts'.")
 
         initial_params = self._prior.sample((num_chains,))
+
         sampler = MCMC(
             kernel=kernel,
             num_samples=(thin * num_samples) // num_chains + num_chains,
