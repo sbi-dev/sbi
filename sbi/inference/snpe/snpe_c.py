@@ -6,7 +6,6 @@ from torch.utils.tensorboard import SummaryWriter
 
 import sbi.utils as utils
 from sbi.inference.snpe.snpe_base import SnpeBase
-from sbi.simulators.simutils import set_simulator_attributes
 
 
 class SnpeC(SnpeBase):

@@ -15,8 +15,11 @@ from tqdm import tqdm
 import sbi.simulators as simulators
 import sbi.utils as utils
 from sbi.inference.posteriors.sbi_posterior import Posterior
-from sbi.utils.torchutils import get_default_device, check_prior_event_shape
-from sbi.simulators.simutils import set_simulator_attributes
+from sbi.utils.torchutils import get_default_device
+from sbi.simulators.simutils import (
+    set_simulator_attributes,
+    check_prior_and_data_dimensions,
+)
 
 
 class SnpeBase:
@@ -68,12 +71,9 @@ class SnpeBase:
                 If None, will infer it
         """
 
-        # XXX: first check the prior by asserting batch_dim == 1, then set sim attrs
-        self._simulator = set_simulator_attributes(simulator, prior)
-        # XXX: where do we need the simulator attrs? can those be class attributes?
-        self._prior = check_prior_event_shape(
-            prior, event_shape=simulator.parameter_dim
-        )
+        check_prior_and_data_dimensions(prior, true_observation)
+        self._simulator = set_simulator_attributes(simulator, prior, true_observation)
+        self._prior = prior
         self._true_observation = true_observation
         self._device = get_default_device() if device is None else device
         self.z_score_obs = z_score_obs

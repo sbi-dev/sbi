@@ -17,7 +17,10 @@ import sbi.simulators as simulators
 import sbi.utils as utils
 from sbi.inference.posteriors.sbi_posterior import Posterior
 from sbi.mcmc import Slice, SliceSampler
-from sbi.simulators.simutils import set_simulator_attributes
+from sbi.simulators.simutils import (
+    set_simulator_attributes,
+    check_prior_and_data_dimensions,
+)
 from sbi.utils.torchutils import get_default_device
 
 
@@ -66,8 +69,9 @@ class SRE:
             If None, will infer it
         """
 
+        check_prior_and_data_dimensions(prior, true_observation)
         # set name and dimensions of simulator
-        simulator = set_simulator_attributes(simulator, prior)
+        simulator = set_simulator_attributes(simulator, prior, true_observation)
 
         self._simulator = simulator
         self._true_observation = true_observation
