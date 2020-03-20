@@ -1,6 +1,6 @@
 """Various PyTorch utility functions."""
 
-from typing import Union
+from typing import Union, List
 import numpy as np
 import torch
 from torch.distributions import Distribution, Independent, Uniform
@@ -220,13 +220,14 @@ def make_conform(target: torch.Tensor, ref: torch.Tensor) -> torch.Tensor:
     return target.unsqueeze(0) if dim_gap else target
 
 
-# XXX get return type right
-def atleast_2d(*arys: Union[np.array, torch.Tensor]):
+def atleast_2d(
+    *arys: Union[np.array, torch.Tensor]
+) -> Union[torch.Tensor, List[torch.Tensor]]:
     if len(arys) == 1:
         arr = arys[0]
         if isinstance(arr, np.ndarray):
             arr = torch.from_numpy(arr)
         return arr if arr.ndim >= 2 else arr.reshape(1, -1)
     else:
-        return map(atleast_2d, arys)
+        return [atleast_2d(arr) for arr in arys]
 
