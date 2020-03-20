@@ -76,6 +76,7 @@ class SnpeBase:
                 If None, will infer it
         """
 
+        true_observation = utils.torchutils.atleast_2d(true_observation)
         check_prior_and_data_dimensions(prior, true_observation)
         self._simulator = set_simulator_attributes(simulator, prior, true_observation)
         self._prior = prior
@@ -532,7 +533,7 @@ class PotentialFunctionProvider:
         log_prob_posterior = -self.posterior_nn.log_prob(
             inputs=parameter, context=self.observation,
         )
-        log_prob_prior = self.prior.log_prob(parameters)
+        log_prob_prior = self.prior.log_prob(parameter)
 
         within_prior = torch.isfinite(log_prob_prior)
 

@@ -11,7 +11,7 @@ from sbi.simulators.linear_gaussian import (
     linear_gaussian,
 )
 
-torch.manual_seed(0)
+torch.manual_seed(1)
 
 
 # running all combinations is excessive. The standard test is (3, "gaussian", "snpe_c"),
@@ -28,7 +28,7 @@ torch.manual_seed(0)
 def test_apt_on_linearGaussian_based_on_mmd(num_dim: int, prior_str: str, algorithm_str: str):
     """Test whether APT infers well a simple example where ground truth is available."""
 
-    true_observation = torch.zeros((1, num_dim))
+    true_observation = torch.zeros(num_dim)
     num_samples = 100
 
     if prior_str == "gaussian":
@@ -161,6 +161,7 @@ def test_multi_round_snpe_on_linearGaussian_based_on_mmd(algorithm_str: str):
 
 
 # testing rejction and mcmc sampling methods
+@pytest.mark.slow
 @pytest.mark.parametrize(
     "train_with_mcmc, mcmc_method, prior",
     (

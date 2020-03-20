@@ -45,18 +45,19 @@ def test_sre_on_linearGaussian_api(num_dim: int):
         prior=prior,
         true_observation=true_observation,
         classifier=classifier,
-        mcmc_method="slice",
+        mcmc_method="slice-np",
     )
 
     # run inference
     posterior = inference_method(num_rounds=1, num_simulations_per_round=1000)
 
     # draw samples from posterior
-    samples = posterior.sample(num_samples=10)
+    samples = posterior.sample(num_samples=10, num_chains=2)
 
     # XXX log_prob is not implemented yet for SRE
     # log_probs = posterior.log_prob(samples)
 
+test_sre_on_linearGaussian_api(3)
 
 @pytest.mark.slow
 @pytest.mark.parametrize("num_dim", [1, 3])

@@ -190,10 +190,11 @@ def simulation_wrapper_batch(
         # run simulator
         # if case is needed due to different behavior of simulation_batch_size == 1 and
         # simulation_batch_size > 1. See docstring.
-        if simulation_batch_size > 1:
-            x = simulator(parameters[n_accepted:n_accepted + n_batch])
-        else:
-            x = simulator(parameters[n_accepted])[None, ]
+        with torch.no_grad():
+            if simulation_batch_size > 1:
+                x = simulator(parameters[n_accepted:n_accepted + n_batch])
+            else:
+                x = simulator(parameters[n_accepted])[None, ]
 
         # add simulations to database of simulations. If simulator output x is torch.Tensor,
         # it automatically gets converted to a np.array here.

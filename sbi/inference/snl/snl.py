@@ -23,7 +23,7 @@ from sbi.simulators.simutils import (
     set_simulator_attributes,
     check_prior_and_data_dimensions,
 )
-from sbi.utils.torchutils import get_default_device, make_conform
+from sbi.utils.torchutils import get_default_device, make_shapes_conform
 
 
 class SNL:
@@ -68,6 +68,7 @@ class SNL:
             If None, will infer it
         """
 
+        true_observation = utils.torchutils.atleast_2d(true_observation)
         check_prior_and_data_dimensions(prior, true_observation)
         # set name and dimensions of simulator
         simulator = set_simulator_attributes(simulator, prior, true_observation)
@@ -389,7 +390,7 @@ class PotentialFunctionProvider:
         parameter = next(iter(parameters.values()))
 
         # => ensure observation's shape conforms with parameter's for cat below
-        observation = make_conform(self.observation, parameter)
+        observation = make_shapes_conform(self.observation, parameter)
 
         log_likelihood = self.likelihood_nn.log_prob(
             inputs=observation.reshape(1, -1), context=parameter.reshape(1, -1)

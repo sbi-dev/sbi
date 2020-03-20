@@ -21,7 +21,7 @@ from sbi.simulators.simutils import (
     set_simulator_attributes,
     check_prior_and_data_dimensions,
 )
-from sbi.utils.torchutils import get_default_device, make_conform
+from sbi.utils.torchutils import get_default_device, make_shapes_conform
 
 
 class SRE:
@@ -74,6 +74,7 @@ class SRE:
             If None, will infer it
         """
 
+        true_observation = utils.torchutils.atleast_2d(true_observation)
         check_prior_and_data_dimensions(prior, true_observation)
         # set name and dimensions of simulator
         simulator = set_simulator_attributes(simulator, prior, true_observation)
@@ -425,6 +426,13 @@ class PotentialFunctionProvider:
         """
         parameters = torch.FloatTensor(parameters)
 
+        if parameters.ndim == 1:
+            parameters = parameters.unsqueeze(0)
+        # => ensure observation has shape (1, dim_x). We also need the first check
+        # in case self.observation is e.g. an image
+        if self.observation.shape[0] > 1 and self.observation.ndim == 1:
+            self.observation = self.observation.unsqueeze(0)
+
         log_ratio = self.classifier(
             torch.cat((parameters, self.observation)).reshape(1, -1)
         )
@@ -444,9 +452,14 @@ class PotentialFunctionProvider:
 
         parameter = next(iter(parameters.values()))
 
-        # => ensure observation's shape conforms with parameter's for cat below
-        observation = make_conform(self.observation, parameter)
+        # => ensure parameters have shape (1, dim_theta)
+        if parameter.ndim == 1:
+            parameter = parameter.unsqueeze(0)
+        # => ensure observation has shape (1, dim_x). We also need the first check
+        # in case self.observation is e.g. an image
+        if self.observation.shape[0] > 1 and self.observation.ndim == 1:
+            self.observation = self.observation.unsqueeze(0)
 
-        log_ratio = self.classifier(torch.cat((parameter, observation)).reshape(1, -1))
+        log_ratio = self.classifier(torch.cat((parameter, self.observation)).reshape(1, -1))
 
         return -(log_ratio + self.prior.log_prob(parameter))

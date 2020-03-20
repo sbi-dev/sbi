@@ -41,18 +41,19 @@ def test_snl_on_linearGaussian_api(num_dim: int):
         prior=prior,
         true_observation=true_observation,
         density_estimator=neural_likelihood,
-        mcmc_method="slice-np",
+        mcmc_method="nuts",
     )
 
     # run inference
     posterior = inference_method(num_rounds=1, num_simulations_per_round=1000)
 
     # draw samples from posterior
-    samples = posterior.sample(num_samples=num_samples)
+    samples = posterior.sample(num_samples=num_samples, num_chains=1)
 
     # test eval
     log_probs = posterior.log_prob(samples)
 
+test_snl_on_linearGaussian_api(3)
 
 @pytest.mark.slow
 @pytest.mark.parametrize("num_dim", (1, 3))
