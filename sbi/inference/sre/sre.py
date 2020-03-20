@@ -40,6 +40,7 @@ class SRE:
         true_observation,
         classifier,
         num_atoms=-1,
+        simulation_batch_size: int = 50,
         mcmc_method="slice-np",
         summary_net=None,
         retrain_from_scratch_each_round=False,
@@ -57,6 +58,10 @@ class SRE:
         :param num_atoms: int
             Number of atoms to use for classification.
             If -1, use all other parameters in minibatch.
+        simulation_batch_size (int): how many parameter sets the simulator takes and converts to data x at
+                the same time. If simulation_batch_size==-1, we simulate ALL parameter sets at the same time.
+                If simulation_batch_size==1, the simulator has to process data of shape (num_dim).
+                If simulation_batch_size>1, the simulator has to process data of shape (simulation_batch_size, num_dim).
         :param summary_net: Optional network which may be used to produce feature vectors
         f(x) for high-dimensional observations.
         :param retrain_from_scratch_each_round: Whether to retrain the conditional density
@@ -76,6 +81,7 @@ class SRE:
         self._simulator = simulator
         self._true_observation = true_observation
         self._prior = prior
+        self._simulation_batch_size = simulation_batch_size
         self._device = get_default_device() if device is None else device
 
         assert isinstance(num_atoms, int), "Number of atoms must be an integer."
@@ -159,20 +165,24 @@ class SRE:
             # Generate parameters from prior in first round, and from most recent posterior
             # estimate in subsequent rounds.
             if round_ == 0:
-                parameters, observations = simulators.simulation_wrapper(
+                parameters, observations = simulators.simulation_wrapper_batch(
                     simulator=self._simulator,
                     parameter_sample_fn=lambda num_samples: self._prior.sample(
                         (num_samples,)
                     ),
                     num_samples=num_simulations_per_round,
+                    simulation_batch_size=self._simulation_batch_size,
+                    x_dim=self._true_observation.shape[1:]  # do not pass batch_dim
                 )
             else:
-                parameters, observations = simulators.simulation_wrapper(
+                parameters, observations = simulators.simulation_wrapper_batch(
                     simulator=self._simulator,
                     parameter_sample_fn=lambda num_samples: self._neural_posterior.sample(
                         num_samples
                     ),
                     num_samples=num_simulations_per_round,
+                    simulation_batch_size=self._simulation_batch_size,
+                    x_dim=self._true_observation.shape[1:]  # do not pass batch_dim
                 )
 
             # Store (parameter, observation) pairs.

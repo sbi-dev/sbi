@@ -112,7 +112,7 @@ def get_simulator_name(simulator_fun, name=None) -> str:
         return name
 
 
-# XXX: do we actually need this wrapper?
+# TODO: deprecated, can be removed
 def simulation_wrapper(
     simulator: Callable, parameter_sample_fn: Callable, num_samples: int = 1
 ) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -139,10 +139,15 @@ def simulation_wrapper_batch(
         simulator: Callable,
         parameter_sample_fn: Callable,
         num_samples: int,
-        simulation_batch_size: int):
+        simulation_batch_size: int,
+        x_dim: torch.Size
+):
     """
     Runs simulations in a loop. Each loop simulates simulation_batch_size parameter sets until
-    a total of num_samples is reached
+    a total of num_samples is reached.
+    Features: - allows to simulate in batches of arbitrary size
+              - if simulation_batch_size==-1, all simulations are run at the same time
+              - simulator output can be list, np.array, or torch.Tensor
 
     Args:
         simulator: Simulator function.
@@ -155,11 +160,10 @@ def simulation_wrapper_batch(
         simulation_batch_size: Number of simulations that are run within a single batch
             If simulation_batch_size == -1, we run a batch with all simulations required,
             i.e. simulation_batch_size = num_samples
+        x_dim: dimensionality of a single simulator output
 
     Returns: torch.Tensor parameters theta, torch.Tensor simulated data x
     """
-
-    # todo: use function in SNL and SRE
 
     # generate theta by sampling from prior (round 1) or proposal (round > 1)
     parameters = parameter_sample_fn(num_samples)
@@ -168,18 +172,14 @@ def simulation_wrapper_batch(
     if simulation_batch_size == -1:
         simulation_batch_size = num_samples
 
-    # we run the simulator once so we know the shape of x
-    n_batch = min(simulation_batch_size, num_samples, )
-    # if case is needed due to different behavior of simulation_batch_size == 1 and
-    # simulation_batch_size > 1. See docstring
-    if simulation_batch_size > 1:
-        all_x = simulator(parameters[:n_batch])
-    else:
-        # Append a dimension to make output shape (1, num_dim_x) instead of just (num_dim_x)
-        all_x = simulator(parameters[0])[None, ]
+    # initialize an empty array that stores the simulation outputs
+    # I opted to use numpy here since torch.Tensors are automatically converted to numpy,
+    # but np.arrays are not automatically converted to torch.Tensors
+    all_x_shape = np.concatenate((np.asarray([0], dtype=int), np.asarray(x_dim, dtype=int)))
+    all_x = np.empty(all_x_shape, dtype=np.float32)
 
     # count total number of simulations
-    n_accepted = n_batch
+    n_accepted = 0
 
     # loop over simulations # Todo: should we use jit here for speed-up?
     while n_accepted < num_samples:
@@ -189,13 +189,14 @@ def simulation_wrapper_batch(
 
         # run simulator
         # if case is needed due to different behavior of simulation_batch_size == 1 and
-        # simulation_batch_size > 1. See docstring
+        # simulation_batch_size > 1. See docstring.
         if simulation_batch_size > 1:
             x = simulator(parameters[n_accepted:n_accepted + n_batch])
         else:
             x = simulator(parameters[n_accepted])[None, ]
 
-        # add simulations to database of simulations
+        # add simulations to database of simulations. If simulator output x is torch.Tensor,
+        # it automatically gets converted to a np.array here.
         all_x = np.concatenate((all_x, x), axis=0)
 
         n_accepted += simulation_batch_size

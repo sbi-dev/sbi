@@ -41,6 +41,7 @@ class SNL:
         prior: torch.distributions,
         true_observation: torch.Tensor,
         density_estimator: Optional[torch.nn.Module],
+        simulation_batch_size: int = 50,
         summary_writer: SummaryWriter = None,
         device: torch.device = None,
         mcmc_method: str = "slice-np",
@@ -53,6 +54,10 @@ class SNL:
         perform inference on the posterior p(theta | x0).
         :param neural_likelihood: Conditional density estimator q(x | theta) in the form of an
         nets.Module. Must have 'log_prob' and 'sample' methods.
+        simulation_batch_size (int): how many parameter sets the simulator takes and converts to data x at
+                the same time. If simulation_batch_size==-1, we simulate ALL parameter sets at the same time.
+                If simulation_batch_size==1, the simulator has to process data of shape (num_dim).
+                If simulation_batch_size>1, the simulator has to process data of shape (simulation_batch_size, num_dim).
         :param mcmc_method: MCMC method to use for posterior sampling. Must be one of
         ['slice', 'hmc', 'nuts'].
         :param summary_writer: SummaryWriter
@@ -70,6 +75,7 @@ class SNL:
         self._simulator = simulator
         self._prior = prior
         self._true_observation = true_observation
+        self._simulation_batch_size = simulation_batch_size
         self._device = get_default_device() if device is None else device
 
         # create the deep neural density estimator
@@ -136,20 +142,24 @@ class SNL:
             # Generate parameters from prior in first round, and from most recent posterior
             # estimate in subsequent rounds.
             if round_ == 0:
-                parameters, observations = simulators.simulation_wrapper(
+                parameters, observations = simulators.simulation_wrapper_batch(
                     simulator=self._simulator,
                     parameter_sample_fn=lambda num_samples: self._prior.sample(
                         (num_samples,)
                     ),
                     num_samples=num_simulations_per_round,
+                    simulation_batch_size=self._simulation_batch_size,
+                    x_dim=self._true_observation.shape[1:]  # do not pass batch_dim
                 )
             else:
-                parameters, observations = simulators.simulation_wrapper(
+                parameters, observations = simulators.simulation_wrapper_batch(
                     simulator=self._simulator,
                     parameter_sample_fn=lambda num_samples: self._neural_posterior.sample(
                         num_samples
                     ),
                     num_samples=num_simulations_per_round,
+                    simulation_batch_size=self._simulation_batch_size,
+                    x_dim=self._true_observation.shape[1:]  # do not pass batch_dim
                 )
 
             # Store (parameter, observation) pairs.
