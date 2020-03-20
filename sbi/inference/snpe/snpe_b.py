@@ -28,7 +28,7 @@ class SnpeB(SnpeBase):
         calibration_kernel=None,
         use_combined_loss=False,
         z_score_obs=True,
-        simulation_batch_size: int = 50,
+        simulation_batch_size: int = 1,
         retrain_from_scratch_each_round=False,
         discard_prior_samples=False,
         summary_writer=None,
@@ -95,7 +95,9 @@ class SnpeB(SnpeBase):
         batch_size = inputs.shape[0]
 
         # Evaluate posterior
-        log_prob_posterior = self._neural_posterior.log_prob(inputs, context, normalize_snpe=False)
+        log_prob_posterior = self._neural_posterior.log_prob(
+            inputs, context, normalize_snpe=False
+        )
         assert utils.notinfnotnan(
             log_prob_posterior
         ), "NaN/inf detected in posterior eval."
@@ -107,7 +109,9 @@ class SnpeB(SnpeBase):
         assert utils.notinfnotnan(log_prob_prior), "NaN/inf detected in prior eval."
 
         # evaluate proposal
-        log_prob_proposal = self._model_bank[-1].log_prob(inputs, context, normalize_snpe=False)
+        log_prob_proposal = self._model_bank[-1].log_prob(
+            inputs, context, normalize_snpe=False
+        )
         assert utils.notinfnotnan(
             log_prob_proposal
         ), "NaN/inf detected in proposal posterior eval."

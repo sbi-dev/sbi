@@ -41,7 +41,7 @@ class SNL:
         prior: torch.distributions,
         true_observation: torch.Tensor,
         density_estimator: Optional[torch.nn.Module],
-        simulation_batch_size: int = 50,
+        simulation_batch_size: int = 1,
         summary_writer: SummaryWriter = None,
         device: torch.device = None,
         mcmc_method: str = "slice-np",
@@ -150,7 +150,7 @@ class SNL:
                     ),
                     num_samples=num_simulations_per_round,
                     simulation_batch_size=self._simulation_batch_size,
-                    x_dim=self._true_observation.shape[1:]  # do not pass batch_dim
+                    x_dim=self._true_observation.shape[1:],  # do not pass batch_dim
                 )
             else:
                 parameters, observations = simulators.simulation_wrapper_batch(
@@ -160,7 +160,7 @@ class SNL:
                     ),
                     num_samples=num_simulations_per_round,
                     simulation_batch_size=self._simulation_batch_size,
-                    x_dim=self._true_observation.shape[1:]  # do not pass batch_dim
+                    x_dim=self._true_observation.shape[1:],  # do not pass batch_dim
                 )
 
             # Store (parameter, observation) pairs.
@@ -389,11 +389,8 @@ class PotentialFunctionProvider:
 
         parameter = next(iter(parameters.values()))
 
-        # => ensure observation's shape conforms with parameter's for cat below
-        observation = make_shapes_conform(self.observation, parameter)
-
         log_likelihood = self.likelihood_nn.log_prob(
-            inputs=observation.reshape(1, -1), context=parameter.reshape(1, -1)
+            inputs=self.observation.reshape(1, -1), context=parameter.reshape(1, -1)
         )
 
         return -(log_likelihood + self.prior.log_prob(parameter))

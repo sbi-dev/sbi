@@ -11,21 +11,24 @@ from sbi.simulators.linear_gaussian import (
     linear_gaussian,
 )
 
-torch.manual_seed(1)
+torch.manual_seed(0)
 
 
 # running all combinations is excessive. The standard test is (3, "gaussian", "snpe_c"),
 # and we then vary only one parameter at a time to test single-d, uniform, and snpe-b
 @pytest.mark.parametrize(
-    "num_dim, prior_str, algorithm_str",
+    "num_dim, prior_str, algorithm_str, simulation_batch_size",
     (
-        (3, "gaussian", "snpe_c"),
-        (1, "gaussian", "snpe_c"),
-        (3, "uniform",  "snpe_c"),
-        (3, "gaussian", "snpe_b"),
+        (3, "gaussian", "snpe_c", 10),
+        (1, "gaussian", "snpe_c", 10),
+        (3, "uniform", "snpe_c", 10),
+        (3, "gaussian", "snpe_b", 10),
+        (3, "gaussian", "snpe_c", 1),
     ),
 )
-def test_apt_on_linearGaussian_based_on_mmd(num_dim: int, prior_str: str, algorithm_str: str):
+def test_apt_on_linearGaussian_based_on_mmd(
+    num_dim: int, prior_str: str, algorithm_str: str, simulation_batch_size: int
+):
     """Test whether APT infers well a simple example where ground truth is available."""
 
     true_observation = torch.zeros(num_dim)
@@ -53,6 +56,7 @@ def test_apt_on_linearGaussian_based_on_mmd(num_dim: int, prior_str: str, algori
             density_estimator=neural_net,
             prior=prior,
             z_score_obs=True,
+            simulation_batch_size=simulation_batch_size,
             use_combined_loss=False,
             retrain_from_scratch_each_round=False,
             discard_prior_samples=False,
@@ -65,7 +69,7 @@ def test_apt_on_linearGaussian_based_on_mmd(num_dim: int, prior_str: str, algori
             prior=prior,
             num_atoms=-1,
             z_score_obs=True,
-            simulation_batch_size=10,
+            simulation_batch_size=simulation_batch_size,
             use_combined_loss=False,
             retrain_from_scratch_each_round=False,
             discard_prior_samples=False,
@@ -85,7 +89,7 @@ def test_apt_on_linearGaussian_based_on_mmd(num_dim: int, prior_str: str, algori
     mmd = utils.unbiased_mmd_squared(target_samples, samples)
 
     # check if mmd is larger than expected
-    max_mmd = 0.02
+    max_mmd = 0.03
 
     print("mmd for apt is:  ", mmd)
 
@@ -120,6 +124,7 @@ def test_multi_round_snpe_on_linearGaussian_based_on_mmd(algorithm_str: str):
             density_estimator=neural_net,
             prior=prior,
             z_score_obs=True,
+            simulation_batch_size=10,
             use_combined_loss=False,
             retrain_from_scratch_each_round=False,
             discard_prior_samples=False,
@@ -132,6 +137,7 @@ def test_multi_round_snpe_on_linearGaussian_based_on_mmd(algorithm_str: str):
             prior=prior,
             num_atoms=10,
             z_score_obs=True,
+            simulation_batch_size=50,
             use_combined_loss=False,
             retrain_from_scratch_each_round=False,
             discard_prior_samples=False,
@@ -197,6 +203,7 @@ def test_apt_posterior_correction(train_with_mcmc, mcmc_method, prior):
         prior=prior,
         num_atoms=-1,
         z_score_obs=True,
+        simulation_batch_size=50,
         use_combined_loss=False,
         retrain_from_scratch_each_round=False,
         discard_prior_samples=False,

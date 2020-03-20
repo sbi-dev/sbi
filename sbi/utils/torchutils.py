@@ -208,23 +208,22 @@ class BoxUniform(Independent):
 
 
 # XXX does an in-place version (e.g. make_conform_) make sense?
-def make_shapes_conform(target: torch.Tensor, ref: torch.Tensor) -> (torch.Tensor, torch.Tensor):
+def make_shapes_conform(parameter: torch.Tensor, observation: torch.Tensor) -> (torch.Tensor, torch.Tensor):
     """
     Return tensors that both have the same tensor.ndim
-    The current version of this function will be problematic if data has multiple dimensions, e.g. images.
+    Function now also covers cases where parameters is ndim=1 and observation ndim=2
+    Also, we have specialized check for multi-dimensional data x, e.g. images.
     """
 
-    dim_gap = ref.ndim - target.ndim
+    # => ensure parameters have shape (1, dim_theta)
+    if parameter.ndim == 1:
+        parameter = parameter.unsqueeze(0)
+    # => ensure observation has shape (1, dim_x). We also need the first check
+    # in case self.observation is e.g. an image
+    if observation.shape[0] > 1 and observation.ndim == 1:
+        observation = observation.unsqueeze(0)
 
-    if dim_gap == 0:
-        return ref, target
-    if dim_gap == 1:
-        return ref, target.unsqueeze(0)
-    if dim_gap == -1:
-        return ref.unsqueeze(0), target
-    else:
-        raise NotImplementedError("Dimensions differ by more than 1.")
-
+    return parameter, observation
 
 
 def atleast_2d(

@@ -41,7 +41,8 @@ def test_snl_on_linearGaussian_api(num_dim: int):
         prior=prior,
         true_observation=true_observation,
         density_estimator=neural_likelihood,
-        mcmc_method="nuts",
+        simulation_batch_size=50,
+        mcmc_method="slice-np",
     )
 
     # run inference
@@ -53,7 +54,6 @@ def test_snl_on_linearGaussian_api(num_dim: int):
     # test eval
     log_probs = posterior.log_prob(samples)
 
-test_snl_on_linearGaussian_api(3)
 
 @pytest.mark.slow
 @pytest.mark.parametrize("num_dim", (1, 3))
@@ -68,7 +68,7 @@ def test_snl_on_linearGaussian_based_on_mmd(num_dim: int, prior_str: str):
     """
 
     true_observation = torch.zeros((1, num_dim))
-    num_samples = 1000
+    num_samples = 200
 
     if prior_str == "gaussian":
         prior = distributions.MultivariateNormal(
@@ -113,3 +113,109 @@ def test_snl_on_linearGaussian_based_on_mmd(num_dim: int, prior_str: str):
     assert (
         mmd < max_mmd
     ), f"MMD={mmd} is more than 2 stds above the average performance."
+
+
+@pytest.mark.slow
+def test_multi_round_snl_on_linearGaussian_based_on_mmd():
+    """Test snl inference on linear Gaussian via mmd to ground truth posterior.
+
+    NOTE: The mmd threshold is calculated based on a number of test runs and taking the mean plus 2 stds.
+
+    Keyword Arguments:
+        num_dim {int} -- Parameter dimension of the gaussian model. (default: {3})
+    """
+
+    num_dim = 3
+    true_observation = torch.zeros((1, num_dim))
+    num_samples = 200
+
+    prior = distributions.MultivariateNormal(
+        loc=torch.zeros(num_dim), covariance_matrix=torch.eye(num_dim)
+    )
+    target_samples = get_true_posterior_samples_linear_gaussian_mvn_prior(
+        true_observation, num_samples=num_samples
+    )
+
+    # get neural likelihood
+    neural_likelihood = utils.likelihood_nn(
+        model="maf", prior=prior, context=true_observation,
+    )
+
+    # create inference method
+    inference_method = SNL(
+        simulator=linear_gaussian,
+        prior=prior,
+        true_observation=true_observation,
+        density_estimator=neural_likelihood,
+        simulation_batch_size=50,
+        mcmc_method="slice",
+    )
+
+    # run inference
+    posterior = inference_method(num_rounds=2, num_simulations_per_round=1000)
+
+    # draw samples from posterior
+    samples = posterior.sample(num_samples=500)
+
+    # compute the mmd
+    mmd = utils.unbiased_mmd_squared(target_samples, samples)
+
+    # check if mmd is larger than expected
+    # NOTE: the mmd is calculated based on a number of test runs
+    max_mmd = 0.02
+
+    assert (
+        mmd < max_mmd
+    ), f"MMD={mmd} is more than 2 stds above the average performance."
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize(
+    "mcmc_method, prior_str",
+    (
+        ("slice-np", "gaussian"),
+        ("slice-np", "uniform"),
+        ("slice", "gaussian"),
+        ("slice", "uniform"),
+    ),
+)
+def test_snl_posterior_correction(mcmc_method, prior_str):
+    """Test snl inference on linear Gaussian via mmd to ground truth posterior.
+
+        NOTE: The mmd threshold is calculated based on a number of test runs and taking the mean plus 2 stds.
+
+        Keyword Arguments:
+            num_dim {int} -- Parameter dimension of the gaussian model. (default: {3})
+        """
+
+    num_dim = 2
+    num_samples = 30
+    true_observation = torch.zeros((1, num_dim))
+
+    if prior_str == "gaussian":
+        prior = distributions.MultivariateNormal(
+            loc=torch.zeros(num_dim), covariance_matrix=torch.eye(num_dim)
+        )
+    else:
+        prior = utils.BoxUniform(-1.0 * torch.ones(num_dim), torch.ones(num_dim))
+
+    # get neural likelihood
+    neural_likelihood = utils.likelihood_nn(
+        model="maf", prior=prior, context=true_observation,
+    )
+
+    # create inference method
+    inference_method = SNL(
+        simulator=linear_gaussian,
+        prior=prior,
+        true_observation=true_observation,
+        density_estimator=neural_likelihood,
+        simulation_batch_size=50,
+        mcmc_method="slice-np",
+    )
+
+    # run inference
+    posterior = inference_method(num_rounds=1, num_simulations_per_round=1000)
+
+    # draw samples from posterior
+    samples = posterior.sample(num_samples=num_samples)

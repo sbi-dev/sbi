@@ -69,7 +69,7 @@ def check_prior_and_data_dimensions(prior: Distribution, observed_data: torch.Te
     if observed_data.squeeze().ndim > 1:
         warnings.warn(
             "The `true_observation` Tensor has more than one dimension, i.e., it is a matrix "
-            "of observed data or batch of observed data points. " 
+            "of observed data or batch of observed data points. "
             "SBI supports only single observed data points."
         )
 
@@ -136,11 +136,11 @@ def simulation_wrapper(
 
 
 def simulation_wrapper_batch(
-        simulator: Callable,
-        parameter_sample_fn: Callable,
-        num_samples: int,
-        simulation_batch_size: int,
-        x_dim: torch.Size
+    simulator: Callable,
+    parameter_sample_fn: Callable,
+    num_samples: int,
+    simulation_batch_size: int,
+    x_dim: torch.Size,
 ):
     """
     Runs simulations in a loop. Each loop simulates simulation_batch_size parameter sets until
@@ -175,7 +175,9 @@ def simulation_wrapper_batch(
     # initialize an empty array that stores the simulation outputs
     # I opted to use numpy here since torch.Tensors are automatically converted to numpy,
     # but np.arrays are not automatically converted to torch.Tensors
-    all_x_shape = np.concatenate((np.asarray([0], dtype=int), np.asarray(x_dim, dtype=int)))
+    all_x_shape = np.concatenate(
+        (np.asarray([0], dtype=int), np.asarray(x_dim, dtype=int))
+    )
     all_x = np.empty(all_x_shape, dtype=np.float32)
 
     # count total number of simulations
@@ -185,16 +187,20 @@ def simulation_wrapper_batch(
     while n_accepted < num_samples:
 
         # make sure batch size doesn't exceed number of total simulations
-        n_batch = min(simulation_batch_size, num_samples - n_accepted, )
+        n_batch = min(simulation_batch_size, num_samples - n_accepted,)
 
         # run simulator
         # if case is needed due to different behavior of simulation_batch_size == 1 and
         # simulation_batch_size > 1. See docstring.
         with torch.no_grad():
             if simulation_batch_size > 1:
-                x = simulator(parameters[n_accepted:n_accepted + n_batch])
+                x = simulator(parameters[n_accepted : n_accepted + n_batch])
             else:
-                x = simulator(parameters[n_accepted])[None, ]
+                # squeeze in case simulator provides an additional dimension for single parameters,
+                # e.g. in linearGaussian example. Then append a dimension to be able to concatenate.
+                x = np.squeeze(simulator(parameters[n_accepted]))[
+                    None,
+                ]
 
         # add simulations to database of simulations. If simulator output x is torch.Tensor,
         # it automatically gets converted to a np.array here.

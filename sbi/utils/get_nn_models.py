@@ -25,7 +25,10 @@ def posterior_nn(
     observation_dim = torch.tensor([context.shape[1:]])
 
     if model == "mdn":
-        raise NameError('MDN needs to be updated with embedding_net to work.')
+        raise NameError(
+            "MDN needs to be updated with embedding_net to work."
+            " Problem is that the input shape will be (num_dim) instead of just an integer value"
+        )
         hidden_features = 50
         neural_net = MultivariateGaussianMDN(
             features=parameter_dim,

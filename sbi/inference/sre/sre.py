@@ -40,7 +40,7 @@ class SRE:
         true_observation,
         classifier,
         num_atoms=-1,
-        simulation_batch_size: int = 50,
+        simulation_batch_size: int = 1,
         mcmc_method="slice-np",
         summary_net=None,
         retrain_from_scratch_each_round=False,
@@ -173,7 +173,7 @@ class SRE:
                     ),
                     num_samples=num_simulations_per_round,
                     simulation_batch_size=self._simulation_batch_size,
-                    x_dim=self._true_observation.shape[1:]  # do not pass batch_dim
+                    x_dim=self._true_observation.shape[1:],  # do not pass batch_dim
                 )
             else:
                 parameters, observations = simulators.simulation_wrapper_batch(
@@ -183,7 +183,7 @@ class SRE:
                     ),
                     num_samples=num_simulations_per_round,
                     simulation_batch_size=self._simulation_batch_size,
-                    x_dim=self._true_observation.shape[1:]  # do not pass batch_dim
+                    x_dim=self._true_observation.shape[1:],  # do not pass batch_dim
                 )
 
             # Store (parameter, observation) pairs.
@@ -424,21 +424,15 @@ class PotentialFunctionProvider:
         Returns:
             [tensor or -inf]: posterior log probability of the parameters.
         """
-        parameters = torch.FloatTensor(parameters)
+        parameter = torch.FloatTensor(parameters)
 
-        if parameters.ndim == 1:
-            parameters = parameters.unsqueeze(0)
-        # => ensure observation has shape (1, dim_x). We also need the first check
-        # in case self.observation is e.g. an image
-        if self.observation.shape[0] > 1 and self.observation.ndim == 1:
-            self.observation = self.observation.unsqueeze(0)
+        # parameter and observation should have shape (1, dim)
+        parameter, observation = make_shapes_conform(parameter, self.observation)
 
-        log_ratio = self.classifier(
-            torch.cat((parameters, self.observation)).reshape(1, -1)
-        )
+        log_ratio = self.classifier(torch.cat((parameter, observation)).reshape(1, -1))
 
         # notice opposite sign to pyro potential
-        return log_ratio + self.prior.log_prob(parameters)
+        return log_ratio + self.prior.log_prob(parameter)
 
     def pyro_potential(self, parameters: Dict[str, torch.Tensor]) -> torch.Tensor:
         """Return potential for Pyro sampler.
@@ -452,14 +446,9 @@ class PotentialFunctionProvider:
 
         parameter = next(iter(parameters.values()))
 
-        # => ensure parameters have shape (1, dim_theta)
-        if parameter.ndim == 1:
-            parameter = parameter.unsqueeze(0)
-        # => ensure observation has shape (1, dim_x). We also need the first check
-        # in case self.observation is e.g. an image
-        if self.observation.shape[0] > 1 and self.observation.ndim == 1:
-            self.observation = self.observation.unsqueeze(0)
+        # parameter and observation should have shape (1, dim)
+        parameter, observation = make_shapes_conform(parameter, self.observation)
 
-        log_ratio = self.classifier(torch.cat((parameter, self.observation)).reshape(1, -1))
+        log_ratio = self.classifier(torch.cat((parameter, observation)).reshape(1, -1))
 
         return -(log_ratio + self.prior.log_prob(parameter))

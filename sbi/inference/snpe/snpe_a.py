@@ -27,7 +27,7 @@ class SnpeA(SnpeBase):
         density_estimator="maf",
         use_combined_loss=False,
         z_score_obs=True,
-        simulation_batch_size: int = 50,
+        simulation_batch_size: int = 1,
         retrain_from_scratch_each_round=False,
         discard_prior_samples=False,
         summary_writer=None,

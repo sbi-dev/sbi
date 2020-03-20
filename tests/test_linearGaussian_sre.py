@@ -45,6 +45,7 @@ def test_sre_on_linearGaussian_api(num_dim: int):
         prior=prior,
         true_observation=true_observation,
         classifier=classifier,
+        simulation_batch_size=50,
         mcmc_method="slice-np",
     )
 
@@ -57,7 +58,6 @@ def test_sre_on_linearGaussian_api(num_dim: int):
     # XXX log_prob is not implemented yet for SRE
     # log_probs = posterior.log_prob(samples)
 
-test_sre_on_linearGaussian_api(3)
 
 @pytest.mark.slow
 @pytest.mark.parametrize("num_dim", [1, 3])
@@ -73,7 +73,7 @@ def test_sre_on_linearGaussian_based_on_mmd(num_dim: int, prior_str: str):
     """
 
     true_observation = torch.zeros(num_dim)
-    num_samples = 1000
+    num_samples = 300
 
     if prior_str == "gaussian":
         prior = distributions.MultivariateNormal(
@@ -97,6 +97,7 @@ def test_sre_on_linearGaussian_based_on_mmd(num_dim: int, prior_str: str):
         prior=prior,
         true_observation=true_observation,
         classifier=classifier,
+        simulation_batch_size=50,
         mcmc_method="slice-np",
     )
 
@@ -151,6 +152,7 @@ def test_sre_posterior_correction(mcmc_method, prior):
         prior=prior,
         true_observation=true_observation,
         classifier=classifier,
+        simulation_batch_size=50,
         mcmc_method=mcmc_method,
     )
 
