@@ -65,6 +65,7 @@ def test_apt_on_linearGaussian_based_on_mmd(num_dim: int, prior_str: str, algori
             prior=prior,
             num_atoms=-1,
             z_score_obs=True,
+            simulation_batch_size=10,
             use_combined_loss=False,
             retrain_from_scratch_each_round=False,
             discard_prior_samples=False,

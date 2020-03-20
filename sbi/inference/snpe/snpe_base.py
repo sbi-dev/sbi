@@ -32,6 +32,7 @@ class SnpeBase:
         density_estimator=None,
         calibration_kernel=None,
         z_score_obs=True,
+        simulation_batch_size: int = 50,
         use_combined_loss=False,
         retrain_from_scratch_each_round=False,
         discard_prior_samples=False,
@@ -55,6 +56,10 @@ class SnpeBase:
                 Density estimator to use.
             z_score_obs: bool
                 Whether to z-score (=normalize) the data features x
+            simulation_batch_size (int): how many parameter sets the simulator takes and converts to data x at
+                the same time. If simulation_batch_size==-1, we simulate ALL parameter sets at the same time.
+                If simulation_batch_size==1, the simulator has to process data of shape (num_dim).
+                If simulation_batch_size>1, the simulator has to process data of shape (simulation_batch_size, num_dim).
             use_combined_loss: bool
                 Whether to jointly neural_net prior samples using maximum likelihood.
                 Useful to prevent density leaking when using box uniform priors.
@@ -77,6 +82,7 @@ class SnpeBase:
         self._true_observation = true_observation
         self._device = get_default_device() if device is None else device
         self.z_score_obs = z_score_obs
+        self._simulation_batch_size = simulation_batch_size
         self.num_pilot_samples = num_pilot_samples
         self._use_combined_loss = use_combined_loss
         self._discard_prior_samples = discard_prior_samples
@@ -86,10 +92,11 @@ class SnpeBase:
         self._retrain_from_scratch_each_round = retrain_from_scratch_each_round
 
         # run prior samples
-        self.pilot_parameters, self.pilot_observations = simulators.simulation_wrapper(
+        self.pilot_parameters, self.pilot_observations = simulators.simulation_wrapper_batch(
             simulator=self._simulator,
             parameter_sample_fn=lambda num_samples: self._prior.sample((num_samples,)),
             num_samples=num_pilot_samples,
+            simulation_batch_size=self._simulation_batch_size,
         )
 
         # create the deep neural density estimator
@@ -246,7 +253,7 @@ class SnpeBase:
         # Generate parameters from prior in first round, and from most recent posterior
         # estimate in subsequent rounds.
         if round_ == 0:
-            parameters, observations = simulators.simulation_wrapper(
+            parameters, observations = simulators.simulation_wrapper_batch(
                 simulator=self._simulator,
                 parameter_sample_fn=lambda num_samples: self._prior.sample(
                     (num_samples,)
@@ -254,6 +261,7 @@ class SnpeBase:
                 num_samples=np.maximum(
                     0, num_simulations_per_round - self.num_pilot_samples
                 ),
+                simulation_batch_size=self._simulation_batch_size,
             )
             parameters = torch.cat(
                 (parameters, self.pilot_parameters[:num_simulations_per_round]), dim=0
@@ -263,12 +271,13 @@ class SnpeBase:
                 dim=0,
             )
         else:
-            parameters, observations = simulators.simulation_wrapper(
+            parameters, observations = simulators.simulation_wrapper_batch(
                 simulator=self._simulator,
                 parameter_sample_fn=lambda num_samples: self._neural_posterior.sample(
                     num_samples, context=self._true_observation,
                 ),
                 num_samples=num_simulations_per_round,
+                simulation_batch_size=self._simulation_batch_size,
             )
 
         # Store (parameter, observation) pairs.

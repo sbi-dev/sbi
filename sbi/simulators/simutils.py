@@ -11,6 +11,7 @@ import sbi.simulators as simulators
 import sbi.utils as utils
 from sbi.utils.torchutils import BoxUniform
 import warnings
+import numpy as np
 
 
 def set_simulator_attributes(
@@ -115,12 +116,12 @@ def get_simulator_name(simulator_fun, name=None) -> str:
 def simulation_wrapper(
     simulator: Callable, parameter_sample_fn: Callable, num_samples: int = 1
 ) -> Tuple[torch.Tensor, torch.Tensor]:
-    """Return parameters and simulated data given a simulator and parameters. 
+    """Return parameters and simulated data given a simulator and parameters.
 
     Arguments:
-        simulator {Callable} -- simulator function taking parameters and returning data, 
-                                both as torch.Tensor 
-        parameter_sample_fn {Callable} -- prior function, wrapped such that it takes 
+        simulator {Callable} -- simulator function taking parameters and returning data,
+                                both as torch.Tensor
+        parameter_sample_fn {Callable} -- prior function, wrapped such that it takes
                                           int argument num_samples
 
     Keyword Arguments:
@@ -132,6 +133,79 @@ def simulation_wrapper(
     parameters = parameter_sample_fn(num_samples)
     observations = simulator(parameters)
     return parameters, observations
+
+
+def simulation_wrapper_batch(
+        simulator: Callable,
+        parameter_sample_fn: Callable,
+        num_samples: int,
+        simulation_batch_size: int):
+    """
+    Runs simulations in a loop. Each loop simulates simulation_batch_size parameter sets until
+    a total of num_samples is reached
+
+    Args:
+        simulator: Simulator function.
+            If simulation_batch_size == 1: takes in thetas of shape (num_dim_theta)
+                and outputs xs of shape (num_dim_x)
+            If simulation_batch_size > 1: takes in thetas of shape (simulation_batch_size, num_dim_theta)
+                and outputs xs of shape (simulation_batch_size, num_dim_x)
+        parameter_sample_fn: Function to call for generating theta, e.g. prior sampling
+        num_samples: Number of simulations to run
+        simulation_batch_size: Number of simulations that are run within a single batch
+            If simulation_batch_size == -1, we run a batch with all simulations required,
+            i.e. simulation_batch_size = num_samples
+
+    Returns: torch.Tensor parameters theta, torch.Tensor simulated data x
+    """
+
+    # todo: use function in SNL and SRE
+
+    # generate theta by sampling from prior (round 1) or proposal (round > 1)
+    parameters = parameter_sample_fn(num_samples)
+
+    # if simulation_batch_size == -1, we run all simulations in a single batch
+    if simulation_batch_size == -1:
+        simulation_batch_size = num_samples
+
+    # we run the simulator once so we know the shape of x
+    n_batch = min(simulation_batch_size, num_samples, )
+    # if case is needed due to different behavior of simulation_batch_size == 1 and
+    # simulation_batch_size > 1. See docstring
+    if simulation_batch_size > 1:
+        all_x = simulator(parameters[:n_batch])
+    else:
+        # Append a dimension to make output shape (1, num_dim_x) instead of just (num_dim_x)
+        all_x = simulator(parameters[0])[None, ]
+
+    # count total number of simulations
+    n_accepted = n_batch
+
+    # loop over simulations # Todo: should we use jit here for speed-up?
+    while n_accepted < num_samples:
+
+        # make sure batch size doesn't exceed number of total simulations
+        n_batch = min(simulation_batch_size, num_samples - n_accepted, )
+
+        # run simulator
+        # if case is needed due to different behavior of simulation_batch_size == 1 and
+        # simulation_batch_size > 1. See docstring
+        if simulation_batch_size > 1:
+            x = simulator(parameters[n_accepted:n_accepted + n_batch])
+        else:
+            x = simulator(parameters[n_accepted])[None, ]
+
+        # add simulations to database of simulations
+        all_x = np.concatenate((all_x, x), axis=0)
+
+        n_accepted += simulation_batch_size
+
+    # if simulation_batch_size >= num_samples, all_x might be a tensor already.
+    # In all other cases, it is a np.array, so we convert it to a tensor here.
+    if not isinstance(all_x, torch.Tensor):
+        all_x = torch.from_numpy(all_x)
+
+    return torch.tensor(parameters), all_x
 
 
 def get_simulator_prior_and_groundtruth(task):
