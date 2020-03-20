@@ -221,9 +221,11 @@ def make_conform(target: torch.Tensor, ref: torch.Tensor) -> torch.Tensor:
 
 
 # XXX get return type right
-def atleast_2d(*arys: Union[np.array, Torch.Tensor]):
+def atleast_2d(*arys: Union[np.array, torch.Tensor]):
     if len(arys) == 1:
-        arr = torch.tensor(arys[0])
+        arr = arys[0]
+        if isinstance(arr, np.ndarray):
+            arr = torch.from_numpy(arr)
         return arr if arr.ndim >= 2 else arr.reshape(1, -1)
     else:
         return map(atleast_2d, arys)

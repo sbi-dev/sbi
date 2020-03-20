@@ -1,5 +1,6 @@
 """Tests for the PyTorch utility functions."""
 
+import numpy as np
 import torch
 import torchtestcase
 import pytest
@@ -110,3 +111,14 @@ def test_make_conform():
 
     assert (t3.squeeze() == t1).all()
     assert t3.ndim == t2.ndim
+
+
+def test_atleast_2d():
+    t1 = np.array([0.0, -1.0, 1.0])
+    t2 = torch.tensor([[1, 2, 3]])
+
+    t3, t4 = torchutils.atleast_2d(t1, t2)
+
+    assert isinstance(t3, torch.Tensor)
+    assert t3.ndim == 2
+    assert t4.ndim == 2
