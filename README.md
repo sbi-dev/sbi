@@ -2,7 +2,7 @@
 
 ## Description
 
-Building on code for "On Contrastive Learning for Likelihood-free Inference" in <https://github.com/conormdurkan/lfi.>
+Building on code for "On Contrastive Learning for Likelihood-free Inference" in <https://github.com/conormdurkan/lfi>.
 
 Features neural likelihood-free methods from
 
