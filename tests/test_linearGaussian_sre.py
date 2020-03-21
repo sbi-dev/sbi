@@ -20,8 +20,8 @@ def test_sre_on_linearGaussian_api(num_dim: int):
 
     Avoids intense computation for fast testing of API etc. 
     
-    Keyword Arguments:
-        num_dim {int} -- Parameter dimension of the gaussian model (default: {3})
+    Args:
+        num_dim: parameter dimension of the gaussian model (default: {3})
     """
     # test api for inference on linear Gaussian model using SNL
     # avoids expensive computations for fast testing
@@ -67,9 +67,9 @@ def test_sre_on_linearGaussian_based_on_mmd(num_dim: int, prior_str: str):
 
     NOTE: The mmd threshold is calculated based on a number of test runs and taking the mean plus 2 stds. 
     
-    Keyword Arguments:
-        num_dim {int} -- Parameter dimension of the gaussian model (default: {3})
-        prior_str {str} -- string for which prior to use: gaussian or uniform
+    Args:
+        num_dim: parameter dimension of the gaussian model (default: {3})
+        prior_str: string for which prior to use: gaussian or uniform
     """
 
     true_observation = torch.zeros(num_dim)
@@ -120,7 +120,7 @@ def test_sre_on_linearGaussian_based_on_mmd(num_dim: int, prior_str: str):
 
 @pytest.mark.slow
 @pytest.mark.parametrize(
-    "mcmc_method, prior",
+    "mcmc_method, prior_str",
     (
         ("slice-np", "gaussian"),
         ("slice-np", "uniform"),
@@ -128,12 +128,17 @@ def test_sre_on_linearGaussian_based_on_mmd(num_dim: int, prior_str: str):
         ("slice", "uniform"),
     ),
 )
-def test_sre_posterior_correction(mcmc_method, prior):
-    """Test that leakage correction applied to sampling works, with both MCMC and rejection."""
+def test_sre_posterior_correction(mcmc_method, prior_str):
+    """Test that leakage correction applied to sampling works, with both MCMC and rejection.
+
+    Args:
+        mcmc_method: which mcmc method to use for sampling
+        prior_str: use gaussian or uniform prior
+    """
 
     num_dim = 2
     simulator = linear_gaussian
-    if prior == "gaussian":
+    if prior_str == "gaussian":
         prior = distributions.MultivariateNormal(
             loc=torch.zeros(num_dim), covariance_matrix=torch.eye(num_dim)
         )

@@ -98,6 +98,8 @@ def test_apt_on_linearGaussian_based_on_mmd(
     ), f"MMD={mmd} is more than 2 stds above the average performance."
 
 
+test_apt_on_linearGaussian_based_on_mmd(3, "gaussian", "snpe_c", 10)
+
 # test multi-round SNPE
 @pytest.mark.slow
 @pytest.mark.parametrize("algorithm_str", ("snpe_b", "snpe_c"))

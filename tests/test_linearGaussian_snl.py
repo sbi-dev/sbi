@@ -19,8 +19,8 @@ def test_snl_on_linearGaussian_api(num_dim: int):
     
     Avoids expensive computations for fast testing by using few training simulations and generating few posterior samples.
 
-    Keyword Arguments:
-        num_dimint {int} -- Parameter dimension of the gaussian model (default: {3})
+    Args:
+        num_dim: parameter dimension of the gaussian model (default: {3})
     """
     num_samples = 10
 
@@ -63,8 +63,9 @@ def test_snl_on_linearGaussian_based_on_mmd(num_dim: int, prior_str: str):
 
     NOTE: The mmd threshold is calculated based on a number of test runs and taking the mean plus 2 stds. 
     
-    Keyword Arguments:
-        num_dim {int} -- Parameter dimension of the gaussian model. (default: {3})
+    Args:
+        num_dim: parameter dimension of the gaussian model (default: {3})
+        prior_str: use gaussian or uniform prior
     """
 
     true_observation = torch.zeros((1, num_dim))
@@ -120,9 +121,6 @@ def test_multi_round_snl_on_linearGaussian_based_on_mmd():
     """Test snl inference on linear Gaussian via mmd to ground truth posterior.
 
     NOTE: The mmd threshold is calculated based on a number of test runs and taking the mean plus 2 stds.
-
-    Keyword Arguments:
-        num_dim {int} -- Parameter dimension of the gaussian model. (default: {3})
     """
 
     num_dim = 3
@@ -179,14 +177,15 @@ def test_multi_round_snl_on_linearGaussian_based_on_mmd():
         ("slice", "uniform"),
     ),
 )
-def test_snl_posterior_correction(mcmc_method, prior_str):
+def test_snl_posterior_correction(mcmc_method: str, prior_str: str):
     """Test snl inference on linear Gaussian via mmd to ground truth posterior.
 
-        NOTE: The mmd threshold is calculated based on a number of test runs and taking the mean plus 2 stds.
+    NOTE: The mmd threshold is calculated based on a number of test runs and taking the mean plus 2 stds.
 
-        Keyword Arguments:
-            num_dim {int} -- Parameter dimension of the gaussian model. (default: {3})
-        """
+    Args:
+        mcmc_method: which mcmc method to use for sampling
+        prior_str: use gaussian or uniform prior
+    """
 
     num_dim = 2
     num_samples = 30

@@ -36,11 +36,6 @@ class SnpeB(SnpeBase):
     ):
         """
         See snpe_base.SnpeBase for docstring.
-
-        Args:
-            num_atoms: int
-                Number of atoms to use for classification.
-                If -1, use all other parameters in minibatch.
         """
 
         super(SnpeB, self).__init__(

@@ -12,13 +12,13 @@ from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from tqdm import tqdm
 
-import sbi.simulators as simulators
 import sbi.utils as utils
 from sbi.inference.posteriors.sbi_posterior import Posterior
 from sbi.utils.torchutils import get_default_device
 from sbi.simulators.simutils import (
     set_simulator_attributes,
     check_prior_and_data_dimensions,
+    simulate_in_batches,
 )
 
 
@@ -56,9 +56,9 @@ class SnpeBase:
                 Density estimator to use.
             z_score_obs: bool
                 Whether to z-score (=normalize) the data features x
-            simulation_batch_size (int): how many parameter sets the simulator takes and converts to data x at
-                the same time. If simulation_batch_size==-1, we simulate ALL parameter sets at the same time.
-                If simulation_batch_size==1, the simulator has to process data of shape (num_dim).
+            simulation_batch_size: the number of parameter sets the simulator takes and converts to data x at
+                the same time. If simulation_batch_size==-1, we simulate all parameter sets at the same time.
+                If simulation_batch_size==1, the simulator has to process data of shape (1, num_dim).
                 If simulation_batch_size>1, the simulator has to process data of shape (simulation_batch_size, num_dim).
             use_combined_loss: bool
                 Whether to jointly neural_net prior samples using maximum likelihood.
@@ -68,9 +68,6 @@ class SnpeBase:
                 from scratch each round.
             discard_prior_samples: bool
                 Whether to discard prior samples from round two onwards.
-            summary_writer: SummaryWriter
-                Optionally pass summary writer. A way to change the log file location.
-                If None, will create one internally, saving logs to cwd/logs.
             device: torch.device
                 Optionally pass device
                 If None, will infer it
@@ -93,10 +90,7 @@ class SnpeBase:
         self._retrain_from_scratch_each_round = retrain_from_scratch_each_round
 
         # run prior samples
-        (
-            self.pilot_parameters,
-            self.pilot_observations,
-        ) = simulators.simulation_wrapper_batch(
+        (self.pilot_parameters, self.pilot_observations,) = simulate_in_batches(
             simulator=self._simulator,
             parameter_sample_fn=lambda num_samples: self._prior.sample((num_samples,)),
             num_samples=num_pilot_samples,
@@ -258,7 +252,7 @@ class SnpeBase:
         # Generate parameters from prior in first round, and from most recent posterior
         # estimate in subsequent rounds.
         if round_ == 0:
-            parameters, observations = simulators.simulation_wrapper_batch(
+            parameters, observations = simulate_in_batches(
                 simulator=self._simulator,
                 parameter_sample_fn=lambda num_samples: self._prior.sample(
                     (num_samples,)
@@ -277,7 +271,7 @@ class SnpeBase:
                 dim=0,
             )
         else:
-            parameters, observations = simulators.simulation_wrapper_batch(
+            parameters, observations = simulate_in_batches(
                 simulator=self._simulator,
                 parameter_sample_fn=lambda num_samples: self._neural_posterior.sample(
                     num_samples, context=self._true_observation,
