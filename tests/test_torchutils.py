@@ -107,7 +107,7 @@ def test_make_conform():
     t1 = torch.tensor([0.0, -1.0, 1.0])
     t2 = torch.tensor([[1, 2, 3]])
 
-    t3 = torchutils.make_shapes_conform(t1, t2)
+    t3 = torchutils.add_batch_dim(t1, t2)
 
     assert (t3.squeeze() == t1).all()
     assert t3.ndim == t2.ndim
