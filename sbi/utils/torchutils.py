@@ -217,10 +217,10 @@ def add_batch_dim(
     Also, we have specialized check for multi-dimensional data x, e.g. images.
     """
 
-    # => ensure parameters have shape (1, dim_theta)
+    # => ensure parameters have shape (1, dim_parameter)
     if parameter.ndim == 1:
         parameter = parameter.unsqueeze(0)
-    # => ensure observation has shape (1, dim_x). If shape[0] > 1, we assume that the batch-dimension
+    # => ensure observation has shape (1, dim_observation). If shape[0] > 1, we assume that the batch-dimension
     # is missing, even though ndim might be >1 (e.g. for images)
     if observation.shape[0] > 1 or observation.ndim == 1:
         observation = observation.unsqueeze(0)
