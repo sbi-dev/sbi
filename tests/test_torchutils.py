@@ -1,8 +1,9 @@
 """Tests for the PyTorch utility functions."""
 
+import numpy as np
 import torch
 import torchtestcase
-import unittest
+import pytest
 
 from sbi.utils import torchutils
 
@@ -96,5 +97,28 @@ class TorchUtilsTest(torchtestcase.TorchTestCase):
         self.assertEqual(idx.shape, inputs.shape)
 
 
-if __name__ == "__main__":
-    unittest.main()
+def test_box_distribution():
+    bu1 = torchutils.BoxUniform(low=0.0, high=torch.Tensor([3.0, 3.0, 3.0]))
+
+    assert bu1.event_shape == torch.Size([3])
+
+
+def test_make_conform():
+    t1 = torch.tensor([0.0, -1.0, 1.0])
+    t2 = torch.tensor([[1, 2, 3]])
+
+    t3 = torchutils.make_shapes_conform(t1, t2)
+
+    assert (t3.squeeze() == t1).all()
+    assert t3.ndim == t2.ndim
+
+
+def test_atleast_2d():
+    t1 = np.array([0.0, -1.0, 1.0])
+    t2 = torch.tensor([[1, 2, 3]])
+
+    t3, t4 = torchutils.atleast_2d(t1, t2)
+
+    assert isinstance(t3, torch.Tensor)
+    assert t3.ndim == 2
+    assert t4.ndim == 2

@@ -1,9 +1,12 @@
 """Various PyTorch utility functions."""
 
+from typing import Union, List
 import numpy as np
 import torch
+from torch.distributions import Distribution, Independent, Uniform
 
 import sbi.utils as utils
+from torch import geqrf
 
 
 def get_default_device():
@@ -179,3 +182,65 @@ def gaussian_kde_log_eval(samples, query):
     d = -np.log(N) - (D / 2) * np.log(2 * np.pi) - D * np.log(std)
     c += d
     return torch.logsumexp(c, dim=-1)
+
+
+class BoxUniform(Independent):
+    def __init__(
+        self,
+        low: Union[torch.Tensor, float],
+        high: Union[torch.Tensor, float],
+        reinterpreted_batch_ndims: int = 1,
+    ):
+        """Multidimensional uniform distribution defined on a box.
+        
+        A `Uniform` distribution initialized with e.g. a parameter vector low or high of length 3 will result in a /batch/ dimension of length 3. A log_prob evaluation will then output three numbers, one for each of the independent Uniforms in the batch. Instead, a `BoxUniform` initialized in the same way has three /event/ dimensions, and returns a scalar log_prob corresponding to whether the evaluated point is in the box defined by low and high or outside. 
+    
+        Refer to torch.distributions.Uniform and torch.distributions.Independent for further documentation.
+    
+        Args:
+            low (Tensor or float): lower range (inclusive).
+            high (Tensor or float): upper range (exclusive).
+            reinterpreted_batch_ndims (int): the number of batch dims to
+                                             reinterpret as event dims.
+        """
+
+        super().__init__(Uniform(low=low, high=high), reinterpreted_batch_ndims)
+
+
+# XXX does an in-place version (e.g. make_conform_) make sense?
+def make_shapes_conform(parameter: torch.Tensor, observation: torch.Tensor) -> (torch.Tensor, torch.Tensor):
+    """
+    Return tensors that both have the same tensor.ndim
+    Function now also covers cases where parameters is ndim=1 and observation ndim=2
+    Also, we have specialized check for multi-dimensional data x, e.g. images.
+    """
+
+    # => ensure parameters have shape (1, dim_theta)
+    if parameter.ndim == 1:
+        parameter = parameter.unsqueeze(0)
+    # => ensure observation has shape (1, dim_x). We also need the first check
+    # in case self.observation is e.g. an image
+    if observation.shape[0] > 1 and observation.ndim == 1:
+        observation = observation.unsqueeze(0)
+
+    return parameter, observation
+
+
+def atleast_2d(
+    *arys: Union[np.array, torch.Tensor]
+) -> Union[torch.Tensor, List[torch.Tensor]]:
+    """Return tensors with at least dimension 2.
+
+    Tensors or arrays of dimension 0 or 1 will be get additional dimension(s) prepended.
+
+    Returns:
+        Tensor or list of tensors all with dimension >= 2.
+    """
+    if len(arys) == 1:
+        arr = arys[0]
+        if isinstance(arr, np.ndarray):
+            arr = torch.from_numpy(arr)
+        return arr if arr.ndim >= 2 else arr.reshape(1, -1)
+    else:
+        return [atleast_2d(arr) for arr in arys]
+

@@ -1,9 +1,11 @@
-import sbi.utils as utils
-from sbi.inference.snpe.base_snpe import SnpeBase
-import torch
 import os
+
+import torch
 from torch import distributions
 from torch.utils.tensorboard import SummaryWriter
+
+import sbi.utils as utils
+from sbi.inference.snpe.snpe_base import SnpeBase
 
 
 class SnpeA(SnpeBase):
@@ -22,16 +24,17 @@ class SnpeA(SnpeBase):
         prior,
         true_observation,
         num_pilot_samples=100,
-        density_estimator='maf',
+        density_estimator="maf",
         use_combined_loss=False,
         z_score_obs=True,
+        simulation_batch_size: int = 1,
         retrain_from_scratch_each_round=False,
         discard_prior_samples=False,
         summary_writer=None,
         device=None,
     ):
         """
-        See base_snpe for docstring.
+        See snpe_base.SnpeBase for docstring.
 
         Args:
             num_atoms: int
@@ -39,17 +42,19 @@ class SnpeA(SnpeBase):
                 If -1, use all other parameters in minibatch.
         """
 
-        super(SnpeA, self).__init__(simulator=simulator,
-                                      prior=prior,
-                                      true_observation=true_observation,
-                                      num_pilot_samples=num_pilot_samples,
-                                      density_estimator=density_estimator,
-                                      use_combined_loss=use_combined_loss,
-                                      z_score_obs=z_score_obs,
-                                      retrain_from_scratch_each_round=retrain_from_scratch_each_round,
-                                      discard_prior_samples=discard_prior_samples,
-                                      device=device,
-                                      )
+        super(SnpeA, self).__init__(
+            simulator=simulator,
+            prior=prior,
+            true_observation=true_observation,
+            num_pilot_samples=num_pilot_samples,
+            density_estimator=density_estimator,
+            use_combined_loss=use_combined_loss,
+            z_score_obs=z_score_obs,
+            simulation_batch_size=simulation_batch_size,
+            retrain_from_scratch_each_round=retrain_from_scratch_each_round,
+            discard_prior_samples=discard_prior_samples,
+            device=device,
+        )
 
         # Each APT run has an associated log directory for TensorBoard output.
         if summary_writer is None:
@@ -61,8 +66,6 @@ class SnpeA(SnpeBase):
             self._summary_writer = summary_writer
 
         raise NotImplementedError
-
-
 
     def _get_log_prob_proposal_posterior(self, inputs, context, masks):
         """
@@ -84,9 +87,7 @@ class SnpeA(SnpeBase):
 
         """
 
-        log_prob_posterior_non_atomic = self._neural_posterior.log_prob(
-            inputs, context
-        )
+        log_prob_posterior_non_atomic = self._neural_posterior.log_prob(inputs, context)
 
         batch_size = inputs.shape[0]
 
@@ -102,13 +103,11 @@ class SnpeA(SnpeBase):
         # of the parameters in the batch.
         assert 0 < num_atoms - 1 < batch_size
         probs = (
-                (1 / (batch_size - 1))
-                * torch.ones(batch_size, batch_size)
-                * (1 - torch.eye(batch_size))
+            (1 / (batch_size - 1))
+            * torch.ones(batch_size, batch_size)
+            * (1 - torch.eye(batch_size))
         )
-        choices = torch.multinomial(
-            probs, num_samples=num_atoms - 1, replacement=False
-        )
+        choices = torch.multinomial(probs, num_samples=num_atoms - 1, replacement=False)
         contrasting_inputs = inputs[choices]
 
         # We can now create our sets of atoms from the contrasting parameter sets
@@ -127,23 +126,17 @@ class SnpeA(SnpeBase):
         log_prob_posterior = log_prob_posterior.reshape(batch_size, num_atoms)
 
         # Get (batch_size * num_atoms) log prob prior evals.
-        if isinstance(self._prior, distributions.Uniform):
-            log_prob_prior = self._prior.log_prob(atomic_inputs).sum(-1)
-            # log_prob_prior = torch.zeros(log_prob_prior.shape)
-        else:
-            log_prob_prior = self._prior.log_prob(atomic_inputs)
+        log_prob_prior = self._prior.log_prob(atomic_inputs)
         log_prob_prior = log_prob_prior.reshape(batch_size, num_atoms)
         assert utils.notinfnotnan(log_prob_prior), "NaN/inf detected in prior eval."
 
         # Compute unnormalized proposal posterior.
-        unnormalized_log_prob_proposal_posterior = (
-                log_prob_posterior - log_prob_prior
-        )
+        unnormalized_log_prob_proposal_posterior = log_prob_posterior - log_prob_prior
 
         # Normalize proposal posterior across discrete set of atoms.
         log_prob_proposal_posterior = unnormalized_log_prob_proposal_posterior[
-                                      :, 0
-                                      ] - torch.logsumexp(unnormalized_log_prob_proposal_posterior, dim=-1)
+            :, 0
+        ] - torch.logsumexp(unnormalized_log_prob_proposal_posterior, dim=-1)
         assert utils.notinfnotnan(
             log_prob_proposal_posterior
         ), "NaN/inf detected in proposal posterior eval."
@@ -152,8 +145,5 @@ class SnpeA(SnpeBase):
             masks = masks.reshape(-1)
 
             log_prob_proposal_posterior = (
-                    masks * log_prob_posterior_non_atomic + log_prob_proposal_posterior
+                masks * log_prob_posterior_non_atomic + log_prob_proposal_posterior
             )
-
-        return log_prob_proposal_posterior
-

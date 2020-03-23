@@ -1,18 +1,25 @@
+import warnings
 from copy import deepcopy
+from typing import Callable, Union
 
 import numpy as np
-import sbi.simulators as simulators
-import sbi.utils as utils
 import torch
-from sbi.utils.torchutils import get_default_device
-from torch import distributions, nn, optim
+from pyknos.mdn.mdn import MultivariateGaussianMDN
+from torch import float32, nn, optim
+from torch.distributions import Distribution
 from torch.nn.utils import clip_grad_norm_
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from tqdm import tqdm
-import warnings
-from pyknos.mdn.mdn import MultivariateGaussianMDN
+
+import sbi.utils as utils
 from sbi.inference.posteriors.sbi_posterior import Posterior
+from sbi.utils.torchutils import get_default_device
+from sbi.simulators.simutils import (
+    set_simulator_attributes,
+    check_prior_and_data_dimensions,
+    simulate_in_batches,
+)
 
 
 class SnpeBase:
@@ -25,6 +32,7 @@ class SnpeBase:
         density_estimator=None,
         calibration_kernel=None,
         z_score_obs=True,
+        simulation_batch_size: int = 1,
         use_combined_loss=False,
         retrain_from_scratch_each_round=False,
         discard_prior_samples=False,
@@ -48,6 +56,10 @@ class SnpeBase:
                 Density estimator to use.
             z_score_obs: bool
                 Whether to z-score (=normalize) the data features x
+            simulation_batch_size: the number of parameter sets the simulator takes and converts to data x at
+                the same time. If simulation_batch_size==-1, we simulate all parameter sets at the same time.
+                If simulation_batch_size==1, the simulator has to process data of shape (1, num_dim).
+                If simulation_batch_size>1, the simulator has to process data of shape (simulation_batch_size, num_dim).
             use_combined_loss: bool
                 Whether to jointly neural_net prior samples using maximum likelihood.
                 Useful to prevent density leaking when using box uniform priors.
@@ -56,19 +68,19 @@ class SnpeBase:
                 from scratch each round.
             discard_prior_samples: bool
                 Whether to discard prior samples from round two onwards.
-            summary_writer: SummaryWriter
-                Optionally pass summary writer. A way to change the log file location.
-                If None, will create one internally, saving logs to cwd/logs.
             device: torch.device
                 Optionally pass device
                 If None, will infer it
         """
 
-        self._simulator = simulator
+        true_observation = utils.torchutils.atleast_2d(true_observation)
+        check_prior_and_data_dimensions(prior, true_observation)
+        self._simulator = set_simulator_attributes(simulator, prior, true_observation)
         self._prior = prior
         self._true_observation = true_observation
         self._device = get_default_device() if device is None else device
         self.z_score_obs = z_score_obs
+        self._simulation_batch_size = simulation_batch_size
         self.num_pilot_samples = num_pilot_samples
         self._use_combined_loss = use_combined_loss
         self._discard_prior_samples = discard_prior_samples
@@ -78,10 +90,12 @@ class SnpeBase:
         self._retrain_from_scratch_each_round = retrain_from_scratch_each_round
 
         # run prior samples
-        self.pilot_parameters, self.pilot_observations = simulators.simulation_wrapper(
+        (self.pilot_parameters, self.pilot_observations,) = simulate_in_batches(
             simulator=self._simulator,
             parameter_sample_fn=lambda num_samples: self._prior.sample((num_samples,)),
             num_samples=num_pilot_samples,
+            simulation_batch_size=self._simulation_batch_size,
+            x_dim=self._true_observation.shape[1:],  # do not pass batch_dim
         )
 
         # create the deep neural density estimator
@@ -92,12 +106,13 @@ class SnpeBase:
 
         # create the neural posterior which can sample(), log_prob()
         self._neural_posterior = Posterior(
-            algorithm="snpe",
+            algorithm_family="snpe",
             neural_net=density_estimator,
             prior=prior,
             context=true_observation,
             train_with_mcmc=train_with_mcmc,
             mcmc_method=mcmc_method,
+            get_potential_function=PotentialFunctionProvider(),
         )
 
         # obtain z-score for observations and define embedding net
@@ -142,9 +157,9 @@ class SnpeBase:
             "rejection-sampling-acceptance-rates": [],
         }
 
-    def run_inference(self, num_rounds, num_simulations_per_round, **kwargs):
+    def __call__(self, num_rounds, num_simulations_per_round, **kwargs):
         """
-        Runs a round of inference
+        Return posterior density after inference over several rounds.
 
         Args:
             num_rounds: int
@@ -152,11 +167,15 @@ class SnpeBase:
             num_simulations_per_round: list or int
                 list or int: Number of simulator calls per round.
 
-        Returns: None
+        Returns: Posterior that can be sampled and evaluated.
 
         """
 
-        if isinstance(num_simulations_per_round, int):
+        try:
+            assert (
+                len(num_simulations_per_round) == num_rounds
+            ), "Please provide list with number of simulations per round for each round, or a single integer to be used for all rounds."
+        except TypeError:
             num_simulations_per_round = [num_simulations_per_round] * num_rounds
 
         round_description = ""
@@ -193,8 +212,8 @@ class SnpeBase:
                 parameter_bank=self._parameter_bank,
                 observation_bank=self._observation_bank,
                 simulator=self._simulator,
-                estimate_acceptance_rate=self._neural_posterior.estimate_acceptance_rate(
-                    context=self._true_observation,
+                posterior_samples_acceptance_rate=self._neural_posterior.get_leakage_correction(
+                    context=self._true_observation
                 ),
             )
         return self._neural_posterior
@@ -233,7 +252,7 @@ class SnpeBase:
         # Generate parameters from prior in first round, and from most recent posterior
         # estimate in subsequent rounds.
         if round_ == 0:
-            parameters, observations = simulators.simulation_wrapper(
+            parameters, observations = simulate_in_batches(
                 simulator=self._simulator,
                 parameter_sample_fn=lambda num_samples: self._prior.sample(
                     (num_samples,)
@@ -241,6 +260,8 @@ class SnpeBase:
                 num_samples=np.maximum(
                     0, num_simulations_per_round - self.num_pilot_samples
                 ),
+                simulation_batch_size=self._simulation_batch_size,
+                x_dim=self._true_observation.shape[1:],  # do not pass batch_dim
             )
             parameters = torch.cat(
                 (parameters, self.pilot_parameters[:num_simulations_per_round]), dim=0
@@ -250,17 +271,19 @@ class SnpeBase:
                 dim=0,
             )
         else:
-            parameters, observations = simulators.simulation_wrapper(
+            parameters, observations = simulate_in_batches(
                 simulator=self._simulator,
                 parameter_sample_fn=lambda num_samples: self._neural_posterior.sample(
                     num_samples, context=self._true_observation,
                 ),
                 num_samples=num_simulations_per_round,
+                simulation_batch_size=self._simulation_batch_size,
+                x_dim=self._true_observation.shape[1:],  # do not pass batch_dim
             )
 
         # Store (parameter, observation) pairs.
-        self._parameter_bank.append(torch.Tensor(parameters))
-        self._observation_bank.append(torch.Tensor(observations))
+        self._parameter_bank.append(parameters)
+        self._observation_bank.append(observations)
         self._prior_masks.append(
             torch.ones(num_simulations_per_round, 1)
             if round_ == 0
@@ -376,7 +399,7 @@ class SnpeBase:
                 # just do maximum likelihood in the first round
                 if round_ == 0:
                     log_prob = self._neural_posterior.log_prob(
-                        inputs, context, normalize=False
+                        inputs, context, normalize_snpe=False
                     )
                 else:  # or call the APT loss
                     log_prob = self._get_log_prob_proposal_posterior(
@@ -405,7 +428,7 @@ class SnpeBase:
                     # just do maximum likelihood in the first round
                     if round_ == 0:
                         log_prob = self._neural_posterior.log_prob(
-                            inputs, context, normalize=False
+                            inputs, context, normalize_snpe=False
                         )
                     else:
                         log_prob = self._get_log_prob_proposal_posterior(
@@ -434,97 +457,81 @@ class SnpeBase:
         self._summary["best-validation-log-probs"].append(best_validation_log_prob)
 
 
-class NeuralPotentialFunction:
+class PotentialFunctionProvider:
     """
-    Implementation of a potential function for Pyro MCMC which uses a classifier
-    to evaluate a quantity proportional to the likelihood.
+    This class is initialized without arguments during the initialization of the Posterior class. When called, it specializes to the potential function appropriate to the requested mcmc_method.
+    
+   
+    NOTE: Why use a class?
+    ----------------------
+    During inference, we use deepcopy to save untrained posteriors in memory. deepcopy uses pickle which can't serialize nested functions (https://stackoverflow.com/a/12022055).
+    
+    It is important to NOT initialize attributes upon instantiation, because we need the most current trained Posterior.neural_net.
+    
+    Returns:
+        [Callable]: potential function for use by either numpy or pyro sampler
     """
 
-    def __init__(self, posterior, prior, true_observation):
+    def __call__(
+        self,
+        prior: Distribution,
+        posterior_nn: torch.nn.Module,
+        observation: torch.Tensor,
+        mcmc_method: str,
+    ) -> Callable:
+        """Return potential function. 
+        
+        Switch on numpy or pyro potential function based on mcmc_method.
+        
         """
-        Args:
-            posterior: nn
-            prior: torch.distribution, Distribution object with 'log_prob' method.
-            true_observation:torch.Tensor containing true observation x0.
-        """
-
+        self.posterior_nn = posterior_nn
         self.prior = prior
-        self.posterior = posterior
-        self.true_observation = true_observation
+        self.observation = observation
 
-    def __call__(self, parameters_dict):
-        """
-        Call method allows the object to be used as a function.
-        Evaluates the given parameters using a given neural likelhood, prior,
-        and true observation.
-
-        Args:
-            parameters_dict: dict of parameter values which need evaluation for MCMC.
-
-        Returns:
-            torch.Tensor potential ~ -[log r(x0, theta) + log p(theta)]
-
-        """
-
-        parameters = next(iter(parameters_dict.values()))
-        potential = -self.posterior.log_prob(
-            inputs=parameters, context=self.true_observation
-        )
-        if isinstance(self.prior, distributions.Uniform):
-            log_prob_prior = self.prior.log_prob(parameters).sum(-1)
+        if mcmc_method in ("slice", "hmc", "nuts"):
+            return self.pyro_potential
         else:
-            log_prob_prior = self.prior.log_prob(parameters)
-        log_prob_prior[~torch.isinf(log_prob_prior)] = 1
-        potential *= log_prob_prior
+            return self.np_potential
 
-        return potential
-
-    def evaluate(self, point):
-        raise NotImplementedError
-
-
-class SliceNpNeuralPotentialFunction:
-    """
-    Implementation of a potential function for Pyro MCMC which uses a classifier
-    to evaluate a quantity proportional to the likelihood.
-    """
-
-    def __init__(self, posterior, prior, true_observation):
-        """
+    def np_potential(self, parameters: np.array) -> Union[torch.Tensor, float]:
+        """Return posterior log prob. of parameters, -inf if outside prior."
+        
         Args:
-            posterior: nn
-            prior: torch.distribution, Distribution object with 'log_prob' method.
-            true_observation:torch.Tensor containing true observation x0.
-        """
-
-        self.prior = prior
-        self.posterior = posterior
-        self.true_observation = true_observation
-
-    def __call__(self, parameters):
-        """
-        Call method allows the object to be used as a function.
-        Evaluates the given parameters using a given neural likelhood, prior,
-        and true observation.
-
-        Args:
-            parameters_dict: dict of parameter values which need evaluation for MCMC.
-
+            parameters ([np.array]): parameter vector, batch dimension 1
+        
         Returns:
-            torch.Tensor potential ~ -[log r(x0, theta) + log p(theta)]
-
+            [tensor or -inf]: posterior log probability of the parameters.
         """
+        parameters = torch.tensor(parameters, dtype=float32)
 
-        if not np.isinf(self.prior.log_prob(torch.Tensor(parameters)).sum().item()):
-            target_log_prob = self.posterior.log_prob(
-                inputs=torch.Tensor(parameters).reshape(1, -1),
-                context=self.true_observation.reshape(1, -1),
-                normalize=False,
+        is_within_prior = torch.isfinite(self.prior.log_prob(parameters))
+        if is_within_prior:
+            target_log_prob = self.posterior_nn.log_prob(
+                inputs=parameters.reshape(1, -1),
+                context=self.observation.reshape(1, -1),
             )
         else:
-            target_log_prob = -np.inf
+            target_log_prob = -float("Inf")
 
         return target_log_prob
 
-    def evaluate(self, point):
-        raise NotImplementedError
+    def pyro_potential(self, parameters: dict) -> torch.Tensor:
+        """Return posterior log prob. of parameters, -inf where outside prior.
+        
+        Args:
+            parameters (dict): parameters (from pyro sampler)
+        
+        Returns:
+            torch.Tensor: posterior log probability, masked outside of prior
+        """
+
+        parameter = next(iter(parameters.values()))
+        # XXX: notice sign, check convention pyro vs. numpy
+        log_prob_posterior = -self.posterior_nn.log_prob(
+            inputs=parameter, context=self.observation,
+        )
+        log_prob_prior = self.prior.log_prob(parameter)
+
+        within_prior = torch.isfinite(log_prob_prior)
+
+        return torch.where(within_prior, log_prob_posterior, log_prob_prior)

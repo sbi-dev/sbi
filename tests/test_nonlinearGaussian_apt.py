@@ -1,18 +1,17 @@
 import os
-import sys
 
 import numpy as np
-import pytest
 import torch
-from torch import distributions
 
-import sbi.utils as utils
-from sbi.inference.snpe.snpe_c import APT
+import pytest
+from sbi.inference.snpe.snpe_base import SnpeBase
+from sbi.inference.snpe.snpe_c import SnpeC
 from sbi.simulators.nonlinear_gaussian import (
     get_ground_truth_posterior_samples_nonlinear_gaussian,
     non_linear_gaussian,
 )
-from sbi.simulators.simutils import set_simulator_attributes
+from sbi.utils.torchutils import BoxUniform
+import sbi.utils as utils
 
 # use cpu by default
 torch.set_default_tensor_type("torch.FloatTensor")
@@ -45,11 +44,11 @@ def test_nonlinearGaussian_based_on_mmd():
     parameter_dim = ground_truth_parameters.shape[0]
     observation_dim = ground_truth_observation.shape[0]
 
-    prior = distributions.Uniform(
+    prior = BoxUniform(
         low=-3 * torch.ones(parameter_dim), high=3 * torch.ones(parameter_dim),
     )
 
-    apt = APT(
+    apt = SnpeC(
         simulator=simulator,
         true_observation=ground_truth_observation[None,],
         prior=prior,
@@ -62,9 +61,7 @@ def test_nonlinearGaussian_based_on_mmd():
 
     # run inference
     num_rounds, num_simulations_per_round = 2, 1000
-    apt.run_inference(
-        num_rounds=num_rounds, num_simulations_per_round=num_simulations_per_round
-    )
+    apt(num_rounds=num_rounds, num_simulations_per_round=num_simulations_per_round)
 
     # draw samples from posterior
     samples = apt._neural_posterior.sample(1000)

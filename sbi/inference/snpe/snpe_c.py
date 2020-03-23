@@ -5,11 +5,10 @@ from torch import distributions
 from torch.utils.tensorboard import SummaryWriter
 
 import sbi.utils as utils
-from sbi.inference.snpe.base_snpe import SnpeBase
-from sbi.simulators.simutils import set_simulator_attributes
+from sbi.inference.snpe.snpe_base import SnpeBase
 
 
-class APT(SnpeBase):
+class SnpeC(SnpeBase):
     """
     Implementation of
     'Automatic Posterior Transformation for Likelihood-free Inference'
@@ -29,6 +28,7 @@ class APT(SnpeBase):
         calibration_kernel=None,
         use_combined_loss=False,
         z_score_obs=True,
+        simulation_batch_size: int = 1,
         retrain_from_scratch_each_round=False,
         discard_prior_samples=False,
         summary_writer=None,
@@ -37,7 +37,7 @@ class APT(SnpeBase):
         mcmc_method="slice-np",
     ):
         """
-        See base_snpe for docstring.
+        See snpe_base.SnpeBase for docstring.
 
         Args:
             num_atoms: int
@@ -45,10 +45,7 @@ class APT(SnpeBase):
                 If -1, use all other parameters in minibatch.
         """
 
-        # set name and dimensions of simulator
-        simulator = set_simulator_attributes(simulator, prior)
-
-        super(APT, self).__init__(
+        super(SnpeC, self).__init__(
             simulator=simulator,
             prior=prior,
             true_observation=true_observation,
@@ -57,6 +54,7 @@ class APT(SnpeBase):
             calibration_kernel=calibration_kernel,
             use_combined_loss=use_combined_loss,
             z_score_obs=z_score_obs,
+            simulation_batch_size=simulation_batch_size,
             retrain_from_scratch_each_round=retrain_from_scratch_each_round,
             discard_prior_samples=discard_prior_samples,
             device=device,
@@ -125,7 +123,7 @@ class APT(SnpeBase):
 
         # Evaluate large batch giving (batch_size * num_atoms) log prob posterior evals.
         log_prob_posterior = self._neural_posterior.log_prob(
-            atomic_inputs, repeated_context, normalize=False
+            atomic_inputs, repeated_context, normalize_snpe=False
         )
         assert utils.notinfnotnan(
             log_prob_posterior
@@ -133,11 +131,7 @@ class APT(SnpeBase):
         log_prob_posterior = log_prob_posterior.reshape(batch_size, num_atoms)
 
         # Get (batch_size * num_atoms) log prob prior evals.
-        if isinstance(self._prior, distributions.Uniform):
-            log_prob_prior = self._prior.log_prob(atomic_inputs).sum(-1)
-            # log_prob_prior = torch.zeros(log_prob_prior.shape)
-        else:
-            log_prob_prior = self._prior.log_prob(atomic_inputs)
+        log_prob_prior = self._prior.log_prob(atomic_inputs)
         log_prob_prior = log_prob_prior.reshape(batch_size, num_atoms)
         assert utils.notinfnotnan(log_prob_prior), "NaN/inf detected in prior eval."
 
@@ -158,7 +152,7 @@ class APT(SnpeBase):
         # todo: at all prior samples
         if self._use_combined_loss:
             log_prob_posterior_non_atomic = self._neural_posterior.log_prob(
-                inputs, context, normalize=False
+                inputs, context, normalize_snpe=False
             )
             masks = masks.reshape(-1)
             log_prob_proposal_posterior = (

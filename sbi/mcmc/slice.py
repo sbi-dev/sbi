@@ -121,10 +121,9 @@ class Slice(MCMCKernel):
         self._reset()
 
     def sample(self, params):
-        # TODO: Indexing needs fixing, currently using squeeze, which is not ideal
         for dim in torch.randperm(self._num_dimensions):
             (
-                params[self._site_name].squeeze()[dim.item()],
+                params[self._site_name].view(-1)[dim.item()],
                 width_d,
             ) = self._sample_from_conditional(params, dim.item())
             if self._t < self._warmup_steps:
@@ -147,23 +146,21 @@ class Slice(MCMCKernel):
                 {
                     self._site_name: torch.cat(
                         (
-                            params[self._site_name].squeeze()[:dim],
+                            params[self._site_name].view(-1)[:dim],
                             x.reshape(1),
-                            params[self._site_name].squeeze()[dim + 1 :],
+                            params[self._site_name].view(-1)[dim + 1 :],
                         )
-                    ).unsqueeze(
-                        0
-                    )  # TODO: The unsqueeze seems to give a speed up, figure out when this is the case exactly
+                    ).unsqueeze(0)  # TODO: The unsqueeze seems to give a speed up, figure out when this is the case exactly
                 }
             )
 
         # Sample uniformly from slice
-        log_height = _log_prob_d(params[self._site_name].squeeze()[dim]) + torch.log(
+        log_height = _log_prob_d(params[self._site_name].view(-1)[dim]) + torch.log(
             torch.rand(1)
         )
 
         # Position the bracket randomly around the current sample
-        lower = params[self._site_name].squeeze()[dim] - self._width[dim] * torch.rand(
+        lower = params[self._site_name].view(-1)[dim] - self._width[dim] * torch.rand(
             1
         )
         upper = lower + self._width[dim]
@@ -171,14 +168,14 @@ class Slice(MCMCKernel):
         # Find lower bracket end
         while (
             _log_prob_d(lower) >= log_height
-            and params[self._site_name].squeeze()[dim] - lower < self._max_width
+            and params[self._site_name].view(-1)[dim] - lower < self._max_width
         ):
             lower -= self._width[dim]
 
         # Find upper bracket end
         while (
             _log_prob_d(upper) >= log_height
-            and upper - params[self._site_name].squeeze()[dim] < self._max_width
+            and upper - params[self._site_name].view(-1)[dim] < self._max_width
         ):
             upper += self._width[dim]
 
@@ -187,7 +184,7 @@ class Slice(MCMCKernel):
 
         # If outside slice, reject sample and shrink bracket
         while _log_prob_d(new_parameter) < log_height:
-            if new_parameter < params[self._site_name].squeeze()[dim]:
+            if new_parameter < params[self._site_name].view(-1)[dim]:
                 lower = new_parameter
             else:
                 upper = new_parameter

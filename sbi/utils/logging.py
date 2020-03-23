@@ -1,6 +1,7 @@
+import torch
+
 import sbi.simulators as simulators
 import sbi.utils as utils
-import torch
 
 
 def summarize(
@@ -11,7 +12,7 @@ def summarize(
     parameter_bank,
     observation_bank,
     simulator,
-    estimate_acceptance_rate=None,
+    posterior_samples_acceptance_rate=None,
 ):
     # get ground truth if available
     try:
@@ -78,9 +79,8 @@ def summarize(
 
     try:
         # Rejection sampling acceptance rate
-        rejection_sampling_acceptance_rate = estimate_acceptance_rate()
         summary["rejection-sampling-acceptance-rates"].append(
-            rejection_sampling_acceptance_rate
+            posterior_samples_acceptance_rate
         )
 
         summary_writer.add_scalar(

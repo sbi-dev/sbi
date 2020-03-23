@@ -1,9 +1,11 @@
 import os
-import sbi.utils as utils
-from sbi.inference.snpe.base_snpe import SnpeBase
+
 import torch
 from torch import distributions
 from torch.utils.tensorboard import SummaryWriter
+
+import sbi.utils as utils
+from sbi.inference.snpe.snpe_base import SnpeBase
 
 
 class SnpeB(SnpeBase):
@@ -17,27 +19,23 @@ class SnpeB(SnpeBase):
     """
 
     def __init__(
-            self,
-            simulator,
-            prior,
-            true_observation,
-            num_pilot_samples=100,
-            density_estimator='maf',
-            calibration_kernel=None,
-            use_combined_loss=False,
-            z_score_obs=True,
-            retrain_from_scratch_each_round=False,
-            discard_prior_samples=False,
-            summary_writer=None,
-            device=None,
+        self,
+        simulator,
+        prior,
+        true_observation,
+        num_pilot_samples=100,
+        density_estimator="maf",
+        calibration_kernel=None,
+        use_combined_loss=False,
+        z_score_obs=True,
+        simulation_batch_size: int = 1,
+        retrain_from_scratch_each_round=False,
+        discard_prior_samples=False,
+        summary_writer=None,
+        device=None,
     ):
         """
-        See base_snpe for docstring.
-
-        Args:
-            num_atoms: int
-                Number of atoms to use for classification.
-                If -1, use all other parameters in minibatch.
+        See snpe_base.SnpeBase for docstring.
         """
 
         super(SnpeB, self).__init__(
@@ -49,10 +47,11 @@ class SnpeB(SnpeBase):
             calibration_kernel=calibration_kernel,
             use_combined_loss=use_combined_loss,
             z_score_obs=z_score_obs,
+            simulation_batch_size=simulation_batch_size,
             retrain_from_scratch_each_round=retrain_from_scratch_each_round,
             discard_prior_samples=discard_prior_samples,
             device=device,
-            )
+        )
 
         # Each APT run has an associated log directory for TensorBoard output.
         if summary_writer is None:
@@ -63,8 +62,13 @@ class SnpeB(SnpeBase):
         else:
             self._summary_writer = summary_writer
 
-    def _get_log_prob_proposal_posterior(self, inputs, context, masks):
+    def _get_log_prob_proposal_posterior(
+        self, inputs: torch.Tensor, context: torch.Tensor, masks: torch.Tensor
+    ):
         """
+        XXX: Improve docstring here, it is not clear what log_prob refers to. isnt this the snpeB "loss"?
+        Return log prob under proposal posterior.
+        
         We have two main options when evaluating the proposal posterior.
         (1) Generate atoms from the proposal prior.
         (2) Generate atoms from a more targeted distribution,
@@ -87,7 +91,7 @@ class SnpeB(SnpeBase):
 
         # Evaluate posterior
         log_prob_posterior = self._neural_posterior.log_prob(
-            inputs, context
+            inputs, context, normalize_snpe=False
         )
         assert utils.notinfnotnan(
             log_prob_posterior
@@ -95,38 +99,31 @@ class SnpeB(SnpeBase):
         log_prob_posterior = log_prob_posterior.reshape(batch_size)
 
         # Evaluate prior
-        if isinstance(self._prior, distributions.Uniform):
-            log_prob_prior = self._prior.log_prob(inputs).sum(-1)
-        else:
-            log_prob_prior = self._prior.log_prob(inputs)
+        log_prob_prior = self._prior.log_prob(inputs)
         log_prob_prior = log_prob_prior.reshape(batch_size)
-        assert utils.notinfnotnan(
-            log_prob_prior
-        ), "NaN/inf detected in prior eval."
+        assert utils.notinfnotnan(log_prob_prior), "NaN/inf detected in prior eval."
 
         # evaluate proposal
         log_prob_proposal = self._model_bank[-1].log_prob(
-            inputs, context
+            inputs, context, normalize_snpe=False
         )
         assert utils.notinfnotnan(
             log_prob_proposal
         ), "NaN/inf detected in proposal posterior eval."
 
         # Compute log prob with importance weights
-        log_prob = self.calibration_kernel(context) * (
-                log_prob_posterior + log_prob_prior - log_prob_proposal
+        log_prob = (
+            self.calibration_kernel(context)
+            * torch.exp(log_prob_prior - log_prob_proposal)
+            * log_prob_posterior
         )
 
         # todo: this implementation is not perfect: it evaluates the posterior
         # todo:     at all prior samples
         if self._use_combined_loss:
             log_prob_posterior_non_atomic = self._neural_posterior.log_prob(
-                inputs, context
+                inputs, context, normalize_snpe=False
             )
             masks = masks.reshape(-1)
-            log_prob = (
-                    masks * log_prob_posterior_non_atomic + log_prob
-            )
-
+            log_prob = masks * log_prob_posterior_non_atomic + log_prob
         return log_prob
-

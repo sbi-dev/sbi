@@ -1,32 +1,32 @@
+from typing import Callable, Union, Dict
 import os
 from copy import deepcopy
-import numpy as np
-import sbi.simulators as simulators
-import sbi.utils as utils
+
 import numpy as np
 import torch
-from sbi.utils.torchutils import get_default_device
 from matplotlib import pyplot as plt
 from pyro.infer.mcmc import HMC, NUTS
 from pyro.infer.mcmc.api import MCMC
-from torch import distributions
-from torch import nn, optim
+from torch import distributions, nn, optim
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
-from sbi.inference.posteriors.sbi_posterior import Posterior
 
 import sbi.simulators as simulators
 import sbi.utils as utils
+from sbi.inference.posteriors.sbi_posterior import Posterior
 from sbi.mcmc import Slice, SliceSampler
-from sbi.simulators.simutils import set_simulator_attributes
-from sbi.utils.torchutils import get_default_device
+from sbi.simulators.simutils import (
+    set_simulator_attributes,
+    check_prior_and_data_dimensions,
+)
+from sbi.utils.torchutils import get_default_device, make_shapes_conform
 
 
 class SRE:
     """
-    Implementation 'Sequential Ratio Estimation', as presented in
+    'Sequential Ratio Estimation', as presented in
     'Likelihood-free MCMC with Amortized Approximate Likelihood Ratios'
     Hermans et al.
     Pre-print 2019
@@ -40,41 +40,50 @@ class SRE:
         true_observation,
         classifier,
         num_atoms=-1,
-        mcmc_method="slice-np",
+        simulation_batch_size: int = 1,
+        mcmc_method: str = "slice-np",
         summary_net=None,
         retrain_from_scratch_each_round=False,
         summary_writer=None,
         device=None,
     ):
         """
-        :param simulator: Python object with 'simulate' method which takes a torch.Tensor
-        of parameter values, and returns a simulation result for each parameter as a torch.Tensor.
-        :param prior: Distribution object with 'log_prob' and 'sample' methods.
-        :param true_observation: torch.Tensor containing the observation x0 for which to
-        perform inference on the posterior p(theta | x0).
-        :param classifier: Binary classifier in the form of an nets.Module.
-        Takes as input (x, theta) pairs and outputs pre-sigmoid activations.
-        :param num_atoms: int
-            Number of atoms to use for classification.
-            If -1, use all other parameters in minibatch.
-        :param summary_net: Optional network which may be used to produce feature vectors
-        f(x) for high-dimensional observations.
-        :param retrain_from_scratch_each_round: Whether to retrain the conditional density
-        estimator for the posterior from scratch each round.
-        :param summary_writer: SummaryWriter
-            Optionally pass summary writer. A way to change the log file location.
-            If None, will create one internally, saving logs to cwd/logs.
-        :param device: torch.device
-            Optionally pass device
-            If None, will infer it
+
+        Args:
+            simulator: Python object with 'simulate' method which takes a torch.Tensor
+                of parameter values, and returns a simulation result for each parameter as a torch.Tensor.
+            prior: Distribution object with 'log_prob' and 'sample' methods.
+            true_observation: torch.Tensor containing the observation x0 for which to
+                perform inference on the posterior p(theta | x0).
+            classifier: Binary classifier in the form of an nets.Module.
+            num_atoms: Number of atoms to use for classification.
+                If -1, use all other parameters in minibatch.
+            simulation_batch_size: the number of parameter sets the simulator takes and converts to data x at
+                the same time. If simulation_batch_size==-1, we simulate all parameter sets at the same time.
+                If simulation_batch_size==1, the simulator has to process data of shape (1, num_dim).
+                If simulation_batch_size>1, the simulator has to process data of shape (simulation_batch_size, num_dim).
+            mcmc_method: What MCMC sampler to use. One of {"slice-np", "slice", "nuts", "hmc"}
+            summary_net: Optional network which may be used to produce feature vectors
+                f(x) for high-dimensional observations.
+            retrain_from_scratch_each_round: Whether to retrain the conditional density
+                estimator for the posterior from scratch each round.
+            summary_writer: SummaryWriter
+                Optionally pass summary writer. A way to change the log file location.
+                If None, will create one internally, saving logs to cwd/logs.
+            device: torch.device
+                Optionally pass device
+                If None, will infer it
         """
 
+        true_observation = utils.torchutils.atleast_2d(true_observation)
+        check_prior_and_data_dimensions(prior, true_observation)
         # set name and dimensions of simulator
-        simulator = set_simulator_attributes(simulator, prior)
+        simulator = set_simulator_attributes(simulator, prior, true_observation)
 
         self._simulator = simulator
         self._true_observation = true_observation
         self._prior = prior
+        self._simulation_batch_size = simulation_batch_size
         self._device = get_default_device() if device is None else device
 
         assert isinstance(num_atoms, int), "Number of atoms must be an integer."
@@ -90,11 +99,12 @@ class SRE:
 
         # create posterior object which can sample()
         self._neural_posterior = Posterior(
-            algorithm="sre",
+            algorithm_family="sre",
             neural_net=classifier,
             prior=prior,
             context=true_observation,
             mcmc_method=mcmc_method,
+            get_potential_function=PotentialFunctionProvider(),
         )
 
         # We may want to summarize high-dimensional observations.
@@ -138,7 +148,7 @@ class SRE:
             "best-validation-log-probs": [],
         }
 
-    def run_inference(self, num_rounds, num_simulations_per_round):
+    def __call__(self, num_rounds, num_simulations_per_round):
         """
         This runs SRE for num_rounds rounds, using num_simulations_per_round calls to
         the simulator per round.
@@ -157,20 +167,24 @@ class SRE:
             # Generate parameters from prior in first round, and from most recent posterior
             # estimate in subsequent rounds.
             if round_ == 0:
-                parameters, observations = simulators.simulation_wrapper(
+                parameters, observations = simulators.simulate_in_batches(
                     simulator=self._simulator,
                     parameter_sample_fn=lambda num_samples: self._prior.sample(
                         (num_samples,)
                     ),
                     num_samples=num_simulations_per_round,
+                    simulation_batch_size=self._simulation_batch_size,
+                    x_dim=self._true_observation.shape[1:],  # do not pass batch_dim
                 )
             else:
-                parameters, observations = simulators.simulation_wrapper(
+                parameters, observations = simulators.simulate_in_batches(
                     simulator=self._simulator,
                     parameter_sample_fn=lambda num_samples: self._neural_posterior.sample(
                         num_samples
                     ),
                     num_samples=num_simulations_per_round,
+                    simulation_batch_size=self._simulation_batch_size,
+                    x_dim=self._true_observation.shape[1:],  # do not pass batch_dim
                 )
 
             # Store (parameter, observation) pairs.
@@ -353,90 +367,89 @@ class SRE:
         return self._summary
 
 
-class NeuralPotentialFunction:
+class PotentialFunctionProvider:
     """
-    Implementation of a potential function for Pyro MCMC which uses a binary classifier
-    to evaluate a quantity proportional to the likelihood.
+    This class is initialized without arguments during the initialization of the Posterior class. When called, it specializes to the potential function appropriate to the requested mcmc_method.
+    
+   
+    NOTE: Why use a class?
+    ----------------------
+    During inference, we use deepcopy to save untrained posteriors in memory. deepcopy uses pickle which can't serialize nested functions (https://stackoverflow.com/a/12022055).
+    
+    It is important to NOT initialize attributes upon instantiation, because we need the most current trained Posterior.neural_net.
+    
+    Returns:
+        [Callable]: potential function for use by either numpy or pyro sampler
     """
 
-    def __init__(self, classifier, prior, true_observation):
+    def __call__(
+        self,
+        prior: torch.distributions.Distribution,
+        classifier: torch.nn.Module,
+        observation: torch.Tensor,
+        mcmc_method: str,
+    ) -> Callable:
+        """Return potential function. 
+        
+        Switch on numpy or pyro potential function based on mcmc_method.
+        
+        Args:
+            prior: prior distribution that can be evaluated.
+            classifier: binary classifier approximating the likelihood up to a constant.
+       
+            observation: actually observed conditioning context, x_o
+            mcmc_method (str): one of slice-np, slice, hmc or nuts.
+        
+        Returns:
+            Callable: potential function for sampler.
+        """ """        
+        
+        Args: 
+        
         """
-        :param neural_likelihood: Binary classifier which has learned an approximation
-        to the likelihood up to a constant.
-        :param prior: Distribution object with 'log_prob' method.
-        :param true_observation: torch.Tensor containing true observation x0.
-        """
-
         self.classifier = classifier
         self.prior = prior
-        self.true_observation = true_observation
+        self.observation = observation
 
-    def __call__(self, parameters_dict):
-        """
-        Call method allows the object to be used as a function.
-        Evaluates the given parameters using a given neural likelhood, prior,
-        and true observation.
-
-        :param inputs_dict: dict of parameter values which need evaluation for MCMC.
-        :return: torch.Tensor potential ~ -[log r(x0, theta) + log p(theta)]
-        """
-
-        parameters = next(iter(parameters_dict.values()))
-        log_ratio = self.classifier(
-            torch.cat((parameters, self.true_observation)).reshape(1, -1)
-        )
-
-        # If prior is uniform we need to sum across last dimension.
-        if isinstance(self.prior, distributions.Uniform):
-            potential = -(log_ratio + self.prior.log_prob(parameters).sum(-1))
+        if mcmc_method in ("slice", "hmc", "nuts"):
+            return self.pyro_potential
         else:
-            potential = -(log_ratio + self.prior.log_prob(parameters))
+            return self.np_potential
 
-        return potential
-
-
-class SliceNpNeuralPotentialFunction:
-    """
-    Implementation of a potential function for Pyro MCMC which uses a classifier
-    to evaluate a quantity proportional to the likelihood.
-    """
-
-    def __init__(self, posterior, prior, true_observation):
-        """
+    def np_potential(self, parameters: np.array) -> Union[torch.Tensor, float]:
+        """Return potential for Numpy slice sampler."
+        
         Args:
-            posterior: nn
-            prior: torch.distribution, Distribution object with 'log_prob' method.
-            true_observation:torch.Tensor containing true observation x0.
-        """
-
-        self.prior = prior
-        self.posterior = posterior
-        self.true_observation = true_observation
-
-    def __call__(self, parameters):
-        """
-        Call method allows the object to be used as a function.
-        Evaluates the given parameters using a given neural likelhood, prior,
-        and true observation.
-
-        Args:
-            parameters_dict: dict of parameter values which need evaluation for MCMC.
-
+            parameters ([np.array]): parameter vector, batch dimension 1
+        
         Returns:
-            torch.Tensor potential ~ -[log r(x0, theta) + log p(theta)]
+            [tensor or -inf]: posterior log probability of the parameters.
+        """
+        parameter = torch.tensor(parameters, dtype=torch.float32)
 
+        # parameter and observation should have shape (1, dim)
+        parameter, observation = make_shapes_conform(parameter, self.observation)
+
+        log_ratio = self.classifier(torch.cat((parameter, observation)).reshape(1, -1))
+
+        # notice opposite sign to pyro potential
+        return log_ratio + self.prior.log_prob(parameter)
+
+    def pyro_potential(self, parameters: Dict[str, torch.Tensor]) -> torch.Tensor:
+        """Return potential for Pyro sampler.
+        
+        Args:
+            parameters: {name: tensor, ...} dictionary (from pyro sampler). The tensor's shape will be (1, x) if running a single chain or just (x) for multiple chains.
+        
+        Returns:
+            potential: -[log r(x0, theta) + log p(theta)]
         """
 
-        target_log_prob = (
-            self.posterior.neural_net(
-                torch.cat((torch.Tensor(parameters), self.true_observation)).reshape(
-                    1, -1
-                )
-            )
-            + self.prior.log_prob(torch.Tensor(parameters)).sum()
-        )
+        parameter = next(iter(parameters.values()))
 
-        return target_log_prob
+        # parameter and observation should have shape (1, dim)
+        parameter, observation = make_shapes_conform(parameter, self.observation)
 
-    def evaluate(self, point):
-        raise NotImplementedError
+        log_ratio = self.classifier(torch.cat((parameter, observation)).reshape(1, -1))
+
+        return -(log_ratio + self.prior.log_prob(parameter))
