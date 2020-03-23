@@ -103,14 +103,24 @@ def test_box_distribution():
     assert bu1.event_shape == torch.Size([3])
 
 
-def test_make_conform():
+def test_add_batch_dim():
+    # first test if batch dimension is added when parameters and observation are both ndim==1
     t1 = torch.tensor([0.0, -1.0, 1.0])
     t2 = torch.tensor([[1, 2, 3]])
 
-    t3 = torchutils.add_batch_dim(t1, t2)
+    t3, t4 = torchutils.add_batch_dim(t1, t2)
 
-    assert (t3.squeeze() == t1).all()
-    assert t3.ndim == t2.ndim
+    assert t3.ndim == 2
+    assert t4.ndim == 2
+
+    # then test if batch dimension is added when parameters are ndim==1 and observation is ndim==2
+    t1 = torch.tensor([0.0, -1.0, 1.0])
+    t2 = torch.tensor([[1, 2, 3], [1, 2, 3]])
+
+    t3, t4 = torchutils.add_batch_dim(t1, t2)
+
+    assert t3.ndim == 2
+    assert t4.ndim == 3
 
 
 def test_atleast_2d():
