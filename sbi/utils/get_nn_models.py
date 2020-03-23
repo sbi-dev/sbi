@@ -2,6 +2,7 @@ from sbi.utils.torchutils import create_alternating_binary_mask
 from torch import nn
 from torch.nn import functional as F
 
+import sbi.utils as utils
 from pyknos.nflows import distributions as distributions_
 from pyknos.nflows import transforms
 from pyknos.nflows.nn import nets
@@ -19,10 +20,9 @@ def posterior_nn(
     normalizing_transform = transforms.AffineTransform(shift=-mean / std, scale=1 / std)
 
     parameter_dim = prior.sample([1]).shape[1]
-    if context.dim() == 1:
-        observation_dim = torch.tensor([context.shape]).item()
-    else:
-        observation_dim = torch.tensor([context.shape[1]]).item()
+
+    context = utils.torchutils.atleast_2d(context)
+    observation_dim = torch.tensor([context.shape[1:]])
 
     if model == "mdn":
         hidden_features = 50
@@ -243,10 +243,8 @@ def classifier_nn(
     model, prior, context,
 ):
     parameter_dim = prior.sample([1]).shape[1]
-    if context.dim() == 1:
-        observation_dim = torch.tensor([context.shape]).item()
-    else:
-        observation_dim = torch.tensor([context.shape[1]]).item()
+    context = utils.torchutils.atleast_2d(context)
+    observation_dim = torch.tensor([context.shape[1:]])
 
     if model == "linear":
         neural_net = nn.Linear(parameter_dim + observation_dim, 1)

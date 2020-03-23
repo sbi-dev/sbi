@@ -23,7 +23,7 @@ from sbi.simulators.simutils import (
     set_simulator_attributes,
     check_prior_and_data_dimensions,
 )
-from sbi.utils.torchutils import get_default_device, make_conform
+from sbi.utils.torchutils import get_default_device, make_shapes_conform
 
 
 class SNL:
@@ -41,28 +41,34 @@ class SNL:
         prior: torch.distributions,
         true_observation: torch.Tensor,
         density_estimator: Optional[torch.nn.Module],
+        simulation_batch_size: int = 1,
         summary_writer: SummaryWriter = None,
         device: torch.device = None,
         mcmc_method: str = "slice-np",
     ):
         """
-        :param simulator: Python object with 'simulate' method which takes a torch.Tensor
-        of parameter values, and returns a simulation result for each parameter as a torch.Tensor.
-        :param prior: Distribution object with 'log_prob' and 'sample' methods.
-        :param true_observation: torch.Tensor containing the observation x0 for which to
-        perform inference on the posterior p(theta | x0).
-        :param neural_likelihood: Conditional density estimator q(x | theta) in the form of an
-        nets.Module. Must have 'log_prob' and 'sample' methods.
-        :param mcmc_method: MCMC method to use for posterior sampling. Must be one of
-        ['slice', 'hmc', 'nuts'].
-        :param summary_writer: SummaryWriter
-            Optionally pass summary writer. A way to change the log file location.
-            If None, will create one internally, saving logs to cwd/logs.
-        :param device: torch.device
-            Optionally pass device
-            If None, will infer it
+        Args:
+            simulator: Python object with 'simulate' method which takes a torch.Tensor
+                of parameter values, and returns a simulation result for each parameter as a torch.Tensor.
+            prior: Distribution object with 'log_prob' and 'sample' methods.
+            true_observation: torch.Tensor containing the observation x0 for which to
+            density_estimator: Conditional density estimator q(x | theta) in the form of an
+                nets.Module. Must have 'log_prob' and 'sample' methods.
+            simulation_batch_size: the number of parameter sets the simulator takes and converts to data x at
+                the same time. If simulation_batch_size==-1, we simulate all parameter sets at the same time.
+                If simulation_batch_size==1, the simulator has to process data of shape (1, num_dim).
+                If simulation_batch_size>1, the simulator has to process data of shape (simulation_batch_size, num_dim).
+            summary_writer: SummaryWriter
+                Optionally pass summary writer. A way to change the log file location.
+                If None, will create one internally, saving logs to cwd/logs.
+            device: torch.device
+                Optionally pass device
+                If None, will infer it
+            mcmc_method: MCMC method to use for posterior sampling. Must be one of
+                ['slice', 'hmc', 'nuts'].
         """
 
+        true_observation = utils.torchutils.atleast_2d(true_observation)
         check_prior_and_data_dimensions(prior, true_observation)
         # set name and dimensions of simulator
         simulator = set_simulator_attributes(simulator, prior, true_observation)
@@ -70,6 +76,7 @@ class SNL:
         self._simulator = simulator
         self._prior = prior
         self._true_observation = true_observation
+        self._simulation_batch_size = simulation_batch_size
         self._device = get_default_device() if device is None else device
 
         # create the deep neural density estimator
@@ -136,20 +143,24 @@ class SNL:
             # Generate parameters from prior in first round, and from most recent posterior
             # estimate in subsequent rounds.
             if round_ == 0:
-                parameters, observations = simulators.simulation_wrapper(
+                parameters, observations = simulators.simulate_in_batches(
                     simulator=self._simulator,
                     parameter_sample_fn=lambda num_samples: self._prior.sample(
                         (num_samples,)
                     ),
                     num_samples=num_simulations_per_round,
+                    simulation_batch_size=self._simulation_batch_size,
+                    x_dim=self._true_observation.shape[1:],  # do not pass batch_dim
                 )
             else:
-                parameters, observations = simulators.simulation_wrapper(
+                parameters, observations = simulators.simulate_in_batches(
                     simulator=self._simulator,
                     parameter_sample_fn=lambda num_samples: self._neural_posterior.sample(
                         num_samples
                     ),
                     num_samples=num_simulations_per_round,
+                    simulation_batch_size=self._simulation_batch_size,
+                    x_dim=self._true_observation.shape[1:],  # do not pass batch_dim
                 )
 
             # Store (parameter, observation) pairs.
@@ -378,11 +389,8 @@ class PotentialFunctionProvider:
 
         parameter = next(iter(parameters.values()))
 
-        # => ensure observation's shape conforms with parameter's for cat below
-        observation = make_conform(self.observation, parameter)
-
         log_likelihood = self.likelihood_nn.log_prob(
-            inputs=observation.reshape(1, -1), context=parameter.reshape(1, -1)
+            inputs=self.observation.reshape(1, -1), context=parameter.reshape(1, -1)
         )
 
         return -(log_likelihood + self.prior.log_prob(parameter))

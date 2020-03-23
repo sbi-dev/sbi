@@ -12,13 +12,13 @@ from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from tqdm import tqdm
 
-import sbi.simulators as simulators
 import sbi.utils as utils
 from sbi.inference.posteriors.sbi_posterior import Posterior
 from sbi.utils.torchutils import get_default_device
 from sbi.simulators.simutils import (
     set_simulator_attributes,
     check_prior_and_data_dimensions,
+    simulate_in_batches,
 )
 
 
@@ -32,6 +32,7 @@ class SnpeBase:
         density_estimator=None,
         calibration_kernel=None,
         z_score_obs=True,
+        simulation_batch_size: int = 1,
         use_combined_loss=False,
         retrain_from_scratch_each_round=False,
         discard_prior_samples=False,
@@ -55,6 +56,10 @@ class SnpeBase:
                 Density estimator to use.
             z_score_obs: bool
                 Whether to z-score (=normalize) the data features x
+            simulation_batch_size: the number of parameter sets the simulator takes and converts to data x at
+                the same time. If simulation_batch_size==-1, we simulate all parameter sets at the same time.
+                If simulation_batch_size==1, the simulator has to process data of shape (1, num_dim).
+                If simulation_batch_size>1, the simulator has to process data of shape (simulation_batch_size, num_dim).
             use_combined_loss: bool
                 Whether to jointly neural_net prior samples using maximum likelihood.
                 Useful to prevent density leaking when using box uniform priors.
@@ -63,20 +68,19 @@ class SnpeBase:
                 from scratch each round.
             discard_prior_samples: bool
                 Whether to discard prior samples from round two onwards.
-            summary_writer: SummaryWriter
-                Optionally pass summary writer. A way to change the log file location.
-                If None, will create one internally, saving logs to cwd/logs.
             device: torch.device
                 Optionally pass device
                 If None, will infer it
         """
 
+        true_observation = utils.torchutils.atleast_2d(true_observation)
         check_prior_and_data_dimensions(prior, true_observation)
         self._simulator = set_simulator_attributes(simulator, prior, true_observation)
         self._prior = prior
         self._true_observation = true_observation
         self._device = get_default_device() if device is None else device
         self.z_score_obs = z_score_obs
+        self._simulation_batch_size = simulation_batch_size
         self.num_pilot_samples = num_pilot_samples
         self._use_combined_loss = use_combined_loss
         self._discard_prior_samples = discard_prior_samples
@@ -86,10 +90,12 @@ class SnpeBase:
         self._retrain_from_scratch_each_round = retrain_from_scratch_each_round
 
         # run prior samples
-        self.pilot_parameters, self.pilot_observations = simulators.simulation_wrapper(
+        (self.pilot_parameters, self.pilot_observations,) = simulate_in_batches(
             simulator=self._simulator,
             parameter_sample_fn=lambda num_samples: self._prior.sample((num_samples,)),
             num_samples=num_pilot_samples,
+            simulation_batch_size=self._simulation_batch_size,
+            x_dim=self._true_observation.shape[1:],  # do not pass batch_dim
         )
 
         # create the deep neural density estimator
@@ -246,7 +252,7 @@ class SnpeBase:
         # Generate parameters from prior in first round, and from most recent posterior
         # estimate in subsequent rounds.
         if round_ == 0:
-            parameters, observations = simulators.simulation_wrapper(
+            parameters, observations = simulate_in_batches(
                 simulator=self._simulator,
                 parameter_sample_fn=lambda num_samples: self._prior.sample(
                     (num_samples,)
@@ -254,6 +260,8 @@ class SnpeBase:
                 num_samples=np.maximum(
                     0, num_simulations_per_round - self.num_pilot_samples
                 ),
+                simulation_batch_size=self._simulation_batch_size,
+                x_dim=self._true_observation.shape[1:],  # do not pass batch_dim
             )
             parameters = torch.cat(
                 (parameters, self.pilot_parameters[:num_simulations_per_round]), dim=0
@@ -263,12 +271,14 @@ class SnpeBase:
                 dim=0,
             )
         else:
-            parameters, observations = simulators.simulation_wrapper(
+            parameters, observations = simulate_in_batches(
                 simulator=self._simulator,
                 parameter_sample_fn=lambda num_samples: self._neural_posterior.sample(
                     num_samples, context=self._true_observation,
                 ),
                 num_samples=num_simulations_per_round,
+                simulation_batch_size=self._simulation_batch_size,
+                x_dim=self._true_observation.shape[1:],  # do not pass batch_dim
             )
 
         # Store (parameter, observation) pairs.
@@ -520,7 +530,7 @@ class PotentialFunctionProvider:
         log_prob_posterior = -self.posterior_nn.log_prob(
             inputs=parameter, context=self.observation,
         )
-        log_prob_prior = self.prior.log_prob(parameters)
+        log_prob_prior = self.prior.log_prob(parameter)
 
         within_prior = torch.isfinite(log_prob_prior)
 

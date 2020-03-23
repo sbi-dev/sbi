@@ -207,15 +207,34 @@ class BoxUniform(Independent):
         super().__init__(Uniform(low=low, high=high), reinterpreted_batch_ndims)
 
 
+# XXX does an in-place version (e.g. make_conform_) make sense?
+def make_shapes_conform(parameter: torch.Tensor, observation: torch.Tensor) -> (torch.Tensor, torch.Tensor):
+    """
+    Return tensors that both have the same tensor.ndim
+    Function now also covers cases where parameters is ndim=1 and observation ndim=2
+    Also, we have specialized check for multi-dimensional data x, e.g. images.
+    """
+
+    # => ensure parameters have shape (1, dim_theta)
+    if parameter.ndim == 1:
+        parameter = parameter.unsqueeze(0)
+    # => ensure observation has shape (1, dim_x). We also need the first check
+    # in case self.observation is e.g. an image
+    if observation.shape[0] > 1 and observation.ndim == 1:
+        observation = observation.unsqueeze(0)
+
+    return parameter, observation
+
+
 def atleast_2d(
     *arys: Union[np.array, torch.Tensor]
 ) -> Union[torch.Tensor, List[torch.Tensor]]:
     """Return tensors with at least dimension 2.
-    
+
     Tensors or arrays of dimension 0 or 1 will be get additional dimension(s) prepended.
-    
+
     Returns:
-        Tensor or list of tensors all with dimension >= 2. 
+        Tensor or list of tensors all with dimension >= 2.
     """
     if len(arys) == 1:
         arr = arys[0]
@@ -224,21 +243,4 @@ def atleast_2d(
         return arr if arr.ndim >= 2 else arr.reshape(1, -1)
     else:
         return [atleast_2d(arr) for arr in arys]
-
-
-# XXX decide whether to keep in view of atleast_2d
-def make_conform(target: torch.Tensor, ref: torch.Tensor) -> torch.Tensor:
-    """Return tensor with maybe additional dimension to match reference.
-    
-    In particular, if reference is dim 1, target will be dim 1. 
-    """
-
-    dim_gap = ref.ndim - target.ndim
-
-    if dim_gap not in (0, 1):
-        # XXX is this scenario possible at all? if not, remove check
-        # XXX if yes, consider generalizing the function
-        raise NotImplementedError(f"Dimensions differ by {dim_gap} ∉ {{0,1}}).")
-
-    return target.unsqueeze(0) if dim_gap else target
 

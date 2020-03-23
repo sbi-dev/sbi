@@ -155,6 +155,8 @@ class Posterior:
 
         if context is None:
             context = self._context
+        else:
+            context = utils.torchutils.atleast_2d(context)
 
         if self._train_with_mcmc:
             return self._sample_posterior_mcmc(

@@ -4,6 +4,6 @@ from sbi.simulators.mg1 import MG1Simulator
 from sbi.simulators.nonlinear_gaussian import NonlinearGaussianSimulator
 from sbi.simulators.simutils import (
     get_simulator_prior_and_groundtruth,
-    simulation_wrapper,
+    simulate_in_batches,
 )
 from sbi.simulators.two_moons import TwoMoonsSimulator

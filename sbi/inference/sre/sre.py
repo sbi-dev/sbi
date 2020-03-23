@@ -21,7 +21,7 @@ from sbi.simulators.simutils import (
     set_simulator_attributes,
     check_prior_and_data_dimensions,
 )
-from sbi.utils.torchutils import get_default_device, make_conform
+from sbi.utils.torchutils import get_default_device, make_shapes_conform
 
 
 class SRE:
@@ -40,35 +40,42 @@ class SRE:
         true_observation,
         classifier,
         num_atoms=-1,
-        mcmc_method="slice-np",
+        simulation_batch_size: int = 1,
+        mcmc_method: str = "slice-np",
         summary_net=None,
         retrain_from_scratch_each_round=False,
         summary_writer=None,
         device=None,
     ):
         """
-        :param simulator: Python object with 'simulate' method which takes a torch.Tensor
-        of parameter values, and returns a simulation result for each parameter as a torch.Tensor.
-        :param prior: Distribution object with 'log_prob' and 'sample' methods.
-        :param true_observation: torch.Tensor containing the observation x0 for which to
-        perform inference on the posterior p(theta | x0).
-        :param classifier: Binary classifier in the form of an nets.Module.
-        Takes as input (x, theta) pairs and outputs pre-sigmoid activations.
-        :param num_atoms: int
-            Number of atoms to use for classification.
-            If -1, use all other parameters in minibatch.
-        :param summary_net: Optional network which may be used to produce feature vectors
-        f(x) for high-dimensional observations.
-        :param retrain_from_scratch_each_round: Whether to retrain the conditional density
-        estimator for the posterior from scratch each round.
-        :param summary_writer: SummaryWriter
-            Optionally pass summary writer. A way to change the log file location.
-            If None, will create one internally, saving logs to cwd/logs.
-        :param device: torch.device
-            Optionally pass device
-            If None, will infer it
+
+        Args:
+            simulator: Python object with 'simulate' method which takes a torch.Tensor
+                of parameter values, and returns a simulation result for each parameter as a torch.Tensor.
+            prior: Distribution object with 'log_prob' and 'sample' methods.
+            true_observation: torch.Tensor containing the observation x0 for which to
+                perform inference on the posterior p(theta | x0).
+            classifier: Binary classifier in the form of an nets.Module.
+            num_atoms: Number of atoms to use for classification.
+                If -1, use all other parameters in minibatch.
+            simulation_batch_size: the number of parameter sets the simulator takes and converts to data x at
+                the same time. If simulation_batch_size==-1, we simulate all parameter sets at the same time.
+                If simulation_batch_size==1, the simulator has to process data of shape (1, num_dim).
+                If simulation_batch_size>1, the simulator has to process data of shape (simulation_batch_size, num_dim).
+            mcmc_method: What MCMC sampler to use. One of {"slice-np", "slice", "nuts", "hmc"}
+            summary_net: Optional network which may be used to produce feature vectors
+                f(x) for high-dimensional observations.
+            retrain_from_scratch_each_round: Whether to retrain the conditional density
+                estimator for the posterior from scratch each round.
+            summary_writer: SummaryWriter
+                Optionally pass summary writer. A way to change the log file location.
+                If None, will create one internally, saving logs to cwd/logs.
+            device: torch.device
+                Optionally pass device
+                If None, will infer it
         """
 
+        true_observation = utils.torchutils.atleast_2d(true_observation)
         check_prior_and_data_dimensions(prior, true_observation)
         # set name and dimensions of simulator
         simulator = set_simulator_attributes(simulator, prior, true_observation)
@@ -76,6 +83,7 @@ class SRE:
         self._simulator = simulator
         self._true_observation = true_observation
         self._prior = prior
+        self._simulation_batch_size = simulation_batch_size
         self._device = get_default_device() if device is None else device
 
         assert isinstance(num_atoms, int), "Number of atoms must be an integer."
@@ -159,20 +167,24 @@ class SRE:
             # Generate parameters from prior in first round, and from most recent posterior
             # estimate in subsequent rounds.
             if round_ == 0:
-                parameters, observations = simulators.simulation_wrapper(
+                parameters, observations = simulators.simulate_in_batches(
                     simulator=self._simulator,
                     parameter_sample_fn=lambda num_samples: self._prior.sample(
                         (num_samples,)
                     ),
                     num_samples=num_simulations_per_round,
+                    simulation_batch_size=self._simulation_batch_size,
+                    x_dim=self._true_observation.shape[1:],  # do not pass batch_dim
                 )
             else:
-                parameters, observations = simulators.simulation_wrapper(
+                parameters, observations = simulators.simulate_in_batches(
                     simulator=self._simulator,
                     parameter_sample_fn=lambda num_samples: self._neural_posterior.sample(
                         num_samples
                     ),
                     num_samples=num_simulations_per_round,
+                    simulation_batch_size=self._simulation_batch_size,
+                    x_dim=self._true_observation.shape[1:],  # do not pass batch_dim
                 )
 
             # Store (parameter, observation) pairs.
@@ -413,14 +425,15 @@ class PotentialFunctionProvider:
         Returns:
             [tensor or -inf]: posterior log probability of the parameters.
         """
-        parameters = torch.FloatTensor(parameters)
+        parameter = torch.tensor(parameters, dtype=torch.float32)
 
-        log_ratio = self.classifier(
-            torch.cat((parameters, self.observation)).reshape(1, -1)
-        )
+        # parameter and observation should have shape (1, dim)
+        parameter, observation = make_shapes_conform(parameter, self.observation)
+
+        log_ratio = self.classifier(torch.cat((parameter, observation)).reshape(1, -1))
 
         # notice opposite sign to pyro potential
-        return log_ratio + self.prior.log_prob(parameters)
+        return log_ratio + self.prior.log_prob(parameter)
 
     def pyro_potential(self, parameters: Dict[str, torch.Tensor]) -> torch.Tensor:
         """Return potential for Pyro sampler.
@@ -434,8 +447,8 @@ class PotentialFunctionProvider:
 
         parameter = next(iter(parameters.values()))
 
-        # => ensure observation's shape conforms with parameter's for cat below
-        observation = make_conform(self.observation, parameter)
+        # parameter and observation should have shape (1, dim)
+        parameter, observation = make_shapes_conform(parameter, self.observation)
 
         log_ratio = self.classifier(torch.cat((parameter, observation)).reshape(1, -1))
 
