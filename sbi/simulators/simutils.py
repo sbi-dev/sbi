@@ -150,18 +150,14 @@ def simulate_in_batches(
         # run all simulations in a single batch
         simulation_batch_size = num_samples
 
-    # initialize an empty array that stores the simulation outputs
-    all_x_shape = torch.cat(
-        (torch.tensor([0], dtype=torch.int), torch.tensor(x_dim, dtype=torch.int))
-    )
-    all_x = torch.empty(torch.Size(all_x_shape), dtype=torch.float32)
-
     # split parameter set into batches of size (simulation_batch_size, num_dim_parameters)
     n_chunks = math.ceil(num_samples / simulation_batch_size)
     parameter_batches = torch.chunk(parameters, chunks=n_chunks)
 
+    all_x = []
     for batch in parameter_batches:
         with torch.no_grad():
+            # XXX: if we assert the that simultor return Tensor with batch dim we can avoid the following 2 checks
             x = simulator(batch)
             if not isinstance(x, torch.Tensor):
                 # convert simulator output to torch in case it was numpy array
@@ -169,13 +165,12 @@ def simulate_in_batches(
             if simulation_batch_size == 1:
                 # squeeze in case simulator provides an additional dimension for single parameters,
                 # e.g. in linearGaussian example. Then prepend a dimension to be able to concatenate.
+                # XXX: here we are squeezing and unsqueezing on the same dim, no?
                 x = torch.squeeze(x, dim=0).unsqueeze(0)
+        # collect batches in list
+        all_x.append(x)
 
-        # add simulations to database of simulations. If simulator output x is torch.Tensor,
-        # it automatically gets converted to a np.array here.
-        all_x = torch.cat((all_x, x), dim=0)
-
-    return torch.tensor(parameters), all_x
+    return torch.tensor(parameters), torch.cat(all_x)
 
 
 def get_simulator_prior_and_groundtruth(task):
