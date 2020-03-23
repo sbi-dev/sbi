@@ -1,6 +1,7 @@
+import math
 import os
 import pickle
-from sbi.simulators.linear_gaussian import linear_gaussian
+import warnings
 from typing import Callable, Tuple
 
 import torch
@@ -9,9 +10,8 @@ from torch.distributions import Distribution, MultivariateNormal, Uniform
 
 import sbi.simulators as simulators
 import sbi.utils as utils
+from sbi.simulators.linear_gaussian import linear_gaussian
 from sbi.utils.torchutils import BoxUniform
-import warnings
-import math
 
 
 def set_simulator_attributes(
@@ -216,17 +216,6 @@ def get_simulator_prior_and_groundtruth(task):
             ]
         )
 
-    elif task == "two-moons":
-        simulator = simulators.TwoMoonsSimulator()
-        a = 2
-        prior = BoxUniform(
-            low=-a * torch.ones(simulator.parameter_dim),
-            high=a * torch.ones(simulator.parameter_dim),
-        )
-        # dummy ground truth parameters as none are specified in 'Automatic Posterior Transformation.'
-        ground_truth_parameters = torch.zeros((1, 2))
-        ground_truth_observation = torch.zeros((1, 2))
-
     elif task == "linear-gaussian":
         dim, std = 20, 0.5
         simulator = lambda theta: linear_gaussian(theta, std=std)
@@ -235,45 +224,6 @@ def get_simulator_prior_and_groundtruth(task):
         )
         ground_truth_parameters = torch.zeros(dim)
         ground_truth_observation = simulator(ground_truth_parameters)
-
-    elif task == "lotka-volterra":
-        simulator = simulators.LotkaVolterraSimulator(
-            summarize_observations=True, gaussian_prior=False
-        )
-        prior = BoxUniform(
-            low=-5 * torch.ones(simulator.parameter_dim),
-            high=2 * torch.ones(simulator.parameter_dim),
-        )
-        ground_truth_parameters = torch.log(torch.tensor([0.01, 0.5, 1.0, 0.01]))
-        path = os.path.join(utils.get_data_root(), "lotka-volterra", "obs_stats.pkl")
-        with open(path, "rb") as file:
-            true_observation = pickle.load(file, encoding="bytes")
-        ground_truth_observation = torch.tensor(true_observation)
-
-    elif task == "lotka-volterra-gaussian":
-        simulator = simulators.LotkaVolterraSimulator(
-            summarize_observations=True, gaussian_prior=True
-        )
-        prior = MultivariateNormal(
-            loc=torch.zeros(4), covariance_matrix=2 * torch.eye(4)
-        )
-        ground_truth_parameters = torch.log(torch.tensor([0.01, 0.5, 1.0, 0.01]))
-        path = os.path.join(utils.get_data_root(), "lotka-volterra", "obs_stats.pkl")
-        with open(path, "rb") as file:
-            true_observation = pickle.load(file, encoding="bytes")
-        ground_truth_observation = torch.tensor(true_observation)
-
-    elif task == "mg1":
-        simulator = simulators.MG1Simulator()
-        prior = distributions_.MG1Uniform(
-            low=torch.zeros(3), high=torch.tensor([10.0, 10.0, 1.0 / 3.0])
-        )
-        ground_truth_parameters = torch.tensor([1.0, 5.0, 0.2])
-        path = os.path.join(utils.get_data_root(), "mg1", "observed_data.pkl")
-        with open(path, "rb") as file:
-            _, true_observation = pickle.load(file, encoding="bytes")
-        ground_truth_observation = torch.tensor(true_observation)
-
     else:
         raise ValueError(f"'{task}' simulator choice not understood.")
 
