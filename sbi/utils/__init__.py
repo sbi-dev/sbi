@@ -35,3 +35,4 @@ from sbi.utils.typechecks import (
     is_positive_int,
     is_power_of_two,
 )
+from sbi.utils.dkl import dkl_monte_carlo_estimate

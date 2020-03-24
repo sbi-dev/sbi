@@ -87,7 +87,18 @@ class Posterior:
         self.neural_net.eval()
 
         # compute the unnormalized log probability by evaluating the network
-        unnormalized_log_prob = self.neural_net.log_prob(inputs, context)
+        if self._alg_family == "snpe":
+            # todo: we need to check if inputs is within the bounds
+            unnormalized_log_prob = self.neural_net.log_prob(inputs, context)
+        elif self._alg_family == "sre":
+            log_ratio = self.neural_net.classifier(
+                torch.cat((inputs, context)).reshape(1, -1)
+            )
+            unnormalized_log_prob = log_ratio + self._prior.log_prob(inputs)
+        else:
+            raise NameError(
+                "Evaluating the log-probability can only be done for SNPE and SRE."
+            )
 
         # find the acceptance rate
         leakage_correction = (

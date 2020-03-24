@@ -8,6 +8,7 @@ from sbi.inference.snpe.snpe_c import SnpeC
 from sbi.simulators.linear_gaussian import (
     get_true_posterior_samples_linear_gaussian_mvn_prior,
     get_true_posterior_samples_linear_gaussian_uniform_prior,
+    get_true_posterior_log_prob_linear_gaussian_mvn_prior,
     linear_gaussian,
 )
 
@@ -85,6 +86,31 @@ def test_apt_on_linearGaussian_based_on_mmd(
     # draw samples from posterior
     samples = posterior.sample(num_samples)
 
+    # define vector where the target density is evaluated
+    inputs = torch.linspace(-5, 5, 100)
+    inputs = inputs[None,].T
+
+    # load ground truth density
+    target_dist = get_true_posterior_log_prob_linear_gaussian_mvn_prior(
+        true_observation,
+    )
+
+    # evaluate the posterior density
+    target_probs = torch.exp(target_dist.log_prob(inputs))
+    posterior_probs = torch.exp(posterior.log_prob(inputs, true_observation))
+
+    print("target    ", target_probs)
+    print("prediction", posterior_probs)
+
+    dkl = utils.dkl_monte_carlo_estimate(target_dist, posterior, num_samples=1000)
+
+    print("dkl is:  ", dkl)
+    max_dkl = 0.03
+
+    assert (
+        dkl < max_dkl
+    ), f"MMD={dkl} is more than 2 stds above the average performance."
+
     # compute the mmd
     mmd = utils.unbiased_mmd_squared(target_samples, samples)
 
@@ -98,7 +124,7 @@ def test_apt_on_linearGaussian_based_on_mmd(
     ), f"MMD={mmd} is more than 2 stds above the average performance."
 
 
-test_apt_on_linearGaussian_based_on_mmd(3, "gaussian", "snpe_c", 10)
+test_apt_on_linearGaussian_based_on_mmd(1, "gaussian", "snpe_c", 10)
 
 # test multi-round SNPE
 @pytest.mark.slow
