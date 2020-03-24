@@ -1,6 +1,8 @@
 # Copyright (c) 2017-2019 Uber Technologies, Inc.
 # SPDX-License-Identifier: Apache-2.0
 
+from copy import deepcopy
+
 import torch
 from pyro.infer.mcmc.mcmc_kernel import MCMCKernel
 from pyro.infer.mcmc.util import initialize_model
@@ -91,7 +93,7 @@ class Slice(MCMCKernel):
 
     @property
     def initial_params(self):
-        return self._initial_params
+        return deepcopy(self._initial_params)
 
     @initial_params.setter
     def initial_params(self, params):
