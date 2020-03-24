@@ -117,56 +117,59 @@ def simulate_in_batches(
     parameter_sample_fn: Callable,
     num_samples: int,
     simulation_batch_size: int,
-    x_dim: torch.Size,
 ) -> (torch.Tensor, torch.Tensor):
     """
-    Draw `num_samples` parameter sets and simulate them in batches of size `simulation_batch_size`.
+    Draw `num_samples` parameter sets and simulate them in batches of size
+     `simulation_batch_size`.
 
     Features: - allows to simulate in batches of arbitrary size
               - if `simulation_batch_size==-1`, all simulations are run at the same time
               - simulator output can be np.array or torch.Tensor
 
     Args:
-        simulator: simulator function.
-            If `simulation_batch_size == 1`: takes in parameters of shape (1, num_dim_parameters)
-                and outputs xs of shape (1, num_dim_x)
-            If `simulation_batch_size > 1`: takes in thetas of shape (simulation_batch_size, num_dim_parameters)
-                and outputs xs of shape (simulation_batch_size, num_dim_x)
+        simulator: simulator function that takes in parameters theta and outputs data x
+            If `simulation_batch_size == 1`: takes in parameters of shape
+             (1, num_dim_parameters) and outputs xs of shape (1, num_dim_x)
+            If `simulation_batch_size > 1`: takes in thetas of shape
+             (simulation_batch_size, num_dim_parameters) and outputs xs of shape
+             (simulation_batch_size, num_dim_x)
         parameter_sample_fn: Function to call for generating theta, e.g. prior sampling
         num_samples: Number of simulations to run
         simulation_batch_size: Number of simulations that are run within a single batch
-            If `simulation_batch_size == -1`, we run a batch with all simulations required,
-            i.e. `simulation_batch_size = num_samples`
-        x_dim: dimensionality of a single simulator output
+            If `simulation_batch_size == -1`, we run a batch with all simulations
+             required, i.e. `simulation_batch_size = num_samples`
 
-    Returns: torch.Tensor simulation input parameters of shape (num_samples, num_dim_parameters),
+    Returns: torch.Tensor simulation input parameters of shape
+                (num_samples, num_dim_parameters)
              torch.Tensor simulator outputs x of shape (num_samples, num_dim_x)
     """
 
-    # generate parameters (simulation inputs) by sampling from prior (round 1) or proposal (round > 1)
+    # generate parameters (simulation inputs) by sampling from prior (round 1)
+    # or proposal (round > 1)
     parameters = parameter_sample_fn(num_samples)
 
     if simulation_batch_size == -1:
         # run all simulations in a single batch
         simulation_batch_size = num_samples
 
-    # split parameter set into batches of size (simulation_batch_size, num_dim_parameters)
+    # split parameter set into batches of size
+    # (simulation_batch_size, num_dim_parameters)
     n_chunks = math.ceil(num_samples / simulation_batch_size)
     parameter_batches = torch.chunk(parameters, chunks=n_chunks)
 
     all_x = []
     for batch in parameter_batches:
         with torch.no_grad():
-            # XXX: if we assert the that simultor return Tensor with batch dim we can avoid the following 2 checks
+            # XXX: if we assert the that simulator returns a torch.Tensor with batch dim
+            # we can avoid the following 2 checks
             x = simulator(batch)
             if not isinstance(x, torch.Tensor):
-                # convert simulator output to torch in case it was numpy array
+                # convert simulator output to torch in case it is not a torch.Tensor
                 x = torch.from_numpy(x)
             if simulation_batch_size == 1:
-                # squeeze in case simulator provides an additional dimension for single parameters,
-                # e.g. in linearGaussian example. Then prepend a dimension to be able to concatenate.
-                # XXX: here we are squeezing and unsqueezing on the same dim, no?
-                x = torch.squeeze(x, dim=0).unsqueeze(0)
+                # In case simulator outputs data of shape (dim_observation), we prepend
+                # a dimension to make it (1, dim_observation)
+                x = utils.torchutils.ensure_observation_batched(x)
         # collect batches in list
         all_x.append(x)
 

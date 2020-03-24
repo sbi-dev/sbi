@@ -95,7 +95,6 @@ class SnpeBase:
             parameter_sample_fn=lambda num_samples: self._prior.sample((num_samples,)),
             num_samples=num_pilot_samples,
             simulation_batch_size=self._simulation_batch_size,
-            x_dim=self._true_observation.shape[1:],  # do not pass batch_dim
         )
 
         # create the deep neural density estimator
@@ -263,7 +262,6 @@ class SnpeBase:
                     0, num_simulations_per_round - self.num_pilot_samples
                 ),
                 simulation_batch_size=self._simulation_batch_size,
-                x_dim=self._true_observation.shape[1:],  # do not pass batch_dim
             )
             parameters = torch.cat(
                 (parameters, self.pilot_parameters[:num_simulations_per_round]), dim=0
@@ -280,7 +278,6 @@ class SnpeBase:
                 ),
                 num_samples=num_simulations_per_round,
                 simulation_batch_size=self._simulation_batch_size,
-                x_dim=self._true_observation.shape[1:],  # do not pass batch_dim
             )
 
         # Store (parameter, observation) pairs.

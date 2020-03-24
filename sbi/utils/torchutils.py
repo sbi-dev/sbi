@@ -193,7 +193,7 @@ class BoxUniform(Independent):
     ):
         """Multidimensional uniform distribution defined on a box.
         
-        A `Uniform` distribution initialized with e.g. a parameter vector low or high of length 3 will result in a /batch/ dimension of length 3. A log_prob evaluation will then output three numbers, one for each of the independent Uniforms in the batch. Instead, a `BoxUniform` initialized in the same way has three /event/ dimensions, and returns a scalar log_prob corresponding to whether the evaluated point is in the box defined by low and high or outside. 
+        A `Uniform` distribution initialized with e.g. a parameter vector low or high of length 3 will result in a /batch/ dimension of length 3. A log_prob evaluation will then output three numbers, one for each of the independent Uniforms in the batch. Instead, a `BoxUniform` initialized in the same way has three /event/ dimensions, and returns a scalar log_prob corresponding to whether the evaluated point is in the box defined by low and high or outside.
     
         Refer to torch.distributions.Uniform and torch.distributions.Independent for further documentation.
     
@@ -207,12 +207,16 @@ class BoxUniform(Independent):
         super().__init__(Uniform(low=low, high=high), reinterpreted_batch_ndims)
 
 
-# XXX does an in-place version (e.g. make_conform_) make sense?
+# XXX does an in-place version (e.g. ensure_parameter_batched_) make sense?
 def ensure_parameter_batched(parameter: torch.Tensor) -> torch.Tensor:
     """
-    Return tensors that both have the same tensor.ndim
-    Function also covers cases where parameters is ndim=1 and observation ndim=2
-    Also, we have specialized check for multi-dimensional data x, e.g. images.
+    Return parameter tensor that has a batch dimension, i.e. has shape
+    (1, dim_parameters)
+
+    Args:
+        parameter: A single parameter set, potentially without batch dimension
+    Returns:
+        Batched parameter set
     """
 
     # => ensure parameters have shape (1, dim_parameter)
@@ -222,16 +226,22 @@ def ensure_parameter_batched(parameter: torch.Tensor) -> torch.Tensor:
     return parameter
 
 
-# XXX does an in-place version (e.g. make_conform_) make sense?
+# XXX does an in-place version (e.g. ensure_observation_batched_) make sense?
 def ensure_observation_batched(observation: torch.Tensor) -> torch.Tensor:
     """
-    Return tensors that both have the same tensor.ndim
-    Function also covers cases where parameters is ndim=1 and observation ndim=2
-    Also, we have specialized check for multi-dimensional data x, e.g. images.
+    Return observation tensor that has a batch dimension, i.e. has shape
+    (1, dim_observation)
+
+    Function also covers cases where observation has observation.ndim>1, e.g. images
+
+    Args:
+        observation: A single observation, potentially without batch dimension
+    Returns:
+        Batched observation
     """
 
-    # => ensure observation has shape (1, dim_observation). If shape[0] > 1, we assume that the batch-dimension
-    # is missing, even though ndim might be >1 (e.g. for images)
+    # => ensure observation has shape (1, dim_observation). If shape[0] > 1, we assume
+    # that the batch-dimension is missing, even though ndim might be >1 (e.g. images)
     if observation.shape[0] > 1 or observation.ndim == 1:
         observation = observation.unsqueeze(0)
 
