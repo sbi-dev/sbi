@@ -23,7 +23,7 @@ from sbi.simulators.simutils import (
     set_simulator_attributes,
     check_prior_and_data_dimensions,
 )
-from sbi.utils.torchutils import get_default_device, add_batch_dim
+from sbi.utils.torchutils import get_default_device
 
 
 class SNL:

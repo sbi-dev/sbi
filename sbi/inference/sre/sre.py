@@ -21,7 +21,11 @@ from sbi.simulators.simutils import (
     set_simulator_attributes,
     check_prior_and_data_dimensions,
 )
-from sbi.utils.torchutils import get_default_device, add_batch_dim
+from sbi.utils.torchutils import (
+    get_default_device,
+    ensure_parameter_batched,
+    ensure_observation_batched,
+)
 
 
 class SRE:
@@ -428,7 +432,8 @@ class PotentialFunctionProvider:
         parameter = torch.tensor(parameters, dtype=torch.float32)
 
         # parameter and observation should have shape (1, dim)
-        parameter, observation = add_batch_dim(parameter, self.observation)
+        parameter = ensure_parameter_batched(parameter)
+        observation = ensure_observation_batched(self.observation)
 
         log_ratio = self.classifier(torch.cat((parameter, observation)).reshape(1, -1))
 
@@ -448,7 +453,8 @@ class PotentialFunctionProvider:
         parameter = next(iter(parameters.values()))
 
         # parameter and observation should have shape (1, dim)
-        parameter, observation = add_batch_dim(parameter, self.observation)
+        parameter = ensure_parameter_batched(parameter)
+        observation = ensure_observation_batched(self.observation)
 
         log_ratio = self.classifier(torch.cat((parameter, observation)).reshape(1, -1))
 
