@@ -208,22 +208,34 @@ class BoxUniform(Independent):
 
 
 # XXX does an in-place version (e.g. make_conform_) make sense?
-def make_shapes_conform(parameter: torch.Tensor, observation: torch.Tensor) -> (torch.Tensor, torch.Tensor):
+def ensure_parameter_batched(parameter: torch.Tensor) -> torch.Tensor:
     """
     Return tensors that both have the same tensor.ndim
-    Function now also covers cases where parameters is ndim=1 and observation ndim=2
+    Function also covers cases where parameters is ndim=1 and observation ndim=2
     Also, we have specialized check for multi-dimensional data x, e.g. images.
     """
 
-    # => ensure parameters have shape (1, dim_theta)
+    # => ensure parameters have shape (1, dim_parameter)
     if parameter.ndim == 1:
         parameter = parameter.unsqueeze(0)
-    # => ensure observation has shape (1, dim_x). We also need the first check
-    # in case self.observation is e.g. an image
-    if observation.shape[0] > 1 and observation.ndim == 1:
+
+    return parameter
+
+
+# XXX does an in-place version (e.g. make_conform_) make sense?
+def ensure_observation_batched(observation: torch.Tensor) -> torch.Tensor:
+    """
+    Return tensors that both have the same tensor.ndim
+    Function also covers cases where parameters is ndim=1 and observation ndim=2
+    Also, we have specialized check for multi-dimensional data x, e.g. images.
+    """
+
+    # => ensure observation has shape (1, dim_observation). If shape[0] > 1, we assume that the batch-dimension
+    # is missing, even though ndim might be >1 (e.g. for images)
+    if observation.shape[0] > 1 or observation.ndim == 1:
         observation = observation.unsqueeze(0)
 
-    return parameter, observation
+    return observation
 
 
 def atleast_2d(
@@ -243,4 +255,3 @@ def atleast_2d(
         return arr if arr.ndim >= 2 else arr.reshape(1, -1)
     else:
         return [atleast_2d(arr) for arr in arys]
-
