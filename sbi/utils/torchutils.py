@@ -214,7 +214,7 @@ def ensure_parameter_batched(parameter: torch.Tensor) -> torch.Tensor:
     (1, dim_parameters)
 
     Args:
-        parameter: A single parameter set, potentially without batch dimension
+        parameter: A tensor (parameter set) of n parameters of shape (n) or (1,n)
     Returns:
         Batched parameter set
     """
@@ -235,7 +235,7 @@ def ensure_observation_batched(observation: torch.Tensor) -> torch.Tensor:
     Function also covers cases where observation has observation.ndim>1, e.g. images
 
     Args:
-        observation: A single observation, potentially without batch dimension
+        observation: A tensor (observation) of n values of shape (n) or (1,n)
     Returns:
         Batched observation
     """

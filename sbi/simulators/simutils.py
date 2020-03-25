@@ -127,12 +127,9 @@ def simulate_in_batches(
               - simulator output can be np.array or torch.Tensor
 
     Args:
-        simulator: simulator function that takes in parameters theta and outputs data x
-            If `simulation_batch_size == 1`: takes in parameters of shape
-             (1, num_dim_parameters) and outputs xs of shape (1, num_dim_x)
-            If `simulation_batch_size > 1`: takes in thetas of shape
-             (simulation_batch_size, num_dim_parameters) and outputs xs of shape
-             (simulation_batch_size, num_dim_x)
+        simulator: simulator function that takes in parameters of shape
+         (simulation_batch_size, num_dim_parameters) and
+         outputs xs of shape (simulation_batch_size, num_dim_x)
         parameter_sample_fn: Function to call for generating theta, e.g. prior sampling
         num_samples: Number of simulations to run
         simulation_batch_size: Number of simulations that are run within a single batch
@@ -158,20 +155,19 @@ def simulate_in_batches(
     parameter_batches = torch.chunk(parameters, chunks=n_chunks)
 
     all_x = []
-    for batch in parameter_batches:
-        with torch.no_grad():
+    with torch.no_grad():
+        for batch in parameter_batches:
             # XXX: if we assert the that simulator returns a torch.Tensor with batch dim
             # we can avoid the following 2 checks
             x = simulator(batch)
             if not isinstance(x, torch.Tensor):
-                # convert simulator output to torch in case it is not a torch.Tensor
                 x = torch.from_numpy(x)
             if simulation_batch_size == 1:
                 # In case simulator outputs data of shape (dim_observation), we prepend
                 # a dimension to make it (1, dim_observation)
                 x = utils.torchutils.ensure_observation_batched(x)
-        # collect batches in list
-        all_x.append(x)
+            # collect batches in list
+            all_x.append(x)
 
     return torch.tensor(parameters), torch.cat(all_x)
 
