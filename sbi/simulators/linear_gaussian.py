@@ -27,6 +27,11 @@ def get_true_posterior_samples_linear_gaussian_mvn_prior(
 def get_true_posterior_log_prob_linear_gaussian_n_prior(
     observation: torch.Tensor, std=1.0
 ):
+    """
+    Get the ground truth density when using just a single dimension.
+
+    Returns: torch.distributions.Normal
+    """
     observation = utils.torchutils.atleast_2d(observation)
     assert observation.ndim == 2, "needs batch dimension in observation"
     mean = observation
@@ -40,6 +45,11 @@ def get_true_posterior_log_prob_linear_gaussian_n_prior(
 def get_true_posterior_log_prob_linear_gaussian_mvn_prior(
     observation: torch.Tensor, std=1.0
 ):
+    """
+    Get the ground truth density when using more than one dimension.
+
+    Returns: torch.distributions.MultivariateNormal
+    """
     observation = utils.torchutils.atleast_2d(observation)
     assert observation.ndim == 2, "needs batch dimension in observation"
     mean = observation

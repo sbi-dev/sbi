@@ -291,6 +291,9 @@ class SRE:
             lr=learning_rate,
         )
 
+        # only used if classifier_loss == "aalr"
+        criterion = nn.BCELoss()
+
         # Keep track of best_validation log_prob seen so far.
         best_validation_log_prob = -1e100
         # Keep track of number of epochs since last improvement.
@@ -303,7 +306,7 @@ class SRE:
         if self._retrain_from_scratch_each_round:
             self._neural_posterior = deepcopy(self._neural_posterior)
 
-        def _get_log_prob(parameters, observations):
+        def _get_loss(parameters, observations):
 
             # num_atoms = parameters.shape[0]
             num_atoms = self._num_atoms if self._num_atoms > 0 else batch_size
@@ -334,17 +337,24 @@ class SRE:
 
             if self._classifier_loss == "aalr":
                 network_outputs = self._neural_posterior.neural_net(inputs)
-                log_prob = torch.squeeze(torch.sigmoid(network_outputs))
+                likelihood = torch.squeeze(torch.sigmoid(network_outputs))
+
+                # the first batch_size elements are the ones where theta and x are
+                # sampled from the joint p(theta, x) and are labelled 1s.
+                # The second batch_size elements are the ones where theta and x are
+                # sampled from the marginals p(theta)p(x) and are labelled 0s.
+                labels = torch.cat((torch.ones(batch_size), torch.zeros(batch_size)))
+                # binary cross entropy to learn the likelihood
+                loss = criterion(likelihood, labels)
             else:
                 logits = self._neural_posterior.neural_net(inputs).reshape(
                     batch_size, num_atoms
                 )
+                # index 0 is the parameter set sampled from the joint
                 log_prob = logits[:, 0] - torch.logsumexp(logits, dim=-1)
+                loss = -torch.mean(log_prob)
 
-            return log_prob
-
-        # only used if classifier_loss == "aalr"
-        criterion = nn.BCELoss()
+            return loss
 
         epochs = 0
         while True:
@@ -353,16 +363,7 @@ class SRE:
             self._neural_posterior.neural_net.train()
             for parameters, observations in train_loader:
                 optimizer.zero_grad()
-                log_prob = _get_log_prob(parameters, observations)
-                if self._classifier_loss == "aalr":
-                    # the first batch_size elements are the ones where theta and x are
-                    # sampled from the joint p(theta, x) and are labelled 1s.
-                    # The second batch_size elements are the ones where theta and x are
-                    # sampled from the marginals p(theta)p(x) and are labelled 0s.
-                    labels = torch.cat((torch.ones(batch_size), torch.zeros(100)))
-                    loss = criterion(log_prob, labels)
-                else:
-                    loss = -torch.mean(log_prob)
+                loss = _get_loss(parameters, observations)
                 loss.backward()
                 optimizer.step()
 
@@ -373,7 +374,7 @@ class SRE:
             log_prob_sum = 0
             with torch.no_grad():
                 for parameters, observations in val_loader:
-                    log_prob = _get_log_prob(parameters, observations)
+                    log_prob = _get_loss(parameters, observations)
                     log_prob_sum += log_prob.sum().item()
                 validation_log_prob = log_prob_sum / num_validation_examples
 
