@@ -117,6 +117,18 @@ def test_sre_on_linearGaussian_based_on_mmd(num_dim: int, prior_str: str):
         mmd < max_mmd
     ), f"MMD={mmd} is more than 2 stds above the average performance."
 
+    # Checks for log_prob()
+    # We are not running tests involving the D-KL and comparisons to the ground truth
+    # since SRE returns an unnormalized density.
+    if prior_str == "uniform":
+        # test whether likelihood outside prior support is zero. Prior bounds are
+        # [-1, 1] in each dimension, so tensor of 2s will be outside of bounds.
+        sample_outside_support = 2 * torch.ones(num_dim)
+        posterior_prob = torch.exp(posterior.log_prob(sample_outside_support))
+        assert (
+            posterior_prob == 0.0
+        ), "The posterior probability outside of the prior support is not zero"
+
 
 @pytest.mark.slow
 @pytest.mark.parametrize(

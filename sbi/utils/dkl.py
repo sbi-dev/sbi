@@ -21,6 +21,8 @@ def dkl_monte_carlo_estimate(p, q, num_samples: int = 1000) -> torch.Tensor:
     summed_log_ratio = torch.tensor([0.0])
     for _ in range(num_samples):
         target_sample = p.sample()
-        summed_log_ratio += p.log_prob(target_sample) - q.log_prob(target_sample)
+        summed_log_ratio += torch.squeeze(p.log_prob(target_sample)) - torch.squeeze(
+            q.log_prob(target_sample)
+        )
     dkl = summed_log_ratio / num_samples
     return dkl

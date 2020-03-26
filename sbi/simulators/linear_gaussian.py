@@ -24,7 +24,7 @@ def get_true_posterior_samples_linear_gaussian_mvn_prior(
     return c * mean + std * torch.randn(num_samples, dim)
 
 
-def get_true_posterior_log_prob_linear_gaussian_mvn_prior(
+def get_true_posterior_log_prob_linear_gaussian_n_prior(
     observation: torch.Tensor, std=1.0
 ):
     observation = utils.torchutils.atleast_2d(observation)
@@ -34,6 +34,19 @@ def get_true_posterior_log_prob_linear_gaussian_mvn_prior(
     std = torch.sqrt(torch.tensor([std ** 2 / (std ** 2 + 1)]))
     c = torch.tensor([1.0 / (std ** 2 + 1.0)])
     target_dist = torch.distributions.Normal(c * mean, std)
+    return target_dist
+
+
+def get_true_posterior_log_prob_linear_gaussian_mvn_prior(
+    observation: torch.Tensor, std=1.0
+):
+    observation = utils.torchutils.atleast_2d(observation)
+    assert observation.ndim == 2, "needs batch dimension in observation"
+    mean = observation
+    dim = mean.shape[1]
+    std = torch.sqrt(torch.tensor([std ** 2 / (std ** 2 + 1)]))
+    c = torch.tensor([1.0 / (std ** 2 + 1.0)])
+    target_dist = torch.distributions.MultivariateNormal(c * mean, std * torch.eye(dim))
     return target_dist
 
 

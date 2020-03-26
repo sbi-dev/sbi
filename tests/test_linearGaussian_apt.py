@@ -8,12 +8,10 @@ from sbi.inference.snpe.snpe_c import SnpeC
 from sbi.simulators.linear_gaussian import (
     get_true_posterior_samples_linear_gaussian_mvn_prior,
     get_true_posterior_samples_linear_gaussian_uniform_prior,
-    get_true_posterior_log_prob_linear_gaussian_mvn_prior,
     linear_gaussian,
 )
 
 torch.manual_seed(0)
-
 
 # running all combinations is excessive. The standard test is (3, "gaussian", "snpe_c"),
 # and we then vary only one parameter at a time to test single-d, uniform, and snpe-b
@@ -21,8 +19,8 @@ torch.manual_seed(0)
     "num_dim, prior_str, algorithm_str, simulation_batch_size",
     (
         (3, "gaussian", "snpe_c", 10),
-        (1, "gaussian", "snpe_c", 10),
         (3, "uniform", "snpe_c", 10),
+        (1, "gaussian", "snpe_c", 10),
         (3, "gaussian", "snpe_b", 10),
         (3, "gaussian", "snpe_c", 1),
     ),
@@ -48,7 +46,7 @@ def test_apt_on_linearGaussian_based_on_mmd(
             true_observation, num_samples=num_samples, prior=prior
         )
 
-    neural_net = utils.posterior_nn(model="maf", prior=prior, context=true_observation,)
+    neural_net = utils.posterior_nn(model="maf", prior=prior, context=true_observation)
 
     if algorithm_str == "snpe_b":
         snpe = SnpeB(
@@ -80,36 +78,11 @@ def test_apt_on_linearGaussian_based_on_mmd(
     # run inference
     num_rounds, num_simulations_per_round = 1, 1000
     posterior = snpe(
-        num_rounds=num_rounds, num_simulations_per_round=num_simulations_per_round
+        num_rounds=num_rounds, num_simulations_per_round=num_simulations_per_round,
     )
 
     # draw samples from posterior
     samples = posterior.sample(num_samples)
-
-    # define vector where the target density is evaluated
-    inputs = torch.linspace(-5, 5, 100)
-    inputs = inputs[None,].T
-
-    # load ground truth density
-    target_dist = get_true_posterior_log_prob_linear_gaussian_mvn_prior(
-        true_observation,
-    )
-
-    # evaluate the posterior density
-    target_probs = torch.exp(target_dist.log_prob(inputs))
-    posterior_probs = torch.exp(posterior.log_prob(inputs, true_observation))
-
-    print("target    ", target_probs)
-    print("prediction", posterior_probs)
-
-    dkl = utils.dkl_monte_carlo_estimate(target_dist, posterior, num_samples=1000)
-
-    print("dkl is:  ", dkl)
-    max_dkl = 0.03
-
-    assert (
-        dkl < max_dkl
-    ), f"MMD={dkl} is more than 2 stds above the average performance."
 
     # compute the mmd
     mmd = utils.unbiased_mmd_squared(target_samples, samples)
@@ -123,8 +96,19 @@ def test_apt_on_linearGaussian_based_on_mmd(
         mmd < max_mmd
     ), f"MMD={mmd} is more than 2 stds above the average performance."
 
+    # Checks for log_prob()
+    if prior_str == "gaussian":
+        # For the Gaussian prior, we compute the D-KL between ground truth and posterior
+        utils.test_utils.dkl_gaussian_prior(posterior, true_observation, num_dim)
+    elif prior_str == "uniform":
+        # if prior is uniform, we only check whether the returned probability outside of
+        # the support is zero and whether normalization (i.e. scaling up the density due
+        # to leakage into regions without prior support) scales up the density by the
+        # correct factor.
+        utils.test_utils.normalization_uniform_prior(
+            posterior, prior, true_observation, num_dim
+        )
 
-test_apt_on_linearGaussian_based_on_mmd(1, "gaussian", "snpe_c", 10)
 
 # test multi-round SNPE
 @pytest.mark.slow

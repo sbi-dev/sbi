@@ -68,8 +68,11 @@ class Posterior:
             context: Tensor or None, conditioning variables. If a Tensor, it must have the same
                 number or rows as the inputs. If None, self._context is used.
             normalize_snpe:
-                whether to normalize the output density when using snpe (by drawing samples, estimating the acceptance
-                ratio, and then scaling the probability with it)
+                If True, normalize the output density when using snpe (by drawing
+                 samples, estimating the acceptance ratio, and then scaling the
+                 probability with it) and return -infinity if inputs are outside of
+                 the prior support. If False, return the output from the density
+                 estimator.
 
         Returns:
             A Tensor of shape [input_size], the log probability of the inputs given the context.
@@ -79,7 +82,7 @@ class Posterior:
         correct_for_leakage = normalize_snpe and self._alg_family == "snpe"
 
         # format inputs and context into the correct shape
-        inputs, context = utils.build_inputs_and_contexts(
+        inputs, context = utils.match_shapes_of_inputs_and_contexts(
             inputs, context, self._context, correct_for_leakage
         )
 
@@ -88,16 +91,25 @@ class Posterior:
 
         # compute the unnormalized log probability by evaluating the network
         if self._alg_family == "snpe":
-            # todo: we need to check if inputs is within the bounds
             unnormalized_log_prob = self.neural_net.log_prob(inputs, context)
         elif self._alg_family == "sre":
-            log_ratio = self.neural_net.classifier(
-                torch.cat((inputs, context)).reshape(1, -1)
+            warn(
+                "The log-probability returned by SRE is only correct up to a"
+                " normalizing constant."
             )
+            log_ratio = self.neural_net(torch.cat((inputs, context)).reshape(1, -1))
             unnormalized_log_prob = log_ratio + self._prior.log_prob(inputs)
         else:
             raise NameError(
                 "Evaluating the log-probability can only be done for SNPE and SRE."
+            )
+
+        if correct_for_leakage:
+            # set the log-likelihood to -infinity if parameter set (inputs) is outside
+            # of prior bounds.
+            prior_log_probs = self._prior.log_prob(inputs)
+            unnormalized_log_prob[torch.isinf(prior_log_probs)] = torch.tensor(
+                [-float("Inf")]
             )
 
         # find the acceptance rate
@@ -105,7 +117,8 @@ class Posterior:
             self.get_leakage_correction(context=context) if correct_for_leakage else 1.0
         )
 
-        # return the normalized (leakage corrected) log prob: devide by acceptance prob of rejection sampling
+        # return the normalized (leakage corrected) log prob: divide by acceptance prob
+        # of rejection sampling
         return -torch.log(torch.tensor([leakage_correction])) + unnormalized_log_prob
 
     def get_leakage_correction(
@@ -113,15 +126,21 @@ class Posterior:
     ) -> float:
         """Return factor for correcting the posterior density for leakage. 
         
-        The factor is estimated from the acceptance probability during rejection sampling from the posterior.
+        The factor is estimated from the acceptance probability during rejection
+         sampling from the posterior.
         
-        NOTE: This is to avoid re-estimating the acceptance probability from scratch whenever log_prob is called and normalize_snpe is True. Here, it is estimated only once for the default context, i.e., self._context, and saved for later, and whenever a new context is passed. 
+        NOTE: This is to avoid re-estimating the acceptance probability from scratch
+         whenever log_prob is called and normalize_snpe is True. Here, it is estimated
+          only once for the default context, i.e., self._context, and saved for later,
+           and whenever a new context is passed.
         
         Arguments:
-            context {torch.Tensor} -- Context to condition the posterior. If None, uses the "default" context the posterior was trained for in multi-round mode.
+            context {torch.Tensor} -- Context to condition the posterior. If None, uses
+             the "default" context the posterior was trained for in multi-round mode.
         
         Keyword Arguments:
-            num_rejection_samples {int} -- Number of samples used to estimate the factor (default: {10000})
+            num_rejection_samples {int} -- Number of samples used to estimate the factor
+             (default: {10000})
         
         Returns:
             float -- Saved or newly estimated correction factor.
