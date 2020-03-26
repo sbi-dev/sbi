@@ -94,8 +94,8 @@ class Posterior:
             unnormalized_log_prob = self.neural_net.log_prob(inputs, context)
         elif self._alg_family == "sre":
             warn(
-                "The log-probability returned by SRE is only correct up to a"
-                " normalizing constant."
+                "The log-probability returned by SRE is only correct up to a "
+                "normalizing constant."
             )
             log_ratio = self.neural_net(torch.cat((inputs, context)).reshape(1, -1))
             unnormalized_log_prob = log_ratio + self._prior.log_prob(inputs)

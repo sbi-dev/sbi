@@ -60,9 +60,18 @@ def test_sre_on_linearGaussian_api(num_dim: int):
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("num_dim", [1, 3])
-@pytest.mark.parametrize("prior_str", ("uniform", "gaussian"))
-def test_sre_on_linearGaussian_based_on_mmd(num_dim: int, prior_str: str):
+@pytest.mark.parametrize(
+    "num_dim, prior_str, classifier_loss",
+    (
+        (3, "gaussian", "sre"),
+        (1, "gaussian", "sre"),
+        (3, "uniform", "sre"),
+        (3, "gaussian", "aalr"),
+    ),
+)
+def test_sre_on_linearGaussian_based_on_mmd(
+    num_dim: int, prior_str: str, classifier_loss: str
+):
     """Test mmd accuracy of inference with SRE on linear gaussian model. 
 
     NOTE: The mmd threshold is calculated based on a number of test runs and taking the mean plus 2 stds. 
@@ -91,12 +100,16 @@ def test_sre_on_linearGaussian_based_on_mmd(num_dim: int, prior_str: str):
     # get classifier
     classifier = utils.classifier_nn("resnet", prior=prior, context=true_observation,)
 
+    num_atoms = 2 if classifier_loss == "aalr" else -1
+
     # create inference method
     inference_method = SRE(
         simulator=linear_gaussian,
         prior=prior,
         true_observation=true_observation,
+        num_atoms=num_atoms,
         classifier=classifier,
+        classifier_loss=classifier_loss,
         simulation_batch_size=50,
         mcmc_method="slice-np",
     )
@@ -111,15 +124,19 @@ def test_sre_on_linearGaussian_based_on_mmd(num_dim: int, prior_str: str):
     mmd = utils.unbiased_mmd_squared(target_samples, samples)
 
     # check if mmd is larger than expected
-    max_mmd = 0.02
+    max_mmd = 0.035
 
     assert (
         mmd < max_mmd
     ), f"MMD={mmd} is more than 2 stds above the average performance."
 
     # Checks for log_prob()
-    # We are not running tests involving the D-KL and comparisons to the ground truth
-    # since SRE returns an unnormalized density.
+    if prior_str == "gaussian" and classifier_loss == "aalr":
+        # For the Gaussian prior, we compute the D-KL between ground truth and
+        # posterior. We can do this only if the classifier_loss was as described in
+        # Hermans et al. 2019 ('aalr') since Durkan et al. 2019 version only allows
+        # evaluation up to a constant.
+        utils.test_utils.dkl_gaussian_prior(posterior, true_observation, num_dim)
     if prior_str == "uniform":
         # test whether likelihood outside prior support is zero. Prior bounds are
         # [-1, 1] in each dimension, so tensor of 2s will be outside of bounds.
