@@ -34,13 +34,13 @@ def match_shapes_of_inputs_and_contexts(
     Assume that x is the context, x_o is the true_context, theta are inputs/parameters.
     If context has shape (dim_x) or (1, dim_x), we build
      `context = torch.tensor([x, x,..., x])` such that we can later evaluate
-      p(theta_n|x) for every parameter set theta_n in inputs
+     p(theta_n|x) for every parameter set theta_n in inputs
     If context is None, we build `context = torch.tensor([x_o, x_o,..., x_o])` such that
      we can later evaluate p(theta_n|x_o) for every parameter set theta_n in inputs
     If context has shape or (N, dim_x) and inputs has shape (N, dim_theta), we leave
      context unaltered as `context = torch.tensor([x_1, x_2,..., x_N])` such that we can
-      later evaluate p(theta_n|x_n) for n={1,...,N}, every parameter set theta_n in
-       inputs
+     later evaluate p(theta_n|x_n) for every parameter set theta_n in inputs with
+     n={1,...,N}
 
     Args:
         inputs: Tensor, input variables.
