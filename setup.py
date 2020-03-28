@@ -15,7 +15,7 @@ setup(
         "nbstripout",
         "numpy",
         "pyro-ppl",
-        "pyknos@git+ssh://git@github.com/mackelab/pyknos.git",
+        "pyknos@git+https://github.com/mackelab/pyknos.git",
         "scipy",
         "tensorboard",
         "torch",
