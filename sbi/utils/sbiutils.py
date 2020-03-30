@@ -1,6 +1,6 @@
 import time
 import warnings
-from typing import Tuple
+from typing import Tuple, Any
 
 import torch
 import torch.nn as nn
@@ -21,8 +21,8 @@ class Normalize(nn.Module):
 
 
 def match_shapes_of_inputs_and_contexts(
-    inputs, context, true_context, correct_for_leakage
-):
+    inputs: Any, context: Any, true_context: torch.Tensor, correct_for_leakage: bool
+) -> (torch.Tensor, torch.Tensor):
     """
     Formats inputs and contexts into shapes that can be processed by neural density
      estimators.
@@ -43,9 +43,8 @@ def match_shapes_of_inputs_and_contexts(
      n={1,...,N}
 
     Args:
-        inputs: Tensor, input variables.
-        context: Tensor or None, conditioning variables. If a Tensor, it must have the
-         same number or rows as the inputs. If None, the context is ignored.
+        inputs: input variables / parameters / thetas
+        context: conditioning variables / contexts / x. If None, the context is ignored.
         true_context: if context=None, replace it with true_context
         correct_for_leakage:
             If True, we normalize the output density
@@ -53,10 +52,11 @@ def match_shapes_of_inputs_and_contexts(
             ratio, and then scaling the probability with it
 
     Returns:
-        inputs, context as torch.tensors
+        inputs, context with same batch dimension
     """
 
-    inputs = torch.as_tensor(inputs)
+    # cast inputs to tensor if they are not already
+    inputs = utils.torchutils.ensure_tensor(inputs)
 
     # add batch dimension to `inputs` if needed. `inputs` how has shape
     # (1, num_dim_inputs) or (N, num_dim_inputs), but not (num_dim_inputs)
@@ -65,6 +65,8 @@ def match_shapes_of_inputs_and_contexts(
     # use "default context" if None is provided
     if context is None:
         context = true_context
+    # cast context to tensor if they are not already
+    context = utils.torchutils.ensure_tensor(context)
 
     # add batch dimension to `context` if needed. `context` how has shape
     # (1, num_dim_context) or (N, num_dim_context), but not (num_dim_context)

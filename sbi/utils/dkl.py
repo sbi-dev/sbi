@@ -1,7 +1,14 @@
 import torch
+import torch.distributions
+from sbi.inference.posteriors.sbi_posterior import Posterior
+from typing import Union
 
 
-def dkl_monte_carlo_estimate(p, q, num_samples: int = 1000) -> torch.Tensor:
+def dkl_monte_carlo_estimate(
+    p: Union[Posterior, torch.distributions.Distribution],
+    q: Union[Posterior, torch.distributions.Distribution],
+    num_samples: int = 1000,
+) -> torch.Tensor:
     """
     Computes the Monte-Carlo estimate of the Kullback-Leibler divergence of two
      distributions p and q.

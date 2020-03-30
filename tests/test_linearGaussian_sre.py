@@ -124,7 +124,7 @@ def test_sre_on_linearGaussian_based_on_mmd(
     mmd = utils.unbiased_mmd_squared(target_samples, samples)
 
     # check if mmd is larger than expected
-    max_mmd = 0.035
+    max_mmd = 0.045
 
     assert (
         mmd < max_mmd

@@ -157,3 +157,13 @@ def test_dkl_gauss():
             f"Monte Carlo based DKL={monte_carlo_dkl} is too far off from the torch"
             f" implementation={torch_dkl}."
         )
+
+
+def test_ensure_tensor():
+    a_tensor = torch.randn([1, 2])
+    an_array = np.array([1, 2, 3])
+    a_scalar = 2.0
+
+    assert isinstance(torchutils.ensure_tensor(a_tensor), torch.Tensor)
+    assert isinstance(torchutils.ensure_tensor(an_array), torch.Tensor)
+    assert isinstance(torchutils.ensure_tensor(a_scalar), torch.Tensor)

@@ -398,8 +398,8 @@ class SnpeBase:
 
                 # just do maximum likelihood in the first round
                 if round_ == 0:
-                    log_prob = self._neural_posterior.log_prob(
-                        inputs, context, normalize_snpe=False
+                    log_prob = self._neural_posterior.neural_net.log_prob(
+                        inputs, context
                     )
                 else:  # or call the APT loss
                     log_prob = self._get_log_prob_proposal_posterior(
@@ -427,8 +427,8 @@ class SnpeBase:
                     )
                     # just do maximum likelihood in the first round
                     if round_ == 0:
-                        log_prob = self._neural_posterior.log_prob(
-                            inputs, context, normalize_snpe=False
+                        log_prob = self._neural_posterior.neural_net.log_prob(
+                            inputs, context
                         )
                     else:
                         log_prob = self._get_log_prob_proposal_posterior(

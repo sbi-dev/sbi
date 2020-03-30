@@ -1,12 +1,16 @@
 import torch
+import torch.distributions
 import sbi.utils as utils
 from sbi.simulators.linear_gaussian import (
     get_true_posterior_log_prob_linear_gaussian_n_prior,
     get_true_posterior_log_prob_linear_gaussian_mvn_prior,
 )
+from sbi.inference.posteriors.sbi_posterior import Posterior
 
 
-def dkl_gaussian_prior(posterior, true_observation: torch.Tensor, num_dim: int):
+def dkl_gaussian_prior(
+    posterior: Posterior, true_observation: torch.Tensor, num_dim: int
+):
     """
     Test whether Kullback-Leibler divergence between estimated posterior (with Gaussian
      prior) and ground truth is below threshold.
@@ -30,15 +34,18 @@ def dkl_gaussian_prior(posterior, true_observation: torch.Tensor, num_dim: int):
     # obtained posterior
     dkl = utils.dkl_monte_carlo_estimate(target_dist, posterior, num_samples=200)
 
-    max_dkl = 0.05 if num_dim == 1 else 0.5
+    max_dkl = 0.05 if num_dim == 1 else 0.8
 
     assert (
         dkl < max_dkl
-    ), f"MMD={dkl} is more than 2 stds above the average performance."
+    ), f"D-KL={dkl} is more than 2 stds above the average performance."
 
 
 def normalization_uniform_prior(
-    posterior, prior, true_observation: torch.Tensor, num_dim: int
+    posterior: Posterior,
+    prior: torch.distributions.Distribution,
+    true_observation: torch.Tensor,
+    num_dim: int,
 ):
     """
     Check the correctness of the log_prob() function of the posterior with a uniform

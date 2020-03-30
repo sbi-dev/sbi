@@ -261,8 +261,8 @@ class SNL:
             for batch in train_loader:
                 optimizer.zero_grad()
                 inputs, context = batch[0].to(self._device), batch[1].to(self._device)
-                log_prob = self._neural_posterior.log_prob(
-                    inputs, context=context, normalize_snpe=False
+                log_prob = self._neural_posterior.neural_net.log_prob(
+                    inputs, context=context
                 )
                 loss = -torch.mean(log_prob)
                 loss.backward()
@@ -282,8 +282,8 @@ class SNL:
                         batch[0].to(self._device),
                         batch[1].to(self._device),
                     )
-                    log_prob = self._neural_posterior.log_prob(
-                        inputs, context=context, normalize_snpe=False
+                    log_prob = self._neural_posterior.neural_net.log_prob(
+                        inputs, context=context
                     )
                     log_prob_sum += log_prob.sum().item()
             validation_log_prob = log_prob_sum / num_validation_examples
