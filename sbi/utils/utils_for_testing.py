@@ -32,7 +32,7 @@ def get_dkl_gaussian_prior(
 
     # get Kullback-Leibler divergence from the ground truth distribution to the
     # obtained posterior
-    dkl = utils.dkl_monte_carlo_estimate(target_dist, posterior, num_samples=200)
+    dkl = utils.dkl_via_monte_carlo(target_dist, posterior, num_samples=200)
 
     return dkl
 

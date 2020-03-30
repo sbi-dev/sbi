@@ -4,7 +4,7 @@ from sbi.inference.posteriors.sbi_posterior import Posterior
 from typing import Union
 
 
-def dkl_monte_carlo_estimate(
+def dkl_via_monte_carlo(
     p: Union[Posterior, torch.distributions.Distribution],
     q: Union[Posterior, torch.distributions.Distribution],
     num_samples: int = 1000,
