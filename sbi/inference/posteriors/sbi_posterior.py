@@ -49,11 +49,12 @@ class Posterior:
         self._context = context
         self._train_with_mcmc = train_with_mcmc
         self._mcmc_method = mcmc_method
-        assert algorithm_family in ["snpe", "snl", "sre"], "Not supported."
+        assert algorithm_family in ["snpe", "snl", "sre", "aalr"], "Not supported."
         self._alg_family = algorithm_family
         self._get_potential_function = get_potential_function
         # correction factor for snpe leakage
         self._leakage_density_correction_factor = None
+        self._num_trained_rounds = 0
 
     def log_prob(
         self,
@@ -92,11 +93,14 @@ class Posterior:
         # compute the unnormalized log probability by evaluating the network
         if self._alg_family == "snpe":
             unnormalized_log_prob = self.neural_net.log_prob(inputs, context)
-        elif self._alg_family == "sre":
-            warn(
-                "The log-probability returned by SRE is only correct up to a "
-                "normalizing constant."
-            )
+        elif self._alg_family == "sre" or self._alg_family == "aalr":
+            if self._num_trained_rounds > 1 or self._alg_family == "sre":
+                # if we train single round with aalr loss (Hermans et al. 2019), the
+                # density is normalized and we do not raise the warning.
+                warn(
+                    "The log-probability returned by SRE is only correct up to a "
+                    "normalizing constant."
+                )
             log_ratio = self.neural_net(torch.cat((inputs, context)).reshape(1, -1))
             unnormalized_log_prob = log_ratio + self._prior.log_prob(inputs)
         else:
@@ -107,9 +111,10 @@ class Posterior:
         if correct_for_leakage:
             # set the log-likelihood to -infinity if parameter set (inputs) is outside
             # of prior bounds.
-            prior_log_probs = self._prior.log_prob(inputs)
-            unnormalized_log_prob[torch.isinf(prior_log_probs)] = torch.tensor(
-                [-float("Inf")]
+            prior_log_prob = self._prior.log_prob(inputs)
+            within_prior = torch.isfinite(prior_log_prob)
+            unnormalized_log_prob = torch.where(
+                within_prior, unnormalized_log_prob, prior_log_prob
             )
 
         # find the acceptance rate

@@ -1,6 +1,6 @@
 import time
 import warnings
-from typing import Tuple, Any
+from typing import Tuple, Sequence, Union
 
 import torch
 import torch.nn as nn
@@ -21,7 +21,10 @@ class Normalize(nn.Module):
 
 
 def match_shapes_of_inputs_and_contexts(
-    inputs: Any, context: Any, true_context: torch.Tensor, correct_for_leakage: bool
+    inputs: Union[Sequence[float], float],
+    context: Union[Sequence[float], float],
+    true_context: torch.Tensor,
+    correct_for_leakage: bool,
 ) -> (torch.Tensor, torch.Tensor):
     """
     Formats inputs and contexts into shapes that can be processed by neural density
@@ -56,7 +59,7 @@ def match_shapes_of_inputs_and_contexts(
     """
 
     # cast inputs to tensor if they are not already
-    inputs = utils.torchutils.ensure_tensor(inputs)
+    inputs = torch.as_tensor(inputs)
 
     # add batch dimension to `inputs` if needed. `inputs` how has shape
     # (1, num_dim_inputs) or (N, num_dim_inputs), but not (num_dim_inputs)
@@ -66,16 +69,13 @@ def match_shapes_of_inputs_and_contexts(
     if context is None:
         context = true_context
     # cast context to tensor if they are not already
-    context = utils.torchutils.ensure_tensor(context)
+    context = torch.as_tensor(context)
 
     # add batch dimension to `context` if needed. `context` how has shape
     # (1, num_dim_context) or (N, num_dim_context), but not (num_dim_context)
     # todo: this will break if we have a multi-dimensional context, e.g. images
     if len(context.shape) == 1:
-        context = context[
-            None,
-        ]
-    context = torch.as_tensor(context)
+        context = context.unsqueeze(0)
 
     # if multiple observations, with snpe avoid expensive leakage
     # correction by rejection sampling

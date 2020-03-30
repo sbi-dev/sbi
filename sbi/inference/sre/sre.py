@@ -112,7 +112,7 @@ class SRE:
 
         # create posterior object which can sample()
         self._neural_posterior = Posterior(
-            algorithm_family="sre",
+            algorithm_family=self._classifier_loss,
             neural_net=classifier,
             prior=prior,
             context=true_observation,
@@ -229,6 +229,8 @@ class SRE:
                 observation_bank=self._observation_bank,
                 simulator=self._simulator,
             )
+
+        self._neural_posterior._num_trained_rounds = num_rounds
         return self._neural_posterior
 
     def _fit_classifier(

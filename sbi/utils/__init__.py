@@ -36,4 +36,8 @@ from sbi.utils.typechecks import (
     is_power_of_two,
 )
 from sbi.utils.dkl import dkl_monte_carlo_estimate
-from sbi.utils.test_utils import dkl_gaussian_prior, normalization_uniform_prior
+from sbi.utils.utils_for_testing import (
+    get_dkl_gaussian_prior,
+    get_prob_outside_uniform_prior,
+    get_normalization_uniform_prior,
+)

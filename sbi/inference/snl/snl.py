@@ -189,6 +189,8 @@ class SNL:
                 observation_bank=self._observation_bank,
                 simulator=self._simulator,
             )
+
+        self._neural_posterior._num_trained_rounds = num_rounds
         return self._neural_posterior
 
     def _fit_likelihood(

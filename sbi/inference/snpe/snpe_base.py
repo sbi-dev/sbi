@@ -216,6 +216,8 @@ class SnpeBase:
                     context=self._true_observation
                 ),
             )
+
+        self._neural_posterior._num_trained_rounds = num_rounds
         return self._neural_posterior
 
     def _get_log_prob_proposal_posterior(self, inputs, context, masks):

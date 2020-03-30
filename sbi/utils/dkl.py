@@ -10,7 +10,7 @@ def dkl_monte_carlo_estimate(
     num_samples: int = 1000,
 ) -> torch.Tensor:
     """
-    Computes the Monte-Carlo estimate of the Kullback-Leibler divergence of two
+    Returns the Monte-Carlo estimate of the Kullback-Leibler divergence of two
      distributions p and q.
 
     Unlike torch.distributions.kl.kl_divergence(p, q), this function does not require p
@@ -33,6 +33,9 @@ def dkl_monte_carlo_estimate(
     summed_log_ratio = torch.tensor([0.0])
     for _ in range(num_samples):
         target_sample = p.sample()
+        # squeeze to make the shapes match. The output from log_prob() is either
+        # torch.tensor([[p_1], [p_2], [p_3]]) or torch.tensor([p_1, p_2, p_3]), so we
+        # squeeze to make both of them torch.tensor([p_1, p_2, p_3])
         summed_log_ratio += torch.squeeze(p.log_prob(target_sample)) - torch.squeeze(
             q.log_prob(target_sample)
         )

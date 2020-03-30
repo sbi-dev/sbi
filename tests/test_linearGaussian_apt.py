@@ -99,15 +99,44 @@ def test_apt_on_linearGaussian_based_on_mmd(
     # Checks for log_prob()
     if prior_str == "gaussian":
         # For the Gaussian prior, we compute the D-KL between ground truth and posterior
-        utils.test_utils.dkl_gaussian_prior(posterior, true_observation, num_dim)
+        dkl = utils.utils_for_testing.get_dkl_gaussian_prior(
+            posterior, true_observation, num_dim
+        )
+
+        max_dkl = 0.05 if num_dim == 1 else 0.8
+
+        assert (
+            dkl < max_dkl
+        ), f"D-KL={dkl} is more than 2 stds above the average performance."
+
     elif prior_str == "uniform":
-        # if prior is uniform, we only check whether the returned probability outside of
-        # the support is zero and whether normalization (i.e. scaling up the density due
+        # Check whether the returned probability outside of the support is zero
+        posterior_prob = utils.utils_for_testing.get_prob_outside_uniform_prior(
+            posterior, num_dim
+        )
+        assert (
+            posterior_prob == 0.0
+        ), "The posterior probability outside of the prior support is not zero"
+
+        # Check whether normalization (i.e. scaling up the density due
         # to leakage into regions without prior support) scales up the density by the
         # correct factor.
-        utils.test_utils.normalization_uniform_prior(
-            posterior, prior, true_observation, num_dim
+        (
+            posterior_likelihood_unnorm,
+            posterior_likelihood_norm,
+            acceptance_prob,
+        ) = utils.utils_for_testing.get_normalization_uniform_prior(
+            posterior, prior, true_observation
         )
+        # The acceptance probability should be *exactly* the ratio of the unnormalized
+        # and the normalized likelihood. However, we allow for an error margin of 1%,
+        # since the estimation of the acceptance probability is random (based on
+        # rejection sampling).
+        assert (
+            acceptance_prob * 0.99
+            < posterior_likelihood_unnorm / posterior_likelihood_norm
+            < acceptance_prob * 1.01
+        ), "Normalizing the posterior density using the acceptance probability failed."
 
 
 # test multi-round SNPE
