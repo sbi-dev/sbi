@@ -129,16 +129,16 @@ def simulate_in_batches(
     Args:
         simulator: simulator function that takes in parameters of shape
          (simulation_batch_size, num_dim_parameters) and
-         outputs xs of shape (simulation_batch_size, num_dim_x)
+         outputs xs of shape (simulation_batch_size, x.shape)
         parameter_sample_fn: Function to call for generating theta, e.g. prior sampling
         num_samples: Number of simulations to run
         simulation_batch_size: Number of simulations that are run within a single batch
-            If `simulation_batch_size == -1`, we run a batch with all simulations
-             required, i.e. `simulation_batch_size = num_samples`
+            If `simulation_batch_size == -1`, we run all required simulations
+             simultaneously , i.e. `simulation_batch_size = num_samples`
 
     Returns: torch.Tensor simulation input parameters of shape
-                (num_samples, num_dim_parameters)
-             torch.Tensor simulator outputs x of shape (num_samples, num_dim_x)
+                (num_samples, parameters.shape)
+             torch.Tensor simulator outputs xs of shape (num_samples, x.shape)
     """
 
     # generate parameters (simulation inputs) by sampling from prior (round 1)
@@ -160,8 +160,7 @@ def simulate_in_batches(
             # XXX: if we assert the that simulator returns a torch.Tensor with batch dim
             # we can avoid the following 2 checks
             x = simulator(batch)
-            if not isinstance(x, torch.Tensor):
-                x = torch.from_numpy(x)
+            x = torch.as_tensor(x)
             if simulation_batch_size == 1:
                 # In case simulator outputs data of shape (dim_observation), we prepend
                 # a dimension to make it (1, dim_observation)
