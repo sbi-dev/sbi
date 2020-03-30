@@ -216,6 +216,8 @@ class SnpeBase:
                     context=self._true_observation
                 ),
             )
+
+        self._neural_posterior._num_trained_rounds = num_rounds
         return self._neural_posterior
 
     def _get_log_prob_proposal_posterior(self, inputs, context, masks):
@@ -398,8 +400,8 @@ class SnpeBase:
 
                 # just do maximum likelihood in the first round
                 if round_ == 0:
-                    log_prob = self._neural_posterior.log_prob(
-                        inputs, context, normalize_snpe=False
+                    log_prob = self._neural_posterior.neural_net.log_prob(
+                        inputs, context
                     )
                 else:  # or call the APT loss
                     log_prob = self._get_log_prob_proposal_posterior(
@@ -427,8 +429,8 @@ class SnpeBase:
                     )
                     # just do maximum likelihood in the first round
                     if round_ == 0:
-                        log_prob = self._neural_posterior.log_prob(
-                            inputs, context, normalize_snpe=False
+                        log_prob = self._neural_posterior.neural_net.log_prob(
+                            inputs, context
                         )
                     else:
                         log_prob = self._get_log_prob_proposal_posterior(

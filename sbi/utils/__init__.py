@@ -5,7 +5,7 @@ from sbi.utils.mmd import biased_mmd, unbiased_mmd_squared
 from sbi.utils.plot import plot_hist_marginals, plot_hist_marginals_pair
 from sbi.utils.sbiutils import (
     Normalize,
-    build_inputs_and_contexts,
+    match_shapes_of_inputs_and_contexts,
     sample_posterior_within_prior,
 )
 from sbi.utils.torchutils import (
@@ -34,4 +34,10 @@ from sbi.utils.typechecks import (
     is_nonnegative_int,
     is_positive_int,
     is_power_of_two,
+)
+from sbi.utils.dkl import dkl_via_monte_carlo
+from sbi.utils.utils_for_testing import (
+    get_dkl_gaussian_prior,
+    get_prob_outside_uniform_prior,
+    get_normalization_uniform_prior,
 )

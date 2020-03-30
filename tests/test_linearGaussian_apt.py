@@ -13,15 +13,14 @@ from sbi.simulators.linear_gaussian import (
 
 torch.manual_seed(0)
 
-
 # running all combinations is excessive. The standard test is (3, "gaussian", "snpe_c"),
 # and we then vary only one parameter at a time to test single-d, uniform, and snpe-b
 @pytest.mark.parametrize(
     "num_dim, prior_str, algorithm_str, simulation_batch_size",
     (
         (3, "gaussian", "snpe_c", 10),
-        (1, "gaussian", "snpe_c", 10),
         (3, "uniform", "snpe_c", 10),
+        (1, "gaussian", "snpe_c", 10),
         (3, "gaussian", "snpe_b", 10),
         (3, "gaussian", "snpe_c", 1),
     ),
@@ -47,7 +46,7 @@ def test_apt_on_linearGaussian_based_on_mmd(
             true_observation, num_samples=num_samples, prior=prior
         )
 
-    neural_net = utils.posterior_nn(model="maf", prior=prior, context=true_observation,)
+    neural_net = utils.posterior_nn(model="maf", prior=prior, context=true_observation)
 
     if algorithm_str == "snpe_b":
         snpe = SnpeB(
@@ -79,7 +78,7 @@ def test_apt_on_linearGaussian_based_on_mmd(
     # run inference
     num_rounds, num_simulations_per_round = 1, 1000
     posterior = snpe(
-        num_rounds=num_rounds, num_simulations_per_round=num_simulations_per_round
+        num_rounds=num_rounds, num_simulations_per_round=num_simulations_per_round,
     )
 
     # draw samples from posterior
@@ -97,8 +96,48 @@ def test_apt_on_linearGaussian_based_on_mmd(
         mmd < max_mmd
     ), f"MMD={mmd} is more than 2 stds above the average performance."
 
+    # Checks for log_prob()
+    if prior_str == "gaussian":
+        # For the Gaussian prior, we compute the D-KL between ground truth and posterior
+        dkl = utils.utils_for_testing.get_dkl_gaussian_prior(
+            posterior, true_observation, num_dim
+        )
 
-test_apt_on_linearGaussian_based_on_mmd(3, "gaussian", "snpe_c", 10)
+        max_dkl = 0.05 if num_dim == 1 else 0.8
+
+        assert (
+            dkl < max_dkl
+        ), f"D-KL={dkl} is more than 2 stds above the average performance."
+
+    elif prior_str == "uniform":
+        # Check whether the returned probability outside of the support is zero
+        posterior_prob = utils.utils_for_testing.get_prob_outside_uniform_prior(
+            posterior, num_dim
+        )
+        assert (
+            posterior_prob == 0.0
+        ), "The posterior probability outside of the prior support is not zero"
+
+        # Check whether normalization (i.e. scaling up the density due
+        # to leakage into regions without prior support) scales up the density by the
+        # correct factor.
+        (
+            posterior_likelihood_unnorm,
+            posterior_likelihood_norm,
+            acceptance_prob,
+        ) = utils.utils_for_testing.get_normalization_uniform_prior(
+            posterior, prior, true_observation
+        )
+        # The acceptance probability should be *exactly* the ratio of the unnormalized
+        # and the normalized likelihood. However, we allow for an error margin of 1%,
+        # since the estimation of the acceptance probability is random (based on
+        # rejection sampling).
+        assert (
+            acceptance_prob * 0.99
+            < posterior_likelihood_unnorm / posterior_likelihood_norm
+            < acceptance_prob * 1.01
+        ), "Normalizing the posterior density using the acceptance probability failed."
+
 
 # test multi-round SNPE
 @pytest.mark.slow

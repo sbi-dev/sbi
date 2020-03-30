@@ -6,6 +6,8 @@ import torchtestcase
 import pytest
 
 from sbi.utils import torchutils
+import torch.distributions as distributions
+import sbi.utils as utils
 
 
 class TorchUtilsTest(torchtestcase.TorchTestCase):
@@ -129,3 +131,39 @@ def test_atleast_2d():
     assert isinstance(t3, torch.Tensor)
     assert t3.ndim == 2
     assert t4.ndim == 2
+
+
+def test_dkl_gauss():
+    """
+    Test whether for two 1D Gaussians and two 2D Gaussians the Monte-Carlo-based D-KL
+     gives similar results as the torch implementation.
+    """
+    dist1 = [
+        distributions.Normal(loc=0.0, scale=1.0),
+        distributions.MultivariateNormal(torch.zeros(2), torch.eye(2)),
+    ]
+    dist2 = [
+        distributions.Normal(loc=1.0, scale=0.5),
+        distributions.MultivariateNormal(torch.ones(2), 0.5 * torch.eye(2)),
+    ]
+
+    for d1, d2 in zip(dist1, dist2):
+        torch_dkl = distributions.kl.kl_divergence(d1, d2)
+        monte_carlo_dkl = utils.dkl_via_monte_carlo(d1, d2, num_samples=1000)
+
+        max_dkl_diff = 0.4
+
+        assert torch.abs(torch_dkl - monte_carlo_dkl) < max_dkl_diff, (
+            f"Monte Carlo based DKL={monte_carlo_dkl} is too far off from the torch"
+            f" implementation={torch_dkl}."
+        )
+
+
+def test_ensure_tensor():
+    a_tensor = torch.randn([1, 2])
+    an_array = np.array([1, 2, 3])
+    a_scalar = 2.0
+
+    assert isinstance(torchutils.ensure_tensor(a_tensor), torch.Tensor)
+    assert isinstance(torchutils.ensure_tensor(an_array), torch.Tensor)
+    assert isinstance(torchutils.ensure_tensor(a_scalar), torch.Tensor)

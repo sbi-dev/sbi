@@ -47,6 +47,7 @@ class SRE:
         simulation_batch_size: int = 1,
         mcmc_method: str = "slice-np",
         summary_net=None,
+        classifier_loss: str = "sre",
         retrain_from_scratch_each_round=False,
         summary_writer=None,
         device=None,
@@ -69,6 +70,13 @@ class SRE:
             mcmc_method: What MCMC sampler to use. One of {"slice-np", "slice", "nuts", "hmc"}
             summary_net: Optional network which may be used to produce feature vectors
                 f(x) for high-dimensional observations.
+            classifier_loss: {"sre", "aalr"}. "sre" implements the
+                 algorithm suggested in Durkan et al. 2019, whereas "aalr" implements
+                 the algorithm suggested in Hermans et al. 2019. "sre" can use more than
+                 two atoms, potentially boosting performance, but does not allow for
+                 exact posterior density evaluation (only up to a normalizing constant),
+                 even when training only one round. "aalr" is limited to num_atoms=2,
+                 but allows for density evaluation when training for one round.
             retrain_from_scratch_each_round: Whether to retrain the conditional density
                 estimator for the posterior from scratch each round.
             summary_writer: SummaryWriter
@@ -89,6 +97,7 @@ class SRE:
         self._prior = prior
         self._simulation_batch_size = simulation_batch_size
         self._device = get_default_device() if device is None else device
+        self._classifier_loss = classifier_loss
 
         assert isinstance(num_atoms, int), "Number of atoms must be an integer."
         self._num_atoms = num_atoms
@@ -103,7 +112,7 @@ class SRE:
 
         # create posterior object which can sample()
         self._neural_posterior = Posterior(
-            algorithm_family="sre",
+            algorithm_family=self._classifier_loss,
             neural_net=classifier,
             prior=prior,
             context=true_observation,
@@ -152,13 +161,16 @@ class SRE:
             "best-validation-log-probs": [],
         }
 
-    def __call__(self, num_rounds, num_simulations_per_round):
+    def __call__(
+        self, num_rounds, num_simulations_per_round,
+    ):
         """
         This runs SRE for num_rounds rounds, using num_simulations_per_round calls to
         the simulator per round.
 
         :param num_rounds: Number of rounds to run.
         :param num_simulations_per_round: Number of simulator calls per round.
+
         :return: None
         """
 
@@ -217,6 +229,8 @@ class SRE:
                 observation_bank=self._observation_bank,
                 simulator=self._simulator,
             )
+
+        self._neural_posterior._num_trained_rounds = num_rounds
         return self._neural_posterior
 
     def _fit_classifier(
@@ -237,6 +251,7 @@ class SRE:
         :param validation_fraction: The fraction of data to use for validation.
         :param stop_after_epochs: The number of epochs to wait for improvement on the
         validation set before terminating training.
+
         :return: None
         """
 
@@ -278,6 +293,9 @@ class SRE:
             lr=learning_rate,
         )
 
+        # only used if classifier_loss == "aalr"
+        criterion = nn.BCELoss()
+
         # Keep track of best_validation log_prob seen so far.
         best_validation_log_prob = -1e100
         # Keep track of number of epochs since last improvement.
@@ -290,10 +308,13 @@ class SRE:
         if self._retrain_from_scratch_each_round:
             self._neural_posterior = deepcopy(self._neural_posterior)
 
-        def _get_log_prob(parameters, observations):
+        def _get_loss(parameters, observations):
 
             # num_atoms = parameters.shape[0]
             num_atoms = self._num_atoms if self._num_atoms > 0 else batch_size
+
+            if self._classifier_loss == "aalr":
+                assert num_atoms == 2, "aalr allows only two atoms, i.e. num_atoms=2."
 
             repeated_observations = utils.repeat_rows(observations, num_atoms)
 
@@ -316,13 +337,26 @@ class SRE:
 
             inputs = torch.cat((atomic_parameters, repeated_observations), dim=1)
 
-            logits = self._neural_posterior.neural_net(inputs).reshape(
-                batch_size, num_atoms
-            )
+            if self._classifier_loss == "aalr":
+                network_outputs = self._neural_posterior.neural_net(inputs)
+                likelihood = torch.squeeze(torch.sigmoid(network_outputs))
 
-            log_prob = logits[:, 0] - torch.logsumexp(logits, dim=-1)
+                # the first batch_size elements are the ones where theta and x are
+                # sampled from the joint p(theta, x) and are labelled 1s.
+                # The second batch_size elements are the ones where theta and x are
+                # sampled from the marginals p(theta)p(x) and are labelled 0s.
+                labels = torch.cat((torch.ones(batch_size), torch.zeros(batch_size)))
+                # binary cross entropy to learn the likelihood
+                loss = criterion(likelihood, labels)
+            else:
+                logits = self._neural_posterior.neural_net(inputs).reshape(
+                    batch_size, num_atoms
+                )
+                # index 0 is the parameter set sampled from the joint
+                log_prob = logits[:, 0] - torch.logsumexp(logits, dim=-1)
+                loss = -torch.mean(log_prob)
 
-            return log_prob
+            return loss
 
         epochs = 0
         while True:
@@ -331,8 +365,7 @@ class SRE:
             self._neural_posterior.neural_net.train()
             for parameters, observations in train_loader:
                 optimizer.zero_grad()
-                log_prob = _get_log_prob(parameters, observations)
-                loss = -torch.mean(log_prob)
+                loss = _get_loss(parameters, observations)
                 loss.backward()
                 optimizer.step()
 
@@ -343,7 +376,7 @@ class SRE:
             log_prob_sum = 0
             with torch.no_grad():
                 for parameters, observations in val_loader:
-                    log_prob = _get_log_prob(parameters, observations)
+                    log_prob = _get_loss(parameters, observations)
                     log_prob_sum += log_prob.sum().item()
                 validation_log_prob = log_prob_sum / num_validation_examples
 

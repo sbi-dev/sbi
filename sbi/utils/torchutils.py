@@ -255,3 +255,12 @@ def atleast_2d(
         return arr if arr.ndim >= 2 else arr.reshape(1, -1)
     else:
         return [atleast_2d(arr) for arr in arys]
+
+
+def ensure_tensor(arg):
+    """Return argument cast into a tensor if it's not one already."""
+
+    if not isinstance(arg, torch.Tensor):
+        return torch.tensor(arg)
+
+    return arg

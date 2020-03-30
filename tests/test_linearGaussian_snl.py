@@ -51,9 +51,6 @@ def test_snl_on_linearGaussian_api(num_dim: int):
     # draw samples from posterior
     samples = posterior.sample(num_samples=num_samples, num_chains=1)
 
-    # test eval
-    log_probs = posterior.log_prob(samples)
-
 
 @pytest.mark.slow
 @pytest.mark.parametrize("num_dim", (1, 3))
