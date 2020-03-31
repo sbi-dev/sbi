@@ -1,4 +1,5 @@
-from typing import Callable, Union, Dict
+from sbi.inference.base import NeuralInference
+from typing import Callable, Union, Dict, Optional
 import os
 from copy import deepcopy
 
@@ -17,18 +18,17 @@ import sbi.simulators as simulators
 import sbi.utils as utils
 from sbi.inference.posteriors.sbi_posterior import Posterior
 from sbi.mcmc import Slice, SliceSampler
-from sbi.simulators.simutils import (
-    set_simulator_attributes,
-    check_prior_and_data_dimensions,
-)
+from sbi.simulators.simutils import set_simulator_attributes
 from sbi.utils.torchutils import (
     get_default_device,
     ensure_parameter_batched,
     ensure_observation_batched,
 )
 
+from sbi.inference.base import NeuralInference
 
-class SRE:
+
+class SRE(NeuralInference):
     """
     'Sequential Ratio Estimation', as presented in
     'Likelihood-free MCMC with Amortized Approximate Likelihood Ratios'
@@ -39,72 +39,54 @@ class SRE:
 
     def __init__(
         self,
-        simulator,
-        prior,
-        true_observation,
-        classifier,
-        num_atoms=-1,
+        simulator: Callable,
+        prior: distributions.Distribution,
+        true_observation: torch.Tensor,
+        classifier: nn.Module,
+        num_atoms: int = -1,
         simulation_batch_size: int = 1,
         mcmc_method: str = "slice-np",
-        summary_net=None,
+        summary_net: Optional[nn.Module] = None,
         classifier_loss: str = "sre",
-        retrain_from_scratch_each_round=False,
-        summary_writer=None,
-        device=None,
+        retrain_from_scratch_each_round: bool = False,
+        summary_writer: Optional[SummaryWriter] = None,
+        device: Optional[torch.device] = None,
     ):
         """
 
         Args:
-            simulator: Python object with 'simulate' method which takes a torch.Tensor
-                of parameter values, and returns a simulation result for each parameter as a torch.Tensor.
-            prior: Distribution object with 'log_prob' and 'sample' methods.
-            true_observation: torch.Tensor containing the observation x0 for which to
-                perform inference on the posterior p(theta | x0).
-            classifier: Binary classifier in the form of an nets.Module.
+            See NeuralInference docstring for all other arguments.
+            
+            classifier: binary classifier in the form of an nn.Module.
+            
             num_atoms: Number of atoms to use for classification.
                 If -1, use all other parameters in minibatch.
-            simulation_batch_size: the number of parameter sets the simulator takes and converts to data x at
-                the same time. If simulation_batch_size==-1, we simulate all parameter sets at the same time.
-                If simulation_batch_size==1, the simulator has to process data of shape (1, num_dim).
-                If simulation_batch_size>1, the simulator has to process data of shape (simulation_batch_size, num_dim).
-            mcmc_method: What MCMC sampler to use. One of {"slice-np", "slice", "nuts", "hmc"}
-            summary_net: Optional network which may be used to produce feature vectors
-                f(x) for high-dimensional observations.
+                
+            summary_net: Optional network which may be used to produce feature
+                vectors f(x) for high-dimensional observations.
+                
             classifier_loss: {"sre", "aalr"}. "sre" implements the
-                 algorithm suggested in Durkan et al. 2019, whereas "aalr" implements
-                 the algorithm suggested in Hermans et al. 2019. "sre" can use more than
-                 two atoms, potentially boosting performance, but does not allow for
-                 exact posterior density evaluation (only up to a normalizing constant),
-                 even when training only one round. "aalr" is limited to num_atoms=2,
+                 algorithm suggested in Durkan et al. 2019, whereas "aalr" implements the algorithm suggested in Hermans et al. 2019. "sre" can use more than two atoms, potentially boosting performance, but does not allow for exact posterior density evaluation (only up to a normalizing constant), even when training only one round. "aalr" is limited to num_atoms=2,
                  but allows for density evaluation when training for one round.
-            retrain_from_scratch_each_round: Whether to retrain the conditional density
-                estimator for the posterior from scratch each round.
-            summary_writer: SummaryWriter
-                Optionally pass summary writer. A way to change the log file location.
-                If None, will create one internally, saving logs to cwd/logs.
-            device: torch.device
-                Optionally pass device
-                If None, will infer it
+                 
+            retrain_from_scratch_each_round: whether to retrain from scratch
+                    each round.
         """
 
-        true_observation = utils.torchutils.atleast_2d(true_observation)
-        check_prior_and_data_dimensions(prior, true_observation)
-        # set name and dimensions of simulator
-        simulator = set_simulator_attributes(simulator, prior, true_observation)
+        super().__init__(
+            simulator,
+            prior,
+            true_observation,
+            simulation_batch_size,
+            device,
+            summary_writer,
+        )
 
-        self._simulator = simulator
-        self._true_observation = true_observation
-        self._prior = prior
-        self._simulation_batch_size = simulation_batch_size
-        self._device = get_default_device() if device is None else device
         self._classifier_loss = classifier_loss
 
         assert isinstance(num_atoms, int), "Number of atoms must be an integer."
         self._num_atoms = num_atoms
 
-        self._mcmc_method = mcmc_method
-
-        # create the deep neural density estimator
         if classifier is None:
             classifier = utils.classifier_nn(
                 model="resnet", prior=self._prior, context=self._true_observation,
@@ -120,6 +102,9 @@ class SRE:
             get_potential_function=PotentialFunctionProvider(),
         )
 
+        # XXX why not classifier.train(True)???
+        self._neural_posterior.neural_net.train(True)
+
         # We may want to summarize high-dimensional observations.
         # This may be either a fixed or learned transformation.
         if summary_net is None:
@@ -127,39 +112,16 @@ class SRE:
         else:
             self._summary_net = summary_net
 
-        self._neural_posterior.neural_net.train()
-
-        self._retrain_from_scratch_each_round = retrain_from_scratch_each_round
         # If we're retraining from scratch each round,
         # keep a copy of the original untrained model for reinitialization.
-        if retrain_from_scratch_each_round:
+        self._retrain_from_scratch_each_round = retrain_from_scratch_each_round
+        if self._retrain_from_scratch_each_round:
             self._untrained_classifier = deepcopy(classifier)
         else:
             self._untrained_classifier = None
 
-        # Need somewhere to store (parameter, observation) pairs from each round.
-        self._parameter_bank, self._observation_bank = [], []
-
-        # Each SRE run has an associated log directory for TensorBoard output.
-        if summary_writer is None:
-            log_dir = os.path.join(
-                utils.get_log_root(), "sre", simulator.name, utils.get_timestamp()
-            )
-            self._summary_writer = SummaryWriter(log_dir)
-        else:
-            self._summary_writer = summary_writer
-
-        # Each run also has a dictionary of summary statistics which are populated
-        # over the course of training.
-        self._summary = {
-            "mmds": [],
-            "median-observation-distances": [],
-            "negative-log-probs-true-parameters": [],
-            "neural-net-fit-times": [],
-            "mcmc-times": [],
-            "epochs": [],
-            "best-validation-log-probs": [],
-        }
+        # SRE-specific summary_writer fields
+        self._summary.update({"mcmc-times": []})
 
     def __call__(
         self, num_rounds, num_simulations_per_round,

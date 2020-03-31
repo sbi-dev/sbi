@@ -1,3 +1,4 @@
+from sbi.inference.base import NeuralInference
 from typing import Callable, Union, Optional, Dict
 
 import os
@@ -19,14 +20,9 @@ from sbi.inference.posteriors.sbi_posterior import Posterior
 import sbi.simulators as simulators
 import sbi.utils as utils
 from sbi.mcmc import Slice, SliceSampler
-from sbi.simulators.simutils import (
-    set_simulator_attributes,
-    check_prior_and_data_dimensions,
-)
-from sbi.utils.torchutils import get_default_device
 
 
-class SNL:
+class SNL(NeuralInference):
     """
     Implementation of
     'Sequential Neural Likelihood: Fast Likelihood-free Inference with Autoregressive Flows'
@@ -37,10 +33,10 @@ class SNL:
 
     def __init__(
         self,
-        simulator,
-        prior: torch.distributions,
+        simulator: Callable,
+        prior: distributions.Distribution,
         true_observation: torch.Tensor,
-        density_estimator: Optional[torch.nn.Module],
+        density_estimator=None,
         simulation_batch_size: int = 1,
         summary_writer: SummaryWriter = None,
         device: torch.device = None,
@@ -48,36 +44,20 @@ class SNL:
     ):
         """
         Args:
-            simulator: Python object with 'simulate' method which takes a torch.Tensor
-                of parameter values, and returns a simulation result for each parameter as a torch.Tensor.
-            prior: Distribution object with 'log_prob' and 'sample' methods.
-            true_observation: torch.Tensor containing the observation x0 for which to
-            density_estimator: Conditional density estimator q(x | theta) in the form of an
-                nets.Module. Must have 'log_prob' and 'sample' methods.
-            simulation_batch_size: the number of parameter sets the simulator takes and converts to data x at
-                the same time. If simulation_batch_size==-1, we simulate all parameter sets at the same time.
-                If simulation_batch_size==1, the simulator has to process data of shape (1, num_dim).
-                If simulation_batch_size>1, the simulator has to process data of shape (simulation_batch_size, num_dim).
-            summary_writer: SummaryWriter
-                Optionally pass summary writer. A way to change the log file location.
-                If None, will create one internally, saving logs to cwd/logs.
-            device: torch.device
-                Optionally pass device
-                If None, will infer it
-            mcmc_method: MCMC method to use for posterior sampling. Must be one of
-                ['slice', 'hmc', 'nuts'].
+            See NeuralInference docstring for all other arguments.
+             
+            density_estimator: Conditional density estimator q(x|theta) in    
+                the form of an nn.Module with 'log_prob' and 'sample' methods.
         """
 
-        true_observation = utils.torchutils.atleast_2d(true_observation)
-        check_prior_and_data_dimensions(prior, true_observation)
-        # set name and dimensions of simulator
-        simulator = set_simulator_attributes(simulator, prior, true_observation)
-
-        self._simulator = simulator
-        self._prior = prior
-        self._true_observation = true_observation
-        self._simulation_batch_size = simulation_batch_size
-        self._device = get_default_device() if device is None else device
+        super().__init__(
+            simulator,
+            prior,
+            true_observation,
+            simulation_batch_size,
+            device,
+            summary_writer,
+        )
 
         # create the deep neural density estimator
         if density_estimator is None:
@@ -95,32 +75,11 @@ class SNL:
             get_potential_function=PotentialFunctionProvider(),
         )
 
-        # switch to training mode
-        self._neural_posterior.neural_net.train()
+        # XXX why not density_estimator.train(True)???
+        self._neural_posterior.neural_net.train(True)
 
-        # Need somewhere to store (parameter, observation) pairs from each round.
-        self._parameter_bank, self._observation_bank = [], []
-
-        # Each SNL run has an associated log directory for TensorBoard output.
-        if summary_writer is None:
-            log_dir = os.path.join(
-                utils.get_log_root(), "snl", simulator.name, utils.get_timestamp()
-            )
-            self._summary_writer = SummaryWriter(log_dir)
-        else:
-            self._summary_writer = summary_writer
-
-        # Each run also has a dictionary of summary statistics which are populated
-        # over the course of training.
-        self._summary = {
-            "mmds": [],
-            "median-observation-distances": [],
-            "negative-log-probs-true-parameters": [],
-            "neural-net-fit-times": [],
-            "mcmc-times": [],
-            "epochs": [],
-            "best-validation-log-probs": [],
-        }
+        # SNL-specific summary_writer fields
+        self._summary.update({"mcmc-times": []})
 
     def __call__(self, num_rounds: int, num_simulations_per_round):
         """
@@ -164,8 +123,8 @@ class SNL:
                 )
 
             # Store (parameter, observation) pairs.
-            self._parameter_bank.append(torch.Tensor(parameters))
-            self._observation_bank.append(torch.Tensor(observations))
+            self._parameter_bank.append(torch.as_tensor(parameters))
+            self._observation_bank.append(torch.as_tensor(observations))
 
             # Fit neural likelihood to newly aggregated dataset.
             self._fit_likelihood()

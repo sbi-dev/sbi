@@ -2,13 +2,11 @@
 
 import numpy as np
 import torch
+import torch.distributions as distributions
 import torchtestcase
-import pytest
+from tests.utils_for_testing.dkl import dkl_via_monte_carlo
 
 from sbi.utils import torchutils
-import torch.distributions as distributions
-import sbi.utils as utils
-from tests.utils_for_testing.dkl import dkl_via_monte_carlo
 
 
 class TorchUtilsTest(torchtestcase.TorchTestCase):
@@ -100,8 +98,8 @@ class TorchUtilsTest(torchtestcase.TorchTestCase):
         self.assertEqual(idx.shape, inputs.shape)
 
 
-def test_box_distribution():
-    bu1 = torchutils.BoxUniform(low=0.0, high=torch.Tensor([3.0, 3.0, 3.0]))
+def test_box_uniform_distribution():
+    bu1 = torchutils.BoxUniform(low=0.0, high=torch.tensor([3.0, 3.0, 3.0]))
 
     assert bu1.event_shape == torch.Size([3])
 
@@ -158,13 +156,3 @@ def test_dkl_gauss():
             f"Monte Carlo based DKL={monte_carlo_dkl} is too far off from the torch"
             f" implementation={torch_dkl}."
         )
-
-
-def test_ensure_tensor():
-    a_tensor = torch.randn([1, 2])
-    an_array = np.array([1, 2, 3])
-    a_scalar = 2.0
-
-    assert isinstance(torchutils.ensure_tensor(a_tensor), torch.Tensor)
-    assert isinstance(torchutils.ensure_tensor(an_array), torch.Tensor)
-    assert isinstance(torchutils.ensure_tensor(a_scalar), torch.Tensor)
