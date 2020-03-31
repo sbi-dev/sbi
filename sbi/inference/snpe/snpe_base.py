@@ -1,9 +1,14 @@
+from typing import Optional, Callable
+from sbi.inference.base import NeuralInference
 import warnings
 from copy import deepcopy
 from typing import Callable, Union
 
 import numpy as np
 import torch
+from torch import nn
+from torch.utils.tensorboard import SummaryWriter
+
 from pyknos.mdn.mdn import MultivariateGaussianMDN
 from torch import float32, nn, optim
 from torch.distributions import Distribution
@@ -15,78 +20,69 @@ from tqdm import tqdm
 import sbi.utils as utils
 from sbi.inference.posteriors.sbi_posterior import Posterior
 from sbi.utils.torchutils import get_default_device
-from sbi.simulators.simutils import (
-    set_simulator_attributes,
-    check_prior_and_data_dimensions,
-    simulate_in_batches,
-)
+from sbi.simulators.simutils import simulate_in_batches
 
 
-class SnpeBase:
+class SnpeBase(NeuralInference):
     def __init__(
         self,
-        simulator,
-        prior,
-        true_observation,
-        num_pilot_samples=100,
+        simulator: Callable,
+        prior: Distribution,
+        true_observation: torch.Tensor,
+        num_pilot_samples: int = 100,
         density_estimator=None,
-        calibration_kernel=None,
-        z_score_obs=True,
+        calibration_kernel: Optional[Callable] = None,
+        z_score_obs: bool = True,
         simulation_batch_size: int = 1,
-        use_combined_loss=False,
-        retrain_from_scratch_each_round=False,
-        discard_prior_samples=False,
-        device=None,
-        train_with_mcmc=False,
-        mcmc_method="slice-np",
+        use_combined_loss: bool = False,
+        retrain_from_scratch_each_round: bool = False,
+        discard_prior_samples: bool = False,
+        device: Optional[torch.device] = None,
+        sample_with_mcmc: bool = False,
+        mcmc_method: str = "slice-np",
+        summary_writer: Optional[SummaryWriter] = None,
     ):
         """
         Args:
-            simulator: Python object with 'simulate' method which takes a torch.Tensor
-                of parameter values, and returns a simulation result for each parameter
-                as a torch.Tensor.
-            prior: torch.distribution
-                Distribution object with 'log_prob' and 'sample' methods.
-            true_observation: torch.Tensor [observation_dim] or [1, observation_dim]
-                True observation x0 for which to perform inference on the posterior p(theta | x0).
-            num_pilot_samples: int
-                Number of simulations that are run when instantiating an object.
-                Used to z-score the observations.
-            density_estimator: Neural density estimator
-                Density estimator to use.
-            z_score_obs: bool
-                Whether to z-score (=normalize) the data features x
-            simulation_batch_size: the number of parameter sets the simulator takes and converts to data x at
-                the same time. If simulation_batch_size==-1, we simulate all parameter sets at the same time.
-                If simulation_batch_size==1, the simulator has to process data of shape (1, num_dim).
-                If simulation_batch_size>1, the simulator has to process data of shape (simulation_batch_size, num_dim).
-            use_combined_loss: bool
-                Whether to jointly neural_net prior samples using maximum likelihood.
-                Useful to prevent density leaking when using box uniform priors.
-            retrain_from_scratch_each_round: bool
-                Whether to retrain the conditional density estimator for the posterior
-                from scratch each round.
-            discard_prior_samples: bool
-                Whether to discard prior samples from round two onwards.
-            device: torch.device
-                Optionally pass device
-                If None, will infer it
+            See NeuralInference docstring for all other arguments.
+         
+            num_pilot_samples: number of simulations that are run when
+                instantiating an object. Used to z-score the observations.
+                
+            density_estimator: neural density estimator
+                
+            calibration_kernel: a function to calibrate the context
+            
+            z_score_obs: whether to z-score the data features x
+        
+            use_combined_loss: whether to jointly neural_net prior samples 
+                using maximum likelihood. Useful to prevent density leaking when using box uniform priors.
+                
+            retrain_from_scratch_each_round: whether to retrain the conditional
+                density estimator for the posterior from scratch each round.
+                
+            discard_prior_samples: whether to discard prior samples from round
+                two onwards.
         """
 
-        true_observation = utils.torchutils.atleast_2d(true_observation)
-        check_prior_and_data_dimensions(prior, true_observation)
-        self._simulator = set_simulator_attributes(simulator, prior, true_observation)
-        self._prior = prior
-        self._true_observation = true_observation
-        self._device = get_default_device() if device is None else device
+        super().__init__(
+            simulator,
+            prior,
+            true_observation,
+            simulation_batch_size,
+            device,
+            summary_writer,
+        )
+
         self.z_score_obs = z_score_obs
-        self._simulation_batch_size = simulation_batch_size
-        self.num_pilot_samples = num_pilot_samples
+
+        self._num_pilot_samples = num_pilot_samples
         self._use_combined_loss = use_combined_loss
         self._discard_prior_samples = discard_prior_samples
-        # Need somewhere to store (parameter, observation) pairs from each round.
-        self._parameter_bank, self._observation_bank, self._prior_masks = [], [], []
+
+        self._prior_masks = []
         self._model_bank = []
+
         self._retrain_from_scratch_each_round = retrain_from_scratch_each_round
 
         # run prior samples
@@ -103,14 +99,13 @@ class SnpeBase:
             density_estimator = utils.posterior_nn(
                 model="maf", prior=self._prior, context=self._true_observation,
             )
-
         # create the neural posterior which can sample(), log_prob()
         self._neural_posterior = Posterior(
             algorithm_family="snpe",
             neural_net=density_estimator,
             prior=prior,
-            context=true_observation,
-            train_with_mcmc=train_with_mcmc,
+            context=self._true_observation,
+            sample_with_mcmc=sample_with_mcmc,
             mcmc_method=mcmc_method,
             get_potential_function=PotentialFunctionProvider(),
         )
@@ -145,17 +140,8 @@ class SnpeBase:
         # keep a copy of the original untrained model for reinitialization.
         self._untrained_neural_posterior = deepcopy(self._neural_posterior)
 
-        # Each run also has a dictionary of summary statistics which are populated
-        # over the course of training.
-        self._summary = {
-            "mmds": [],
-            "median-observation-distances": [],
-            "negative-log-probs-true-parameters": [],
-            "neural-net-fit-times": [],
-            "epochs": [],
-            "best-validation-log-probs": [],
-            "rejection-sampling-acceptance-rates": [],
-        }
+        # extra SNPE-specific fields summary_writer
+        self._summary.update({"rejection-sampling-acceptance-rates": []})
 
     def __call__(self, num_rounds, num_simulations_per_round, **kwargs):
         """
@@ -260,7 +246,7 @@ class SnpeBase:
                     (num_samples,)
                 ),
                 num_samples=np.maximum(
-                    0, num_simulations_per_round - self.num_pilot_samples
+                    0, num_simulations_per_round - self._num_pilot_samples
                 ),
                 simulation_batch_size=self._simulation_batch_size,
                 x_dim=self._true_observation.shape[1:],  # do not pass batch_dim

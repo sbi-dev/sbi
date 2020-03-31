@@ -73,7 +73,7 @@ def test_apt_on_linearGaussian_based_on_mmd(
             use_combined_loss=False,
             retrain_from_scratch_each_round=False,
             discard_prior_samples=False,
-            train_with_mcmc=False,
+            sample_with_mcmc=False,
         )
 
     # run inference
@@ -179,7 +179,7 @@ def test_multi_round_snpe_on_linearGaussian_based_on_mmd(algorithm_str: str):
             use_combined_loss=False,
             retrain_from_scratch_each_round=False,
             discard_prior_samples=False,
-            train_with_mcmc=False,
+            sample_with_mcmc=False,
         )
 
     # run inference
@@ -207,7 +207,7 @@ def test_multi_round_snpe_on_linearGaussian_based_on_mmd(algorithm_str: str):
 # testing rejction and mcmc sampling methods
 @pytest.mark.slow
 @pytest.mark.parametrize(
-    "train_with_mcmc, mcmc_method, prior",
+    "sample_with_mcmc, mcmc_method, prior",
     (
         (True, "slice-np", "gaussian"),
         (True, "slice", "gaussian"),
@@ -216,7 +216,7 @@ def test_multi_round_snpe_on_linearGaussian_based_on_mmd(algorithm_str: str):
         (False, "rejection", "uniform"),
     ),
 )
-def test_apt_posterior_correction(train_with_mcmc, mcmc_method, prior):
+def test_apt_posterior_correction(sample_with_mcmc, mcmc_method, prior):
     """Test that leakage correction applied to sampling works, with both MCMC and rejection."""
 
     num_dim = 2
@@ -245,7 +245,7 @@ def test_apt_posterior_correction(train_with_mcmc, mcmc_method, prior):
         use_combined_loss=False,
         retrain_from_scratch_each_round=False,
         discard_prior_samples=False,
-        train_with_mcmc=train_with_mcmc,
+        sample_with_mcmc=sample_with_mcmc,
         mcmc_method=mcmc_method,
     )
 
