@@ -8,6 +8,7 @@ import pytest
 from sbi.utils import torchutils
 import torch.distributions as distributions
 import sbi.utils as utils
+from tests.utils_for_testing.dkl import dkl_via_monte_carlo
 
 
 class TorchUtilsTest(torchtestcase.TorchTestCase):
@@ -149,7 +150,7 @@ def test_dkl_gauss():
 
     for d1, d2 in zip(dist1, dist2):
         torch_dkl = distributions.kl.kl_divergence(d1, d2)
-        monte_carlo_dkl = utils.dkl_via_monte_carlo(d1, d2, num_samples=1000)
+        monte_carlo_dkl = dkl_via_monte_carlo(d1, d2, num_samples=1000)
 
         max_dkl_diff = 0.4
 

@@ -35,9 +35,3 @@ from sbi.utils.typechecks import (
     is_positive_int,
     is_power_of_two,
 )
-from sbi.utils.dkl import dkl_via_monte_carlo
-from sbi.utils.utils_for_testing import (
-    get_dkl_gaussian_prior,
-    get_prob_outside_uniform_prior,
-    get_normalization_uniform_prior,
-)

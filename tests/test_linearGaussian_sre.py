@@ -9,6 +9,7 @@ from sbi.simulators.linear_gaussian import (
     get_true_posterior_samples_linear_gaussian_uniform_prior,
     linear_gaussian,
 )
+import tests.utils_for_testing.linearGaussian_logprob as test_utils
 
 # seed the simulations
 torch.manual_seed(0)
@@ -137,9 +138,7 @@ def test_sre_on_linearGaussian_based_on_mmd(
         # Hermans et al. 2019 ('aalr') since Durkan et al. 2019 version only allows
         # evaluation up to a constant.
         # For the Gaussian prior, we compute the D-KL between ground truth and posterior
-        dkl = utils.utils_for_testing.get_dkl_gaussian_prior(
-            posterior, true_observation, num_dim
-        )
+        dkl = test_utils.get_dkl_gaussian_prior(posterior, true_observation, num_dim)
 
         max_dkl = 0.05 if num_dim == 1 else 0.8
 
@@ -148,9 +147,7 @@ def test_sre_on_linearGaussian_based_on_mmd(
         ), f"D-KL={dkl} is more than 2 stds above the average performance."
     if prior_str == "uniform":
         # Check whether the returned probability outside of the support is zero
-        posterior_prob = utils.utils_for_testing.get_prob_outside_uniform_prior(
-            posterior, num_dim
-        )
+        posterior_prob = test_utils.get_prob_outside_uniform_prior(posterior, num_dim)
         assert (
             posterior_prob == 0.0
         ), "The posterior probability outside of the prior support is not zero"

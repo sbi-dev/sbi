@@ -1,7 +1,7 @@
 import torch
 from torch.distributions import Independent, MultivariateNormal
 
-import sbi.utils.torchutils as torchutils
+import sbi.utils as utils
 
 
 def linear_gaussian(parameters: torch.Tensor, std=1.0) -> torch.Tensor:
@@ -15,7 +15,7 @@ def linear_gaussian(parameters: torch.Tensor, std=1.0) -> torch.Tensor:
 def get_true_posterior_samples_linear_gaussian_mvn_prior(
     observation: torch.Tensor, num_samples: int = 1000, std: float = 1.0
 ):
-    observation = torchutils.atleast_2d(observation)
+    observation = utils.torchutils.atleast_2d(observation)
     assert observation.ndim == 2, "needs batch dimension in observation"
     mean = observation
     dim = mean.shape[1]
@@ -32,7 +32,7 @@ def get_true_posterior_log_prob_linear_gaussian_n_prior(
 
     Returns: univariate Gaussian posterior distribution
     """
-    observation = torchutils.atleast_2d(observation)
+    observation = utils.torchutils.atleast_2d(observation)
     assert observation.ndim == 2, "needs batch dimension in observation"
     mean = observation
     dim = mean.shape[1]
@@ -50,7 +50,7 @@ def get_true_posterior_log_prob_linear_gaussian_mvn_prior(
 
     Returns: multivariate Gaussian posterior distribution
     """
-    observation = torchutils.atleast_2d(observation)
+    observation = utils.torchutils.atleast_2d(observation)
     assert observation.ndim == 2, "needs batch dimension in observation"
     mean = observation
     dim = mean.shape[1]
@@ -63,7 +63,7 @@ def get_true_posterior_log_prob_linear_gaussian_mvn_prior(
 def get_true_posterior_samples_linear_gaussian_uniform_prior(
     observation: torch.Tensor, prior: Independent, num_samples: int = 1000, std=1,
 ):
-    observation = torchutils.atleast_2d(observation)
+    observation = utils.torchutils.atleast_2d(observation)
     assert observation.ndim == 2, "needs batch dimension in observation"
     mean = observation
     event_shape = mean.shape[1]

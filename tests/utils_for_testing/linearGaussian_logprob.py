@@ -6,6 +6,7 @@ from sbi.simulators.linear_gaussian import (
     get_true_posterior_log_prob_linear_gaussian_mvn_prior,
 )
 from sbi.inference.posteriors.sbi_posterior import Posterior
+from tests.utils_for_testing.dkl import dkl_via_monte_carlo
 
 
 def get_dkl_gaussian_prior(
@@ -32,7 +33,7 @@ def get_dkl_gaussian_prior(
 
     # get Kullback-Leibler divergence from the ground truth distribution to the
     # obtained posterior
-    dkl = utils.dkl_via_monte_carlo(target_dist, posterior, num_samples=200)
+    dkl = dkl_via_monte_carlo(target_dist, posterior, num_samples=200)
 
     return dkl
 

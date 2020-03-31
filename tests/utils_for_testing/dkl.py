@@ -1,5 +1,6 @@
 import torch
 import torch.distributions
+
 from sbi.inference.posteriors.sbi_posterior import Posterior
 from typing import Union
 
