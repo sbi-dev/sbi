@@ -46,12 +46,13 @@ class NeuralInference(ABC):
         """
 
         self._warn_on_possibly_batched_observations(true_observation)
+        
+        # XXX want self._true_observation (atleast_2d) as attribute instead?
+        self._simulator = set_simulator_attributes(simulator, prior,
+                                                   true_observation)
         self._true_observation = atleast_2d(true_observation)
 
         self._warn_on_batch_reinterpretation_extra_d_uniform(prior)
-        
-        self._simulator = set_simulator_attributes(simulator, prior,  
-                                                   self._true_observation)
         
         self._simulation_batch_size = simulation_batch_size
 
