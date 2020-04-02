@@ -45,13 +45,13 @@ def summarize(
                 )
             )
         )
-        summary["median-observation-distances"].append(
+        summary["median_observation_distances"].append(
             median_observation_distance.item()
         )
 
         summary_writer.add_scalar(
-            tag="median-observation-distance",
-            scalar_value=summary["median-observation-distances"][-1],
+            tag="median_observation_distance",
+            scalar_value=summary["median_observation_distances"][-1],
             global_step=round_ + 1,
         )
 
@@ -65,13 +65,13 @@ def summarize(
         negative_log_prob_true_parameters = -utils.gaussian_kde_log_eval(
             samples=parameter_bank[-1], query=ground_truth_parameters.reshape(1, -1),
         )
-        summary["negative-log-probs-true-parameters"].append(
+        summary["negative_log_probs_true_parameters"].append(
             negative_log_prob_true_parameters.item()
         )
 
         summary_writer.add_scalar(
-            tag="negative-log-prob-true-parameters",
-            scalar_value=summary["negative-log-probs-true-parameters"][-1],
+            tag="negative_log_prob_true_parameters",
+            scalar_value=summary["negative_log_probs_true_parameters"][-1],
             global_step=round_ + 1,
         )
     except:
@@ -79,13 +79,13 @@ def summarize(
 
     try:
         # Rejection sampling acceptance rate
-        summary["rejection-sampling-acceptance-rates"].append(
+        summary["rejection_sampling_acceptance-rates"].append(
             posterior_samples_acceptance_rate
         )
 
         summary_writer.add_scalar(
-            tag="rejection-sampling-acceptance-rate",
-            scalar_value=summary["rejection-sampling-acceptance-rates"][-1],
+            tag="rejection_sampling_acceptance_rate",
+            scalar_value=summary["rejection_sampling_acceptance_rates"][-1],
             global_step=round_ + 1,
         )
     except:
@@ -100,21 +100,21 @@ def summarize(
             lims=simulator.parameter_plotting_limits,
         )
         summary_writer.add_figure(
-            tag="posterior-samples", figure=figure, global_step=round_ + 1
+            tag="posterior_samples", figure=figure, global_step=round_ + 1
         )
     except:
         pass
 
     # Write quantities using SummaryWriter.
     summary_writer.add_scalar(
-        tag="epochs-trained",
+        tag="epochs_trained",
         scalar_value=summary["epochs"][-1],
         global_step=round_ + 1,
     )
 
     summary_writer.add_scalar(
-        tag="best-validation-log-prob",
-        scalar_value=summary["best-validation-log-probs"][-1],
+        tag="best_validation_log_prob",
+        scalar_value=summary["best_validation_log_probs"][-1],
         global_step=round_ + 1,
     )
 
