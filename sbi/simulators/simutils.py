@@ -141,6 +141,7 @@ def simulate_in_batches(
     return torch.as_tensor(parameters), torch.cat(all_x)
 
 
+# XXX is this a utility function for testing? -> specific utils module
 def get_simulator_prior_and_groundtruth(task):
 
     if task == "nonlinear-gaussian":

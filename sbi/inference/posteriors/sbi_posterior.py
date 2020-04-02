@@ -1,6 +1,4 @@
 from typing import Callable, Optional
-from torch import Tensor
-from torch.distributions import Distribution
 from warnings import warn
 
 from pyro.infer.mcmc import HMC, NUTS
@@ -9,17 +7,13 @@ from torch import Tensor
 import torch
 from torch import nn
 from torch import multiprocessing as mp
-from pyro.infer.mcmc import HMC, NUTS
-from pyro.infer.mcmc.api import MCMC
 
 from sbi.mcmc import Slice, SliceSampler
 import sbi.utils as utils
 from sbi.utils.torchutils import atleast_2d
 
-import sbi.utils as utils
-from sbi.mcmc import Slice, SliceSampler
 
-NEG_INF = torch.as_tensor(float("-inf"))
+NEG_INF = torch.as_tensor(float("-inf"), dtype=torch.float32)
 
 
 class Posterior:
@@ -49,14 +43,13 @@ class Posterior:
             neural_net: a classifier for sre/aalr, a density estimator for snpe/snl   
             prior: prior distribution with methods `log_prob` and `sample`
             context: observations acting as conditioning variables. Absent if 
-                None. If provided, it must have same leading dimension as the inputs.
-            
+                None. If provided, it must have same leading dimension as the inputs.  
             sample_with_mcmc: sample with MCMC for leakage
         """
 
         self.neural_net = neural_net
         self._prior = prior
-        self._context = atleast_2d(context)
+        self._context = context  # atleast_2d(context)
 
         self._sample_with_mcmc = sample_with_mcmc
         self._mcmc_method = mcmc_method
@@ -67,10 +60,10 @@ class Posterior:
         else:
             raise ValueError("Algorithm family unsupported.")
 
+        self._num_trained_rounds = 0
 
         # correction factor for snpe leakage
         self._leakage_density_correction_factor = None
-        self._num_trained_rounds = 0
 
     def log_prob(
         self,
@@ -84,7 +77,6 @@ class Posterior:
             inputs: parameters.
             context: observations acting as conditioning variables. 
                 If None, uses the "default" context the posterior was trained for in multi-round mode. If provided, it must have same leading dimension as the inputs.
-
             normalize_snpe_density:
                 If True, normalize the output density when using snpe (by drawing samples, estimating the acceptance ratio, and then scaling the probability with it) and return -infinity where inputs are outside of the prior support. If False, directly return the output from the density estimator.
 
@@ -93,7 +85,9 @@ class Posterior:
             the inputs given the context.
         """
 
-        # we care about the normalized density only when we do snpe.
+        # XXX I would like to remove this and deal with everything leakage-
+        # XXX related down locally in the _log_prob_snpe function
+        # XXX See draft code commented down below.
         correct_leakage = normalize_snpe_density and self._alg_family == "snpe"
 
         inputs, context = utils.match_shapes_of_inputs_and_contexts(
@@ -101,42 +95,54 @@ class Posterior:
         )
 
         # XXX train exited here, entered after sampling?
-        self.neural_net.train(False)
+        self.neural_net.eval()
 
-        if self._alg_family == "snpe":
-            unnormalized_log_prob = self.neural_net.log_prob(inputs, context)
-        # XXX would like to see different branches for sre and aalr, for clarity
-        elif self._alg_family in ("sre", "aalr"):
-            if self._num_trained_rounds > 1 or self._alg_family == "sre":
-                # if we train single round with aalr loss, the
-                # density is normalized and we do not raise the warning.
-                warn(
-                    "The log-probability returned by SRE is only correct up to a normalizing constant."
-                )
-            # XXX unsqueeze?
-            log_ratio = self.neural_net(torch.cat((inputs, context)).reshape(1, -1))
-            unnormalized_log_prob = log_ratio + self._prior.log_prob(inputs)
-        else:
-            # given __init__ currently this catches only alg_family=="snl"
-            raise ValueError(f"Log probability unavailable for {self._alg_family}.")
+        try:
+            log_prob_fn = getattr(self, f"_log_prob_{self._alg_family}")
+        except AttributeError:
+            raise ValueError(f"{self.alg_family} cannot evaluate probabilities.")
 
-        if correct_leakage:
-            # set the log-likelihood to -infinity if parameter set (inputs) is
-            # outside of prior bounds.
-            prior_log_prob = self._prior.log_prob(inputs)
-            within_prior = torch.isfinite(prior_log_prob)
-            unnormalized_log_prob = torch.where(
-                within_prior, unnormalized_log_prob, prior_log_prob
-            )
-
-        # find the acceptance rate
-        leakage_correction = (
-            self.get_leakage_correction(context=context) if correct_leakage else 1.0
+        return log_prob_fn(
+            inputs, context, normalize_snpe_density=normalize_snpe_density
         )
 
-        # return the normalized (leakage-corrected) log prob: subtract
-        # acceptance probability from rejection sampling
-        return unnormalized_log_prob - torch.log(torch.as_tensor([leakage_correction]))
+    def _log_prob_snpe(self, inputs: Tensor, context: Tensor, **kwargs) -> Tensor:
+        unnormalized_log_prob = self.neural_net.log_prob(inputs, context)
+
+        if not kwargs.get("normalize_snpe_density", True):
+            # XXX Should we test if a leakage correction is due, warn only then?
+            # XXX or is it too expensive?
+            warn("No leakage correction was requested.")
+            return unnormalized_log_prob
+        else:
+            # XXX See above note on defining `correct_leakage`
+            # if context.shape[0] > 1:
+            #     raise ValueError("etc")
+            #
+            # Set log-likelihood to -infinity if parameters outside prior support.
+            is_prior_finite = torch.isfinite(self._prior.log_prob(inputs))
+            masked_log_prob = torch.where(
+                is_prior_finite, unnormalized_log_prob, NEG_INF
+            )
+            leakage_correction = self.get_leakage_correction(context=context)
+            return masked_log_prob - torch.log(leakage_correction)
+
+    def _log_prob_classifier(self, inputs: Tensor, context: Tensor, **kwargs) -> Tensor:
+        log_ratio = self.neural_net(torch.cat((inputs, context)).reshape(1, -1))
+        return log_ratio + self._prior.log_prob(inputs)
+
+    def _log_prob_sre(self, inputs: Tensor, context: Tensor, **kwargs) -> Tensor:
+        warn(
+            "The log-probability returned by SRE is only correct up to a normalizing constant."
+        )
+        return self._log_prob_classifier(inputs, context)
+
+    def _log_prob_aalr(self, inputs: Tensor, context: Tensor, **kwargs) -> Tensor:
+        if self._num_trained_rounds > 1:
+            warn(
+                "The log-probability returned by AALR beyond round 1 is only correct up to a normalizing constant."
+            )
+        return self._log_prob_classifier(inputs, context)
 
     def get_leakage_correction(
         self, context: Tensor, num_rejection_samples: int = 10000
@@ -159,10 +165,9 @@ class Posterior:
             Saved or newly estimated correction factor (scalar Tensor).
         """
 
-        # check whether context is new
-        new_context = (context != self._context).all()
+        is_new_context = (context != self._context).all()
 
-        if new_context:
+        if is_new_context:
             _, acceptance_rate = utils.sample_posterior_within_prior(
                 self.neural_net, self._prior, context, num_samples=num_rejection_samples
             )
@@ -176,6 +181,7 @@ class Posterior:
                 num_samples=num_rejection_samples,
             )
             self._leakage_density_correction_factor = acceptance_rate
+            # XXX merge with next return (move out)
             return torch.as_tensor(self._leakage_density_correction_factor)
         # otherwise just return the saved correction factor
         else:
@@ -187,9 +193,7 @@ class Posterior:
 
         Args:
             num_samples: number of samples
-            
             context: conditioning observation. Will be _true_observation if None
-            
             **kwargs:
                 Additional parameters passed to MCMC sampler (thin and warmup)
 
@@ -310,18 +314,15 @@ class Posterior:
     ):
         """Return samples obtained using Pyro's HMC, NUTS or slice kernels.
 
-        Args:
-            num_samples: desired number of samples
+        Args: 
+            num_samples: desired number of samples  
             potential_fn: defining the potential function as a callable **class** makes
                 it picklable for Pyro's MCMC to use it across chains in parallel, even
                 if the potential function requires evaluating a neural network. context:
                 conditioning observation
             mcmc_method: one of "hmc", "nuts" or "slice" (default "slice")
-            
             thin: thinning (subsampling) factor (default 10)
-            
             warmup_steps: initial samples to discard (defaults to 200)
-            
             num_chains: whether to sample in parallel. If None, will use all
                 CPUs except one (default 1)
 
