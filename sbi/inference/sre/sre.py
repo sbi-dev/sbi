@@ -1,31 +1,22 @@
-from sbi.inference.base import NeuralInference
-from typing import Callable, Union, Dict, Optional
-import os
 from copy import deepcopy
+from typing import Callable, Dict, Optional, Union
 
 import numpy as np
-import torch
-from matplotlib import pyplot as plt
 from pyro.infer.mcmc import HMC, NUTS
 from pyro.infer.mcmc.api import MCMC
-from torch import distributions, nn, optim
+import torch
+from torch import Tensor
+from torch import nn, optim
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
+from sbi.inference.base import NeuralInference
+from sbi.inference.posteriors.sbi_posterior import Posterior
 import sbi.simulators as simulators
 import sbi.utils as utils
-from sbi.inference.posteriors.sbi_posterior import Posterior
-from sbi.mcmc import Slice, SliceSampler
-from sbi.simulators.simutils import set_simulator_attributes
-from sbi.utils.torchutils import (
-    get_default_device,
-    ensure_parameter_batched,
-    ensure_observation_batched,
-)
-
-from sbi.inference.base import NeuralInference
+from sbi.utils.torchutils import ensure_observation_batched, ensure_parameter_batched
 
 
 class SRE(NeuralInference):
@@ -41,6 +32,7 @@ class SRE(NeuralInference):
         self,
         simulator: Callable,
         prior,
+        true_observation: Tensor,
         classifier: nn.Module,
         num_atoms: int = -1,
         simulation_batch_size: int = 1,
@@ -57,17 +49,13 @@ class SRE(NeuralInference):
             See NeuralInference docstring for all other arguments.
             
             classifier: binary classifier in the form of an nn.Module.
-            
             num_atoms: Number of atoms to use for classification.
-                If -1, use all other parameters in minibatch.
-                
+                If -1, use all other parameters in minibatch. 
             summary_net: Optional network which may be used to produce feature
                 vectors f(x) for high-dimensional observations.
-                
             classifier_loss: {"sre", "aalr"}. "sre" implements the
                  algorithm suggested in Durkan et al. 2019, whereas "aalr" implements the algorithm suggested in Hermans et al. 2019. "sre" can use more than two atoms, potentially boosting performance, but does not allow for exact posterior density evaluation (only up to a normalizing constant), even when training only one round. "aalr" is limited to num_atoms=2,
                  but allows for density evaluation when training for one round.
-                 
             retrain_from_scratch_each_round: whether to retrain from scratch
                     each round.
         """
@@ -381,11 +369,7 @@ class PotentialFunctionProvider:
     """
 
     def __call__(
-        self,
-        prior: torch.distributions.Distribution,
-        classifier: torch.nn.Module,
-        observation: torch.Tensor,
-        mcmc_method: str,
+        self, prior, classifier: nn.Module, observation: Tensor, mcmc_method: str,
     ) -> Callable:
         """Return potential function. 
         
@@ -414,7 +398,7 @@ class PotentialFunctionProvider:
         else:
             return self.np_potential
 
-    def np_potential(self, parameters: np.array) -> Union[torch.Tensor, float]:
+    def np_potential(self, parameters: np.array) -> Union[Tensor, float]:
         """Return potential for Numpy slice sampler."
         
         Args:
@@ -423,7 +407,7 @@ class PotentialFunctionProvider:
         Returns:
             [tensor or -inf]: posterior log probability of the parameters.
         """
-        parameter = torch.tensor(parameters, dtype=torch.float32)
+        parameter = torch.as_tensor(parameters, dtype=torch.float32)
 
         # parameter and observation should have shape (1, dim)
         parameter = ensure_parameter_batched(parameter)
@@ -434,7 +418,7 @@ class PotentialFunctionProvider:
         # notice opposite sign to pyro potential
         return log_ratio + self.prior.log_prob(parameter)
 
-    def pyro_potential(self, parameters: Dict[str, torch.Tensor]) -> torch.Tensor:
+    def pyro_potential(self, parameters: Dict[str, Tensor]) -> Tensor:
         """Return potential for Pyro sampler.
         
         Args:

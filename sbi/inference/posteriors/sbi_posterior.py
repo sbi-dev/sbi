@@ -3,16 +3,23 @@ from torch import Tensor
 from torch.distributions import Distribution
 from warnings import warn
 
+from pyro.infer.mcmc import HMC, NUTS
+from pyro.infer.mcmc.api import MCMC
+from torch import Tensor
 import torch
 from torch import nn
 from torch import multiprocessing as mp
 from pyro.infer.mcmc import HMC, NUTS
 from pyro.infer.mcmc.api import MCMC
 
+from sbi.mcmc import Slice, SliceSampler
+import sbi.utils as utils
 from sbi.utils.torchutils import atleast_2d
 
 import sbi.utils as utils
 from sbi.mcmc import Slice, SliceSampler
+
+NEG_INF = torch.as_tensor(float("-inf"))
 
 
 class Posterior:
@@ -20,9 +27,10 @@ class Posterior:
     
     This class is used by inference algorithms as follows:
     
-    - SNPE-family algorithms put density outside of the prior. This class uses the prior to adjust evaluation and sampling and correct for that.
-    - SNL and and SRE methods don't return posteriors directly. This class provides MCMC methods that given the prior, allow to sample from the posterior.
-    
+    - SNPE-family algorithms put density outside of the prior. This class uses the  
+      prior to adjust evaluation and sampling and correct for that.
+    - SNL and and SRE methods don't return posteriors directly. This class provides
+      MCMC methods that given the prior, allow to sample from the posterior.
     """
 
     def __init__(
@@ -38,12 +46,8 @@ class Posterior:
         """
         Args:
             algorithm_family: one of 'snpe', 'snl', 'sre' or 'aalr'
-            
-            neural_net: depends on algorithm: classifier for sre, density
-                estimator for snpe and snl
-                
-            prior: prior distribution
-            
+            neural_net: a classifier for sre/aalr, a density estimator for snpe/snl   
+            prior: prior distribution with methods `log_prob` and `sample`
             context: observations acting as conditioning variables. Absent if 
                 None. If provided, it must have same leading dimension as the inputs.
             
@@ -63,6 +67,7 @@ class Posterior:
         else:
             raise ValueError("Algorithm family unsupported.")
 
+
         # correction factor for snpe leakage
         self._leakage_density_correction_factor = None
         self._num_trained_rounds = 0
@@ -76,16 +81,15 @@ class Posterior:
         """Return posterior log probability.
 
         Args: 
-
-            inputs: input variables
-
+            inputs: parameters.
             context: observations acting as conditioning variables. 
                 If None, uses the "default" context the posterior was trained for in multi-round mode. If provided, it must have same leading dimension as the inputs.
 
             normalize_snpe_density:
                 If True, normalize the output density when using snpe (by drawing samples, estimating the acceptance ratio, and then scaling the probability with it) and return -infinity where inputs are outside of the prior support. If False, directly return the output from the density estimator.
 
-        Returns: tensor shaped like the input, containing the log probability of
+        Returns: 
+            Tensor shaped like the input, containing the log probability of
             the inputs given the context.
         """
 
@@ -136,7 +140,7 @@ class Posterior:
 
     def get_leakage_correction(
         self, context: Tensor, num_rejection_samples: int = 10000
-    ) -> float:
+    ) -> Tensor:
         """Return leakage-correction factor for a leaky posterior density. 
         
         The factor is estimated from the acceptance probability during rejection
@@ -152,7 +156,7 @@ class Posterior:
              (default: 10000).
         
         Returns:
-            Saved or newly estimated correction factor.
+            Saved or newly estimated correction factor (scalar Tensor).
         """
 
         # check whether context is new
@@ -162,7 +166,7 @@ class Posterior:
             _, acceptance_rate = utils.sample_posterior_within_prior(
                 self.neural_net, self._prior, context, num_samples=num_rejection_samples
             )
-            return acceptance_rate
+            return torch.as_tensor(acceptance_rate)
         # if factor for default context wasn't estimated yet, estimate and set
         elif self._leakage_density_correction_factor is None:
             _, acceptance_rate = utils.sample_posterior_within_prior(
@@ -172,10 +176,10 @@ class Posterior:
                 num_samples=num_rejection_samples,
             )
             self._leakage_density_correction_factor = acceptance_rate
-            return self._leakage_density_correction_factor
+            return torch.as_tensor(self._leakage_density_correction_factor)
         # otherwise just return the saved correction factor
         else:
-            return self._leakage_density_correction_factor
+            return torch.as_tensor(self._leakage_density_correction_factor)
 
     def sample(self, num_samples: int, context: Tensor = None, **kwargs) -> Tensor:
         """
@@ -308,12 +312,10 @@ class Posterior:
 
         Args:
             num_samples: desired number of samples
-            
-            potential_fn: defining the potential function as a callable
-                **class** makes it picklable for Pyro's MCMC to use it across chains in parallel, even if the potential function requires evaluating a neural network.
-
-            context: conditioning observation
-            
+            potential_fn: defining the potential function as a callable **class** makes
+                it picklable for Pyro's MCMC to use it across chains in parallel, even
+                if the potential function requires evaluating a neural network. context:
+                conditioning observation
             mcmc_method: one of "hmc", "nuts" or "slice" (default "slice")
             
             thin: thinning (subsampling) factor (default 10)
@@ -323,8 +325,7 @@ class Posterior:
             num_chains: whether to sample in parallel. If None, will use all
                 CPUs except one (default 1)
 
-        Returns: 
-            tensor of shape num_samples x parameter dimension
+        Returns: tensor of shape num_samples x parameter dimension
         """
         if num_chains is None:
             num_chains = mp.cpu_count - 1

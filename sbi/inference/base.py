@@ -1,17 +1,17 @@
 
 from abc import ABC
-from typing import Optional, Callable
-import warnings
 import os.path
+from typing import Callable, Optional
+import warnings
+
 import torch
-from torch.utils.tensorboard import SummaryWriter
 from torch import Tensor
 from torch.distributions import Uniform
-from sbi.utils.torchutils import atleast_2d, get_default_device
+from torch.utils.tensorboard import SummaryWriter
+
 from sbi.simulators.simutils import set_simulator_attributes
 from sbi.utils import get_log_root, get_timestamp
-from copy import deepcopy
-from sbi.inference.posteriors.sbi_posterior import Posterior
+from sbi.utils.torchutils import atleast_2d, get_default_device
 
 
 class NeuralInference(ABC):
@@ -30,79 +30,43 @@ class NeuralInference(ABC):
 
         """
         Args:
-            simulator: function that takes (vector) parameter and returns one  
-                (vector) result per parameter vector, with shape (num_parameters, result_dimension)
-            
+
+            simulator: a regular function parameter->result
+                Both parameters and result can be multi-dimensional.         
             prior: distribution-like object with `log_prob`and `sample` methods.
-            
-            true_observation: tensor containing the observation x0.
-            
-            simulation_batch_size: number of parameter vectors that the 
-                 simulator accepts and converts to data x at once. If -1, we simulate all parameter sets at the same time. If >= 1, the simulator has to process data of shape (sim_batch_size, parameter_dimension).
-            
-            summary_writer: an optional SummaryWriter to control log file 
-                location (default is <current working directory>/logs.)
-             
+            true_observation: tensor containing the observation x_o.
+                If it has more than one dimension, the leading dimension will be interpreted as a batch dimension but *currently* only the first batch element will be used to condition on.
+            simulation_batch_size: number of parameter sets that the 
+                simulator accepts and converts to data x at once. If -1, we simulate all parameter sets at the same time. If >= 1, the simulator has to process data of shape (simulation_batch_size, parameter_dimension).
+            summary_writer: an optional SummaryWriter to control, among others, log     
+                file location (default is <current working directory>/logs.)
             device: torch.device on which to compute (optional).
-            
             mcmc_method: MCMC method to use for posterior sampling, one of 
                 ['slice', 'hmc', 'nuts'].
         """
 
-        # check inputs: observation
+        self._warn_on_possibly_batched_observations(true_observation)
         self._true_observation = atleast_2d(true_observation)
 
-        # warn if prior is Uniform and dim_input > 1 (inferred by drawing once)
-        # XXX if prior is a torch Distribution, then it should support
-        # XXX event_shape, no need to sample
-        # XXX also, why use 'input' here? -> parms are input to the simulator
-        scalar_input = prior.sample().numel() == 1
-
-        if isinstance(prior, Uniform) and not scalar_input:
-            warnings.warn(
-                f"""The parameter dimension of the simulator we expect 
-                rom the provided prior's `event_shape` is >1,
-                and the prior is a PyTorch Uniform distribution. 
-                Beware that you are using a `batch_shape` >1 implicitly 
-                and `event_shape` 1, because PyTorch does not support 
-                multivariate Uniform. Please consider using a BoxUniform prior instead."""
-            )
-        # warning if observed data is multidimensional.
-        # XXX we want numel here?
-        if true_observation.squeeze().ndim > 1:
-            warnings.warn(
-                """`true_observation` has several dimensions. 
-                It could be e.g. a matrix (D=2) of observed data or a batch of
-                1D vector observations. SBI currently does not support batches."""
-            )
-
-        # XXX do simulator attributes get used outside of us accessing them from 
-        # XXX inference classes? In that case, we can store them in a dict
-        # XXX here, e.g. self._simspec()...
-        self._simulator = set_simulator_attributes(simulator, prior, true_observation)
+        self._warn_on_batch_reinterpretation_extra_d_uniform(prior)
+        
+        self._simulator = set_simulator_attributes(simulator, prior,  
+                                                   self._true_observation)
+        
+        self._simulation_batch_size = simulation_batch_size
 
         self._prior = prior
         
         self._device = get_default_device() if device is None else device
 
-        self._simulation_batch_size = simulation_batch_size
-
-        # initialize roundwise (parameter, observation) storage
+        # Initialize roundwise (parameter, observation) storage.
         self._parameter_bank, self._observation_bank = [], []
 
-        # XXX we could instantiate here the Posterior
-        # XXX solve first dispatching to the right PotentialProvider
-        # XXX f"Class name: {self.__class__.__name__}" -> use in dispatching
-        # XXX additional complication now alg_family is not just class name
-        # XXX (distinction introduced between SRE, AALR, not reflected in class)
-        # XXX  could this be done here, instead of in the child class?
-        # XXX  have to pass string or can access subclass name (for alg family)
-       
-        # XXX set embedding net for all?
+        # XXX We could instantiate here the Posterior for all children. Two problems:
+        # XXX 1. We must dispatch to right PotentialProvider for mcmc based on name
+        # XXX 2. `alg_family` cannot be resolved only from `self.__class__.__name__`,
+        # XXX     since SRE, AALR demand different handling but are both in SRE class.
 
-        # each run has an associated log directory for TensorBoard output.
-        # XXX pass / set up log_dir, not SummaryWriter. Cleaner, allows manual override
-        # XXX but then, **kwargs_summary_writer?
         if summary_writer is None:
             log_dir = os.path.join(
                 get_log_root(),
@@ -124,11 +88,46 @@ class NeuralInference(ABC):
             best_validation_log_probs=[],
         )
         
-        self._summary = {
-            "mmds": [],
-            "median-observation-distances": [],
-            "negative-log-probs-true-parameters": [],
-            "neural-net-fit-times": [],
-            "epochs": [],
-            "best-validation-log-probs": [],
-        }
+    def _warn_on_batch_reinterpretation_extra_d_uniform(self, prior):
+        """Warn when prior is a batch of scalar Uniforms.
+
+        Most likely the user wants to specify a prior on a multi-dimensional parameter
+        rather than several 1D priors at once.
+        """
+        
+        # Note .batch_shape will always work because and is short-circuiting. 
+        if isinstance(prior, Uniform) and prior.batch_shape.numel() > 1: 
+            warnings.warn(
+                f"""The specified Uniform prior is a prior on *several scalar parameters* (i.e. a batch), not a prior on a multi-dimensional parameter.
+
+                Please use utils.torchutils.BoxUniform if you'd rather put a prior on a multi-dimensional parameter.
+                """
+            )
+            
+    def _warn_on_possibly_batched_observations(self, true_observation):
+                
+        if true_observation.squeeze().ndim > 1:
+            warnings.warn(
+                """`true_observation` has D>1 dimensions. SBI interprets the leading dimension as a batch dimension, but it *currently* only processes a single observation, i.e. the first element of the batch.
+                
+                For example:
+                
+                > true_observation = [ [1,2,3], [4,5,6] ] 
+                
+                is interpreted as two vector observations, only the first of which is currently used to condition inference.
+                
+                Use rather:
+                
+                > true_observation = [ [[1,2,3], [4,5,6]] ]
+                > true_observation = [ [1], [2], [3]]
+                
+                if your single observation is matrix-shaped or scalar-shaped.
+                
+                Finally:
+                
+                > true_observation = [1]
+                > true_observation = [1, 2, 3]
+                
+                will be interpreted as one scalar observation or one vector observation and don't require wrapping (unsqueezing).
+                """
+            )
