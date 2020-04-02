@@ -1,0 +1,8 @@
+a[title="Edit this page"] {
+  display: none;
+}
+
+.md-typeset .footnote-ref:before {
+  margin: 0 !important;
+  border: none !important;
+}
