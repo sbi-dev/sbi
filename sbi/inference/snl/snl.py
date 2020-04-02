@@ -1,15 +1,15 @@
 from sbi.inference.base import NeuralInference
 from typing import Callable, Union, Optional, Dict
 
-import os
 from copy import deepcopy
 
 import numpy as np
 import torch
+from torch import Tensor
 from pyro.infer.mcmc import HMC, NUTS
 from pyro.infer.mcmc.api import MCMC
-from torch import distributions
-from torch import optim
+from torch import nn, optim
+
 from torch.nn.utils import clip_grad_norm_
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
@@ -19,7 +19,6 @@ from sbi.inference.posteriors.sbi_posterior import Posterior
 
 import sbi.simulators as simulators
 import sbi.utils as utils
-from sbi.mcmc import Slice, SliceSampler
 
 
 class SNL(NeuralInference):
@@ -35,6 +34,8 @@ class SNL(NeuralInference):
         self,
         simulator: Callable,
         prior,
+        true_observation: Tensor,
+        density_estimator=Optional[nn.Module],
         simulation_batch_size: int = 1,
         summary_writer: SummaryWriter = None,
         device: torch.device = None,
@@ -57,7 +58,6 @@ class SNL(NeuralInference):
             summary_writer,
         )
 
-        # create the deep neural density estimator
         if density_estimator is None:
             density_estimator = utils.likelihood_nn(
                 model="maf", prior=self._prior, context=self._true_observation,
@@ -287,11 +287,7 @@ class PotentialFunctionProvider:
     """
 
     def __call__(
-        self,
-        prior: torch.distributions.Distribution,
-        likelihood_nn: torch.nn.Module,
-        observation: torch.Tensor,
-        mcmc_method: str,
+        self, prior, likelihood_nn: nn.Module, observation: Tensor, mcmc_method: str,
     ) -> Callable:
         """Return potential function. 
         
@@ -319,7 +315,7 @@ class PotentialFunctionProvider:
         else:
             return self.np_potential
 
-    def np_potential(self, parameters: np.array) -> Union[torch.Tensor, float]:
+    def np_potential(self, parameters: np.array) -> Union[Tensor, float]:
         """Return posterior log prob. of parameters."
         
         Args:
@@ -328,7 +324,7 @@ class PotentialFunctionProvider:
         Returns:
             Posterior log probability of the parameters, -Inf if impossible under prior.
         """
-        parameters = torch.FloatTensor(parameters)
+        parameters = torch.as_tensor(parameters, dtype=torch.float32)
         log_likelihood = self.likelihood_nn.log_prob(
             inputs=self.observation.reshape(1, -1), context=parameters.reshape(1, -1)
         )
@@ -336,7 +332,7 @@ class PotentialFunctionProvider:
         # notice opposite sign to pyro potential
         return log_likelihood + self.prior.log_prob(parameters)
 
-    def pyro_potential(self, parameters: Dict[str, torch.Tensor]) -> torch.Tensor:
+    def pyro_potential(self, parameters: Dict[str, Tensor]) -> Tensor:
         """Return posterior log prob. of parameters.
         
          Args:
