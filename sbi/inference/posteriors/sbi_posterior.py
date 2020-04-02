@@ -29,7 +29,7 @@ class Posterior:
         self,
         algorithm_family: str,
         neural_net: nn.Module,
-        prior: Distribution,
+        prior,
         context: Optional[Tensor],
         sample_with_mcmc: bool = True,
         mcmc_method: str = "slice-np",

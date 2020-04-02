@@ -40,8 +40,7 @@ class SRE(NeuralInference):
     def __init__(
         self,
         simulator: Callable,
-        prior: distributions.Distribution,
-        true_observation: torch.Tensor,
+        prior,
         classifier: nn.Module,
         num_atoms: int = -1,
         simulation_batch_size: int = 1,

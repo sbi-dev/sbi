@@ -1,3 +1,5 @@
+from abc import ABC
+
 from typing import Optional, Callable
 from sbi.inference.base import NeuralInference
 import warnings
@@ -6,6 +8,7 @@ from typing import Callable, Union
 
 import numpy as np
 import torch
+from torch import Tensor
 from torch import nn
 from torch.utils.tensorboard import SummaryWriter
 
@@ -23,12 +26,12 @@ from sbi.utils.torchutils import get_default_device
 from sbi.simulators.simutils import simulate_in_batches
 
 
-class SnpeBase(NeuralInference):
+class SnpeBase(NeuralInference, ABC):
     def __init__(
         self,
         simulator: Callable,
-        prior: Distribution,
-        true_observation: torch.Tensor,
+        prior,
+        true_observation: Tensor,
         num_pilot_samples: int = 100,
         density_estimator=None,
         calibration_kernel: Optional[Callable] = None,
@@ -461,11 +464,7 @@ class PotentialFunctionProvider:
     """
 
     def __call__(
-        self,
-        prior: Distribution,
-        posterior_nn: torch.nn.Module,
-        observation: torch.Tensor,
-        mcmc_method: str,
+        self, prior, posterior_nn: nn.Module, observation: Tensor, mcmc_method: str,
     ) -> Callable:
         """Return potential function. 
         
@@ -481,7 +480,7 @@ class PotentialFunctionProvider:
         else:
             return self.np_potential
 
-    def np_potential(self, parameters: np.array) -> Union[torch.Tensor, float]:
+    def np_potential(self, parameters: np.array) -> Union[Tensor, float]:
         """Return posterior log prob. of parameters, -inf if outside prior."
         
         Args:
@@ -490,7 +489,7 @@ class PotentialFunctionProvider:
         Returns:
             [tensor or -inf]: posterior log probability of the parameters.
         """
-        parameters = torch.tensor(parameters, dtype=float32)
+        parameters = torch.as_tensor(parameters, dtype=torch.float32)
 
         is_within_prior = torch.isfinite(self.prior.log_prob(parameters))
         if is_within_prior:
@@ -503,14 +502,14 @@ class PotentialFunctionProvider:
 
         return target_log_prob
 
-    def pyro_potential(self, parameters: dict) -> torch.Tensor:
+    def pyro_potential(self, parameters: dict) -> Tensor:
         """Return posterior log prob. of parameters, -inf where outside prior.
         
         Args:
             parameters (dict): parameters (from pyro sampler)
         
         Returns:
-            torch.Tensor: posterior log probability, masked outside of prior
+            Posterior log probability, masked outside of prior
         """
 
         parameter = next(iter(parameters.values()))
