@@ -114,10 +114,16 @@ class NeuralInference(ABC):
         else:
             self._summary_writer = summary_writer
 
-        # XXX maybe use dict() or a dataclass -- requires renaming of keys
-        # Each run also has a dictionary of summary statistics which are
-        # populated over the course of training.
-
+        # Logging during training (by SummaryWriter).
+        self._summary = dict(
+            mmds=[],
+            median_observation_distances=[],
+            negative_log_probs_true_parameters=[],
+            neural_net_fit_times= [], #XXX unused elsewhere
+            epochs=[],
+            best_validation_log_probs=[],
+        )
+        
         self._summary = {
             "mmds": [],
             "median-observation-distances": [],

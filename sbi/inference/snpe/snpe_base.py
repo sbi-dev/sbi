@@ -141,7 +141,7 @@ class SnpeBase(NeuralInference):
         self._untrained_neural_posterior = deepcopy(self._neural_posterior)
 
         # extra SNPE-specific fields summary_writer
-        self._summary.update({"rejection-sampling-acceptance-rates": []})
+        self._summary.update({"rejection_sampling_acceptance_rates": []})
 
     def __call__(self, num_rounds, num_simulations_per_round, **kwargs):
         """
@@ -186,7 +186,7 @@ class SnpeBase(NeuralInference):
                 f"||||| ROUND {round_ + 1} STATS |||||:\n"
                 f"-------------------------\n"
                 f"Epochs trained: {self._summary['epochs'][-1]}\n"
-                f"Best validation performance: {self._summary['best-validation-log-probs'][-1]:.4f}\n\n"
+                f"Best validation performance: {self._summary['best_validation_log_probs'][-1]:.4f}\n\n"
             )
 
             # Update tensorboard and summary dict.
@@ -442,7 +442,7 @@ class SnpeBase(NeuralInference):
 
         # Update summary.
         self._summary["epochs"].append(epochs)
-        self._summary["best-validation-log-probs"].append(best_validation_log_prob)
+        self._summary["best_validation_log_probs"].append(best_validation_log_prob)
 
 
 class PotentialFunctionProvider:

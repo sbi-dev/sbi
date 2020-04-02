@@ -79,7 +79,7 @@ class SNL(NeuralInference):
         self._neural_posterior.neural_net.train(True)
 
         # SNL-specific summary_writer fields
-        self._summary.update({"mcmc-times": []})
+        self._summary.update({"mcmc_times": []})
 
     def __call__(self, num_rounds: int, num_simulations_per_round):
         """
@@ -135,7 +135,7 @@ class SNL(NeuralInference):
                 f"||||| ROUND {round_ + 1} STATS |||||:\n"
                 f"-------------------------\n"
                 f"Epochs trained: {self._summary['epochs'][-1]}\n"
-                f"Best validation performance: {self._summary['best-validation-log-probs'][-1]:.4f}\n\n"
+                f"Best validation performance: {self._summary['best_validation_log_probs'][-1]:.4f}\n\n"
             )
 
             # Update TensorBoard and summary dict.
@@ -266,7 +266,7 @@ class SNL(NeuralInference):
 
         # Update summary.
         self._summary["epochs"].append(epochs)
-        self._summary["best-validation-log-probs"].append(best_validation_log_prob)
+        self._summary["best_validation_log_probs"].append(best_validation_log_prob)
 
     @property
     def summary(self):
