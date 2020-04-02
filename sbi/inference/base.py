@@ -21,7 +21,7 @@ class NeuralInference(ABC):
     def __init__(
         self,
         simulator: Callable,
-        prior: torch.distributions.Distribution,
+        prior,
         true_observation: Tensor,
         simulation_batch_size: int = 1,
         device: Optional[torch.device] = None,

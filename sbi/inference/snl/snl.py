@@ -34,9 +34,7 @@ class SNL(NeuralInference):
     def __init__(
         self,
         simulator: Callable,
-        prior: distributions.Distribution,
-        true_observation: torch.Tensor,
-        density_estimator=None,
+        prior,
         simulation_batch_size: int = 1,
         summary_writer: SummaryWriter = None,
         device: torch.device = None,
