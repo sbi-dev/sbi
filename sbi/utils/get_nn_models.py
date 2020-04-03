@@ -1,21 +1,44 @@
-from sbi.utils.torchutils import create_alternating_binary_mask
+from typing import Optional
+
+import torch
+from pyknos.mdn.mdn import MultivariateGaussianMDN
+from pyknos.nflows import distributions as distributions_
+from pyknos.nflows import flows, transforms
+from pyknos.nflows.nn import nets
+from pyknos.nflows.nn.nde import MixtureOfGaussiansMADE
 from torch import nn
-from torch.nn import functional as F
 
 import sbi.utils as utils
-from pyknos.nflows import distributions as distributions_
-from pyknos.nflows import transforms
-from pyknos.nflows.nn import nets
-import torch
-from pyknos.nflows import flows
-from pyknos.mdn.mdn import MultivariateGaussianMDN
-from pyknos.nflows.nn.nde import MixtureOfGaussiansMADE
+from sbi.utils.torchutils import create_alternating_binary_mask
 
 
 def posterior_nn(
-    model, prior, context, embedding=None,
-):
+    model: str,
+    prior: torch.distributions.Distribution,
+    context: torch.Tensor,
+    embedding: Optional[torch.nn.Module] = None,
+    hidden_features: int = 50,
+    mdn_num_components: int = 20,
+    made_num_mixture_components: int = 10,
+    made_num_blocks: int = 4,
+    flow_num_transforms: int = 5,
+) -> torch.nn.Module:
+    """Neural posterior density estimator
 
+    Args:
+        model: Model, one of maf / mdn / made / nsf
+        prior: Prior distribution
+        context: Observation
+        embedding: Embedding network
+        hidden_features: For all, number of hidden features
+        mdn_num_components: For MDNs only, number of components
+        made_num_mixture_components: For MADEs only, number of mixture components
+        made_num_blocks: For MADEs only, number of blocks
+        flow_num_transforms: For flows only, number of transforms
+
+    Returns:
+        Neural network
+    """
     mean, std = (prior.mean, prior.stddev)
     normalizing_transform = transforms.AffineTransform(shift=-mean / std, scale=1 / std)
 
@@ -25,7 +48,6 @@ def posterior_nn(
     observation_dim = torch.tensor([context.shape[1:]])
 
     if model == "mdn":
-        hidden_features = 50
         neural_net = MultivariateGaussianMDN(
             features=parameter_dim,
             context_features=observation_dim,
@@ -39,22 +61,21 @@ def posterior_nn(
                 nn.Linear(hidden_features, hidden_features),
                 nn.ReLU(),
             ),
-            num_components=20,
+            num_components=mdn_num_components,
             custom_initialization=True,
         )
 
     elif model == "made":
-        num_mixture_components = 5
         transform = normalizing_transform
         distribution = distributions_.MADEMoG(
             features=parameter_dim,
-            hidden_features=50,
+            hidden_features=hidden_features,
             context_features=observation_dim,
-            num_blocks=2,
-            num_mixture_components=num_mixture_components,
+            num_blocks=made_num_blocks,
+            num_mixture_components=made_num_mixture_components,
             use_residual_blocks=True,
             random_mask=False,
-            activation=F.relu,
+            activation=torch.relu,
             dropout_probability=0.0,
             use_batch_norm=False,
             custom_initialization=True,
@@ -68,19 +89,19 @@ def posterior_nn(
                     [
                         transforms.MaskedAffineAutoregressiveTransform(
                             features=parameter_dim,
-                            hidden_features=50,
+                            hidden_features=hidden_features,
                             context_features=observation_dim,
                             num_blocks=2,
                             use_residual_blocks=False,
                             random_mask=False,
-                            activation=F.tanh,
+                            activation=torch.tanh,
                             dropout_probability=0.0,
                             use_batch_norm=True,
                         ),
                         transforms.RandomPermutation(features=parameter_dim),
                     ]
                 )
-                for _ in range(5)
+                for _ in range(flow_num_transforms)
             ]
         )
 
@@ -101,10 +122,10 @@ def posterior_nn(
                             transform_net_create_fn=lambda in_features, out_features: nets.ResidualNet(
                                 in_features=in_features,
                                 out_features=out_features,
-                                hidden_features=50,
+                                hidden_features=hidden_features,
                                 context_features=observation_dim,
                                 num_blocks=2,
-                                activation=F.relu,
+                                activation=torch.relu,
                                 dropout_probability=0.0,
                                 use_batch_norm=False,
                             ),
@@ -116,7 +137,7 @@ def posterior_nn(
                         transforms.LULinear(parameter_dim, identity_init=True),
                     ]
                 )
-                for i in range(5)
+                for i in range(flow_num_transforms)
             ]
         )
 
@@ -130,8 +151,32 @@ def posterior_nn(
 
 
 def likelihood_nn(
-    model, prior, context, embedding=None,
-):
+    model: str,
+    prior: torch.distributions.Distribution,
+    context: torch.Tensor,
+    embedding: Optional[torch.nn.Module] = None,
+    hidden_features: int = 50,
+    mdn_num_components: int = 20,
+    made_num_mixture_components: int = 10,
+    made_num_blocks: int = 4,
+    flow_num_transforms: int = 5,
+) -> torch.nn.Module:
+    """Neural likelihood density estimator
+
+    Args:
+        model: Model, one of maf / mdn / made / nsf
+        prior: Prior distribution
+        context: Observation
+        embedding: Embedding network
+        hidden_features: For all, number of hidden features
+        mdn_num_components: For MDNs only, number of components
+        made_num_mixture_components: For MADEs only, number of mixture components
+        made_num_blocks: For MADEs only, number of blocks
+        flow_num_transforms: For flows only, number of transforms
+
+    Returns:
+        Neural network
+    """
     parameter_dim = prior.sample([1]).shape[1]
     if context.dim() == 1:
         observation_dim = torch.tensor([context.shape]).item()
@@ -139,7 +184,6 @@ def likelihood_nn(
         observation_dim = torch.tensor([context.shape[1]]).item()
 
     if model == "mdn":
-        hidden_features = 50
         neural_net = MultivariateGaussianMDN(
             features=observation_dim,
             context_features=parameter_dim,
@@ -156,20 +200,20 @@ def likelihood_nn(
                 nn.BatchNorm1d(hidden_features),
                 nn.ReLU(),
             ),
-            num_components=20,
+            num_components=mdn_num_components,
             custom_initialization=True,
         )
 
     elif model == "made":
         neural_net = MixtureOfGaussiansMADE(
             features=observation_dim,
-            hidden_features=50,
+            hidden_features=hidden_features,
             context_features=parameter_dim,
-            num_blocks=4,
-            num_mixture_components=10,
+            num_blocks=made_num_blocks,
+            num_mixture_components=made_num_mixture_components,
             use_residual_blocks=True,
             random_mask=False,
-            activation=F.relu,
+            activation=torch.relu,
             use_batch_norm=True,
             dropout_probability=0.0,
             custom_initialization=True,
@@ -182,19 +226,19 @@ def likelihood_nn(
                     [
                         transforms.MaskedAffineAutoregressiveTransform(
                             features=observation_dim,
-                            hidden_features=50,
+                            hidden_features=hidden_features,
                             context_features=parameter_dim,
                             num_blocks=2,
                             use_residual_blocks=False,
                             random_mask=False,
-                            activation=F.tanh,
+                            activation=torch.tanh,
                             dropout_probability=0.0,
                             use_batch_norm=True,
                         ),
                         transforms.RandomPermutation(features=observation_dim),
                     ]
                 )
-                for _ in range(5)
+                for _ in range(flow_num_transforms)
             ]
         )
         distribution = distributions_.StandardNormal((observation_dim,))
@@ -212,10 +256,10 @@ def likelihood_nn(
                             transform_net_create_fn=lambda in_features, out_features: nets.ResidualNet(
                                 in_features=in_features,
                                 out_features=out_features,
-                                hidden_features=50,
+                                hidden_features=hidden_features,
                                 context_features=parameter_dim,
                                 num_blocks=2,
-                                activation=F.relu,
+                                activation=torch.relu,
                                 dropout_probability=0.0,
                                 use_batch_norm=False,
                             ),
@@ -227,7 +271,7 @@ def likelihood_nn(
                         transforms.LULinear(observation_dim, identity_init=True),
                     ]
                 )
-                for i in range(5)
+                for i in range(flow_num_transforms)
             ]
         )
         distribution = distributions_.StandardNormal((observation_dim,))
@@ -240,8 +284,22 @@ def likelihood_nn(
 
 
 def classifier_nn(
-    model, prior, context,
-):
+    model,
+    prior: torch.distributions.Distribution,
+    context: torch.Tensor,
+    hidden_features: int = 50,
+) -> torch.nn.Module:
+    """Neural classifier
+
+    Args:
+        model: Model, one of linear / mlp / resnet
+        prior: Prior distribution
+        context: Observation
+        hidden_features: For all, number of hidden features
+
+    Returns:
+        Neural network
+    """
     parameter_dim = prior.sample([1]).shape[1]
     context = utils.torchutils.atleast_2d(context)
     observation_dim = torch.tensor([context.shape[1:]])
@@ -250,25 +308,24 @@ def classifier_nn(
         neural_net = nn.Linear(parameter_dim + observation_dim, 1)
 
     elif model == "mlp":
-        hidden_dim = 50
         neural_net = nn.Sequential(
-            nn.Linear(parameter_dim + observation_dim, hidden_dim),
-            nn.BatchNorm1d(hidden_dim),
+            nn.Linear(parameter_dim + observation_dim, hidden_features),
+            nn.BatchNorm1d(hidden_features),
             nn.ReLU(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.BatchNorm1d(hidden_dim),
+            nn.Linear(hidden_features, hidden_features),
+            nn.BatchNorm1d(hidden_features),
             nn.ReLU(),
-            nn.Linear(hidden_dim, 1),
+            nn.Linear(hidden_features, 1),
         )
 
     elif model == "resnet":
         neural_net = nets.ResidualNet(
             in_features=parameter_dim + observation_dim,
             out_features=1,
-            hidden_features=50,
+            hidden_features=hidden_features,
             context_features=None,
             num_blocks=2,
-            activation=F.relu,
+            activation=torch.relu,
             dropout_probability=0.0,
             use_batch_norm=False,
         )
