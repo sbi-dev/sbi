@@ -53,9 +53,6 @@ markdown_extensions:
 plugins:
   - search
   - mknotebooks
-  - redirects:
-      redirect_maps:
-          'tutorial.md': 'tutorials/quickstart.ipynb'
 
 extra_javascript:
   - 'https://cdn.jsdelivr.net/npm/katex@0.10.2/dist/katex.min.js'
