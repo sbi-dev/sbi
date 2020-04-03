@@ -1,0 +1,64 @@
+site_name: sbi 
+
+nav:
+  - Home: index.md
+  - Installation: install.md
+  - Credits: credits.md
+
+repo_name: 'mackelab/sbi'
+repo_url: http://github.com/mackelab/sbi
+
+theme:
+  name: 'material'
+  palette:
+    primary: 'indigo'
+    accent: 'indigo'
+  logo: 'static/logo.svg'
+  collapse_navigation: False
+
+extra:
+  social:
+    - type: 'github'
+      link: 'https://github.com/mackelab/sbi'
+
+markdown_extensions:
+  - extra
+  - smarty
+  - admonition
+  - codehilite:
+      guess_lang: false
+  - toc:
+      permalink: true
+      toc_depth: 2
+  - markdown_include.include:
+      base_path: ../
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.critic
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_generator: !!python/name:pymdownx.emoji.to_svg
+  - pymdownx.inlinehilite
+  - pymdownx.magiclink
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.superfences
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+plugins:
+  - search
+  - mknotebooks
+
+extra_javascript:
+  - 'https://cdn.jsdelivr.net/npm/katex@0.10.2/dist/katex.min.js'
+  - 'static/katex.js'
+  - 'static/nav.js'
+
+extra_css:
+  - 'https://cdn.jsdelivr.net/npm/katex@0.10.2/dist/katex.min.css'
+  - 'static/global.css'
