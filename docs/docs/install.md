@@ -2,14 +2,12 @@
 
 ## Quick start
 
-You can install `sbi` by cloning from the [GitHub repository](https://github.com/mackelab/sbi) and using pip:
+Clone the repo and install all the dependencies using the `environment.yml` file to create a conda environment: `conda env create -f environment.yml`. If you already have an `sbi` environment and want to refresh dependencies, just run `conda env update -f environment.yml --prune`.
+
+Alternatively, you can install via `setup.py` using `pip install -e ".[dev]"` (the dev flag installs development and testing dependencies).
 
 ```
 git clone https://github.com/mackelab/sbi.git
 cd sbi
-pip install -r requirements.txt
-pip install -e .
+pip install -e ".dev"
 ```
-
-Installing `sbi` as described above will automatically take care of the requirements. In total, this installation will typically take less than a minute.
-

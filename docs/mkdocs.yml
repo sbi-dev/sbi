@@ -3,7 +3,6 @@ site_name: sbi
 nav:
   - Home: index.md
   - Installation: install.md
-  - Tutorial: tutorials/quickstart.ipynb
   - Credits: credits.md
 
 repo_name: 'mackelab/sbi'

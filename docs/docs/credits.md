@@ -1,5 +1,11 @@
 # Credits
 
+##  Code
+
+This code builds heavily on previous work by [Conor Durkan](https://conormdurkan.github.io/), [George Papamakarios](https://gpapamak.github.io/) and [Artur Bekasov](https://arturbekasov.github.io/).
+Relevant repositories include [bayesiains/nsf](https://github.com/bayesiains/nsf) and [conormdurkan/lfi](https://github.com/conormdurkan/lfi).
+
+
 ## Algorithms
 
 `sbi` implements algorithms from the following papers:
@@ -14,10 +20,3 @@
   Murray, Papamakarios (arXiv 2020) <br>[[PDF]](https://arxiv.org/abs/2002.03712)
 
 We refer to these algorithms as SNPE-A, SNPE-B, and SNPE-C/APT, respectively.
-
-
-##  Code
-
-This code builds heavily on previous work by [Conor Durkan](https://conormdurkan.github.io/), [George Papamakarios](https://gpapamak.github.io/) and [Artur Bekasov](https://arturbekasov.github.io/).
-Relevant repositories include [bayesiains/nsf](https://github.com/bayesiains/nsf) and [conormdurkan/lfi](https://github.com/conormdurkan/lfi). 
-
