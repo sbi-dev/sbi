@@ -138,7 +138,7 @@ def simulate_in_batches(
         # collect batches in list
         all_x.append(x)
 
-    return torch.as_tensor(parameters), torch.cat(all_x)
+    return torch.tensor(parameters), torch.cat(all_x)
 
 
 # XXX is this a utility function for testing? -> specific utils module

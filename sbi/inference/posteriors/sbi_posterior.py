@@ -13,7 +13,7 @@ import sbi.utils as utils
 from sbi.utils.torchutils import atleast_2d
 
 
-NEG_INF = torch.as_tensor(float("-inf"), dtype=torch.float32)
+NEG_INF = torch.tensor(float("-inf"), dtype=torch.float32)
 
 
 class Posterior:
