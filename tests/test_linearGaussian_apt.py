@@ -137,7 +137,6 @@ def test_apt_on_linearGaussian_based_on_mmd(
 
 
 # test multi-round SNPE
-@pytest.mark.slow
 @pytest.mark.parametrize("algorithm_str", ("snpe_b", "snpe_c"))
 def test_multi_round_snpe_on_linearGaussian_based_on_mmd(algorithm_str: str):
     """Test whether APT infers well a simple example where ground truth is available."""
