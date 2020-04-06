@@ -1,29 +1,24 @@
-from abc import ABC
-
-from typing import Optional, Callable
-from sbi.inference.base import NeuralInference
 import warnings
+from abc import ABC
 from copy import deepcopy
-from typing import Callable, Union
+from typing import Callable, Optional, Union
 
 import numpy as np
 import torch
-from torch import Tensor
-from torch import nn
-from torch.utils.tensorboard import SummaryWriter
-
 from pyknos.mdn.mdn import MultivariateGaussianMDN
-from torch import float32, nn, optim
+from torch import Tensor, float32, nn, optim
 from torch.distributions import Distribution
 from torch.nn.utils import clip_grad_norm_
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
+from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 import sbi.utils as utils
+from sbi.inference.base import NeuralInference
 from sbi.inference.posteriors.sbi_posterior import Posterior
-from sbi.utils.torchutils import get_default_device
 from sbi.simulators.simutils import simulate_in_batches
+from sbi.utils.torchutils import get_default_device
 
 
 class SnpeBase(NeuralInference, ABC):
@@ -46,24 +41,18 @@ class SnpeBase(NeuralInference, ABC):
         summary_writer: Optional[SummaryWriter] = None,
     ):
         """
-        Args:
-            See NeuralInference docstring for all other arguments.
-         
+        See NeuralInference docstring for all other arguments.
+
+        Args:         
             num_pilot_samples: number of simulations that are run when
-                instantiating an object. Used to z-score the observations.
-                
+                instantiating an object. Used to z-score the observations.   
             density_estimator: neural density estimator
-                
             calibration_kernel: a function to calibrate the context
-            
             z_score_obs: whether to z-score the data features x
-        
             use_combined_loss: whether to jointly neural_net prior samples 
                 using maximum likelihood. Useful to prevent density leaking when using box uniform priors.
-                
             retrain_from_scratch_each_round: whether to retrain the conditional
                 density estimator for the posterior from scratch each round.
-                
             discard_prior_samples: whether to discard prior samples from round
                 two onwards.
         """

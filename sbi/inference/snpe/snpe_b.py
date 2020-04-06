@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 
 import torch
@@ -9,15 +11,6 @@ from sbi.inference.snpe.snpe_base import SnpeBase
 
 
 class SnpeB(SnpeBase):
-    """
-    Implementation of
-    'Flexible statistical inference for mechanistic
-        models of neural dynamics'
-    Lueckmann et al.
-    NeurIPS 2017
-    https://arxiv.org/abs/1711.01861
-    """
-
     def __init__(
         self,
         simulator,
@@ -35,7 +28,21 @@ class SnpeB(SnpeBase):
         device=None,
     ):
         """
-        See snpe_base.SnpeBase for docstring.
+
+        Implementation of __Flexible statistical inference for mechanistic models of neural dynamics__ by Lueckmann et al., NeurIPS 2017, https://arxiv.org/abs/1711.01861
+        
+        Args:
+            num_pilot_samples: number of simulations that are run when
+                instantiating an object. Used to z-score the observations.   
+            density_estimator: neural density estimator
+            calibration_kernel: a function to calibrate the context
+            z_score_obs: whether to z-score the data features x
+            use_combined_loss: whether to jointly neural_net prior samples 
+                using maximum likelihood. Useful to prevent density leaking when using box uniform priors.
+            retrain_from_scratch_each_round: whether to retrain the conditional
+                density estimator for the posterior from scratch each round.
+            discard_prior_samples: whether to discard prior samples from round
+                two onwards.
         """
 
         super(SnpeB, self).__init__(

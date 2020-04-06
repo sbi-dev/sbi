@@ -1,35 +1,26 @@
-from sbi.inference.base import NeuralInference
-from typing import Callable, Union, Optional, Dict
+from __future__ import annotations
 
 from copy import deepcopy
+from typing import Callable, Dict, Optional, Union
 
 import numpy as np
 import torch
-from torch import Tensor
 from pyro.infer.mcmc import HMC, NUTS
 from pyro.infer.mcmc.api import MCMC
-from torch import nn, optim
-
+from torch import Tensor, nn, optim
 from torch.nn.utils import clip_grad_norm_
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
-from sbi.inference.posteriors.sbi_posterior import Posterior
 
 import sbi.simulators as simulators
 import sbi.utils as utils
+from sbi.inference.base import NeuralInference
+from sbi.inference.posteriors.sbi_posterior import Posterior
 
 
 class SNL(NeuralInference):
-    """
-    Implementation of
-    'Sequential Neural Likelihood: Fast Likelihood-free Inference with Autoregressive Flows'
-    Papamakarios et al.
-    AISTATS 2019
-    https://arxiv.org/abs/1805.07226
-    """
-
     def __init__(
         self,
         simulator: Callable,
@@ -41,12 +32,14 @@ class SNL(NeuralInference):
         device: torch.device = None,
         mcmc_method: str = "slice-np",
     ):
-        """
-        Args:
-            See NeuralInference docstring for all other arguments.
-             
+        """Sequential Neural Likelihood
+        
+        Implementation of
+        _Sequential Neural Likelihood: Fast Likelihood-free Inference with Autoregressive Flows_ by Papamakarios et al., AISTATS 2019, https://arxiv.org/abs/1805.07226
+        
+        Args:             
             density_estimator: Conditional density estimator q(x|theta) in    
-                the form of an nn.Module with 'log_prob' and 'sample' methods.
+                the form of an nn.Module with `log_prob` and `sample` methods.
         """
 
         super().__init__(

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 
 import torch
@@ -9,15 +11,6 @@ from sbi.inference.snpe.snpe_base import SnpeBase
 
 
 class SnpeA(SnpeBase):
-    """
-    Implementation of
-    'Fast epsilon-free Inference of Simulation Models
-        with Bayesian Conditional Density Estimation'
-    Papamakarios et al.
-    NeurIPS 2016
-    https://arxiv.org/abs/1605.06376
-    """
-
     def __init__(
         self,
         simulator,
@@ -33,15 +26,24 @@ class SnpeA(SnpeBase):
         summary_writer=None,
         device=None,
     ):
-        """
-        See snpe_base.SnpeBase for docstring.
+        """SNPE-A
 
+        Implementation of _Fast epsilon-free Inference of Simulation Models with Bayesian Conditional Density Estimation_ by Papamakarios et al., NeurIPS 2016, 
+        https://arxiv.org/abs/1605.06376
+        
         Args:
-            num_atoms: int
-                Number of atoms to use for classification.
-                If -1, use all other parameters in minibatch.
+            num_pilot_samples: number of simulations that are run when
+                instantiating an object. Used to z-score the observations.   
+            density_estimator: neural density estimator
+            calibration_kernel: a function to calibrate the context
+            z_score_obs: whether to z-score the data features x
+            use_combined_loss: whether to jointly neural_net prior samples 
+                using maximum likelihood. Useful to prevent density leaking when using box uniform priors.
+            retrain_from_scratch_each_round: whether to retrain the conditional
+                density estimator for the posterior from scratch each round.
+            discard_prior_samples: whether to discard prior samples from round
+                two onwards.
         """
-
         super(SnpeA, self).__init__(
             simulator=simulator,
             prior=prior,
