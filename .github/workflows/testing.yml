@@ -1,4 +1,4 @@
-name: Tests
+name: Tests and docs
 
 on:
   push:
@@ -10,7 +10,7 @@ on:
 
 jobs:
   build:
-    name: Tests
+    name: Tests and docs
     runs-on: ubuntu-18.04
 
     steps:
@@ -33,3 +33,15 @@ jobs:
         pip install torchtestcase
         pip install pytest
         pytest -m "not slow"
+
+    - name: Build docs
+      run: |
+        pip install mkdocs-material markdown-include mknotebooks mkdocs-redirects mkdocstrings
+        cd docs && mkdocs build
+    - name: Deploy docs to gh-pages
+      uses: s0/git-publish-subdir-action@master
+      env:
+        REPO: self
+        BRANCH: gh-pages
+        FOLDER: docs/site
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
