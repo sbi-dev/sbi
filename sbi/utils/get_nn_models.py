@@ -110,7 +110,7 @@ def posterior_nn(
                             ),
                             num_bins=10,
                             tails="linear",
-                            tail_bound=3.0,
+                            tail_bound=5.0,
                             apply_unconditional_transform=False,
                         ),
                         transforms.LULinear(parameter_dim, identity_init=True),
@@ -119,6 +119,8 @@ def posterior_nn(
                 for i in range(5)
             ]
         )
+
+        transform = transforms.CompositeTransform([normalizing_transform, transform,])
 
         distribution = distributions_.StandardNormal((parameter_dim,))
         neural_net = flows.Flow(transform, distribution, embedding)

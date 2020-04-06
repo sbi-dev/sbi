@@ -362,4 +362,4 @@ class Posterior:
             "please simply pass the encoded features and pass "
             "embedding_net=None"
         )
-        self.neural_net.embedding_net = embedding_net
+        self.neural_net._embedding_net = embedding_net

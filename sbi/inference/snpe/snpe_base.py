@@ -28,6 +28,7 @@ class SnpeBase:
         simulator,
         prior,
         true_observation,
+        pilot_data=None,
         num_pilot_samples=100,
         density_estimator=None,
         calibration_kernel=None,
@@ -78,6 +79,7 @@ class SnpeBase:
         self._simulator = set_simulator_attributes(simulator, prior, true_observation)
         self._prior = prior
         self._true_observation = true_observation
+        self._pilot_data = pilot_data
         self._device = get_default_device() if device is None else device
         self.z_score_obs = z_score_obs
         self._simulation_batch_size = simulation_batch_size
@@ -89,14 +91,20 @@ class SnpeBase:
         self._model_bank = []
         self._retrain_from_scratch_each_round = retrain_from_scratch_each_round
 
-        # run prior samples
-        (self.pilot_parameters, self.pilot_observations,) = simulate_in_batches(
-            simulator=self._simulator,
-            parameter_sample_fn=lambda num_samples: self._prior.sample((num_samples,)),
-            num_samples=num_pilot_samples,
-            simulation_batch_size=self._simulation_batch_size,
-            x_dim=self._true_observation.shape[1:],  # do not pass batch_dim
-        )
+        if pilot_data is not None:
+            self.pilot_parameters = self._pilot_data[0][: self.num_pilot_samples]
+            self.pilot_observations = self._pilot_data[1][: self.num_pilot_samples]
+        else:
+            # run prior samples
+            (self.pilot_parameters, self.pilot_observations,) = simulate_in_batches(
+                simulator=self._simulator,
+                parameter_sample_fn=lambda num_samples: self._prior.sample(
+                    (num_samples,)
+                ),
+                num_samples=num_pilot_samples,
+                simulation_batch_size=self._simulation_batch_size,
+                x_dim=self._true_observation.shape[1:],  # do not pass batch_dim
+            )
 
         # create the deep neural density estimator
         if density_estimator is None:
@@ -185,7 +193,20 @@ class SnpeBase:
             tbar.set_description(round_description)
 
             # run simulations for the round
-            self._run_sims(round_, num_simulations_per_round[round_])
+            if self._pilot_data is not None:
+                self._parameter_bank.append(
+                    self._pilot_data[0][: num_simulations_per_round[round_]]
+                )
+                self._observation_bank.append(
+                    self._pilot_data[1][: num_simulations_per_round[round_]]
+                )
+                self._prior_masks.append(
+                    torch.ones(num_simulations_per_round[round_], 1)
+                    if round_ == 0
+                    else torch.zeros(num_simulations_per_round[round_], 1)
+                )
+            else:
+                self._run_sims(round_, num_simulations_per_round[round_])
 
             # Fit posterior using newly aggregated data set.
             self._train(round_=round_, **kwargs)
@@ -203,6 +224,14 @@ class SnpeBase:
                 f"Best validation performance: {self._summary['best-validation-log-probs'][-1]:.4f}\n\n"
             )
 
+            # aaa = self._neural_posterior.get_leakage_correction(
+            #     context=self._true_observation, num_rejection_samples=100
+            # )
+
+            print("starting to sample")
+            mysample = self._neural_posterior.sample(1)
+            print("mysample", mysample)
+
             # Update tensorboard and summary dict.
             self._summary_writer, self._summary = utils.summarize(
                 summary_writer=self._summary_writer,
@@ -213,7 +242,7 @@ class SnpeBase:
                 observation_bank=self._observation_bank,
                 simulator=self._simulator,
                 posterior_samples_acceptance_rate=self._neural_posterior.get_leakage_correction(
-                    context=self._true_observation
+                    context=self._true_observation, num_rejection_samples=20,
                 ),
             )
 
@@ -388,6 +417,8 @@ class SnpeBase:
         converged = False
         while not converged:
 
+            print("========= Starting new epoch ===========")
+
             # Train for a single epoch.
             self._neural_posterior.neural_net.train()
             for batch in train_loader:
@@ -439,6 +470,8 @@ class SnpeBase:
                     log_prob_sum += log_prob.sum().item()
             validation_log_prob = log_prob_sum / num_validation_examples
 
+            print("==== Validation log_prob:  ", validation_log_prob, "====")
+
             # Check for improvement in validation performance over previous epochs.
             if validation_log_prob > best_validation_log_prob:
                 best_validation_log_prob = validation_log_prob
@@ -457,6 +490,8 @@ class SnpeBase:
         # Update summary.
         self._summary["epochs"].append(epochs)
         self._summary["best-validation-log-probs"].append(best_validation_log_prob)
+
+        print("==================================== Done")
 
 
 class PotentialFunctionProvider:
