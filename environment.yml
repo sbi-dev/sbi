@@ -22,7 +22,7 @@ dependencies:
   - pillow
   - pip
   - pip:
-    - "pyknos@git+https://github.com/mackelab/pyknos.git"
+    - "pyknos@git+https://github.com/mackelab/pyknos.git@v0.10"
     - pyro-ppl
     - torchtestcase
     - -e .  # install package in development mode
