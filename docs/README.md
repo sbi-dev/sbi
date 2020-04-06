@@ -7,7 +7,7 @@ The documentation is available at: <http://mackelab.org/sbi>
 
 To build the docs you will need to:
 ```bash
-pip install mkdocs-material markdown-include mknotebooks mkdocs-redirects
+pip install mkdocs-material markdown-include mknotebooks mkdocs-redirects mkdocstrings
 ```
 
 You can build the docs locally by running in this subfolder:

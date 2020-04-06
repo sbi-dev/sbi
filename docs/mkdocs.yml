@@ -3,6 +3,7 @@ site_name: sbi
 nav:
   - Home: index.md
   - Installation: install.md
+  - API Reference: reference.md
   - Credits: credits.md
 
 repo_name: 'mackelab/sbi'
@@ -29,7 +30,7 @@ markdown_extensions:
       guess_lang: false
   - toc:
       permalink: true
-      toc_depth: 2
+      toc_depth: 3
   - markdown_include.include:
       base_path: ../
   - pymdownx.arithmatex:
@@ -53,6 +54,15 @@ markdown_extensions:
 plugins:
   - search
   - mknotebooks
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          rendering:
+            show_source: true
+            heading_level: 3
+      watch:
+        - ../sbi
 
 extra_javascript:
   - 'https://cdn.jsdelivr.net/npm/katex@0.10.2/dist/katex.min.js'
