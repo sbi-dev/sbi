@@ -327,10 +327,7 @@ def set_simulator_attributes(
     """
 
     parameter_dim, observation_dim = get_simulator_dimensions(prior, observed_data)
-    if name is None:
-        name = simulator_fun.__name__
 
-    setattr(simulator_fun, "name", name)
     setattr(simulator_fun, "parameter_dim", parameter_dim)
     setattr(simulator_fun, "observation_dim", observation_dim)
 
@@ -352,27 +349,6 @@ def get_simulator_dimensions(
     """
     # infer parameter dim by sampling once
     return prior.sample().numel(), observed_data.numel()
-
-
-def get_simulator_name(simulator_fun, name=None) -> str:
-    """Get or set name of the simulator. 
-    
-    Returns function name if no name is given. 
-    
-    Arguments:
-        simulator_fun {function} -- simulator function taking parameter batch as only argument, return data.
-    
-    Keyword Arguments:
-        name {string} -- name of the simualtor, e.g., 'linearGaussian' (default: {None})
-    
-    Returns:
-        string -- Name of the simulator. 
-    """
-    if name is None:
-        return simulator_fun.__name__
-    else:
-        simulator_fun.__name__ = name
-        return name
 
 
 def simulate_in_batches(
@@ -434,61 +410,3 @@ def simulate_in_batches(
         all_x.append(x)
 
     return torch.tensor(parameters), torch.cat(all_x)
-
-
-# XXX is this a utility function for testing? -> specific utils module
-def get_simulator_prior_and_groundtruth(task):
-
-    if task == "nonlinear-gaussian":
-        simulator = simulators.NonlinearGaussianSimulator()
-        prior = BoxUniform(
-            low=-3 * torch.ones(simulator.parameter_dim),
-            high=3 * torch.ones(simulator.parameter_dim),
-        )
-        # ground truth parameters as specified in 'Sequential Neural Likelihood' paper.
-        ground_truth_parameters = torch.tensor([-0.7, -2.9, -1.0, -0.9, 0.6])
-        # ground truth observation using same seed as 'Sequential Neural Likelihood' paper.
-        ground_truth_observation = torch.tensor(
-            [
-                -0.97071232,
-                -2.94612244,
-                -0.44947218,
-                -3.42318484,
-                -0.13285634,
-                -3.36401699,
-                -0.85367595,
-                -2.42716377,
-            ]
-        )
-
-    elif task == "nonlinear-gaussian-gaussian":
-        simulator = simulators.NonlinearGaussianSimulator()
-        prior = MultivariateNormal(loc=torch.zeros(5), covariance_matrix=torch.eye(5))
-        # ground truth parameters as specified in 'Sequential Neural Likelihood' paper.
-        ground_truth_parameters = torch.tensor([-0.7, -2.9, -1.0, -0.9, 0.6])
-        # ground truth observation using same seed as 'Sequential Neural Likelihood' paper.
-        ground_truth_observation = torch.tensor(
-            [
-                -0.97071232,
-                -2.94612244,
-                -0.44947218,
-                -3.42318484,
-                -0.13285634,
-                -3.36401699,
-                -0.85367595,
-                -2.42716377,
-            ]
-        )
-
-    elif task == "linear-gaussian":
-        dim, std = 20, 0.5
-        simulator = lambda theta: linear_gaussian(theta, std=std)
-        prior = MultivariateNormal(
-            loc=torch.zeros(dim), covariance_matrix=torch.eye(dim)
-        )
-        ground_truth_parameters = torch.zeros(dim)
-        ground_truth_observation = simulator(ground_truth_parameters)
-    else:
-        raise ValueError(f"'{task}' simulator choice not understood.")
-
-    return simulator, prior, ground_truth_parameters, ground_truth_observation

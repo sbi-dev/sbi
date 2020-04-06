@@ -25,7 +25,8 @@ class NeuralInference(ABC):
         true_observation: Tensor,
         simulation_batch_size: int = 1,
         device: Optional[torch.device] = None,
-        summary_writer: Optional[SummaryWriter] = None
+        summary_writer: Optional[SummaryWriter] = None, 
+        simulator_name: Optional[str] = "simulator",
     ):
 
         """
@@ -72,7 +73,7 @@ class NeuralInference(ABC):
             log_dir = os.path.join(
                 get_log_root(),
                 self.__class__.__name__,
-                simulator.name,
+                simulator_name,
                 get_timestamp(),
             )
             self._summary_writer = SummaryWriter(log_dir)
