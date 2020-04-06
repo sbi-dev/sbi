@@ -26,20 +26,19 @@ class SNL(NeuralInference):
         simulator: Callable,
         prior,
         true_observation: Tensor,
-        density_estimator=Optional[nn.Module],
+        density_estimator: Optional[nn.Module],
         simulation_batch_size: int = 1,
         summary_writer: SummaryWriter = None,
         device: torch.device = None,
         mcmc_method: str = "slice-np",
     ):
-        """Sequential Neural Likelihood
+        r"""Sequential Neural Likelihood
         
         Implementation of
         _Sequential Neural Likelihood: Fast Likelihood-free Inference with Autoregressive Flows_ by Papamakarios et al., AISTATS 2019, https://arxiv.org/abs/1805.07226
-        
-        Args:             
-            density_estimator: Conditional density estimator q(x|theta) in    
-                the form of an nn.Module with `log_prob` and `sample` methods.
+
+        Args:
+            density_estimator: Conditional density estimator $q(x|\theta)$, a nn.Module with `log_prob` and `sample` methods
         """
 
         super().__init__(
