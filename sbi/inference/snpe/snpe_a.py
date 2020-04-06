@@ -56,17 +56,6 @@ class SnpeA(SnpeBase):
             device=device,
         )
 
-        # Each APT run has an associated log directory for TensorBoard output.
-        if summary_writer is None:
-            log_dir = os.path.join(
-                utils.get_log_root(), "snpe-a", simulator.name, utils.get_timestamp()
-            )
-            self._summary_writer = SummaryWriter(log_dir)
-        else:
-            self._summary_writer = summary_writer
-
-        raise NotImplementedError
-
     def _get_log_prob_proposal_posterior(self, inputs, context, masks):
         """
         We have two main options when evaluating the proposal posterior.
@@ -120,15 +109,15 @@ class SnpeA(SnpeBase):
         log_prob_posterior = self._neural_posterior.log_prob(
             atomic_inputs, repeated_context
         )
-        assert utils.notinfnotnan(
+        assert torch.isfinite(
             log_prob_posterior
-        ), "NaN/inf detected in posterior eval."
+        ).all(), "NaN/inf detected in posterior eval."
         log_prob_posterior = log_prob_posterior.reshape(batch_size, num_atoms)
 
         # Get (batch_size * num_atoms) log prob prior evals.
         log_prob_prior = self._prior.log_prob(atomic_inputs)
         log_prob_prior = log_prob_prior.reshape(batch_size, num_atoms)
-        assert utils.notinfnotnan(log_prob_prior), "NaN/inf detected in prior eval."
+        assert torch.isfinite(log_prob_prior).all(), "NaN/inf detected in prior eval."
 
         # Compute unnormalized proposal posterior.
         unnormalized_log_prob_proposal_posterior = log_prob_posterior - log_prob_prior
@@ -137,9 +126,9 @@ class SnpeA(SnpeBase):
         log_prob_proposal_posterior = unnormalized_log_prob_proposal_posterior[
             :, 0
         ] - torch.logsumexp(unnormalized_log_prob_proposal_posterior, dim=-1)
-        assert utils.notinfnotnan(
+        assert torch.isfinite(
             log_prob_proposal_posterior
-        ), "NaN/inf detected in proposal posterior eval."
+        ).all(), "NaN/inf detected in proposal posterior eval."
 
         if self._use_combined_loss:
             masks = masks.reshape(-1)

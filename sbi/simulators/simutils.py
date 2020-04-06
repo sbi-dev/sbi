@@ -42,38 +42,6 @@ def set_simulator_attributes(
     return simulator_fun
 
 
-def check_prior_and_data_dimensions(prior: Distribution, observed_data: torch.Tensor):
-    """Check prior event shape and data dimensionality and warn. 
-    
-    Arguments:
-        prior {Distribution} -- [description]
-        observed_data {torch.Tensor} -- [description]
-
-    Raises: 
-        warning if prior is Uniform and dim input > 1. 
-        warning if observed data is multidimensional.
-    """
-
-    # infer parameter dim by simulating once
-    dim_input = prior.sample().numel()
-
-    if isinstance(prior, Uniform) and dim_input > 1:
-        warnings.warn(
-            f"The paramerer dimension (`event_shape`) of the simualtor inferred from the "
-            "prior is D={dim_input}>1 and the prior PyTorch Uniform. Therefore, beware "
-            "that you are using a `batch_shape` of {dim_input} implicitly and "
-            "`event_shape` 1, because Pytorch does not support multivariate Uniform. "
-            "Consider using a BoxUniform prior instead."
-        )
-
-    if observed_data.squeeze().ndim > 1:
-        warnings.warn(
-            "The `true_observation` Tensor has more than one dimension, i.e., it is a matrix "
-            "of observed data or batch of observed data points. "
-            "SBI supports only single observed data points."
-        )
-
-
 def get_simulator_dimensions(
     prior: Distribution, observed_data: torch.Tensor
 ) -> Tuple[int, int]:
@@ -173,6 +141,7 @@ def simulate_in_batches(
     return torch.tensor(parameters), torch.cat(all_x)
 
 
+# XXX is this a utility function for testing? -> specific utils module
 def get_simulator_prior_and_groundtruth(task):
 
     if task == "nonlinear-gaussian":

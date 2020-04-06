@@ -1,12 +1,13 @@
 """Various PyTorch utility functions."""
 
-from typing import Union, List
+from typing import List, Union
+
 import numpy as np
 import torch
-from torch.distributions import Distribution, Independent, Uniform
+from torch import Tensor
+from torch.distributions import Independent, Uniform
 
 import sbi.utils as utils
-from torch import geqrf
 
 
 def get_default_device():
@@ -168,10 +169,6 @@ def get_temperature(max_value, bound=1 - 1e-3):
     return temperature
 
 
-def notinfnotnan(x):
-    return torch.all(~torch.isnan(x)) and torch.all(~torch.isinf(x))
-
-
 def gaussian_kde_log_eval(samples, query):
     N, D = samples.shape[0], samples.shape[-1]
     std = N ** (-1 / (D + 4))
@@ -187,8 +184,8 @@ def gaussian_kde_log_eval(samples, query):
 class BoxUniform(Independent):
     def __init__(
         self,
-        low: Union[torch.Tensor, float],
-        high: Union[torch.Tensor, float],
+        low: Union[Tensor, float],
+        high: Union[Tensor, float],
         reinterpreted_batch_ndims: int = 1,
     ):
         """Multidimensional uniform distribution defined on a box.
@@ -198,8 +195,8 @@ class BoxUniform(Independent):
         Refer to torch.distributions.Uniform and torch.distributions.Independent for further documentation.
     
         Args:
-            low (Tensor or float): lower range (inclusive).
-            high (Tensor or float): upper range (exclusive).
+            low: lower range (inclusive).
+            high: upper range (exclusive).
             reinterpreted_batch_ndims (int): the number of batch dims to
                                              reinterpret as event dims.
         """
@@ -207,8 +204,7 @@ class BoxUniform(Independent):
         super().__init__(Uniform(low=low, high=high), reinterpreted_batch_ndims)
 
 
-# XXX does an in-place version (e.g. make_conform_) make sense?
-def ensure_parameter_batched(parameter: torch.Tensor) -> torch.Tensor:
+def ensure_parameter_batched(parameter: Tensor) -> Tensor:
     """
     Return tensors that both have the same tensor.ndim
     Function also covers cases where parameters is ndim=1 and observation ndim=2
@@ -222,8 +218,7 @@ def ensure_parameter_batched(parameter: torch.Tensor) -> torch.Tensor:
     return parameter
 
 
-# XXX does an in-place version (e.g. make_conform_) make sense?
-def ensure_observation_batched(observation: torch.Tensor) -> torch.Tensor:
+def ensure_observation_batched(observation: Tensor) -> Tensor:
     """
     Return tensors that both have the same tensor.ndim
     Function also covers cases where parameters is ndim=1 and observation ndim=2
@@ -238,12 +233,10 @@ def ensure_observation_batched(observation: torch.Tensor) -> torch.Tensor:
     return observation
 
 
-def atleast_2d(
-    *arys: Union[np.array, torch.Tensor]
-) -> Union[torch.Tensor, List[torch.Tensor]]:
+def atleast_2d(*arys: Union[np.array, Tensor]) -> Union[Tensor, List[Tensor]]:
     """Return tensors with at least dimension 2.
 
-    Tensors or arrays of dimension 0 or 1 will be get additional dimension(s) prepended.
+    Tensors or arrays of dimension 0 or 1 will get additional dimension(s) prepended.
 
     Returns:
         Tensor or list of tensors all with dimension >= 2.
@@ -255,12 +248,3 @@ def atleast_2d(
         return arr if arr.ndim >= 2 else arr.reshape(1, -1)
     else:
         return [atleast_2d(arr) for arr in arys]
-
-
-def ensure_tensor(arg):
-    """Return argument cast into a tensor if it's not one already."""
-
-    if not isinstance(arg, torch.Tensor):
-        return torch.tensor(arg)
-
-    return arg

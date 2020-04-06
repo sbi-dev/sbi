@@ -1,14 +1,15 @@
+from sbi.inference.base import NeuralInference
 from typing import Callable, Union, Optional, Dict
 
-import os
 from copy import deepcopy
 
 import numpy as np
 import torch
+from torch import Tensor
 from pyro.infer.mcmc import HMC, NUTS
 from pyro.infer.mcmc.api import MCMC
-from torch import distributions
-from torch import optim
+from torch import nn, optim
+
 from torch.nn.utils import clip_grad_norm_
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
@@ -18,15 +19,9 @@ from sbi.inference.posteriors.sbi_posterior import Posterior
 
 import sbi.simulators as simulators
 import sbi.utils as utils
-from sbi.mcmc import Slice, SliceSampler
-from sbi.simulators.simutils import (
-    set_simulator_attributes,
-    check_prior_and_data_dimensions,
-)
-from sbi.utils.torchutils import get_default_device
 
 
-class SNL:
+class SNL(NeuralInference):
     """
     Implementation of
     'Sequential Neural Likelihood: Fast Likelihood-free Inference with Autoregressive Flows'
@@ -37,10 +32,10 @@ class SNL:
 
     def __init__(
         self,
-        simulator,
-        prior: torch.distributions,
-        true_observation: torch.Tensor,
-        density_estimator: Optional[torch.nn.Module],
+        simulator: Callable,
+        prior,
+        true_observation: Tensor,
+        density_estimator=Optional[nn.Module],
         simulation_batch_size: int = 1,
         summary_writer: SummaryWriter = None,
         device: torch.device = None,
@@ -48,38 +43,21 @@ class SNL:
     ):
         """
         Args:
-            simulator: Python object with 'simulate' method which takes a torch.Tensor
-                of parameter values, and returns a simulation result for each parameter as a torch.Tensor.
-            prior: Distribution object with 'log_prob' and 'sample' methods.
-            true_observation: torch.Tensor containing the observation x0 for which to
-            density_estimator: Conditional density estimator q(x | theta) in the form of an
-                nets.Module. Must have 'log_prob' and 'sample' methods.
-            simulation_batch_size: the number of parameter sets the simulator takes and converts to data x at
-                the same time. If simulation_batch_size==-1, we simulate all parameter sets at the same time.
-                If simulation_batch_size==1, the simulator has to process data of shape (1, num_dim).
-                If simulation_batch_size>1, the simulator has to process data of shape (simulation_batch_size, num_dim).
-            summary_writer: SummaryWriter
-                Optionally pass summary writer. A way to change the log file location.
-                If None, will create one internally, saving logs to cwd/logs.
-            device: torch.device
-                Optionally pass device
-                If None, will infer it
-            mcmc_method: MCMC method to use for posterior sampling. Must be one of
-                ['slice', 'hmc', 'nuts'].
+            See NeuralInference docstring for all other arguments.
+             
+            density_estimator: Conditional density estimator q(x|theta) in    
+                the form of an nn.Module with 'log_prob' and 'sample' methods.
         """
 
-        true_observation = utils.torchutils.atleast_2d(true_observation)
-        check_prior_and_data_dimensions(prior, true_observation)
-        # set name and dimensions of simulator
-        simulator = set_simulator_attributes(simulator, prior, true_observation)
+        super().__init__(
+            simulator,
+            prior,
+            true_observation,
+            simulation_batch_size,
+            device,
+            summary_writer,
+        )
 
-        self._simulator = simulator
-        self._prior = prior
-        self._true_observation = true_observation
-        self._simulation_batch_size = simulation_batch_size
-        self._device = get_default_device() if device is None else device
-
-        # create the deep neural density estimator
         if density_estimator is None:
             density_estimator = utils.likelihood_nn(
                 model="maf", prior=self._prior, context=self._true_observation,
@@ -95,32 +73,11 @@ class SNL:
             get_potential_function=PotentialFunctionProvider(),
         )
 
-        # switch to training mode
-        self._neural_posterior.neural_net.train()
+        # XXX why not density_estimator.train(True)???
+        self._neural_posterior.neural_net.train(True)
 
-        # Need somewhere to store (parameter, observation) pairs from each round.
-        self._parameter_bank, self._observation_bank = [], []
-
-        # Each SNL run has an associated log directory for TensorBoard output.
-        if summary_writer is None:
-            log_dir = os.path.join(
-                utils.get_log_root(), "snl", simulator.name, utils.get_timestamp()
-            )
-            self._summary_writer = SummaryWriter(log_dir)
-        else:
-            self._summary_writer = summary_writer
-
-        # Each run also has a dictionary of summary statistics which are populated
-        # over the course of training.
-        self._summary = {
-            "mmds": [],
-            "median-observation-distances": [],
-            "negative-log-probs-true-parameters": [],
-            "neural-net-fit-times": [],
-            "mcmc-times": [],
-            "epochs": [],
-            "best-validation-log-probs": [],
-        }
+        # SNL-specific summary_writer fields
+        self._summary.update({"mcmc_times": []})
 
     def __call__(self, num_rounds: int, num_simulations_per_round):
         """
@@ -164,8 +121,8 @@ class SNL:
                 )
 
             # Store (parameter, observation) pairs.
-            self._parameter_bank.append(torch.Tensor(parameters))
-            self._observation_bank.append(torch.Tensor(observations))
+            self._parameter_bank.append(torch.as_tensor(parameters))
+            self._observation_bank.append(torch.as_tensor(observations))
 
             # Fit neural likelihood to newly aggregated dataset.
             self._fit_likelihood()
@@ -176,7 +133,7 @@ class SNL:
                 f"||||| ROUND {round_ + 1} STATS |||||:\n"
                 f"-------------------------\n"
                 f"Epochs trained: {self._summary['epochs'][-1]}\n"
-                f"Best validation performance: {self._summary['best-validation-log-probs'][-1]:.4f}\n\n"
+                f"Best validation performance: {self._summary['best_validation_log_probs'][-1]:.4f}\n\n"
             )
 
             # Update TensorBoard and summary dict.
@@ -307,7 +264,7 @@ class SNL:
 
         # Update summary.
         self._summary["epochs"].append(epochs)
-        self._summary["best-validation-log-probs"].append(best_validation_log_prob)
+        self._summary["best_validation_log_probs"].append(best_validation_log_prob)
 
     @property
     def summary(self):
@@ -330,11 +287,7 @@ class PotentialFunctionProvider:
     """
 
     def __call__(
-        self,
-        prior: torch.distributions.Distribution,
-        likelihood_nn: torch.nn.Module,
-        observation: torch.Tensor,
-        mcmc_method: str,
+        self, prior, likelihood_nn: nn.Module, observation: Tensor, mcmc_method: str,
     ) -> Callable:
         """Return potential function. 
         
@@ -362,7 +315,7 @@ class PotentialFunctionProvider:
         else:
             return self.np_potential
 
-    def np_potential(self, parameters: np.array) -> Union[torch.Tensor, float]:
+    def np_potential(self, parameters: np.array) -> Union[Tensor, float]:
         """Return posterior log prob. of parameters."
         
         Args:
@@ -371,7 +324,7 @@ class PotentialFunctionProvider:
         Returns:
             Posterior log probability of the parameters, -Inf if impossible under prior.
         """
-        parameters = torch.FloatTensor(parameters)
+        parameters = torch.as_tensor(parameters, dtype=torch.float32)
         log_likelihood = self.likelihood_nn.log_prob(
             inputs=self.observation.reshape(1, -1), context=parameters.reshape(1, -1)
         )
@@ -379,7 +332,7 @@ class PotentialFunctionProvider:
         # notice opposite sign to pyro potential
         return log_likelihood + self.prior.log_prob(parameters)
 
-    def pyro_potential(self, parameters: Dict[str, torch.Tensor]) -> torch.Tensor:
+    def pyro_potential(self, parameters: Dict[str, Tensor]) -> Tensor:
         """Return posterior log prob. of parameters.
         
          Args:
