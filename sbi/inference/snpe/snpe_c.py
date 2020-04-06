@@ -33,7 +33,7 @@ class SnpeC(SnpeBase):
         discard_prior_samples=False,
         summary_writer=None,
         device=None,
-        sample_with_mcmc=False,
+        train_with_mcmc=False,
         mcmc_method="slice-np",
     ):
         """
@@ -58,12 +58,21 @@ class SnpeC(SnpeBase):
             retrain_from_scratch_each_round=retrain_from_scratch_each_round,
             discard_prior_samples=discard_prior_samples,
             device=device,
-            sample_with_mcmc=sample_with_mcmc,
+            train_with_mcmc=train_with_mcmc,
             mcmc_method=mcmc_method,
         )
 
         assert isinstance(num_atoms, int), "Number of atoms must be an integer."
         self._num_atoms = num_atoms
+
+        # Each APT run has an associated log directory for TensorBoard output.
+        if summary_writer is None:
+            log_dir = os.path.join(
+                utils.get_log_root(), "apt", simulator.name, utils.get_timestamp()
+            )
+            self._summary_writer = SummaryWriter(log_dir)
+        else:
+            self._summary_writer = summary_writer
 
     def _get_log_prob_proposal_posterior(self, inputs, context, masks):
         """
@@ -114,17 +123,17 @@ class SnpeC(SnpeBase):
 
         # Evaluate large batch giving (batch_size * num_atoms) log prob posterior evals.
         log_prob_posterior = self._neural_posterior.log_prob(
-            atomic_inputs, repeated_context, normalize_snpe_density=False
+            atomic_inputs, repeated_context, normalize_snpe=False
         )
-        assert torch.isfinite(
+        assert utils.notinfnotnan(
             log_prob_posterior
-        ).all(), "NaN/inf detected in posterior eval."
+        ), "NaN/inf detected in posterior eval."
         log_prob_posterior = log_prob_posterior.reshape(batch_size, num_atoms)
 
         # Get (batch_size * num_atoms) log prob prior evals.
         log_prob_prior = self._prior.log_prob(atomic_inputs)
         log_prob_prior = log_prob_prior.reshape(batch_size, num_atoms)
-        assert torch.isfinite(log_prob_prior).all(), "NaN/inf detected in prior eval."
+        assert utils.notinfnotnan(log_prob_prior), "NaN/inf detected in prior eval."
 
         # Compute unnormalized proposal posterior.
         unnormalized_log_prob_proposal_posterior = log_prob_posterior - log_prob_prior
@@ -135,15 +144,15 @@ class SnpeC(SnpeBase):
         ) * unnormalized_log_prob_proposal_posterior[:, 0] - torch.logsumexp(
             unnormalized_log_prob_proposal_posterior, dim=-1
         )
-        assert torch.isfinite(
+        assert utils.notinfnotnan(
             log_prob_proposal_posterior
-        ).all(), "NaN/inf detected in proposal posterior eval."
+        ), "NaN/inf detected in proposal posterior eval."
 
         # todo: this implementation is not perfect: it evaluates the posterior
         # todo: at all prior samples
         if self._use_combined_loss:
             log_prob_posterior_non_atomic = self._neural_posterior.log_prob(
-                inputs, context, normalize_snpe_density=False
+                inputs, context, normalize_snpe=False
             )
             masks = masks.reshape(-1)
             log_prob_proposal_posterior = (

@@ -19,6 +19,7 @@ from sbi.utils.torchutils import (
     get_temperature,
     logabsdet,
     merge_leading_dims,
+    notinfnotnan,
     random_orthogonal,
     repeat_rows,
     searchsorted,

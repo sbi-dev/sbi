@@ -53,6 +53,15 @@ class SnpeB(SnpeBase):
             device=device,
         )
 
+        # Each APT run has an associated log directory for TensorBoard output.
+        if summary_writer is None:
+            log_dir = os.path.join(
+                utils.get_log_root(), "snpe-b", simulator.name, utils.get_timestamp()
+            )
+            self._summary_writer = SummaryWriter(log_dir)
+        else:
+            self._summary_writer = summary_writer
+
     def _get_log_prob_proposal_posterior(
         self, inputs: torch.Tensor, context: torch.Tensor, masks: torch.Tensor
     ):
@@ -82,25 +91,25 @@ class SnpeB(SnpeBase):
 
         # Evaluate posterior
         log_prob_posterior = self._neural_posterior.log_prob(
-            inputs, context, normalize_snpe_density=False
+            inputs, context, normalize_snpe=False
         )
-        assert torch.isfinite(
+        assert utils.notinfnotnan(
             log_prob_posterior
-        ).all(), "NaN/inf detected in posterior eval."
+        ), "NaN/inf detected in posterior eval."
         log_prob_posterior = log_prob_posterior.reshape(batch_size)
 
         # Evaluate prior
         log_prob_prior = self._prior.log_prob(inputs)
         log_prob_prior = log_prob_prior.reshape(batch_size)
-        assert torch.isfinite(log_prob_prior).all(), "NaN/inf detected in prior eval."
+        assert utils.notinfnotnan(log_prob_prior), "NaN/inf detected in prior eval."
 
         # evaluate proposal
         log_prob_proposal = self._model_bank[-1].log_prob(
-            inputs, context, normalize_snpe_density=False
+            inputs, context, normalize_snpe=False
         )
-        assert torch.isfinite(
+        assert utils.notinfnotnan(
             log_prob_proposal
-        ).all(), "NaN/inf detected in proposal posterior eval."
+        ), "NaN/inf detected in proposal posterior eval."
 
         # Compute log prob with importance weights
         log_prob = (
@@ -113,7 +122,7 @@ class SnpeB(SnpeBase):
         # todo:     at all prior samples
         if self._use_combined_loss:
             log_prob_posterior_non_atomic = self._neural_posterior.log_prob(
-                inputs, context, normalize_snpe_density=False
+                inputs, context, normalize_snpe=False
             )
             masks = masks.reshape(-1)
             log_prob = masks * log_prob_posterior_non_atomic + log_prob
