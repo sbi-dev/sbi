@@ -15,9 +15,10 @@ from pyro.contrib.conjugate.infer import (BetaBinomialPair, GammaPoissonPair,
                                           collapse_conjugate, posterior_replay)
 from pyro.infer import SVI, TraceEnum_ELBO
 from pyro.infer.autoguide import AutoDelta
-from pyro.infer.mcmc.api import MCMC
+#from pyro.infer.mcmc.api import MCMC
 from pyro.util import ignore_jit_warnings
 
+from sbi.mcmc.mcmc import MCMC
 from sbi.mcmc.slice import Slice
 
 from .common import assert_equal
@@ -183,7 +184,7 @@ def test_logistic_regression(jit, num_chains):
     slice_kernel = Slice(model,
                          jit_compile=jit,
                          ignore_jit_warnings=True)
-    mcmc = MCMC(slice_kernel, num_samples=500, warmup_steps=100, num_chains=num_chains, mp_context="fork")
+    mcmc = MCMC(slice_kernel, num_samples=500, warmup_steps=100, num_chains=num_chains, mp_context="fork", available_cpu=1)
     mcmc.run(data)
     samples = mcmc.get_samples()
     assert_equal(rmse(true_coefs, samples["beta"].mean(0)).item(), 0.0, prec=0.1)
