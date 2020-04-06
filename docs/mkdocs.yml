@@ -66,10 +66,7 @@ plugins:
         - ../sbi
 
 extra_javascript:
-  - 'https://cdn.jsdelivr.net/npm/katex@0.10.2/dist/katex.min.js'
-  - 'static/katex.js'
-  - 'static/nav.js'
+  - 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-MML-AM_CHTML'
 
 extra_css:
-  - 'https://cdn.jsdelivr.net/npm/katex@0.10.2/dist/katex.min.css'
   - 'static/global.css'
