@@ -17,7 +17,8 @@ import sbi.simulators as simulators
 import sbi.utils as utils
 from sbi.inference.base import NeuralInference
 from sbi.inference.posteriors.sbi_posterior import Posterior
-from sbi.utils.torchutils import ensure_observation_batched, ensure_parameter_batched
+from sbi.utils.torchutils import (ensure_observation_batched,
+                                  ensure_parameter_batched)
 
 
 class SRE(NeuralInference):
@@ -218,7 +219,7 @@ class SRE(NeuralInference):
         # Create neural_net and validation loaders using a subset sampler.
         train_loader = data.DataLoader(
             dataset,
-            batch_size=batch_size,
+            batch_size=min(batch_size, num_training_examples),
             drop_last=True,
             sampler=SubsetRandomSampler(train_indices),
         )
