@@ -24,7 +24,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -e .[dev]
-        pip install mkdocs-material markdown-include mknotebooks mkdocs-redirects mkdocstrings
+        pip install mkdocs-material markdown-include mknotebooks mkdocs-redirects pymdown-extensions==6.3 mkdocstrings
 
     - name: Build docs
       run: |
