@@ -478,48 +478,6 @@ def check_sbi_problem(simulator: Callable, prior, observed_data: Tensor):
     ), f"Observed data shape must match simulated data shape."
 
 
-def set_simulator_attributes(
-    simulator_fun: Callable, prior: Distribution, observed_data: Tensor, name=None
-) -> Callable:
-    """Add name and input and output dimension as attributes to the simulator function.
-    
-    Arguments:
-        simulator_fun {Callable} -- simulator function taking parameters as input
-        prior {torch.distributions.Distribution} -- prior as pytorch distributions object
-        observed_data {Tensor} -- Observed data points, x0
-    
-    Keyword Arguments:
-        name {Optional(str)} -- name of the simulator, if None take __name__ (default: {None})
-    
-    Returns:
-        Callable -- simualtor function with attributes name, parameter_dim, observation_dim.
-    """
-
-    parameter_dim, observation_dim = get_simulator_dimensions(prior, observed_data)
-
-    setattr(simulator_fun, "parameter_dim", parameter_dim)
-    setattr(simulator_fun, "observation_dim", observation_dim)
-
-    return simulator_fun
-
-
-def get_simulator_dimensions(
-    prior: Distribution, observed_data: Tensor
-) -> Tuple[int, int]:
-    """Return simulator input output dimension from prior and observed data. 
-    
-    Arguments:
-        prior {Distribution} -- pytorch prior distribution with event and batch shapes
-        observed_data {Tensor} -- Observed data point, x0
-    
-    Returns:
-        dim_input [int] -- input dimension of simulator, i.e., parameter vector dimension, event shape.
-        dim_output [int] -- output dimension of simualtor, i.e., dimension of data or summary stats.
-    """
-    # infer parameter dim by sampling once
-    return prior.sample().numel(), observed_data.numel()
-
-
 def simulate_in_batches(
     simulator: Callable,
     parameter_sample_fn: Callable,
