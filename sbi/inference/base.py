@@ -9,14 +9,13 @@ from torch import Tensor
 from torch.distributions import Uniform
 from torch.utils.tensorboard import SummaryWriter
 
-from sbi.simulators.simutils import set_simulator_attributes
+from sbi.simulators.simutils import prepare_sbi_problem
 from sbi.utils import get_log_root, get_timestamp
-from sbi.utils.torchutils import atleast_2d, get_default_device
+from sbi.utils.torchutils import get_default_device
 
 
 class NeuralInference(ABC):
-    """Abstract base class for neural inference methods.
-    """
+    """Abstract base class for neural inference methods."""
 
     def __init__(
         self,
@@ -46,12 +45,12 @@ class NeuralInference(ABC):
                 ['slice', 'hmc', 'nuts'].
         """
 
-        # XXX want self._true_observation (atleast_2d) as attribute instead?
-        self._simulator = simulator
-        self._true_observation = atleast_2d(true_observation)
-        
-        self._prior = prior
-        
+        self._simulator, self._prior, self._true_observation = prepare_sbi_problem(
+            simulator, 
+            prior, 
+            true_observation
+        )
+
         self._simulation_batch_size = simulation_batch_size
 
         self._device = get_default_device() if device is None else device
