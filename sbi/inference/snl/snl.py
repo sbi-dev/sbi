@@ -124,7 +124,7 @@ class SNL(NeuralInference):
             self._observation_bank.append(torch.as_tensor(observations))
 
             # Fit neural likelihood to newly aggregated dataset.
-            self._fit_likelihood(**kwargs)
+            self._train(**kwargs)
 
             # Update description for progress bar.
             round_description = (
@@ -149,7 +149,7 @@ class SNL(NeuralInference):
         self._neural_posterior._num_trained_rounds = num_rounds
         return self._neural_posterior
 
-    def _fit_likelihood(
+    def _train(
         self,
         batch_size=100,
         learning_rate=5e-4,

@@ -157,7 +157,7 @@ class SRE(NeuralInference):
             self._observation_bank.append(torch.Tensor(observations))
 
             # Fit posterior using newly aggregated data set.
-            self._fit_classifier(**kwargs)
+            self._train(**kwargs)
 
             # Update description for progress bar.
             round_description = (
@@ -182,7 +182,7 @@ class SRE(NeuralInference):
         self._neural_posterior._num_trained_rounds = num_rounds
         return self._neural_posterior
 
-    def _fit_classifier(
+    def _train(
         self,
         batch_size=100,
         learning_rate=5e-4,
