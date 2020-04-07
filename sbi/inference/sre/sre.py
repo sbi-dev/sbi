@@ -1,33 +1,26 @@
+from __future__ import annotations
+
 from copy import deepcopy
 from typing import Callable, Dict, Optional, Union
 
 import numpy as np
+import torch
 from pyro.infer.mcmc import HMC, NUTS
 from pyro.infer.mcmc.api import MCMC
-import torch
-from torch import Tensor
-from torch import nn, optim
+from torch import Tensor, nn, optim
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from sbi.inference.base import NeuralInference
-from sbi.inference.posteriors.sbi_posterior import Posterior
 import sbi.simulators as simulators
 import sbi.utils as utils
+from sbi.inference.base import NeuralInference
+from sbi.inference.posteriors.sbi_posterior import Posterior
 from sbi.utils.torchutils import ensure_observation_batched, ensure_parameter_batched
 
 
 class SRE(NeuralInference):
-    """
-    'Sequential Ratio Estimation', as presented in
-    'Likelihood-free MCMC with Amortized Approximate Likelihood Ratios'
-    Hermans et al.
-    Pre-print 2019
-    https://arxiv.org/abs/1903.04057
-    """
-
     def __init__(
         self,
         simulator: Callable,
@@ -43,21 +36,22 @@ class SRE(NeuralInference):
         summary_writer: Optional[SummaryWriter] = None,
         device: Optional[torch.device] = None,
     ):
-        """
+        """Sequential Ratio Estimation
+
+        As presented in _Likelihood-free MCMC with Amortized Approximate Likelihood Ratios_ by Hermans et al., Pre-print 2019, https://arxiv.org/abs/1903.04057
+
+        See NeuralInference docstring for all other arguments.
 
         Args:
-            See NeuralInference docstring for all other arguments.
-            
-            classifier: binary classifier in the form of an nn.Module.
+            classifier: Binary classifier
             num_atoms: Number of atoms to use for classification.
-                If -1, use all other parameters in minibatch. 
-            summary_net: Optional network which may be used to produce feature
-                vectors f(x) for high-dimensional observations.
-            classifier_loss: {"sre", "aalr"}. "sre" implements the
-                 algorithm suggested in Durkan et al. 2019, whereas "aalr" implements the algorithm suggested in Hermans et al. 2019. "sre" can use more than two atoms, potentially boosting performance, but does not allow for exact posterior density evaluation (only up to a normalizing constant), even when training only one round. "aalr" is limited to num_atoms=2,
-                 but allows for density evaluation when training for one round.
+                If -1, use all other parameters in minibatch
             retrain_from_scratch_each_round: whether to retrain from scratch
-                    each round.
+                each round
+            summary_net: Optional network which may be used to produce feature
+                vectors f(x) for high-dimensional observations
+            classifier_loss: `sre` implements the algorithm suggested in Durkan et al. 
+                2019, whereas `aalr` implements the algorithm suggested in Hermans et al. 2019. `sre` can use more than two atoms, potentially boosting performance, but does not allow for exact posterior density evaluation (only up to a normalizing constant), even when training only one round. `aalr` is limited to `num_atoms=2`, but allows for density evaluation when training for one round.
         """
 
         super().__init__(

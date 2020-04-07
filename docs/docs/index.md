@@ -6,8 +6,9 @@ The focus of `sbi` is _Sequential Neural Posterior Estimation_ (SNPE). In SNPE, 
 
 - To see illustrations of SNPE on canonical problems in neuroscience, read our preprint:
 [Training deep neural density estimators to identify mechanistic models of neural dynamics](https://www.biorxiv.org/content/10.1101/838383v1).
-- To get started quickly, refer to the [installation instructions](http://mackelab.org/sbi/install/) and [tutorials](http://mackelab.org/sbi/tutorials/quickstart/). More in-depth tutorials will be added soon.
 - To learn more about the general motivation behind simulation-based inference, and algorithms included in `sbi`, keep on reading.
+
+We are working on making tutorials available.
 
 
 ## Motivation and approach

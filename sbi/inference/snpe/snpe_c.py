@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 
 import torch
@@ -9,14 +11,6 @@ from sbi.inference.snpe.snpe_base import SnpeBase
 
 
 class SnpeC(SnpeBase):
-    """
-    Implementation of
-    'Automatic Posterior Transformation for Likelihood-free Inference'
-    Greenberg et al.
-    ICML 2019
-    https://arxiv.org/abs/1905.07488
-    """
-
     def __init__(
         self,
         simulator,
@@ -36,10 +30,23 @@ class SnpeC(SnpeBase):
         sample_with_mcmc=False,
         mcmc_method="slice-np",
     ):
-        """
-        See snpe_base.SnpeBase for docstring.
+        """SNPE-C / APT
+
+        Implementation of _Automatic Posterior Transformation for Likelihood-free
+        Inference_ by Greenberg et al., ICML 2019, https://arxiv.org/abs/1905.07488
 
         Args:
+            num_pilot_samples: number of simulations that are run when
+                instantiating an object. Used to z-score the observations.   
+            density_estimator: neural density estimator
+            calibration_kernel: a function to calibrate the context
+            z_score_obs: whether to z-score the data features x
+            use_combined_loss: whether to jointly neural_net prior samples 
+                using maximum likelihood. Useful to prevent density leaking when using box uniform priors.
+            retrain_from_scratch_each_round: whether to retrain the conditional
+                density estimator for the posterior from scratch each round.
+            discard_prior_samples: whether to discard prior samples from round
+                two onwards.
             num_atoms: int
                 Number of atoms to use for classification.
                 If -1, use all other parameters in minibatch.
