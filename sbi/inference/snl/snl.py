@@ -188,7 +188,7 @@ class SNL(NeuralInference):
         )
         val_loader = data.DataLoader(
             dataset,
-            batch_size=min(batch_size, num_examples - num_training_examples),
+            batch_size=min(batch_size, num_validation_examples),
             shuffle=False,
             drop_last=False,
             sampler=SubsetRandomSampler(val_indices),
