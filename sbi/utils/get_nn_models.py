@@ -42,7 +42,9 @@ def posterior_nn(
         Neural network
     """
     mean, std = (prior.mean, prior.stddev)
-    normalizing_transform = transforms.AffineTransform(shift=-mean / std, scale=1 / std)
+    standardizing_transform = transforms.AffineTransform(
+        shift=-mean / std, scale=1 / std
+    )
 
     parameter_dim = prior.sample([1]).shape[1]
 
@@ -68,7 +70,7 @@ def posterior_nn(
         )
 
     elif model == "made":
-        transform = normalizing_transform
+        transform = standardizing_transform
         distribution = distributions_.MADEMoG(
             features=parameter_dim,
             hidden_features=hidden_features,
@@ -107,7 +109,7 @@ def posterior_nn(
             ]
         )
 
-        transform = transforms.CompositeTransform([normalizing_transform, transform,])
+        transform = transforms.CompositeTransform([standardizing_transform, transform,])
 
         distribution = distributions_.StandardNormal((parameter_dim,))
         neural_net = flows.Flow(transform, distribution, embedding)
@@ -142,6 +144,8 @@ def posterior_nn(
                 for i in range(flow_num_transforms)
             ]
         )
+
+        transform = transforms.CompositeTransform([standardizing_transform, transform,])
 
         distribution = distributions_.StandardNormal((parameter_dim,))
         neural_net = flows.Flow(transform, distribution, embedding)
