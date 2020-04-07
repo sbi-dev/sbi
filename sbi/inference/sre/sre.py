@@ -407,7 +407,9 @@ class PotentialFunctionProvider:
         parameter = ensure_parameter_batched(parameter)
         observation = ensure_observation_batched(self.observation)
 
-        log_ratio = self.classifier(torch.cat((parameter, observation)).reshape(1, -1))
+        log_ratio = self.classifier(
+            torch.cat((parameter, observation), dim=1).reshape(1, -1)
+        )
 
         # notice opposite sign to pyro potential
         return log_ratio + self.prior.log_prob(parameter)
@@ -428,6 +430,8 @@ class PotentialFunctionProvider:
         parameter = ensure_parameter_batched(parameter)
         observation = ensure_observation_batched(self.observation)
 
-        log_ratio = self.classifier(torch.cat((parameter, observation)).reshape(1, -1))
+        log_ratio = self.classifier(
+            torch.cat((parameter, observation), dim=1).reshape(1, -1)
+        )
 
         return -(log_ratio + self.prior.log_prob(parameter))
