@@ -108,7 +108,10 @@ class SRE(NeuralInference):
         self,
         num_rounds: int,
         num_simulations_per_round: Union[List[int], int],
-        **kwargs: Any,
+        batch_size: int = 100,
+        learning_rate: float = 5e-4,
+        validation_fraction: float = 0.1,
+        stop_after_epochs: int = 20,
     ) -> Posterior:
         """Run SRE
 
@@ -118,8 +121,12 @@ class SRE(NeuralInference):
         Args:
             num_rounds: Number of rounds to run
             num_simulations_per_round: Number of simulator calls per round
-            kwargs: Passed on to _train
-
+            batch_size: Size of batch to use for training.
+            learning_rate: Learning rate for Adam optimizer.
+            validation_fraction: The fraction of data to use for validation.
+            stop_after_epochs: The number of epochs to wait for improvement on the
+                validation set before terminating training.
+            
         Returns: 
             Posterior that can be sampled and evaluated.
         """
@@ -157,7 +164,12 @@ class SRE(NeuralInference):
             self._observation_bank.append(torch.Tensor(observations))
 
             # Fit posterior using newly aggregated data set.
-            self._train(**kwargs)
+            self._train(
+                batch_size=batch_size,
+                learning_rate=learning_rate,
+                validation_fraction=validation_fraction,
+                stop_after_epochs=stop_after_epochs,
+            )
 
             # Update description for progress bar.
             round_description = (
@@ -183,25 +195,13 @@ class SRE(NeuralInference):
         return self._neural_posterior
 
     def _train(
-        self,
-        batch_size=100,
-        learning_rate=5e-4,
-        validation_fraction=0.1,
-        stop_after_epochs=20,
+        self, batch_size, learning_rate, validation_fraction, stop_after_epochs,
     ):
         """
         Trains the classifier by maximizing a Bernoulli likelihood which distinguishes
         between jointly distributed (parameter, observation) pairs and randomly chosen
         (parameter, observation) pairs.
         Uses early stopping on a held-out validation set as a terminating condition.
-
-        :param batch_size: Size of batch to use for training.
-        :param learning_rate: Learning rate for Adam optimizer.
-        :param validation_fraction: The fraction of data to use for validation.
-        :param stop_after_epochs: The number of epochs to wait for improvement on the
-        validation set before terminating training.
-
-        :return: None
         """
 
         # Get total number of training examples.
@@ -222,15 +222,16 @@ class SRE(NeuralInference):
         )
 
         # Create neural_net and validation loaders using a subset sampler.
+        batch_size = min(batch_size, num_validation_examples)
         train_loader = data.DataLoader(
             dataset,
-            batch_size=min(batch_size, num_training_examples),
+            batch_size=batch_size,
             drop_last=True,
             sampler=SubsetRandomSampler(train_indices),
         )
         val_loader = data.DataLoader(
             dataset,
-            batch_size=min(batch_size, num_validation_examples),
+            batch_size=batch_size,
             shuffle=False,
             drop_last=False,
             sampler=SubsetRandomSampler(val_indices),
