@@ -334,7 +334,7 @@ class SnpeBase(NeuralInference, ABC):
         # Create neural_net and validation loaders using a subset sampler.
         train_loader = data.DataLoader(
             dataset,
-            batch_size=batch_size,
+            batch_size=min(batch_size, num_training_examples),
             drop_last=True,
             sampler=SubsetRandomSampler(train_indices),
         )

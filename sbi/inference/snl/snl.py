@@ -182,13 +182,13 @@ class SNL(NeuralInference):
         # Create neural_net and validation loaders using a subset sampler.
         train_loader = data.DataLoader(
             dataset,
-            batch_size=batch_size,
+            batch_size=min(batch_size, num_training_examples),
             drop_last=True,
             sampler=SubsetRandomSampler(train_indices),
         )
         val_loader = data.DataLoader(
             dataset,
-            batch_size=min(batch_size, num_examples - num_training_examples),
+            batch_size=min(batch_size, num_validation_examples),
             shuffle=False,
             drop_last=False,
             sampler=SubsetRandomSampler(val_indices),
