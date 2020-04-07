@@ -46,19 +46,14 @@ class NeuralInference(ABC):
                 ['slice', 'hmc', 'nuts'].
         """
 
-        self._warn_on_possibly_batched_observations(true_observation)
-        
         # XXX want self._true_observation (atleast_2d) as attribute instead?
-        self._simulator = set_simulator_attributes(simulator, prior,
-                                                   true_observation)
+        self._simulator = simulator
         self._true_observation = atleast_2d(true_observation)
-
-        self._warn_on_batch_reinterpretation_extra_d_uniform(prior)
+        
+        self._prior = prior
         
         self._simulation_batch_size = simulation_batch_size
 
-        self._prior = prior
-        
         self._device = get_default_device() if device is None else device
 
         # Initialize roundwise (parameter, observation) storage.
@@ -89,47 +84,3 @@ class NeuralInference(ABC):
             epochs=[],
             best_validation_log_probs=[],
         )
-        
-    def _warn_on_batch_reinterpretation_extra_d_uniform(self, prior):
-        """Warn when prior is a batch of scalar Uniforms.
-
-        Most likely the user wants to specify a prior on a multi-dimensional parameter
-        rather than several 1D priors at once.
-        """
-        
-        # Note .batch_shape will always work because and is short-circuiting. 
-        if isinstance(prior, Uniform) and prior.batch_shape.numel() > 1: 
-            warnings.warn(
-                f"""The specified Uniform prior is a prior on *several scalar parameters* (i.e. a batch), not a prior on a multi-dimensional parameter.
-
-                Please use utils.torchutils.BoxUniform if you'd rather put a prior on a multi-dimensional parameter.
-                """
-            )
-            
-    def _warn_on_possibly_batched_observations(self, true_observation):
-                
-        if true_observation.squeeze().ndim > 1:
-            warnings.warn(
-                """`true_observation` has D>1 dimensions. SBI interprets the leading dimension as a batch dimension, but it *currently* only processes a single observation, i.e. the first element of the batch.
-                
-                For example:
-                
-                > true_observation = [ [1,2,3], [4,5,6] ] 
-                
-                is interpreted as two vector observations, only the first of which is currently used to condition inference.
-                
-                Use rather:
-                
-                > true_observation = [ [[1,2,3], [4,5,6]] ]
-                > true_observation = [ [1], [2], [3]]
-                
-                if your single observation is matrix-shaped or scalar-shaped.
-                
-                Finally:
-                
-                > true_observation = [1]
-                > true_observation = [1, 2, 3]
-                
-                will be interpreted as one scalar observation or one vector observation and don't require wrapping (unsqueezing).
-                """
-            )

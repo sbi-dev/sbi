@@ -10,137 +10,239 @@ from scipy.stats._distn_infrastructure import rv_frozen
 import torch
 from pyknos.nflows import distributions as distributions_
 from torch.distributions import Distribution, MultivariateNormal, Uniform
+from torch import Tensor
 
 import sbi.simulators as simulators
 import sbi.utils as utils
 from sbi.utils.torchutils import BoxUniform
 
 
-def check_prior(prior: Callable) -> Tuple[Distribution, int, bool]:
+def process_prior(prior: Callable) -> Tuple[Distribution, int, bool]:
     """Check prior object provided by the user. Return pytorch distribution like prior
     object.
 
-    Arguments:
-        prior -- prior object provided by the user.
+    Args:
+        prior: prior object provided by the user.
     
     Raises:
         AttributeError: If prior objects lacks .sample or .log_prob
     
     Returns:
-        prior -- Pytorch distribution prior. 
-        parameter_dim -- event shape of the prior, number of parameters.
-        prior_returns_numpy -- whether the original prior return type is numpy array.
+        prior: Pytorch distribution prior. 
+        parameter_dim: event shape of the prior, number of parameters.
+        prior_returns_numpy: whether the original prior return type is numpy array.
     """
 
     if isinstance(prior, Distribution):
-        return check_pytorch_distribution_prior(prior)
+        return process_pytorch_prior(prior)
 
-    # XXX: check for numpy random distribution object explicitly? How?
-
-    # check for scipy stats distribution objects
-    if isinstance(prior, (rv_frozen, multi_rv_frozen)):
-        # wrap to pytorch distribution and check
+    # If prior is given as scipy.stats object, wrap to pytorch.
+    elif isinstance(prior, (rv_frozen, multi_rv_frozen)):
         prior = ScipyToPytorchWrapper(prior)
-        return check_pytorch_distribution_prior(prior)
+        return process_pytorch_prior(prior)
 
-    # check for sample and log_prob methods
-    n_batch = 2
-    try:
-        theta = prior.sample((n_batch,))
-        log_probs = prior.log_prob(theta)
-
-    except AttributeError:
-        raise AttributeError(
-            "Prior needs methods .sample() and .log_prob(). Consider using a pytorch Distribution"
-        )
-
-    # check for batch shape
-    assert (
-        theta.shape[0] == n_batch
-    ), "prior.sample((batch_size, )) does not return batch_size parameters."
-
-    assert (
-        log_probs.shape[0] == n_batch
-    ), "prior.log_prob doesnt return the input batch size."
-
-    # check numpy or pytorch
-    assert isinstance(theta, torch.Tensor) or isinstance(
-        theta, np.ndarray
-    ), f"prior must return torch.Tensor or np.ndarray, but is {type(theta)}"
-
-    # wrap prior into torch distribution if it returns numpy
-    if isinstance(theta, np.ndarray):
-        prior = CustomToPytorchWrapper(
-            prior_numpy=prior, event_shape=torch.Size([prior.sample().size])
-        )
-        prior_returns_numpy = True
+    # Otherwise it is a custom prior - check for .sample and .log_prob methods.
     else:
-        prior_returns_numpy = False
+        return process_custom_prior(prior)
 
-    # infer parameter dimension
+
+def process_custom_prior(prior) -> Tuple[Distribution, int, bool]:
+    """Check and correct prior object defined by the user."""
+
+    check_prior_methods(prior)
+
+    check_prior_batch_behavior(prior)
+
+    prior, prior_returns_numpy = maybe_wrap_prior_to_pytorch(prior)
+
     parameter_dim = prior.sample().numel()
 
     return prior, parameter_dim, prior_returns_numpy
 
 
-def check_pytorch_distribution_prior(
-    prior: Distribution,
-) -> Tuple[Distribution, int, bool]:
+def maybe_wrap_prior_to_pytorch(prior) -> Tuple[Distribution, bool]:
+    """Check prior return type and maybe wrap to pytorch.
+    
+    Args:
+        prior: prior object with .sample and .log_prob methods.
+    
+    Raises:
+        TypeError: if prior return type is pytorch or numpy.
+    
+    Returns:
+        prior: prior returning only pytorch tensor. 
+        prior_returns_numpy: whether the prior returned numpy before wrapping.
+    """
+
+    # Get samples, log probs and event dimension.
+    num_samples = 2
+    theta = prior.sample((num_samples,))
+    log_probs = prior.log_prob(theta)
+    _, prior_event_dim = theta.shape
+
+    # Check return types
+    if isinstance(theta, Tensor) and isinstance(log_probs, Tensor):
+        prior_returns_numpy = False
+    elif isinstance(theta, np.ndarray) and isinstance(log_probs, np.ndarray):
+        # wrap prior into torch distribution if it returns numpy
+        prior = CustomToPytorchWrapper(
+            prior_numpy=prior, event_shape=torch.Size([prior_event_dim])
+        )
+        prior_returns_numpy = True
+    else:
+        raise TypeError(
+            "Prior must return torch.Tensor or np.ndarray, but is {type(theta)}"
+        )
+
+    return prior, prior_returns_numpy
+
+
+def process_pytorch_prior(prior: Distribution,) -> Tuple[Distribution, int, bool]:
     """Check validity of pytorch prior, return corrected prior.
     
-    Arguments:
-        prior  -- pytorch distribution prior provided by the user.
+    Args:
+        prior: pytorch distribution prior provided by the user.
     
     Raises:
         ValueError: If prior is defined over a scalar variable.
     
     Returns:
-        prior -- Pytorch distribution prior. 
-        parameter_dim -- event shape of the prior, number of parameters.
-        prior_returns_numpy -- False.
+        prior: Pytorch distribution prior. 
+        parameter_dim: event shape of the prior, number of parameters.
+        prior_returns_numpy: False.
     """
-
-    # batch shape must not be multidimensional
-    assert (
-        torch.as_tensor(prior.batch_shape).ndim == 1
-    ), "prior batch_shape has to one dimensional"
 
     # reject scalar priors
     if prior.sample().ndim == 0:
         raise ValueError(
-            "Detected scalar prior. Please make sure to pass a pytorch prior with batch_shape=torch.Size([1])"
+            "Detected scalar prior. Please make sure to pass a pytorch prior with "
+            "batch_shape=torch.Size([1]), or event_shape=torch.Size([1])"
         )
 
-    # assert batch shape.
-    # NOTE: batch shape can be empty, as long as event shape is not.
-    assert prior.batch_shape == torch.Size([1]) or prior.batch_shape == torch.Size(
-        []
-    ), "The prior has batch_shape>1. Please define it with batch_shape=1."
+    assert prior.batch_shape in (
+        torch.Size([1]),
+        torch.Size([]),
+    ), f"The prior must have batch shape torch.Size([]) or torch.Size([1]), but has {prior.batch_shape}."
 
-    # infer parameter dimension
+    check_prior_batch_behavior(prior)
+
+    check_for_batch_reinterpretation_extra_d_uniform(prior)
+
     parameter_dim = prior.sample().numel()
 
-    # final prior batch behavior check
-    assert prior.sample((2,)).shape == torch.Size(
-        [2, parameter_dim]
-    ), "pytorch prior batch behavior is wrong."
-
-    # check batch shape vs event shape confusion in pytorch Uniform
-    # XXX: use Alvaros more in depth check function here
-    if isinstance(prior, Uniform) and prior.sample().numel() > 1:
-        warnings.warn(
-            f"The paramerer dimension (`event_shape`) of the simualtor inferred from the "
-            "prior is D={dim_input}>1 and the prior PyTorch Uniform. Therefore, beware "
-            "that you are using a `batch_shape` of {dim_input} implicitly and "
-            "`event_shape` 1, because Pytorch does not support multivariate Uniform. "
-            "Consider using a BoxUniform prior instead."
-        )
     return prior, parameter_dim, False
 
 
-class CustomToPytorchWrapper(Distribution):
+def check_for_batch_reinterpretation_extra_d_uniform(prior):
+    """Warn when prior is a batch of scalar Uniforms.
+
+    Most likely the user wants to specify a prior on a multi-dimensional parameter
+    rather than several 1D priors at once.
     """
-    Wrap custom prior object with .sample and .log_prob methods to pytorch 
+
+    # Note .batch_shape will always work because and is short-circuiting.
+    if isinstance(prior, Uniform) and prior.batch_shape.numel() > 1:
+        raise ValueError(
+            f"""The specified Uniform prior is a prior on *several scalar parameters*
+            (i.e. a batch), not a prior on a multi-dimensional parameter.
+
+            Please use utils.torchutils.BoxUniform if you'd rather put a prior on a 
+            multi-dimensional parameter.
+            """
+        )
+
+
+def check_for_possibly_batched_observations(true_observation: Tensor):
+    """Raise ValueError if dimensionality of data doesn't match requirements.
+    
+    The current requirements are that is 2D with a leading batch dimension of size 1.
+    That is, neither multiple, batched observations are supported, 
+    nor a multidimensional observation e.g., an image.
+    """
+
+    if true_observation.squeeze().ndim > 1:
+        raise ValueError(
+            """`true_observation` has D>1 dimensions. SBI interprets the leading 
+                dimension as a batch dimension, but it *currently* only processes 
+                a single observation, i.e. the first element of the batch.
+                
+                For example:
+                
+                > true_observation = [ [1,2,3], [4,5,6] ] 
+                
+                is interpreted as two vector observations, only the first of which 
+                is currently used to condition inference.
+                
+                Use rather:
+                
+                > true_observation = [ [[1,2,3], [4,5,6]] ]
+                > true_observation = [ [1], [2], [3]]
+                
+                if your single observation is matrix-shaped or scalar-shaped.
+                
+                Finally:
+                
+                > true_observation = [1]
+                > true_observation = [1, 2, 3]
+                
+                will be interpreted as one scalar observation or one vector observation
+                and don't require wrapping (unsqueezing).
+                """
+        )
+
+
+def check_prior_methods(prior):
+    """Check whether the prior has methods .sample and .log_prob. 
+    
+    Raises: 
+        AttributionError: if either of the two methods doesnt works as expected. 
+    """
+
+    # Sample a batch of two parameters to check batch behaviour > 1.
+    num_samples = 2
+    # Check .sample and log_prob, keep for later use.
+    try:
+        theta = prior.sample((num_samples,))
+    except AttributeError:
+        raise AttributeError(
+            "Prior needs method .sample((num_samples, )). Consider using a "
+            "pytorch Distribution"
+        )
+    try:
+        log_probs = prior.log_prob(theta)
+    except AttributeError:
+        raise AttributeError(
+            "Prior needs method .log_prob(values). Consider using a pytorch Distribution"
+        )
+
+
+def check_prior_batch_behavior(prior):
+    """Assert that it is possible to sample and evaluate batches of parameters."""
+
+    # Check for correct batch size in .sample and .log_prob
+    num_samples = 2
+    theta = prior.sample((num_samples,))
+    log_probs = prior.log_prob(theta)
+
+    assert (
+        len(theta.shape) == 2
+    ), f"""A parameter batch sampled from the prior must be 2D, 
+    (num_samples, parameter_dim), but is {len(theta.shape)}"""
+
+    num_sampled, parameter_dim = theta.shape
+    num_log_probs = log_probs.shape[0]
+
+    assert (
+        num_sampled == num_samples
+    ), "prior.sample((batch_size, )) does not return batch_size parameters."
+
+    assert (
+        num_log_probs == num_samples
+    ), "prior.log_prob doesnt return the input batch size."
+
+
+class CustomToPytorchWrapper(Distribution):
+    """Wrap custom prior object with .sample and .log_prob methods to pytorch 
     Distribution object.
     """
 
@@ -169,9 +271,7 @@ class CustomToPytorchWrapper(Distribution):
 
 
 class ScipyToPytorchWrapper(Distribution):
-    """
-    Wrap scipy.stats prior to pytorch Distribution object.
-    """
+    """Wrap scipy.stats prior to pytorch Distribution object."""
 
     def __init__(
         self,
@@ -197,127 +297,196 @@ class ScipyToPytorchWrapper(Distribution):
         )
 
 
-def check_simulator(user_simulator: Callable, prior, numpy_input: bool) -> Callable:
+def process_simulator(
+    user_simulator: Callable, prior, is_numpy_simulator: bool
+) -> Callable:
+    """Check requirements and return a pytorch batch simulator.
+    
+    That is, a simulator that received as input and returns a Tensor, 
+    and that can simulate batches of parameters.
+    """
 
-    assert isinstance(user_simulator, Callable), "simulator needs to be a function"
+    assert isinstance(user_simulator, Callable), "Simulator must be a function."
 
-    # if simulator takes numpy input wrap to torch
-    if numpy_input:
-        # first assert that it input is consistent with output
-        theta = prior.sample().numpy()
-        data = user_simulator(theta)
+    pytorch_simulator = wrap_as_pytorch_simulator(
+        user_simulator, prior, is_numpy_simulator
+    )
+
+    batch_simulator = wrap_as_batch_simulator(pytorch_simulator, prior)
+
+    return batch_simulator
+
+
+def wrap_as_pytorch_simulator(
+    simulator: Callable, prior, is_numpy_simulator
+) -> Callable:
+    """Return a simulator that receives as input and returns a Tensor."""
+
+    if is_numpy_simulator:
+        # Get data to check input type is consistent with data
+        theta = prior.sample().numpy()  # cast to numpy because prior is fixed already
+        data = simulator(theta)
         assert isinstance(
             data, np.ndarray
         ), f"Simulator output type {type(data)} should match simulator input type "
         f"{type(theta)}"
 
-        # then define wrapped simulator
-        def pytorch_simulator(theta: torch.Tensor):
-            return torch.as_tensor(user_simulator(theta.numpy()), dtype=torch.float32)
+        # Define a wrapper function to pytorch
+        def pytorch_simulator(theta: Tensor):
+            return torch.as_tensor(simulator(theta.numpy()), dtype=torch.float32)
 
         warnings.warn("Simulator cant handle torch input. It will be wrapped.")
     else:
-        pytorch_simulator = user_simulator
+        pytorch_simulator = simulator
 
-    # check batch shape handling
-    can_handle_batch = True
+    return pytorch_simulator
+
+
+def wrap_as_batch_simulator(simualtor: Callable, prior) -> Callable:
+    """Return a batch simulator. 
+    
+    A batch simulator can handle a batch of parameters and return the 
+    corresponding batch of simulated data.
+    """
+
+    is_batch_simulator = True
     try:
         n_batch = 2
-        data = pytorch_simulator(prior.sample((n_batch,)))
+        data = simualtor(prior.sample((n_batch,)))
         assert data.shape[0] == n_batch
     except:
-        can_handle_batch = False
         warnings.warn(
             "Simulator can't handle batches of parameters. It will be wrapped using 'map', "
             "which can be inefficient."
         )
+        is_batch_simulator = False
 
-    if not can_handle_batch:
-
-        def batch_simulator(thetas: torch.Tensor):
+        def batch_simulator(thetas: Tensor):
             # use map to get data for every theta in batch
             # use stack to collect list of tensors in tensor
             assert (
                 thetas.ndim > 1
             ), f"batch simulator needs batch dimension. shape: {thetas.shape}"
-            return torch.stack(list(map(pytorch_simulator, thetas)))
+            return torch.stack(list(map(simualtor, thetas)))
 
-    else:
-        batch_simulator = pytorch_simulator
-
-    return batch_simulator
+    return simualtor if is_batch_simulator else batch_simulator
 
 
-def check_observed_data(observed_data, simulator, prior):
+def process_observed_data(
+    observed_data: Union[Tensor, np.ndarray], simulator: Callable, prior
+) -> Tuple[Tensor, int]:
+    """Check and correct for requirements on the observed data object.
+    
+    Args:
+        observed_data: observed data as provided by the user.
+        simulator: simulator function. 
+        prior: prior object.
+    
+    Returns:
+        observed data: corrected observed data.
+        observation_dim: number of elements in a single data point.
+    """
 
-    # cast to tensor
+    # Cast to Tensor because data could be in numpy.
     observed_data = torch.as_tensor(observed_data, dtype=torch.float32)
 
-    assert observed_data.ndim > 1, (
-        f"observed data needs at least 2 dimensions, batch dim and data dim, e.g., "
-        f"(1, data_dim). has only {observed_data.ndim}"
-    )
+    check_for_possibly_batched_observations(observed_data)
 
-    # sample from original prior and simulate, remove batch dimension
+    # Get unbatched simulated data by sampling from prior and simualtor.
     # cast to tensor for comparison
     simulated_data = torch.as_tensor(
         simulator(prior.sample()), dtype=torch.float32
     ).squeeze(0)
 
-    # match simulator output and observed data
-    assert observed_data.shape[1:] == simulated_data.shape, (
+    # Get data shape by ommitting the batch dimension.
+    observed_data_shape = observed_data.shape[1:]
+
+    assert observed_data_shape == simulated_data.shape, (
         f"Observed data shape ({observed_data.shape[1:]}) must match "
         f"simulator output shape ({simulated_data.shape})."
     )
-
-    if observed_data.shape[0] > 1:
-        raise NotImplementedError(
-            "It seems you passed a batch of observed data. SBI does not support "
-            " multiple observations yet."
-        )
-
-    # check dimensionality
-    if observed_data.ndim > 2:
-        raise NotImplementedError(
-            "The observed data has more than one dimension, e.g., it is a matrix. "
-            "This is not implemented in SBI yet"
-        )
 
     observation_dim = observed_data[0, :].numel()
 
     return observed_data, observation_dim
 
 
-def check_user_input(
-    user_simulator: Callable, user_prior, user_observed_data
-) -> Tuple[Callable, Callable, torch.Tensor]:
+def prepare_sbi_problem(
+    user_simulator: Callable, user_prior, user_observed_data: Union[Tensor, np.ndarray]
+) -> Tuple[Callable, Callable, Tensor]:
+    """Prepare simulator, prior and observed data for usage in sbi. 
+
+    The following requirements are tried to be met by wrapping or reshaping and casting
+    to pytorch: 
+        - the simulator function receives as input and returns a Tensor.
+        - the simulator can simulate batches of parameters and return batches of data.
+        - the prior behaves like a pytorch.distributions.Distribution.
+        - the observed data is a Tensor and has a leading batch dimension of one. 
+    
+    If this is not possible assertion erros or corresponding erros are raised.
+
+    Args:
+        user_simulator: simulator as provided by the user
+        user_prior: prior as provided by the user
+        user_observed_data: observed data as provided by the user
+
+    Returns:
+        simulator: corrected simulator ready to be used in sbi. 
+        prior: corrected prior. 
+        observed_data: corrected observed data.
+    """
 
     # check prior, return pytorch prior
-    prior, parameter_dim, prior_returns_numpy = check_prior(user_prior)
+    prior, parameter_dim, prior_returns_numpy = process_prior(user_prior)
 
     # check data, returns batched 1D data
-    observed_data, observation_dim = check_observed_data(
+    observed_data, observation_dim = process_observed_data(
         user_observed_data, user_simulator, user_prior
     )
 
     # check simulator, returns pytorch batch simulator
-    simulator = check_simulator(user_simulator, prior, prior_returns_numpy)
+    simulator = process_simulator(user_simulator, prior, prior_returns_numpy)
 
-    # set function attributes for logging
-    simulator = set_simulator_attributes(simulator, prior, observed_data)
+    # final check
+    check_sbi_problem(simulator, prior, observed_data)
 
     return simulator, prior, observed_data
 
 
+def check_sbi_problem(simulator: Callable, prior, observed_data: Tensor):
+    """Assert requirements for simulator, prior and x0 for usage in sbi. 
+    
+    Args:
+        simulator: simulator function
+        prior: prior (Distribution like)
+        observed_data: observed data
+    """
+    num_samples = 2
+    theta = prior.sample((num_samples,))
+    data = simulator(theta)
+    assert isinstance(theta, Tensor), "theta must be a Tensor."
+    assert isinstance(data, Tensor), "simulator output must be a Tensor."
+    assert isinstance(observed_data, Tensor), "observed data must be a Tensor."
+    assert (
+        theta.shape[0] == num_samples
+    ), f"Theta batch shape {theta.shape[0]} must match num_samples={num_samples}."
+    assert (
+        data.shape[0] == num_samples
+    ), f"Data batch shape {data.shape[0]} must match num_samples={num_samples}."
+    assert (
+        observed_data.shape[1:] == data[0, :].shape
+    ), f"Observed data shape must match simulated data shape."
+
+
 def set_simulator_attributes(
-    simulator_fun: Callable, prior: Distribution, observed_data: torch.Tensor, name=None
+    simulator_fun: Callable, prior: Distribution, observed_data: Tensor, name=None
 ) -> Callable:
     """Add name and input and output dimension as attributes to the simulator function.
     
     Arguments:
         simulator_fun {Callable} -- simulator function taking parameters as input
         prior {torch.distributions.Distribution} -- prior as pytorch distributions object
-        observed_data {torch.Tensor} -- Observed data points, x0
+        observed_data {Tensor} -- Observed data points, x0
     
     Keyword Arguments:
         name {Optional(str)} -- name of the simulator, if None take __name__ (default: {None})
@@ -335,13 +504,13 @@ def set_simulator_attributes(
 
 
 def get_simulator_dimensions(
-    prior: Distribution, observed_data: torch.Tensor
+    prior: Distribution, observed_data: Tensor
 ) -> Tuple[int, int]:
     """Return simulator input output dimension from prior and observed data. 
     
     Arguments:
         prior {Distribution} -- pytorch prior distribution with event and batch shapes
-        observed_data {torch.Tensor} -- Observed data point, x0
+        observed_data {Tensor} -- Observed data point, x0
     
     Returns:
         dim_input [int] -- input dimension of simulator, i.e., parameter vector dimension, event shape.
@@ -357,20 +526,17 @@ def simulate_in_batches(
     num_samples: int,
     simulation_batch_size: int,
     x_dim: torch.Size,
-) -> (torch.Tensor, torch.Tensor):
+) -> (Tensor, Tensor):
     """
-    Draw `num_samples` parameter sets and simulate them in batches of size `simulation_batch_size`.
+    Draw `num_samples` parameter sets and simulate them in batches 
+    of size `simulation_batch_size`.
 
-    Features: - allows to simulate in batches of arbitrary size
-              - if `simulation_batch_size==-1`, all simulations are run at the same time
-              - simulator output can be np.array or torch.Tensor
+    Features: 
+        Allows to simulate in batches of arbitrary size.
+        If `simulation_batch_size==-1`, all simulations are run at the same time.
 
     Args:
         simulator: simulator function.
-            If `simulation_batch_size == 1`: takes in parameters of shape (1, num_dim_parameters)
-                and outputs xs of shape (1, num_dim_x)
-            If `simulation_batch_size > 1`: takes in thetas of shape (simulation_batch_size, num_dim_parameters)
-                and outputs xs of shape (simulation_batch_size, num_dim_x)
         parameter_sample_fn: Function to call for generating theta, e.g. prior sampling
         num_samples: Number of simulations to run
         simulation_batch_size: Number of simulations that are run within a single batch
@@ -378,11 +544,12 @@ def simulate_in_batches(
             i.e. `simulation_batch_size = num_samples`
         x_dim: dimensionality of a single simulator output
 
-    Returns: torch.Tensor simulation input parameters of shape (num_samples, num_dim_parameters),
-             torch.Tensor simulator outputs x of shape (num_samples, num_dim_x)
+    Returns: Tensor simulation input parameters of shape (num_samples, num_dim_parameters),
+             Tensor simulator outputs x of shape (num_samples, num_dim_x)
     """
 
-    # generate parameters (simulation inputs) by sampling from prior (round 1) or proposal (round > 1)
+    # generate parameters (simulation inputs) by sampling from prior
+    # (round 1) or proposal (round > 1)
     parameters = parameter_sample_fn(num_samples)
 
     if simulation_batch_size == -1:
@@ -393,20 +560,9 @@ def simulate_in_batches(
     n_chunks = math.ceil(num_samples / simulation_batch_size)
     parameter_batches = torch.chunk(parameters, chunks=n_chunks)
 
-    all_x = []
+    xs = []
     for batch in parameter_batches:
         with torch.no_grad():
-            # XXX: if we assert the that simultor return Tensor with batch dim we can avoid the following 2 checks
-            x = simulator(batch)
-            if not isinstance(x, torch.Tensor):
-                # convert simulator output to torch in case it was numpy array
-                x = torch.from_numpy(x)
-            if simulation_batch_size == 1:
-                # squeeze in case simulator provides an additional dimension for single parameters,
-                # e.g. in linearGaussian example. Then prepend a dimension to be able to concatenate.
-                # XXX: here we are squeezing and unsqueezing on the same dim, no?
-                x = torch.squeeze(x, dim=0).unsqueeze(0)
-        # collect batches in list
-        all_x.append(x)
+            xs.append(simulator(batch))
 
-    return torch.tensor(parameters), torch.cat(all_x)
+    return torch.tensor(parameters), torch.cat(xs)

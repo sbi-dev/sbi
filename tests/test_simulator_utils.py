@@ -3,10 +3,10 @@ import pytest
 import torch
 from torch.distributions import Uniform, MultivariateNormal, Distribution
 from sbi.simulators.simutils import (
-    check_user_input,
-    check_prior,
-    check_observed_data,
-    check_simulator,
+    prepare_sbi_problem,
+    process_prior,
+    process_observed_data,
+    process_simulator,
     ScipyToPytorchWrapper,
     CustomToPytorchWrapper,
 )
@@ -18,6 +18,9 @@ import numpy as np
 
 class UserUniform:
     """User defined numpy uniform prior. 
+    
+    Used for testing to mimick a user-defined prior with valid .sample and .log_prob 
+    methods. 
     """
 
     def __init__(self, lower, upper, return_numpy=False):
@@ -71,7 +74,7 @@ def list_simulator(x):
     ),
 )
 def test_prior_wrappers(wrapper, prior):
-
+    """Test prior wrappers to pytorch distributions."""
     prior = wrapper(prior)
 
     theta = prior.sample((10,))
@@ -98,9 +101,9 @@ def test_prior_wrappers(wrapper, prior):
         UserUniform(torch.zeros(3), torch.ones(3), return_numpy=True),
     ),
 )
-def test_check_prior(prior):
+def test_process_prior(prior):
 
-    prior, parameter_dim, numpy_simulator = check_prior(prior)
+    prior, parameter_dim, numpy_simulator = process_prior(prior)
 
     batch_size = 2
     theta = prior.sample((batch_size,))
@@ -134,10 +137,10 @@ def test_check_prior(prior):
         (BoxUniform(torch.zeros(1), torch.ones(1)), [[2.0]]),
     ),
 )
-def test_check_observed_data(
+def test_process_observed_data(
     prior, observed_data, simulator=linear_gaussian,
 ):
-    observed_data, observation_dim = check_observed_data(
+    observed_data, observation_dim = process_observed_data(
         observed_data, simulator, prior
     )
 
@@ -159,10 +162,10 @@ def test_check_observed_data(
         ),
     ),
 )
-def test_check_simulator(simulator: Callable, prior: Distribution):
+def test_process_simulator(simulator: Callable, prior: Distribution):
 
-    prior, theta_dim, prior_returns_numpy = check_prior(prior)
-    simulator = check_simulator(simulator, prior, prior_returns_numpy)
+    prior, theta_dim, prior_returns_numpy = process_prior(prior)
+    simulator = process_simulator(simulator, prior, prior_returns_numpy)
 
     n_batch = 2
     x = simulator(prior.sample((n_batch,)))
@@ -204,20 +207,20 @@ def test_check_simulator(simulator: Callable, prior: Distribution):
         ),
     ),
 )
-def test_check_user_input(simulator: Callable, prior, observed_data):
-    """Test user interface by passing different kinds of simulator functions.
+def test_prepare_sbi_problem(simulator: Callable, prior, observed_data):
+    """Test user interface by passing different kinds of simulators, prior and data.
 
-    Arguments:
-        simulator -- simulator function
+    Args:
+        simulator: simulator function
+        prior: prior as defined by the user (pytorch, scipy, custom)
+        observed_data: data as defined by the user. 
     """
 
-    simulator, prior, observed_data = check_user_input(simulator, prior, observed_data)
+    simulator, prior, observed_data = prepare_sbi_problem(
+        simulator, prior, observed_data
+    )
 
     # check batch sims and type
     n_batch = 2
     assert simulator(prior.sample((n_batch,))).shape[0] == n_batch
     assert isinstance(simulator(prior.sample((1,))), torch.Tensor)
-
-    # check function attributes
-    assert simulator.parameter_dim == 3
-    assert simulator.observation_dim == 3
