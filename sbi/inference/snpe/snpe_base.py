@@ -1,7 +1,7 @@
 import warnings
 from abc import ABC
 from copy import deepcopy
-from typing import Callable, Optional, Union
+from typing import Any, Callable, List, Optional, Union
 
 import numpy as np
 import torch
@@ -135,20 +135,24 @@ class SnpeBase(NeuralInference, ABC):
         # extra SNPE-specific fields summary_writer
         self._summary.update({"rejection_sampling_acceptance_rates": []})
 
-    def __call__(self, num_rounds, num_simulations_per_round, **kwargs):
-        """
+    def __call__(
+        self,
+        num_rounds: int,
+        num_simulations_per_round: Union[List[int], int],
+        **kwargs: Any,
+    ) -> Posterior:
+        """Run SNPE
+
         Return posterior density after inference over several rounds.
 
         Args:
-            num_rounds: int
-                Number of rounds to run.
-            num_simulations_per_round: list or int
-                list or int: Number of simulator calls per round.
+            num_rounds: Number of rounds to run
+            num_simulations_per_round: Number of simulator calls per round
+            kwargs: Passed on to _train
 
-        Returns: Posterior that can be sampled and evaluated.
-
+        Returns:
+            Posterior that can be sampled and evaluated.
         """
-
         try:
             assert (
                 len(num_simulations_per_round) == num_rounds
@@ -279,10 +283,12 @@ class SnpeBase(NeuralInference, ABC):
         stop_after_epochs=20,
         clip_grad_norm=True,
     ):
-        """
+        """Train
+
         Trains the conditional density estimator for the posterior by maximizing the
         proposal posterior using the most recently aggregated bank of (parameter, observation)
         pairs.
+        
         Uses early stopping on a held-out validation set as a terminating condition.
 
         Args:

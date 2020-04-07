@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from typing import Callable, Dict, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import numpy as np
 import torch
@@ -71,18 +71,25 @@ class SNL(NeuralInference):
         # SNL-specific summary_writer fields
         self._summary.update({"mcmc_times": []})
 
-    def __call__(self, num_rounds: int, num_simulations_per_round):
-        """
-        Run SNL over multiple rounds.
+    def __call__(
+        self,
+        num_rounds: int,
+        num_simulations_per_round: Union[List[int], int],
+        **kwargs: Any,
+    ) -> Posterior:
+        """Run SNL
+
+        This runs SNL for num_rounds rounds, using num_simulations_per_round calls to
+        the simulator
         
-        This method requires num_simulations_per_round calls to
-        the simulator per each of `num_rounds`.
+        Args:
+            num_rounds: Number of rounds to run
+            num_simulations_per_round: Number of simulator calls per round
+            kwargs: Passed on to _train
 
-        :param num_rounds: Number of rounds to run.
-        :param num_simulations_per_round: Number of simulator calls per round.
-        :return: None
+        Returns: 
+            Posterior that can be sampled and evaluated
         """
-
         round_description = ""
         tbar = tqdm(range(num_rounds))
         for round_ in tbar:
@@ -117,7 +124,7 @@ class SNL(NeuralInference):
             self._observation_bank.append(torch.as_tensor(observations))
 
             # Fit neural likelihood to newly aggregated dataset.
-            self._fit_likelihood()
+            self._fit_likelihood(**kwargs)
 
             # Update description for progress bar.
             round_description = (

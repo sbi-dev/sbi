@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from typing import Callable, Dict, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import numpy as np
 import torch
@@ -17,8 +17,7 @@ import sbi.simulators as simulators
 import sbi.utils as utils
 from sbi.inference.base import NeuralInference
 from sbi.inference.posteriors.sbi_posterior import Posterior
-from sbi.utils.torchutils import (ensure_observation_batched,
-                                  ensure_parameter_batched)
+from sbi.utils.torchutils import ensure_observation_batched, ensure_parameter_batched
 
 
 class SRE(NeuralInference):
@@ -106,18 +105,24 @@ class SRE(NeuralInference):
         self._summary.update({"mcmc_times": []})
 
     def __call__(
-        self, num_rounds, num_simulations_per_round,
-    ):
-        """
+        self,
+        num_rounds: int,
+        num_simulations_per_round: Union[List[int], int],
+        **kwargs: Any,
+    ) -> Posterior:
+        """Run SRE
+
         This runs SRE for num_rounds rounds, using num_simulations_per_round calls to
-        the simulator per round.
+        the simulator
+        
+        Args:
+            num_rounds: Number of rounds to run
+            num_simulations_per_round: Number of simulator calls per round
+            kwargs: Passed on to _train
 
-        :param num_rounds: Number of rounds to run.
-        :param num_simulations_per_round: Number of simulator calls per round.
-
-        :return: None
+        Returns: 
+            Posterior that can be sampled and evaluated.
         """
-
         round_description = ""
         tbar = tqdm(range(num_rounds))
         for round_ in tbar:
@@ -152,7 +157,7 @@ class SRE(NeuralInference):
             self._observation_bank.append(torch.Tensor(observations))
 
             # Fit posterior using newly aggregated data set.
-            self._fit_classifier()
+            self._fit_classifier(**kwargs)
 
             # Update description for progress bar.
             round_description = (
