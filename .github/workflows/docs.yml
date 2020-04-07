@@ -30,6 +30,7 @@ jobs:
         pip install mkdocs-redirects==1.0.0
         pip install mknotebooks==0.3.5
         pip install pymdown-extensions==6.3
+        pip install markdown-include==0.5.1
     - name: Build docs
       run: |
         cd docs && mkdocs build
