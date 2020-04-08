@@ -1,23 +1,10 @@
-#!/usr/bin/env python
-
-"""Stimulus.py: a Collection of stimuli that might be fed to HH simulator"""
+"""HH_stimuli.py: a Collection of stimuli that might be fed to HH simulator"""
 
 # GENERICS
-import inspect
 from typing import Optional, Tuple
 
 # ANALYSIS
 import numpy as np
-
-# MODULE INFORMATION
-__author__ = "Ole Jonas Wenzel"
-# __copyright__ = "Copyright 2020, The Nostalgic project"
-__credits__ = ["Ole Jonas Wenzel", ""]
-# __license__ = "MPL 2.0"
-__version__ = "0.0.1"
-__maintainer__ = "Ole Jonas Wenzel"
-__email__ = "olejonaswenzel@gmail.com"
-__status__ = "Dev"
 
 
 class Stimulus:

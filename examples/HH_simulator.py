@@ -1,14 +1,11 @@
-#!/usr/bin/env python
-
-"""HH_simulator.py: a Hodgekin-Huxley Generator"""
+"""HH_simulator.py: a Hodgekin-Huxley simulator"""
 
 # GENERICS
-import inspect
 from typing import List, Dict, Optional, Union
 
 # IMPORT FROM SRC
 from .HH_statistics import HHSummaryStats
-from .HH_stimuli import Stimulus, CurrentClamp
+from .HH_stimuli import CurrentClamp
 
 # ANALYSIS
 import numpy as np
@@ -17,20 +14,7 @@ import numpy as np
 import torch
 
 # SBI
-from .simulator import Simulator
-
-# DEBUGGING
-import pdb
-
-# MODULE INFORMATION
-__author__ = "Ole Jonas Wenzel"
-# __copyright__ = "Copyright 2020, The Nostalgic project"
-__credits__ = ["Ole Jonas Wenzel", ""]
-# __license__ = "MPL 2.0"
-__version__ = "0.0.1"
-__maintainer__ = "Ole Jonas Wenzel"
-__email__ = "olejonaswenzel@gmail.com"
-__status__ = "Dev"
+from ..sbi.simulators.simulator import Simulator
 
 
 class HHSimulator(Simulator):

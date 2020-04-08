@@ -1,6 +1,4 @@
-#!/usr/bin/env python
-
-"""HH_simulator.py: a Hodgekin-Huxley Generator"""
+"""HH_statistics.py: Summary statistics for HH simulated traces."""
 
 # GENERICS
 from typing import List, Tuple, Callable
@@ -10,16 +8,6 @@ import numpy as np
 
 # STATISTICS
 from scipy import stats as spstats
-
-# MODULE INFORMATION
-__author__ = "Ole Jonas Wenzel"
-# __copyright__ = "Copyright 2020, The Nostalgic project"
-__credits__ = ["Ole Jonas Wenzel", ""]
-# __license__ = "MPL 2.0"
-__version__ = "0.0.1"
-__maintainer__ = "Ole Jonas Wenzel"
-__email__ = "olejonaswenzel@gmail.com"
-__status__ = "Dev"
 
 
 class HHSummaryStats:
