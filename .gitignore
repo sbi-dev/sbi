@@ -59,6 +59,7 @@ nosetests.xml
 coverage.xml
 *,cover
 .hypothesis/
+tests/.mypy_cache
 
 # Translations
 *.mo
