@@ -1,14 +1,14 @@
-"""Tests for the PyTorch utility functions."""
+"""Test PyTorch utility functions."""
 
 import numpy as np
 import torch
 import torch.distributions as distributions
 import torchtestcase
-from tests.utils_for_testing.dkl import dkl_via_monte_carlo
 
 from sbi.utils import torchutils
+from tests.utils_for_testing.dkl import dkl_via_monte_carlo
 
-
+# XXX move to pytest? - investigate how to derive from TorchTestCase
 class TorchUtilsTest(torchtestcase.TorchTestCase):
     def test_split_leading_dim(self):
         x = torch.randn(24, 5)
@@ -134,17 +134,17 @@ def test_atleast_2d():
 
 def test_dkl_gauss():
     """
-    Test whether for two 1D Gaussians and two 2D Gaussians the Monte-Carlo-based D-KL
-     gives similar results as the torch implementation.
+    Test whether for two 1D Gaussians and two 2D Gaussians the Monte-Carlo-based KLd
+    gives similar results as the torch implementation.
     """
-    dist1 = [
+    dist1 = (
         distributions.Normal(loc=0.0, scale=1.0),
         distributions.MultivariateNormal(torch.zeros(2), torch.eye(2)),
-    ]
-    dist2 = [
+    )
+    dist2 = (
         distributions.Normal(loc=1.0, scale=0.5),
         distributions.MultivariateNormal(torch.ones(2), 0.5 * torch.eye(2)),
-    ]
+    )
 
     for d1, d2 in zip(dist1, dist2):
         torch_dkl = distributions.kl.kl_divergence(d1, d2)
@@ -153,6 +153,6 @@ def test_dkl_gauss():
         max_dkl_diff = 0.4
 
         assert torch.abs(torch_dkl - monte_carlo_dkl) < max_dkl_diff, (
-            f"Monte Carlo based DKL={monte_carlo_dkl} is too far off from the torch"
-            f" implementation={torch_dkl}."
+            f"Monte-Carlo-based KLd={monte_carlo_dkl} is too far from the torch"
+            f" implementation, {torch_dkl}."
         )
