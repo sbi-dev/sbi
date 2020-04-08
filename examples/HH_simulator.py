@@ -14,7 +14,7 @@ import numpy as np
 import torch
 
 # SBI
-from ..sbi.simulators.simulator import Simulator
+from sbi.simulators.simulator import Simulator
 
 
 class HHSimulator(Simulator):
