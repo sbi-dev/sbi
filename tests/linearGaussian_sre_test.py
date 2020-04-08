@@ -2,46 +2,41 @@ import pytest
 import torch
 from torch import distributions
 
-import sbi.utils as utils
 from sbi.inference.sre.sre import SRE
 from sbi.simulators.linear_gaussian import (
     get_true_posterior_samples_linear_gaussian_mvn_prior,
     get_true_posterior_samples_linear_gaussian_uniform_prior,
     linear_gaussian,
 )
+import sbi.utils as utils
 import tests.utils_for_testing.linearGaussian_logprob as test_utils
 
-# seed the simulations
 torch.manual_seed(0)
 
-# will be called by pytest. Then runs test_*(num_dim) for 1D and 3D
-@pytest.mark.parametrize("num_dim", [1, 3])
+
+@pytest.mark.parametrize("num_dim", (1, 3))
 def test_sre_on_linearGaussian_api(num_dim: int):
-    """Test inference api of SRE with linear gaussian model. 
+    """Test inference API of SRE with linear Gaussian model. 
 
     Avoids intense computation for fast testing of API etc. 
     
     Args:
-        num_dim: parameter dimension of the gaussian model (default: {3})
+        num_dim: parameter dimension of the Gaussian model
     """
-    # test api for inference on linear Gaussian model using SNL
-    # avoids expensive computations for fast testing
 
     simulator = linear_gaussian
     prior = distributions.MultivariateNormal(
         loc=torch.zeros(num_dim), covariance_matrix=torch.eye(num_dim)
     )
 
-    parameter_dim, observation_dim = num_dim, num_dim
     # XXX this breaks the test! (and #76 doesn't seem to fix)
     # true_observation = torch.zeros(1, num_dim)
+
     true_observation = torch.zeros(num_dim)
 
-    # get classifier
     classifier = utils.classifier_nn("resnet", prior=prior, context=true_observation,)
 
-    # create inference method
-    inference_method = SRE(
+    infer = SRE(
         simulator=simulator,
         prior=prior,
         true_observation=true_observation,
@@ -50,14 +45,12 @@ def test_sre_on_linearGaussian_api(num_dim: int):
         mcmc_method="slice-np",
     )
 
-    # run inference
-    posterior = inference_method(num_rounds=1, num_simulations_per_round=1000)
+    posterior = infer(num_rounds=1, num_simulations_per_round=1000)
 
-    # draw samples from posterior
     samples = posterior.sample(num_samples=10, num_chains=2)
 
     # XXX log_prob is not implemented yet for SRE
-    # log_probs = posterior.log_prob(samples)
+    # posterior.log_prob(samples)
 
 
 @pytest.mark.slow
@@ -73,13 +66,13 @@ def test_sre_on_linearGaussian_api(num_dim: int):
 def test_sre_on_linearGaussian_based_on_mmd(
     num_dim: int, prior_str: str, classifier_loss: str
 ):
-    """Test mmd accuracy of inference with SRE on linear gaussian model. 
+    """Test MMD accuracy of inference with SRE on linear Gaussian model. 
 
     NOTE: The mmd threshold is calculated based on a number of test runs and taking the mean plus 2 stds. 
     
     Args:
-        num_dim: parameter dimension of the gaussian model (default: {3})
-        prior_str: string for which prior to use: gaussian or uniform
+        num_dim: parameter dimension of the gaussian model
+        prior_str: one of "gaussian" or "uniform"
     """
 
     true_observation = torch.zeros(num_dim)
@@ -98,13 +91,11 @@ def test_sre_on_linearGaussian_based_on_mmd(
             true_observation[None,], num_samples=num_samples, prior=prior
         )
 
-    # get classifier
     classifier = utils.classifier_nn("resnet", prior=prior, context=true_observation,)
 
     num_atoms = 2 if classifier_loss == "aalr" else -1
 
-    # create inference method
-    inference_method = SRE(
+    infer = SRE(
         simulator=linear_gaussian,
         prior=prior,
         true_observation=true_observation,
@@ -115,38 +106,33 @@ def test_sre_on_linearGaussian_based_on_mmd(
         mcmc_method="slice-np",
     )
 
-    # run inference
-    posterior = inference_method(num_rounds=1, num_simulations_per_round=1000)
+    posterior = infer(num_rounds=1, num_simulations_per_round=1000)
 
-    # draw samples from posterior
     samples = posterior.sample(num_samples=num_samples)
 
-    # compute the mmd
+    # Check if mmd is larger than expected.
     mmd = utils.unbiased_mmd_squared(target_samples, samples)
-
-    # check if mmd is larger than expected
     max_mmd = 0.045
-
     assert (
         mmd < max_mmd
     ), f"MMD={mmd} is more than 2 stds above the average performance."
 
     # Checks for log_prob()
     if prior_str == "gaussian" and classifier_loss == "aalr":
-        # For the Gaussian prior, we compute the D-KL between ground truth and
+        # For the Gaussian prior, we compute the KLd between ground truth and
         # posterior. We can do this only if the classifier_loss was as described in
         # Hermans et al. 2019 ('aalr') since Durkan et al. 2019 version only allows
         # evaluation up to a constant.
-        # For the Gaussian prior, we compute the D-KL between ground truth and posterior
+        # For the Gaussian prior, we compute the KLd between ground truth and posterior
         dkl = test_utils.get_dkl_gaussian_prior(posterior, true_observation, num_dim)
 
         max_dkl = 0.05 if num_dim == 1 else 0.8
 
         assert (
             dkl < max_dkl
-        ), f"D-KL={dkl} is more than 2 stds above the average performance."
+        ), f"KLd={dkl} is more than 2 stds above the average performance."
     if prior_str == "uniform":
-        # Check whether the returned probability outside of the support is zero
+        # Check whether the returned probability outside of the support is zero.
         posterior_prob = test_utils.get_prob_outside_uniform_prior(posterior, num_dim)
         assert (
             posterior_prob == 0.0
@@ -163,16 +149,15 @@ def test_sre_on_linearGaussian_based_on_mmd(
         ("slice", "uniform"),
     ),
 )
-def test_sre_posterior_correction(mcmc_method, prior_str):
-    """Test that leakage correction applied to sampling works, with both MCMC and rejection.
+def test_sre_posterior_correction(mcmc_method: str, prior_str: str):
+    """Test leakage correction both for MCMC and rejection sampling.
 
     Args:
         mcmc_method: which mcmc method to use for sampling
-        prior_str: use gaussian or uniform prior
+        prior_str: one of "gaussian" or "uniform"
     """
 
     num_dim = 2
-    simulator = linear_gaussian
     if prior_str == "gaussian":
         prior = distributions.MultivariateNormal(
             loc=torch.zeros(num_dim), covariance_matrix=torch.eye(num_dim)
@@ -186,9 +171,8 @@ def test_sre_posterior_correction(mcmc_method, prior_str):
 
     classifier = utils.classifier_nn("resnet", prior=prior, context=true_observation,)
 
-    # create inference method
-    inference_method = SRE(
-        simulator=simulator,
+    infer = SRE(
+        simulator=linear_gaussian,
         prior=prior,
         true_observation=true_observation,
         classifier=classifier,
@@ -196,11 +180,9 @@ def test_sre_posterior_correction(mcmc_method, prior_str):
         mcmc_method=mcmc_method,
     )
 
-    # run inference
-    posterior = inference_method(num_rounds=1, num_simulations_per_round=1000)
+    posterior = infer(num_rounds=1, num_simulations_per_round=1000)
 
-    # draw samples from posterior
     samples = posterior.sample(num_samples=50)
 
-    # no log prob for SRE yet - see issue #73
-    # densities = posterior.log_prob(samples)
+    # TODO No log prob for SRE yet - see #73.
+    # posterior.log_prob(samples)

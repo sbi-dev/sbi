@@ -1,22 +1,17 @@
-import os
-
-import numpy as np
-import torch
 
 import pytest
-from sbi.inference.snpe.snpe_base import SnpeBase
+import torch
+
+import sbi.utils as utils
 from sbi.inference.snpe.snpe_c import SnpeC
 from sbi.simulators.nonlinear_gaussian import (
     get_ground_truth_posterior_samples_nonlinear_gaussian,
     non_linear_gaussian,
 )
 from sbi.utils.torchutils import BoxUniform
-import sbi.utils as utils
 
 # use cpu by default
 torch.set_default_tensor_type("torch.FloatTensor")
-
-# seed the simulations
 torch.manual_seed(0)
 
 
@@ -24,7 +19,7 @@ torch.manual_seed(0)
 def test_nonlinearGaussian_based_on_mmd():
     simulator = non_linear_gaussian
 
-    # ground truth parameters as specified in 'Sequential Neural Likelihood' paper.
+    # Ground truth parameters as specified in 'Sequential Neural Likelihood' paper.
     ground_truth_parameters = torch.tensor([-0.7, -2.9, -1.0, -0.9, 0.6])
     # ground truth observation using same seed as 'Sequential Neural Likelihood' paper.
     ground_truth_observation = torch.tensor(
@@ -48,7 +43,7 @@ def test_nonlinearGaussian_based_on_mmd():
         low=-3 * torch.ones(parameter_dim), high=3 * torch.ones(parameter_dim),
     )
 
-    apt = SnpeC(
+    infer = SnpeC(
         simulator=simulator,
         true_observation=ground_truth_observation[None,],
         prior=prior,
@@ -59,21 +54,18 @@ def test_nonlinearGaussian_based_on_mmd():
         discard_prior_samples=False,
     )
 
-    # run inference
     num_rounds, num_simulations_per_round = 2, 1000
-    apt(num_rounds=num_rounds, num_simulations_per_round=num_simulations_per_round)
+    posterior = infer(num_rounds=num_rounds, num_simulations_per_round=num_simulations_per_round)
 
-    # draw samples from posterior
-    samples = apt._neural_posterior.sample(1000)
+    samples = posterior.sample(1000)
 
-    # define target distribution (analytically tractable) and sample from it
+    # Sample from (analytically tractable) target distribution.
     target_samples = get_ground_truth_posterior_samples_nonlinear_gaussian(
         num_samples=1000
     )
 
-    # compute the mmd
+    # Compute and check if MMD is larger than expected.
     mmd = utils.unbiased_mmd_squared(target_samples.float(), samples.float())
 
-    # check if mmd is larger than expected
     max_mmd = 0.16  # mean mmd plus 2 stds.
     assert mmd < max_mmd, f"MMD={mmd} larger than mean plus 2 stds."
