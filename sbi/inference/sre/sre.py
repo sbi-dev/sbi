@@ -222,16 +222,18 @@ class SRE(NeuralInference):
         )
 
         # Create neural_net and validation loaders using a subset sampler.
-        batch_size = min(batch_size, num_validation_examples)
+
+        # NOTE: The batch_size is clipped to num_validation samples
+        clipped_batch_size = min(batch_size, num_validation_examples)
         train_loader = data.DataLoader(
             dataset,
-            batch_size=batch_size,
+            batch_size=clipped_batch_size,
             drop_last=True,
             sampler=SubsetRandomSampler(train_indices),
         )
         val_loader = data.DataLoader(
             dataset,
-            batch_size=batch_size,
+            batch_size=clipped_batch_size,
             shuffle=False,
             drop_last=False,
             sampler=SubsetRandomSampler(val_indices),
@@ -261,7 +263,7 @@ class SRE(NeuralInference):
         def _get_loss(parameters, observations):
 
             # num_atoms = parameters.shape[0]
-            num_atoms = self._num_atoms if self._num_atoms > 0 else batch_size
+            num_atoms = self._num_atoms if self._num_atoms > 0 else clipped_batch_size
 
             if self._classifier_loss == "aalr":
                 assert num_atoms == 2, "aalr allows only two atoms, i.e. num_atoms=2."
@@ -270,11 +272,11 @@ class SRE(NeuralInference):
 
             # Choose between 1 and num_atoms - 1 parameters from the rest
             # of the batch for each observation.
-            assert 0 < num_atoms - 1 < batch_size
+            assert 0 < num_atoms - 1 < clipped_batch_size
             probs = (
-                (1 / (batch_size - 1))
-                * torch.ones(batch_size, batch_size)
-                * (1 - torch.eye(batch_size))
+                (1 / (clipped_batch_size - 1))
+                * torch.ones(clipped_batch_size, clipped_batch_size)
+                * (1 - torch.eye(clipped_batch_size))
             )
             choices = torch.multinomial(
                 probs, num_samples=num_atoms - 1, replacement=False
@@ -283,7 +285,7 @@ class SRE(NeuralInference):
 
             atomic_parameters = torch.cat(
                 (parameters[:, None, :], contrasting_parameters), dim=1
-            ).reshape(batch_size * num_atoms, -1)
+            ).reshape(clipped_batch_size * num_atoms, -1)
 
             inputs = torch.cat((atomic_parameters, repeated_observations), dim=1)
 
@@ -291,16 +293,18 @@ class SRE(NeuralInference):
                 network_outputs = self._neural_posterior.neural_net(inputs)
                 likelihood = torch.squeeze(torch.sigmoid(network_outputs))
 
-                # the first batch_size elements are the ones where theta and x are
-                # sampled from the joint p(theta, x) and are labelled 1s.
-                # The second batch_size elements are the ones where theta and x are
-                # sampled from the marginals p(theta)p(x) and are labelled 0s.
-                labels = torch.cat((torch.ones(batch_size), torch.zeros(batch_size)))
+                # the first clipped_batch_size elements are the ones where theta and x
+                # are sampled from the joint p(theta, x) and are labelled 1s.
+                # The second clipped_batch_size elements are the ones where theta and x
+                # are sampled from the marginals p(theta)p(x) and are labelled 0s.
+                labels = torch.cat(
+                    (torch.ones(clipped_batch_size), torch.zeros(clipped_batch_size))
+                )
                 # binary cross entropy to learn the likelihood
                 loss = criterion(likelihood, labels)
             else:
                 logits = self._neural_posterior.neural_net(inputs).reshape(
-                    batch_size, num_atoms
+                    clipped_batch_size, num_atoms
                 )
                 # index 0 is the parameter set sampled from the joint
                 log_prob = logits[:, 0] - torch.logsumexp(logits, dim=-1)
