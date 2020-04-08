@@ -1,7 +1,7 @@
 import warnings
 from abc import ABC
 from copy import deepcopy
-from typing import Callable, Optional, Union
+from typing import Any, Callable, List, Optional, Union
 
 import numpy as np
 import torch
@@ -135,20 +135,33 @@ class SnpeBase(NeuralInference, ABC):
         # extra SNPE-specific fields summary_writer
         self._summary.update({"rejection_sampling_acceptance_rates": []})
 
-    def __call__(self, num_rounds, num_simulations_per_round, **kwargs):
-        """
+    def __call__(
+        self,
+        num_rounds: int,
+        num_simulations_per_round: Union[List[int], int],
+        batch_size: int = 100,
+        learning_rate: float = 5e-4,
+        validation_fraction: float = 0.1,
+        stop_after_epochs: int = 20,
+        clip_grad_norm: bool = True,
+    ) -> Posterior:
+        """Run SNPE
+
         Return posterior density after inference over several rounds.
 
         Args:
-            num_rounds: int
-                Number of rounds to run.
-            num_simulations_per_round: list or int
-                list or int: Number of simulator calls per round.
-
-        Returns: Posterior that can be sampled and evaluated.
-
+            num_rounds: Number of rounds to run
+            num_simulations_per_round: Number of simulator calls per round
+            batch_size: Size of batch to use for training.
+            learning_rate: Learning rate for Adam optimizer.
+            validation_fraction: The fraction of data to use for validation.
+            stop_after_epochs: The number of epochs to wait for improvement on the
+                validation set before terminating training.
+            clip_grad_norm: Whether to clip norm of gradients or not.
+            
+        Returns:
+            Posterior that can be sampled and evaluated.
         """
-
         try:
             assert (
                 len(num_simulations_per_round) == num_rounds
@@ -166,7 +179,14 @@ class SnpeBase(NeuralInference, ABC):
             self._run_sims(round_, num_simulations_per_round[round_])
 
             # Fit posterior using newly aggregated data set.
-            self._train(round_=round_, **kwargs)
+            self._train(
+                round_=round_,
+                batch_size=batch_size,
+                learning_rate=learning_rate,
+                validation_fraction=validation_fraction,
+                stop_after_epochs=stop_after_epochs,
+                clip_grad_norm=clip_grad_norm,
+            )
 
             # Store models at end of each round.
             self._model_bank.append(deepcopy(self._neural_posterior))
@@ -273,35 +293,19 @@ class SnpeBase(NeuralInference, ABC):
     def _train(
         self,
         round_,
-        batch_size=100,
-        learning_rate=5e-4,
-        validation_fraction=0.1,
-        stop_after_epochs=20,
-        clip_grad_norm=True,
+        batch_size,
+        learning_rate,
+        validation_fraction,
+        stop_after_epochs,
+        clip_grad_norm,
     ):
-        """
+        """Train
+
         Trains the conditional density estimator for the posterior by maximizing the
         proposal posterior using the most recently aggregated bank of (parameter, observation)
         pairs.
+        
         Uses early stopping on a held-out validation set as a terminating condition.
-
-        Args:
-            round_: int
-                Which round we're currently in. Needed when sampling procedure is
-                not simply sampling from (proposal) marginal.
-            batch_size: int
-                Size of batch to use for training.
-            learning_rate: float
-                Learning rate for Adam optimizer.
-            validation_fraction: float in [0, 1]
-                The fraction of data to use for validation.
-            stop_after_epochs: int
-                The number of epochs to wait for improvement on the
-                validation set before terminating training.
-            clip_grad_norm: bool
-                Whether to clip norm of gradients or not.
-
-        Returns: None
         """
 
         # get the start index for what training set to use. Either 0 or 1

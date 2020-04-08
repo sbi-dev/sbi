@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from typing import Callable, Dict, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import numpy as np
 import torch
@@ -17,8 +17,7 @@ import sbi.simulators as simulators
 import sbi.utils as utils
 from sbi.inference.base import NeuralInference
 from sbi.inference.posteriors.sbi_posterior import Posterior
-from sbi.utils.torchutils import (ensure_observation_batched,
-                                  ensure_parameter_batched)
+from sbi.utils.torchutils import ensure_observation_batched, ensure_parameter_batched
 
 
 class SRE(NeuralInference):
@@ -106,18 +105,31 @@ class SRE(NeuralInference):
         self._summary.update({"mcmc_times": []})
 
     def __call__(
-        self, num_rounds, num_simulations_per_round,
-    ):
-        """
+        self,
+        num_rounds: int,
+        num_simulations_per_round: Union[List[int], int],
+        batch_size: int = 100,
+        learning_rate: float = 5e-4,
+        validation_fraction: float = 0.1,
+        stop_after_epochs: int = 20,
+    ) -> Posterior:
+        """Run SRE
+
         This runs SRE for num_rounds rounds, using num_simulations_per_round calls to
-        the simulator per round.
-
-        :param num_rounds: Number of rounds to run.
-        :param num_simulations_per_round: Number of simulator calls per round.
-
-        :return: None
+        the simulator
+        
+        Args:
+            num_rounds: Number of rounds to run
+            num_simulations_per_round: Number of simulator calls per round
+            batch_size: Size of batch to use for training.
+            learning_rate: Learning rate for Adam optimizer.
+            validation_fraction: The fraction of data to use for validation.
+            stop_after_epochs: The number of epochs to wait for improvement on the
+                validation set before terminating training.
+            
+        Returns: 
+            Posterior that can be sampled and evaluated.
         """
-
         round_description = ""
         tbar = tqdm(range(num_rounds))
         for round_ in tbar:
@@ -152,7 +164,12 @@ class SRE(NeuralInference):
             self._observation_bank.append(torch.Tensor(observations))
 
             # Fit posterior using newly aggregated data set.
-            self._fit_classifier()
+            self._train(
+                batch_size=batch_size,
+                learning_rate=learning_rate,
+                validation_fraction=validation_fraction,
+                stop_after_epochs=stop_after_epochs,
+            )
 
             # Update description for progress bar.
             round_description = (
@@ -177,26 +194,14 @@ class SRE(NeuralInference):
         self._neural_posterior._num_trained_rounds = num_rounds
         return self._neural_posterior
 
-    def _fit_classifier(
-        self,
-        batch_size=100,
-        learning_rate=5e-4,
-        validation_fraction=0.1,
-        stop_after_epochs=20,
+    def _train(
+        self, batch_size, learning_rate, validation_fraction, stop_after_epochs,
     ):
         """
         Trains the classifier by maximizing a Bernoulli likelihood which distinguishes
         between jointly distributed (parameter, observation) pairs and randomly chosen
         (parameter, observation) pairs.
         Uses early stopping on a held-out validation set as a terminating condition.
-
-        :param batch_size: Size of batch to use for training.
-        :param learning_rate: Learning rate for Adam optimizer.
-        :param validation_fraction: The fraction of data to use for validation.
-        :param stop_after_epochs: The number of epochs to wait for improvement on the
-        validation set before terminating training.
-
-        :return: None
         """
 
         # Get total number of training examples.
@@ -217,15 +222,18 @@ class SRE(NeuralInference):
         )
 
         # Create neural_net and validation loaders using a subset sampler.
+
+        # NOTE: The batch_size is clipped to num_validation samples
+        clipped_batch_size = min(batch_size, num_validation_examples)
         train_loader = data.DataLoader(
             dataset,
-            batch_size=min(batch_size, num_training_examples),
+            batch_size=clipped_batch_size,
             drop_last=True,
             sampler=SubsetRandomSampler(train_indices),
         )
         val_loader = data.DataLoader(
             dataset,
-            batch_size=min(batch_size, num_validation_examples),
+            batch_size=clipped_batch_size,
             shuffle=False,
             drop_last=False,
             sampler=SubsetRandomSampler(val_indices),
@@ -255,7 +263,7 @@ class SRE(NeuralInference):
         def _get_loss(parameters, observations):
 
             # num_atoms = parameters.shape[0]
-            num_atoms = self._num_atoms if self._num_atoms > 0 else batch_size
+            num_atoms = self._num_atoms if self._num_atoms > 0 else clipped_batch_size
 
             if self._classifier_loss == "aalr":
                 assert num_atoms == 2, "aalr allows only two atoms, i.e. num_atoms=2."
@@ -264,11 +272,11 @@ class SRE(NeuralInference):
 
             # Choose between 1 and num_atoms - 1 parameters from the rest
             # of the batch for each observation.
-            assert 0 < num_atoms - 1 < batch_size
+            assert 0 < num_atoms - 1 < clipped_batch_size
             probs = (
-                (1 / (batch_size - 1))
-                * torch.ones(batch_size, batch_size)
-                * (1 - torch.eye(batch_size))
+                (1 / (clipped_batch_size - 1))
+                * torch.ones(clipped_batch_size, clipped_batch_size)
+                * (1 - torch.eye(clipped_batch_size))
             )
             choices = torch.multinomial(
                 probs, num_samples=num_atoms - 1, replacement=False
@@ -277,7 +285,7 @@ class SRE(NeuralInference):
 
             atomic_parameters = torch.cat(
                 (parameters[:, None, :], contrasting_parameters), dim=1
-            ).reshape(batch_size * num_atoms, -1)
+            ).reshape(clipped_batch_size * num_atoms, -1)
 
             inputs = torch.cat((atomic_parameters, repeated_observations), dim=1)
 
@@ -285,16 +293,18 @@ class SRE(NeuralInference):
                 network_outputs = self._neural_posterior.neural_net(inputs)
                 likelihood = torch.squeeze(torch.sigmoid(network_outputs))
 
-                # the first batch_size elements are the ones where theta and x are
-                # sampled from the joint p(theta, x) and are labelled 1s.
-                # The second batch_size elements are the ones where theta and x are
-                # sampled from the marginals p(theta)p(x) and are labelled 0s.
-                labels = torch.cat((torch.ones(batch_size), torch.zeros(batch_size)))
+                # the first clipped_batch_size elements are the ones where theta and x
+                # are sampled from the joint p(theta, x) and are labelled 1s.
+                # The second clipped_batch_size elements are the ones where theta and x
+                # are sampled from the marginals p(theta)p(x) and are labelled 0s.
+                labels = torch.cat(
+                    (torch.ones(clipped_batch_size), torch.zeros(clipped_batch_size))
+                )
                 # binary cross entropy to learn the likelihood
                 loss = criterion(likelihood, labels)
             else:
                 logits = self._neural_posterior.neural_net(inputs).reshape(
-                    batch_size, num_atoms
+                    clipped_batch_size, num_atoms
                 )
                 # index 0 is the parameter set sampled from the joint
                 log_prob = logits[:, 0] - torch.logsumexp(logits, dim=-1)

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from typing import Callable, Dict, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import numpy as np
 import torch
@@ -71,18 +71,32 @@ class SNL(NeuralInference):
         # SNL-specific summary_writer fields
         self._summary.update({"mcmc_times": []})
 
-    def __call__(self, num_rounds: int, num_simulations_per_round):
-        """
-        Run SNL over multiple rounds.
+    def __call__(
+        self,
+        num_rounds: int,
+        num_simulations_per_round: Union[List[int], int],
+        batch_size: int = 100,
+        learning_rate: float = 5e-4,
+        validation_fraction: float = 0.1,
+        stop_after_epochs: int = 20,
+    ) -> Posterior:
+        """Run SNL
+
+        This runs SNL for num_rounds rounds, using num_simulations_per_round calls to
+        the simulator
         
-        This method requires num_simulations_per_round calls to
-        the simulator per each of `num_rounds`.
+        Args:
+            num_rounds: Number of rounds to run
+            num_simulations_per_round: Number of simulator calls per round
+            batch_size: Size of batch to use for training.
+            learning_rate: Learning rate for Adam optimizer.
+            validation_fraction: The fraction of data to use for validation.
+            stop_after_epochs: The number of epochs to wait for improvement on the
+                validation set before terminating training.
 
-        :param num_rounds: Number of rounds to run.
-        :param num_simulations_per_round: Number of simulator calls per round.
-        :return: None
+        Returns:
+            Posterior that can be sampled and evaluated
         """
-
         round_description = ""
         tbar = tqdm(range(num_rounds))
         for round_ in tbar:
@@ -117,7 +131,12 @@ class SNL(NeuralInference):
             self._observation_bank.append(torch.as_tensor(observations))
 
             # Fit neural likelihood to newly aggregated dataset.
-            self._fit_likelihood()
+            self._train(
+                batch_size=batch_size,
+                learning_rate=learning_rate,
+                validation_fraction=validation_fraction,
+                stop_after_epochs=stop_after_epochs,
+            )
 
             # Update description for progress bar.
             round_description = (
@@ -142,24 +161,11 @@ class SNL(NeuralInference):
         self._neural_posterior._num_trained_rounds = num_rounds
         return self._neural_posterior
 
-    def _fit_likelihood(
-        self,
-        batch_size=100,
-        learning_rate=5e-4,
-        validation_fraction=0.1,
-        stop_after_epochs=20,
-    ):
+    def _train(self, batch_size, learning_rate, validation_fraction, stop_after_epochs):
         """
         Trains the conditional density estimator for the likelihood by maximum likelihood
         on the most recently aggregated bank of (parameter, observation) pairs.
         Uses early stopping on a held-out validation set as a terminating condition.
-
-        :param batch_size: Size of batch to use for training.
-        :param learning_rate: Learning rate for Adam optimizer.
-        :param validation_fraction: The fraction of data to use for validation.
-        :param stop_after_epochs: The number of epochs to wait for improvement on the
-        validation set before terminating training.
-        :return: None
         """
 
         # Get total number of training examples.
