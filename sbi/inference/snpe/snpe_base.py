@@ -314,11 +314,6 @@ class SnpeBase(NeuralInference, ABC):
         # Get total number of training examples.
         num_examples = torch.cat(self._parameter_bank[ix:]).shape[0]
 
-        if round_ > 0:
-            assert (
-                validation_fraction * num_examples >= batch_size
-            ), "There are fewer samples in the validation set than the batchsize."
-
         # Select random neural_net and validation splits from (parameter, observation) pairs.
         permuted_indices = torch.randperm(num_examples)
         num_training_examples = int((1 - validation_fraction) * num_examples)
