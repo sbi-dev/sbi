@@ -252,24 +252,30 @@ class SnpeBase(NeuralInference, ABC):
         # Generate parameters from prior in first round, and from most recent posterior
         # estimate in subsequent rounds.
         if round_ == 0:
-            parameters, observations = simulate_in_batches(
-                simulator=self._simulator,
-                parameter_sample_fn=lambda num_samples: self._prior.sample(
-                    (num_samples,)
-                ),
-                num_samples=np.maximum(
-                    0, num_simulations_per_round - self._num_pilot_samples
-                ),
-                simulation_batch_size=self._simulation_batch_size,
-                x_dim=self._true_observation.shape[1:],  # do not pass batch_dim
-            )
-            parameters = torch.cat(
-                (parameters, self.pilot_parameters[:num_simulations_per_round]), dim=0
-            )
-            observations = torch.cat(
-                (observations, self.pilot_observations[:num_simulations_per_round]),
-                dim=0,
-            )
+            # New simulations are run only if pilot samples are not enough.
+            num_samples_remaining = num_simulations_per_round - self._num_pilot_samples
+            if num_samples_remaining > 0:
+                parameters, observations = simulate_in_batches(
+                    simulator=self._simulator,
+                    parameter_sample_fn=lambda num_samples: self._prior.sample(
+                        (num_samples,)
+                    ),
+                    num_samples=num_samples_remaining,
+                    simulation_batch_size=self._simulation_batch_size,
+                    x_dim=self._true_observation.shape[1:],  # do not pass batch_dim
+                )
+                parameters = torch.cat(
+                    (parameters, self.pilot_parameters[:num_simulations_per_round]),
+                    dim=0,
+                )
+                observations = torch.cat(
+                    (observations, self.pilot_observations[:num_simulations_per_round]),
+                    dim=0,
+                )
+            else:
+                parameters = self.pilot_parameters[:num_simulations_per_round]
+                observations = self.pilot_observations[:num_simulations_per_round]
+
         else:
             parameters, observations = simulate_in_batches(
                 simulator=self._simulator,
