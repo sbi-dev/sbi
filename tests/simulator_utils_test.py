@@ -17,6 +17,8 @@ from sbi.simulators.simutils import (
 from scipy.stats import multivariate_normal, uniform, beta
 from sbi.simulators.linear_gaussian import linear_gaussian
 from sbi.utils.torchutils import BoxUniform
+from sbi.utils.get_nn_models import posterior_nn
+from sbi.inference.snpe import SnpeC
 import numpy as np
 
 
@@ -270,4 +272,31 @@ def test_simulate_in_batches(
         num_samples,
         batch_size,
         torch.Size([5]),
+    )
+
+
+def test_inference_with_pilot_samples_samples():
+    """Test whether num_pilot_samples can be same as num_simulations_per_round."""
+
+    num_dim = 3
+    true_observation = torch.zeros((1, num_dim))
+
+    prior = MultivariateNormal(
+        loc=torch.zeros(num_dim), covariance_matrix=torch.eye(num_dim)
+    )
+
+    infer = SnpeC(
+        simulator=linear_gaussian,
+        true_observation=true_observation,
+        density_estimator=posterior_nn(
+            model="maf", prior=prior, context=true_observation,
+        ),
+        prior=prior,
+        simulation_batch_size=100,
+    )
+
+    # Run inference.
+    num_rounds, num_simulations_per_round = 2, 100
+    posterior = infer(
+        num_rounds=num_rounds, num_simulations_per_round=num_simulations_per_round
     )
