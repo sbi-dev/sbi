@@ -83,7 +83,6 @@ class SnpeBase(NeuralInference, ABC):
             parameter_sample_fn=lambda num_samples: self._prior.sample((num_samples,)),
             num_samples=num_pilot_samples,
             simulation_batch_size=self._simulation_batch_size,
-            x_dim=self._true_observation.shape[1:],  # do not pass batch_dim
         )
 
         # create the deep neural density estimator
@@ -176,7 +175,7 @@ class SnpeBase(NeuralInference, ABC):
             tbar.set_description(round_description)
 
             # run simulations for the round
-            self._run_sims(round_, num_simulations_per_round[round_])
+            self._run_simulations(round_, num_simulations_per_round[round_])
 
             # Fit posterior using newly aggregated data set.
             self._train(
@@ -233,27 +232,27 @@ class SnpeBase(NeuralInference, ABC):
         """
         raise NotImplementedError
 
-    def _run_sims(
-        self, round_, num_simulations_per_round,
+    def _run_simulations(
+        self, round_: int, num_samples: int,
     ):
         """
-        Runs the simulations at the beginning of each round.
+        Run the simulations for a given round.
 
         Args:
-            round_: int. Round
-            num_simulations_per_round: int. Number of simulations in current round
+            round_: Round
+            num_samples: Number of simulations in current round.
 
         Returns:
-            self._parameter_bank: torch.tensor. theta used for training
-            self._observation_bank: torch.tensor. x used for training
-            self._prior_masks: torch.tensor. Masks of 0/1 for each prior sample,
+            self._parameter_bank: theta used for training
+            self._observation_bank: x used for training
+            self._prior_masks: Masks of 0/1 for each prior sample,
                 indicating whether prior sample will be used in current round
         """
         # Generate parameters from prior in first round, and from most recent posterior
         # estimate in subsequent rounds.
         if round_ == 0:
             # New simulations are run only if pilot samples are not enough.
-            num_samples_remaining = num_simulations_per_round - self._num_pilot_samples
+            num_samples_remaining = num_samples - self._num_pilot_samples
             if num_samples_remaining > 0:
                 parameters, observations = simulate_in_batches(
                     simulator=self._simulator,
@@ -262,19 +261,16 @@ class SnpeBase(NeuralInference, ABC):
                     ),
                     num_samples=num_samples_remaining,
                     simulation_batch_size=self._simulation_batch_size,
-                    x_dim=self._true_observation.shape[1:],  # do not pass batch_dim
                 )
                 parameters = torch.cat(
-                    (parameters, self.pilot_parameters[:num_simulations_per_round]),
-                    dim=0,
+                    (parameters, self.pilot_parameters[:num_samples]), dim=0,
                 )
                 observations = torch.cat(
-                    (observations, self.pilot_observations[:num_simulations_per_round]),
-                    dim=0,
+                    (observations, self.pilot_observations[:num_samples]), dim=0,
                 )
             else:
-                parameters = self.pilot_parameters[:num_simulations_per_round]
-                observations = self.pilot_observations[:num_simulations_per_round]
+                parameters = self.pilot_parameters[:num_samples]
+                observations = self.pilot_observations[:num_samples]
 
         else:
             parameters, observations = simulate_in_batches(
@@ -282,18 +278,16 @@ class SnpeBase(NeuralInference, ABC):
                 parameter_sample_fn=lambda num_samples: self._neural_posterior.sample(
                     num_samples, context=self._true_observation,
                 ),
-                num_samples=num_simulations_per_round,
+                num_samples=num_samples,
                 simulation_batch_size=self._simulation_batch_size,
-                x_dim=self._true_observation.shape[1:],  # do not pass batch_dim
             )
 
         # Store (parameter, observation) pairs.
         self._parameter_bank.append(parameters)
         self._observation_bank.append(observations)
+        # Mark simulations sampled from prior.
         self._prior_masks.append(
-            torch.ones(num_simulations_per_round, 1)
-            if round_ == 0
-            else torch.zeros(num_simulations_per_round, 1)
+            torch.ones(num_samples, 1) if round_ == 0 else torch.zeros(num_samples, 1)
         )
 
     def _train(

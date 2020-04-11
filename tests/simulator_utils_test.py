@@ -267,19 +267,15 @@ def test_simulate_in_batches(
     """Test combinations of num_samples and simulation_batch_size. """
 
     simulate_in_batches(
-        simulator,
-        lambda n: prior.sample((n,)),
-        num_samples,
-        batch_size,
-        torch.Size([5]),
+        simulator, lambda n: prior.sample((n,)), num_samples, batch_size,
     )
 
 
-def test_inference_with_pilot_samples_samples():
+def test_inference_with_pilot_samples_many_samples():
     """Test whether num_pilot_samples can be same as num_simulations_per_round."""
 
     num_dim = 3
-    true_observation = torch.zeros((1, num_dim))
+    true_observation = torch.zeros(num_dim)
 
     prior = MultivariateNormal(
         loc=torch.zeros(num_dim), covariance_matrix=torch.eye(num_dim)

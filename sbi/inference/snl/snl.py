@@ -113,7 +113,6 @@ class SNL(NeuralInference):
                     ),
                     num_samples=num_simulations_per_round,
                     simulation_batch_size=self._simulation_batch_size,
-                    x_dim=self._true_observation.shape[1:],  # do not pass batch_dim
                 )
             else:
                 parameters, observations = simulators.simulate_in_batches(
@@ -123,7 +122,6 @@ class SNL(NeuralInference):
                     ),
                     num_samples=num_simulations_per_round,
                     simulation_batch_size=self._simulation_batch_size,
-                    x_dim=self._true_observation.shape[1:],  # do not pass batch_dim
                 )
 
             # Store (parameter, observation) pairs.

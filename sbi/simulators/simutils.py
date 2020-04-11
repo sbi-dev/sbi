@@ -547,8 +547,7 @@ def simulate_in_batches(
     parameter_sample_fn: Callable,
     num_samples: int,
     simulation_batch_size: int,
-    x_dim: torch.Size,
-) -> Tuple[Tensor, Tensor]:
+) -> (Tensor, Tensor):
     """
     Return parameters and simulated data for `num_samples` parameter sets. 
     
@@ -563,14 +562,14 @@ def simulate_in_batches(
         parameter_sample_fn: Function to call for generating theta, e.g. prior sampling
         num_samples: Number of simulations to run
         simulation_batch_size: Number of simulations that are run within a single batch
-            If `simulation_batch_size == -1`, we run a batch with all simulations required, i.e. `simulation_batch_size = num_samples`
-        x_dim: dimensionality of a single simulator output
+            If `simulation_batch_size == -1`, we run a batch with all simulations required,
+            i.e. `simulation_batch_size = num_samples`
 
     Returns: Tensor simulation input parameters of shape (num_samples, num_dim_parameters),
              Tensor simulator outputs x of shape (num_samples, num_dim_x)
     """
 
-    assert num_samples > 0, "number of samples must be larger than zero."
+    assert num_samples > 0, "Number of samples to simulate must be larger than zero."
 
     # Generate parameters (simulation inputs) by sampling from prior (round 1) or
     # proposal (round > 1).
