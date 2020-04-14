@@ -18,9 +18,8 @@ import sbi.utils as utils
 from sbi.utils.torchutils import BoxUniform, atleast_2d
 
 
-def process_prior(prior: Callable) -> Tuple[Distribution, int, bool]:
-    """Check prior object provided by the user. Return PyTorch distribution-like prior
-    object.
+def process_prior(prior) -> Tuple[Distribution, int, bool]:
+    """Return PyTorch distribution-like prior adapted from user-provided prior.
 
     Args:
         prior: prior object provided by the user.
