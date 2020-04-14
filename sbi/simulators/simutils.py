@@ -516,29 +516,34 @@ def prepare_sbi_problem(
     return simulator, prior, observed_data
 
 
-def check_sbi_problem(simulator: Callable, prior, observed_data: Tensor):
-    """Assert requirements for simulator, prior and x0 for usage in sbi. 
+def check_sbi_problem(simulator: Callable, prior, observation: Tensor):
+    """Assert requirements for simulator, prior and observation for usage in sbi. 
     
     Args:
         simulator: simulator function
         prior: prior (Distribution like)
-        observed_data: observed data
+        observation: observed data
     """
-    num_samples = 2
-    theta = prior.sample((num_samples,))
-    data = simulator(theta)
-    assert isinstance(theta, Tensor), "theta must be a Tensor."
-    assert isinstance(data, Tensor), "simulator output must be a Tensor."
-    assert isinstance(observed_data, Tensor), "observed data must be a Tensor."
+    num_prior_samples = 2
+    theta = prior.sample((num_prior_samples,))
+    theta_batch_shape, *_ = theta.shape
+    simulation = simulator(theta)
+    sim_batch_shape, *sim_event_shape = simulation.shape
+    _, *obs_event_shape = observation.shape
+
+    assert isinstance(theta, Tensor), "Parameters theta must be a Tensor."
+    assert isinstance(simulation, Tensor), "Simulator output must be a Tensor."
+    assert isinstance(observation, Tensor), "Observation must be a Tensor."
+
     assert (
-        theta.shape[0] == num_samples
-    ), f"Theta batch shape {theta.shape[0]} must match num_samples={num_samples}."
+        theta_batch_shape == num_prior_samples
+    ), f"Theta batch shape {theta_batch_shape} must match num_samples={num_prior_samples}."
     assert (
-        data.shape[0] == num_samples
-    ), f"Data batch shape {data.shape[0]} must match num_samples={num_samples}."
+        sim_batch_shape == num_prior_samples
+    ), f"Simulation batch shape {sim_batch_shape} must match num_samples={num_prior_samples}."
     assert (
-        observed_data.shape[1:] == data[0, :].shape
-    ), f"Observed data shape must match simulated data shape."
+        obs_event_shape == sim_event_shape
+    ), f"The shape of a single observation must match that of a single simulation."
 
 
 def simulate_in_batches(
