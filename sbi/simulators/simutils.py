@@ -186,21 +186,26 @@ def check_for_possibly_batched_observations(observed_data: Tensor):
         raise ValueError(
             """`observed_data` has D>1 dimensions. SBI interprets the leading 
                 dimension as a batch dimension, but it *currently* only processes 
-                a single observation, a batch of several observation is not supported yet.
+                a single observation, a batch of several observation is not supported 
+                yet.
 
-                NOTE: below we use list notation to reduce clutter, but observation should be of type torch.Tensor or np.ndarray. 
+                NOTE: below we use list notation to reduce clutter, but observation 
+                should be of type torch.Tensor or np.ndarray. 
                 
                 For example:
 
                 > observed_data = [[1]]
                 > observed_data = [[1, 2, 3]]
 
-                are interpreted as single observation with a leading batch dimension of one. However
+                are interpreted as single observation with a leading batch dimension of
+                one. However
                 
                 > observed_data = [ [1], [2] ]
                 > observed_data = [ [1,2,3], [4,5,6] ]   
 
-                are interpreted as a batch of two scalar or vector observations, which is not supported yet. The following is interpreted as a matrix-shaped observation, i.e a monochromatic image:
+                are interpreted as a batch of two scalar or vector observations, which 
+                is not supported yet. The following is interpreted as a matrix-shaped 
+                observation, i.e a monochromatic image:
                 
                 > observed_data = [ [[1,2,3], [4,5,6]] ]
                 
@@ -209,14 +214,16 @@ def check_for_possibly_batched_observations(observed_data: Tensor):
                 > observed_data = [1]
                 > observed_data = [1, 2, 3]
                 
-                will be interpreted as a single scalar or single vector observation respectively, without the user needing to wrap or unsqueeze them. 
+                will be interpreted as a single scalar or single vector observation 
+                respectively, without the user needing to wrap or unsqueeze them. 
                 """
         )
     # Warn on multidimensional data with batch_size one.
     elif inferred_data_dim > 1 and inferred_batch_shape == 1:
         warnings.warn(
             f"""Beware: The `observed_data` you passed was interpreted to have 
-            matrix shape: {inferred_data_shape}. The current implementation of SBI might not provide stable support for this and result in shape mismatches.
+            matrix shape: {inferred_data_shape}. The current implementation of SBI 
+            might not provide stable support for this and result in shape mismatches.
             """
         )
     else:
@@ -242,7 +249,8 @@ def check_prior_methods(prior):
     except TypeError:
         raise TypeError(
             f"""The prior.sample() method must accept Tuple arguments, e.g., 
-            prior.sample(({num_samples}, )) to sample a batch of 2 parameters. Consider using a PyTorch distribution."""
+            prior.sample(({num_samples}, )) to sample a batch of 2 parameters. Consider
+            using a PyTorch distribution."""
         )
     except:
         raise ValueError(
@@ -402,13 +410,23 @@ def wrap_as_batch_simulator(simulator: Callable, prior) -> Callable:
 
     is_batched_simulator = True
     try:
-        n_batch = 2
-        data = simulator(prior.sample((n_batch,)))
-        assert data.shape[0] == n_batch
+        batch_size = 2
+        simulator_batch_size, *_ = simulator(prior.sample((batch_size,))).shape
+
+        assert simulator_batch_size == batch_size
     except:
         warnings.warn(
-            "Simulator can't handle batches of parameters. It will loop over batches in Python with `map`. Consider vectorising the simulator natively for performance."
+            """Simulator can't handle batches of parameters. It will loop over batches
+            in Python with `map`. Consider vectorising the simulator natively for 
+            performance."""
         )
+        # make sure the simulator does not return batch dim.
+        single_simulation = simulator(prior.sample())
+        assert (
+            not single_simulation.shape[0] == 1
+        ), f"""The simulator can't handle batches and returns a singleton batch 
+            dimension: {single_simulation.shape}. A simulator that can't handle batches
+            of parameters must not return a batch dim."""
         is_batched_simulator = False
 
     return simulator if is_batched_simulator else get_batched_simulator(simulator)
@@ -539,7 +557,10 @@ def check_sbi_problem(simulator: Callable, prior, observation: Tensor):
     ), f"Simulation batch shape {sim_batch_shape} must match num_samples={num_prior_samples}."
     assert (
         obs_event_shape == sim_event_shape
-    ), f"The shape of a single observation is {obs_event_shape} and it does not match that of a single simulation {sim_event_shape}."
+    ), f"""The shape of a single observation is {obs_event_shape} and it does not match
+        that of a single simulation {sim_event_shape}. For a batch size of {num_prior_samples}
+        the simulator returns {simulation.shape} (should be ({num_prior_samples}, 
+        {obs_event_shape})."""
 
 
 def simulate_in_batches(

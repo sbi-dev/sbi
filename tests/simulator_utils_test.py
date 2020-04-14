@@ -231,6 +231,12 @@ def test_process_simulator(simulator: Callable, prior: Distribution):
             UserNumpyUniform(torch.zeros(3), torch.ones(3), return_numpy=True),
             np.zeros((1, 3)),
         ),
+        pytest.param(  # test simulator always returning batch dim.
+            lambda _: torch.zeros(1, 480),
+            BoxUniform(torch.zeros(2), torch.ones(2)),
+            torch.zeros(1, 480),
+            marks=pytest.mark.xfail,
+        ),
     ),
 )
 def test_prepare_sbi_problem(
