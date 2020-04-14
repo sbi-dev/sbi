@@ -539,7 +539,7 @@ def check_sbi_problem(simulator: Callable, prior, observation: Tensor):
     ), f"Simulation batch shape {sim_batch_shape} must match num_samples={num_prior_samples}."
     assert (
         obs_event_shape == sim_event_shape
-    ), f"The shape of a single observation must match that of a single simulation."
+    ), f"The shape of a single observation is {obs_event_shape} and it does not match that of a single simulation {sim_event_shape}."
 
 
 def simulate_in_batches(
