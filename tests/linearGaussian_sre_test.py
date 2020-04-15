@@ -10,6 +10,7 @@ from sbi.simulators.linear_gaussian import (
 )
 import sbi.utils as utils
 import tests.utils_for_testing.linearGaussian_logprob as test_utils
+from sbi.simulators.simutils import prepare_sbi_problem
 
 torch.manual_seed(0)
 
@@ -24,22 +25,21 @@ def test_sre_on_linearGaussian_api(num_dim: int):
         num_dim: parameter dimension of the Gaussian model
     """
 
-    simulator = linear_gaussian
+    x_o = torch.zeros(num_dim)
     prior = distributions.MultivariateNormal(
         loc=torch.zeros(num_dim), covariance_matrix=torch.eye(num_dim)
     )
 
     # XXX this breaks the test! (and #76 doesn't seem to fix)
-    # true_observation = torch.zeros(1, num_dim)
 
-    true_observation = torch.zeros(num_dim)
+    simulator, prior, x_o = prepare_sbi_problem(linear_gaussian, prior, x_o)
 
-    classifier = utils.classifier_nn("resnet", prior=prior, context=true_observation,)
+    classifier = utils.classifier_nn("resnet", prior=prior, x_o=x_o,)
 
     infer = SRE(
         simulator=simulator,
         prior=prior,
-        true_observation=true_observation,
+        x_o=x_o,
         classifier=classifier,
         simulation_batch_size=50,
         mcmc_method="slice-np",
@@ -75,7 +75,7 @@ def test_sre_on_linearGaussian_based_on_mmd(
         prior_str: one of "gaussian" or "uniform"
     """
 
-    true_observation = torch.zeros(num_dim)
+    x_o = torch.zeros(num_dim)
     num_samples = 300
 
     if prior_str == "gaussian":
@@ -83,22 +83,24 @@ def test_sre_on_linearGaussian_based_on_mmd(
             loc=torch.zeros(num_dim), covariance_matrix=torch.eye(num_dim)
         )
         target_samples = get_true_posterior_samples_linear_gaussian_mvn_prior(
-            true_observation[None,], num_samples=num_samples
+            x_o[None,], num_samples=num_samples
         )
     else:
         prior = utils.BoxUniform(-1.0 * torch.ones(num_dim), torch.ones(num_dim))
         target_samples = get_true_posterior_samples_linear_gaussian_uniform_prior(
-            true_observation[None,], num_samples=num_samples, prior=prior
+            x_o[None,], num_samples=num_samples, prior=prior
         )
 
-    classifier = utils.classifier_nn("resnet", prior=prior, context=true_observation,)
+    classifier = utils.classifier_nn("resnet", prior=prior, x_o=x_o,)
+
+    simulator, prior, x_o = prepare_sbi_problem(linear_gaussian, prior, x_o)
 
     num_atoms = 2 if classifier_loss == "aalr" else -1
 
     infer = SRE(
-        simulator=linear_gaussian,
+        simulator=simulator,
         prior=prior,
-        true_observation=true_observation,
+        x_o=x_o,
         num_atoms=num_atoms,
         classifier=classifier,
         classifier_loss=classifier_loss,
@@ -124,7 +126,7 @@ def test_sre_on_linearGaussian_based_on_mmd(
         # Hermans et al. 2019 ('aalr') since Durkan et al. 2019 version only allows
         # evaluation up to a constant.
         # For the Gaussian prior, we compute the KLd between ground truth and posterior
-        dkl = test_utils.get_dkl_gaussian_prior(posterior, true_observation, num_dim)
+        dkl = test_utils.get_dkl_gaussian_prior(posterior, x_o, num_dim)
 
         max_dkl = 0.05 if num_dim == 1 else 0.8
 
@@ -158,6 +160,7 @@ def test_sre_posterior_correction(mcmc_method: str, prior_str: str):
     """
 
     num_dim = 2
+    x_o = torch.zeros(num_dim)
     if prior_str == "gaussian":
         prior = distributions.MultivariateNormal(
             loc=torch.zeros(num_dim), covariance_matrix=torch.eye(num_dim)
@@ -166,15 +169,15 @@ def test_sre_posterior_correction(mcmc_method: str, prior_str: str):
         prior = utils.BoxUniform(
             low=-1.0 * torch.ones(num_dim), high=torch.ones(num_dim)
         )
+    
+    simulator, prior, x_o = prepare_sbi_problem(linear_gaussian, prior, x_o)
 
-    true_observation = torch.zeros(num_dim)
-
-    classifier = utils.classifier_nn("resnet", prior=prior, context=true_observation,)
+    classifier = utils.classifier_nn("resnet", prior=prior, x_o=x_o,)
 
     infer = SRE(
-        simulator=linear_gaussian,
+        simulator=simulator,
         prior=prior,
-        true_observation=true_observation,
+        x_o=x_o,
         classifier=classifier,
         simulation_batch_size=50,
         mcmc_method=mcmc_method,

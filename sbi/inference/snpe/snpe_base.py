@@ -26,11 +26,11 @@ class SnpeBase(NeuralInference, ABC):
         self,
         simulator: Callable,
         prior,
-        true_observation: Tensor,
+        x_o: Tensor,
         num_pilot_samples: int = 100,
         density_estimator=None,
         calibration_kernel: Optional[Callable] = None,
-        z_score_obs: bool = True,
+        z_score_x: bool = True,
         simulation_batch_size: int = 1,
         use_combined_loss: bool = False,
         retrain_from_scratch_each_round: bool = False,
@@ -43,14 +43,15 @@ class SnpeBase(NeuralInference, ABC):
         """
         See NeuralInference docstring for all other arguments.
 
-        Args:         
+        Args:
             num_pilot_samples: number of simulations that are run when
-                instantiating an object. Used to z-score the observations.   
+                instantiating an object. Used to z-score the data x.
             density_estimator: neural density estimator
-            calibration_kernel: a function to calibrate the context
-            z_score_obs: whether to z-score the data features x
+            calibration_kernel: a function to calibrate the data x
+            z_score_x: whether to z-score the data features x
             use_combined_loss: whether to jointly neural_net prior samples 
-                using maximum likelihood. Useful to prevent density leaking when using box uniform priors.
+                using maximum likelihood. Useful to prevent density leaking when using
+                box uniform priors.
             retrain_from_scratch_each_round: whether to retrain the conditional
                 density estimator for the posterior from scratch each round.
             discard_prior_samples: whether to discard prior samples from round
@@ -58,15 +59,10 @@ class SnpeBase(NeuralInference, ABC):
         """
 
         super().__init__(
-            simulator,
-            prior,
-            true_observation,
-            simulation_batch_size,
-            device,
-            summary_writer,
+            simulator, prior, x_o, simulation_batch_size, device, summary_writer,
         )
 
-        self.z_score_obs = z_score_obs
+        self._z_score_x = z_score_x
 
         self._num_pilot_samples = num_pilot_samples
         self._use_combined_loss = use_combined_loss
@@ -78,7 +74,7 @@ class SnpeBase(NeuralInference, ABC):
         self._retrain_from_scratch_each_round = retrain_from_scratch_each_round
 
         # run prior samples
-        (self.pilot_parameters, self.pilot_observations,) = simulate_in_batches(
+        (self.pilot_theta, self.pilot_x,) = simulate_in_batches(
             simulator=self._simulator,
             parameter_sample_fn=lambda num_samples: self._prior.sample((num_samples,)),
             num_samples=num_pilot_samples,
@@ -88,42 +84,40 @@ class SnpeBase(NeuralInference, ABC):
         # create the deep neural density estimator
         if density_estimator is None:
             density_estimator = utils.posterior_nn(
-                model="maf", prior=self._prior, context=self._true_observation,
+                model="maf", prior=self._prior, x_o=self._x_o,
             )
         # create the neural posterior which can sample(), log_prob()
         self._neural_posterior = Posterior(
             algorithm_family="snpe",
             neural_net=density_estimator,
             prior=prior,
-            context=self._true_observation,
+            x_o=self._x_o,
             sample_with_mcmc=sample_with_mcmc,
             mcmc_method=mcmc_method,
             get_potential_function=PotentialFunctionProvider(),
         )
 
-        # obtain z-score for observations and define embedding net
-        if self.z_score_obs:
-            self.obs_mean = torch.mean(self.pilot_observations, dim=0)
-            self.obs_std = torch.std(self.pilot_observations, dim=0)
+        # obtain z-score for data x and define embedding net
+        if self._z_score_x:
+            self.x_mean = torch.mean(self.pilot_x, dim=0)
+            self.x_std = torch.std(self.pilot_x, dim=0)
         else:
-            self.obs_mean = torch.zeros(self._true_observation.shape)
-            self.obs_std = torch.ones(self._true_observation.shape)
+            self.x_mean = torch.zeros(self._x_o.shape)
+            self.x_std = torch.ones(self._x_o.shape)
 
         # new embedding_net contains z-scoring
         if not isinstance(self._neural_posterior.neural_net, MultivariateGaussianMDN):
             embedding = nn.Sequential(
-                utils.Normalize(self.obs_mean, self.obs_std),
+                utils.Standardize(self.x_mean, self.x_std),
                 self._neural_posterior.neural_net._embedding_net,
             )
             self._neural_posterior.set_embedding_net(embedding)
-        elif z_score_obs:
-            warnings.warn("z-scoring of observation not implemented for MDNs")
+        elif z_score_x:
+            warnings.warn("z-scoring of data x not implemented for MDNs")
 
         # calibration kernels proposed in Lueckmann, Goncalves et al 2017
         if calibration_kernel is None:
-            self.calibration_kernel = lambda context_input: torch.ones(
-                [len(context_input)]
-            )
+            self.calibration_kernel = lambda x: torch.ones([len(x)])
         else:
             self.calibration_kernel = calibration_kernel
 
@@ -144,9 +138,9 @@ class SnpeBase(NeuralInference, ABC):
         stop_after_epochs: int = 20,
         clip_grad_norm: bool = True,
     ) -> Posterior:
-        """Run SNPE
+        r"""Run SNPE
 
-        Return posterior density after inference over several rounds.
+        Return posterior $p(\theta|x_o)$ after inference over several rounds.
 
         Args:
             num_rounds: Number of rounds to run
@@ -205,27 +199,27 @@ class SnpeBase(NeuralInference, ABC):
                 summary_writer=self._summary_writer,
                 summary=self._summary,
                 round_=round_,
-                true_observation=self._true_observation,
-                parameter_bank=self._parameter_bank,
-                observation_bank=self._observation_bank,
+                x_o=self._x_o,
+                theta_bank=self._theta_bank,
+                x_bank=self._x_bank,
                 simulator=self._simulator,
                 posterior_samples_acceptance_rate=self._neural_posterior.get_leakage_correction(
-                    context=self._true_observation
+                    x=self._x_o
                 ),
             )
 
         self._neural_posterior._num_trained_rounds = num_rounds
         return self._neural_posterior
 
-    def _get_log_prob_proposal_posterior(self, inputs, context, masks):
-        """
+    def _get_log_prob_proposal_posterior(self, theta: Tensor, x: Tensor, masks: Tensor):
+        r"""
         Evaluate the log-probability used for the loss. Depending on
         the algorithm, this evaluates a different term.
 
         Args:
-            inputs: torch.tensor(), parameters theta
-            context: torch.tensor(), data x
-            masks: torch.tensor(), binary, indicates whether to
+            theta: parameters $\theta$
+            x: simulation outputs $x$
+            masks: binary, indicates whether to
                 use prior samples
 
         Returns: log-probability
@@ -235,7 +229,7 @@ class SnpeBase(NeuralInference, ABC):
     def _run_simulations(
         self, round_: int, num_samples: int,
     ):
-        """
+        r"""
         Run the simulations for a given round.
 
         Args:
@@ -243,18 +237,18 @@ class SnpeBase(NeuralInference, ABC):
             num_samples: Number of simulations in current round.
 
         Returns:
-            self._parameter_bank: theta used for training
-            self._observation_bank: x used for training
+            self._theta_bank: $\theta$ used for training
+            self._x_bank: $x$ used for training
             self._prior_masks: Masks of 0/1 for each prior sample,
                 indicating whether prior sample will be used in current round
         """
-        # Generate parameters from prior in first round, and from most recent posterior
+        # Generate theta from prior in first round, and from most recent posterior
         # estimate in subsequent rounds.
         if round_ == 0:
             # New simulations are run only if pilot samples are not enough.
             num_samples_remaining = num_samples - self._num_pilot_samples
             if num_samples_remaining > 0:
-                parameters, observations = simulate_in_batches(
+                theta, x = simulate_in_batches(
                     simulator=self._simulator,
                     parameter_sample_fn=lambda num_samples: self._prior.sample(
                         (num_samples,)
@@ -262,29 +256,25 @@ class SnpeBase(NeuralInference, ABC):
                     num_samples=num_samples_remaining,
                     simulation_batch_size=self._simulation_batch_size,
                 )
-                parameters = torch.cat(
-                    (parameters, self.pilot_parameters[:num_samples]), dim=0,
-                )
-                observations = torch.cat(
-                    (observations, self.pilot_observations[:num_samples]), dim=0,
-                )
+                theta = torch.cat((theta, self.pilot_theta[:num_samples]), dim=0,)
+                x = torch.cat((x, self.pilot_x[:num_samples]), dim=0,)
             else:
-                parameters = self.pilot_parameters[:num_samples]
-                observations = self.pilot_observations[:num_samples]
+                theta = self.pilot_theta[:num_samples]
+                x = self.pilot_x[:num_samples]
 
         else:
-            parameters, observations = simulate_in_batches(
+            theta, x = simulate_in_batches(
                 simulator=self._simulator,
                 parameter_sample_fn=lambda num_samples: self._neural_posterior.sample(
-                    num_samples, context=self._true_observation,
+                    num_samples, x=self._x_o,
                 ),
                 num_samples=num_samples,
                 simulation_batch_size=self._simulation_batch_size,
             )
 
-        # Store (parameter, observation) pairs.
-        self._parameter_bank.append(parameters)
-        self._observation_bank.append(observations)
+        # Store (theta, x) pairs.
+        self._theta_bank.append(theta)
+        self._x_bank.append(x)
         # Mark simulations sampled from prior.
         self._prior_masks.append(
             torch.ones(num_samples, 1) if round_ == 0 else torch.zeros(num_samples, 1)
@@ -299,11 +289,11 @@ class SnpeBase(NeuralInference, ABC):
         stop_after_epochs,
         clip_grad_norm,
     ):
-        """Train
+        r"""Train
 
-        Trains the conditional density estimator for the posterior by maximizing the
-        proposal posterior using the most recently aggregated bank of (parameter, observation)
-        pairs.
+        Trains the conditional density estimator for the posterior $p(\theta|x)$ by
+         maximizing the proposal posterior using the most recently aggregated bank of
+         $(\theta, x)$ pairs.
         
         Uses early stopping on a held-out validation set as a terminating condition.
         """
@@ -312,9 +302,9 @@ class SnpeBase(NeuralInference, ABC):
         ix = int(self._discard_prior_samples and (round_ > 0))
 
         # Get total number of training examples.
-        num_examples = torch.cat(self._parameter_bank[ix:]).shape[0]
+        num_examples = torch.cat(self._theta_bank[ix:]).shape[0]
 
-        # Select random neural_net and validation splits from (parameter, observation) pairs.
+        # Select random neural_net and validation splits from (theta, x) pairs.
         permuted_indices = torch.randperm(num_examples)
         num_training_examples = int((1 - validation_fraction) * num_examples)
         num_validation_examples = num_examples - num_training_examples
@@ -325,8 +315,8 @@ class SnpeBase(NeuralInference, ABC):
 
         # Dataset is shared for training and validation loaders.
         dataset = data.TensorDataset(
-            torch.cat(self._parameter_bank[ix:]),
-            torch.cat(self._observation_bank[ix:]),
+            torch.cat(self._theta_bank[ix:]),
+            torch.cat(self._x_bank[ix:]),
             torch.cat(self._prior_masks[ix:]),
         )
 
@@ -368,7 +358,7 @@ class SnpeBase(NeuralInference, ABC):
             self._neural_posterior.neural_net.train()
             for batch in train_loader:
                 optimizer.zero_grad()
-                inputs, context, masks = (
+                theta_batch, x_batch, masks = (
                     batch[0].to(self._device),
                     batch[1].to(self._device),
                     batch[2].to(self._device),
@@ -377,11 +367,11 @@ class SnpeBase(NeuralInference, ABC):
                 # just do maximum likelihood in the first round
                 if round_ == 0:
                     log_prob = self._neural_posterior.neural_net.log_prob(
-                        inputs, context
+                        theta_batch, x_batch
                     )
                 else:  # or call the APT loss
                     log_prob = self._get_log_prob_proposal_posterior(
-                        inputs, context, masks
+                        theta_batch, x_batch, masks
                     )
                 loss = -torch.mean(log_prob)
                 loss.backward()
@@ -398,7 +388,7 @@ class SnpeBase(NeuralInference, ABC):
             log_prob_sum = 0
             with torch.no_grad():
                 for batch in val_loader:
-                    inputs, context, masks = (
+                    theta_batch, x_batch, masks = (
                         batch[0].to(self._device),
                         batch[1].to(self._device),
                         batch[2].to(self._device),
@@ -406,11 +396,11 @@ class SnpeBase(NeuralInference, ABC):
                     # just do maximum likelihood in the first round
                     if round_ == 0:
                         log_prob = self._neural_posterior.neural_net.log_prob(
-                            inputs, context
+                            theta_batch, x_batch
                         )
                     else:
                         log_prob = self._get_log_prob_proposal_posterior(
-                            inputs, context, masks
+                            theta_batch, x_batch, masks
                         )
                     log_prob_sum += log_prob.sum().item()
             validation_log_prob = log_prob_sum / num_validation_examples
@@ -437,21 +427,26 @@ class SnpeBase(NeuralInference, ABC):
 
 class PotentialFunctionProvider:
     """
-    This class is initialized without arguments during the initialization of the Posterior class. When called, it specializes to the potential function appropriate to the requested mcmc_method.
+    This class is initialized without arguments during the initialization of the
+     Posterior class. When called, it specializes to the potential function appropriate
+     to the requested mcmc_method.
     
    
     NOTE: Why use a class?
     ----------------------
-    During inference, we use deepcopy to save untrained posteriors in memory. deepcopy uses pickle which can't serialize nested functions (https://stackoverflow.com/a/12022055).
+    During inference, we use deepcopy to save untrained posteriors in memory. deepcopy
+     uses pickle which can't serialize nested functions
+     (https://stackoverflow.com/a/12022055).
     
-    It is important to NOT initialize attributes upon instantiation, because we need the most current trained Posterior.neural_net.
+    It is important to NOT initialize attributes upon instantiation, because we need the
+     most current trained Posterior.neural_net.
     
     Returns:
         [Callable]: potential function for use by either numpy or pyro sampler
     """
 
     def __call__(
-        self, prior, posterior_nn: nn.Module, observation: Tensor, mcmc_method: str,
+        self, prior, posterior_nn: nn.Module, x: Tensor, mcmc_method: str,
     ) -> Callable:
         """Return potential function. 
         
@@ -460,51 +455,48 @@ class PotentialFunctionProvider:
         """
         self.posterior_nn = posterior_nn
         self.prior = prior
-        self.observation = observation
+        self.x = x
 
         if mcmc_method in ("slice", "hmc", "nuts"):
             return self.pyro_potential
         else:
             return self.np_potential
 
-    def np_potential(self, parameters: np.array) -> Union[Tensor, float]:
-        """Return posterior log prob. of parameters, -inf if outside prior."
+    def np_potential(self, theta: np.ndarray) -> Union[Tensor, float]:
+        r"""Return posterior log prob. of theta $p(\theta|x)$, -inf if outside prior."
         
         Args:
-            parameters ([np.array]): parameter vector, batch dimension 1
+            theta: parameters $\theta$, batch dimension 1
         
         Returns:
-            [tensor or -inf]: posterior log probability of the parameters.
+            posterior log probability $\log(p(\theta|x))$
         """
-        parameters = torch.as_tensor(parameters, dtype=torch.float32)
+        theta = torch.as_tensor(theta, dtype=torch.float32)
 
-        is_within_prior = torch.isfinite(self.prior.log_prob(parameters))
+        is_within_prior = torch.isfinite(self.prior.log_prob(theta))
         if is_within_prior:
             target_log_prob = self.posterior_nn.log_prob(
-                inputs=parameters.reshape(1, -1),
-                context=self.observation.reshape(1, -1),
+                inputs=theta.reshape(1, -1), context=self.x.reshape(1, -1),
             )
         else:
             target_log_prob = -float("Inf")
 
         return target_log_prob
 
-    def pyro_potential(self, parameters: dict) -> Tensor:
-        """Return posterior log prob. of parameters, -inf where outside prior.
+    def pyro_potential(self, theta: dict) -> Tensor:
+        r"""Return posterior log prob. of theta $p(\theta|x)$, -inf where outside prior.
         
         Args:
-            parameters (dict): parameters (from pyro sampler)
+            theta: parameters $\theta$ (from pyro sampler)
         
         Returns:
-            Posterior log probability, masked outside of prior
+            Posterior log probability $p(\theta|x)$, masked outside of prior
         """
 
-        parameter = next(iter(parameters.values()))
+        theta = next(iter(theta.values()))
         # XXX: notice sign, check convention pyro vs. numpy
-        log_prob_posterior = -self.posterior_nn.log_prob(
-            inputs=parameter, context=self.observation,
-        )
-        log_prob_prior = self.prior.log_prob(parameter)
+        log_prob_posterior = -self.posterior_nn.log_prob(inputs=theta, context=self.x,)
+        log_prob_prior = self.prior.log_prob(theta)
 
         within_prior = torch.isfinite(log_prob_prior)
 

@@ -107,17 +107,17 @@ def test_box_uniform_distribution():
 def test_ensure_batch_dim():
     # test if batch dimension is added when parameter is ndim==1
     t1 = torch.tensor([0.0, -1.0, 1.0])
-    t2 = torchutils.ensure_parameter_batched(t1)
+    t2 = torchutils.ensure_theta_batched(t1)
     assert t2.ndim == 2
 
     # test if batch dimension is added when observation is ndim==1
     t1 = torch.tensor([0.0, -1.0, 1.0])
-    t2 = torchutils.ensure_observation_batched(t1)
+    t2 = torchutils.ensure_x_batched(t1)
     assert t2.ndim == 2
 
     # then test if batch dimension is added when observation is ndim==2, e.g. an image
     t1 = torch.tensor([[1, 2, 3], [1, 2, 3]])
-    t2 = torchutils.ensure_observation_batched(t1)
+    t2 = torchutils.ensure_x_batched(t1)
     assert t2.ndim == 3
 
 

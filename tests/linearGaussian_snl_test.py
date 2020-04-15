@@ -9,6 +9,7 @@ from sbi.simulators.linear_gaussian import (
     linear_gaussian,
 )
 import sbi.utils as utils
+from sbi.simulators.simutils import prepare_sbi_problem
 
 torch.manual_seed(0)
 
@@ -28,16 +29,16 @@ def test_snl_on_linearGaussian_api(num_dim: int):
         loc=torch.zeros(num_dim), covariance_matrix=torch.eye(num_dim)
     )
 
-    true_observation = torch.zeros(num_dim)
-
-    neural_likelihood = utils.likelihood_nn(
-        model="maf", prior=prior, context=true_observation,
+    simulator, prior, x_o = prepare_sbi_problem(
+        linear_gaussian, prior, torch.zeros(num_dim)
     )
 
+    neural_likelihood = utils.likelihood_nn(model="maf", prior=prior, x_o=x_o,)
+
     infer = SNL(
-        simulator=linear_gaussian,
+        simulator=simulator,
         prior=prior,
-        true_observation=true_observation,
+        x_o=x_o,
         density_estimator=neural_likelihood,
         simulation_batch_size=50,
         mcmc_method="slice-np",
@@ -61,7 +62,7 @@ def test_snl_on_linearGaussian_based_on_mmd(num_dim: int, prior_str: str):
         prior_str: one of "gaussian" or "uniform"
     """
 
-    true_observation = torch.zeros((1, num_dim))
+    x_o = torch.zeros((1, num_dim))
     num_samples = 200
 
     if prior_str == "gaussian":
@@ -69,22 +70,22 @@ def test_snl_on_linearGaussian_based_on_mmd(num_dim: int, prior_str: str):
             loc=torch.zeros(num_dim), covariance_matrix=torch.eye(num_dim)
         )
         target_samples = get_true_posterior_samples_linear_gaussian_mvn_prior(
-            true_observation, num_samples=num_samples
+            x_o, num_samples=num_samples
         )
     else:
         prior = utils.BoxUniform(-1.0 * torch.ones(num_dim), torch.ones(num_dim))
         target_samples = get_true_posterior_samples_linear_gaussian_uniform_prior(
-            true_observation, num_samples=num_samples, prior=prior
+            x_o, num_samples=num_samples, prior=prior
         )
 
-    neural_likelihood = utils.likelihood_nn(
-        model="maf", prior=prior, context=true_observation,
-    )
+    simulator, prior, x_o = prepare_sbi_problem(linear_gaussian, prior, x_o)
+
+    neural_likelihood = utils.likelihood_nn(model="maf", prior=prior, x_o=x_o,)
 
     infer = SNL(
-        simulator=linear_gaussian,
+        simulator=simulator,
         prior=prior,
-        true_observation=true_observation,
+        x_o=x_o,
         density_estimator=neural_likelihood,
         mcmc_method="slice-np",
     )
@@ -114,24 +115,24 @@ def test_multi_round_snl_on_linearGaussian_based_on_mmd():
     """
 
     num_dim = 3
-    true_observation = torch.zeros((1, num_dim))
+    x_o = torch.zeros((1, num_dim))
     num_samples = 200
 
     prior = distributions.MultivariateNormal(
         loc=torch.zeros(num_dim), covariance_matrix=torch.eye(num_dim)
     )
     target_samples = get_true_posterior_samples_linear_gaussian_mvn_prior(
-        true_observation, num_samples=num_samples
+        x_o, num_samples=num_samples
     )
 
-    neural_likelihood = utils.likelihood_nn(
-        model="maf", prior=prior, context=true_observation,
-    )
+    simulator, prior, x_o = prepare_sbi_problem(linear_gaussian, prior, x_o)
+
+    neural_likelihood = utils.likelihood_nn(model="maf", prior=prior, x_o=x_o,)
 
     infer = SNL(
-        simulator=linear_gaussian,
+        simulator=simulator,
         prior=prior,
-        true_observation=true_observation,
+        x_o=x_o,
         density_estimator=neural_likelihood,
         simulation_batch_size=50,
         mcmc_method="slice",
@@ -174,7 +175,7 @@ def test_snl_posterior_correction(mcmc_method: str, prior_str: str):
 
     num_dim = 2
     num_samples = 30
-    true_observation = torch.zeros((1, num_dim))
+    x_o = torch.zeros((1, num_dim))
 
     if prior_str == "gaussian":
         prior = distributions.MultivariateNormal(
@@ -183,14 +184,14 @@ def test_snl_posterior_correction(mcmc_method: str, prior_str: str):
     else:
         prior = utils.BoxUniform(-1.0 * torch.ones(num_dim), torch.ones(num_dim))
 
-    neural_likelihood = utils.likelihood_nn(
-        model="maf", prior=prior, context=true_observation,
-    )
+    simulator, prior, x_o = prepare_sbi_problem(linear_gaussian, prior, x_o)
+
+    neural_likelihood = utils.likelihood_nn(model="maf", prior=prior, x_o=x_o,)
 
     infer = SNL(
-        simulator=linear_gaussian,
+        simulator=simulator,
         prior=prior,
-        true_observation=true_observation,
+        x_o=x_o,
         density_estimator=neural_likelihood,
         simulation_batch_size=50,
         mcmc_method="slice-np",

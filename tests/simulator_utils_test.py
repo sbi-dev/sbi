@@ -8,7 +8,7 @@ from torch import Tensor
 from sbi.simulators.simutils import (
     prepare_sbi_problem,
     process_prior,
-    process_observed_data,
+    process_x_o,
     process_simulator,
     ScipyPytorchWrapper,
     CustomPytorchWrapper,
@@ -135,7 +135,7 @@ def test_process_prior(prior):
 
 
 @pytest.mark.parametrize(
-    "prior, observed_data",
+    "prior, x_o",
     (
         (BoxUniform(torch.zeros(3), torch.ones(3)), torch.ones(3)),
         (BoxUniform(torch.zeros(3), torch.ones(3)), np.ones(3)),
@@ -154,26 +154,22 @@ def test_process_prior(prior):
         (BoxUniform(torch.zeros(1), torch.ones(1)), np.zeros((1, 1))),
     ),
 )
-def test_process_observed_data(
+def test_process_x_o(
     prior: Distribution,
-    observed_data: Union[Tensor, np.ndarray],
+    x_o: Union[Tensor, np.ndarray],
     simulator: Optional[Callable] = linear_gaussian,
 ):
-    observed_data, observation_dim = process_observed_data(
-        observed_data, simulator, prior
-    )
+    x_o, x_o_dim = process_x_o(x_o, simulator, prior)
 
-    assert observed_data.shape == torch.Size([1, observation_dim])
+    assert x_o.shape == torch.Size([1, x_o_dim])
 
 
 def test_process_matrix_observation():
     prior = BoxUniform(torch.zeros(4), torch.ones(4))
-    observed_data = np.zeros((1, 2, 2))
+    x_o = np.zeros((1, 2, 2))
     simulator = matrix_simulator
 
-    observed_data, observation_dim = process_observed_data(
-        observed_data, simulator, prior
-    )
+    x_o, x_o_dim = process_x_o(x_o, simulator, prior)
 
 
 @pytest.mark.parametrize(
@@ -206,7 +202,7 @@ def test_process_simulator(simulator: Callable, prior: Distribution):
 
 
 @pytest.mark.parametrize(
-    "simulator, prior, observed_data",
+    "simulator, prior, x_o",
     (
         (
             torch_simulator_no_batch,
@@ -240,19 +236,17 @@ def test_process_simulator(simulator: Callable, prior: Distribution):
     ),
 )
 def test_prepare_sbi_problem(
-    simulator: Callable, prior, observed_data: Union[Tensor, np.ndarray]
+    simulator: Callable, prior, x_o: Union[Tensor, np.ndarray]
 ):
     """Test user interface by passing different kinds of simulators, prior and data.
 
     Args:
         simulator: simulator function
         prior: prior as defined by the user (pytorch, scipy, custom)
-        observed_data: data as defined by the user. 
+        x_o: data as defined by the user. 
     """
 
-    simulator, prior, observed_data = prepare_sbi_problem(
-        simulator, prior, observed_data
-    )
+    simulator, prior, x_o = prepare_sbi_problem(simulator, prior, x_o)
 
     # check batch sims and type
     n_batch = 2
@@ -281,18 +275,18 @@ def test_inference_with_pilot_samples_many_samples():
     """Test whether num_pilot_samples can be same as num_simulations_per_round."""
 
     num_dim = 3
-    true_observation = torch.zeros(num_dim)
+    x_o = torch.zeros(num_dim)
 
     prior = MultivariateNormal(
         loc=torch.zeros(num_dim), covariance_matrix=torch.eye(num_dim)
     )
 
+    simulator, prior, x_o = prepare_sbi_problem(linear_gaussian, prior, x_o)
+
     infer = SnpeC(
-        simulator=linear_gaussian,
-        true_observation=true_observation,
-        density_estimator=posterior_nn(
-            model="maf", prior=prior, context=true_observation,
-        ),
+        simulator=simulator,
+        x_o=x_o,
+        density_estimator=posterior_nn(model="maf", prior=prior, x_o=x_o,),
         prior=prior,
         simulation_batch_size=100,
     )

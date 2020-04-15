@@ -1,21 +1,17 @@
 from __future__ import annotations
+
 import math
-import os
-import pickle
 import warnings
-from typing import Callable, Tuple, Union, Optional
+from typing import Callable, Optional, Tuple, Union
+
 import numpy as np
-from scipy.stats._multivariate import multi_rv_frozen
-from scipy.stats._distn_infrastructure import rv_frozen
-
 import torch
-from pyknos.nflows import distributions as distributions_
-from torch.distributions import Distribution, MultivariateNormal, Uniform
+from scipy.stats._distn_infrastructure import rv_frozen
+from scipy.stats._multivariate import multi_rv_frozen
 from torch import Tensor
+from torch.distributions import Distribution, Uniform
 
-import sbi.simulators as simulators
-import sbi.utils as utils
-from sbi.utils.torchutils import BoxUniform, atleast_2d
+from sbi.utils.torchutils import atleast_2d
 
 
 def process_prior(prior) -> Tuple[Distribution, int, bool]:
@@ -23,13 +19,13 @@ def process_prior(prior) -> Tuple[Distribution, int, bool]:
 
     Args:
         prior: prior object provided by the user.
-    
+
     Raises:
         AttributeError: If prior objects lacks .sample() or .log_prob()
-    
+
     Returns:
         prior: prior that emits samples and log probabilities as PyTorch tensors.
-        parameter_dim: event shape of the prior, number of parameters.
+        theta_dim: event shape of the prior, number of parameters.
         prior_returns_numpy: whether the return type of the prior was a numpy array.
     """
 
@@ -52,13 +48,13 @@ def process_prior(prior) -> Tuple[Distribution, int, bool]:
 
 def process_custom_prior(prior) -> Tuple[Distribution, int, bool]:
     """Check and return corrected prior object defined by the user.
-    
+
     Args:
         prior: prior object with .sample and .log_prob methods.
 
-    Returns: 
-        prior: corrected prior. 
-        parameter_dim: event dimension of the prior, size of single parameter vector.
+    Returns:
+        prior: corrected prior.
+        theta_dim: event dimension of the prior, size of single parameter vector.
         is_prior_numpy: whether the prior returned numpy before wrapping.
     """
 
@@ -68,22 +64,22 @@ def process_custom_prior(prior) -> Tuple[Distribution, int, bool]:
 
     prior, is_prior_numpy = maybe_wrap_prior_to_pytorch(prior)
 
-    parameter_dim = prior.sample().numel()
+    theta_dim = prior.sample().numel()
 
-    return prior, parameter_dim, is_prior_numpy
+    return prior, theta_dim, is_prior_numpy
 
 
 def maybe_wrap_prior_to_pytorch(prior) -> Tuple[Distribution, bool]:
     """Check prior return type and maybe wrap to PyTorch.
-    
+
     Args:
         prior: prior object with .sample and .log_prob methods.
-    
+
     Raises:
         TypeError: if prior return type is PyTorch or numpy.
-    
+
     Returns:
-        prior: prior returning Tensor. 
+        prior: prior returning Tensor.
         is_prior_numpy: whether the prior returned numpy before wrapping.
     """
 
@@ -110,16 +106,16 @@ def maybe_wrap_prior_to_pytorch(prior) -> Tuple[Distribution, bool]:
 
 def process_pytorch_prior(prior: Distribution,) -> Tuple[Distribution, int, bool]:
     """Return corrected prior after checking requirements for SBI.
-    
+
     Args:
         prior: PyTorch distribution prior provided by the user.
-    
+
     Raises:
         ValueError: If prior is defined over an unwrapped scalar variable.
-    
+
     Returns:
-        prior: PyTorch distribution prior. 
-        parameter_dim: event shape of the prior, number of parameters.
+        prior: PyTorch distribution prior.
+        theta_dim: event shape of the prior, number of parameters.
         prior_returns_numpy: False.
     """
 
@@ -141,9 +137,9 @@ def process_pytorch_prior(prior: Distribution,) -> Tuple[Distribution, int, bool
 
     check_for_batch_reinterpretation_extra_d_uniform(prior)
 
-    parameter_dim = prior.sample().numel()
+    theta_dim = prior.sample().numel()
 
-    return prior, parameter_dim, False
+    return prior, theta_dim, False
 
 
 # XXX This is equally liable to happen with others, e.g. Beta...
@@ -151,7 +147,7 @@ def process_pytorch_prior(prior: Distribution,) -> Tuple[Distribution, int, bool
 def check_for_batch_reinterpretation_extra_d_uniform(prior):
     """Raise ValueError in case of inadvertent use of batched scalar Uniform as prior.
 
-    Most likely the user needs to specify a prior on a multi-dimensional parameter
+    Most likely the user needs to specify a prior on a multi-dimensional theta
     rather than several batched 1D priors at once.
     """
 
@@ -161,68 +157,68 @@ def check_for_batch_reinterpretation_extra_d_uniform(prior):
             f"""The specified Uniform prior is a prior on *several scalar parameters*
             (i.e. a batch), not a prior on a multi-dimensional parameter.
 
-            Please use utils.torchutils.BoxUniform if you'd rather put a prior on a 
+            Please use utils.torchutils.BoxUniform if you'd rather put a prior on a
             multi-dimensional parameter.
             """
         )
 
 
-def check_for_possibly_batched_observations(observed_data: Tensor):
+def check_for_possibly_batched_observations(x_o: Tensor):
     """Raise ValueError if dimensionality of data doesn't match requirements.
-    
+
     SBI does not support multiple observations yet. For 2D observed data the leading
     dimension will be interpreted as batch dimension and a ValueError is raised if the
-    batch dimension is larger than 1. 
+    batch dimension is larger than 1.
     Multidimensional observations e.g., images, are allowed when they are passed with an
-    additional leading batch dimension of size 1. 
+    additional leading batch dimension of size 1.
     """
 
     # Interpret first dimension as batch dimension.
-    inferred_batch_shape, *inferred_data_shape = observed_data.shape
+    inferred_batch_shape, *inferred_data_shape = x_o.shape
     inferred_data_dim = len(inferred_data_shape)
 
     # Reject multidimensional data with batch_shape > 1.
-    if observed_data.ndim > 1 and inferred_batch_shape > 1:
+    if x_o.ndim > 1 and inferred_batch_shape > 1:
         raise ValueError(
-            """`observed_data` has D>1 dimensions. SBI interprets the leading 
-                dimension as a batch dimension, but it *currently* only processes 
-                a single observation, a batch of several observation is not supported 
+            """observed data `x_o` has D>1 dimensions. SBI interprets the leading
+                dimension as a batch dimension, but it *currently* only processes
+                a single observation, a batch of several observation is not supported
                 yet.
 
-                NOTE: below we use list notation to reduce clutter, but observation 
-                should be of type torch.Tensor or np.ndarray. 
-                
+                NOTE: below we use list notation to reduce clutter, but observation
+                should be of type torch.Tensor or np.ndarray.
+
                 For example:
 
-                > observed_data = [[1]]
-                > observed_data = [[1, 2, 3]]
+                > x_o = [[1]]
+                > x_o = [[1, 2, 3]]
 
                 are interpreted as single observation with a leading batch dimension of
                 one. However
-                
-                > observed_data = [ [1], [2] ]
-                > observed_data = [ [1,2,3], [4,5,6] ]   
 
-                are interpreted as a batch of two scalar or vector observations, which 
-                is not supported yet. The following is interpreted as a matrix-shaped 
+                > x_o = [ [1], [2] ]
+                > x_o = [ [1,2,3], [4,5,6] ]
+
+                are interpreted as a batch of two scalar or vector observations, which
+                is not supported yet. The following is interpreted as a matrix-shaped
                 observation, i.e a monochromatic image:
-                
-                > observed_data = [ [[1,2,3], [4,5,6]] ]
-                
+
+                > x_o = [ [[1,2,3], [4,5,6]] ]
+
                 Finally, for convenience,
-                
-                > observed_data = [1]
-                > observed_data = [1, 2, 3]
-                
-                will be interpreted as a single scalar or single vector observation 
-                respectively, without the user needing to wrap or unsqueeze them. 
+
+                > x_o = [1]
+                > x_o = [1, 2, 3]
+
+                will be interpreted as a single scalar or single vector observation
+                respectively, without the user needing to wrap or unsqueeze them.
                 """
         )
     # Warn on multidimensional data with batch_size one.
     elif inferred_data_dim > 1 and inferred_batch_shape == 1:
         warnings.warn(
-            f"""Beware: The `observed_data` you passed was interpreted to have 
-            matrix shape: {inferred_data_shape}. The current implementation of SBI 
+            f"""Beware: The observed data (x_o) you passed was interpreted to have
+            matrix shape: {inferred_data_shape}. The current implementation of SBI
             might not provide stable support for this and result in shape mismatches.
             """
         )
@@ -231,10 +227,10 @@ def check_for_possibly_batched_observations(observed_data: Tensor):
 
 
 def check_prior_methods(prior):
-    """Check whether the prior has methods .sample and .log_prob. 
-    
-    Raises: 
-        AttributeError: if either of the two methods doen't exist. 
+    """Check whether the prior has methods .sample and .log_prob.
+
+    Raises:
+        AttributeError: if either of the two methods doesn't exist.
     """
 
     # Sample a batch of two parameters to check batch behaviour > 1.
@@ -248,14 +244,14 @@ def check_prior_methods(prior):
         )
     except TypeError:
         raise TypeError(
-            f"""The prior.sample() method must accept Tuple arguments, e.g., 
+            f"""The prior.sample() method must accept Tuple arguments, e.g.,
             prior.sample(({num_samples}, )) to sample a batch of 2 parameters. Consider
             using a PyTorch distribution."""
         )
-    except:
+    except:  # Catch any other error.
         raise ValueError(
-            f"""Something went wrong when sampling a batch of parameters 
-            from the prior as prior.sample(({num_samples}, )). Consider using a PyTorch 
+            f"""Something went wrong when sampling a batch of parameters
+            from the prior as prior.sample(({num_samples}, )). Consider using a PyTorch
             distribution."""
         )
     try:
@@ -264,7 +260,7 @@ def check_prior_methods(prior):
         raise AttributeError(
             "Prior needs method .log_prob(). Consider using a PyTorch distribution."
         )
-    except:
+    except:  # Catch any other error.
         raise ValueError(
             """Something went wrong when evaluating a batch of parameters theta
             with prior.log_prob(theta). Consider using a PyTorch distribution."""
@@ -281,7 +277,7 @@ def check_prior_batch_behavior(prior):
 
     assert (
         len(theta.shape) >= 2
-    ), f"""A parameter batch sampled from the prior must be at least 2D, 
+    ), f"""A parameter batch sampled from the prior must be at least 2D,
     (num_samples, parameter_dim), but is {len(theta.shape)}"""
 
     num_sampled, parameter_dim = theta.shape
@@ -300,7 +296,7 @@ def check_prior_batch_behavior(prior):
 class CustomPytorchWrapper(Distribution):
     """Wrap custom prior object to PyTorch distribution object.
 
-    Note that the prior must have .sample and .log_prob methods and numpy return type. 
+    Note that the prior must have .sample and .log_prob methods and numpy return type.
     """
 
     def __init__(
@@ -361,9 +357,9 @@ class ScipyPytorchWrapper(Distribution):
 def process_simulator(
     user_simulator: Callable, prior, is_numpy_simulator: bool
 ) -> Callable:
-    """Return a simulator that meets the requirements for usage in SBI. 
+    """Return a simulator that meets the requirements for usage in SBI.
 
-    Wraps the simulator to return only torch.Tensor and handle batches of parameters. 
+    Wraps the simulator to return only torch.Tensor and handle batches of parameters.
     """
 
     assert isinstance(user_simulator, Callable), "Simulator must be a function."
@@ -402,9 +398,9 @@ def wrap_as_pytorch_simulator(
 
 
 def wrap_as_batch_simulator(simulator: Callable, prior) -> Callable:
-    """Return a batch simulator. 
-    
-    A batch simulator can handle a batch of parameters and return the 
+    """Return a batch simulator.
+
+    A batch simulator can handle a batch of parameters and return the
     corresponding batch of simulated data.
     """
 
@@ -415,19 +411,19 @@ def wrap_as_batch_simulator(simulator: Callable, prior) -> Callable:
 
         assert simulator_batch_size == batch_size
     except:
+        is_batched_simulator = False
         warnings.warn(
             """Simulator can't handle batches of parameters. It will loop over batches
-            in Python with `map`. Consider vectorising the simulator natively for 
+            in Python with `map`. Consider vectorising the simulator natively for
             performance."""
         )
         # make sure the simulator does not return batch dim.
         single_simulation = simulator(prior.sample())
         assert (
             not single_simulation.shape[0] == 1
-        ), f"""The simulator can't handle batches and returns a singleton batch 
+        ), f"""The simulator can't handle batches and returns a singleton batch
             dimension: {single_simulation.shape}. A simulator that can't handle batches
             of parameters must not return a batch dim."""
-        is_batched_simulator = False
 
     return simulator if is_batched_simulator else get_batched_simulator(simulator)
 
@@ -448,25 +444,25 @@ def get_batched_simulator(simulator: Callable) -> Callable:
     return batched_simulator
 
 
-def process_observed_data(
-    observed_data: Union[Tensor, np.ndarray], simulator: Callable, prior
+def process_x_o(
+    x_o: Union[Tensor, np.ndarray], simulator: Callable, prior
 ) -> Tuple[Tensor, int]:
-    """Check observed data and adapt it to sbi's shape and type requirements.
-    
+    """Return observed data to sbi's shape and type requirements.
+
     Args:
-        observed_data: observed data as provided by the user.
+        x_o: observed data as provided by the user.
         simulator: simulator function as provided by the user.
         prior: prior object with .sample() and .log_prob() methods.
-    
+
     Returns:
-        observed data: observed data with shape corrected for usage in SBI.
-        observation_dim: number of elements in a single data point.
+        x_o: observed data with shape corrected for usage in SBI.
+        x_o_dim: number of elements in a single data point.
     """
 
     # maybe add batch dimension, cast to tensor
-    observed_data = atleast_2d(observed_data)
+    x_o = atleast_2d(x_o)
 
-    check_for_possibly_batched_observations(observed_data)
+    check_for_possibly_batched_observations(x_o)
 
     # Get unbatched simulated data by sampling from prior and simulator.
     # cast to tensor for comparison
@@ -475,92 +471,92 @@ def process_observed_data(
     ).squeeze(0)
 
     # Get data shape by ommitting the batch dimension.
-    observed_data_shape = observed_data.shape[1:]
+    x_o_shape = x_o.shape[1:]
 
-    assert observed_data_shape == simulated_data.shape, (
-        f"Observed data shape ({observed_data_shape}) must match "
+    assert x_o_shape == simulated_data.shape, (
+        f"Observed data shape ({x_o_shape}) must match "
         f"simulator output shape ({simulated_data.shape})."
     )
 
-    observation_dim = observed_data[0, :].numel()
+    x_o_dim = x_o[0, :].numel()
 
-    return observed_data, observation_dim
+    return x_o, x_o_dim
 
 
 def prepare_sbi_problem(
-    user_simulator: Callable, user_prior, user_observed_data: Union[Tensor, np.ndarray]
+    user_simulator: Callable, user_prior, user_x_o: Union[Tensor, np.ndarray]
 ) -> Tuple[Callable, Callable, Tensor]:
-    """Prepare simulator, prior and observed data for usage in sbi. 
+    """Prepare simulator, prior and observed data for usage in sbi.
 
     Attempts to meet the following requirements by reshaping and type casting to PyTorch
-    Tensor: 
+    Tensor:
 
-    - the simulator function receives as input and returns a Tensor. 
-    - the simulator can simulate batches of parameters and return batches of data. 
-    - the prior does not produce batches and samples and evaluates to Tensor. 
-    - the observed data is a Tensor and has a leading batch dimension of one. 
+    - the simulator function receives as input and returns a Tensor.
+    - the simulator can simulate batches of parameters and return batches of data.
+    - the prior does not produce batches and samples and evaluates to Tensor.
+    - the observed data is a Tensor and has a leading batch dimension of one.
 
     If this is not possible, a suitable exception will be raised.
 
-    Args: 
+    Args:
         user_simulator: simulator as provided by the user.
-        user_prior: prior as provided by the user user_observed_data: observed data as  
+        user_prior: prior as provided by the user user_x_o: observed data as
             provided by the user
 
-    Returns: 
-        simulator: simulator adapted for sbi. 
+    Returns:
+        simulator: simulator adapted for sbi.
         prior: adapted prior.
-        observed_data: adapted observed data.
+        x_o: adapted observed data.
     """
 
     # Check prior, return PyTorch prior.
     prior, _, prior_returns_numpy = process_prior(user_prior)
 
     # Check data, returns data with leading batch dimension.
-    observed_data, observation_dim = process_observed_data(
-        user_observed_data, user_simulator, user_prior
-    )
+    x_o, _ = process_x_o(user_x_o, user_simulator, user_prior)
 
     # Check simulator, returns PyTorch simulator able to simulate batches.
     simulator = process_simulator(user_simulator, prior, prior_returns_numpy)
 
     # Consistency check after making ready for SBI.
-    check_sbi_problem(simulator, prior, observed_data)
+    check_sbi_problem(simulator, prior, x_o)
 
-    return simulator, prior, observed_data
+    return simulator, prior, x_o
 
 
-def check_sbi_problem(simulator: Callable, prior, observation: Tensor):
-    """Assert requirements for simulator, prior and observation for usage in sbi. 
-    
+def check_sbi_problem(simulator: Callable, prior, x_o: Tensor):
+    """Assert requirements for simulator, prior and observation for usage in sbi.
+
     Args:
         simulator: simulator function
         prior: prior (Distribution like)
-        observation: observed data
+        x_o: observed data
     """
     num_prior_samples = 2
     theta = prior.sample((num_prior_samples,))
     theta_batch_shape, *_ = theta.shape
     simulation = simulator(theta)
     sim_batch_shape, *sim_event_shape = simulation.shape
-    _, *obs_event_shape = observation.shape
+    _, *obs_event_shape = x_o.shape
 
     assert isinstance(theta, Tensor), "Parameters theta must be a Tensor."
     assert isinstance(simulation, Tensor), "Simulator output must be a Tensor."
-    assert isinstance(observation, Tensor), "Observation must be a Tensor."
+    assert isinstance(x_o, Tensor), "Observation must be a Tensor."
 
     assert (
         theta_batch_shape == num_prior_samples
-    ), f"Theta batch shape {theta_batch_shape} must match num_samples={num_prior_samples}."
+    ), f"""Theta batch shape {theta_batch_shape} must match
+        num_samples={num_prior_samples}."""
     assert (
         sim_batch_shape == num_prior_samples
-    ), f"Simulation batch shape {sim_batch_shape} must match num_samples={num_prior_samples}."
+    ), f"""Simulation batch shape {sim_batch_shape} must match
+        num_samples={num_prior_samples}."""
     assert (
         obs_event_shape == sim_event_shape
-    ), f"""The shape of a single observation is {obs_event_shape} and it does not match
-        that of a single simulation {sim_event_shape}. For a batch size of {num_prior_samples}
-        the simulator returns {simulation.shape} (should be ({num_prior_samples}, 
-        {obs_event_shape})."""
+    ), f"""The shape of a single x_o is {obs_event_shape} and it does not match
+        that of a single simulation {sim_event_shape}. For a batch size of
+        {num_prior_samples} the simulator returns {simulation.shape}
+        (should be ({num_prior_samples}, {obs_event_shape})."""
 
 
 def simulate_in_batches(
@@ -570,11 +566,11 @@ def simulate_in_batches(
     simulation_batch_size: int,
 ) -> (Tensor, Tensor):
     """
-    Return parameters and simulated data for `num_samples` parameter sets. 
-    
+    Return parameters and simulated data for `num_samples` parameter sets.
+
     Simulate them in batches of size `simulation_batch_size`.
 
-    Features: 
+    Features:
         Allows to simulate in batches of arbitrary size.
         If `simulation_batch_size==-1`, all simulations are run at the same time.
 
@@ -583,11 +579,12 @@ def simulate_in_batches(
         parameter_sample_fn: Function to call for generating theta, e.g. prior sampling
         num_samples: Number of simulations to run
         simulation_batch_size: Number of simulations that are run within a single batch
-            If `simulation_batch_size == -1`, we run a batch with all simulations required,
-            i.e. `simulation_batch_size = num_samples`
+            If `simulation_batch_size == -1`, we run a batch with all simulations
+            required, i.e. `simulation_batch_size = num_samples`
 
-    Returns: Tensor simulation input parameters of shape (num_samples, num_dim_parameters),
-             Tensor simulator outputs x of shape (num_samples, num_dim_x)
+    Returns:
+        Tensor simulation input parameters of shape (num_samples, num_dim_parameters),
+        Tensor simulator outputs x of shape (num_samples, num_dim_x)
     """
 
     assert num_samples > 0, "Number of samples to simulate must be larger than zero."

@@ -1,23 +1,22 @@
+from typing import Union
+
 import torch
-from torch.distributions import Independent, MultivariateNormal
+from torch import Tensor
+from torch.distributions import Independent, MultivariateNormal, Uniform
 
-import sbi.utils as utils
 
+def linear_gaussian(theta: Tensor, std=1.0) -> Tensor:
 
-def linear_gaussian(parameters: torch.Tensor, std=1.0) -> torch.Tensor:
+    if theta.ndim == 1:
+        theta = theta.unsqueeze(0)
 
-    if parameters.ndim == 1:
-        parameters = parameters[None, :]
-
-    return parameters + std * torch.randn_like(parameters)
+    return theta + std * torch.randn_like(theta)
 
 
 def get_true_posterior_samples_linear_gaussian_mvn_prior(
-    observation: torch.Tensor, num_samples: int = 1000, std: float = 1.0
+    x_o: Tensor, num_samples: int = 1000, std: float = 1.0
 ):
-    observation = utils.torchutils.atleast_2d(observation)
-    assert observation.ndim == 2, "needs batch dimension in observation"
-    mean = observation
+    mean = x_o
     dim = mean.shape[1]
     std = torch.sqrt(torch.tensor([std ** 2 / (std ** 2 + 1)]))
     c = torch.tensor([1.0 / (std ** 2 + 1.0)])
@@ -25,16 +24,14 @@ def get_true_posterior_samples_linear_gaussian_mvn_prior(
 
 
 def get_true_posterior_log_prob_linear_gaussian_n_prior(
-    observation: torch.Tensor, std: float = 1.0
+    x_o: Tensor, std: float = 1.0
 ) -> torch.distributions.Distribution:
     """
     Returns the ground truth density when using just a single dimension.
 
     Returns: univariate Gaussian posterior distribution
     """
-    observation = utils.torchutils.atleast_2d(observation)
-    assert observation.ndim == 2, "needs batch dimension in observation"
-    mean = observation
+    mean = x_o
     dim = mean.shape[1]
     std = torch.sqrt(torch.tensor([std ** 2 / (std ** 2 + 1)]))
     c = torch.tensor([1.0 / (std ** 2 + 1.0)])
@@ -43,16 +40,14 @@ def get_true_posterior_log_prob_linear_gaussian_n_prior(
 
 
 def get_true_posterior_log_prob_linear_gaussian_mvn_prior(
-    observation: torch.Tensor, std: float = 1.0
+    x_o: Tensor, std: float = 1.0
 ) -> torch.distributions.Distribution:
     """
     Returns the ground truth density when using more than one dimension.
 
     Returns: multivariate Gaussian posterior distribution
     """
-    observation = utils.torchutils.atleast_2d(observation)
-    assert observation.ndim == 2, "needs batch dimension in observation"
-    mean = observation
+    mean = x_o
     dim = mean.shape[1]
     std = torch.sqrt(torch.tensor([std ** 2 / (std ** 2 + 1)]))
     c = torch.tensor([1.0 / (std ** 2 + 1.0)])
@@ -61,11 +56,9 @@ def get_true_posterior_log_prob_linear_gaussian_mvn_prior(
 
 
 def get_true_posterior_samples_linear_gaussian_uniform_prior(
-    observation: torch.Tensor, prior: Independent, num_samples: int = 1000, std=1,
+    x_o: Tensor, prior: Union[Uniform, Independent], num_samples: int = 1000, std=1,
 ):
-    observation = utils.torchutils.atleast_2d(observation)
-    assert observation.ndim == 2, "needs batch dimension in observation"
-    mean = observation
+    mean = x_o
     event_shape = mean.shape[1]
     posterior = MultivariateNormal(
         loc=mean, covariance_matrix=std * torch.eye(event_shape)
@@ -80,9 +73,7 @@ def get_true_posterior_samples_linear_gaussian_uniform_prior(
         is_in_prior = torch.isfinite(prior.log_prob(candidate_samples))
         # accept if in prior
         if is_in_prior.sum():
-            samples.append(
-                candidate_samples[is_in_prior,]
-            )
+            samples.append(candidate_samples[is_in_prior, :])
             num_remaining -= is_in_prior.sum().item()
 
     return torch.cat(samples)
