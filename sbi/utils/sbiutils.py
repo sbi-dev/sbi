@@ -7,11 +7,14 @@ import torch.nn as nn
 import sbi.utils as utils
 
 
-# XXX standardize? zscore?
-# XXX want to insert it in Sequential
-class Normalize(nn.Module):
+class Standardize(nn.Module):
+    """
+    Standardize inputs, i.e. subtract mean and divide by standard deviation. Inherits
+     from nn.Module so we can use it in nn.Sequential
+    """
+
     def __init__(self, mean, std):
-        super(Normalize, self).__init__()
+        super(Standardize, self).__init__()
         self.mean = mean
         self.std = std
 
@@ -20,112 +23,113 @@ class Normalize(nn.Module):
         return (tensor - self.mean) / self.std
 
 
-def match_shapes_of_inputs_and_contexts(
-    inputs: Union[Sequence[float], float],
-    context: Union[Sequence[float], float],
-    true_context: torch.Tensor,
+def match_shapes_of_theta_and_x(
+    theta: Union[Sequence[float], float],
+    x: Union[Sequence[float], float],
+    x_o: torch.Tensor,
     correct_for_leakage: bool,
 ) -> (torch.Tensor, torch.Tensor):
-    """
-    Formats inputs and contexts into shapes that can be processed by neural density
-     estimators.
+    r"""
+    Formats parameters theta and simulation outputs x into shapes that can be processed
+     by neural density estimators for the posterior $p(\theta|x)$.
 
-    Neural density estimators require the first dimension of inputs and contexts to
-     match, `inputs.shape == (N, dim_inputs)` and `context.shape == (N, dim_context)`,
+    Neural density estimators require the first dimension of theta and x to
+     match, `theta.shape == (N, dim_theta)` and `x.shape == (N, dim_x)`,
      with N being the number of data points where we evaluate the density estimator.
-     In this function, we match the shape of context to the shape of inputs.
-    Assume that x is the context, x_o is the true_context, theta are inputs/parameters.
-    If context has shape (dim_x) or (1, dim_x), we build
-     `context = torch.tensor([x, x,..., x])` such that we can later evaluate
-     p(theta_n|x) for every parameter set theta_n in inputs
-    If context is None, we build `context = torch.tensor([x_o, x_o,..., x_o])` such that
-     we can later evaluate p(theta_n|x_o) for every parameter set theta_n in inputs
-    If context has shape or (N, dim_x) and inputs has shape (N, dim_theta), we leave
-     context unaltered as `context = torch.tensor([x_1, x_2,..., x_N])` such that we can
-     later evaluate p(theta_n|x_n) for every parameter set theta_n in inputs with
+     In this function, we match the shape of x to the shape of theta.
+    If x has shape (dim_x) or (1, dim_x), we build
+     `x = torch.tensor([x, x,..., x])` such that we can later evaluate
+     $p(\theta_n|x)$ for every parameter set $\theta_n$ in theta
+    If x is None, we build `x = torch.tensor([x_o, x_o,..., x_o])` such that
+     we can later evaluate $p(\theta_n|x_o)$ for every parameter set $\theta_n$ in theta
+    If x has shape or (N, dim_x) and theta has shape (N, dim_theta), we leave
+     x unaltered as `x = torch.tensor([x_1, x_2,..., x_N])` such that we can
+     later evaluate $p(\theta_n|x_n)$ for every parameter set $\theta_n$ in theta with
      n={1,...,N}
 
     Args:
-        inputs: input variables / parameters / thetas
-        context: conditioning variables / contexts / x. If None, the context is ignored.
-        true_context: if context=None, replace it with true_context
+        theta: parameters $\theta$
+        x: conditioning variables $x$. If None, x is ignored.
+        x_o: if x=None, replace it with x_o
         correct_for_leakage:
             If True, we normalize the output density
             by drawing samples, estimating the acceptance
             ratio, and then scaling the probability with it
 
     Returns:
-        inputs, context with same batch dimension
+        theta, x with same batch dimension
     """
 
-    # cast inputs to tensor if they are not already
-    inputs = torch.as_tensor(inputs)
+    # cast theta to tensor if they are not already
+    theta = torch.as_tensor(theta)
 
-    # add batch dimension to `inputs` if needed. `inputs` how has shape
-    # (1, num_dim_inputs) or (N, num_dim_inputs), but not (num_dim_inputs)
-    inputs = utils.torchutils.ensure_parameter_batched(inputs)
+    # add batch dimension to `theta` if needed. `theta` how has shape
+    # (1, shape_of_single_theta) or (N, shape_of_single_theta), but not
+    # (shape_of_single_theta)
+    theta = utils.torchutils.ensure_theta_batched(theta)
 
-    # use "default context" if None is provided
-    if context is None:
-        context = true_context
-    # cast context to tensor if they are not already
-    context = torch.as_tensor(context)
+    # use x_o if x=None is provided
+    if x is None:
+        x = x_o
+    # cast x to tensor if they are not already
+    x = torch.as_tensor(x)
 
-    # add batch dimension to `context` if needed. `context` how has shape
-    # (1, num_dim_context) or (N, num_dim_context), but not (num_dim_context)
-    # todo: this will break if we have a multi-dimensional context, e.g. images
-    if len(context.shape) == 1:
-        context = context.unsqueeze(0)
+    # add batch dimension to `x` if needed. `x` how has shape
+    # (1, shape_of_single_x) or (N, shape_of_single_x), but not (shape_of_single_x)
+    # todo: this will break if we have a multi-dimensional x, e.g. images
+    if len(x.shape) == 1:
+        x = x.unsqueeze(0)
 
     # if multiple observations, with snpe avoid expensive leakage
     # correction by rejection sampling
-    if context.shape[0] > 1 and correct_for_leakage:
+    if x.shape[0] > 1 and correct_for_leakage:
         raise ValueError(
-            "Only a single context allowed for log-prob when normalizing the density."
-            "Please use a for-loop over your inputs and contexts."
+            "Only a single conditioning variable x allowed for log-prob when "
+            "normalizing the density. Please use a for-loop over your theta and x."
         )
 
-    if context.shape[0] != inputs.shape[0]:
-        # multiple parameters, single observation:
-        # repeat the context to match the parameters
-        context = context.repeat(inputs.shape[0], 1)
+    if x.shape[0] != theta.shape[0]:
+        # multiple parameter sets theta, single observation x:
+        # repeat the x to match the parameters theta
+        x = x.repeat(theta.shape[0], 1)
 
-    if inputs.shape[0] != context.shape[0]:
+    if theta.shape[0] != x.shape[0]:
         # catch all remaining errors after shape-mangling above
         # THIS SHOULD NEVER HAPPEN
-        raise ValueError(
-            "Number of input items must be equal to number of context items."
-        )
+        raise ValueError("Number of theta items must be equal to number of x items.")
 
-    return inputs, context
+    return theta, x
 
 
 def sample_posterior_within_prior(
     posterior_nn: torch.nn.Module,
     prior: torch.distributions.Distribution,
-    context: torch.Tensor,
+    x: torch.Tensor,
     num_samples: int = 1,
     patience: int = 5,
 ) -> Tuple[torch.Tensor, float]:
-    """Return samples from a posterior within the support of the prior via rejection sampling. 
+    r"""Return samples from a posterior $p(\theta|x)$ within the support of the prior
+     via rejection sampling.
     
-    This is relevant for snpe methods and flows for which the posterior tends to have mass outside the prior boundaries. 
+    This is relevant for snpe methods and flows for which the posterior tends to have
+     mass outside the prior boundaries.
     
     This function uses rejection sampling with samples from posterior, to do two things: 
         1) obtain posterior samples within the prior support. 
-        2) calculate the fraction of accepted samples as a proxy for correcting the density during evaluation of the posterior. 
+        2) calculate the fraction of accepted samples as a proxy for correcting the
+         density during evaluation of the posterior.
     
-    Arguments:
-        posterior_nn {torch.nn.Module} -- neural net representing the posterior
-        prior {torch.distributions.Distribution} -- torch distribution prior
-        context {torch.Tensor} -- context for the posterior, i.e., the observed data to condition on. 
-    
-    Keyword Arguments:
-        num_samples {int} -- number of sample to generate (default: {1})
-        patience {int} -- upper time bound in minutes, in case sampling takes too long due to strong leakage (default: {5})
+    Args:
+        posterior_nn: neural net representing the posterior
+        prior: torch distribution prior
+        x: conditioning variable $x$ for the posterior $p(\theta|x)$
+        num_samples: number of sample to generate
+        patience: upper time bound in minutes, in case sampling takes too long
+         due to strong leakage
     
     Returns:
-        Tuple[torch.Tensor, float] -- Accepted samples, and estimated acceptance probability
+        Accepted samples, and estimated acceptance
+         probability
     """
 
     assert (
@@ -140,7 +144,7 @@ def sample_posterior_within_prior(
 
     while num_remaining > 0 and not time_over:
 
-        sample = posterior_nn.sample(num_remaining, context=context)
+        sample = posterior_nn.sample(num_remaining, context=x)
         num_sampled_total += num_remaining
 
         is_within_prior = torch.isfinite(prior.log_prob(sample))

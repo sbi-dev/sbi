@@ -25,7 +25,7 @@ class SNL(NeuralInference):
         self,
         simulator: Callable,
         prior,
-        true_observation: Tensor,
+        x_o: Tensor,
         density_estimator: Optional[nn.Module],
         simulation_batch_size: int = 1,
         summary_writer: SummaryWriter = None,
@@ -34,25 +34,22 @@ class SNL(NeuralInference):
     ):
         r"""Sequential Neural Likelihood
         
-        Implementation of
-        _Sequential Neural Likelihood: Fast Likelihood-free Inference with Autoregressive Flows_ by Papamakarios et al., AISTATS 2019, https://arxiv.org/abs/1805.07226
+        Implementation of Sequential Neural Likelihood: Fast Likelihood-free Inference
+         with Autoregressive Flows_ by Papamakarios et al., AISTATS 2019,
+         https://arxiv.org/abs/1805.07226
 
         Args:
-            density_estimator: Conditional density estimator $q(x|\theta)$, a nn.Module with `log_prob` and `sample` methods
+            density_estimator: Conditional density estimator $q(x|\theta)$, a nn.Module
+             with `.log_prob()` and `.sample()`
         """
 
         super().__init__(
-            simulator,
-            prior,
-            true_observation,
-            simulation_batch_size,
-            device,
-            summary_writer,
+            simulator, prior, x_o, simulation_batch_size, device, summary_writer,
         )
 
         if density_estimator is None:
             density_estimator = utils.likelihood_nn(
-                model="maf", prior=self._prior, context=self._true_observation,
+                model="maf", prior=self._prior, x_o=self._x_o,
             )
 
         # create neural posterior which can sample()
@@ -60,7 +57,7 @@ class SNL(NeuralInference):
             algorithm_family="snl",
             neural_net=density_estimator,
             prior=prior,
-            context=true_observation,
+            x_o=x_o,
             mcmc_method=mcmc_method,
             get_potential_function=PotentialFunctionProvider(),
         )
@@ -80,7 +77,7 @@ class SNL(NeuralInference):
         validation_fraction: float = 0.1,
         stop_after_epochs: int = 20,
     ) -> Posterior:
-        """Run SNL
+        r"""Run SNL
 
         This runs SNL for num_rounds rounds, using num_simulations_per_round calls to
         the simulator
@@ -95,7 +92,7 @@ class SNL(NeuralInference):
                 validation set before terminating training.
 
         Returns:
-            Posterior that can be sampled and evaluated
+            Posterior $p(\theta|x_o)$ that can be sampled and evaluated
         """
         round_description = ""
         tbar = tqdm(range(num_rounds))
@@ -103,10 +100,10 @@ class SNL(NeuralInference):
 
             tbar.set_description(round_description)
 
-            # Generate parameters from prior in first round, and from most recent posterior
-            # estimate in subsequent rounds.
+            # Generate parameters theta from prior in first round, and from most recent
+            # posterior estimate in subsequent rounds.
             if round_ == 0:
-                parameters, observations = simulators.simulate_in_batches(
+                theta, x = simulators.simulate_in_batches(
                     simulator=self._simulator,
                     parameter_sample_fn=lambda num_samples: self._prior.sample(
                         (num_samples,)
@@ -115,7 +112,7 @@ class SNL(NeuralInference):
                     simulation_batch_size=self._simulation_batch_size,
                 )
             else:
-                parameters, observations = simulators.simulate_in_batches(
+                theta, x = simulators.simulate_in_batches(
                     simulator=self._simulator,
                     parameter_sample_fn=lambda num_samples: self._neural_posterior.sample(
                         num_samples
@@ -124,9 +121,9 @@ class SNL(NeuralInference):
                     simulation_batch_size=self._simulation_batch_size,
                 )
 
-            # Store (parameter, observation) pairs.
-            self._parameter_bank.append(torch.as_tensor(parameters))
-            self._observation_bank.append(torch.as_tensor(observations))
+            # Store (theta, x) pairs.
+            self._theta_bank.append(torch.as_tensor(theta))
+            self._x_bank.append(torch.as_tensor(x))
 
             # Fit neural likelihood to newly aggregated dataset.
             self._train(
@@ -150,9 +147,9 @@ class SNL(NeuralInference):
                 summary_writer=self._summary_writer,
                 summary=self._summary,
                 round_=round_,
-                true_observation=self._true_observation,
-                parameter_bank=self._parameter_bank,
-                observation_bank=self._observation_bank,
+                x_o=self._x_o,
+                theta_bank=self._theta_bank,
+                x_bank=self._x_bank,
                 simulator=self._simulator,
             )
 
@@ -160,16 +157,16 @@ class SNL(NeuralInference):
         return self._neural_posterior
 
     def _train(self, batch_size, learning_rate, validation_fraction, stop_after_epochs):
-        """
-        Trains the conditional density estimator for the likelihood by maximum likelihood
-        on the most recently aggregated bank of (parameter, observation) pairs.
-        Uses early stopping on a held-out validation set as a terminating condition.
+        r"""
+        Trains the conditional density estimator for the likelihood by maximum
+         likelihood on the most recently aggregated bank of $(\theta, x)$ pairs.
+         Uses early stopping on a held-out validation set as a terminating condition.
         """
 
         # Get total number of training examples.
-        num_examples = torch.cat(self._parameter_bank).shape[0]
+        num_examples = torch.cat(self._theta_bank).shape[0]
 
-        # Select random train and validation splits from (parameter, observation) pairs.
+        # Select random train and validation splits from (theta, x) pairs.
         permuted_indices = torch.randperm(num_examples)
         num_training_examples = int((1 - validation_fraction) * num_examples)
         num_validation_examples = num_examples - num_training_examples
@@ -180,7 +177,7 @@ class SNL(NeuralInference):
 
         # Dataset is shared for training and validation loaders.
         dataset = data.TensorDataset(
-            torch.cat(self._observation_bank), torch.cat(self._parameter_bank)
+            torch.cat(self._x_bank), torch.cat(self._theta_bank)
         )
 
         # Create neural_net and validation loaders using a subset sampler.
@@ -215,9 +212,12 @@ class SNL(NeuralInference):
             self._neural_posterior.neural_net.train()
             for batch in train_loader:
                 optimizer.zero_grad()
-                inputs, context = batch[0].to(self._device), batch[1].to(self._device)
+                theta_batch, x_batch = (
+                    batch[0].to(self._device),
+                    batch[1].to(self._device),
+                )
                 log_prob = self._neural_posterior.neural_net.log_prob(
-                    inputs, context=context
+                    theta_batch, context=x_batch
                 )
                 loss = -torch.mean(log_prob)
                 loss.backward()
@@ -233,12 +233,12 @@ class SNL(NeuralInference):
             log_prob_sum = 0
             with torch.no_grad():
                 for batch in val_loader:
-                    inputs, context = (
+                    theta_batch, x_batch = (
                         batch[0].to(self._device),
                         batch[1].to(self._device),
                     )
                     log_prob = self._neural_posterior.neural_net.log_prob(
-                        inputs, context=context
+                        theta_batch, context=x_batch
                     )
                     log_prob_sum += log_prob.sum().item()
             validation_log_prob = log_prob_sum / num_validation_examples
@@ -269,30 +269,35 @@ class SNL(NeuralInference):
 
 class PotentialFunctionProvider:
     """
-    This class is initialized without arguments during the initialization of the Posterior class. When called, it specializes to the potential function appropriate to the requested mcmc_method.
+    This class is initialized without arguments during the initialization of the
+     Posterior class. When called, it specializes to the potential function appropriate
+     to the requested mcmc_method.
     
    
     NOTE: Why use a class?
     ----------------------
-    During inference, we use deepcopy to save untrained posteriors in memory. deepcopy uses pickle which can't serialize nested functions (https://stackoverflow.com/a/12022055).
+    During inference, we use deepcopy to save untrained posteriors in memory. deepcopy
+    uses pickle which can't serialize nested functions
+    (https://stackoverflow.com/a/12022055).
     
-    It is important to NOT initialize attributes upon instantiation, because we need the most current trained Posterior.neural_net.
+    It is important to NOT initialize attributes upon instantiation, because we need the
+    most current trained Posterior.neural_net.
     
     Returns:
         [Callable]: potential function for use by either numpy or pyro sampler
     """
 
     def __call__(
-        self, prior, likelihood_nn: nn.Module, observation: Tensor, mcmc_method: str,
+        self, prior, likelihood_nn: nn.Module, x: Tensor, mcmc_method: str,
     ) -> Callable:
-        """Return potential function. 
+        r"""Return potential function for posterior $p(\theta|x)$.
         
         Switch on numpy or pyro potential function based on mcmc_method.
         
         Args:
             prior: prior distribution that can be evaluated
             likelihood_nn: neural likelihood estimator that can be evaluated
-            observation: actually observed conditioning context, x_o
+            x: conditioning variable for posterior $p(\theta|x)$.
             mcmc_method (str): one of slice-np, slice, hmc or nuts
         
         Returns:
@@ -304,44 +309,46 @@ class PotentialFunctionProvider:
         """
         self.likelihood_nn = likelihood_nn
         self.prior = prior
-        self.observation = observation
+        self.x = x
 
         if mcmc_method in ("slice", "hmc", "nuts"):
             return self.pyro_potential
         else:
             return self.np_potential
 
-    def np_potential(self, parameters: np.array) -> Union[Tensor, float]:
-        """Return posterior log prob. of parameters."
+    def np_potential(self, theta: np.array) -> Union[Tensor, float]:
+        r"""Return posterior log prob. of theta $p(\theta|x)$"
         
         Args:
-            parameters: parameter vector, batch dimension 1
+            theta: parameters $\theta$, batch dimension 1
         
         Returns:
-            Posterior log probability of the parameters, -Inf if impossible under prior.
+            Posterior log probability of the theta, -Inf if impossible under prior.
         """
-        parameters = torch.as_tensor(parameters, dtype=torch.float32)
+        theta = torch.as_tensor(theta, dtype=torch.float32)
         log_likelihood = self.likelihood_nn.log_prob(
-            inputs=self.observation.reshape(1, -1), context=parameters.reshape(1, -1)
+            inputs=self.x.reshape(1, -1), context=theta.reshape(1, -1)
         )
 
         # notice opposite sign to pyro potential
-        return log_likelihood + self.prior.log_prob(parameters)
+        return log_likelihood + self.prior.log_prob(theta)
 
-    def pyro_potential(self, parameters: Dict[str, Tensor]) -> Tensor:
-        """Return posterior log prob. of parameters.
+    def pyro_potential(self, theta: Dict[str, Tensor]) -> Tensor:
+        r"""Return posterior log prob. of parameters $p(\theta|x)$.
         
          Args:
-            parameters: {name: tensor, ...} dictionary (from pyro sampler). The tensor's shape will be (1, x) if running a single chain or just (x) for multiple chains.
+            theta: parameters $\theta$. The tensor's shape will be
+            (1, shape_of_single_theta) if running a single chain or just
+             (shape_of_single_theta) for multiple  chains.
         
         Returns:
-            potential: -[log r(x0, theta) + log p(theta)]
+            potential: $-[\log r(x_o, \theta) + \log p(\theta)]$
         """
 
-        parameter = next(iter(parameters.values()))
+        theta = next(iter(theta.values()))
 
         log_likelihood = self.likelihood_nn.log_prob(
-            inputs=self.observation.reshape(1, -1), context=parameter.reshape(1, -1)
+            inputs=self.x.reshape(1, -1), context=theta.reshape(1, -1)
         )
 
-        return -(log_likelihood + self.prior.log_prob(parameter))
+        return -(log_likelihood + self.prior.log_prob(theta))

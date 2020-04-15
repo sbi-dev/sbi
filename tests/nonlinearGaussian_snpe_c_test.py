@@ -1,4 +1,3 @@
-
 import pytest
 import torch
 
@@ -9,6 +8,7 @@ from sbi.simulators.nonlinear_gaussian import (
     non_linear_gaussian,
 )
 from sbi.utils.torchutils import BoxUniform
+from sbi.simulators.simutils import prepare_sbi_problem
 
 # use cpu by default
 torch.set_default_tensor_type("torch.FloatTensor")
@@ -17,12 +17,11 @@ torch.manual_seed(0)
 
 @pytest.mark.slow
 def test_nonlinearGaussian_based_on_mmd():
-    simulator = non_linear_gaussian
 
     # Ground truth parameters as specified in 'Sequential Neural Likelihood' paper.
-    ground_truth_parameters = torch.tensor([-0.7, -2.9, -1.0, -0.9, 0.6])
+    theta_o = torch.tensor([-0.7, -2.9, -1.0, -0.9, 0.6])
     # ground truth observation using same seed as 'Sequential Neural Likelihood' paper.
-    ground_truth_observation = torch.tensor(
+    x_o = torch.tensor(
         [
             -0.97071232,
             -2.94612244,
@@ -36,26 +35,28 @@ def test_nonlinearGaussian_based_on_mmd():
     )
 
     # assume batch dims
-    parameter_dim = ground_truth_parameters.shape[0]
-    observation_dim = ground_truth_observation.shape[0]
+    theta_dim = theta_o.shape[0]
+    x_o_dim = x_o.shape[0]
 
-    prior = BoxUniform(
-        low=-3 * torch.ones(parameter_dim), high=3 * torch.ones(parameter_dim),
-    )
+    prior = BoxUniform(low=-3 * torch.ones(theta_dim), high=3 * torch.ones(theta_dim),)
+
+    simulator, prior, x_o = prepare_sbi_problem(non_linear_gaussian, prior, x_o)
 
     infer = SnpeC(
         simulator=simulator,
-        true_observation=ground_truth_observation[None,],
+        x_o=x_o,
         prior=prior,
         num_atoms=-1,
-        z_score_obs=True,
+        z_score_x=True,
         use_combined_loss=False,
         retrain_from_scratch_each_round=False,
         discard_prior_samples=False,
     )
 
     num_rounds, num_simulations_per_round = 2, 1000
-    posterior = infer(num_rounds=num_rounds, num_simulations_per_round=num_simulations_per_round)
+    posterior = infer(
+        num_rounds=num_rounds, num_simulations_per_round=num_simulations_per_round
+    )
 
     samples = posterior.sample(1000)
 

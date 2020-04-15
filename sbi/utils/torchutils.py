@@ -190,9 +190,15 @@ class BoxUniform(Independent):
     ):
         """Multidimensional uniform distribution defined on a box.
         
-        A `Uniform` distribution initialized with e.g. a parameter vector low or high of length 3 will result in a /batch/ dimension of length 3. A log_prob evaluation will then output three numbers, one for each of the independent Uniforms in the batch. Instead, a `BoxUniform` initialized in the same way has three /event/ dimensions, and returns a scalar log_prob corresponding to whether the evaluated point is in the box defined by low and high or outside. 
+        A `Uniform` distribution initialized with e.g. a parameter vector low or high of
+         length 3 will result in a /batch/ dimension of length 3. A log_prob evaluation
+         will then output three numbers, one for each of the independent Uniforms in
+         the batch. Instead, a `BoxUniform` initialized in the same way has three
+         /event/ dimensions, and returns a scalar log_prob corresponding to whether
+         the evaluated point is in the box defined by low and high or outside.
     
-        Refer to torch.distributions.Uniform and torch.distributions.Independent for further documentation.
+        Refer to torch.distributions.Uniform and torch.distributions.Independent for
+         further documentation.
     
         Args:
             low: lower range (inclusive).
@@ -204,33 +210,39 @@ class BoxUniform(Independent):
         super().__init__(Uniform(low=low, high=high), reinterpreted_batch_ndims)
 
 
-def ensure_parameter_batched(parameter: Tensor) -> Tensor:
+def ensure_theta_batched(theta: Tensor) -> Tensor:
     """
-    Return tensors that both have the same tensor.ndim
-    Function also covers cases where parameters is ndim=1 and observation ndim=2
-    Also, we have specialized check for multi-dimensional data x, e.g. images.
-    """
+    Return theta that has a batch dimension, i.e. has shape (1, shape_of_single_theta)
 
-    # => ensure parameters have shape (1, dim_parameter)
-    if parameter.ndim == 1:
-        parameter = parameter.unsqueeze(0)
-
-    return parameter
-
-
-def ensure_observation_batched(observation: Tensor) -> Tensor:
-    """
-    Return tensors that both have the same tensor.ndim
-    Function also covers cases where parameters is ndim=1 and observation ndim=2
-    Also, we have specialized check for multi-dimensional data x, e.g. images.
+     Args:
+         theta: parameter set of n parameters of shape (n) or (1,n)
+     Returns:
+         Batched parameter set theta
     """
 
-    # => ensure observation has shape (1, dim_observation). If shape[0] > 1, we assume that the batch-dimension
-    # is missing, even though ndim might be >1 (e.g. for images)
-    if observation.shape[0] > 1 or observation.ndim == 1:
-        observation = observation.unsqueeze(0)
+    # => ensure theta has shape (1, dim_parameter)
+    if theta.ndim == 1:
+        theta = theta.unsqueeze(0)
 
-    return observation
+    return theta
+
+
+def ensure_x_batched(x: Tensor) -> Tensor:
+    """
+    Return x that has a batch dimension, i.e. has shape (1, shape_of_single_x)
+
+    Args:
+         x: simulation output of shape (n) or (1,n)
+     Returns:
+         Batched simulation output x
+    """
+
+    # ensure x has shape (1, shape_of_single_x). If shape[0] > 1, we assume that
+    # the batch-dimension is missing, even though ndim might be >1 (e.g. for images)
+    if x.shape[0] > 1 or x.ndim == 1:
+        x = x.unsqueeze(0)
+
+    return x
 
 
 def atleast_2d(*arys: Union[np.array, Tensor]) -> Union[Tensor, List[Tensor]]:

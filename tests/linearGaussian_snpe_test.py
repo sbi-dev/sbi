@@ -11,6 +11,7 @@ from sbi.simulators.linear_gaussian import (
 )
 import sbi.utils as utils
 import tests.utils_for_testing.linearGaussian_logprob as test_utils
+from sbi.simulators.simutils import prepare_sbi_problem
 
 torch.manual_seed(0)
 
@@ -31,7 +32,7 @@ def test_apt_on_linearGaussian_based_on_mmd(
 ):
     """Test whether APT infers well a simple example where ground truth is available."""
 
-    true_observation = torch.zeros(num_dim)
+    x_o = torch.zeros(1, num_dim)
     num_samples = 100
 
     if prior_str == "gaussian":
@@ -39,22 +40,24 @@ def test_apt_on_linearGaussian_based_on_mmd(
             loc=torch.zeros(num_dim), covariance_matrix=torch.eye(num_dim)
         )
         target_samples = get_true_posterior_samples_linear_gaussian_mvn_prior(
-            true_observation, num_samples=num_samples
+            x_o, num_samples=num_samples
         )
     else:
         prior = utils.BoxUniform(-1.0 * torch.ones(num_dim), torch.ones(num_dim))
         target_samples = get_true_posterior_samples_linear_gaussian_uniform_prior(
-            true_observation, num_samples=num_samples, prior=prior
+            x_o, num_samples=num_samples, prior=prior
         )
 
-    neural_net = utils.posterior_nn(model="maf", prior=prior, context=true_observation)
+    simulator, prior, x_o = prepare_sbi_problem(linear_gaussian, prior, x_o)
+
+    neural_net = utils.posterior_nn(model="maf", prior=prior, x_o=x_o)
 
     snpe_common_args = dict(
-        simulator=linear_gaussian,
-        true_observation=true_observation,
+        simulator=simulator,
+        x_o=x_o,
         density_estimator=neural_net,
         prior=prior,
-        z_score_obs=True,
+        z_score_x=True,
         simulation_batch_size=simulation_batch_size,
         use_combined_loss=False,
         retrain_from_scratch_each_round=False,
@@ -88,7 +91,7 @@ def test_apt_on_linearGaussian_based_on_mmd(
     # Checks for log_prob()
     if prior_str == "gaussian":
         # For the Gaussian prior, we compute the KLd between ground truth and posterior.
-        dkl = test_utils.get_dkl_gaussian_prior(posterior, true_observation, num_dim)
+        dkl = test_utils.get_dkl_gaussian_prior(posterior, x_o, num_dim)
 
         max_dkl = 0.05 if num_dim == 1 else 0.8
 
@@ -110,9 +113,7 @@ def test_apt_on_linearGaussian_based_on_mmd(
             posterior_likelihood_unnorm,
             posterior_likelihood_norm,
             acceptance_prob,
-        ) = test_utils.get_normalization_uniform_prior(
-            posterior, prior, true_observation
-        )
+        ) = test_utils.get_normalization_uniform_prior(posterior, prior, x_o)
         # The acceptance probability should be *exactly* the ratio of the unnormalized
         # and the normalized likelihood. However, we allow for an error margin of 1%,
         # since the estimation of the acceptance probability is random (based on
@@ -140,14 +141,18 @@ def test_multi_round_snpe_on_linearGaussian_based_on_mmd(algorithm_str: str):
         true_observation, num_samples=num_samples
     )
 
-    neural_net = utils.posterior_nn(model="maf", prior=prior, context=true_observation,)
+    simulator, prior, x_o = prepare_sbi_problem(
+        linear_gaussian, prior, true_observation
+    )
+
+    neural_net = utils.posterior_nn(model="maf", prior=prior, x_o=true_observation,)
 
     snpe_common_args = dict(
-        simulator=linear_gaussian,
-        true_observation=true_observation,
+        simulator=simulator,
+        x_o=true_observation,
         density_estimator=neural_net,
         prior=prior,
-        z_score_obs=True,
+        z_score_x=True,
         use_combined_loss=False,
         retrain_from_scratch_each_round=False,
         discard_prior_samples=False,
@@ -198,7 +203,8 @@ def test_multi_round_snpe_on_linearGaussian_based_on_mmd(algorithm_str: str):
     ),
 )
 def test_apt_posterior_correction(sample_with_mcmc, mcmc_method, prior):
-    """Test that leakage correction applied to sampling works, with both MCMC and rejection."""
+    """Test that leakage correction applied to sampling works, with both MCMC and 
+    rejection."""
 
     num_dim = 2
 
@@ -211,17 +217,19 @@ def test_apt_posterior_correction(sample_with_mcmc, mcmc_method, prior):
             low=-1.0 * torch.ones(num_dim), high=torch.ones(num_dim)
         )
 
-    true_observation = torch.zeros((1, num_dim))
+    simulator, prior, x_o = prepare_sbi_problem(
+        linear_gaussian, prior, torch.zeros(num_dim)
+    )
 
-    neural_net = utils.posterior_nn(model="maf", prior=prior, context=true_observation,)
+    neural_net = utils.posterior_nn(model="maf", prior=prior, x_o=x_o,)
 
     infer = SnpeC(
-        simulator=linear_gaussian,
-        true_observation=true_observation,
+        simulator=simulator,
+        x_o=x_o,
         density_estimator=neural_net,
         prior=prior,
         num_atoms=-1,
-        z_score_obs=True,
+        z_score_x=True,
         simulation_batch_size=50,
         use_combined_loss=False,
         retrain_from_scratch_each_round=False,

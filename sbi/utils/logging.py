@@ -8,9 +8,9 @@ def summarize(
     summary_writer,
     summary,
     round_,
-    true_observation,
-    parameter_bank,
-    observation_bank,
+    x_o,
+    theta_bank,
+    x_bank,
     simulator,
     posterior_samples_acceptance_rate=None,
 ):
@@ -19,8 +19,8 @@ def summarize(
         (
             _,
             prior,
-            ground_truth_parameters,
-            ground_truth_observation,
+            ground_truth_theta,
+            ground_truth_x_o,
         ) = simulators.get_simulator_prior_and_groundtruth(simulator.name)
     # Update summaries.
     except:
@@ -28,7 +28,7 @@ def summarize(
 
     try:
         mmd = utils.unbiased_mmd_squared(
-            parameter_bank[-1],
+            theta_bank[-1],
             simulator.get_ground_truth_posterior_samples(num_samples=1000),
         )
         summary["mmds"].append(mmd.item())
@@ -38,12 +38,7 @@ def summarize(
     try:
         # Median |x - x0| for most recent round.
         median_observation_distance = torch.median(
-            torch.sqrt(
-                torch.sum(
-                    (observation_bank[-1] - true_observation.reshape(1, -1)) ** 2,
-                    dim=-1,
-                )
-            )
+            torch.sqrt(torch.sum((x_bank[-1] - x_o.reshape(1, -1)) ** 2, dim=-1,))
         )
         summary["median_observation_distances"].append(
             median_observation_distance.item()
@@ -63,7 +58,7 @@ def summarize(
         # parameters from most recent round.
 
         negative_log_prob_true_parameters = -utils.gaussian_kde_log_eval(
-            samples=parameter_bank[-1], query=ground_truth_parameters.reshape(1, -1),
+            samples=theta_bank[-1], query=ground_truth_theta.reshape(1, -1),
         )
         summary["negative_log_probs_true_parameters"].append(
             negative_log_prob_true_parameters.item()
@@ -93,10 +88,10 @@ def summarize(
 
     try:
         # Plot most recently sampled parameters.
-        parameters = utils.tensor2numpy(parameter_bank[-1])
+        parameters = utils.tensor2numpy(theta_bank[-1])
         figure = utils.plot_hist_marginals(
             data=parameters,
-            ground_truth=utils.tensor2numpy(ground_truth_parameters).reshape(-1),
+            ground_truth=utils.tensor2numpy(ground_truth_theta).reshape(-1),
             lims=simulator.parameter_plotting_limits,
         )
         summary_writer.add_figure(
