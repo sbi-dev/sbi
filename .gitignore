@@ -6,6 +6,9 @@
 # log files 
 *sbi-logs/
 
+# SHA version
+sbi/_version.py
+
 # Notebook checkpoints
 .ipynb_checkpoints
 
