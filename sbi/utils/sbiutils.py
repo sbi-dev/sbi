@@ -1,9 +1,10 @@
 import time
 import warnings
-from typing import Tuple, Sequence, Union
+from typing import Sequence, Tuple, Union
 
 import torch
 import torch.nn as nn
+
 import sbi.utils as utils
 
 
@@ -110,15 +111,15 @@ def sample_posterior_within_prior(
 ) -> Tuple[torch.Tensor, float]:
     r"""Return samples from a posterior $p(\theta|x)$ within the support of the prior
      via rejection sampling.
-    
+
     This is relevant for snpe methods and flows for which the posterior tends to have
      mass outside the prior boundaries.
-    
-    This function uses rejection sampling with samples from posterior, to do two things: 
-        1) obtain posterior samples within the prior support. 
+
+    This function uses rejection sampling with samples from posterior, to do two things:
+        1) obtain posterior samples within the prior support.
         2) calculate the fraction of accepted samples as a proxy for correcting the
          density during evaluation of the posterior.
-    
+
     Args:
         posterior_nn: neural net representing the posterior
         prior: torch distribution prior
@@ -126,7 +127,7 @@ def sample_posterior_within_prior(
         num_samples: number of sample to generate
         patience: upper time bound in minutes, in case sampling takes too long
          due to strong leakage
-    
+
     Returns:
         Accepted samples, and estimated acceptance
          probability
@@ -165,7 +166,9 @@ def sample_posterior_within_prior(
 
     if num_remaining > 0:
         warnings.warn(
-            f"Beware: Rejection sampling resulted in only {samples.shape[0]} samples within patience of {patience} min. Consider having more patience, leakage is {1-acceptance_prob}"
+            f"""Beware: Rejection sampling resulted in only {samples.shape[0]} samples
+            within patience of {patience} min. Consider having more patience, leakage
+            is {1-acceptance_prob}."""
         )
 
     return samples, acceptance_prob
