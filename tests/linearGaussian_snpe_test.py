@@ -2,6 +2,8 @@ import pytest
 import torch
 from torch import distributions
 
+import sbi.utils as utils
+import tests.utils_for_testing.linearGaussian_logprob as test_utils
 from sbi.inference.snpe.snpe_b import SnpeB
 from sbi.inference.snpe.snpe_c import SnpeC
 from sbi.simulators.linear_gaussian import (
@@ -9,11 +11,8 @@ from sbi.simulators.linear_gaussian import (
     get_true_posterior_samples_linear_gaussian_uniform_prior,
     linear_gaussian,
 )
-import sbi.utils as utils
-import tests.utils_for_testing.linearGaussian_logprob as test_utils
 from sbi.simulators.simutils import prepare_sbi_problem
 
-torch.manual_seed(0)
 
 # Running all combinations is excessive. The standard test is (3, "gaussian", "snpe_c"),
 # and we then vary only one parameter at a time to test single-D, uniform, and snpe-b.
@@ -203,7 +202,7 @@ def test_multi_round_snpe_on_linearGaussian_based_on_mmd(algorithm_str: str):
     ),
 )
 def test_apt_posterior_correction(sample_with_mcmc, mcmc_method, prior):
-    """Test that leakage correction applied to sampling works, with both MCMC and 
+    """Test that leakage correction applied to sampling works, with both MCMC and
     rejection."""
 
     num_dim = 2

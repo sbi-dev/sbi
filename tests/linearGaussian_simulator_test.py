@@ -6,8 +6,8 @@ from sbi.simulators.linear_gaussian import linear_gaussian
 
 @pytest.mark.parametrize("D, N", ((1, 10000), (5, 100000)))
 def test_linearGaussian_simulator(D: int, N: int):
-    """Test linear Gaussian simulator. 
-    
+    """Test linear Gaussian simulator.
+
     Args:
         D: parameter dimension
         N: number of samples

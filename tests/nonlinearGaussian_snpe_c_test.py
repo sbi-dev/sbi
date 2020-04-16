@@ -7,12 +7,11 @@ from sbi.simulators.nonlinear_gaussian import (
     get_ground_truth_posterior_samples_nonlinear_gaussian,
     non_linear_gaussian,
 )
-from sbi.utils.torchutils import BoxUniform
 from sbi.simulators.simutils import prepare_sbi_problem
+from sbi.utils.torchutils import BoxUniform
 
 # use cpu by default
 torch.set_default_tensor_type("torch.FloatTensor")
-torch.manual_seed(0)
 
 
 @pytest.mark.slow
@@ -20,6 +19,7 @@ def test_nonlinearGaussian_based_on_mmd():
 
     # Ground truth parameters as specified in 'Sequential Neural Likelihood' paper.
     theta_o = torch.tensor([-0.7, -2.9, -1.0, -0.9, 0.6])
+    theta_dim = theta_o.numel()
     # ground truth observation using same seed as 'Sequential Neural Likelihood' paper.
     x_o = torch.tensor(
         [
@@ -33,10 +33,6 @@ def test_nonlinearGaussian_based_on_mmd():
             -2.42716377,
         ]
     )
-
-    # assume batch dims
-    theta_dim = theta_o.shape[0]
-    x_o_dim = x_o.shape[0]
 
     prior = BoxUniform(low=-3 * torch.ones(theta_dim), high=3 * torch.ones(theta_dim),)
 

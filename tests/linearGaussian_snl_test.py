@@ -2,23 +2,22 @@ import pytest
 import torch
 from torch import distributions
 
+import sbi.utils as utils
 from sbi.inference.snl.snl import SNL
 from sbi.simulators.linear_gaussian import (
     get_true_posterior_samples_linear_gaussian_mvn_prior,
     get_true_posterior_samples_linear_gaussian_uniform_prior,
     linear_gaussian,
 )
-import sbi.utils as utils
 from sbi.simulators.simutils import prepare_sbi_problem
-
-torch.manual_seed(0)
 
 
 @pytest.mark.parametrize("num_dim", (1, 3))
 def test_snl_on_linearGaussian_api(num_dim: int):
     """Test API for inference on linear Gaussian model using SNL.
-    
-    Avoids expensive computations by training on few simulations and generating few posterior samples.
+
+    Avoids expensive computations by training on few simulations and generating few
+    posterior samples.
 
     Args:
         num_dim: parameter dimension of the gaussian model
@@ -55,8 +54,9 @@ def test_snl_on_linearGaussian_api(num_dim: int):
 def test_snl_on_linearGaussian_based_on_mmd(num_dim: int, prior_str: str):
     """Test SNL on linear Gaussian, comparing to ground truth posterior via MMD.
 
-    NOTE: The MMD threshold is calculated based on a number of test runs and taking the mean plus 2 stds. 
-    
+    NOTE: The MMD threshold is calculated based on a number of test runs and taking the
+    mean plus 2 stds.
+
     Args:
         num_dim: parameter dimension of the gaussian model
         prior_str: one of "gaussian" or "uniform"
@@ -110,7 +110,8 @@ def test_snl_on_linearGaussian_based_on_mmd(num_dim: int, prior_str: str):
 def test_multi_round_snl_on_linearGaussian_based_on_mmd():
     """Test SNL on linear Gaussian, comparing to ground truth posterior via MMD.
 
-    NOTE: The MMD threshold is calculated based on a number of test runs and taking the mean plus 2 stds. 
+    NOTE: The MMD threshold is calculated based on a number of test runs and taking the
+    mean plus 2 stds.
 
     """
 
@@ -166,7 +167,8 @@ def test_multi_round_snl_on_linearGaussian_based_on_mmd():
 def test_snl_posterior_correction(mcmc_method: str, prior_str: str):
     """Test SNL on linear Gaussian, comparing to ground truth posterior via MMD.
 
-    NOTE: The mmd threshold is calculated based on a number of test runs and taking the mean plus 2 stds.
+    NOTE: The mmd threshold is calculated based on a number of test runs and taking the
+    mean plus 2 stds.
 
     Args:
         mcmc_method: which mcmc method to use for sampling

@@ -2,25 +2,23 @@ import pytest
 import torch
 from torch import distributions
 
+import sbi.utils as utils
+import tests.utils_for_testing.linearGaussian_logprob as test_utils
 from sbi.inference.sre.sre import SRE
 from sbi.simulators.linear_gaussian import (
     get_true_posterior_samples_linear_gaussian_mvn_prior,
     get_true_posterior_samples_linear_gaussian_uniform_prior,
     linear_gaussian,
 )
-import sbi.utils as utils
-import tests.utils_for_testing.linearGaussian_logprob as test_utils
 from sbi.simulators.simutils import prepare_sbi_problem
-
-torch.manual_seed(0)
 
 
 @pytest.mark.parametrize("num_dim", (1, 3))
 def test_sre_on_linearGaussian_api(num_dim: int):
-    """Test inference API of SRE with linear Gaussian model. 
+    """Test inference API of SRE with linear Gaussian model.
 
-    Avoids intense computation for fast testing of API etc. 
-    
+    Avoids intense computation for fast testing of API etc.
+
     Args:
         num_dim: parameter dimension of the Gaussian model
     """
@@ -47,7 +45,7 @@ def test_sre_on_linearGaussian_api(num_dim: int):
 
     posterior = infer(num_rounds=1, num_simulations_per_round=1000)
 
-    samples = posterior.sample(num_samples=10, num_chains=2)
+    _ = posterior.sample(num_samples=10, num_chains=2)
 
     # XXX log_prob is not implemented yet for SRE
     # posterior.log_prob(samples)
@@ -66,16 +64,17 @@ def test_sre_on_linearGaussian_api(num_dim: int):
 def test_sre_on_linearGaussian_based_on_mmd(
     num_dim: int, prior_str: str, classifier_loss: str
 ):
-    """Test MMD accuracy of inference with SRE on linear Gaussian model. 
+    """Test MMD accuracy of inference with SRE on linear Gaussian model.
 
-    NOTE: The mmd threshold is calculated based on a number of test runs and taking the mean plus 2 stds. 
-    
+    NOTE: The mmd threshold is calculated based on a number of test runs and taking the
+    mean plus 2 stds.
+
     Args:
         num_dim: parameter dimension of the gaussian model
         prior_str: one of "gaussian" or "uniform"
     """
 
-    x_o = torch.zeros(num_dim)
+    x_o = torch.zeros(1, num_dim)
     num_samples = 300
 
     if prior_str == "gaussian":
@@ -83,12 +82,12 @@ def test_sre_on_linearGaussian_based_on_mmd(
             loc=torch.zeros(num_dim), covariance_matrix=torch.eye(num_dim)
         )
         target_samples = get_true_posterior_samples_linear_gaussian_mvn_prior(
-            x_o[None,], num_samples=num_samples
+            x_o, num_samples=num_samples
         )
     else:
         prior = utils.BoxUniform(-1.0 * torch.ones(num_dim), torch.ones(num_dim))
         target_samples = get_true_posterior_samples_linear_gaussian_uniform_prior(
-            x_o[None,], num_samples=num_samples, prior=prior
+            x_o, num_samples=num_samples, prior=prior
         )
 
     classifier = utils.classifier_nn("resnet", prior=prior, x_o=x_o,)
@@ -169,7 +168,7 @@ def test_sre_posterior_correction(mcmc_method: str, prior_str: str):
         prior = utils.BoxUniform(
             low=-1.0 * torch.ones(num_dim), high=torch.ones(num_dim)
         )
-    
+
     simulator, prior, x_o = prepare_sbi_problem(linear_gaussian, prior, x_o)
 
     classifier = utils.classifier_nn("resnet", prior=prior, x_o=x_o,)
@@ -185,7 +184,7 @@ def test_sre_posterior_correction(mcmc_method: str, prior_str: str):
 
     posterior = infer(num_rounds=1, num_simulations_per_round=1000)
 
-    samples = posterior.sample(num_samples=50)
+    _ = posterior.sample(num_samples=50)
 
     # TODO No log prob for SRE yet - see #73.
     # posterior.log_prob(samples)
