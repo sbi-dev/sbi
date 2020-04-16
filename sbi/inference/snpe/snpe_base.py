@@ -355,11 +355,10 @@ class SnpeBase(NeuralInference, ABC):
         # Keep track of model with best validation performance.
         best_model_state_dict = None
 
-        # If we're retraining from scratch each round, reset the neural posterior
-        # to the untrained copy we made at the start.
+        # If retraining from scratch each round, reset the neural posterior
+        # to the untrained copy.
         if self._retrain_from_scratch_each_round and round_ > 0:
             self._neural_posterior = deepcopy(self._untrained_neural_posterior)
-            # self._neural_posterior = deepcopy(self._model_bank[0])
 
         epochs = 0
         converged = False
