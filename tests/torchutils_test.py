@@ -8,6 +8,7 @@ import torchtestcase
 from sbi.utils import torchutils
 from tests.utils_for_testing.dkl import dkl_via_monte_carlo
 
+
 # XXX move to pytest? - investigate how to derive from TorchTestCase
 class TorchUtilsTest(torchtestcase.TorchTestCase):
     def test_split_leading_dim(self):

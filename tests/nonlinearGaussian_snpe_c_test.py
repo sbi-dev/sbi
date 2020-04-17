@@ -15,7 +15,14 @@ torch.set_default_tensor_type("torch.FloatTensor")
 
 
 @pytest.mark.slow
-def test_nonlinearGaussian_based_on_mmd():
+def test_nonlinearGaussian_based_on_mmd(set_seed):
+    """Run inference with snpe-c and test against average mmd.
+
+    This test is seeded using the set_seed fixture defined in tests/conftest.py.
+
+    Args:
+        set_seed: fixture for manual seeding, see tests/conftest.py
+    """
 
     # Ground truth parameters as specified in 'Sequential Neural Likelihood' paper.
     theta_o = torch.tensor([-0.7, -2.9, -1.0, -0.9, 0.6])
