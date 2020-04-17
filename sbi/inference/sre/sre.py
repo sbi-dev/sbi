@@ -332,7 +332,7 @@ class SRE(NeuralInference):
             with torch.no_grad():
                 for theta_batch, x_batch in val_loader:
                     log_prob = _get_loss(theta_batch, x_batch)
-                    log_prob_sum += log_prob.sum().item()
+                    log_prob_sum -= log_prob.sum().item()
                 validation_log_prob = log_prob_sum / num_validation_examples
 
             # check for improvement
