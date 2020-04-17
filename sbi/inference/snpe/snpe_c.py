@@ -123,8 +123,8 @@ class SnpeC(SnpeBase):
         )
 
         # Evaluate large batch giving (batch_size * num_atoms) log prob posterior evals.
-        log_prob_posterior = self._neural_posterior.log_prob(
-            atomic_theta, repeated_x, normalize_snpe_density=False
+        log_prob_posterior = self._neural_posterior.neural_net.log_prob(
+            atomic_theta, repeated_x
         )
         assert torch.isfinite(
             log_prob_posterior
@@ -152,8 +152,8 @@ class SnpeC(SnpeBase):
         # todo: this implementation is not perfect: it evaluates the posterior
         # todo: at all prior samples
         if self._use_combined_loss:
-            log_prob_posterior_non_atomic = self._neural_posterior.log_prob(
-                theta, x, normalize_snpe_density=False
+            log_prob_posterior_non_atomic = self._neural_posterior.neural_net.log_prob(
+                theta, x
             )
             masks = masks.reshape(-1)
             log_prob_proposal_posterior = (

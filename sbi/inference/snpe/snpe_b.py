@@ -83,9 +83,7 @@ class SnpeB(SnpeBase):
         batch_size = theta.shape[0]
 
         # Evaluate posterior
-        log_prob_posterior = self._neural_posterior.log_prob(
-            theta, x, normalize_snpe_density=False
-        )
+        log_prob_posterior = self._neural_posterior.neural_net.log_prob(theta, x)
         assert torch.isfinite(
             log_prob_posterior
         ).all(), "NaN/inf detected in posterior eval."
@@ -97,9 +95,7 @@ class SnpeB(SnpeBase):
         assert torch.isfinite(log_prob_prior).all(), "NaN/inf detected in prior eval."
 
         # evaluate proposal
-        log_prob_proposal = self._model_bank[-1].log_prob(
-            theta, x, normalize_snpe_density=False
-        )
+        log_prob_proposal = self._model_bank[-1].neural_net.log_prob(theta, x)
         assert torch.isfinite(
             log_prob_proposal
         ).all(), "NaN/inf detected in proposal posterior eval."
@@ -114,8 +110,8 @@ class SnpeB(SnpeBase):
         # todo: this implementation is not perfect: it evaluates the posterior
         # todo:     at all prior samples
         if self._use_combined_loss:
-            log_prob_posterior_non_atomic = self._neural_posterior.log_prob(
-                theta, x, normalize_snpe_density=False
+            log_prob_posterior_non_atomic = self._neural_posterior.neural_net.log_prob(
+                theta, x
             )
             masks = masks.reshape(-1)
             log_prob = masks * log_prob_posterior_non_atomic + log_prob

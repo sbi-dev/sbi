@@ -81,7 +81,9 @@ class SnpeA(SnpeBase):
 
         """
 
-        log_prob_posterior_non_atomic = self._neural_posterior.log_prob(theta, x)
+        log_prob_posterior_non_atomic = self._neural_posterior.neural_net.log_prob(
+            theta, x
+        )
 
         batch_size = theta.shape[0]
 
@@ -111,7 +113,9 @@ class SnpeA(SnpeBase):
         )
 
         # Evaluate large batch giving (batch_size * num_atoms) log prob posterior evals.
-        log_prob_posterior = self._neural_posterior.log_prob(atomic_theta, repeated_x)
+        log_prob_posterior = self._neural_posterior.neural_net.log_prob(
+            atomic_theta, repeated_x
+        )
         assert torch.isfinite(
             log_prob_posterior
         ).all(), "NaN/inf detected in posterior eval."
