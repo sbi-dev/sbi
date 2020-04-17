@@ -4,6 +4,7 @@ from typing import Sequence, Tuple, Union
 
 import torch
 import torch.nn as nn
+from torch import Tensor
 
 import sbi.utils as utils
 
@@ -27,9 +28,9 @@ class Standardize(nn.Module):
 def match_shapes_of_theta_and_x(
     theta: Union[Sequence[float], float],
     x: Union[Sequence[float], float],
-    x_o: torch.Tensor,
+    x_o: Tensor,
     correct_for_leakage: bool,
-) -> (torch.Tensor, torch.Tensor):
+) -> (Tensor, Tensor):
     r"""
     Formats parameters theta and simulation outputs x into shapes that can be processed
      by neural density estimators for the posterior $p(\theta|x)$.
@@ -105,10 +106,10 @@ def match_shapes_of_theta_and_x(
 def sample_posterior_within_prior(
     posterior_nn: torch.nn.Module,
     prior: torch.distributions.Distribution,
-    x: torch.Tensor,
+    x: Tensor,
     num_samples: int = 1,
     patience: int = 5,
-) -> Tuple[torch.Tensor, float]:
+) -> Tuple[Tensor, float]:
     r"""Return samples from a posterior $p(\theta|x)$ within the support of the prior
      via rejection sampling.
 
