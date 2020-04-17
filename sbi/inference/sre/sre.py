@@ -295,13 +295,12 @@ class SRE(NeuralInference):
                 network_outputs = self._neural_posterior.neural_net(theta_and_x)
                 likelihood = torch.squeeze(torch.sigmoid(network_outputs))
 
-                # the first clipped_batch_size elements are the ones where theta and x
-                # are sampled from the joint p(theta, x) and are labelled 1s.
-                # The second clipped_batch_size elements are the ones where theta and x
-                # are sampled from the marginals p(theta)p(x) and are labelled 0s.
-                labels = torch.cat(
-                    (torch.ones(clipped_batch_size), torch.zeros(clipped_batch_size))
-                )
+                # Alternating pairs where there is one sampled from the joint and one
+                # sampled from the marginals. The first element is sampled from the
+                # joint p(theta, x) and is labelled 1. The second element is sampled
+                # from the marginals p(theta)p(x) and is labelled 0. And so on.
+                labels = torch.ones(2 * clipped_batch_size)  # two atoms
+                labels[1::2] = 0.0
                 # binary cross entropy to learn the likelihood
                 loss = criterion(likelihood, labels)
             else:
