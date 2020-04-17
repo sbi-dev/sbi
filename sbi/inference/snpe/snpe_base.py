@@ -90,7 +90,7 @@ class SnpeBase(NeuralInference, ABC):
         self._neural_posterior = Posterior(
             algorithm_family="snpe",
             neural_net=density_estimator,
-            prior=prior,
+            prior=self._prior,
             x_o=self._x_o,
             sample_with_mcmc=sample_with_mcmc,
             mcmc_method=mcmc_method,
