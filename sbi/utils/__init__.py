@@ -2,7 +2,11 @@ from sbi.utils.get_nn_models import classifier_nn, likelihood_nn, posterior_nn
 from sbi.utils.io import get_data_root, get_log_root, get_project_root, get_timestamp
 from sbi.utils.logging import summarize
 from sbi.utils.mmd import biased_mmd, unbiased_mmd_squared
-from sbi.utils.plot import plot_hist_marginals, plot_hist_marginals_pair
+from sbi.utils.plot.plot import (
+    plot_hist_marginals,
+    plot_hist_marginals_pair,
+    samples_nd,
+)
 from sbi.utils.sbiutils import (
     Standardize,
     match_shapes_of_theta_and_x,
