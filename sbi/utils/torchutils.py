@@ -211,13 +211,14 @@ class BoxUniform(Independent):
 
 
 def ensure_theta_batched(theta: Tensor) -> Tensor:
-    """
-    Return theta that has a batch dimension, i.e. has shape (1, shape_of_single_theta)
+    r"""
+    Return parameter set theta that has a batch dimension, i.e. has shape
+     (1, shape_of_single_theta)
 
      Args:
-         theta: parameter set of n parameters of shape (n) or (1,n)
+         theta: parameters $\theta$, of shape (n) or (1,n)
      Returns:
-         Batched parameter set theta
+         Batched parameter set $\theta$
     """
 
     # => ensure theta has shape (1, dim_parameter)
@@ -229,7 +230,8 @@ def ensure_theta_batched(theta: Tensor) -> Tensor:
 
 def ensure_x_batched(x: Tensor) -> Tensor:
     """
-    Return x that has a batch dimension, i.e. has shape (1, shape_of_single_x)
+    Return simulation output x that has a batch dimension, i.e. has shape
+    (1, shape_of_single_x)
 
     Args:
          x: simulation output of shape (n) or (1,n)

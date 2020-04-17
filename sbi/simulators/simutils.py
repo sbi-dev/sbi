@@ -565,8 +565,8 @@ def simulate_in_batches(
     num_samples: int,
     simulation_batch_size: int,
 ) -> (Tensor, Tensor):
-    """
-    Return parameters and simulated data for `num_samples` parameter sets.
+    r"""
+    Return parameters and simulated data for `num_samples` parameter sets $\theta$.
 
     Simulate them in batches of size `simulation_batch_size`.
 
@@ -576,15 +576,16 @@ def simulate_in_batches(
 
     Args:
         simulator: simulator function.
-        parameter_sample_fn: Function to call for generating theta, e.g. prior sampling
+        parameter_sample_fn: Function to call for generating $\theta$, e.g. prior
+            sampling
         num_samples: Number of simulations to run
         simulation_batch_size: Number of simulations that are run within a single batch
             If `simulation_batch_size == -1`, we run a batch with all simulations
             required, i.e. `simulation_batch_size = num_samples`
 
     Returns:
-        Tensor simulation input parameters of shape (num_samples, num_dim_parameters),
-        Tensor simulator outputs x of shape (num_samples, num_dim_x)
+        Simulation parameters $\theta$ of shape (num_samples, shape_of_single_theta),
+        Simulator outputs $x$ of shape (num_samples, shape_of_single_x)
     """
 
     assert num_samples > 0, "Number of samples to simulate must be larger than zero."
