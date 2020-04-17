@@ -45,7 +45,7 @@ def test_sre_on_linearGaussian_api(num_dim: int):
 
     posterior = infer(num_rounds=1, num_simulations_per_round=1000)
 
-    _ = posterior.sample(num_samples=10, num_chains=2)
+    posterior.sample(num_samples=10, num_chains=2)
 
     # XXX log_prob is not implemented yet for SRE
     # posterior.log_prob(samples)
@@ -62,16 +62,19 @@ def test_sre_on_linearGaussian_api(num_dim: int):
     ),
 )
 def test_sre_on_linearGaussian_based_on_mmd(
-    num_dim: int, prior_str: str, classifier_loss: str
+    num_dim: int, prior_str: str, classifier_loss: str, set_seed,
 ):
     """Test MMD accuracy of inference with SRE on linear Gaussian model.
 
     NOTE: The mmd threshold is calculated based on a number of test runs and taking the
     mean plus 2 stds.
 
+    This test is seeded using the set_seed fixture defined in tests/conftest.py.
+
     Args:
         num_dim: parameter dimension of the gaussian model
         prior_str: one of "gaussian" or "uniform"
+        set_seed: fixture for manual seeding, see tests/conftest.py
     """
 
     x_o = torch.zeros(1, num_dim)
@@ -150,12 +153,15 @@ def test_sre_on_linearGaussian_based_on_mmd(
         ("slice", "uniform"),
     ),
 )
-def test_sre_posterior_correction(mcmc_method: str, prior_str: str):
+def test_sre_posterior_correction(mcmc_method: str, prior_str: str, set_seed):
     """Test leakage correction both for MCMC and rejection sampling.
+
+    This test is seeded using the set_seed fixture defined in tests/conftest.py.
 
     Args:
         mcmc_method: which mcmc method to use for sampling
         prior_str: one of "gaussian" or "uniform"
+        set_seed: fixture for manual seeding, see tests/conftest.py
     """
 
     num_dim = 2

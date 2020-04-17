@@ -1,32 +1,34 @@
 from __future__ import annotations
 
-from typing import Callable, Union
+from typing import Callable, Optional, Union
+
+import numpy as np
 import pytest
 import torch
-from torch.distributions import Uniform, MultivariateNormal, Distribution
+from scipy.stats import beta, multivariate_normal, uniform
 from torch import Tensor
+from torch.distributions import Distribution, MultivariateNormal, Uniform
+
+from sbi.inference.snpe import SnpeC
+from sbi.simulators.linear_gaussian import linear_gaussian
 from sbi.simulators.simutils import (
+    CustomPytorchWrapper,
+    ScipyPytorchWrapper,
     prepare_sbi_problem,
     process_prior,
-    process_x_o,
     process_simulator,
-    ScipyPytorchWrapper,
-    CustomPytorchWrapper,
+    process_x_o,
     simulate_in_batches,
 )
-from scipy.stats import multivariate_normal, uniform, beta
-from sbi.simulators.linear_gaussian import linear_gaussian
-from sbi.utils.torchutils import BoxUniform
 from sbi.utils.get_nn_models import posterior_nn
-from sbi.inference.snpe import SnpeC
-import numpy as np
+from sbi.utils.torchutils import BoxUniform
 
 
 class UserNumpyUniform:
-    """User defined numpy uniform prior. 
-    
-    Used for testing to mimick a user-defined prior with valid .sample and .log_prob 
-    methods. 
+    """User defined numpy uniform prior.
+
+    Used for testing to mimick a user-defined prior with valid .sample and .log_prob
+    methods.
     """
 
     def __init__(self, lower: Tensor, upper: Tensor, return_numpy: bool = False):
@@ -243,7 +245,7 @@ def test_prepare_sbi_problem(
     Args:
         simulator: simulator function
         prior: prior as defined by the user (pytorch, scipy, custom)
-        x_o: data as defined by the user. 
+        x_o: data as defined by the user.
     """
 
     simulator, prior, x_o = prepare_sbi_problem(simulator, prior, x_o)
@@ -293,6 +295,4 @@ def test_inference_with_pilot_samples_many_samples():
 
     # Run inference.
     num_rounds, num_simulations_per_round = 2, 100
-    posterior = infer(
-        num_rounds=num_rounds, num_simulations_per_round=num_simulations_per_round
-    )
+    infer(num_rounds=num_rounds, num_simulations_per_round=num_simulations_per_round)

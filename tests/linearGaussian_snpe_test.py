@@ -27,9 +27,19 @@ from sbi.simulators.simutils import prepare_sbi_problem
     ),
 )
 def test_apt_on_linearGaussian_based_on_mmd(
-    num_dim: int, prior_str: str, algorithm_str: str, simulation_batch_size: int
+    num_dim: int,
+    prior_str: str,
+    algorithm_str: str,
+    simulation_batch_size: int,
+    set_seed,
 ):
-    """Test whether APT infers well a simple example where ground truth is available."""
+    """Test whether APT infers well a simple example where ground truth is available.
+
+    This test is seeded using the set_seed fixture defined in tests/conftest.py.
+
+    Args:
+        set_seed: fixture for manual seeding, see tests/conftest.py
+    """
 
     x_o = torch.zeros(1, num_dim)
     num_samples = 100
@@ -126,8 +136,14 @@ def test_apt_on_linearGaussian_based_on_mmd(
 
 # Test multi-round SNPE.
 @pytest.mark.parametrize("algorithm_str", ("snpe_b", "snpe_c"))
-def test_multi_round_snpe_on_linearGaussian_based_on_mmd(algorithm_str: str):
-    """Test whether APT infers well a simple example where ground truth is available."""
+def test_multi_round_snpe_on_linearGaussian_based_on_mmd(algorithm_str: str, set_seed):
+    """Test whether APT infers well a simple example where ground truth is available.
+
+    This test is seeded using the set_seed fixture defined in tests/conftest.py.
+
+    Args:
+        set_seed: fixture for manual seeding, see tests/conftest.py.
+    """
 
     num_dim = 3
     true_observation = torch.zeros((1, num_dim))
@@ -201,9 +217,15 @@ def test_multi_round_snpe_on_linearGaussian_based_on_mmd(algorithm_str: str):
         (False, "rejection", "uniform"),
     ),
 )
-def test_apt_posterior_correction(sample_with_mcmc, mcmc_method, prior):
+def test_apt_posterior_correction(sample_with_mcmc, mcmc_method, prior, set_seed):
     """Test that leakage correction applied to sampling works, with both MCMC and
-    rejection."""
+    rejection.
+
+    This test is seeded using the set_seed fixture defined in tests/conftest.py.
+
+    Args:
+        set_seed: fixture for manual seeding, see tests/conftest.py.
+    """
 
     num_dim = 2
 

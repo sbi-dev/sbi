@@ -51,15 +51,18 @@ def test_snl_on_linearGaussian_api(num_dim: int):
 @pytest.mark.slow
 @pytest.mark.parametrize("num_dim", (1, 3))
 @pytest.mark.parametrize("prior_str", ("uniform", "gaussian"))
-def test_snl_on_linearGaussian_based_on_mmd(num_dim: int, prior_str: str):
+def test_snl_on_linearGaussian_based_on_mmd(num_dim: int, prior_str: str, set_seed):
     """Test SNL on linear Gaussian, comparing to ground truth posterior via MMD.
 
     NOTE: The MMD threshold is calculated based on a number of test runs and taking the
     mean plus 2 stds.
 
+    This test is seeded using the set_seed fixture defined in tests/conftest.py.
+
     Args:
         num_dim: parameter dimension of the gaussian model
         prior_str: one of "gaussian" or "uniform"
+        set_seed: fixture for manual seeding, see tests/conftest.py
     """
 
     x_o = torch.zeros((1, num_dim))
@@ -107,12 +110,16 @@ def test_snl_on_linearGaussian_based_on_mmd(num_dim: int, prior_str: str):
 
 
 @pytest.mark.slow
-def test_multi_round_snl_on_linearGaussian_based_on_mmd():
+def test_multi_round_snl_on_linearGaussian_based_on_mmd(set_seed):
     """Test SNL on linear Gaussian, comparing to ground truth posterior via MMD.
 
     NOTE: The MMD threshold is calculated based on a number of test runs and taking the
     mean plus 2 stds.
+    
+    This test is seeded using the set_seed fixture defined in tests/conftest.py.
 
+    Args:
+        set_seed: fixture for manual seeding, see tests/conftest.py
     """
 
     num_dim = 3
@@ -164,15 +171,18 @@ def test_multi_round_snl_on_linearGaussian_based_on_mmd():
         ("slice", "uniform"),
     ),
 )
-def test_snl_posterior_correction(mcmc_method: str, prior_str: str):
+def test_snl_posterior_correction(mcmc_method: str, prior_str: str, set_seed):
     """Test SNL on linear Gaussian, comparing to ground truth posterior via MMD.
 
     NOTE: The mmd threshold is calculated based on a number of test runs and taking the
     mean plus 2 stds.
 
+    This test is seeded using the set_seed fixture defined in tests/conftest.py.
+
     Args:
         mcmc_method: which mcmc method to use for sampling
         prior_str: use gaussian or uniform prior
+        set_seed: fixture for manual seeding, see tests/conftest.py
     """
 
     num_dim = 2
