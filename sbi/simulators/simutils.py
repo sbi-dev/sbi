@@ -9,9 +9,9 @@ import torch
 from scipy.stats._distn_infrastructure import rv_frozen
 from scipy.stats._multivariate import multi_rv_frozen
 from torch import Tensor
-from torch.distributions import Distribution, Uniform
+from torch.distributions import Distribution, Uniform, Beta
 
-from sbi.utils.torchutils import atleast_2d
+from sbi.utils.torchutils import atleast_2d, ensure_theta_batched
 
 
 def process_prior(prior) -> Tuple[Distribution, int, bool]:
@@ -58,11 +58,13 @@ def process_custom_prior(prior) -> Tuple[Distribution, int, bool]:
         is_prior_numpy: whether the prior returned numpy before wrapping.
     """
 
-    check_prior_methods(prior)
+    check_prior_attributes(prior)
 
     check_prior_batch_behavior(prior)
 
     prior, is_prior_numpy = maybe_wrap_prior_to_pytorch(prior)
+
+    check_prior_return_type(prior)
 
     theta_dim = prior.sample().numel()
 
@@ -137,28 +139,36 @@ def process_pytorch_prior(prior: Distribution,) -> Tuple[Distribution, int, bool
 
     check_for_batch_reinterpretation_extra_d_uniform(prior)
 
+    if not prior.sample().dtype == torch.float32:
+        prior = PytorchReturnTypeWrapper(prior, return_type=torch.float32)
+
+    # This will fail for float64 priors.
+    check_prior_return_type(prior)
+
     theta_dim = prior.sample().numel()
 
     return prior, theta_dim, False
 
 
-# XXX This is equally liable to happen with others, e.g. Beta...
-# XXX Wrapping with Independent seems to be a universally valid remedy
-def check_for_batch_reinterpretation_extra_d_uniform(prior):
-    """Raise ValueError in case of inadvertent use of batched scalar Uniform as prior.
+def maybe_reinterpret_batch_dims(prior) -> Distribution:
+    """Return prior with batch shape smaller or equal 1. 
+
+    Reinterprets all batch dimensions as event dimensions if possible, e.g., for
+    Uniform, Beta, Gamma priors. 
 
     Most likely the user needs to specify a prior on a multi-dimensional theta
     rather than several batched 1D priors at once.
     """
 
     # Note .batch_shape will always work because and is short-circuiting.
-    if isinstance(prior, Uniform) and prior.batch_shape.numel() > 1:
+    if isinstance(prior, (Uniform, Beta)) and prior.batch_shape.numel() > 1:
         raise ValueError(
-            f"""The specified Uniform prior is a prior on *several scalar parameters*
+            f"""The specified prior is a prior on *several scalar parameters*
             (i.e. a batch), not a prior on a multi-dimensional parameter.
 
-            Please use utils.torchutils.BoxUniform if you'd rather put a prior on a
-            multi-dimensional parameter.
+            You can define multi-dimensional prior using 
+            torch.distributions.Independent. For an example, or in case you are using
+            a Uniform prior see utils.torchutils.BoxUniform for implementation.
             """
         )
 
@@ -226,11 +236,15 @@ def check_for_possibly_batched_observations(x_o: Tensor):
         pass
 
 
-def check_prior_methods(prior):
-    """Check whether the prior has methods .sample and .log_prob.
+def check_prior_attributes(prior):
+    """Check for prior attributes needed in sbi.
+    
+    We check for .sample(sample_shape) .log_prob(value) methods, and for
+    .mean and .variance attributes.
 
     Raises:
         AttributeError: if either of the two methods doesn't exist.
+        AssertionError: if .mean or .variance attributes dont exist.
     """
 
     # Sample a batch of two parameters to check batch behaviour > 1.
@@ -265,6 +279,20 @@ def check_prior_methods(prior):
             """Something went wrong when evaluating a batch of parameters theta
             with prior.log_prob(theta). Consider using a PyTorch distribution."""
         )
+
+    assert hasattr(prior, "mean"), "the prior must have a mean attribute or property."
+    assert hasattr(
+        prior, "variance"
+    ), "the prior must have a variance attribute or property."
+
+
+def check_prior_return_type(prior, return_type: Optional[torch.dtype] = torch.float32):
+    """Check whether prior.sample() returns float32 Tensor."""
+
+    prior_dtype = prior.sample().dtype
+    assert (
+        prior_dtype == return_type
+    ), f"Prior return type must be {return_type}, but is {prior_dtype}."
 
 
 def check_prior_batch_behavior(prior):
@@ -324,6 +352,14 @@ class CustomPytorchWrapper(Distribution):
             self.prior_numpy.sample(sample_shape), dtype=self.return_type
         )
 
+    @property
+    def mean(self):
+        return torch.as_tensor(self.prior_numpy.mean, dtype=self.return_type)
+
+    @property
+    def variance(self):
+        return torch.as_tensor(self.prior_numpy.variance, dtype=self.return_type)
+
 
 class ScipyPytorchWrapper(Distribution):
     """Wrap scipy.stats prior as a PyTorch Distribution object."""
@@ -346,12 +382,55 @@ class ScipyPytorchWrapper(Distribution):
         self.return_type = return_type
 
     def log_prob(self, value) -> Tensor:
-        return torch.as_tensor(self.prior_scipy.logpdf(x=value), dtype=torch.float32)
+        return torch.as_tensor(self.prior_scipy.logpdf(x=value), dtype=self.return_type)
 
     def sample(self, sample_shape=torch.Size()) -> Tensor:
         return torch.as_tensor(
-            self.prior_scipy.rvs(size=sample_shape), dtype=torch.float32
+            self.prior_scipy.rvs(size=sample_shape), dtype=self.return_type
         )
+
+    @property
+    def mean(self):
+        return self.prior_scipy.mean()
+
+    @property
+    def variance(self):
+        return self.prior_scipy.var()
+
+
+class PytorchReturnTypeWrapper(Distribution):
+    """Wrap PyTorch Distribution to return a given return type."""
+
+    def __init__(
+        self,
+        prior: Distribution,
+        return_type: Optional[torch.dtype] = torch.float32,
+        batch_shape=torch.Size(),
+        event_shape=torch.Size(),
+        validate_args=None,
+    ):
+        super().__init__(
+            batch_shape=batch_shape,
+            event_shape=event_shape,
+            validate_args=validate_args,
+        )
+
+        self.prior = prior
+        self.return_type = return_type
+
+    def log_prob(self, value) -> Tensor:
+        return torch.as_tensor(self.prior.log_prob(value), dtype=self.return_type)
+
+    def sample(self, sample_shape=torch.Size()) -> Tensor:
+        return torch.as_tensor(self.prior.sample(sample_shape), dtype=self.return_type)
+
+    @property
+    def mean(self):
+        return torch.as_tensor(self.prior.mean, dtype=self.return_type)
+
+    @property
+    def variance(self):
+        return torch.as_tensor(self.prior.variance, dtype=self.return_type)
 
 
 def process_simulator(
@@ -433,13 +512,11 @@ def get_batched_simulator(simulator: Callable) -> Callable:
 
     # XXX: this should be handled with more care, e.g., enable multiprocessing
     # XXX: with Pool() as p: p.map(...)
-    def batched_simulator(thetas: Tensor) -> Tensor:
+    def batched_simulator(theta: Tensor) -> Tensor:
+        theta = ensure_theta_batched(theta)
         # use map to get data for every theta in batch
         # use stack to collect list of tensors in tensor
-        assert (
-            thetas.ndim > 1
-        ), f"batch simulator needs batch dimension. shape: {thetas.shape}"
-        return torch.stack(list(map(simulator, thetas)))
+        return torch.stack(list(map(simulator, theta)))
 
     return batched_simulator
 
@@ -461,6 +538,7 @@ def process_x_o(
 
     # maybe add batch dimension, cast to tensor
     x_o = atleast_2d(x_o)
+    x_o = torch.as_tensor(x_o, dtype=torch.float32)
 
     check_for_possibly_batched_observations(x_o)
 

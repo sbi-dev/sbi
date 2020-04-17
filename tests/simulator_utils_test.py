@@ -13,6 +13,7 @@ from sbi.inference.snpe import SnpeC
 from sbi.simulators.linear_gaussian import linear_gaussian
 from sbi.simulators.simutils import (
     CustomPytorchWrapper,
+    PytorchReturnTypeWrapper,
     ScipyPytorchWrapper,
     prepare_sbi_problem,
     process_prior,
@@ -22,6 +23,9 @@ from sbi.simulators.simutils import (
 )
 from sbi.utils.get_nn_models import posterior_nn
 from sbi.utils.torchutils import BoxUniform
+
+# use cpu by default
+torch.set_default_tensor_type("torch.FloatTensor")
 
 
 class UserNumpyUniform:
@@ -36,6 +40,9 @@ class UserNumpyUniform:
         self.upper = upper
         self.dist = BoxUniform(lower, upper)
         self.return_numpy = return_numpy
+        self.mean = self.dist.mean
+        self.variance = self.dist.variance
+        self.stddev = self.dist.stddev
 
     def sample(self, sample_shape=torch.Size([])):
         samples = self.dist.sample(sample_shape)
@@ -48,16 +55,10 @@ class UserNumpyUniform:
         return log_probs.numpy() if self.return_numpy else log_probs
 
 
-def torch_simulator_no_batch(x):
+def linear_gaussian_no_batch(theta):
     """Identity simulator throwing assertion error when called on a batch."""
-    assert x.ndim == 1, "cant handle batches, bitches."
-    return x
-
-
-def numpy_simulator(x):
-    """Simulator returning zeroed input, Assertion error if input is not numpy."""
-    assert isinstance(x, np.ndarray)
-    return np.zeros_like(x)
+    assert theta.ndim == 1, "cant handle batches."
+    return MultivariateNormal(theta, torch.eye(theta.numel())).sample()
 
 
 def numpy_linear_gaussian(theta):
@@ -67,10 +68,6 @@ def numpy_linear_gaussian(theta):
 
 def list_simulator(theta):
     return list(theta)
-
-
-def identity_simulator(theta):
-    return theta
 
 
 def matrix_simulator(theta):
@@ -89,6 +86,12 @@ def matrix_simulator(theta):
         (ScipyPytorchWrapper, multivariate_normal()),
         (ScipyPytorchWrapper, uniform()),
         (ScipyPytorchWrapper, beta(a=1, b=1)),
+        (
+            PytorchReturnTypeWrapper,
+            BoxUniform(
+                torch.zeros(3, dtype=torch.float64), torch.ones(3, dtype=torch.float64)
+            ),
+        ),
     ),
 )
 def test_prior_wrappers(wrapper, prior):
@@ -106,6 +109,9 @@ def test_prior_wrappers(wrapper, prior):
     assert isinstance(log_probs, Tensor)
     assert log_probs.shape[0] == batch_size
 
+    # Test return type
+    assert prior.sample().dtype == torch.float32
+
 
 @pytest.mark.parametrize(
     "prior",
@@ -120,6 +126,9 @@ def test_prior_wrappers(wrapper, prior):
         MultivariateNormal(torch.zeros(3), torch.eye(3)),
         UserNumpyUniform(torch.zeros(3), torch.ones(3), return_numpy=False),
         UserNumpyUniform(torch.zeros(3), torch.ones(3), return_numpy=True),
+        BoxUniform(
+            torch.zeros(3, dtype=torch.float64), torch.ones(3, dtype=torch.float64)
+        ),
     ),
 )
 def test_process_prior(prior):
@@ -179,9 +188,8 @@ def test_process_matrix_observation():
     (
         (linear_gaussian, BoxUniform(torch.zeros(1), torch.ones(1))),
         (linear_gaussian, BoxUniform(torch.zeros(2), torch.ones(2))),
-        (numpy_simulator, UserNumpyUniform(torch.zeros(2), torch.ones(2), True)),
         (numpy_linear_gaussian, UserNumpyUniform(torch.zeros(2), torch.ones(2), True)),
-        (torch_simulator_no_batch, BoxUniform(torch.zeros(2), torch.ones(2))),
+        (linear_gaussian_no_batch, BoxUniform(torch.zeros(2), torch.ones(2))),
         pytest.param(
             list_simulator,
             BoxUniform(torch.zeros(2), torch.ones(2)),
@@ -207,17 +215,23 @@ def test_process_simulator(simulator: Callable, prior: Distribution):
     "simulator, prior, x_o",
     (
         (
-            torch_simulator_no_batch,
+            linear_gaussian_no_batch,
             BoxUniform(torch.zeros(3), torch.ones(3)),
-            torch.zeros(1, 3),
+            torch.zeros(3),
         ),
         (
-            numpy_simulator,
+            numpy_linear_gaussian,
             UserNumpyUniform(torch.zeros(3), torch.ones(3), return_numpy=True),
             np.zeros((1, 3)),
         ),
         (linear_gaussian, BoxUniform(torch.zeros(3), torch.ones(3)), torch.zeros(1, 3)),
-        (linear_gaussian, BoxUniform(torch.zeros(3), torch.ones(3)), torch.zeros(3)),
+        (
+            linear_gaussian,
+            BoxUniform(
+                torch.zeros(3, dtype=torch.float64), torch.ones(3, dtype=torch.float64)
+            ),
+            torch.zeros(3),
+        ),
         pytest.param(
             list_simulator,
             BoxUniform(torch.zeros(3), torch.ones(3)),
@@ -254,6 +268,66 @@ def test_prepare_sbi_problem(
     n_batch = 2
     assert simulator(prior.sample((n_batch,))).shape[0] == n_batch
     assert isinstance(simulator(prior.sample((1,))), Tensor)
+    assert prior.sample().dtype == torch.float32
+
+
+# XXX: this tests combinations of user defined  simulators, priors, x_os during
+# inference.
+@pytest.mark.parametrize(
+    "user_simulator, user_prior, user_x_o",
+    (
+        (
+            linear_gaussian,
+            BoxUniform(
+                torch.zeros(3, dtype=torch.float64), torch.ones(3, dtype=torch.float64)
+            ),
+            torch.zeros(3),
+        ),
+        (
+            linear_gaussian_no_batch,
+            BoxUniform(torch.zeros(3), torch.ones(3)),
+            torch.zeros(3),
+        ),
+        (
+            numpy_linear_gaussian,
+            UserNumpyUniform(torch.zeros(3), torch.ones(3), return_numpy=True),
+            np.zeros((1, 3)),
+        ),
+        (linear_gaussian, BoxUniform(torch.zeros(3), torch.ones(3)), torch.zeros(1, 3)),
+        pytest.param(
+            list_simulator,
+            BoxUniform(torch.zeros(3), torch.ones(3)),
+            torch.zeros(1, 3),
+            marks=pytest.mark.xfail,
+        ),
+        (
+            numpy_linear_gaussian,
+            UserNumpyUniform(torch.zeros(3), torch.ones(3), return_numpy=True),
+            np.zeros((1, 3)),
+        ),
+        pytest.param(  # test simulator always returning batch dim.
+            lambda _: torch.zeros(1, 480),
+            BoxUniform(torch.zeros(2), torch.ones(2)),
+            torch.zeros(1, 480),
+            marks=pytest.mark.xfail,
+        ),
+    ),
+)
+def test_inference_with_user_sbi_problems(
+    user_simulator: Callable, user_prior, user_x_o: Union[Tensor, np.ndarray]
+):
+
+    infer = SnpeC(
+        simulator=user_simulator,
+        x_o=user_x_o,
+        # XXX: Dont pass density_estimator as that would bypass prior checking.
+        # density_estimator=posterior_nn(model="maf", prior=prior, x_o=x_o,),
+        prior=user_prior,
+        simulation_batch_size=100,
+    )
+
+    # Run inference.
+    infer(num_rounds=1, num_simulations_per_round=100)
 
 
 @pytest.mark.parametrize(
