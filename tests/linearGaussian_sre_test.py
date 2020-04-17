@@ -12,6 +12,9 @@ from sbi.simulators.linear_gaussian import (
 )
 from sbi.simulators.simutils import prepare_sbi_problem
 
+# use cpu by default
+torch.set_default_tensor_type("torch.FloatTensor")
+
 
 @pytest.mark.parametrize("num_dim", (1, 3))
 def test_sre_on_linearGaussian_api(num_dim: int):

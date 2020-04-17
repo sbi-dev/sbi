@@ -13,9 +13,10 @@ from sbi.simulators.linear_gaussian import (
 )
 from sbi.simulators.simutils import prepare_sbi_problem
 
+# use cpu by default
+torch.set_default_tensor_type("torch.FloatTensor")
 
-# Running all combinations is excessive. The standard test is (3, "gaussian", "snpe_c"),
-# and we then vary only one parameter at a time to test single-D, uniform, and snpe-b.
+
 @pytest.mark.parametrize(
     "num_dim, prior_str, algorithm_str, simulation_batch_size",
     (
