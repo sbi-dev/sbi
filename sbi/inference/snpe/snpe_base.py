@@ -86,6 +86,11 @@ class SnpeBase(NeuralInference, ABC):
             density_estimator = utils.posterior_nn(
                 model="maf", prior=self._prior, x_o=self._x_o,
             )
+        # else: check density estimator for valid prior etc.
+        # XXX: here, the user could sneak in an invalid prior and x_o by providing a
+        # density estimator with invalid .prior and .x_o, thus bypassing
+        # the input checks.
+
         # create the neural posterior which can sample(), log_prob()
         self._neural_posterior = Posterior(
             algorithm_family="snpe",
