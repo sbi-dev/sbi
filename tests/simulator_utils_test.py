@@ -5,9 +5,10 @@ from typing import Callable, Optional, Union
 import numpy as np
 import pytest
 import torch
+import warnings
 from scipy.stats import beta, multivariate_normal, uniform
 from torch import Tensor
-from torch.distributions import Distribution, MultivariateNormal, Uniform
+from torch.distributions import Distribution, MultivariateNormal, Uniform, Gamma
 
 from sbi.inference.snpe import SnpeC
 from sbi.simulators.linear_gaussian import linear_gaussian
@@ -113,14 +114,32 @@ def test_prior_wrappers(wrapper, prior):
     assert prior.sample().dtype == torch.float32
 
 
+def test_reinterpreted_batch_dim_prior():
+    """Test whether the right warning and error are raised for reinterpreted priors."""
+
+    with pytest.warns(UserWarning, match="The specified prior is a prior on"):
+        process_prior(Uniform(torch.zeros(3), torch.ones(3)))
+
+    # Pass a MVN with batch_shape>1 to enforce ValueError.
+    with pytest.raises(ValueError):
+        process_prior(MultivariateNormal(torch.zeros(2, 3), torch.ones(3)))
+
+    # This must pass without warnings or errors.
+    process_prior(BoxUniform(torch.zeros(3), torch.ones(3)))
+
+
 @pytest.mark.parametrize(
     "prior",
     (
         pytest.param(Uniform(0.0, 1.0), marks=pytest.mark.xfail),
-        pytest.param(Uniform(torch.zeros(3), torch.ones(3)), marks=pytest.mark.xfail),
         pytest.param(
             Uniform(torch.zeros((1, 3)), torch.ones((1, 3))), marks=pytest.mark.xfail
         ),
+        pytest.param(
+            MultivariateNormal(torch.zeros(3, 3), torch.eye(3)),
+            marks=pytest.mark.xfail,
+        ),
+        Uniform(torch.zeros(3), torch.ones(3)),
         Uniform(torch.zeros(1), torch.ones(1)),
         BoxUniform(torch.zeros(3), torch.ones(3)),
         MultivariateNormal(torch.zeros(3), torch.eye(3)),
@@ -271,8 +290,6 @@ def test_prepare_sbi_problem(
     assert prior.sample().dtype == torch.float32
 
 
-# XXX: this tests combinations of user defined  simulators, priors, x_os during
-# inference.
 @pytest.mark.parametrize(
     "user_simulator, user_prior, user_x_o",
     (
@@ -316,6 +333,9 @@ def test_prepare_sbi_problem(
 def test_inference_with_user_sbi_problems(
     user_simulator: Callable, user_prior, user_x_o: Union[Tensor, np.ndarray]
 ):
+    """
+    Test inference with combinations of user defined simulators, priors and x_os.
+    """
 
     infer = SnpeC(
         simulator=user_simulator,
