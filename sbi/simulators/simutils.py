@@ -9,7 +9,7 @@ import torch
 from scipy.stats._distn_infrastructure import rv_frozen
 from scipy.stats._multivariate import multi_rv_frozen
 from torch import Tensor
-from torch.distributions import Distribution, Uniform, Beta
+from torch.distributions import Distribution, Uniform, Beta, Independent, Gamma
 
 from sbi.utils.torchutils import atleast_2d, ensure_theta_batched
 
@@ -128,16 +128,9 @@ def process_pytorch_prior(prior: Distribution,) -> Tuple[Distribution, int, bool
             "batch_shape=torch.Size([1]), or event_shape=torch.Size([1])"
         )
 
-    assert prior.batch_shape in (
-        torch.Size([1]),
-        torch.Size([]),
-    ), f"""The prior must have batch shape torch.Size([]) or torch.Size([1]), but has
-        {prior.batch_shape}.
-        """
-
     check_prior_batch_behavior(prior)
 
-    check_for_batch_reinterpretation_extra_d_uniform(prior)
+    prior = maybe_reinterpret_batch_dims(prior)
 
     if not prior.sample().dtype == torch.float32:
         prior = PytorchReturnTypeWrapper(prior, return_type=torch.float32)
@@ -156,20 +149,35 @@ def maybe_reinterpret_batch_dims(prior) -> Distribution:
     Reinterprets all batch dimensions as event dimensions if possible, e.g., for
     Uniform, Beta, Gamma priors. 
 
-    Most likely the user needs to specify a prior on a multi-dimensional theta
-    rather than several batched 1D priors at once.
+    Raises: 
+        ValueError: if batch_shape larger 1 and reinterpretation is not possible. 
+
+    Returns:
+        prior: prior with maybe reinterpreted batch dimensions.
     """
 
-    # Note .batch_shape will always work because and is short-circuiting.
-    if isinstance(prior, (Uniform, Beta)) and prior.batch_shape.numel() > 1:
+    reinterpretable_priors = (Uniform, Beta, Gamma)
+
+    if prior.batch_shape.numel() <= 1:
+        return prior
+
+    elif isinstance(prior, reinterpretable_priors) and prior.batch_shape.numel() > 1:
+        warnings.warn(
+            f"""The specified prior is a prior on *several scalar parameters*
+            (i.e., a batch), not a prior on a multi-dimensional parameter. 
+
+            Because we recognised its type its batch dimensions will be reinterpreted
+            as event dimensions using pytorch.distributions.Independent.
+            """,
+            UserWarning,
+        )
+        # Reinterpret all batch dimensions as event dimensions.
+        return Independent(prior, reinterpreted_batch_ndims=len(prior.batch_shape))
+
+    else:
         raise ValueError(
             f"""The specified prior is a prior on *several scalar parameters*
-            (i.e. a batch), not a prior on a multi-dimensional parameter.
-
-            You can define multi-dimensional prior using 
-            torch.distributions.Independent. For an example, or in case you are using
-            a Uniform prior see utils.torchutils.BoxUniform for implementation.
-            """
+            (i.e. a batch), not a prior on a multi-dimensional parameter."""
         )
 
 
