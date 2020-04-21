@@ -146,7 +146,12 @@ def sample_posterior_within_prior(
 
     while num_remaining > 0 and not time_over:
 
-        sample = posterior_nn.sample(num_remaining, context=x)
+        # XXX: we need this reshape here because posterior_nn.sample sometimes return
+        # leading singleton dimension instead of (num_samples), e.g., (1, 10000, 4)
+        # instead of (10000, 4). and this cant be handle by IndependentJoint.
+        sample = posterior_nn.sample(num_remaining, context=x).reshape(
+            num_remaining, -1
+        )
         num_sampled_total += num_remaining
 
         is_within_prior = torch.isfinite(prior.log_prob(sample))
