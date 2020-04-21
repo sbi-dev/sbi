@@ -22,7 +22,7 @@ from sbi.simulators.user_input_checks_utils import (
     CustomPytorchWrapper,
     PytorchReturnTypeWrapper,
     ScipyPytorchWrapper,
-    IndependentJoint,
+    CombinedJoint,
 )
 from sbi.simulators.simutils import simulate_in_batches
 from sbi.utils.get_nn_models import posterior_nn
@@ -231,6 +231,15 @@ def test_process_simulator(simulator: Callable, prior: Distribution):
             torch.zeros(1, 480),
             marks=pytest.mark.xfail,
         ),
+        pytest.param(
+            linear_gaussian,
+            [
+                Gamma(torch.ones(1), torch.ones(1)),
+                Beta(torch.ones(1), torch.ones(1)),
+                MultivariateNormal(torch.zeros(2), torch.eye(2)),
+            ],
+            torch.zeros(1, 4),
+        ),
     ),
 )
 def test_prepare_sbi_problem(
@@ -291,6 +300,15 @@ def test_prepare_sbi_problem(
             torch.zeros(1, 480),
             marks=pytest.mark.xfail,
         ),
+        pytest.param(
+            linear_gaussian,
+            (
+                Gamma(torch.ones(1), torch.ones(1)),
+                Beta(torch.ones(1), torch.ones(1)),
+                MultivariateNormal(torch.zeros(2), torch.eye(2)),
+            ),
+            torch.zeros(1, 4),
+        ),
     ),
 )
 def test_inference_with_user_sbi_problems(
@@ -303,8 +321,6 @@ def test_inference_with_user_sbi_problems(
     infer = SnpeC(
         simulator=user_simulator,
         x_o=user_x_o,
-        # XXX: Dont pass density_estimator as that would bypass prior checking.
-        # density_estimator=posterior_nn(model="maf", prior=prior, x_o=x_o,),
         prior=user_prior,
         simulation_batch_size=100,
     )
@@ -321,7 +337,7 @@ def test_inference_with_user_sbi_problems(
         pytest.param(
             [
                 Gamma(torch.ones(2), torch.ones(1)),
-                IndependentJoint(
+                CombinedJoint(
                     [
                         Uniform(torch.zeros(1), torch.ones(1)),
                         Uniform(torch.zeros(1), torch.ones(1)),
@@ -330,15 +346,16 @@ def test_inference_with_user_sbi_problems(
             ],
             marks=pytest.mark.xfail,
         ),
+        pytest.param([Uniform(0, 1), Beta(1, 2),], marks=pytest.mark.xfail),
         [
             Uniform(torch.zeros(1), torch.ones(1)),
             Uniform(torch.zeros(1), torch.ones(1)),
         ],
-        [
+        (
             Gamma(torch.ones(1), torch.ones(1)),
             Uniform(torch.zeros(1), torch.ones(1)),
             Beta(torch.ones(1), 2 * torch.ones(1)),
-        ],
+        ),
         [
             MultivariateNormal(torch.zeros(3), torch.eye(3)),
             Gamma(torch.ones(1), torch.ones(1)),
@@ -352,7 +369,7 @@ def test_independent_joint_shapes_and_samples(dists):
     # Fix the seed for reseeding within this test.
     seed = 0
 
-    joint = IndependentJoint(dists)
+    joint = CombinedJoint(dists)
 
     # Check shape of single sample and log prob
     sample = joint.sample()
@@ -400,7 +417,7 @@ def test_invalid_inputs():
         Uniform(torch.zeros(1), torch.ones(1)),
         Beta(torch.ones(1), 2 * torch.ones(1)),
     ]
-    joint = IndependentJoint(dists)
+    joint = CombinedJoint(dists)
 
     # Test too many input dimensions.
     with pytest.raises(AssertionError):
@@ -408,7 +425,7 @@ def test_invalid_inputs():
 
     # Test nested construction.
     with pytest.raises(AssertionError):
-        IndependentJoint([joint])
+        CombinedJoint([joint])
 
     # Test 3D value.
     with pytest.raises(AssertionError):

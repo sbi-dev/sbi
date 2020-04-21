@@ -148,7 +148,7 @@ def sample_posterior_within_prior(
 
         # XXX: we need this reshape here because posterior_nn.sample sometimes return
         # leading singleton dimension instead of (num_samples), e.g., (1, 10000, 4)
-        # instead of (10000, 4). and this cant be handle by IndependentJoint.
+        # instead of (10000, 4). and this can't be handled by CombinedJoint. issue #141
         sample = posterior_nn.sample(num_remaining, context=x).reshape(
             num_remaining, -1
         )

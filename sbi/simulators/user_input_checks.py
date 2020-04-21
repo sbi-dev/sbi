@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import warnings
-from typing import Callable, Optional, Tuple, Union
+from typing import Callable, Optional, Tuple, Union, Sequence
 
 from numpy import ndarray
 import torch
@@ -13,7 +13,7 @@ from sbi.simulators.user_input_checks_utils import (
     CustomPytorchWrapper,
     ScipyPytorchWrapper,
     PytorchReturnTypeWrapper,
-    IndependentJoint,
+    CombinedJoint,
 )
 
 from sbi.utils.torchutils import atleast_2d, ensure_theta_batched
@@ -33,6 +33,15 @@ def process_prior(prior) -> Tuple[Distribution, int, bool]:
         theta_dim: event shape of the prior, number of parameters.
         prior_returns_numpy: whether the return type of the prior was a numpy array.
     """
+
+    # If prior is a sequence, assume independent components and check as pytorch prior.
+    if isinstance(prior, Sequence):
+        warnings.warn(
+            f"""Prior was provided as a sequence {len(prior)} priors. They will be
+            interpreted as independent of each other and assigned in order of the
+            components of the parameter."""
+        )
+        return process_pytorch_prior(CombinedJoint(prior))
 
     if isinstance(prior, Distribution):
         return process_pytorch_prior(prior)
@@ -172,10 +181,25 @@ def maybe_reinterpret_batch_dims(prior) -> Distribution:
     elif isinstance(prior, reinterpretable_priors) and prior.batch_shape.numel() > 1:
         warnings.warn(
             f"""The specified prior is a prior on *several scalar parameters*
-            (i.e., a batch), not a prior on a multi-dimensional parameter. 
+            (i.e., a batch, batch_shape>1), not a prior on a multi-dimensional
+            parameter (event_shape>1).
 
-            Because we recognised its type its batch dimensions will be reinterpreted
+            Because we recognised its type the batch dimensions will be reinterpreted
             as event dimensions using pytorch.distributions.Independent.
+
+            You can do that yourself with more control by passing a sequence (list,
+            tuple) of priors, e.g., to give a uniform prior over two parameters, pass as 
+            prior:
+                prior = [
+                            Uniform(torch.zeros(1), torch.ones(1)),
+                            Uniform(torch.ones(1), 2 * torch.ones(1))
+                        ]
+            or, to pass a Gamma over the first parameter and a correlated Gaussian over
+            the other two, pass:
+                prior = [
+                            Gamma(torch.ones(1), 2 * torch.ones(1)),
+                            MVG(torch.zeros(2), tensor([[1., 0.1], [0.1, 2.]])),
+                        ]
             """,
             UserWarning,
         )
@@ -184,8 +208,12 @@ def maybe_reinterpret_batch_dims(prior) -> Distribution:
 
     else:
         raise ValueError(
-            f"""The specified prior is a prior on *several scalar parameters*
-            (i.e. a batch), not a prior on a multi-dimensional parameter."""
+            f"""The specified prior has batch_shape than one. Please
+            specify a prior with batch_shape smaller equal to 1 and event_shape
+            equal to number of parameters of your model.
+
+            Consider using pytorch.distributions.Independent or the CombinedJoint
+            distribution provided by us."""
         )
 
 
@@ -487,11 +515,11 @@ def prepare_sbi_problem(
     # Check prior, return PyTorch prior.
     prior, _, prior_returns_numpy = process_prior(user_prior)
 
-    # Check data, returns data with leading batch dimension.
-    x_o, _ = process_x_o(user_x_o, user_simulator, user_prior)
-
     # Check simulator, returns PyTorch simulator able to simulate batches.
     simulator = process_simulator(user_simulator, prior, prior_returns_numpy)
+
+    # Check data, returns data with leading batch dimension.
+    x_o, _ = process_x_o(user_x_o, simulator, prior)
 
     # Consistency check after making ready for SBI.
     check_sbi_problem(simulator, prior, x_o)
