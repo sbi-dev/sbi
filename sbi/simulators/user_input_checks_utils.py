@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import warnings
-from typing import Optional, Union, List
+from typing import Optional, Sequence, Union
 
 import torch
 from scipy.stats._distn_infrastructure import rv_frozen
@@ -151,16 +151,29 @@ class PytorchReturnTypeWrapper(Distribution):
         return torch.as_tensor(self.prior.variance, dtype=self.return_type)
 
 
-class IndependentJoint(Distribution):
+class CombinedJoint(Distribution):
+    """Wrap a sequence of PyTorch distributions into a joint PyTorch distribution.
+
+    Every element of the sequence is treated as independent from the other elements.
+    Single elements can be multivariate with dependent dimensions, e.g.,:
+        - [
+            Gamma(torch.zeros(1), torch.ones(1)),
+            Beta(torch.zeros(1), torch.ones(1)),
+            MVG(torch.ones(2), torch.tensor([[1, .1], [.1, 1.]]))
+        ]
+        - [
+            Uniform(torch.zeros(1), torch.ones(1)),
+            Uniform(torch.ones(1), 2.0 * torch.ones(1))]    
+    """
+
     def __init__(
-        self, dists: List[Distribution], validate_args=None,
-    ):
-        # reject all batch_shape>1, assert Distribution.
+        self, dists: Sequence[Distribution], validate_args=None,
+    ) -> CombinedJoint:
         self._check_distributions(dists)
 
         self.dists = dists
-        # numel() instead of event_shape because all scalar dists usually have
-        # event_shape=[] and batch_shape=[1]
+        # numel() instead of event_shape because for all dists both is possible,
+        # event_shape=[1] or batch_shape=[1]
         self.dims_per_dist = torch.as_tensor([d.sample().numel() for d in self.dists])
         self.ndims = torch.sum(torch.as_tensor(self.dims_per_dist)).item()
 
@@ -172,15 +185,39 @@ class IndependentJoint(Distribution):
             validate_args=validate_args,
         )
 
-    def _check_distributions(self, dists: List[Distribution]):
-        """Check validity of input distributions."""
-        assert isinstance(dists, List)
-        assert len(dists) > 1
-        for d in dists:
-            assert not isinstance(d, IndependentJoint)  # Nesting is not allowed.
-            assert isinstance(d, Distribution)
-            # Make sure batch shape is smaller or equal to 1.
-            assert d.batch_shape in (torch.Size([1]), torch.Size([0]), torch.Size([]))
+    def _check_distributions(self, dists):
+        """Check if dists is Sequence and longer 1 and check every member."""
+        assert isinstance(
+            dists, Sequence
+        ), f"""The combination of independent priors must be of type Sequence, is 
+               {type(dists)}."""
+        assert len(dists) > 1, "Provide at least 2 distributions to combine."
+        # Check every element of the sequence.
+        [self._check_distribution(d) for d in dists]
+
+    def _check_distribution(self, dist: Distribution):
+        """Check type and shape of a single input distribution."""
+
+        assert not isinstance(
+            dist, CombinedJoint
+        ), "Nesting of combined distributions is not possible."
+        assert isinstance(
+            dist, Distribution
+        ), "Distribution must be a PyTorch distribution."
+        # Make sure batch shape is smaller or equal to 1.
+        assert dist.batch_shape in (
+            torch.Size([1]),
+            torch.Size([0]),
+            torch.Size([]),
+        ), "The batch shape of every distribution must be smaller or equal to 1."
+
+        assert (
+            len(dist.batch_shape) > 0 or len(dist.event_shape) > 0
+        ), """One of the distributions you passed is defined over a scalar only. Make
+        sure pass distributions with one of event_shape or batch_shape > 0: For example
+            - instead of Uniform(0.0, 1.0) pass Uniform(torch.zeros(1), torch.ones(1))
+            - instead of Beta(1.0, 2.0) pass Beta(tensor([1.0]), tensor([2.0])).
+        """
 
     def sample(self, sample_shape=torch.Size()) -> Tensor:
 
@@ -214,7 +251,13 @@ class IndependentJoint(Distribution):
         # Sum accross last dimension to get joint log prob over all distributions.
         return torch.cat(log_probs, dim=1).sum(-1)
 
-    def _prepare_value(self, value):
+    def _prepare_value(self, value) -> Tensor:
+        """Return input value with fixed shape.
+
+        Raises: 
+            AssertionError: if value has more than 2 dimensions or invalid size in
+                2nd dimension.
+        """
 
         if value.ndim < 2:
             value = value.unsqueeze(0)
@@ -230,3 +273,11 @@ class IndependentJoint(Distribution):
         ), f"Number of dimensions must match dimensions of this joint: {self.ndims}."
 
         return value
+
+    @property
+    def mean(self) -> Tensor:
+        return torch.cat([d.mean for d in self.dists])
+
+    @property
+    def variance(self) -> Tensor:
+        return torch.cat([d.variance for d in self.dists])
