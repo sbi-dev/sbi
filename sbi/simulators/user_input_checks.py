@@ -95,8 +95,11 @@ def maybe_wrap_prior_to_pytorch(prior) -> Tuple[Distribution, bool]:
 
     # Check return types
     if isinstance(theta, Tensor) and isinstance(log_probs, Tensor):
-        # XXX: in this case the prior will not be wrapped and might not be a PyTorch
-        # distribution. Once we use type tests this will result in a type error.
+        # XXX: We wrap to get a Distribution. But this might interfere with the fact
+        # that the custom prior can be a probabilistic program.
+        prior = CustomPytorchWrapper(
+            custom_prior=prior, event_shape=torch.Size([theta.numel()])
+        )
         is_prior_numpy = False
     elif isinstance(theta, ndarray) and isinstance(log_probs, ndarray):
         # infer event shape from single numpy sample.
