@@ -11,7 +11,7 @@ from sbi.simulators.linear_gaussian import (
     get_true_posterior_samples_linear_gaussian_uniform_prior,
     linear_gaussian,
 )
-from sbi.simulators.simutils import prepare_sbi_problem
+from sbi.simulators.user_input_checks import prepare_sbi_problem
 
 # use cpu by default
 torch.set_default_tensor_type("torch.FloatTensor")
