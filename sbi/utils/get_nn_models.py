@@ -125,6 +125,43 @@ def posterior_nn(
         distribution = distributions_.StandardNormal((parameter_dim,))
         neural_net = flows.Flow(transform, distribution, embedding)
 
+    elif model == "nsf_uncond":
+        print("=============parameter_dim", parameter_dim)
+        print("=============observation_dim", observation_dim)
+        transform = transforms.CompositeTransform(
+            [
+                transforms.CompositeTransform(
+                    [
+                        transforms.PiecewiseRationalQuadraticCouplingTransform(
+                            mask=create_alternating_binary_mask(
+                                features=parameter_dim, even=(i % 2 == 0)
+                            ),
+                            transform_net_create_fn=lambda in_features, out_features: nets.ResidualNet(
+                                in_features=in_features,
+                                out_features=out_features,
+                                hidden_features=50,
+                                num_blocks=2,
+                                activation=F.relu,
+                                dropout_probability=0.0,
+                                use_batch_norm=False,
+                            ),
+                            num_bins=10,
+                            tails="linear",
+                            tail_bound=5.0,
+                            apply_unconditional_transform=True,
+                        ),
+                        transforms.LULinear(parameter_dim, identity_init=True),
+                    ]
+                )
+                for i in range(5)
+            ]
+        )
+
+        transform = transforms.CompositeTransform([normalizing_transform, transform,])
+
+        distribution = distributions_.StandardNormal((parameter_dim,))
+        neural_net = flows.Flow(transform, distribution, embedding)
+
     else:
         raise ValueError
 
