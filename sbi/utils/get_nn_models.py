@@ -126,8 +126,6 @@ def posterior_nn(
         neural_net = flows.Flow(transform, distribution, embedding)
 
     elif model == "nsf_uncond":
-        print("=============parameter_dim", parameter_dim)
-        print("=============observation_dim", observation_dim)
         transform = transforms.CompositeTransform(
             [
                 transforms.CompositeTransform(
