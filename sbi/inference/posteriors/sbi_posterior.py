@@ -212,16 +212,22 @@ class Posterior:
 
         x = self.x_o if x is None else atleast_2d(x)
 
-        if self._sample_with_mcmc:
-            return self._sample_posterior_mcmc(
-                x=x, num_samples=num_samples, mcmc_method=self._mcmc_method, **kwargs,
-            )
-        else:
-            # rejection sampling
-            samples, _ = utils.sample_posterior_within_prior(
-                self.neural_net, self._prior, x, num_samples=num_samples
-            )
-            return samples
+        with torch.no_grad():
+            if self._sample_with_mcmc:
+
+                samples = self._sample_posterior_mcmc(
+                    x=x,
+                    num_samples=num_samples,
+                    mcmc_method=self._mcmc_method,
+                    **kwargs,
+                )
+            else:
+                # rejection sampling
+                samples, _ = utils.sample_posterior_within_prior(
+                    self.neural_net, self._prior, x, num_samples=num_samples
+                )
+
+        return samples
 
     def _sample_posterior_mcmc(
         self,
@@ -273,7 +279,6 @@ class Posterior:
                 warmup,
                 num_chains,
             )
-
 
         return samples
 
