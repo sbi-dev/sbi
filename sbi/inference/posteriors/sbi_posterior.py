@@ -274,9 +274,6 @@ class Posterior:
                 num_chains,
             )
 
-        # XXX train exited in log_prob, entered here?
-        # back to training mode
-        self.neural_net.train(True)
 
         return samples
 
