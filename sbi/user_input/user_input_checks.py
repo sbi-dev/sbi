@@ -9,11 +9,11 @@ from scipy.stats._distn_infrastructure import rv_frozen
 from scipy.stats._multivariate import multi_rv_frozen
 from torch import Tensor, float32
 from torch.distributions import Distribution, Uniform, Beta, Independent, Gamma
-from sbi.simulators.user_input_checks_utils import (
+from sbi.user_input.user_input_checks_utils import (
     CustomPytorchWrapper,
     ScipyPytorchWrapper,
     PytorchReturnTypeWrapper,
-    CombinedJoint,
+    MultipleIndependent,
 )
 
 from sbi.utils.torchutils import atleast_2d, ensure_theta_batched
@@ -41,7 +41,7 @@ def process_prior(prior) -> Tuple[Distribution, int, bool]:
             interpreted as independent of each other and assigned in order of the
             components of the parameter."""
         )
-        return process_pytorch_prior(CombinedJoint(prior))
+        return process_pytorch_prior(MultipleIndependent(prior))
 
     if isinstance(prior, Distribution):
         return process_pytorch_prior(prior)
@@ -212,7 +212,7 @@ def maybe_reinterpret_batch_dims(prior) -> Distribution:
             specify a prior with batch_shape smaller equal to 1 and event_shape
             equal to number of parameters of your model.
 
-            Consider using pytorch.distributions.Independent or the CombinedJoint
+            Consider using pytorch.distributions.Independent or the MultipleIndependent
             distribution provided by us."""
         )
 

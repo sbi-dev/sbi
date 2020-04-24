@@ -151,7 +151,7 @@ class PytorchReturnTypeWrapper(Distribution):
         return torch.as_tensor(self.prior.variance, dtype=self.return_type)
 
 
-class CombinedJoint(Distribution):
+class MultipleIndependent(Distribution):
     """Wrap a sequence of PyTorch distributions into a joint PyTorch distribution.
 
     Every element of the sequence is treated as independent from the other elements.
@@ -168,7 +168,7 @@ class CombinedJoint(Distribution):
 
     def __init__(
         self, dists: Sequence[Distribution], validate_args=None,
-    ) -> CombinedJoint:
+    ) -> MultipleIndependent:
         self._check_distributions(dists)
 
         self.dists = dists
@@ -199,7 +199,7 @@ class CombinedJoint(Distribution):
         """Check type and shape of a single input distribution."""
 
         assert not isinstance(
-            dist, CombinedJoint
+            dist, MultipleIndependent
         ), "Nesting of combined distributions is not possible."
         assert isinstance(
             dist, Distribution

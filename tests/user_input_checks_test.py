@@ -12,17 +12,17 @@ from torch.distributions import Distribution, MultivariateNormal, Uniform, Gamma
 
 from sbi.inference.snpe import SnpeC
 from sbi.simulators.linear_gaussian import linear_gaussian
-from sbi.simulators.user_input_checks import (
+from sbi.user_input.user_input_checks import (
     prepare_sbi_problem,
     process_prior,
     process_simulator,
     process_x_o,
 )
-from sbi.simulators.user_input_checks_utils import (
+from sbi.user_input.user_input_checks_utils import (
     CustomPytorchWrapper,
     PytorchReturnTypeWrapper,
     ScipyPytorchWrapper,
-    CombinedJoint,
+    MultipleIndependent,
 )
 from sbi.simulators.simutils import simulate_in_batches
 from sbi.utils.get_nn_models import posterior_nn
@@ -337,7 +337,7 @@ def test_inference_with_user_sbi_problems(
         pytest.param(
             [
                 Gamma(torch.ones(2), torch.ones(1)),
-                CombinedJoint(
+                MultipleIndependent(
                     [
                         Uniform(torch.zeros(1), torch.ones(1)),
                         Uniform(torch.zeros(1), torch.ones(1)),
@@ -369,7 +369,7 @@ def test_independent_joint_shapes_and_samples(dists):
     # Fix the seed for reseeding within this test.
     seed = 0
 
-    joint = CombinedJoint(dists)
+    joint = MultipleIndependent(dists)
 
     # Check shape of single sample and log prob
     sample = joint.sample()
@@ -417,7 +417,7 @@ def test_invalid_inputs():
         Uniform(torch.zeros(1), torch.ones(1)),
         Beta(torch.ones(1), 2 * torch.ones(1)),
     ]
-    joint = CombinedJoint(dists)
+    joint = MultipleIndependent(dists)
 
     # Test too many input dimensions.
     with pytest.raises(AssertionError):
@@ -425,7 +425,7 @@ def test_invalid_inputs():
 
     # Test nested construction.
     with pytest.raises(AssertionError):
-        CombinedJoint([joint])
+        MultipleIndependent([joint])
 
     # Test 3D value.
     with pytest.raises(AssertionError):
