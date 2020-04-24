@@ -8,7 +8,7 @@ from torch import Tensor
 from torch.distributions import Uniform
 from torch.utils.tensorboard import SummaryWriter
 
-from sbi.simulators.user_input_checks import prepare_sbi_problem
+from sbi.user_input.user_input_checks import prepare_sbi_problem
 from sbi.utils import get_log_root, get_timestamp
 from sbi.utils.torchutils import get_default_device
 
