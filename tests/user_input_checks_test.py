@@ -80,10 +80,9 @@ def matrix_simulator(theta):
 def test_reinterpreted_batch_dim_prior():
     """Test whether the right warning and error are raised for reinterpreted priors."""
 
-    with pytest.warns(UserWarning, match="The specified prior is a prior on"):
+    # Both must raise ValueError because we don't reinterpret batch dims anymore.
+    with pytest.raises(ValueError):
         process_prior(Uniform(torch.zeros(3), torch.ones(3)))
-
-    # Pass a MVN with batch_shape>1 to enforce ValueError.
     with pytest.raises(ValueError):
         process_prior(MultivariateNormal(torch.zeros(2, 3), torch.ones(3)))
 
@@ -94,15 +93,17 @@ def test_reinterpreted_batch_dim_prior():
 @pytest.mark.parametrize(
     "prior",
     (
-        pytest.param(Uniform(0.0, 1.0), marks=pytest.mark.xfail),
+        pytest.param(Uniform(0.0, 1.0), marks=pytest.mark.xfail),  # scalar prior.
         pytest.param(
             Uniform(torch.zeros((1, 3)), torch.ones((1, 3))), marks=pytest.mark.xfail
-        ),
+        ),  # batch shape > 1.
         pytest.param(
             MultivariateNormal(torch.zeros(3, 3), torch.eye(3)),
             marks=pytest.mark.xfail,
-        ),
-        Uniform(torch.zeros(3), torch.ones(3)),
+        ),  # batch shape > 1.
+        pytest.param(
+            Uniform(torch.zeros(3), torch.ones(3)), marks=pytest.mark.xfail
+        ),  # batched uniform.
         Uniform(torch.zeros(1), torch.ones(1)),
         BoxUniform(torch.zeros(3), torch.ones(3)),
         MultivariateNormal(torch.zeros(3), torch.eye(3)),
@@ -134,13 +135,10 @@ def test_process_prior(prior):
         (BoxUniform(torch.zeros(3), torch.ones(3)), np.ones(3)),
         pytest.param(
             BoxUniform(torch.zeros(1), torch.ones(1)), 2.0, marks=pytest.mark.xfail
-        ),
+        ),  # scalar observation.
         pytest.param(
             BoxUniform(torch.zeros(3), torch.ones(3)), [2.0], marks=pytest.mark.xfail
-        ),
-        pytest.param(
-            BoxUniform(torch.zeros(2), torch.ones(2)), [[1]], marks=pytest.mark.xfail,
-        ),
+        ),  # list observation.
         (BoxUniform(torch.zeros(3), torch.ones(3)), torch.ones(1, 3)),
         (BoxUniform(torch.zeros(1), torch.ones(1)), torch.ones(1, 1)),
         (BoxUniform(torch.zeros(3), torch.ones(3)), np.zeros((1, 3))),
@@ -288,18 +286,18 @@ def test_prepare_sbi_problem(
             BoxUniform(torch.zeros(3), torch.ones(3)),
             torch.zeros(1, 3),
             marks=pytest.mark.xfail,
-        ),
+        ),  # list simulator.
         (
             numpy_linear_gaussian,
             UserNumpyUniform(torch.zeros(3), torch.ones(3), return_numpy=True),
             np.zeros((1, 3)),
         ),
-        pytest.param(  # test simulator always returning batch dim.
+        pytest.param(
             lambda _: torch.zeros(1, 480),
             BoxUniform(torch.zeros(2), torch.ones(2)),
             torch.zeros(1, 480),
             marks=pytest.mark.xfail,
-        ),
+        ),  # test simulator always returning batch dim.
         pytest.param(
             linear_gaussian,
             (
@@ -332,8 +330,12 @@ def test_inference_with_user_sbi_problems(
 @pytest.mark.parametrize(
     "dists",
     [
-        pytest.param([Beta(torch.ones(1), 2 * torch.ones(1))], marks=pytest.mark.xfail),
-        pytest.param([Gamma(torch.ones(2), torch.ones(1))], marks=pytest.mark.xfail),
+        pytest.param(
+            [Beta(torch.ones(1), 2 * torch.ones(1))], marks=pytest.mark.xfail
+        ),  # single dist.
+        pytest.param(
+            [Gamma(torch.ones(2), torch.ones(1))], marks=pytest.mark.xfail
+        ),  # single batched dist.
         pytest.param(
             [
                 Gamma(torch.ones(2), torch.ones(1)),
@@ -345,8 +347,10 @@ def test_inference_with_user_sbi_problems(
                 ),
             ],
             marks=pytest.mark.xfail,
-        ),
-        pytest.param([Uniform(0, 1), Beta(1, 2),], marks=pytest.mark.xfail),
+        ),  # nested definition.
+        pytest.param(
+            [Uniform(0, 1), Beta(1, 2),], marks=pytest.mark.xfail
+        ),  # scalar dists.
         [
             Uniform(torch.zeros(1), torch.ones(1)),
             Uniform(torch.zeros(1), torch.ones(1)),
