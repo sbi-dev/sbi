@@ -1,6 +1,6 @@
 from abc import ABC
 from copy import deepcopy
-from typing import Callable, List, Optional, Union
+from typing import Callable, List, Optional, Union, Tuple, List
 import warnings
 
 import numpy as np
@@ -152,21 +152,18 @@ class SnpeBase(NeuralInference, ABC):
         Returns:
             Posterior that can be sampled and evaluated.
         """
-        try:
-            assert (
-                len(num_simulations_per_round) == num_rounds
-            ), "Please provide list with number of simulations per round for each round, or a single integer to be used for all rounds."
-        except TypeError:
-            num_simulations_per_round = [num_simulations_per_round] * num_rounds
 
-        round_description = ""
-        tbar = tqdm(range(num_rounds))
-        for round_ in tbar:
+        num_sims_per_round = self._ensure_list(num_simulations_per_round, num_rounds)
 
-            tbar.set_description(round_description)
+        tbar = tqdm(enumerate(num_sims_per_round))
+        for round_, num_sims in tbar:
 
-            # run simulations for the round
-            self._run_simulations(round_, num_simulations_per_round[round_])
+            # Run simulations for the round.
+            theta, x, prior_mask = self._run_simulations(round_, num_sims)
+            # XXX Rename bank -> rounds/roundwise.
+            self._theta_bank.append(theta)
+            self._x_bank.append(x)
+            self._prior_masks.append(prior_mask)
 
             # Fit posterior using newly aggregated data set.
             self._train(
@@ -183,13 +180,7 @@ class SnpeBase(NeuralInference, ABC):
             self._model_bank[-1].neural_net.eval()
 
             # Update description for progress bar.
-            round_description = (
-                f"-------------------------\n"
-                f"||||| ROUND {round_ + 1} STATS |||||:\n"
-                f"-------------------------\n"
-                f"Epochs trained: {self._summary['epochs'][-1]}\n"
-                f"Best validation performance: {self._summary['best_validation_log_probs'][-1]:.4f}\n\n"
-            )
+            tbar.set_description(self._describe_round(round_, self._summary))
 
             # Update tensorboard and summary dict.
             self._summary_writer, self._summary = utils.summarize(
@@ -225,7 +216,7 @@ class SnpeBase(NeuralInference, ABC):
 
     def _run_simulations(
         self, round_: int, num_sims: int,
-    ):
+    ) -> Tuple[Tensor, Tensor, Tensor]:
         r"""
         Run the simulations for a given round.
 
@@ -234,16 +225,14 @@ class SnpeBase(NeuralInference, ABC):
             num_sims: Number of simulations in the round.
 
         Returns:
-            self._theta_bank: $\theta$ used for training
-            self._x_bank: $x$ used for training
-            self._prior_masks: boolean masks of for each prior sample,
-                indicating whether prior sample will be used in current round
+            theta: Parameters used for training
+            x: Simulations used for training
+            prior_mask: Did the simulation come from a prior parameter sample?
         """
-        # Generate theta from prior in first round, and from most recent posterior
-        # estimate in subsequent rounds.
+
         if round_ == 0:
-            # One in mask -> prior simulations not used in rounds>=1.
-            prior_mask = torch.ones((num_sims, 1))
+            # In round 0, mark simulations as made from prior-drawn parameters.
+            prior_mask = torch.ones((num_sims, 1), dtype=torch.bool)
 
             num_missing_sims = max(num_sims - self._num_pilot_sims, 0)
 
@@ -258,17 +247,13 @@ class SnpeBase(NeuralInference, ABC):
                 x = torch.cat((x, missing_x), dim=0)
 
         else:
-            # Zero in mask -> prior simulations not used in rounds>=1.
-            prior_mask = torch.zeros((num_sims, 1))
-            # XXX Align signature of posterior.sample() with that of prior.sample().
+            # In subsequent rounds mark simulations as NOT from prior-drawn parameters.
+            prior_mask = torch.zeros((num_sims, 1), dtype=torch.bool)
+            # XXX Meke posterior.sample() accept tuples like prior.sample().
             theta = self._neural_posterior.sample(num_sims, x=self._x_o)
             x = self._batched_simulator(theta)
 
-        # XXX Return here round-wise outputs, accumulate elsewhere
-        # XXX Rename bank -> rounds/roundwise.
-        self._theta_bank.append(theta)
-        self._x_bank.append(x)
-        self._prior_masks.append(prior_mask)
+        return theta, x, prior_mask
 
     def _train(
         self,
@@ -288,11 +273,11 @@ class SnpeBase(NeuralInference, ABC):
         Uses early stopping on a held-out validation set as a terminating condition.
         """
 
-        # get the start index for what training set to use. Either 0 or 1
-        ix = int(self._discard_prior_samples and (round_ > 0))
+        # Starting index for the training set (1 = discard round-0 samples).
+        start = int(self._discard_prior_samples and round_ > 0)
 
         # Get total number of training examples.
-        num_examples = torch.cat(self._theta_bank[ix:]).shape[0]
+        num_examples = sum(map(len, self._theta_bank[start:]))
 
         # Select random neural_net and validation splits from (theta, x) pairs.
         permuted_indices = torch.randperm(num_examples)
@@ -305,9 +290,9 @@ class SnpeBase(NeuralInference, ABC):
 
         # Dataset is shared for training and validation loaders.
         dataset = data.TensorDataset(
-            torch.cat(self._theta_bank[ix:]),
-            torch.cat(self._x_bank[ix:]),
-            torch.cat(self._prior_masks[ix:]),
+            torch.cat(self._theta_bank[start:]),
+            torch.cat(self._x_bank[start:]),
+            torch.cat(self._prior_masks[start:]),
         )
 
         # Create neural_net and validation loaders using a subset sampler.
@@ -329,7 +314,7 @@ class SnpeBase(NeuralInference, ABC):
             list(self._neural_posterior.neural_net.parameters()), lr=learning_rate,
         )
         # Keep track of best_validation log_prob seen so far.
-        best_validation_log_prob = -1e100
+        best_validation_log_prob = float("-Inf")
         # Keep track of number of epochs since last improvement.
         epochs_since_last_improvement = 0
         # Keep track of model with best validation performance.
@@ -366,6 +351,7 @@ class SnpeBase(NeuralInference, ABC):
                 loss = -torch.mean(log_prob)
                 loss.backward()
                 if clip_grad_norm:
+                    # XXX Use default parameter or MODULE_CONSTANT for max_norm.
                     clip_grad_norm_(
                         self._neural_posterior.neural_net.parameters(), max_norm=5.0
                     )

@@ -1,13 +1,12 @@
 from abc import ABC
 import os.path
-from typing import Callable, Optional
-import warnings
+from typing import Callable, Dict, List, Optional, Union
 
 import torch
 from torch import Tensor
-from torch.distributions import Uniform
 from torch.utils.tensorboard import SummaryWriter
 
+from sbi.simulators.simutils import simulate_in_batches
 from sbi.user_input.user_input_checks import prepare_sbi_problem
 from sbi.utils import get_log_root, get_timestamp
 from sbi.utils.torchutils import get_default_device
@@ -26,10 +25,8 @@ class NeuralInference(ABC):
         summary_writer: Optional[SummaryWriter] = None,
         simulator_name: Optional[str] = "simulator",
     ):
-
         r"""
         Args:
-
             simulator: a regular function parameter->result
                 Both parameters and result can be multi-dimensional.         
             prior: distribution-like object with `log_prob`and `sample` methods.
@@ -87,3 +84,34 @@ class NeuralInference(ABC):
             epochs=[],
             best_validation_log_probs=[],
         )
+
+    @staticmethod
+    def _ensure_list(
+        num_simulations_per_round: Union[List, int], num_rounds: int
+    ) -> List[int]:
+        """Return `num_simulations_per_round` as a list of length `num_rounds`.
+        """
+        try:
+            assert (
+                len(num_simulations_per_round) == num_rounds
+            ), "Please provide list with number of simulations per round for each round, or a single integer to be used for all rounds."
+        except TypeError:
+            num_simulations_per_round = [num_simulations_per_round] * num_rounds
+        return num_simulations_per_round
+
+    @staticmethod
+    def _describe_round(round_: int, summary: Dict[str, list]) -> str:
+        epochs = summary["epochs"][-1]
+        best_validation_log_probs = summary["best_validation_log_probs"][-1]
+
+        description = f"""
+        -------------------------
+        ||||| ROUND {round_ + 1} STATS |||||:
+        -------------------------
+        Epochs trained: {epochs}
+        Best validation performance: {best_validation_log_probs:.4f}
+
+
+        """
+
+        return description
