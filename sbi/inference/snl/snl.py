@@ -92,18 +92,17 @@ class SNL(NeuralInference):
         Returns:
             Posterior $p(\theta|x_o)$ that can be sampled and evaluated
         """
-        round_description = ""
-        tbar = tqdm(range(num_rounds))
-        for round_ in tbar:
+        num_sims_per_round = self._ensure_list(num_simulations_per_round, num_rounds)
 
-            tbar.set_description(round_description)
+        tbar = tqdm(enumerate(num_sims_per_round))
+        for round_, num_sims in tbar:
 
             # Generate parameters theta from prior in first round, and from most recent
             # posterior estimate in subsequent rounds.
             if round_ == 0:
-                theta = self._prior.sample((num_simulations_per_round,))
+                theta = self._prior.sample((num_sims,))
             else:
-                theta = self._neural_posterior.sample(num_simulations_per_round)
+                theta = self._neural_posterior.sample(num_sims)
 
             x = self._batched_simulator(theta)
             # Store (theta, x) pairs.
@@ -119,13 +118,7 @@ class SNL(NeuralInference):
             )
 
             # Update description for progress bar.
-            round_description = (
-                f"-------------------------\n"
-                f"||||| ROUND {round_ + 1} STATS |||||:\n"
-                f"-------------------------\n"
-                f"Epochs trained: {self._summary['epochs'][-1]}\n"
-                f"Best validation performance: {self._summary['best_validation_log_probs'][-1]:.4f}\n\n"
-            )
+            tbar.set_description(self._describe_round(round_, self._summary))
 
             # Update TensorBoard and summary dict.
             self._summary_writer, self._summary = utils.summarize(
