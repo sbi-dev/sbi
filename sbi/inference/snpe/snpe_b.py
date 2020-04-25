@@ -16,7 +16,7 @@ class SnpeB(SnpeBase):
         simulator,
         prior,
         x_o,
-        num_pilot_samples=100,
+        num_pilot_sims=100,
         density_estimator="maf",
         calibration_kernel=None,
         use_combined_loss=False,
@@ -34,7 +34,7 @@ class SnpeB(SnpeBase):
          NeurIPS 2017, https://arxiv.org/abs/1711.01861
         
         Args:
-            num_pilot_samples: number of simulations that are run when
+            num_pilot_sims: number of simulations that are run when
                 instantiating an object. Used to z-score the data $x$.
             density_estimator: neural density estimator
             calibration_kernel: a function to calibrate the data $x$
@@ -52,7 +52,7 @@ class SnpeB(SnpeBase):
             simulator=simulator,
             prior=prior,
             x_o=x_o,
-            num_pilot_samples=num_pilot_samples,
+            num_pilot_sims=num_pilot_sims,
             density_estimator=density_estimator,
             calibration_kernel=calibration_kernel,
             use_combined_loss=use_combined_loss,

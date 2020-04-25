@@ -16,7 +16,7 @@ class SnpeA(SnpeBase):
         simulator,
         prior,
         x_o,
-        num_pilot_samples=100,
+        num_pilot_sims=100,
         density_estimator="maf",
         use_combined_loss=False,
         z_score_x=True,
@@ -32,7 +32,7 @@ class SnpeA(SnpeBase):
         https://arxiv.org/abs/1605.06376
         
         Args:
-            num_pilot_samples: number of simulations that are run when
+            num_pilot_sims: number of simulations that are run when
                 instantiating an object. Used to z-score the data x.
             density_estimator: neural density estimator
             calibration_kernel: a function to calibrate the data x
@@ -51,7 +51,7 @@ class SnpeA(SnpeBase):
             simulator=simulator,
             prior=prior,
             x_o=x_o,
-            num_pilot_samples=num_pilot_samples,
+            num_pilot_sims=num_pilot_sims,
             density_estimator=density_estimator,
             use_combined_loss=use_combined_loss,
             z_score_x=z_score_x,

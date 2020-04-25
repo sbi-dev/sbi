@@ -52,11 +52,14 @@ class NeuralInference(ABC):
             simulator, prior, x_o
         )
 
-        self._simulation_batch_size = simulation_batch_size
+        self._batched_simulator = lambda theta: simulate_in_batches(
+            self._simulator, theta, simulation_batch_size
+        )
 
         self._device = get_default_device() if device is None else device
 
-        # Initialize roundwise (theta, x) for (parameters, simulation outputs) storage.
+        # Initialize roundwise (theta, x) for storage of parameters and simulations.
+        # XXX rename self._roundwise_theta, self._roundwise_x = [], []
         self._theta_bank, self._x_bank = [], []
 
         # XXX We could instantiate here the Posterior for all children. Two problems:

@@ -1,12 +1,11 @@
 from __future__ import annotations
-
 from copy import deepcopy
 from typing import Any, Callable, Dict, List, Optional, Union
 
 import numpy as np
-import torch
 from pyro.infer.mcmc import HMC, NUTS
 from pyro.infer.mcmc.api import MCMC
+import torch
 from torch import Tensor, nn, optim
 from torch.nn.utils import clip_grad_norm_
 from torch.utils import data
@@ -14,10 +13,9 @@ from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-import sbi.simulators as simulators
-import sbi.utils as utils
 from sbi.inference.base import NeuralInference
 from sbi.inference.posteriors.sbi_posterior import Posterior
+import sbi.utils as utils
 
 
 class SNL(NeuralInference):
@@ -103,27 +101,14 @@ class SNL(NeuralInference):
             # Generate parameters theta from prior in first round, and from most recent
             # posterior estimate in subsequent rounds.
             if round_ == 0:
-                theta, x = simulators.simulate_in_batches(
-                    simulator=self._simulator,
-                    parameter_sample_fn=lambda num_samples: self._prior.sample(
-                        (num_samples,)
-                    ),
-                    num_samples=num_simulations_per_round,
-                    simulation_batch_size=self._simulation_batch_size,
-                )
+                theta = self._prior.sample((num_simulations_per_round,))
             else:
-                theta, x = simulators.simulate_in_batches(
-                    simulator=self._simulator,
-                    parameter_sample_fn=lambda num_samples: self._neural_posterior.sample(
-                        num_samples
-                    ),
-                    num_samples=num_simulations_per_round,
-                    simulation_batch_size=self._simulation_batch_size,
-                )
+                theta = self._neural_posterior.sample(num_simulations_per_round)
 
+            x = self._batched_simulator(theta)
             # Store (theta, x) pairs.
-            self._theta_bank.append(torch.as_tensor(theta))
-            self._x_bank.append(torch.as_tensor(x))
+            self._theta_bank.append(theta)
+            self._x_bank.append(x)
 
             # Fit neural likelihood to newly aggregated dataset.
             self._train(
