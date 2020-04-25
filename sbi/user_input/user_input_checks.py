@@ -413,12 +413,10 @@ def wrap_as_batch_simulator(simulator: Callable, prior) -> Callable:
 def get_batched_simulator(simulator: Callable) -> Callable:
     """Return simulator wrapped with `map` to handle batches of parameters."""
 
-    # XXX: this should be handled with more care, e.g., enable multiprocessing
-    # XXX: with Pool() as p: p.map(...)
     def batched_simulator(theta: Tensor) -> Tensor:
         theta = ensure_theta_batched(theta)
-        # use map to get data for every theta in batch
-        # use stack to collect list of tensors in tensor
+        # XXX: this should be handled with more care, e.g., enable multiprocessing
+        # XXX: with Pool() as p: p.map(...)
         return torch.stack(list(map(simulator, theta)))
 
     return batched_simulator

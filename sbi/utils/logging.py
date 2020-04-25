@@ -3,7 +3,8 @@ import torch
 import sbi.simulators as simulators
 import sbi.utils as utils
 
-
+# XXX Now we have NeuralInference superclass, this belongs as a method there
+# XXX try/except only when needed, make exceptions specific
 def summarize(
     summary_writer,
     summary,

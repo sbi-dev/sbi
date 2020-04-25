@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import pytest
 import torch
-from torch import Tensor
 from torch.distributions import MultivariateNormal
 
 from sbi.inference.snpe import SnpeC
 from sbi.simulators.linear_gaussian import linear_gaussian
-from sbi.inference.base import simulate_in_batches
+from sbi.simulators.simutils import simulate_in_batches
 from sbi.utils.torchutils import BoxUniform
 
 # use cpu by default
