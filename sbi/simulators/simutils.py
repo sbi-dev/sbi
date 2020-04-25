@@ -28,7 +28,8 @@ def simulate_in_batches(
     if num_sims == 0:
         raise ValueError("Zero-length parameter theta implies zero simulations.")
     elif sim_batch_size is not None and sim_batch_size < num_sims:
-        # Pyright complains of lack of a type stub for torch.split as of 1.4.0
+        # Dev note: pyright complains of torch.split lacking a type stub
+        # as of PyTorch 1.4.0, see https://github.com/microsoft/pyright/issues/291
         batches = torch.split(theta, sim_batch_size, dim=0)
         return torch.cat([simulator(batch) for batch in batches], dim=0)
     else:
