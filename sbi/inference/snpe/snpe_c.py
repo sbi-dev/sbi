@@ -17,7 +17,7 @@ class SnpeC(SnpeBase):
         prior,
         x_o,
         num_atoms=-1,
-        num_pilot_samples=100,
+        num_pilot_sims=100,
         density_estimator=None,
         calibration_kernel=None,
         use_combined_loss=False,
@@ -36,7 +36,7 @@ class SnpeC(SnpeBase):
         Inference_ by Greenberg et al., ICML 2019, https://arxiv.org/abs/1905.07488
 
         Args:
-            num_pilot_samples: number of simulations that are run when
+            num_pilot_sims: number of simulations that are run when
                 instantiating an object. Used to z-score the observations.   
             density_estimator: neural density estimator
             calibration_kernel: a function to calibrate the data $x$
@@ -57,7 +57,7 @@ class SnpeC(SnpeBase):
             simulator=simulator,
             prior=prior,
             x_o=x_o,
-            num_pilot_samples=num_pilot_samples,
+            num_pilot_sims=num_pilot_sims,
             density_estimator=density_estimator,
             calibration_kernel=calibration_kernel,
             use_combined_loss=use_combined_loss,

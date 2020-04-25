@@ -1,24 +1,21 @@
-import warnings
 from abc import ABC
 from copy import deepcopy
-from typing import Any, Callable, List, Optional, Union
+from typing import Callable, List, Optional, Union
+import warnings
 
 import numpy as np
-import torch
 from pyknos.mdn.mdn import MultivariateGaussianMDN
-from torch import Tensor, float32, nn, optim
-from torch.distributions import Distribution
+import torch
+from torch import Tensor, nn, optim
 from torch.nn.utils import clip_grad_norm_
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-import sbi.utils as utils
 from sbi.inference.base import NeuralInference
 from sbi.inference.posteriors.sbi_posterior import Posterior
-from sbi.simulators.simutils import simulate_in_batches
-from sbi.utils.torchutils import get_default_device
+import sbi.utils as utils
 
 
 class SnpeBase(NeuralInference, ABC):
@@ -27,7 +24,7 @@ class SnpeBase(NeuralInference, ABC):
         simulator: Callable,
         prior,
         x_o: Tensor,
-        num_pilot_samples: int = 100,
+        num_pilot_sims: int = 100,
         density_estimator=None,
         calibration_kernel: Optional[Callable] = None,
         z_score_x: bool = True,
@@ -44,7 +41,7 @@ class SnpeBase(NeuralInference, ABC):
         See NeuralInference docstring for all other arguments.
 
         Args:
-            num_pilot_samples: number of simulations that are run when
+            num_pilot_sims: number of simulations that are run when
                 instantiating an object. Used to z-score the data x.
             density_estimator: neural density estimator
             calibration_kernel: a function to calibrate the data x
@@ -64,7 +61,7 @@ class SnpeBase(NeuralInference, ABC):
 
         self._z_score_x = z_score_x
 
-        self._num_pilot_samples = num_pilot_samples
+        self._num_pilot_sims = num_pilot_sims
         self._use_combined_loss = use_combined_loss
         self._discard_prior_samples = discard_prior_samples
 
@@ -73,13 +70,8 @@ class SnpeBase(NeuralInference, ABC):
 
         self._retrain_from_scratch_each_round = retrain_from_scratch_each_round
 
-        # run prior samples
-        (self.pilot_theta, self.pilot_x,) = simulate_in_batches(
-            simulator=self._simulator,
-            parameter_sample_fn=lambda num_samples: self._prior.sample((num_samples,)),
-            num_samples=num_pilot_samples,
-            simulation_batch_size=self._simulation_batch_size,
-        )
+        self.pilot_theta = self._prior.sample((num_pilot_sims,))
+        self.pilot_x = self._batched_simulator(self.pilot_theta)
 
         # create the deep neural density estimator
         if density_estimator is None:
@@ -232,58 +224,51 @@ class SnpeBase(NeuralInference, ABC):
         raise NotImplementedError
 
     def _run_simulations(
-        self, round_: int, num_samples: int,
+        self, round_: int, num_sims: int,
     ):
         r"""
         Run the simulations for a given round.
 
         Args:
             round_: Round
-            num_samples: Number of simulations in current round.
+            num_sims: Number of simulations in the round.
 
         Returns:
             self._theta_bank: $\theta$ used for training
             self._x_bank: $x$ used for training
-            self._prior_masks: Masks of 0/1 for each prior sample,
+            self._prior_masks: boolean masks of for each prior sample,
                 indicating whether prior sample will be used in current round
         """
         # Generate theta from prior in first round, and from most recent posterior
         # estimate in subsequent rounds.
         if round_ == 0:
-            # New simulations are run only if pilot samples are not enough.
-            num_samples_remaining = num_samples - self._num_pilot_samples
-            if num_samples_remaining > 0:
-                theta, x = simulate_in_batches(
-                    simulator=self._simulator,
-                    parameter_sample_fn=lambda num_samples: self._prior.sample(
-                        (num_samples,)
-                    ),
-                    num_samples=num_samples_remaining,
-                    simulation_batch_size=self._simulation_batch_size,
-                )
-                theta = torch.cat((theta, self.pilot_theta[:num_samples]), dim=0,)
-                x = torch.cat((x, self.pilot_x[:num_samples]), dim=0,)
-            else:
-                theta = self.pilot_theta[:num_samples]
-                x = self.pilot_x[:num_samples]
+            # One in mask -> prior simulations not used in rounds>=1.
+            prior_mask = torch.ones((num_sims, 1))
+
+            num_missing_sims = max(num_sims - self._num_pilot_sims, 0)
+
+            # We take at most the total requested number from the pilot run.
+            theta = self.pilot_theta[:num_sims]
+            x = self.pilot_x[:num_sims]
+            if num_missing_sims > 0:
+                # If missing, we produce extra simulations as needed.
+                missing_theta = self._prior.sample((num_missing_sims,))
+                missing_x = self._batched_simulator(missing_theta)
+                theta = torch.cat((theta, missing_theta), dim=0)
+                x = torch.cat((x, missing_x), dim=0)
 
         else:
-            theta, x = simulate_in_batches(
-                simulator=self._simulator,
-                parameter_sample_fn=lambda num_samples: self._neural_posterior.sample(
-                    num_samples, x=self._x_o,
-                ),
-                num_samples=num_samples,
-                simulation_batch_size=self._simulation_batch_size,
-            )
+            # Zero in mask -> prior simulations not used in rounds>=1.
+            prior_mask = torch.zeros((num_sims, 1))
+            # XXX Align signature of posterior.sample() with that of prior.sample().
+            theta = self._neural_posterior.sample(num_sims, x=self._x_o)
+            x = self._batched_simulator(theta)
 
-        # Store (theta, x) pairs.
+        # XXX Return here round-wise outputs, accumulate elsewhere
+        # XXX Rename bank -> rounds/roundwise.
         self._theta_bank.append(theta)
         self._x_bank.append(x)
-        # Mark simulations sampled from prior.
-        self._prior_masks.append(
-            torch.ones(num_samples, 1) if round_ == 0 else torch.zeros(num_samples, 1)
-        )
+        self._prior_masks.append(prior_mask)
 
     def _train(
         self,

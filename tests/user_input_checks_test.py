@@ -1,14 +1,11 @@
 from __future__ import annotations
-
 from typing import Callable, Optional, Union
 
 import numpy as np
 import pytest
 import torch
-import warnings
-from scipy.stats import beta, multivariate_normal, uniform
 from torch import Tensor
-from torch.distributions import Distribution, MultivariateNormal, Uniform, Gamma, Beta
+from torch.distributions import Beta, Distribution, Gamma, MultivariateNormal, Uniform
 
 from sbi.inference.snpe import SnpeC
 from sbi.simulators.linear_gaussian import linear_gaussian
@@ -18,14 +15,7 @@ from sbi.user_input.user_input_checks import (
     process_simulator,
     process_x_o,
 )
-from sbi.user_input.user_input_checks_utils import (
-    CustomPytorchWrapper,
-    PytorchReturnTypeWrapper,
-    ScipyPytorchWrapper,
-    MultipleIndependent,
-)
-from sbi.simulators.simutils import simulate_in_batches
-from sbi.utils.get_nn_models import posterior_nn
+from sbi.user_input.user_input_checks_utils import MultipleIndependent
 from sbi.utils.torchutils import BoxUniform
 
 # use cpu by default
@@ -381,7 +371,6 @@ def test_independent_joint_shapes_and_samples(dists):
     assert joint.log_prob(sample).shape == torch.Size([1])
 
     num_samples = 10
-    num_dists = len(dists)
 
     # seed sampling for later comparison.
     torch.manual_seed(seed)
@@ -400,7 +389,7 @@ def test_independent_joint_shapes_and_samples(dists):
     true_log_probs = []
 
     # Get samples and log probs by hand.
-    for idx, d in enumerate(dists):
+    for d in dists:
         sample = d.sample((num_samples,))
         true_samples.append(sample)
         true_log_probs.append(d.log_prob(sample).reshape(num_samples, -1))
