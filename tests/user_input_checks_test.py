@@ -4,6 +4,7 @@ from typing import Callable, Optional, Union
 import numpy as np
 import pytest
 import torch
+from scipy.stats import beta, multivariate_normal, uniform
 from torch import Tensor
 from torch.distributions import Beta, Distribution, Gamma, MultivariateNormal, Uniform
 
@@ -15,7 +16,12 @@ from sbi.user_input.user_input_checks import (
     process_simulator,
     process_x_o,
 )
-from sbi.user_input.user_input_checks_utils import MultipleIndependent
+from sbi.user_input.user_input_checks_utils import (
+    CustomPytorchWrapper,
+    MultipleIndependent,
+    PytorchReturnTypeWrapper,
+    ScipyPytorchWrapper,
+)
 from sbi.utils.torchutils import BoxUniform
 
 # use cpu by default
@@ -65,6 +71,43 @@ def matrix_simulator(theta):
     """Return a 2-by-2 matrix."""
     assert theta.numel() == 4
     return theta.reshape(2, 2)
+
+
+@pytest.mark.parametrize(
+    "wrapper, prior",
+    (
+        (
+            CustomPytorchWrapper,
+            UserNumpyUniform(torch.zeros(3), torch.ones(3), return_numpy=True),
+        ),
+        (ScipyPytorchWrapper, multivariate_normal()),
+        (ScipyPytorchWrapper, uniform()),
+        (ScipyPytorchWrapper, beta(a=1, b=1)),
+        (
+            PytorchReturnTypeWrapper,
+            BoxUniform(
+                torch.zeros(3, dtype=torch.float64), torch.ones(3, dtype=torch.float64)
+            ),
+        ),
+    ),
+)
+def test_prior_wrappers(wrapper, prior):
+    """Test prior wrappers to pytorch distributions."""
+    prior = wrapper(prior)
+
+    # use 2 here to test for minimal case >1
+    batch_size = 2
+    theta = prior.sample((batch_size,))
+    assert isinstance(theta, Tensor)
+    assert theta.shape[0] == batch_size
+
+    # Test log prob on batch of thetas.
+    log_probs = prior.log_prob(theta)
+    assert isinstance(log_probs, Tensor)
+    assert log_probs.shape[0] == batch_size
+
+    # Test return type
+    assert prior.sample().dtype == torch.float32
 
 
 def test_reinterpreted_batch_dim_prior():
