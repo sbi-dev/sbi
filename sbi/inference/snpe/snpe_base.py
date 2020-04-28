@@ -221,8 +221,9 @@ class SnpeBase(NeuralInference, ABC):
         Run the simulations for a given round.
 
         Args:
-            round_: Round
-            num_sims: Number of simulations in the round.
+            round_: Round number
+            num_sims: Number of desired simulations for the round.
+                Note that if leakage correction is requested with finite patience this number may not be reached; A warning will be displayed in this case. 
 
         Returns:
             theta: Parameters used for training
@@ -231,14 +232,12 @@ class SnpeBase(NeuralInference, ABC):
         """
 
         if round_ == 0:
-            # In round 0, mark simulations as made from prior-drawn parameters.
-            prior_mask = torch.ones((num_sims, 1), dtype=torch.bool)
-
-            num_missing_sims = max(num_sims - self._num_pilot_sims, 0)
-
             # We take at most the total requested number from the pilot run.
             theta = self.pilot_theta[:num_sims]
             x = self.pilot_x[:num_sims]
+
+            num_missing_sims = max(num_sims - self._num_pilot_sims, 0)
+
             if num_missing_sims > 0:
                 # If missing, we produce extra simulations as needed.
                 missing_theta = self._prior.sample((num_missing_sims,))
@@ -247,13 +246,23 @@ class SnpeBase(NeuralInference, ABC):
                 x = torch.cat((x, missing_x), dim=0)
 
         else:
-            # In subsequent rounds mark simulations as NOT from prior-drawn parameters.
-            prior_mask = torch.zeros((num_sims, 1), dtype=torch.bool)
-            # XXX Meke posterior.sample() accept tuples like prior.sample().
+            # XXX Make posterior.sample() accept tuples like prior.sample().
             theta = self._neural_posterior.sample(num_sims, x=self._x_o)
             x = self._batched_simulator(theta)
 
-        return theta, x, prior_mask
+        return theta, x, self._mask_sims_from_prior(round_, theta.size(0))
+
+    def _mask_sims_from_prior(self, round_: int, num_simulations: int) -> Tensor:
+        """Returns Tensor True where simulated from prior parameters.
+
+        Args:
+            round_: Current training round, starting at 0.
+            num_simulations: Actually performed simulations. This number can be below
+                the one fixed for the round if leakage correction through sampling is active and `patience` is not enough to reach it. 
+        """
+
+        prior_mask_values = torch.ones if round_ == 0 else torch.zeros
+        return prior_mask_values((num_simulations, 1), dtype=torch.bool)
 
     def _train(
         self,
@@ -274,15 +283,13 @@ class SnpeBase(NeuralInference, ABC):
         """
 
         # Starting index for the training set (1 = discard round-0 samples).
-        start = int(self._discard_prior_samples and round_ > 0)
-
-        # Get total number of training examples.
-        num_examples = sum(map(len, self._theta_bank[start:]))
+        start_idx = int(self._discard_prior_samples and round_ > 0)
+        num_total_examples = sum(len(theta) for theta in self._theta_bank[start_idx:])
 
         # Select random neural_net and validation splits from (theta, x) pairs.
-        permuted_indices = torch.randperm(num_examples)
-        num_training_examples = int((1 - validation_fraction) * num_examples)
-        num_validation_examples = num_examples - num_training_examples
+        permuted_indices = torch.randperm(num_total_examples)
+        num_training_examples = int((1 - validation_fraction) * num_total_examples)
+        num_validation_examples = num_total_examples - num_training_examples
         train_indices, val_indices = (
             permuted_indices[:num_training_examples],
             permuted_indices[num_training_examples:],
@@ -290,9 +297,9 @@ class SnpeBase(NeuralInference, ABC):
 
         # Dataset is shared for training and validation loaders.
         dataset = data.TensorDataset(
-            torch.cat(self._theta_bank[start:]),
-            torch.cat(self._x_bank[start:]),
-            torch.cat(self._prior_masks[start:]),
+            torch.cat(self._theta_bank[start_idx:]),
+            torch.cat(self._x_bank[start_idx:]),
+            torch.cat(self._prior_masks[start_idx:]),
         )
 
         # Create neural_net and validation loaders using a subset sampler.
