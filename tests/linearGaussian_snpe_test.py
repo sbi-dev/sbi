@@ -1,6 +1,7 @@
 import pytest
 import torch
-from torch import distributions
+from torch import zeros, ones, eye
+from torch.distributions import MultivariateNormal
 
 import sbi.utils as utils
 import tests.utils_for_testing.linearGaussian_logprob as test_utils
@@ -13,7 +14,7 @@ from sbi.simulators.linear_gaussian import (
 )
 from sbi.user_input.user_input_checks import prepare_sbi_problem
 
-# use cpu by default
+# Use cpu by default.
 torch.set_default_tensor_type("torch.FloatTensor")
 
 
@@ -27,14 +28,14 @@ torch.set_default_tensor_type("torch.FloatTensor")
         (3, "gaussian", "snpe_c", 1),
     ),
 )
-def test_apt_on_linearGaussian_based_on_mmd(
+def test_snpe_on_linearGaussian_based_on_mmd(
     num_dim: int,
     prior_str: str,
     algorithm_str: str,
     simulation_batch_size: int,
     set_seed,
 ):
-    """Test whether APT infers well a simple example where ground truth is available.
+    """Test whether SNPE B/C infer well a simple example with available round truth.
 
     This test is seeded using the set_seed fixture defined in tests/conftest.py.
 
@@ -42,18 +43,16 @@ def test_apt_on_linearGaussian_based_on_mmd(
         set_seed: fixture for manual seeding, see tests/conftest.py
     """
 
-    x_o = torch.zeros(1, num_dim)
+    x_o = zeros(1, num_dim)
     num_samples = 100
 
     if prior_str == "gaussian":
-        prior = distributions.MultivariateNormal(
-            loc=torch.zeros(num_dim), covariance_matrix=torch.eye(num_dim)
-        )
+        prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
         target_samples = get_true_posterior_samples_linear_gaussian_mvn_prior(
             x_o, num_samples=num_samples
         )
     else:
-        prior = utils.BoxUniform(-1.0 * torch.ones(num_dim), torch.ones(num_dim))
+        prior = utils.BoxUniform(-1.0 * ones(num_dim), ones(num_dim))
         target_samples = get_true_posterior_samples_linear_gaussian_uniform_prior(
             x_o, num_samples=num_samples, prior=prior
         )
@@ -79,13 +78,7 @@ def test_apt_on_linearGaussian_based_on_mmd(
     elif algorithm_str == "snpe_c":
         infer = SnpeC(num_atoms=-1, sample_with_mcmc=False, **snpe_common_args)
 
-    # Run inference.
-    num_rounds, num_simulations_per_round = 1, 1000
-    posterior = infer(
-        num_rounds=num_rounds, num_simulations_per_round=num_simulations_per_round,
-    )
-
-    # Draw from posterior.
+    posterior = infer(num_rounds=1, num_simulations_per_round=1000)  # type: ignore
     samples = posterior.sample(num_samples)
 
     # Compute the mmd, and check if larger than expected
@@ -138,7 +131,7 @@ def test_apt_on_linearGaussian_based_on_mmd(
 # Test multi-round SNPE.
 @pytest.mark.parametrize("algorithm_str", ("snpe_b", "snpe_c"))
 def test_multi_round_snpe_on_linearGaussian_based_on_mmd(algorithm_str: str, set_seed):
-    """Test whether APT infers well a simple example where ground truth is available.
+    """Test whether SNPE B/C infer well a simple example with available ground truth.
 
     This test is seeded using the set_seed fixture defined in tests/conftest.py.
 
@@ -147,19 +140,15 @@ def test_multi_round_snpe_on_linearGaussian_based_on_mmd(algorithm_str: str, set
     """
 
     num_dim = 3
-    true_observation = torch.zeros((1, num_dim))
+    true_observation = zeros((1, num_dim))
     num_samples = 100
 
-    prior = distributions.MultivariateNormal(
-        loc=torch.zeros(num_dim), covariance_matrix=torch.eye(num_dim)
-    )
+    prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
     target_samples = get_true_posterior_samples_linear_gaussian_mvn_prior(
         true_observation, num_samples=num_samples
     )
 
-    simulator, prior, x_o = prepare_sbi_problem(
-        linear_gaussian, prior, true_observation
-    )
+    simulator, prior, _ = prepare_sbi_problem(linear_gaussian, prior, true_observation)
 
     neural_net = utils.posterior_nn(model="maf", prior=prior, x_o=true_observation,)
 
@@ -184,13 +173,7 @@ def test_multi_round_snpe_on_linearGaussian_based_on_mmd(algorithm_str: str, set
             **snpe_common_args,
         )
 
-    # Run inference.
-    num_rounds, num_simulations_per_round = 2, 1000
-    posterior = infer(
-        num_rounds=num_rounds, num_simulations_per_round=num_simulations_per_round
-    )
-
-    # Draw from posterior.
+    posterior = infer(num_rounds=2, num_simulations_per_round=1000)  # type: ignore
     samples = posterior.sample(num_samples)
 
     # Compute the mmd, and check if larger than expected.
@@ -281,7 +264,7 @@ def test_multi_round_snpe_deterministic_simulator(set_seed, z_score_min_std):
         (False, "rejection", "uniform"),
     ),
 )
-def test_apt_posterior_correction(sample_with_mcmc, mcmc_method, prior, set_seed):
+def test_snpec_posterior_correction(sample_with_mcmc, mcmc_method, prior, set_seed):
     """Test that leakage correction applied to sampling works, with both MCMC and
     rejection.
 
@@ -294,17 +277,11 @@ def test_apt_posterior_correction(sample_with_mcmc, mcmc_method, prior, set_seed
     num_dim = 2
 
     if prior == "gaussian":
-        prior = distributions.MultivariateNormal(
-            loc=torch.zeros(num_dim), covariance_matrix=torch.eye(num_dim)
-        )
+        prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
     else:
-        prior = utils.BoxUniform(
-            low=-1.0 * torch.ones(num_dim), high=torch.ones(num_dim)
-        )
+        prior = utils.BoxUniform(low=-1.0 * ones(num_dim), high=ones(num_dim))
 
-    simulator, prior, x_o = prepare_sbi_problem(
-        linear_gaussian, prior, torch.zeros(num_dim)
-    )
+    simulator, prior, x_o = prepare_sbi_problem(linear_gaussian, prior, zeros(num_dim))
 
     neural_net = utils.posterior_nn(model="maf", prior=prior, x_o=x_o,)
 
@@ -323,14 +300,9 @@ def test_apt_posterior_correction(sample_with_mcmc, mcmc_method, prior, set_seed
         mcmc_method=mcmc_method,
     )
 
-    # Run inference.
-    num_rounds, num_simulations_per_round = 1, 1000
-    posterior = infer(
-        num_rounds=num_rounds, num_simulations_per_round=num_simulations_per_round
-    )
+    posterior = infer(num_rounds=1, num_simulations_per_round=1000)
 
-    # Draw samples from posterior (should be corrected for leakage)
-    # even if just num_rounds=1.
+    # Posterior should be corrected for leakage even if num_rounds just 1.
     samples = posterior.sample(10)
 
     # Evaluate the samples to check correction factor.
