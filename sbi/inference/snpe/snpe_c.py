@@ -29,6 +29,7 @@ class SnpeC(SnpeBase):
         device=None,
         sample_with_mcmc=False,
         mcmc_method="slice-np",
+        z_score_min_std: float = 1e-7,
     ):
         r"""SNPE-C / APT
 
@@ -51,6 +52,8 @@ class SnpeC(SnpeBase):
             num_atoms: int
                 Number of atoms to use for classification.
                 If -1, use all other thetas in minibatch.
+            z_score_min_std: Minimum value of the standard deviation to use when
+                standardizing inputs. This is typically needed when some simulator outputs are deterministic or nearly so.
         """
 
         super(SnpeC, self).__init__(
@@ -68,6 +71,7 @@ class SnpeC(SnpeBase):
             device=device,
             sample_with_mcmc=sample_with_mcmc,
             mcmc_method=mcmc_method,
+            z_score_min_std=z_score_min_std,
         )
 
         assert isinstance(num_atoms, int), "Number of atoms must be an integer."

@@ -205,6 +205,69 @@ def test_multi_round_snpe_on_linearGaussian_based_on_mmd(algorithm_str: str, set
     samples = posterior.sample(num_samples)
 
 
+@pytest.mark.parametrize(
+    "z_score_min_std",
+    [
+        pytest.param(
+            0.0,
+            marks=pytest.mark.xfail(
+                raises=AttributeError,
+                reason="If the simulator has truely deterministic (even partial) outputs, NaNs appear while standardizing if not enforcing z_score_std > 0. The AttributeError is rather remote - while attempting to save fit parameters (deepcopy).",
+            ),
+        ),
+        pytest.param(
+            1e-7,
+            marks=pytest.mark.xfail(
+                raises=AssertionError,
+                reason="If the simulator has truely deterministic (even partial) outputs, the inference can succeed with z_score_std > 0, but the log posterior will have infinites, which we reject.",
+            ),
+        ),
+    ],
+)
+def test_multi_round_snpe_deterministic_simulator(set_seed, z_score_min_std):
+    """Test if a deterministic simulator breaks inference for SNPE B.
+    
+    This test is seeded using the set_seed fixture defined in tests/conftest.py.
+
+    Args:
+        set_seed: fixture for manual seeding, see tests/conftest.py.
+    """
+
+    num_dim = 3
+    true_observation = zeros((1, num_dim))
+    num_samples = 100
+
+    prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
+    target_samples = get_true_posterior_samples_linear_gaussian_mvn_prior(
+        true_observation, num_samples=num_samples
+    )
+
+    simulator, prior, _ = prepare_sbi_problem(linear_gaussian, prior, true_observation)
+
+    def deterministic_simulator(theta):
+        """Simulator with deterministic last output dimension (across batches)."""
+        result = simulator(theta)
+        result[:, num_dim - 1] = 1.0
+
+        return result
+
+    neural_net = utils.posterior_nn(model="maf", prior=prior, x_o=true_observation)
+    infer = SnpeB(
+        simulator=deterministic_simulator,
+        x_o=true_observation,
+        density_estimator=neural_net,
+        prior=prior,
+        z_score_x=True,
+        use_combined_loss=False,
+        retrain_from_scratch_each_round=False,
+        discard_prior_samples=False,
+        simulation_batch_size=10,
+        z_score_min_std=z_score_min_std,
+    )
+
+    infer(num_rounds=2, num_simulations_per_round=1000)
+
+
 # Testing rejection and mcmc sampling methods.
 @pytest.mark.slow
 @pytest.mark.parametrize(
