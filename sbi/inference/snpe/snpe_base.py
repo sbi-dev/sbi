@@ -36,6 +36,7 @@ class SnpeBase(NeuralInference, ABC):
         sample_with_mcmc: bool = False,
         mcmc_method: str = "slice-np",
         summary_writer: Optional[SummaryWriter] = None,
+        z_score_min_std: float = 1e-7,
     ):
         """
         See NeuralInference docstring for all other arguments.
@@ -53,6 +54,8 @@ class SnpeBase(NeuralInference, ABC):
                 density estimator for the posterior from scratch each round.
             discard_prior_samples: whether to discard prior samples from round
                 two onwards.
+            z_score_min_std: Minimum value of the standard deviation to use when
+                standardizing inputs. This is typically needed when some simulator outputs are deterministic or nearly so.
         """
 
         super().__init__(
@@ -105,7 +108,7 @@ class SnpeBase(NeuralInference, ABC):
         # new embedding_net contains z-scoring
         if not isinstance(self._neural_posterior.neural_net, MultivariateGaussianMDN):
             embedding = nn.Sequential(
-                utils.Standardize(self.x_mean, self.x_std),
+                utils.Standardize(self.x_mean, self.x_std + z_score_min_std),
                 self._neural_posterior.neural_net._embedding_net,
             )
             self._neural_posterior.set_embedding_net(embedding)

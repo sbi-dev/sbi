@@ -25,6 +25,7 @@ class SnpeA(SnpeBase):
         discard_prior_samples=False,
         summary_writer=None,
         device=None,
+        z_score_min_std: float = 1e-7,
     ):
         """SNPE-A
 
@@ -43,6 +44,8 @@ class SnpeA(SnpeBase):
                 density estimator for the posterior from scratch each round.
             discard_prior_samples: whether to discard prior samples from round
                 two onwards.
+            z_score_min_std: Minimum value of the standard deviation to use when
+                standardizing inputs. This is typically needed when some simulator outputs are deterministic or nearly so.
         """
 
         raise NotImplementedError
@@ -59,6 +62,7 @@ class SnpeA(SnpeBase):
             retrain_from_scratch_each_round=retrain_from_scratch_each_round,
             discard_prior_samples=discard_prior_samples,
             device=device,
+            z_score_min_std=z_score_min_std,
         )
 
     def _get_log_prob_proposal_posterior(self, theta, x, masks):
