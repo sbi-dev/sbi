@@ -4,6 +4,7 @@ site_url: "http://mackelab.org/sbi/"
 nav:
   - Home: index.md
   - Installation: install.md
+  - Contribute: contribute.md
   - API Reference: reference.md
   - Credits: credits.md
 
