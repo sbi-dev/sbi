@@ -1,0 +1,28 @@
+{{! Google Docstring Template without types }}
+{{summaryPlaceholder}}
+
+{{extendedSummaryPlaceholder}}
+
+{{#parametersExist}}
+Args:
+{{#args}}
+    {{var}}: {{descriptionPlaceholder}}
+{{/args}}
+{{#kwargs}}
+    {{var}}: {{descriptionPlaceholder}}
+{{/kwargs}}
+{{/parametersExist}}
+
+{{#returnsExist}}
+Returns:
+{{#returns}}
+    {{typePlaceholder}}: {{descriptionPlaceholder}}
+{{/returns}}
+{{/returnsExist}}
+
+{{#yieldsExist}}
+Yields:
+{{#yields}}
+    {{typePlaceholder}}: {{descriptionPlaceholder}}
+{{/yields}}
+{{/yieldsExist}}

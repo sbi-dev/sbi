@@ -14,7 +14,6 @@ sbi/_version.py
 
 # System
 .DS_Store
-.vscode
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -86,3 +85,9 @@ target/
 *.out
 *.gz
 *.toc
+
+# IDEs (VSCode, etc.)
+.env
+
+# Class diagram
+*.pyns
