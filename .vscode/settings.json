@@ -1,0 +1,89 @@
+{
+    "python.envFile": ".env",
+    // XXX Unfortunately, pyright does not play well with the .env file approach for now
+    // see https://github.com/microsoft/pyright/issues/310
+    // One workaround: change manually environment, then back to sbi.
+    // This will taint the current file by inserting here a resolved absolute path
+    "python.pythonPath": "${env:PYTHON}",
+    //
+    // Testing: enable only one at a time (pytest, generally)
+    //
+    "python.testing.unittestEnabled": false,
+    "python.testing.nosetestsEnabled": false,
+    "python.testing.pytestEnabled": true,
+    "python.testing.pytestArgs": [
+        "tests"
+    ],
+    //
+    // Editor settings for python
+    //
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.python",
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+            "source.sortImports": true
+        }, // OK as long as isort 3rd parties managed in setup.cfg?, see below
+        "editor.wordWrapColumn": 88,
+        "editor.renderWhitespace": "boundary",
+        "editor.wordWrap": "wordWrapColumn",
+        "editor.fontLigatures": true,
+    },
+    //
+    // Formatting
+    // https://code.visualstudio.com/docs/python/editing#_formatting
+    //
+    "python.formatting.provider": "black",
+    //"python.formatting.blackPath": "${env:BLACK}",
+    "python.formatting.blackArgs": [
+        "--line-length=88"
+    ],
+    //
+    // Sort imports
+    // https://github.com/microsoft/vscode-python/issues/5840#issuecomment-497321419
+    //
+    //"python.sortImports.path": "${env:ISORT}",
+    "python.sortImports.args": [
+        "--settings-path=${workspaceFolder}/setup.cfg"
+    ],
+    //
+    // Linting
+    // https://code.visualstudio.com/docs/python/linting#_specific-linters
+    //
+    "python.linting.enabled": true,
+    "python.linting.lintOnSave": true,
+    "python.linting.flake8Enabled": true,
+    //"python.linting.flake8Path": "${env:FLAKE8}",
+    "python.linting.args": [
+        "--settings-path=${workspaceFolder}/setup.cfg"
+    ],
+    // flake8 works better than pylint, e.g. no need specify generated members.
+    "python.linting.pylintEnabled": true,
+    // "python.linting.pylintArgs": [
+    //     "--generated-members=numpy.* ,torch.*",
+    //     "--disable=invalid-name"
+    // ],
+    //
+    // Files to exclude
+    //
+    "files.exclude": {
+        "**/__pycache__": true,
+        "**/.pytest_cache": true,
+        "**/.ipynb_checkpoints": true,
+        "**/*.egg-info": true,
+    },
+    //
+    // Rewrap vscode plugin (stkb.rewrap)
+    // Needs manual installation (!) -- added to recommended extensions
+    // https://marketplace.visualstudio.com/items?itemName=stkb.rewrap
+    //
+    "rewrap.autoWrap.enabled": true,
+    "rewrap.wrappingColumn": 88,
+    //
+    // autoDocstring vscode plugin (njpwerner.autodocstring)
+    // Needs manual installation (!) -- added to recommended extensions
+    // https://marketplace.visualstudio.com/items?itemName=njpwerner.autodocstring
+    //
+    "autoDocstring.customTemplatePath": ".vscode/autodocstring.template",
+    // just showing how customizable this is
+    "window.title": "Simulation Based Inference -- ${dirty}${activeEditorShort}${separator}${rootName}${separator}${appName}",
+}
