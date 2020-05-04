@@ -86,3 +86,9 @@ target/
 *.out
 *.gz
 *.toc
+
+# IDEs (VSCode, etc.)
+.env
+
+# Class diagram
+*.pyns
