@@ -5,10 +5,12 @@ import numpy as np
 import pytest
 import torch
 from scipy.stats import beta, multivariate_normal, uniform
-from torch import Tensor
+from torch import Tensor, ones, zeros, eye
 from torch.distributions import Beta, Distribution, Gamma, MultivariateNormal, Uniform
 
 from sbi.inference.snpe import SnpeC
+from sbi.inference.snl import SNL
+from sbi.inference.sre import SRE
 from sbi.simulators.linear_gaussian import linear_gaussian
 from sbi.user_input.user_input_checks import (
     prepare_sbi_problem,
@@ -55,7 +57,7 @@ class UserNumpyUniform:
 def linear_gaussian_no_batch(theta):
     """Identity simulator throwing assertion error when called on a batch."""
     assert theta.ndim == 1, "cant handle batches."
-    return MultivariateNormal(theta, torch.eye(theta.numel())).sample()
+    return MultivariateNormal(theta, eye(theta.numel())).sample()
 
 
 def numpy_linear_gaussian(theta):
@@ -76,18 +78,13 @@ def matrix_simulator(theta):
 @pytest.mark.parametrize(
     "wrapper, prior",
     (
-        (
-            CustomPytorchWrapper,
-            UserNumpyUniform(torch.zeros(3), torch.ones(3), return_numpy=True),
-        ),
+        (CustomPytorchWrapper, UserNumpyUniform(zeros(3), ones(3), return_numpy=True),),
         (ScipyPytorchWrapper, multivariate_normal()),
         (ScipyPytorchWrapper, uniform()),
         (ScipyPytorchWrapper, beta(a=1, b=1)),
         (
             PytorchReturnTypeWrapper,
-            BoxUniform(
-                torch.zeros(3, dtype=torch.float64), torch.ones(3, dtype=torch.float64)
-            ),
+            BoxUniform(zeros(3, dtype=torch.float64), ones(3, dtype=torch.float64)),
         ),
     ),
 )
@@ -115,12 +112,12 @@ def test_reinterpreted_batch_dim_prior():
 
     # Both must raise ValueError because we don't reinterpret batch dims anymore.
     with pytest.raises(ValueError):
-        process_prior(Uniform(torch.zeros(3), torch.ones(3)))
+        process_prior(Uniform(zeros(3), ones(3)))
     with pytest.raises(ValueError):
-        process_prior(MultivariateNormal(torch.zeros(2, 3), torch.ones(3)))
+        process_prior(MultivariateNormal(zeros(2, 3), ones(3)))
 
     # This must pass without warnings or errors.
-    process_prior(BoxUniform(torch.zeros(3), torch.ones(3)))
+    process_prior(BoxUniform(zeros(3), ones(3)))
 
 
 @pytest.mark.parametrize(
@@ -128,23 +125,20 @@ def test_reinterpreted_batch_dim_prior():
     (
         pytest.param(Uniform(0.0, 1.0), marks=pytest.mark.xfail),  # scalar prior.
         pytest.param(
-            Uniform(torch.zeros((1, 3)), torch.ones((1, 3))), marks=pytest.mark.xfail
+            Uniform(zeros((1, 3)), ones((1, 3))), marks=pytest.mark.xfail
         ),  # batch shape > 1.
         pytest.param(
-            MultivariateNormal(torch.zeros(3, 3), torch.eye(3)),
-            marks=pytest.mark.xfail,
+            MultivariateNormal(zeros(3, 3), eye(3)), marks=pytest.mark.xfail,
         ),  # batch shape > 1.
         pytest.param(
-            Uniform(torch.zeros(3), torch.ones(3)), marks=pytest.mark.xfail
+            Uniform(zeros(3), ones(3)), marks=pytest.mark.xfail
         ),  # batched uniform.
-        Uniform(torch.zeros(1), torch.ones(1)),
-        BoxUniform(torch.zeros(3), torch.ones(3)),
-        MultivariateNormal(torch.zeros(3), torch.eye(3)),
-        UserNumpyUniform(torch.zeros(3), torch.ones(3), return_numpy=False),
-        UserNumpyUniform(torch.zeros(3), torch.ones(3), return_numpy=True),
-        BoxUniform(
-            torch.zeros(3, dtype=torch.float64), torch.ones(3, dtype=torch.float64)
-        ),
+        Uniform(zeros(1), ones(1)),
+        BoxUniform(zeros(3), ones(3)),
+        MultivariateNormal(zeros(3), eye(3)),
+        UserNumpyUniform(zeros(3), ones(3), return_numpy=False),
+        UserNumpyUniform(zeros(3), ones(3), return_numpy=True),
+        BoxUniform(zeros(3, dtype=torch.float64), ones(3, dtype=torch.float64)),
     ),
 )
 def test_process_prior(prior):
@@ -164,18 +158,18 @@ def test_process_prior(prior):
 @pytest.mark.parametrize(
     "prior, x_o",
     (
-        (BoxUniform(torch.zeros(3), torch.ones(3)), torch.ones(3)),
-        (BoxUniform(torch.zeros(3), torch.ones(3)), np.ones(3)),
+        (BoxUniform(zeros(3), ones(3)), ones(3)),
+        (BoxUniform(zeros(3), ones(3)), np.ones(3)),
         pytest.param(
-            BoxUniform(torch.zeros(1), torch.ones(1)), 2.0, marks=pytest.mark.xfail
+            BoxUniform(zeros(1), ones(1)), 2.0, marks=pytest.mark.xfail
         ),  # scalar observation.
         pytest.param(
-            BoxUniform(torch.zeros(3), torch.ones(3)), [2.0], marks=pytest.mark.xfail
+            BoxUniform(zeros(3), ones(3)), [2.0], marks=pytest.mark.xfail
         ),  # list observation.
-        (BoxUniform(torch.zeros(3), torch.ones(3)), torch.ones(1, 3)),
-        (BoxUniform(torch.zeros(1), torch.ones(1)), torch.ones(1, 1)),
-        (BoxUniform(torch.zeros(3), torch.ones(3)), np.zeros((1, 3))),
-        (BoxUniform(torch.zeros(1), torch.ones(1)), np.zeros((1, 1))),
+        (BoxUniform(zeros(3), ones(3)), ones(1, 3)),
+        (BoxUniform(zeros(1), ones(1)), ones(1, 1)),
+        (BoxUniform(zeros(3), ones(3)), np.zeros((1, 3))),
+        (BoxUniform(zeros(1), ones(1)), np.zeros((1, 1))),
     ),
 )
 def test_process_x_o(
@@ -189,7 +183,7 @@ def test_process_x_o(
 
 
 def test_process_matrix_observation():
-    prior = BoxUniform(torch.zeros(4), torch.ones(4))
+    prior = BoxUniform(zeros(4), ones(4))
     x_o = np.zeros((1, 2, 2))
     simulator = matrix_simulator
 
@@ -199,14 +193,12 @@ def test_process_matrix_observation():
 @pytest.mark.parametrize(
     "simulator, prior",
     (
-        (linear_gaussian, BoxUniform(torch.zeros(1), torch.ones(1))),
-        (linear_gaussian, BoxUniform(torch.zeros(2), torch.ones(2))),
-        (numpy_linear_gaussian, UserNumpyUniform(torch.zeros(2), torch.ones(2), True)),
-        (linear_gaussian_no_batch, BoxUniform(torch.zeros(2), torch.ones(2))),
+        (linear_gaussian, BoxUniform(zeros(1), ones(1))),
+        (linear_gaussian, BoxUniform(zeros(2), ones(2))),
+        (numpy_linear_gaussian, UserNumpyUniform(zeros(2), ones(2), True)),
+        (linear_gaussian_no_batch, BoxUniform(zeros(2), ones(2))),
         pytest.param(
-            list_simulator,
-            BoxUniform(torch.zeros(2), torch.ones(2)),
-            marks=pytest.mark.xfail,
+            list_simulator, BoxUniform(zeros(2), ones(2)), marks=pytest.mark.xfail,
         ),
     ),
 )
@@ -227,49 +219,43 @@ def test_process_simulator(simulator: Callable, prior: Distribution):
 @pytest.mark.parametrize(
     "simulator, prior, x_o",
     (
-        (
-            linear_gaussian_no_batch,
-            BoxUniform(torch.zeros(3), torch.ones(3)),
-            torch.zeros(3),
-        ),
+        (linear_gaussian_no_batch, BoxUniform(zeros(3), ones(3)), zeros(3),),
         (
             numpy_linear_gaussian,
-            UserNumpyUniform(torch.zeros(3), torch.ones(3), return_numpy=True),
+            UserNumpyUniform(zeros(3), ones(3), return_numpy=True),
             np.zeros((1, 3)),
         ),
-        (linear_gaussian, BoxUniform(torch.zeros(3), torch.ones(3)), torch.zeros(1, 3)),
+        (linear_gaussian, BoxUniform(zeros(3), ones(3)), zeros(1, 3)),
         (
             linear_gaussian,
-            BoxUniform(
-                torch.zeros(3, dtype=torch.float64), torch.ones(3, dtype=torch.float64)
-            ),
-            torch.zeros(3),
+            BoxUniform(zeros(3, dtype=torch.float64), ones(3, dtype=torch.float64)),
+            zeros(3),
         ),
         pytest.param(
             list_simulator,
-            BoxUniform(torch.zeros(3), torch.ones(3)),
-            torch.zeros(1, 3),
+            BoxUniform(zeros(3), ones(3)),
+            zeros(1, 3),
             marks=pytest.mark.xfail,
         ),
         (
             numpy_linear_gaussian,
-            UserNumpyUniform(torch.zeros(3), torch.ones(3), return_numpy=True),
+            UserNumpyUniform(zeros(3), ones(3), return_numpy=True),
             np.zeros((1, 3)),
         ),
         pytest.param(  # test simulator always returning batch dim.
-            lambda _: torch.zeros(1, 480),
-            BoxUniform(torch.zeros(2), torch.ones(2)),
-            torch.zeros(1, 480),
+            lambda _: zeros(1, 480),
+            BoxUniform(zeros(2), ones(2)),
+            zeros(1, 480),
             marks=pytest.mark.xfail,
         ),
         pytest.param(
             linear_gaussian,
             [
-                Gamma(torch.ones(1), torch.ones(1)),
-                Beta(torch.ones(1), torch.ones(1)),
-                MultivariateNormal(torch.zeros(2), torch.eye(2)),
+                Gamma(ones(1), ones(1)),
+                Beta(ones(1), ones(1)),
+                MultivariateNormal(zeros(2), eye(2)),
             ],
-            torch.zeros(1, 4),
+            zeros(1, 4),
         ),
     ),
 )
@@ -298,47 +284,41 @@ def test_prepare_sbi_problem(
     (
         (
             linear_gaussian,
-            BoxUniform(
-                torch.zeros(3, dtype=torch.float64), torch.ones(3, dtype=torch.float64)
-            ),
-            torch.zeros(3),
+            BoxUniform(zeros(3, dtype=torch.float64), ones(3, dtype=torch.float64)),
+            zeros(3),
         ),
-        (
-            linear_gaussian_no_batch,
-            BoxUniform(torch.zeros(3), torch.ones(3)),
-            torch.zeros(3),
-        ),
+        (linear_gaussian_no_batch, BoxUniform(zeros(3), ones(3)), zeros(3),),
         (
             numpy_linear_gaussian,
-            UserNumpyUniform(torch.zeros(3), torch.ones(3), return_numpy=True),
+            UserNumpyUniform(zeros(3), ones(3), return_numpy=True),
             np.zeros((1, 3)),
         ),
-        (linear_gaussian, BoxUniform(torch.zeros(3), torch.ones(3)), torch.zeros(1, 3)),
+        (linear_gaussian, BoxUniform(zeros(3), ones(3)), zeros(1, 3)),
         pytest.param(
             list_simulator,
-            BoxUniform(torch.zeros(3), torch.ones(3)),
-            torch.zeros(1, 3),
+            BoxUniform(zeros(3), ones(3)),
+            zeros(1, 3),
             marks=pytest.mark.xfail,
         ),  # list simulator.
         (
             numpy_linear_gaussian,
-            UserNumpyUniform(torch.zeros(3), torch.ones(3), return_numpy=True),
+            UserNumpyUniform(zeros(3), ones(3), return_numpy=True),
             np.zeros((1, 3)),
         ),
         pytest.param(
-            lambda _: torch.zeros(1, 480),
-            BoxUniform(torch.zeros(2), torch.ones(2)),
-            torch.zeros(1, 480),
+            lambda _: zeros(1, 480),
+            BoxUniform(zeros(2), ones(2)),
+            zeros(1, 480),
             marks=pytest.mark.xfail,
         ),  # test simulator always returning batch dim.
         pytest.param(
             linear_gaussian,
             (
-                Gamma(torch.ones(1), torch.ones(1)),
-                Beta(torch.ones(1), torch.ones(1)),
-                MultivariateNormal(torch.zeros(2), torch.eye(2)),
+                Gamma(ones(1), ones(1)),
+                Beta(ones(1), ones(1)),
+                MultivariateNormal(zeros(2), eye(2)),
             ),
-            torch.zeros(1, 4),
+            zeros(1, 4),
         ),
     ),
 )
@@ -364,19 +344,16 @@ def test_inference_with_user_sbi_problems(
     "dists",
     [
         pytest.param(
-            [Beta(torch.ones(1), 2 * torch.ones(1))], marks=pytest.mark.xfail
+            [Beta(ones(1), 2 * ones(1))], marks=pytest.mark.xfail
         ),  # single dist.
         pytest.param(
-            [Gamma(torch.ones(2), torch.ones(1))], marks=pytest.mark.xfail
+            [Gamma(ones(2), ones(1))], marks=pytest.mark.xfail
         ),  # single batched dist.
         pytest.param(
             [
-                Gamma(torch.ones(2), torch.ones(1)),
+                Gamma(ones(2), ones(1)),
                 MultipleIndependent(
-                    [
-                        Uniform(torch.zeros(1), torch.ones(1)),
-                        Uniform(torch.zeros(1), torch.ones(1)),
-                    ]
+                    [Uniform(zeros(1), ones(1)), Uniform(zeros(1), ones(1)),]
                 ),
             ],
             marks=pytest.mark.xfail,
@@ -384,19 +361,13 @@ def test_inference_with_user_sbi_problems(
         pytest.param(
             [Uniform(0, 1), Beta(1, 2),], marks=pytest.mark.xfail
         ),  # scalar dists.
-        [
-            Uniform(torch.zeros(1), torch.ones(1)),
-            Uniform(torch.zeros(1), torch.ones(1)),
-        ],
+        [Uniform(zeros(1), ones(1)), Uniform(zeros(1), ones(1)),],
         (
-            Gamma(torch.ones(1), torch.ones(1)),
-            Uniform(torch.zeros(1), torch.ones(1)),
-            Beta(torch.ones(1), 2 * torch.ones(1)),
+            Gamma(ones(1), ones(1)),
+            Uniform(zeros(1), ones(1)),
+            Beta(ones(1), 2 * ones(1)),
         ),
-        [
-            MultivariateNormal(torch.zeros(3), torch.eye(3)),
-            Gamma(torch.ones(1), torch.ones(1)),
-        ],
+        [MultivariateNormal(zeros(3), eye(3)), Gamma(ones(1), ones(1)),],
     ],
 )
 def test_independent_joint_shapes_and_samples(dists):
@@ -449,15 +420,15 @@ def test_independent_joint_shapes_and_samples(dists):
 def test_invalid_inputs():
 
     dists = [
-        Gamma(torch.ones(1), torch.ones(1)),
-        Uniform(torch.zeros(1), torch.ones(1)),
-        Beta(torch.ones(1), 2 * torch.ones(1)),
+        Gamma(ones(1), ones(1)),
+        Uniform(zeros(1), ones(1)),
+        Beta(ones(1), 2 * ones(1)),
     ]
     joint = MultipleIndependent(dists)
 
     # Test too many input dimensions.
     with pytest.raises(AssertionError):
-        joint.log_prob(torch.ones(10, 4))
+        joint.log_prob(ones(10, 4))
 
     # Test nested construction.
     with pytest.raises(AssertionError):
@@ -465,4 +436,16 @@ def test_invalid_inputs():
 
     # Test 3D value.
     with pytest.raises(AssertionError):
-        joint.log_prob(torch.ones(10, 4, 1))
+        joint.log_prob(ones(10, 4, 1))
+
+
+@pytest.mark.parametrize("method", (SnpeC, SNL, SRE))
+def test_skip_input_checks(method):
+
+    with pytest.warns(UserWarning):
+        method(
+            linear_gaussian,
+            Uniform(zeros(1), ones(1)),
+            zeros(1),
+            skip_input_checks=True,
+        )

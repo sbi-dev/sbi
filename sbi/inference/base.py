@@ -24,6 +24,7 @@ class NeuralInference(ABC):
         device: Optional[torch.device] = None,
         summary_writer: Optional[SummaryWriter] = None,
         simulator_name: Optional[str] = "simulator",
+        skip_input_checks: bool = False,
     ):
         r"""
         Args:
@@ -35,18 +36,19 @@ class NeuralInference(ABC):
                  interpreted as a batch dimension but *currently* only the first batch
                  element will be used to condition on.
             simulation_batch_size: number of parameter sets that the
-                simulator accepts and converts to data x at once. If -1, we simulate all
-                 parameter sets at the same time. If >= 1, the simulator has to process
-                 data of shape (simulation_batch_size, parameter_dimension).
+                simulator accepts and converts to data x at once. If -1, we simulate 
+                all parameter sets at the same time. If >= 1, the simulator has to 
+                process data of shape (simulation_batch_size, parameter_dimension).
+            device: torch.device on which to compute (optional).
             summary_writer: an optional SummaryWriter to control, among others, log     
                 file location (default is <current working directory>/logs.)
-            device: torch.device on which to compute (optional).
-            mcmc_method: MCMC method to use for posterior sampling, one of 
-                ['slice', 'hmc', 'nuts'].
+            skip_simulator_checks: Flag to turn off input checks,
+                e.g., for saving simulation budget as the input checks run the
+                simulator a couple of times.
         """
 
         self._simulator, self._prior, self._x_o = prepare_sbi_problem(
-            simulator, prior, x_o
+            simulator, prior, x_o, skip_input_checks
         )
 
         self._batched_simulator = lambda theta: simulate_in_batches(

@@ -26,6 +26,7 @@ class SnpeA(SnpeBase):
         summary_writer=None,
         device=None,
         z_score_min_std: float = 1e-7,
+        skip_input_checks: bool = False,
     ):
         """SNPE-A
 
@@ -46,6 +47,9 @@ class SnpeA(SnpeBase):
                 two onwards.
             z_score_min_std: Minimum value of the standard deviation to use when
                 standardizing inputs. This is typically needed when some simulator outputs are deterministic or nearly so.
+            skip_simulator_checks: Flag to turn off input checks,
+                e.g., for saving simulation budget as the input checks run the
+                simulator a couple of times.
         """
 
         raise NotImplementedError
@@ -63,6 +67,7 @@ class SnpeA(SnpeBase):
             discard_prior_samples=discard_prior_samples,
             device=device,
             z_score_min_std=z_score_min_std,
+            skip_input_checks=skip_input_checks,
         )
 
     def _get_log_prob_proposal_posterior(self, theta, x, masks):
