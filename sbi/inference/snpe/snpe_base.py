@@ -89,8 +89,12 @@ class SnpeBase(NeuralInference, ABC):
         # create the deep neural density estimator
         if density_estimator is None:
             density_estimator = utils.posterior_nn(
-                model="maf", prior=self._prior, x_o=self._x_o,
+                model="maf",
+                prior_mean=self._prior.mean,
+                prior_std=self._prior.stddev,
+                x_o_shape=self._x_o.shape,
             )
+
         # else: check density estimator for valid prior etc.
         # XXX: here, the user could sneak in an invalid prior and x_o by providing a
         # density estimator with invalid .prior and .x_o, thus bypassing

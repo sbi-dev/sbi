@@ -35,13 +35,11 @@ def test_snl_on_linearGaussian_api(num_dim: int):
         linear_gaussian, prior, torch.zeros(num_dim)
     )
 
-    neural_likelihood = utils.likelihood_nn(model="maf", prior=prior, x_o=x_o,)
-
     infer = SNL(
         simulator=simulator,
         prior=prior,
         x_o=x_o,
-        density_estimator=neural_likelihood,
+        density_estimator=None,  # Use default MAF.
         simulation_batch_size=50,
         mcmc_method="slice-np",
     )
@@ -86,13 +84,11 @@ def test_snl_on_linearGaussian_based_on_mmd(num_dim: int, prior_str: str, set_se
 
     simulator, prior, x_o = prepare_sbi_problem(linear_gaussian, prior, x_o)
 
-    neural_likelihood = utils.likelihood_nn(model="maf", prior=prior, x_o=x_o,)
-
     infer = SNL(
         simulator=simulator,
         prior=prior,
         x_o=x_o,
-        density_estimator=neural_likelihood,
+        density_estimator=None,  # Use default MAF.
         mcmc_method="slice-np",
     )
 
@@ -138,13 +134,11 @@ def test_multi_round_snl_on_linearGaussian_based_on_mmd(set_seed):
 
     simulator, prior, x_o = prepare_sbi_problem(linear_gaussian, prior, x_o)
 
-    neural_likelihood = utils.likelihood_nn(model="maf", prior=prior, x_o=x_o,)
-
     infer = SNL(
         simulator=simulator,
         prior=prior,
         x_o=x_o,
-        density_estimator=neural_likelihood,
+        density_estimator=None,  # Use default MAF.
         simulation_batch_size=50,
         mcmc_method="slice",
     )
@@ -201,13 +195,11 @@ def test_snl_posterior_correction(mcmc_method: str, prior_str: str, set_seed):
 
     simulator, prior, x_o = prepare_sbi_problem(linear_gaussian, prior, x_o)
 
-    neural_likelihood = utils.likelihood_nn(model="maf", prior=prior, x_o=x_o,)
-
     infer = SNL(
         simulator=simulator,
         prior=prior,
         x_o=x_o,
-        density_estimator=neural_likelihood,
+        density_estimator=None,  # Use default MAF.
         simulation_batch_size=50,
         mcmc_method="slice-np",
     )

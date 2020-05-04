@@ -57,7 +57,9 @@ class SNL(NeuralInference):
 
         if density_estimator is None:
             density_estimator = utils.likelihood_nn(
-                model="maf", prior=self._prior, x_o=self._x_o,
+                model="maf",
+                theta_shape=self._prior.sample().shape,
+                x_o_shape=self._x_o.shape,
             )
 
         # create neural posterior which can sample()
