@@ -59,12 +59,10 @@ def test_snpe_on_linearGaussian_based_on_mmd(
 
     simulator, prior, x_o = prepare_sbi_problem(linear_gaussian, prior, x_o)
 
-    neural_net = utils.posterior_nn(model="maf", prior=prior, x_o=x_o)
-
     snpe_common_args = dict(
         simulator=simulator,
         x_o=x_o,
-        density_estimator=neural_net,
+        density_estimator=None,  # Use default MAF.
         prior=prior,
         z_score_x=True,
         simulation_batch_size=simulation_batch_size,
@@ -150,12 +148,10 @@ def test_multi_round_snpe_on_linearGaussian_based_on_mmd(algorithm_str: str, set
 
     simulator, prior, _ = prepare_sbi_problem(linear_gaussian, prior, true_observation)
 
-    neural_net = utils.posterior_nn(model="maf", prior=prior, x_o=true_observation,)
-
     snpe_common_args = dict(
         simulator=simulator,
         x_o=true_observation,
-        density_estimator=neural_net,
+        density_estimator=None,  # Use default MAF.
         prior=prior,
         z_score_x=True,
         use_combined_loss=False,
@@ -234,11 +230,10 @@ def test_multi_round_snpe_deterministic_simulator(set_seed, z_score_min_std):
 
         return result
 
-    neural_net = utils.posterior_nn(model="maf", prior=prior, x_o=true_observation)
     infer = SnpeB(
         simulator=deterministic_simulator,
         x_o=true_observation,
-        density_estimator=neural_net,
+        density_estimator=None,  # Use default MAF.
         prior=prior,
         z_score_x=True,
         use_combined_loss=False,
@@ -283,12 +278,10 @@ def test_snpec_posterior_correction(sample_with_mcmc, mcmc_method, prior, set_se
 
     simulator, prior, x_o = prepare_sbi_problem(linear_gaussian, prior, zeros(num_dim))
 
-    neural_net = utils.posterior_nn(model="maf", prior=prior, x_o=x_o,)
-
     infer = SnpeC(
         simulator=simulator,
         x_o=x_o,
-        density_estimator=neural_net,
+        density_estimator=None,  # Use default MAF.
         prior=prior,
         num_atoms=-1,
         z_score_x=True,

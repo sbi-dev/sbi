@@ -35,13 +35,11 @@ def test_sre_on_linearGaussian_api(num_dim: int):
 
     simulator, prior, x_o = prepare_sbi_problem(linear_gaussian, prior, x_o)
 
-    classifier = utils.classifier_nn("resnet", prior=prior, x_o=x_o,)
-
     infer = SRE(
         simulator=simulator,
         prior=prior,
         x_o=x_o,
-        classifier=classifier,
+        classifier=None,  # Use default RESNET.
         simulation_batch_size=50,
         mcmc_method="slice-np",
     )
@@ -96,8 +94,6 @@ def test_sre_on_linearGaussian_based_on_mmd(
             x_o, num_samples=num_samples, prior=prior
         )
 
-    classifier = utils.classifier_nn("resnet", prior=prior, x_o=x_o,)
-
     simulator, prior, x_o = prepare_sbi_problem(linear_gaussian, prior, x_o)
 
     num_atoms = 2 if classifier_loss == "aalr" else -1
@@ -107,7 +103,7 @@ def test_sre_on_linearGaussian_based_on_mmd(
         prior=prior,
         x_o=x_o,
         num_atoms=num_atoms,
-        classifier=classifier,
+        classifier=None,  # Use default RESNET.
         classifier_loss=classifier_loss,
         simulation_batch_size=50,
         mcmc_method="slice-np",
@@ -180,13 +176,11 @@ def test_sre_posterior_correction(mcmc_method: str, prior_str: str, set_seed):
 
     simulator, prior, x_o = prepare_sbi_problem(linear_gaussian, prior, x_o)
 
-    classifier = utils.classifier_nn("resnet", prior=prior, x_o=x_o,)
-
     infer = SRE(
         simulator=simulator,
         prior=prior,
         x_o=x_o,
-        classifier=classifier,
+        classifier=None,  # Use default RESNET.
         simulation_batch_size=50,
         mcmc_method=mcmc_method,
     )

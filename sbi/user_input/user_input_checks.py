@@ -30,7 +30,8 @@ def process_prior(prior) -> Tuple[Distribution, int, bool]:
 
     Returns:
         prior: prior that emits samples and log probabilities as PyTorch tensors.
-        theta_dim: event shape of the prior, number of parameters.
+        theta_numel: number of parameters, number of elements of a single sample from
+            the prior.
         prior_returns_numpy: whether the return type of the prior was a numpy array.
     """
 
@@ -68,7 +69,8 @@ def process_custom_prior(prior) -> Tuple[Distribution, int, bool]:
 
     Returns:
         prior: corrected prior.
-        theta_dim: event dimension of the prior, size of single parameter vector.
+        theta_numel: number of parameters, number of elements of a single sample from
+            the prior.
         is_prior_numpy: whether the prior returned numpy before wrapping.
     """
 
@@ -80,9 +82,9 @@ def process_custom_prior(prior) -> Tuple[Distribution, int, bool]:
 
     check_prior_return_type(prior)
 
-    theta_dim = prior.sample().numel()
+    theta_numel = prior.sample().numel()
 
-    return prior, theta_dim, is_prior_numpy
+    return prior, theta_numel, is_prior_numpy
 
 
 def maybe_wrap_prior_to_pytorch(prior) -> Tuple[Distribution, bool]:
@@ -134,7 +136,8 @@ def process_pytorch_prior(prior: Distribution) -> Tuple[Distribution, int, bool]
 
     Returns:
         prior: PyTorch distribution prior.
-        theta_dim: event shape of the prior, number of parameters.
+        theta_numel: number of parameters, number of elements of a single sample from
+            the prior.
         prior_returns_numpy: False.
     """
 
@@ -155,9 +158,9 @@ def process_pytorch_prior(prior: Distribution) -> Tuple[Distribution, int, bool]
     # This will fail for float64 priors.
     check_prior_return_type(prior)
 
-    theta_dim = prior.sample().numel()
+    theta_numel = prior.sample().numel()
 
-    return prior, theta_dim, False
+    return prior, theta_numel, False
 
 
 def check_prior_batch_dims(prior):

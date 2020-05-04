@@ -71,7 +71,9 @@ class SRE(NeuralInference):
 
         if classifier is None:
             classifier = utils.classifier_nn(
-                model="resnet", prior=self._prior, x_o=self._x_o,
+                model="resnet",
+                theta_shape=self._prior.sample().shape,
+                x_o_shape=self._x_o.shape,
             )
 
         # create posterior object which can sample()
