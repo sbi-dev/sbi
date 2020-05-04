@@ -29,6 +29,7 @@ class SNL(NeuralInference):
         summary_writer: SummaryWriter = None,
         device: torch.device = None,
         mcmc_method: str = "slice-np",
+        skip_input_checks: bool = False,
     ):
         r"""Sequential Neural Likelihood
         
@@ -38,11 +39,20 @@ class SNL(NeuralInference):
 
         Args:
             density_estimator: Conditional density estimator $q(x|\theta)$, a nn.Module
-             with `.log_prob()` and `.sample()`
+                with `.log_prob()` and `.sample()`
+            skip_simulator_checks: Flag to turn off input checks,
+                e.g., for saving simulation budget as the input checks run the
+                simulator a couple of times.
         """
 
         super().__init__(
-            simulator, prior, x_o, simulation_batch_size, device, summary_writer,
+            simulator,
+            prior,
+            x_o,
+            simulation_batch_size,
+            device,
+            summary_writer,
+            skip_input_checks=skip_input_checks,
         )
 
         if density_estimator is None:

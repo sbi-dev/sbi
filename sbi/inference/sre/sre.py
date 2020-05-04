@@ -34,6 +34,7 @@ class SRE(NeuralInference):
         retrain_from_scratch_each_round: bool = False,
         summary_writer: Optional[SummaryWriter] = None,
         device: Optional[torch.device] = None,
+        skip_input_checks: bool = False,
     ):
         r"""Sequential Ratio Estimation
 
@@ -53,15 +54,24 @@ class SRE(NeuralInference):
                 vectors f(x) for high-dimensional simulation outputs $x$.
             classifier_loss: `sre` implements the algorithm suggested in Durkan et al. 
                 2019, whereas `aalr` implements the algorithm suggested in
-                 Hermans et al. 2019. `sre` can use more than two atoms, potentially
-                 boosting performance, but does not allow for exact posterior density
-                 evaluation (only up to a normalizing constant), even when training
-                 only one round. `aalr` is limited to `num_atoms=2`, but allows for
-                 density evaluation when training for one round.
+                Hermans et al. 2019. `sre` can use more than two atoms, potentially
+                boosting performance, but does not allow for exact posterior density
+                evaluation (only up to a normalizing constant), even when training
+                only one round. `aalr` is limited to `num_atoms=2`, but allows for
+                density evaluation when training for one round.
+            skip_simulator_checks: Flag to turn off input checks,
+                e.g., for saving simulation budget as the input checks run the
+                simulator a couple of times.                
         """
 
         super().__init__(
-            simulator, prior, x_o, simulation_batch_size, device, summary_writer,
+            simulator,
+            prior,
+            x_o,
+            simulation_batch_size,
+            device,
+            summary_writer,
+            skip_input_checks=skip_input_checks,
         )
 
         self._classifier_loss = classifier_loss

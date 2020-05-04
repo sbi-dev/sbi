@@ -337,7 +337,7 @@ def check_prior_batch_behavior(prior):
 
 
 def process_simulator(
-    user_simulator: Callable, prior, is_numpy_simulator: bool
+    user_simulator: Callable, prior, is_numpy_simulator: bool,
 ) -> Callable:
     """Return a simulator that meets the requirements for usage in SBI.
 
@@ -463,7 +463,10 @@ def process_x_o(
 
 
 def prepare_sbi_problem(
-    user_simulator: Callable, user_prior, user_x_o: Union[Tensor, ndarray]
+    user_simulator: Callable,
+    user_prior,
+    user_x_o: Union[Tensor, ndarray],
+    skip_input_checks: bool = False,
 ) -> Tuple[Callable, Callable, Tensor]:
     """Prepare simulator, prior and observed data for usage in sbi.
 
@@ -479,8 +482,12 @@ def prepare_sbi_problem(
 
     Args:
         user_simulator: simulator as provided by the user.
-        user_prior: prior as provided by the user user_x_o: observed data as
+        user_prior: prior as provided by the user
+        user_x_o: observed data as
             provided by the user
+        skip_simulator_checks: Flag to turn off input checks,
+            e.g., for saving simulation budget as the input checks run the simulator
+            a couple of times.
 
     Returns:
         simulator: simulator adapted for sbi.
@@ -488,19 +495,27 @@ def prepare_sbi_problem(
         x_o: adapted observed data.
     """
 
-    # Check prior, return PyTorch prior.
-    prior, _, prior_returns_numpy = process_prior(user_prior)
+    if skip_input_checks:
+        warnings.warn(
+            """SBI input checks are skipped, make sure to pass a valid prior, simulator
+            and x_o. Consult the documentation for the exact requirements.""",
+            UserWarning,
+        )
+        return user_simulator, user_prior, user_x_o
+    else:
+        # Check prior, return PyTorch prior.
+        prior, _, prior_returns_numpy = process_prior(user_prior)
 
-    # Check simulator, returns PyTorch simulator able to simulate batches.
-    simulator = process_simulator(user_simulator, prior, prior_returns_numpy)
+        # Check simulator, returns PyTorch simulator able to simulate batches.
+        simulator = process_simulator(user_simulator, prior, prior_returns_numpy)
 
-    # Check data, returns data with leading batch dimension.
-    x_o, _ = process_x_o(user_x_o, simulator, prior)
+        # Check data, returns data with leading batch dimension.
+        x_o, _ = process_x_o(user_x_o, simulator, prior)
 
-    # Consistency check after making ready for SBI.
-    check_sbi_problem(simulator, prior, x_o)
+        # Consistency check after making ready for SBI.
+        check_sbi_problem(simulator, prior, x_o)
 
-    return simulator, prior, x_o
+        return simulator, prior, x_o
 
 
 def check_sbi_problem(simulator: Callable, prior, x_o: Tensor):

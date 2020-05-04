@@ -37,6 +37,7 @@ class SnpeBase(NeuralInference, ABC):
         mcmc_method: str = "slice-np",
         summary_writer: Optional[SummaryWriter] = None,
         z_score_min_std: float = 1e-7,
+        skip_input_checks: bool = False,
     ):
         """
         See NeuralInference docstring for all other arguments.
@@ -56,10 +57,19 @@ class SnpeBase(NeuralInference, ABC):
                 two onwards.
             z_score_min_std: Minimum value of the standard deviation to use when
                 standardizing inputs. This is typically needed when some simulator outputs are deterministic or nearly so.
+            skip_simulator_checks: Flag to turn off input checks,
+                e.g., for saving simulation budget as the input checks run the
+                simulator a couple of times.
         """
 
         super().__init__(
-            simulator, prior, x_o, simulation_batch_size, device, summary_writer,
+            simulator,
+            prior,
+            x_o,
+            simulation_batch_size,
+            device,
+            summary_writer,
+            skip_input_checks=skip_input_checks,
         )
 
         self._z_score_x = z_score_x

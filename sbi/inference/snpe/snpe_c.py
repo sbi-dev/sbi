@@ -30,6 +30,7 @@ class SnpeC(SnpeBase):
         sample_with_mcmc=False,
         mcmc_method="slice-np",
         z_score_min_std: float = 1e-7,
+        skip_input_checks: bool = False,
     ):
         r"""SNPE-C / APT
 
@@ -54,6 +55,9 @@ class SnpeC(SnpeBase):
                 If -1, use all other thetas in minibatch.
             z_score_min_std: Minimum value of the standard deviation to use when
                 standardizing inputs. This is typically needed when some simulator outputs are deterministic or nearly so.
+            skip_simulator_checks: Flag to turn off input checks,
+                e.g., for saving simulation budget as the input checks run the
+                simulator a couple of times.
         """
 
         super(SnpeC, self).__init__(
@@ -72,6 +76,7 @@ class SnpeC(SnpeBase):
             sample_with_mcmc=sample_with_mcmc,
             mcmc_method=mcmc_method,
             z_score_min_std=z_score_min_std,
+            skip_input_checks=skip_input_checks,
         )
 
         assert isinstance(num_atoms, int), "Number of atoms must be an integer."
