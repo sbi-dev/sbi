@@ -16,6 +16,7 @@ from tqdm import tqdm
 from sbi.inference.base import NeuralInference
 from sbi.inference.posteriors.sbi_posterior import Posterior
 import sbi.utils as utils
+from sbi.utils import Standardize
 
 
 class SnpeBase(NeuralInference, ABC):
@@ -83,9 +84,6 @@ class SnpeBase(NeuralInference, ABC):
 
         self._retrain_from_scratch_each_round = retrain_from_scratch_each_round
 
-        self.pilot_theta = self._prior.sample((num_pilot_sims,))
-        self.pilot_x = self._batched_simulator(self.pilot_theta)
-
         # create the deep neural density estimator
         if density_estimator is None:
             density_estimator = utils.posterior_nn(
@@ -111,23 +109,21 @@ class SnpeBase(NeuralInference, ABC):
             get_potential_function=PotentialFunctionProvider(),
         )
 
-        # obtain z-score for data x and define embedding net
-        if self._z_score_x:
-            self.x_mean = torch.mean(self.pilot_x, dim=0)
-            self.x_std = torch.std(self.pilot_x, dim=0)
-        else:
-            self.x_mean = zeros(self._x_o.shape)
-            self.x_std = ones(self._x_o.shape)
+        # What is happening here? By design, we want the neural net to take care of
+        # normalizing both input and output, x and theta. But since we don't know the
+        # dimensions of these upon instantiation, or in the case of standardization, the
+        # mean and std we need to use, we grab the embedding net from the posterior
+        # (though presumably we could get it directly here, since what the posterior has
+        # is just a reference to the `density_estimator`), we do things with it (such as
+        # prepending a standardization step) and then we (destructively!) re-set the
+        # attribute in the Posterior to be this now-normalized embedding net. Perhaps
+        # the delayed chaining ideas in thinc can help make this a bit more transparent.
 
-        # new embedding_net contains z-scoring
-        if not isinstance(self._neural_posterior.neural_net, MultivariateGaussianMDN):
-            embedding = nn.Sequential(
-                utils.Standardize(self.x_mean, self.x_std + z_score_min_std),
-                self._neural_posterior.neural_net._embedding_net,
-            )
-            self._neural_posterior.set_embedding_net(embedding)
-        elif z_score_x:
-            warnings.warn("z-scoring of data x not implemented for MDNs")
+        self.pilot_theta = self._prior.sample((num_pilot_sims,))
+        self.pilot_x = self._batched_simulator(self.pilot_theta)
+        if z_score_x:
+            z_scored_embedding = self._z_score_embedding(self.pilot_x, z_score_min_std)
+            self._neural_posterior.set_embedding_net(z_scored_embedding)
 
         # calibration kernels proposed in Lueckmann, Goncalves et al 2017
         if calibration_kernel is None:
@@ -141,6 +137,18 @@ class SnpeBase(NeuralInference, ABC):
 
         # extra SNPE-specific fields summary_writer
         self._summary.update({"rejection_sampling_acceptance_rates": []})
+
+    def _z_score_embedding(self, x: Tensor, z_score_min_std: float):
+        """Return embedding net that maybe standardizes its inputs."""
+
+        # XXX Mouthful, rename self.posterior.nnb
+        embed_nn = self._neural_posterior.neural_net._embedding_net
+
+        nonzero_std = torch.clamp(torch.std(x, dim=0), min=z_score_min_std)
+        preprocess = Standardize(torch.mean(x, dim=0), nonzero_std)
+
+        # If Sequential has a None component, forward will TypeError.
+        return preprocess if embed_nn is None else nn.Sequential(preprocess, embed_nn)
 
     def __call__(
         self,
