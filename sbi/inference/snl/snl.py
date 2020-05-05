@@ -24,7 +24,7 @@ class SNL(NeuralInference):
         simulator: Callable,
         prior,
         x_o: Tensor,
-        density_estimator: Optional[nn.Module],
+        density_estimator: Optional[nn.Module] = None,
         simulation_batch_size: int = 1,
         summary_writer: SummaryWriter = None,
         device: torch.device = None,
