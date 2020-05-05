@@ -1,12 +1,8 @@
 from __future__ import annotations
 
-import os
-
 import torch
-from torch import distributions
-from torch.utils.tensorboard import SummaryWriter
+from torch import Tensor
 
-import sbi.utils as utils
 from sbi.inference.snpe.snpe_base import SnpeBase
 
 
@@ -73,8 +69,8 @@ class SnpeB(SnpeBase):
         )
 
     def _get_log_prob_proposal_posterior(
-        self, theta: torch.Tensor, x: torch.Tensor, masks: torch.Tensor
-    ) -> torch.Tensor:
+        self, theta: Tensor, x: Tensor, masks: Tensor
+    ) -> Tensor:
         r"""
         Return importance weighted log probability as proposed in
          Lueckmann, Goncalves et al 2017.

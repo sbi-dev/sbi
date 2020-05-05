@@ -3,11 +3,10 @@ from __future__ import annotations
 import os
 
 import torch
-from torch import distributions
-from torch.utils.tensorboard import SummaryWriter
 
 import sbi.utils as utils
 from sbi.inference.snpe.snpe_base import SnpeBase
+from torch import Tensor, isfinite, ones, eye
 
 
 class SnpeC(SnpeBase):
@@ -83,8 +82,8 @@ class SnpeC(SnpeBase):
         self._num_atoms = num_atoms
 
     def _get_log_prob_proposal_posterior(
-        self, theta: torch.Tensor, x: torch.Tensor, masks: torch.Tensor
-    ) -> torch.Tensor:
+        self, theta: Tensor, x: Tensor, masks: Tensor
+    ) -> Tensor:
         r"""
         We have two main options when evaluating the proposal posterior.
         (1) Generate atoms from the proposal prior.
@@ -119,8 +118,8 @@ class SnpeC(SnpeBase):
         assert 0 < num_atoms - 1 < batch_size
         probs = (
             (1 / (batch_size - 1))
-            * torch.ones(batch_size, batch_size)
-            * (1 - torch.eye(batch_size))
+            * ones(batch_size, batch_size)
+            * (1 - eye(batch_size))
         )
         choices = torch.multinomial(probs, num_samples=num_atoms - 1, replacement=False)
         contrasting_theta = theta[choices]
@@ -135,15 +134,13 @@ class SnpeC(SnpeBase):
         log_prob_posterior = self._neural_posterior.neural_net.log_prob(
             atomic_theta, repeated_x
         )
-        assert torch.isfinite(
-            log_prob_posterior
-        ).all(), "NaN/inf detected in posterior eval."
+        assert isfinite(log_prob_posterior).all(), "NaN/inf detected in posterior eval."
         log_prob_posterior = log_prob_posterior.reshape(batch_size, num_atoms)
 
         # Get (batch_size * num_atoms) log prob prior evals.
         log_prob_prior = self._prior.log_prob(atomic_theta)
         log_prob_prior = log_prob_prior.reshape(batch_size, num_atoms)
-        assert torch.isfinite(log_prob_prior).all(), "NaN/inf detected in prior eval."
+        assert isfinite(log_prob_prior).all(), "NaN/inf detected in prior eval."
 
         # Compute unnormalized proposal posterior.
         unnormalized_log_prob_proposal_posterior = log_prob_posterior - log_prob_prior
@@ -154,7 +151,7 @@ class SnpeC(SnpeBase):
         ) * unnormalized_log_prob_proposal_posterior[:, 0] - torch.logsumexp(
             unnormalized_log_prob_proposal_posterior, dim=-1
         )
-        assert torch.isfinite(
+        assert isfinite(
             log_prob_proposal_posterior
         ).all(), "NaN/inf detected in proposal posterior eval."
 

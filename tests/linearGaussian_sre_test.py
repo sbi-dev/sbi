@@ -1,6 +1,6 @@
 import pytest
 import torch
-from torch import distributions
+from torch import distributions, eye, zeros, ones
 
 import sbi.utils as utils
 import tests.utils_for_testing.linearGaussian_logprob as test_utils
@@ -26,9 +26,9 @@ def test_sre_on_linearGaussian_api(num_dim: int):
         num_dim: parameter dimension of the Gaussian model
     """
 
-    x_o = torch.zeros(num_dim)
+    x_o = zeros(num_dim)
     prior = distributions.MultivariateNormal(
-        loc=torch.zeros(num_dim), covariance_matrix=torch.eye(num_dim)
+        loc=zeros(num_dim), covariance_matrix=eye(num_dim)
     )
 
     # XXX this breaks the test! (and #76 doesn't seem to fix)
@@ -80,18 +80,18 @@ def test_sre_on_linearGaussian_based_on_mmd(
         set_seed: fixture for manual seeding, see tests/conftest.py
     """
 
-    x_o = torch.zeros(1, num_dim)
+    x_o = zeros(1, num_dim)
     num_samples = 300
 
     if prior_str == "gaussian":
         prior = distributions.MultivariateNormal(
-            loc=torch.zeros(num_dim), covariance_matrix=torch.eye(num_dim)
+            loc=zeros(num_dim), covariance_matrix=eye(num_dim)
         )
         target_samples = get_true_posterior_samples_linear_gaussian_mvn_prior(
             x_o, num_samples=num_samples
         )
     else:
-        prior = utils.BoxUniform(-1.0 * torch.ones(num_dim), torch.ones(num_dim))
+        prior = utils.BoxUniform(-1.0 * ones(num_dim), ones(num_dim))
         target_samples = get_true_posterior_samples_linear_gaussian_uniform_prior(
             x_o, num_samples=num_samples, prior=prior
         )
@@ -168,15 +168,13 @@ def test_sre_posterior_correction(mcmc_method: str, prior_str: str, set_seed):
     """
 
     num_dim = 2
-    x_o = torch.zeros(num_dim)
+    x_o = zeros(num_dim)
     if prior_str == "gaussian":
         prior = distributions.MultivariateNormal(
-            loc=torch.zeros(num_dim), covariance_matrix=torch.eye(num_dim)
+            loc=zeros(num_dim), covariance_matrix=eye(num_dim)
         )
     else:
-        prior = utils.BoxUniform(
-            low=-1.0 * torch.ones(num_dim), high=torch.ones(num_dim)
-        )
+        prior = utils.BoxUniform(low=-1.0 * ones(num_dim), high=ones(num_dim))
 
     simulator, prior, x_o = prepare_sbi_problem(linear_gaussian, prior, x_o)
 

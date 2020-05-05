@@ -6,7 +6,7 @@ import warnings
 import numpy as np
 from pyknos.mdn.mdn import MultivariateGaussianMDN
 import torch
-from torch import Tensor, nn, optim
+from torch import Tensor, nn, optim, zeros, ones
 from torch.nn.utils import clip_grad_norm_
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
@@ -112,8 +112,8 @@ class SnpeBase(NeuralInference, ABC):
             self.x_mean = torch.mean(self.pilot_x, dim=0)
             self.x_std = torch.std(self.pilot_x, dim=0)
         else:
-            self.x_mean = torch.zeros(self._x_o.shape)
-            self.x_std = torch.ones(self._x_o.shape)
+            self.x_mean = zeros(self._x_o.shape)
+            self.x_std = ones(self._x_o.shape)
 
         # new embedding_net contains z-scoring
         if not isinstance(self._neural_posterior.neural_net, MultivariateGaussianMDN):
@@ -127,7 +127,7 @@ class SnpeBase(NeuralInference, ABC):
 
         # calibration kernels proposed in Lueckmann, Goncalves et al 2017
         if calibration_kernel is None:
-            self.calibration_kernel = lambda x: torch.ones([len(x)])
+            self.calibration_kernel = lambda x: ones([len(x)])
         else:
             self.calibration_kernel = calibration_kernel
 
@@ -274,7 +274,7 @@ class SnpeBase(NeuralInference, ABC):
                 the one fixed for the round if leakage correction through sampling is active and `patience` is not enough to reach it. 
         """
 
-        prior_mask_values = torch.ones if round_ == 0 else torch.zeros
+        prior_mask_values = ones if round_ == 0 else zeros
         return prior_mask_values((num_simulations, 1), dtype=torch.bool)
 
     def _train(

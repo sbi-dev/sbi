@@ -6,6 +6,7 @@ import torch.distributions as distributions
 import torchtestcase
 
 from sbi.utils import torchutils
+from torch import zeros, ones, eye
 from tests.utils_for_testing.dkl import dkl_via_monte_carlo
 
 
@@ -73,7 +74,7 @@ class TorchUtilsTest(torchtestcase.TorchTestCase):
         self.assertIsInstance(matrix, torch.Tensor)
         self.assertEqual(matrix.shape, torch.Size([size, size]))
         self.eps = 1e-5
-        unit = torch.eye(size, size)
+        unit = eye(size, size)
         self.assertEqual(matrix @ matrix.t(), unit)
         self.assertEqual(matrix.t() @ matrix, unit)
         self.assertEqual(matrix.t(), matrix.inverse())
@@ -140,11 +141,11 @@ def test_dkl_gauss():
     """
     dist1 = (
         distributions.Normal(loc=0.0, scale=1.0),
-        distributions.MultivariateNormal(torch.zeros(2), torch.eye(2)),
+        distributions.MultivariateNormal(zeros(2), eye(2)),
     )
     dist2 = (
         distributions.Normal(loc=1.0, scale=0.5),
-        distributions.MultivariateNormal(torch.ones(2), 0.5 * torch.eye(2)),
+        distributions.MultivariateNormal(ones(2), 0.5 * eye(2)),
     )
 
     for d1, d2 in zip(dist1, dist2):

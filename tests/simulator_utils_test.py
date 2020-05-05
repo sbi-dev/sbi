@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 import torch
 from torch.distributions import MultivariateNormal
+from torch import zeros, ones, eye
 
 from sbi.inference.snpe import SnpeC
 from sbi.simulators.linear_gaussian import linear_gaussian
@@ -21,7 +22,7 @@ def test_simulate_in_batches(
     num_sims,
     batch_size,
     simulator=linear_gaussian,
-    prior=BoxUniform(torch.zeros(5), torch.ones(5)),
+    prior=BoxUniform(zeros(5), ones(5)),
 ):
     """Test combinations of num_sims and simulation_batch_size. """
 
@@ -33,11 +34,9 @@ def test_inference_with_pilot_samples_many_samples():
     """Test whether num_pilot_sims can be same as num_simulations_per_round."""
 
     num_dim = 3
-    x_o = torch.zeros(num_dim)
+    x_o = zeros(num_dim)
 
-    prior = MultivariateNormal(
-        loc=torch.zeros(num_dim), covariance_matrix=torch.eye(num_dim)
-    )
+    prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
 
     infer = SnpeC(
         simulator=linear_gaussian, x_o=x_o, prior=prior, simulation_batch_size=100,
