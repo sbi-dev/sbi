@@ -1,10 +1,8 @@
 from abc import ABC
 from copy import deepcopy
 from typing import Callable, List, Optional, Union, Tuple, List
-import warnings
 
 import numpy as np
-from pyknos.mdn.mdn import MultivariateGaussianMDN
 import torch
 from torch import Tensor, nn, optim, zeros, ones
 from torch.nn.utils import clip_grad_norm_
@@ -25,10 +23,10 @@ class SnpeBase(NeuralInference, ABC):
         simulator: Callable,
         prior,
         x_o: Tensor,
-        num_pilot_sims: int = 100,
-        density_estimator=None,
+        density_estimator: Optional[nn.Module] = None,
         calibration_kernel: Optional[Callable] = None,
         z_score_x: bool = True,
+        z_score_min_std: float = 1e-7,
         simulation_batch_size: Optional[int] = 1,
         retrain_from_scratch_each_round: bool = False,
         discard_prior_samples: bool = False,
@@ -36,54 +34,34 @@ class SnpeBase(NeuralInference, ABC):
         sample_with_mcmc: bool = False,
         mcmc_method: str = "slice-np",
         summary_writer: Optional[SummaryWriter] = None,
-        z_score_min_std: float = 1e-7,
         skip_input_checks: bool = False,
     ):
         """
         See NeuralInference docstring for all other arguments.
 
         Args:
-            num_pilot_sims: number of simulations that are run when
-                instantiating an object. Used to z-score the data x.
-            density_estimator: neural density estimator
-            calibration_kernel: a function to calibrate the data x
-            z_score_x: whether to z-score the data features x
-            use_combined_loss: whether to jointly neural_net prior samples 
-                using maximum likelihood. Useful to prevent density leaking when using
-                box uniform priors.
-            retrain_from_scratch_each_round: whether to retrain the conditional
-                density estimator for the posterior from scratch each round.
-            discard_prior_samples: whether to discard prior samples from round
-                two onwards.
+            density_estimator: Neural density estimator.
+            calibration_kernel: A function to calibrate the data x.
+            z_score_x: Whether to z-score the data features x, default True.
             z_score_min_std: Minimum value of the standard deviation to use when
                 standardizing inputs. This is typically needed when some simulator outputs are deterministic or nearly so.
-            skip_simulator_checks: Flag to turn off input checks,
-                e.g., for saving simulation budget as the input checks run the
-                simulator a couple of times.
+            retrain_from_scratch_each_round: Whether to retrain the conditional
+                density estimator for the posterior from scratch each round.
+            discard_prior_samples: Whether to discard samples simulated in round 1, i.e.
+                from the prior. Training may be sped up by ignoring such less specific samples.
+            skip_input_checks: Whether to turn off input checks. This saves
+                simulation time because the input checks test-run the simulator to ensure it's correct.
         """
-
         super().__init__(
-            simulator,
-            prior,
-            x_o,
-            simulation_batch_size,
-            device,
-            summary_writer,
+            simulator=simulator,
+            prior=prior,
+            x_o=x_o,
+            simulation_batch_size=simulation_batch_size,
+            device=device,
+            summary_writer=summary_writer,
             skip_input_checks=skip_input_checks,
         )
 
-        self._z_score_x = z_score_x
-
-        self._num_pilot_sims = num_pilot_sims
-        self._use_combined_loss = use_combined_loss
-        self._discard_prior_samples = discard_prior_samples
-
-        self._prior_masks = []
-        self._model_bank = []
-
-        self._retrain_from_scratch_each_round = retrain_from_scratch_each_round
-
-        # create the deep neural density estimator
         if density_estimator is None:
             density_estimator = utils.posterior_nn(
                 model="maf",
@@ -92,12 +70,17 @@ class SnpeBase(NeuralInference, ABC):
                 x_o_shape=self._x_o.shape,
             )
 
-        # else: check density estimator for valid prior etc.
-        # XXX: here, the user could sneak in an invalid prior and x_o by providing a
-        # density estimator with invalid .prior and .x_o, thus bypassing
-        # the input checks.
+        # Calibration kernels proposed in Lueckmann, Goncalves et al 2017.
+        if calibration_kernel is None:
+            self.calibration_kernel = lambda x: ones([len(x)])
+        else:
+            self.calibration_kernel = calibration_kernel
 
-        # create the neural posterior which can sample(), log_prob()
+        self._z_score_x, self._z_score_min_std = z_score_x, z_score_min_std
+        self._retrain_from_scratch_each_round = retrain_from_scratch_each_round
+        self._discard_prior_samples = discard_prior_samples
+
+        # Create a neural posterior which can sample(), log_prob().
         self._neural_posterior = Posterior(
             algorithm_family="snpe",
             neural_net=density_estimator,
@@ -108,46 +91,14 @@ class SnpeBase(NeuralInference, ABC):
             get_potential_function=PotentialFunctionProvider(),
         )
 
-        # What is happening here? By design, we want the neural net to take care of
-        # normalizing both input and output, x and theta. But since we don't know the
-        # dimensions of these upon instantiation, or in the case of standardization, the
-        # mean and std we need to use, we grab the embedding net from the posterior
-        # (though presumably we could get it directly here, since what the posterior has
-        # is just a reference to the `density_estimator`), we do things with it (such as
-        # prepending a standardization step) and then we (destructively!) re-set the
-        # attribute in the Posterior to be this now-normalized embedding net. Perhaps
-        # the delayed chaining ideas in thinc can help make this a bit more transparent.
+        self._prior_masks, self._model_bank = [], []
 
-        self.pilot_theta = self._prior.sample((num_pilot_sims,))
-        self.pilot_x = self._batched_simulator(self.pilot_theta)
-        if z_score_x:
-            z_scored_embedding = self._z_score_embedding(self.pilot_x, z_score_min_std)
-            self._neural_posterior.set_embedding_net(z_scored_embedding)
-
-        # calibration kernels proposed in Lueckmann, Goncalves et al 2017
-        if calibration_kernel is None:
-            self.calibration_kernel = lambda x: ones([len(x)])
-        else:
-            self.calibration_kernel = calibration_kernel
-
-        # If we're retraining from scratch each round,
-        # keep a copy of the original untrained model for reinitialization.
+        # If we're retraining from scratch each round, keep a copy
+        # of the original untrained model for reinitialization.
         self._untrained_neural_posterior = deepcopy(self._neural_posterior)
 
-        # extra SNPE-specific fields summary_writer
+        # Extra SNPE-specific fields summary_writer.
         self._summary.update({"rejection_sampling_acceptance_rates": []})
-
-    def _z_score_embedding(self, x: Tensor, z_score_min_std: float):
-        """Return embedding net that maybe standardizes its inputs."""
-
-        # XXX Mouthful, rename self.posterior.nnb
-        embed_nn = self._neural_posterior.neural_net._embedding_net
-
-        nonzero_std = torch.clamp(torch.std(x, dim=0), min=z_score_min_std)
-        preprocess = Standardize(torch.mean(x, dim=0), nonzero_std)
-
-        # If Sequential has a None component, forward will TypeError.
-        return preprocess if embed_nn is None else nn.Sequential(preprocess, embed_nn)
 
     def __call__(
         self,
@@ -224,15 +175,13 @@ class SnpeBase(NeuralInference, ABC):
         return self._neural_posterior
 
     def _get_log_prob_proposal_posterior(self, theta: Tensor, x: Tensor, masks: Tensor):
-        r"""
-        Evaluate the log-probability used for the loss. Depending on
-        the algorithm, this evaluates a different term.
+        """
+        Return the log-probability used for the loss. Depending on the algorithm, this evaluates a different term.
 
         Args:
-            theta: parameters $\theta$
-            x: simulation outputs $x$
-            masks: binary, indicates whether to
-                use prior samples
+            theta: parameters θ
+            x: simulations
+            masks: binary, indicates whether to use prior samples
 
         Returns: log-probability
         """
@@ -245,29 +194,31 @@ class SnpeBase(NeuralInference, ABC):
         Run the simulations for a given round.
 
         Args:
-            round_: Round number
+            round_: Round number.
             num_sims: Number of desired simulations for the round.
                 Note that if leakage correction is requested with finite patience this number may not be reached; A warning will be displayed in this case. 
 
         Returns:
-            theta: Parameters used for training
-            x: Simulations used for training
-            prior_mask: Did the simulation come from a prior parameter sample?
+            theta: Parameters used for training.
+            x: Simulations used for training.
+            prior_mask: Whether each simulation came from a prior parameter sample.
         """
 
         if round_ == 0:
-            # We take at most the total requested number from the pilot run.
-            theta = self.pilot_theta[:num_sims]
-            x = self.pilot_x[:num_sims]
-
-            num_missing_sims = max(num_sims - self._num_pilot_sims, 0)
-
-            if num_missing_sims > 0:
-                # If missing, we produce extra simulations as needed.
-                missing_theta = self._prior.sample((num_missing_sims,))
-                missing_x = self._batched_simulator(missing_theta)
-                theta = torch.cat((theta, missing_theta), dim=0)
-                x = torch.cat((x, missing_x), dim=0)
+            theta = self._prior.sample((num_sims,))
+            x = self._batched_simulator(theta)
+            # What is happening here? By design, we want the neural net to take care of
+            # normalizing both input and output, x and theta. But since we don't know
+            # the dimensions of these upon instantiation, or in the case of
+            # standardization, the mean and std we need to use, we grab the embedding
+            # net from the posterior (though presumably we could get it directly here,
+            # since what the posterior has is just a reference to the
+            # `density_estimator`), we do things with it (such as prepending a
+            # standardization step) and then we (destructively!) re-set the attribute
+            # in the Posterior to be this now-normalized embedding net. Perhaps the
+            # delayed chaining ideas in thinc can help make this a bit more transparent.
+            if self._z_score_x:
+                self._neural_posterior.set_embedding_net(self._z_score_embedding(x))
 
         else:
             # XXX Make posterior.sample() accept tuples like prior.sample().
@@ -275,6 +226,18 @@ class SnpeBase(NeuralInference, ABC):
             x = self._batched_simulator(theta)
 
         return theta, x, self._mask_sims_from_prior(round_, theta.size(0))
+
+    def _z_score_embedding(self, x: Tensor) -> nn.Module:
+        """Return embedding net that maybe standardizes its inputs."""
+
+        # XXX Mouthful, rename self.posterior.nn
+        embed_nn = self._neural_posterior.neural_net._embedding_net
+
+        nonzero_std = torch.clamp(torch.std(x, dim=0), min=self._z_score_min_std)
+        preprocess = Standardize(torch.mean(x, dim=0), nonzero_std)
+
+        # If Sequential has a None component, forward will TypeError.
+        return preprocess if embed_nn is None else nn.Sequential(preprocess, embed_nn)
 
     def _mask_sims_from_prior(self, round_: int, num_simulations: int) -> Tensor:
         """Returns Tensor True where simulated from prior parameters.

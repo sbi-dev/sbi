@@ -1,92 +1,99 @@
 from __future__ import annotations
-
-import os
+from typing import Callable, Optional
 
 import torch
+from torch import Tensor, eye, nn, ones
+from torch.utils.tensorboard import SummaryWriter
 
-import sbi.utils as utils
 from sbi.inference.snpe.snpe_base import SnpeBase
-from torch import Tensor, isfinite, ones, eye
+import sbi.utils as utils
 
 
 class SnpeC(SnpeBase):
     def __init__(
         self,
-        simulator,
+        simulator: Callable,
         prior,
+        x_o: Tensor,
         num_atoms: Optional[int] = None,
+        density_estimator: Optional[nn.Module] = None,
+        calibration_kernel: Optional[Callable] = None,
+        use_combined_loss: bool = False,
+        z_score_x: bool = True,
         z_score_min_std: float = 1e-7,
+        simulation_batch_size: Optional[int] = 1,
+        retrain_from_scratch_each_round: bool = False,
+        discard_prior_samples: bool = False,
+        summary_writer: Optional[SummaryWriter] = None,
+        device: Optional[torch.device] = None,
+        sample_with_mcmc: bool = False,
+        mcmc_method: str = "slice-np",
         skip_input_checks: bool = False,
     ):
-        r"""SNPE-C / APT
+        r"""SNPE-C / APT [1]
 
-        Implementation of _Automatic Posterior Transformation for Likelihood-free
-        Inference_ by Greenberg et al., ICML 2019, https://arxiv.org/abs/1905.07488
+        [1] _Automatic Posterior Transformation for Likelihood-free Inference_,
+            Greenberg et al., ICML 2019, https://arxiv.org/abs/1905.07488.
 
         Args:
-            num_pilot_sims: number of simulations that are run when
-                instantiating an object. Used to z-score the observations.   
-            density_estimator: neural density estimator
-            calibration_kernel: a function to calibrate the data $x$
-            z_score_x: whether to z-score the data features $x$
-            use_combined_loss: whether to jointly neural_net prior samples 
-                using maximum likelihood. Useful to prevent density leaking when using
-                 box uniform priors.
-            retrain_from_scratch_each_round: whether to retrain the conditional
-                density estimator for the posterior from scratch each round.
-            discard_prior_samples: whether to discard prior samples from round
-                two onwards.
-            num_atoms: int
-                Number of atoms to use for classification.
-                If -1, use all other thetas in minibatch.
+            density_estimator: Neural density estimator.
+            calibration_kernel: A function to calibrate the data $x$.
+            z_score_x: Whether to z-score the data features $x$.
             z_score_min_std: Minimum value of the standard deviation to use when
                 standardizing inputs. This is typically needed when some simulator outputs are deterministic or nearly so.
+            use_combined_loss: Whether to train the neural_net jointly on prior samples 
+                using maximum likelihood and on all samples using atomic loss. Useful to prevent density leaking when using bounded priors.
+            retrain_from_scratch_each_round: Whether to retrain the conditional
+                density estimator for the posterior from scratch each round.
+            discard_prior_samples: Whether to discard samples simulated in round 1, i.e.
+                from the prior. Training may be sped up by ignoring such less specific samples.
             num_atoms: Number of atoms to use for classification. If None, use all
                 other parameters $\theta$ in minibatch.
+            skip_input_checks: Whether to turn off input checks. This saves
+                simulation time because the input checks test-run the simulator to ensure it's correct.
         """
 
         self._num_atoms = num_atoms if num_atoms is not None else 0
+        self._use_combined_loss = use_combined_loss
+
+        super().__init__(
             simulator=simulator,
             prior=prior,
             x_o=x_o,
-            num_pilot_sims=num_pilot_sims,
             density_estimator=density_estimator,
             calibration_kernel=calibration_kernel,
-            use_combined_loss=use_combined_loss,
             z_score_x=z_score_x,
+            z_score_min_std=z_score_min_std,
             simulation_batch_size=simulation_batch_size,
             retrain_from_scratch_each_round=retrain_from_scratch_each_round,
             discard_prior_samples=discard_prior_samples,
             device=device,
             sample_with_mcmc=sample_with_mcmc,
             mcmc_method=mcmc_method,
-            z_score_min_std=z_score_min_std,
             skip_input_checks=skip_input_checks,
         )
-
-        assert isinstance(num_atoms, int), "Number of atoms must be an integer."
-        self._num_atoms = num_atoms
 
     def _get_log_prob_proposal_posterior(
         self, theta: Tensor, x: Tensor, masks: Tensor
     ) -> Tensor:
-        r"""
+        """
+        Return log probability of the proposal posterior.
+
         We have two main options when evaluating the proposal posterior.
-        (1) Generate atoms from the proposal prior.
-        (2) Generate atoms from a more targeted distribution,
-        such as the most recent posterior.
+            (1) Generate atoms from the proposal prior.
+            (2) Generate atoms from a more targeted distribution, such as the most
+                recent posterior.
         If we choose the latter, it is likely beneficial not to do this in the first
-        round, since we would be sampling from a randomly initialized neural density
+        round, since we would be sampling from a randomly-initialized neural density
         estimator.
 
         Args:
-            theta: batch of parameters $\theta$.
-            x: batch of data $x$.
-            masks: binary, whether or not to retrain with prior loss on specific prior
-             sample
+            theta: Batch of parameters θ.
+            x: Batch of data.
+            masks: Whetherto retrain with prior loss (for each prior sample).
 
-        Returns: log_prob_proposal_posterior
-
+        Returns:
+            Log-probability of the proposal posterior. 
         """
 
         batch_size = theta.shape[0]
@@ -94,8 +101,7 @@ class SnpeC(SnpeBase):
         num_atoms = self._num_atoms if self._num_atoms > 0 else batch_size
 
         # Each set of parameter atoms is evaluated using the same x,
-        # so we repeat rows of the data x.
-        # e.g. [1, 2] -> [1, 1, 2, 2]
+        # so we repeat rows of the data x, e.g. [1, 2] -> [1, 1, 2, 2]
         repeated_x = utils.repeat_rows(x, num_atoms)
 
         # To generate the full set of atoms for a given item in the batch,
@@ -139,8 +145,7 @@ class SnpeC(SnpeBase):
         )
         self._assert_all_finite(log_prob_proposal_posterior, "proposal posterior eval")
 
-        # todo: this implementation is not perfect: it evaluates the posterior
-        # todo: at all prior samples
+        # XXX This evaluates the posterior on _all_ prior samples
         if self._use_combined_loss:
             log_prob_posterior_non_atomic = self._neural_posterior.neural_net.log_prob(
                 theta, x
@@ -152,6 +157,8 @@ class SnpeC(SnpeBase):
 
         return log_prob_proposal_posterior
 
-    def _get_log_prob_proposal_MoG(self, theta, x, masks):
+    def _get_log_prob_proposal_MoG(
+        self, theta: Tensor, x: Tensor, masks: Tensor
+    ) -> Tensor:
 
         raise NotImplementedError
