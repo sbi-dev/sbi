@@ -88,23 +88,18 @@ class SnpeB(SnpeBase):
 
         batch_size = theta.shape[0]
 
-        # Evaluate posterior
+        # Evaluate posterior.
         log_prob_posterior = self._neural_posterior.neural_net.log_prob(theta, x)
-        assert torch.isfinite(
-            log_prob_posterior
-        ).all(), "NaN/inf detected in posterior eval."
         log_prob_posterior = log_prob_posterior.reshape(batch_size)
+        self._assert_all_finite(log_prob_posterior, "posterior eval")
 
-        # Evaluate prior
-        log_prob_prior = self._prior.log_prob(theta)
-        log_prob_prior = log_prob_prior.reshape(batch_size)
-        assert torch.isfinite(log_prob_prior).all(), "NaN/inf detected in prior eval."
+        # Evaluate prior.
+        log_prob_prior = self._prior.log_prob(theta).reshape(batch_size)
+        self._assert_all_finite(log_prob_prior, "prior eval.")
 
-        # evaluate proposal
+        # Evaluate proposal.
         log_prob_proposal = self._model_bank[-1].neural_net.log_prob(theta, x)
-        assert torch.isfinite(
-            log_prob_proposal
-        ).all(), "NaN/inf detected in proposal posterior eval."
+        self._assert_all_finite(log_prob_proposal, "proposal posterior eval")
 
         # Compute log prob with importance weights
         log_prob = (

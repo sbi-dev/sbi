@@ -110,3 +110,10 @@ class NeuralInference(ABC):
         """
 
         return description
+
+    @staticmethod
+    def _assert_all_finite(quantity: Tensor, description: str = "tensor") -> None:
+        """Raise if tensor quantity contains any NaN or Inf element."""
+
+        msg = f"NaN/Inf present in {description}."
+        assert torch.isfinite(quantity).all(), msg
