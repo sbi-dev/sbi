@@ -3,8 +3,6 @@ from copy import deepcopy
 from typing import Any, Callable, Dict, List, Optional, Union
 
 import numpy as np
-from pyro.infer.mcmc import HMC, NUTS
-from pyro.infer.mcmc.api import MCMC
 import torch
 from torch import Tensor, nn, optim
 from torch.nn.utils import clip_grad_norm_

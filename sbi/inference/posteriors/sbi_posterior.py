@@ -3,9 +3,8 @@ from warnings import warn
 
 from pyro.infer.mcmc import HMC, NUTS
 from pyro.infer.mcmc.api import MCMC
-from torch import Tensor
 import torch
-from torch import nn
+from torch import nn, Tensor
 from torch import multiprocessing as mp
 
 from sbi.mcmc import Slice, SliceSampler

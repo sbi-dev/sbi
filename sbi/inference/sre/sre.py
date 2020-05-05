@@ -5,9 +5,7 @@ from typing import Callable, Dict, List, Optional, Union
 
 import numpy as np
 import torch
-from pyro.infer.mcmc import HMC, NUTS
-from pyro.infer.mcmc.api import MCMC
-from torch import Tensor, nn, optim
+from torch import Tensor, nn, optim, ones
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
@@ -269,7 +267,7 @@ class SRE(NeuralInference):
             assert 0 < num_atoms - 1 < clipped_batch_size
             probs = (
                 (1 / (clipped_batch_size - 1))
-                * torch.ones(clipped_batch_size, clipped_batch_size)
+                * ones(clipped_batch_size, clipped_batch_size)
                 * (1 - torch.eye(clipped_batch_size))
             )
             choices = torch.multinomial(
@@ -291,7 +289,7 @@ class SRE(NeuralInference):
                 # sampled from the marginals. The first element is sampled from the
                 # joint p(theta, x) and is labelled 1. The second element is sampled
                 # from the marginals p(theta)p(x) and is labelled 0. And so on.
-                labels = torch.ones(2 * clipped_batch_size)  # two atoms
+                labels = ones(2 * clipped_batch_size)  # two atoms
                 labels[1::2] = 0.0
                 # binary cross entropy to learn the likelihood
                 loss = criterion(likelihood, labels)
