@@ -25,7 +25,7 @@ class SRE(NeuralInference):
         simulator: Callable,
         prior,
         x_o: Tensor,
-        classifier: nn.Module,
+        classifier: Optional[nn.Module] = None,
         num_atoms: int = -1,
         simulation_batch_size: int = 1,
         mcmc_method: str = "slice-np",
