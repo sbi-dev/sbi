@@ -120,13 +120,13 @@ class SnpeC(SnpeBase):
         log_prob_posterior = self._neural_posterior.neural_net.log_prob(
             atomic_theta, repeated_x
         )
-        assert isfinite(log_prob_posterior).all(), "NaN/inf detected in posterior eval."
+        self._assert_all_finite(log_prob_posterior, "posterior eval")
         log_prob_posterior = log_prob_posterior.reshape(batch_size, num_atoms)
 
         # Get (batch_size * num_atoms) log prob prior evals.
         log_prob_prior = self._prior.log_prob(atomic_theta)
         log_prob_prior = log_prob_prior.reshape(batch_size, num_atoms)
-        assert isfinite(log_prob_prior).all(), "NaN/inf detected in prior eval."
+        self._assert_all_finite(log_prob_prior, "prior eval")
 
         # Compute unnormalized proposal posterior.
         unnormalized_log_prob_proposal_posterior = log_prob_posterior - log_prob_prior
@@ -137,9 +137,7 @@ class SnpeC(SnpeBase):
         ) * unnormalized_log_prob_proposal_posterior[:, 0] - torch.logsumexp(
             unnormalized_log_prob_proposal_posterior, dim=-1
         )
-        assert isfinite(
-            log_prob_proposal_posterior
-        ).all(), "NaN/inf detected in proposal posterior eval."
+        self._assert_all_finite(log_prob_proposal_posterior, "proposal posterior eval")
 
         # todo: this implementation is not perfect: it evaluates the posterior
         # todo: at all prior samples
