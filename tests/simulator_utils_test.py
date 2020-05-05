@@ -2,15 +2,13 @@ from __future__ import annotations
 
 import pytest
 import torch
-from torch.distributions import MultivariateNormal
-from torch import zeros, ones, eye
+from torch import ones, zeros
 
-from sbi.inference.snpe import SnpeC
 from sbi.simulators.linear_gaussian import linear_gaussian
 from sbi.simulators.simutils import simulate_in_batches
 from sbi.utils.torchutils import BoxUniform
 
-# use cpu by default
+# Use cpu by default.
 torch.set_default_tensor_type("torch.FloatTensor")
 
 
@@ -28,20 +26,3 @@ def test_simulate_in_batches(
 
     theta = prior.sample((num_sims,))
     simulate_in_batches(simulator, theta, batch_size)
-
-
-def test_inference_with_pilot_samples_many_samples():
-    """Test whether num_pilot_sims can be same as num_simulations_per_round."""
-
-    num_dim = 3
-    x_o = zeros(num_dim)
-
-    prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
-
-    infer = SnpeC(
-        simulator=linear_gaussian, x_o=x_o, prior=prior, simulation_batch_size=100,
-    )
-
-    # Run inference.
-    num_rounds, num_simulations_per_round = 2, 100
-    infer(num_rounds=num_rounds, num_simulations_per_round=num_simulations_per_round)
