@@ -1,7 +1,9 @@
 from __future__ import annotations
+from typing import Callable, Optional
 
 import torch
-from torch import Tensor
+from torch import Tensor, nn
+from torch.utils.tensorboard import SummaryWriter
 
 from sbi.inference.snpe.snpe_base import SnpeBase
 
@@ -9,81 +11,72 @@ from sbi.inference.snpe.snpe_base import SnpeBase
 class SnpeB(SnpeBase):
     def __init__(
         self,
-        simulator,
+        simulator: Callable,
         prior,
-        x_o,
-        num_pilot_sims=100,
-        density_estimator="maf",
-        calibration_kernel=None,
-        use_combined_loss=False,
-        z_score_x=True,
-        simulation_batch_size: int = 1,
-        retrain_from_scratch_each_round=False,
-        discard_prior_samples=False,
-        summary_writer=None,
-        device=None,
+        x_o: Tensor,
+        density_estimator: Optional[nn.Module] = None,
+        calibration_kernel: Optional[Callable] = None,
+        use_combined_loss: bool = False,
+        z_score_x: bool = True,
         z_score_min_std: float = 1e-7,
         simulation_batch_size: Optional[int] = 1,
+        retrain_from_scratch_each_round: bool = False,
+        discard_prior_samples: bool = False,
+        summary_writer: Optional[SummaryWriter] = None,
+        device: Optional[torch.device] = None,
         skip_input_checks: bool = False,
     ):
-        r"""
+        r"""SNPE-B [1]
 
-        Implementation of __Flexible statistical inference for mechanistic models of
-         neural dynamics__ by Lueckmann et al.,
-         NeurIPS 2017, https://arxiv.org/abs/1711.01861
+        [1] _Flexible statistical inference for mechanistic models of neural dynamics_,
+            Lueckmann et al., NeurIPS 2017, https://arxiv.org/abs/1711.01861.
         
         Args:
-            num_pilot_sims: number of simulations that are run when
-                instantiating an object. Used to z-score the data $x$.
-            density_estimator: neural density estimator
-            calibration_kernel: a function to calibrate the data $x$
-            z_score_x: whether to z-score the data features $x$
-            use_combined_loss: whether to jointly neural_net prior samples 
-                using maximum likelihood. Useful to prevent density leaking when using
-                 box uniform priors.
-            retrain_from_scratch_each_round: whether to retrain the conditional
-                density estimator for the posterior from scratch each round.
-            discard_prior_samples: whether to discard prior samples from round
-                two onwards.
+            density_estimator: Neural density estimator.
+            calibration_kernel: A function to calibrate the data $x$.
+            z_score_x: Whether to z-score the data features x, default True.
             z_score_min_std: Minimum value of the standard deviation to use when
                 standardizing inputs. This is typically needed when some simulator outputs are deterministic or nearly so.
-            skip_simulator_checks: Flag to turn off input checks,
-                e.g., for saving simulation budget as the input checks run the
-                simulator a couple of times.
+            use_combined_loss: Whether to train jointly on prior samples
+                using maximum likelihood and on all samples using importance-weighted loss.
+            retrain_from_scratch_each_round: Whether to retrain the conditional
+                density estimator for the posterior from scratch each round.
+            discard_prior_samples: Whether to discard samples simulated in round 1, i.e.
+                from the prior. Training may be sped up by ignoring such less specific samples.
+            skip_input_checks: Whether to turn off input checks. This saves     
+                simulation time because the input checks test-run the simulator to ensure it's correct.
         """
 
-        super(SnpeB, self).__init__(
+        self._use_combined_loss = use_combined_loss
+
+        super().__init__(
             simulator=simulator,
             prior=prior,
             x_o=x_o,
-            num_pilot_sims=num_pilot_sims,
             density_estimator=density_estimator,
             calibration_kernel=calibration_kernel,
-            use_combined_loss=use_combined_loss,
             z_score_x=z_score_x,
+            z_score_min_std=z_score_min_std,
             simulation_batch_size=simulation_batch_size,
             retrain_from_scratch_each_round=retrain_from_scratch_each_round,
             discard_prior_samples=discard_prior_samples,
             device=device,
-            z_score_min_std=z_score_min_std,
             skip_input_checks=skip_input_checks,
         )
 
     def _get_log_prob_proposal_posterior(
         self, theta: Tensor, x: Tensor, masks: Tensor
     ) -> Tensor:
-        r"""
-        Return importance weighted log probability as proposed in
-         Lueckmann, Goncalves et al 2017.
+        """
+        Return importance-weighted log probability (Lueckmann, Goncalves et al., 2017).
 
         Args:
-            theta: batch of parameters $\theta$.
-            x: batch of data $x$.
-            masks: binary, whether or not to retrain with prior loss on specific prior
-                 sample
+            theta: Batch of parameters θ.
+            x: Batch of data.
+            masks: Whether to retrain with prior loss (for each prior sample).
 
-        Returns: log_prob_proposal_posterior
-
+        Returns:
+            Log probability of proposal posterior.
         """
 
         batch_size = theta.shape[0]
@@ -101,19 +94,19 @@ class SnpeB(SnpeBase):
         log_prob_proposal = self._model_bank[-1].neural_net.log_prob(theta, x)
         self._assert_all_finite(log_prob_proposal, "proposal posterior eval")
 
-        # Compute log prob with importance weights
+        # Compute log prob with importance weights.
         log_prob = (
             self.calibration_kernel(x)
             * torch.exp(log_prob_prior - log_prob_proposal)
             * log_prob_posterior
         )
 
-        # todo: this implementation is not perfect: it evaluates the posterior
-        # todo:     at all prior samples
+        # XXX This evaluates the posterior on _all_ prior samples.
         if self._use_combined_loss:
             log_prob_posterior_non_atomic = self._neural_posterior.neural_net.log_prob(
                 theta, x
             )
             masks = masks.reshape(-1)
             log_prob = masks * log_prob_posterior_non_atomic + log_prob
+
         return log_prob

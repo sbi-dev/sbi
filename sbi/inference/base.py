@@ -28,16 +28,20 @@ class NeuralInference(ABC):
     ):
         r"""
         Args:
+            simulator: A regular callable $f(\theta)\to x$. Both parameter $\theta$ and 
+                simulation $x$ can be multi-dimensional.
+            prior: Distribution-like object with `log_prob`and `sample` methods.
+            x_o: Observation $x_o$. If it has more than one dimension, the leading 
+                dimension will be interpreted as a batch dimension but *currently* only the first batch element will be used to condition on.
             simulation_batch_size: Number of parameter sets that the
                 simulator accepts maps to data x at once. If None, we simulate
                 all parameter sets at the same time. If >= 1, the simulator has to
                 process data of shape (simulation_batch_size, parameter_dimension).
             device: torch.device on which to compute (optional).
-            summary_writer: an optional SummaryWriter to control, among others, log     
+            summary_writer: An optional SummaryWriter to control, among others, log
                 file location (default is <current working directory>/logs.)
-            skip_simulator_checks: Flag to turn off input checks,
-                e.g., for saving simulation budget as the input checks run the
-                simulator a couple of times.
+            skip_input_checks: Whether to turn off input checks. This saves     
+                simulation time because the input checks test-run the simulator to ensure it's correct.
         """
 
         self._simulator, self._prior, self._x_o = prepare_sbi_problem(
@@ -51,13 +55,13 @@ class NeuralInference(ABC):
         self._device = get_default_device() if device is None else device
 
         # Initialize roundwise (theta, x) for storage of parameters and simulations.
-        # XXX rename self._roundwise_theta, self._roundwise_x = [], []
+        # XXX Rename self._roundwise_* or self._rounds_*
         self._theta_bank, self._x_bank = [], []
 
         # XXX We could instantiate here the Posterior for all children. Two problems:
-        # XXX 1. We must dispatch to right PotentialProvider for mcmc based on name
-        # XXX 2. `alg_family` cannot be resolved only from `self.__class__.__name__`,
-        # XXX     since SRE, AALR demand different handling but are both in SRE class.
+        #     1. We must dispatch to right PotentialProvider for mcmc based on name
+        #     2. `alg_family` cannot be resolved only from `self.__class__.__name__`,
+        #         since SRE, AALR demand different handling but are both in SRE class.
 
         if summary_writer is None:
             log_dir = os.path.join(
@@ -75,14 +79,13 @@ class NeuralInference(ABC):
             mmds=[],
             median_observation_distances=[],
             negative_log_probs_true_parameters=[],
-            neural_net_fit_times=[],  # XXX unused elsewhere
             epochs=[],
             best_validation_log_probs=[],
         )
 
     @staticmethod
     def _ensure_list(
-        num_simulations_per_round: Union[List, int], num_rounds: int
+        num_simulations_per_round: Union[List[int], int], num_rounds: int
     ) -> List[int]:
         """Return `num_simulations_per_round` as a list of length `num_rounds`.
         """
