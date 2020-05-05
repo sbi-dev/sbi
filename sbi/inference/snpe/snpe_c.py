@@ -14,20 +14,7 @@ class SnpeC(SnpeBase):
         self,
         simulator,
         prior,
-        x_o,
-        num_atoms=-1,
-        num_pilot_sims=100,
-        density_estimator=None,
-        calibration_kernel=None,
-        use_combined_loss=False,
-        z_score_x=True,
-        simulation_batch_size: int = 1,
-        retrain_from_scratch_each_round=False,
-        discard_prior_samples=False,
-        summary_writer=None,
-        device=None,
-        sample_with_mcmc=False,
-        mcmc_method="slice-np",
+        num_atoms: Optional[int] = None,
         z_score_min_std: float = 1e-7,
         skip_input_checks: bool = False,
     ):
@@ -54,12 +41,11 @@ class SnpeC(SnpeBase):
                 If -1, use all other thetas in minibatch.
             z_score_min_std: Minimum value of the standard deviation to use when
                 standardizing inputs. This is typically needed when some simulator outputs are deterministic or nearly so.
-            skip_simulator_checks: Flag to turn off input checks,
-                e.g., for saving simulation budget as the input checks run the
-                simulator a couple of times.
+            num_atoms: Number of atoms to use for classification. If None, use all
+                other parameters $\theta$ in minibatch.
         """
 
-        super(SnpeC, self).__init__(
+        self._num_atoms = num_atoms if num_atoms is not None else 0
             simulator=simulator,
             prior=prior,
             x_o=x_o,

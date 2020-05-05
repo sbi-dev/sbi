@@ -23,6 +23,7 @@ class SnpeB(SnpeBase):
         summary_writer=None,
         device=None,
         z_score_min_std: float = 1e-7,
+        simulation_batch_size: Optional[int] = 1,
         skip_input_checks: bool = False,
     ):
         r"""

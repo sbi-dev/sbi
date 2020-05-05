@@ -24,7 +24,7 @@ class SRE(NeuralInference):
         prior,
         x_o: Tensor,
         classifier: Optional[nn.Module] = None,
-        num_atoms: int = -1,
+        num_atoms: Optional[int] = None,
         simulation_batch_size: int = 1,
         mcmc_method: str = "slice-np",
         summary_net: Optional[nn.Module] = None,
@@ -43,9 +43,8 @@ class SRE(NeuralInference):
 
         Args:
             classifier: Binary classifier
-            num_atoms: Number of atoms to use for classification.
-                If -1, use all other thetas in minibatch
-                # TODO: use None instead of -1?
+            num_atoms: Number of atoms to use for classification. If None, use all
+                other parameters $\theta$ in minibatch.
             retrain_from_scratch_each_round: whether to retrain from scratch
                 each round
             summary_net: Optional network which may be used to produce feature
@@ -73,9 +72,7 @@ class SRE(NeuralInference):
         )
 
         self._classifier_loss = classifier_loss
-
-        assert isinstance(num_atoms, int), "Number of atoms must be an integer."
-        self._num_atoms = num_atoms
+        self._num_atoms = num_atoms if num_atoms is not None else 0
 
         if classifier is None:
             classifier = utils.classifier_nn(
