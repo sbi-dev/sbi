@@ -20,7 +20,7 @@ class NeuralInference(ABC):
         simulator: Callable,
         prior,
         x_o: Tensor,
-        simulation_batch_size: int = 1,
+        simulation_batch_size: Optional[int] = 1,
         device: Optional[torch.device] = None,
         summary_writer: Optional[SummaryWriter] = None,
         simulator_name: Optional[str] = "simulator",
@@ -28,16 +28,9 @@ class NeuralInference(ABC):
     ):
         r"""
         Args:
-            simulator: a regular function parameter->result
-                Both parameters and result can be multi-dimensional.         
-            prior: distribution-like object with `log_prob`and `sample` methods.
-            x_o: tensor containing the observation $x_o$.
-                If it has more than one dimension, the leading dimension will be
-                 interpreted as a batch dimension but *currently* only the first batch
-                 element will be used to condition on.
-            simulation_batch_size: number of parameter sets that the
-                simulator accepts and converts to data x at once. If -1, we simulate 
-                all parameter sets at the same time. If >= 1, the simulator has to 
+            simulation_batch_size: Number of parameter sets that the
+                simulator accepts maps to data x at once. If None, we simulate
+                all parameter sets at the same time. If >= 1, the simulator has to
                 process data of shape (simulation_batch_size, parameter_dimension).
             device: torch.device on which to compute (optional).
             summary_writer: an optional SummaryWriter to control, among others, log     

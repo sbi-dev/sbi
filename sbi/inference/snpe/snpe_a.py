@@ -17,7 +17,7 @@ class SnpeA(SnpeBase):
         density_estimator: Optional[nn.Module] = None,
         z_score_x: bool = True,
         z_score_min_std: float = 1e-7,
-        simulation_batch_size: int = 1,
+        simulation_batch_size: Optional[int] = 1,
         retrain_from_scratch_each_round: bool = False,
         discard_prior_samples: bool = False,
         summary_writer: Optional[SummaryWriter] = None,
