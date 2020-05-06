@@ -34,12 +34,10 @@ class SRE(NeuralInference):
         device: Optional[torch.device] = None,
         skip_input_checks: bool = False,
     ):
-        r"""Sequential Ratio Estimation
+        r"""Sequential Ratio Estimation [1]
 
-        As presented in _Likelihood-free MCMC with Amortized Approximate Likelihood
-         Ratios_ by Hermans et al., Pre-print 2019, https://arxiv.org/abs/1903.04057
-
-        See NeuralInference docstring for all other arguments.
+        [1] _Likelihood-free MCMC with Amortized Approximate Likelihood
+            Ratios_, Hermans et al., Pre-print 2019, https://arxiv.org/abs/1903.04057
 
         Args:
             classifier: Binary classifier
@@ -56,9 +54,8 @@ class SRE(NeuralInference):
                 evaluation (only up to a normalizing constant), even when training
                 only one round. `aalr` is limited to `num_atoms=2`, but allows for
                 density evaluation when training for one round.
-            skip_simulator_checks: Flag to turn off input checks,
-                e.g., for saving simulation budget as the input checks run the
-                simulator a couple of times.                
+
+            See NeuralInference docstring for all other arguments.
         """
 
         super().__init__(
@@ -81,7 +78,7 @@ class SRE(NeuralInference):
                 x_o_shape=self._x_o.shape,
             )
 
-        # create posterior object which can sample()
+        # Create posterior object which can sample().
         self._neural_posterior = Posterior(
             algorithm_family=self._classifier_loss,
             neural_net=classifier,
@@ -91,7 +88,6 @@ class SRE(NeuralInference):
             get_potential_function=PotentialFunctionProvider(),
         )
 
-        # XXX why not classifier.train(True)???
         self._neural_posterior.neural_net.train(True)
 
         # We may want to summarize high-dimensional x.

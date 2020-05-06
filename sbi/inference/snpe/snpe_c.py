@@ -36,21 +36,12 @@ class SnpeC(SnpeBase):
             Greenberg et al., ICML 2019, https://arxiv.org/abs/1905.07488.
 
         Args:
-            density_estimator: Neural density estimator.
-            calibration_kernel: A function to calibrate the data $x$.
-            z_score_x: Whether to z-score the data features $x$.
-            z_score_min_std: Minimum value of the standard deviation to use when
-                standardizing inputs. This is typically needed when some simulator outputs are deterministic or nearly so.
             use_combined_loss: Whether to train the neural_net jointly on prior samples 
                 using maximum likelihood and on all samples using atomic loss. Useful to prevent density leaking when using bounded priors.
-            retrain_from_scratch_each_round: Whether to retrain the conditional
-                density estimator for the posterior from scratch each round.
-            discard_prior_samples: Whether to discard samples simulated in round 1, i.e.
-                from the prior. Training may be sped up by ignoring such less specific samples.
             num_atoms: Number of atoms to use for classification. If None, use all
                 other parameters $\theta$ in minibatch.
-            skip_input_checks: Whether to turn off input checks. This saves
-                simulation time because the input checks test-run the simulator to ensure it's correct.
+
+            See `SnpeBase` and `NeuralInference` docstrings for all other arguments.
         """
 
         self._num_atoms = num_atoms if num_atoms is not None else 0

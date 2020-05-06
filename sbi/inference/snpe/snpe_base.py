@@ -36,8 +36,7 @@ class SnpeBase(NeuralInference, ABC):
         summary_writer: Optional[SummaryWriter] = None,
         skip_input_checks: bool = False,
     ):
-        """
-        See NeuralInference docstring for all other arguments.
+        """ Base class for Sequential Neural Posterior Estimation algorithms.
 
         Args:
             density_estimator: Neural density estimator.
@@ -49,9 +48,10 @@ class SnpeBase(NeuralInference, ABC):
                 density estimator for the posterior from scratch each round.
             discard_prior_samples: Whether to discard samples simulated in round 1, i.e.
                 from the prior. Training may be sped up by ignoring such less specific samples.
-            skip_input_checks: Whether to turn off input checks. This saves
-                simulation time because the input checks test-run the simulator to ensure it's correct.
+            
+            See `NeuralInference` docstring for all other arguments.
         """
+
         super().__init__(
             simulator=simulator,
             prior=prior,
