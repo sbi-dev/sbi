@@ -32,6 +32,8 @@ class SRE(NeuralInference):
         summary_net: Optional[nn.Module] = None,
         classifier_loss: str = "sre",
         retrain_from_scratch_each_round: bool = False,
+        num_workers: int = 1,
+        worker_batch_size: int = 20,
         summary_writer: Optional[SummaryWriter] = None,
         device: Optional[torch.device] = None,
         skip_input_checks: bool = False,
@@ -69,6 +71,8 @@ class SRE(NeuralInference):
             simulation_batch_size=simulation_batch_size,
             device=device,
             summary_writer=summary_writer,
+            num_workers=num_workers,
+            worker_batch_size=worker_batch_size,
             skip_input_checks=skip_input_checks,
             show_progressbar=show_progressbar,
             show_round_summary=show_round_summary,
@@ -160,7 +164,7 @@ class SRE(NeuralInference):
                     num_sims, show_progressbar=self._show_progressbar
                 )
 
-            x = self._batched_simulator(theta)
+            theta, x = self._batched_simulator(theta)
 
             # Store (theta, x) pairs.
             self._theta_bank.append(theta)

@@ -33,6 +33,8 @@ class SnpeBase(NeuralInference, ABC):
         device: Optional[torch.device] = None,
         sample_with_mcmc: bool = False,
         mcmc_method: str = "slice-np",
+        num_workers: int = 1,
+        worker_batch_size: int = 20,
         summary_writer: Optional[SummaryWriter] = None,
         skip_input_checks: bool = False,
         show_progressbar: bool = True,
@@ -63,6 +65,8 @@ class SnpeBase(NeuralInference, ABC):
             simulation_batch_size=simulation_batch_size,
             device=device,
             summary_writer=summary_writer,
+            num_workers=num_workers,
+            worker_batch_size=worker_batch_size,
             skip_input_checks=skip_input_checks,
             show_progressbar=show_progressbar,
             show_round_summary=show_round_summary,
@@ -229,7 +233,13 @@ class SnpeBase(NeuralInference, ABC):
 
         if round_ == 0:
             theta = self._prior.sample((num_sims,))
-            x = self._batched_simulator(theta)
+
+            # why do we return theta just below? When using multiprocessing, the thetas
+            # are not handled sequentially anymore. Hence, the x that are returned do
+            # not necessarily have the same order as the theta we define above. We
+            # therefore return a theta vector with the same ordering as x.
+            theta, x = self._batched_simulator(theta)
+
             # What is happening here? By design, we want the neural net to take care of
             # normalizing both input and output, x and theta. But since we don't know
             # the dimensions of these upon instantiation, or in the case of
@@ -248,7 +258,9 @@ class SnpeBase(NeuralInference, ABC):
             theta = self._neural_posterior.sample(
                 num_sims, x=self._x_o, show_progressbar=self._show_progressbar
             )
-            x = self._batched_simulator(theta)
+
+            # why do we return theta just below? See above in if round_ == 0 case.
+            theta, x = self._batched_simulator(theta)
 
         return theta, x, self._mask_sims_from_prior(round_, theta.size(0))
 
