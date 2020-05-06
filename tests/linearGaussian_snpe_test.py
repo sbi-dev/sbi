@@ -74,7 +74,7 @@ def test_snpe_on_linearGaussian_based_on_mmd(
     if algorithm_str == "snpe_b":
         infer = SnpeB(**snpe_common_args)
     elif algorithm_str == "snpe_c":
-        infer = SnpeC(num_atoms=-1, sample_with_mcmc=False, **snpe_common_args)
+        infer = SnpeC(num_atoms=None, sample_with_mcmc=False, **snpe_common_args)
 
     posterior = infer(num_rounds=1, num_simulations_per_round=1000)  # type: ignore
     samples = posterior.sample(num_samples)
