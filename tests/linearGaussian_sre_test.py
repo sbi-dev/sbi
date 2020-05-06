@@ -96,7 +96,7 @@ def test_sre_on_linearGaussian_based_on_mmd(
 
     simulator, prior, x_o = prepare_sbi_problem(linear_gaussian, prior, x_o)
 
-    num_atoms = 2 if classifier_loss == "aalr" else -1
+    num_atoms = 2 if classifier_loss == "aalr" else None
 
     infer = SRE(
         simulator=simulator,

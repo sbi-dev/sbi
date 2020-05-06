@@ -284,7 +284,7 @@ def test_snpec_posterior_correction(sample_with_mcmc, mcmc_method, prior, set_se
         x_o=x_o,
         density_estimator=None,  # Use default MAF.
         prior=prior,
-        num_atoms=-1,
+        num_atoms=None,
         z_score_x=True,
         simulation_batch_size=50,
         use_combined_loss=False,
