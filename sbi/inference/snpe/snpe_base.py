@@ -228,7 +228,7 @@ class SnpeBase(NeuralInference, ABC):
         return theta, x, self._mask_sims_from_prior(round_, theta.size(0))
 
     def _z_score_embedding(self, x: Tensor) -> nn.Module:
-        """Return embedding net that maybe standardizes its inputs."""
+        """Return embedding net with a standardizing step preprended."""
 
         # XXX Mouthful, rename self.posterior.nn
         embed_nn = self._neural_posterior.neural_net._embedding_net
