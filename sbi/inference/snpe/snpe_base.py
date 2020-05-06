@@ -233,8 +233,9 @@ class SnpeBase(NeuralInference, ABC):
         # XXX Mouthful, rename self.posterior.nn
         embed_nn = self._neural_posterior.neural_net._embedding_net
 
-        nonzero_std = torch.clamp(torch.std(x, dim=0), min=self._z_score_min_std)
-        preprocess = Standardize(torch.mean(x, dim=0), nonzero_std)
+        x_std = torch.std(x, dim=0)
+        x_std[x_std == 0] = self._z_score_min_std
+        preprocess = Standardize(torch.mean(x, dim=0), x_std)
 
         # If Sequential has a None component, forward will TypeError.
         return preprocess if embed_nn is None else nn.Sequential(preprocess, embed_nn)
