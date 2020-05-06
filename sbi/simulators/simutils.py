@@ -5,6 +5,54 @@ from typing import Callable, Optional
 import torch
 from torch import Tensor
 from tqdm.auto import tqdm
+from sbi.simulators.mp_simulator import simulate_mp
+
+
+def simulate_mp_in_batches(
+    simulator: Callable,
+    theta: Tensor,
+    sim_batch_size: Optional[int],
+    number_of_workers: int = 4,
+    worker_batch_size: int = 20,
+    show_progressbar: Optional[bool] = True,
+):
+    """
+    Distributes all parameters theta to simulate_in_batches, i.e. splits them between
+     cores and then processes them in batches.
+
+    Args:
+        simulator: simulator function.
+        theta: parameters $\theta$ sampled from prior or posterior.
+        number_of_workers: how many parallel workers to start
+        worker_batch_size: how many params are processed on each worker. This number is
+            thetas will then be handled by simulate_in_batches()
+        sim_batch_size: number of simulations per batch. Default is to simulate
+            the entire theta in a single batch.
+        show_progressbar: whether to show a progressbar during simulating
+
+    Returns: parameters theta and simulation outputs x
+
+    """
+
+    assert worker_batch_size >= sim_batch_size, (
+        "worker_batch_size has to be smaller than simulation_batch_size when using"
+        " multiprocessing."
+    )
+
+    batched_simulator = lambda theta_: simulate_in_batches(
+        simulator, theta_, sim_batch_size, show_progressbar=False
+    )
+    theta, data = simulate_mp(
+        simulator=batched_simulator,
+        theta=theta,
+        num_workers=number_of_workers,
+        worker_batch_size=worker_batch_size,
+        verbose=False,  # verbose gives a ton of information on what each worker is
+        # currently doing. Not sure if we want to make this an easily accessible kwarg
+        show_progressbar=show_progressbar,
+    )
+
+    return theta, data
 
 
 def simulate_in_batches(
@@ -12,7 +60,7 @@ def simulate_in_batches(
     theta: Tensor,
     sim_batch_size: Optional[int],
     show_progressbar: Optional[bool] = True,
-) -> Tensor:
+) -> (Tensor, Tensor):
     r"""
     Return simulations $x$ for parameters $\theta$ conducted batchwise.
     
@@ -26,8 +74,9 @@ def simulate_in_batches(
         show_progressbar: whether to show a progressbar during simulating
 
     Returns:
-        Simulations $x$ with shape (num_sims, shape_of_single_x)
+        Parameters theta and simulations $x$ with shape (num_sims, shape_of_single_x)
     """
+
     num_sims, *_ = theta.shape
 
     if num_sims == 0:
@@ -48,6 +97,7 @@ def simulate_in_batches(
             for batch in batches:
                 simulation_outputs.append(simulator(batch))
                 pbar.update(sim_batch_size)
-        return torch.cat(simulation_outputs, dim=0)
+
+        return theta, torch.cat(simulation_outputs, dim=0)
     else:
-        return simulator(theta)
+        return theta, simulator(theta)
