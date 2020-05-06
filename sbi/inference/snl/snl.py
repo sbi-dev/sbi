@@ -152,7 +152,7 @@ class SNL(NeuralInference):
         """
 
         # Get total number of training examples.
-        num_examples = torch.cat(self._theta_bank).shape[0]
+        num_examples = sum(len(theta) for theta in self._theta_bank)
 
         # Select random train and validation splits from (theta, x) pairs.
         permuted_indices = torch.randperm(num_examples)
