@@ -377,7 +377,9 @@ def wrap_as_pytorch_simulator(
             return torch.as_tensor(simulator(theta.numpy()), dtype=float32)
 
     else:
-        pytorch_simulator = simulator
+        # Define a wrapper to make sure that the output of the simulator is float32
+        def pytorch_simulator(theta: Tensor):
+            return torch.as_tensor(simulator(theta), dtype=float32)
 
     return pytorch_simulator
 
@@ -488,7 +490,7 @@ def prepare_sbi_problem(
         user_prior: prior as provided by the user
         user_x_o: observed data as
             provided by the user
-        skip_simulator_checks: Flag to turn off input checks,
+        skip_input_checks: Flag to turn off input checks,
             e.g., for saving simulation budget as the input checks run the simulator
             a couple of times.
 
