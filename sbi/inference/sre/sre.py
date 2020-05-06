@@ -207,7 +207,7 @@ class SRE(NeuralInference):
 
         # Create neural_net and validation loaders using a subset sampler.
 
-        # NOTE: The batch_size is clipped to num_validation samples
+        # NOTE: The batch_size is clipped to num_validation samples.
         clipped_batch_size = min(batch_size, num_validation_examples)
         train_loader = data.DataLoader(
             dataset,
@@ -229,15 +229,8 @@ class SRE(NeuralInference):
             lr=learning_rate,
         )
 
-        # only used if classifier_loss == "aalr"
+        # Only used if classifier_loss == "aalr".
         criterion = nn.BCELoss()
-
-        # Keep track of best_validation log_prob seen so far.
-        best_validation_log_prob = -1e100
-        # Keep track of number of epochs since last improvement.
-        epochs_since_last_improvement = 0
-        # Keep track of model with best validation performance.
-        best_model_state_dict = None
 
         # If we're retraining from scratch each round, reset the neural posterior
         # to the untrained copy we made at the start.
@@ -283,20 +276,20 @@ class SRE(NeuralInference):
                 # from the marginals p(theta)p(x) and is labelled 0. And so on.
                 labels = ones(2 * clipped_batch_size)  # two atoms
                 labels[1::2] = 0.0
-                # binary cross entropy to learn the likelihood
+                # Binary cross entropy to learn the likelihood.
                 loss = criterion(likelihood, labels)
             else:
                 logits = self._neural_posterior.neural_net(theta_and_x).reshape(
                     clipped_batch_size, num_atoms
                 )
-                # index 0 is the theta sampled from the joint
+                # Index 0 is the theta sampled from the joint.
                 log_prob = logits[:, 0] - torch.logsumexp(logits, dim=-1)
                 loss = -torch.mean(log_prob)
 
             return loss
 
-        epochs = 0
-        while True:
+        epoch, self._val_log_prob = 0, float("-Inf")
+        while not self._has_converged(epoch, stop_after_epochs):
 
             # Train for a single epoch.
             self._neural_posterior.neural_net.train()
@@ -306,35 +299,20 @@ class SRE(NeuralInference):
                 loss.backward()
                 optimizer.step()
 
-            epochs += 1
+            epoch += 1
 
-            # calculate validation performance
+            # Calculate validation performance.
             self._neural_posterior.neural_net.eval()
             log_prob_sum = 0
             with torch.no_grad():
                 for theta_batch, x_batch in val_loader:
                     log_prob = _get_loss(theta_batch, x_batch)
                     log_prob_sum -= log_prob.sum().item()
-                validation_log_prob = log_prob_sum / num_validation_examples
-
-            # check for improvement
-            if validation_log_prob > best_validation_log_prob:
-                best_model_state_dict = deepcopy(
-                    self._neural_posterior.neural_net.state_dict()
-                )
-                best_validation_log_prob = validation_log_prob
-                epochs_since_last_improvement = 0
-            else:
-                epochs_since_last_improvement += 1
-
-            # if no validation improvement over many epochs, stop training
-            if epochs_since_last_improvement > stop_after_epochs - 1:
-                self._neural_posterior.neural_net.load_state_dict(best_model_state_dict)
-                break
+                self._val_log_prob = log_prob_sum / num_validation_examples
 
         # Update summary.
-        self._summary["epochs"].append(epochs)
-        self._summary["best_validation_log_probs"].append(best_validation_log_prob)
+        self._summary["epochs"].append(epoch)
+        self._summary["best_validation_log_probs"].append(self._best_val_log_prob)
 
     @property
     def summary(self):
