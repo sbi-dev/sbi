@@ -184,24 +184,25 @@ def test_multi_round_snpe_on_linearGaussian_based_on_mmd(algorithm_str: str, set
     samples = posterior.sample(num_samples)
 
 
+_fail_reason_deterministic_sim = """If the simulator has truely deterministic (even partial) outputs, the inference can succeed with z_score_std > 0, but the log posterior will have infinites, which we reject."""
+
+
 @pytest.mark.parametrize(
     "z_score_min_std",
-    [
+    (
         pytest.param(
             0.0,
             marks=pytest.mark.xfail(
-                raises=AttributeError,
-                reason="If the simulator has truely deterministic (even partial) outputs, NaNs appear while standardizing if not enforcing z_score_std > 0. The AttributeError is rather remote - while attempting to save fit parameters (deepcopy).",
+                raises=AssertionError, reason=_fail_reason_deterministic_sim,
             ),
         ),
         pytest.param(
             1e-7,
             marks=pytest.mark.xfail(
-                raises=AssertionError,
-                reason="If the simulator has truely deterministic (even partial) outputs, the inference can succeed with z_score_std > 0, but the log posterior will have infinites, which we reject.",
+                raises=AssertionError, reason=_fail_reason_deterministic_sim,
             ),
         ),
-    ],
+    ),
 )
 def test_multi_round_snpe_deterministic_simulator(set_seed, z_score_min_std):
     """Test if a deterministic simulator breaks inference for SNPE B.

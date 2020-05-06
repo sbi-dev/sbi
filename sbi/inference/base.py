@@ -6,6 +6,7 @@ import torch
 from torch import Tensor
 from torch.utils.tensorboard import SummaryWriter
 
+from copy import deepcopy
 from sbi.simulators.simutils import simulate_in_batches
 from sbi.user_input.user_input_checks import prepare_sbi_problem
 from sbi.utils import get_log_root, get_timestamp
@@ -86,6 +87,37 @@ class NeuralInference(ABC):
             epochs=[],
             best_validation_log_probs=[],
         )
+
+    def _has_converged(self, epoch: int, stop_after_epochs: int) -> bool:
+        """Return whether the training converged yet and save best model state so far.
+
+        Checks for improvement in validation performance over previous epochs.
+
+        Args:
+            epoch: Current epoch in training.
+            stop_after_epochs: How many fruitless epochs to let pass before stopping.
+
+        Returns:
+            Whether the training has stopped improving, i.e. has converged.
+        """
+        converged = False
+
+        posterior_nn = self._neural_posterior.neural_net
+
+        # (Re)-start the epoch count with the first epoch or any improvement.
+        if epoch == 0 or self._val_log_prob > self._best_val_log_prob:
+            self._best_val_log_prob = self._val_log_prob
+            self._epochs_since_last_improvement = 0
+            self._best_model_state_dict = deepcopy(posterior_nn.state_dict())
+        else:
+            self._epochs_since_last_improvement += 1
+
+        # If no validation improvement over many epochs, stop training.
+        if self._epochs_since_last_improvement > stop_after_epochs - 1:
+            posterior_nn.load_state_dict(self._best_model_state_dict)
+            converged = True
+
+        return converged
 
     @staticmethod
     def _ensure_list(

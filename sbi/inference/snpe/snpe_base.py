@@ -337,21 +337,14 @@ class SnpeBase(NeuralInference, ABC):
         optimizer = optim.Adam(
             list(self._neural_posterior.neural_net.parameters()), lr=learning_rate,
         )
-        # Keep track of best_validation log_prob seen so far.
-        best_validation_log_prob = float("-Inf")
-        # Keep track of number of epochs since last improvement.
-        epochs_since_last_improvement = 0
-        # Keep track of model with best validation performance.
-        best_model_state_dict = None
 
         # If retraining from scratch each round, reset the neural posterior
         # to the untrained copy.
         if self._retrain_from_scratch_each_round and round_ > 0:
             self._neural_posterior = deepcopy(self._untrained_neural_posterior)
 
-        epochs = 0
-        converged = False
-        while not converged:
+        epoch, self._val_log_prob = 0, float("-Inf")
+        while not self._has_converged(epoch, stop_after_epochs):
 
             # Train for a single epoch.
             self._neural_posterior.neural_net.train()
@@ -363,12 +356,12 @@ class SnpeBase(NeuralInference, ABC):
                     batch[2].to(self._device),
                 )
 
-                # just do maximum likelihood in the first round
+                # Just do maximum likelihood in the first round.
                 if round_ == 0:
                     log_prob = self._neural_posterior.neural_net.log_prob(
                         theta_batch, x_batch
                     )
-                else:  # or call the APT loss
+                else:  # Or call the APT loss.
                     log_prob = self._get_log_prob_proposal_posterior(
                         theta_batch, x_batch, masks
                     )
@@ -381,7 +374,7 @@ class SnpeBase(NeuralInference, ABC):
                     )
                 optimizer.step()
 
-            epochs += 1
+            epoch += 1
 
             # Calculate validation performance.
             self._neural_posterior.neural_net.eval()
@@ -393,7 +386,7 @@ class SnpeBase(NeuralInference, ABC):
                         batch[1].to(self._device),
                         batch[2].to(self._device),
                     )
-                    # just do maximum likelihood in the first round
+                    # Just do maximum likelihood in the first round.
                     if round_ == 0:
                         log_prob = self._neural_posterior.neural_net.log_prob(
                             theta_batch, x_batch
@@ -403,26 +396,12 @@ class SnpeBase(NeuralInference, ABC):
                             theta_batch, x_batch, masks
                         )
                     log_prob_sum += log_prob.sum().item()
-            validation_log_prob = log_prob_sum / num_validation_examples
 
-            # Check for improvement in validation performance over previous epochs.
-            if validation_log_prob > best_validation_log_prob:
-                best_validation_log_prob = validation_log_prob
-                epochs_since_last_improvement = 0
-                best_model_state_dict = deepcopy(
-                    self._neural_posterior.neural_net.state_dict()
-                )
-            else:
-                epochs_since_last_improvement += 1
-
-            # If no validation improvement over many epochs, stop training.
-            if epochs_since_last_improvement > stop_after_epochs - 1:
-                self._neural_posterior.neural_net.load_state_dict(best_model_state_dict)
-                converged = True
+            self._val_log_prob = log_prob_sum / num_validation_examples
 
         # Update summary.
-        self._summary["epochs"].append(epochs)
-        self._summary["best_validation_log_probs"].append(best_validation_log_prob)
+        self._summary["epochs"].append(epoch)
+        self._summary["best_validation_log_probs"].append(self._best_val_log_prob)
 
 
 class PotentialFunctionProvider:
