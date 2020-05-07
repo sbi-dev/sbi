@@ -1,6 +1,7 @@
 from abc import ABC
 from copy import deepcopy
 from typing import Callable, List, Optional, Union, Tuple, List
+import warnings
 
 import numpy as np
 import torch
@@ -9,7 +10,6 @@ from torch.nn.utils import clip_grad_norm_
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
-from tqdm import tqdm
 
 from sbi.inference.base import NeuralInference
 from sbi.inference.posteriors.sbi_posterior import Posterior
@@ -35,6 +35,8 @@ class SnpeBase(NeuralInference, ABC):
         mcmc_method: str = "slice-np",
         summary_writer: Optional[SummaryWriter] = None,
         skip_input_checks: bool = False,
+        show_progressbar: Optional[bool] = True,
+        show_round_summary: Optional[bool] = False,
     ):
         """ Base class for Sequential Neural Posterior Estimation algorithms.
 
@@ -47,9 +49,11 @@ class SnpeBase(NeuralInference, ABC):
             retrain_from_scratch_each_round: Whether to retrain the conditional
                 density estimator for the posterior from scratch each round.
             discard_prior_samples: Whether to discard samples simulated in round 1, i.e.
-                from the prior. Training may be sped up by ignoring such less specific samples.
-            
-            See `NeuralInference` docstring for all other arguments.
+                from the prior. Training may be sped up by ignoring such less specific samples
+            show_progressbar: whether to show a progressbar during simulating, training,
+                sampling
+            show_round_summary: whether to print the validation loss and leakage after
+                each round
         """
 
         super().__init__(
@@ -60,6 +64,8 @@ class SnpeBase(NeuralInference, ABC):
             device=device,
             summary_writer=summary_writer,
             skip_input_checks=skip_input_checks,
+            show_progressbar=show_progressbar,
+            show_round_summary=show_round_summary,
         )
 
         if density_estimator is None:
@@ -108,6 +114,7 @@ class SnpeBase(NeuralInference, ABC):
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
         stop_after_epochs: int = 20,
+        max_num_epochs: Optional[int] = None,
         clip_grad_norm: bool = True,
     ) -> Posterior:
         r"""Run SNPE
@@ -122,16 +129,22 @@ class SnpeBase(NeuralInference, ABC):
             validation_fraction: The fraction of data to use for validation.
             stop_after_epochs: The number of epochs to wait for improvement on the
                 validation set before terminating training.
+            max_num_epochs: maximal number of epochs to run. If max_num_epochs
+                is reached, we stop training even if the validation loss is still
+                decreasing. If None, we train until validation loss increases (see
+                argument stop_after_epochs)
             clip_grad_norm: Whether to clip norm of gradients or not.
             
         Returns:
             Posterior that can be sampled and evaluated.
         """
 
+        if max_num_epochs is None:
+            max_num_epochs = float("Inf")
+
         num_sims_per_round = self._ensure_list(num_simulations_per_round, num_rounds)
 
-        tbar = tqdm(enumerate(num_sims_per_round))
-        for round_, num_sims in tbar:
+        for round_, num_sims in enumerate(num_sims_per_round):
 
             # Run simulations for the round.
             theta, x, prior_mask = self._run_simulations(round_, num_sims)
@@ -147,6 +160,7 @@ class SnpeBase(NeuralInference, ABC):
                 learning_rate=learning_rate,
                 validation_fraction=validation_fraction,
                 stop_after_epochs=stop_after_epochs,
+                max_num_epochs=max_num_epochs,
                 clip_grad_norm=clip_grad_norm,
             )
 
@@ -154,8 +168,19 @@ class SnpeBase(NeuralInference, ABC):
             self._model_bank.append(deepcopy(self._neural_posterior))
             self._model_bank[-1].neural_net.eval()
 
+            # making the call to get_leakage_correction() and the update of
+            # self._leakage_density_correction_factor explicit here. This is just
+            # to make sure this update never gets lost when we e.g. do not log our
+            # things to tensorboard anymore. Calling get_leakage_correction() is needed
+            # to update the leakage after each round.
+            acceptance_rate = self._neural_posterior.get_leakage_correction(
+                x=self._x_o, force_update=True, show_progressbar=self._show_progressbar,
+            )
+            self._summary["rejection_sampling_acceptance_rates"].append(acceptance_rate)
+
             # Update description for progress bar.
-            tbar.set_description(self._describe_round(round_, self._summary))
+            if self._show_round_summary:
+                print(self._describe_round(round_, self._summary))
 
             # Update tensorboard and summary dict.
             self._summary_writer, self._summary = utils.summarize(
@@ -167,7 +192,7 @@ class SnpeBase(NeuralInference, ABC):
                 x_bank=self._x_bank,
                 simulator=self._simulator,
                 posterior_samples_acceptance_rate=self._neural_posterior.get_leakage_correction(
-                    x=self._x_o
+                    x=self._x_o,
                 ),
             )
 
@@ -196,7 +221,6 @@ class SnpeBase(NeuralInference, ABC):
         Args:
             round_: Round number.
             num_sims: Number of desired simulations for the round.
-                Note that if leakage correction is requested with finite patience this number may not be reached; A warning will be displayed in this case. 
 
         Returns:
             theta: Parameters used for training.
@@ -222,7 +246,9 @@ class SnpeBase(NeuralInference, ABC):
 
         else:
             # XXX Make posterior.sample() accept tuples like prior.sample().
-            theta = self._neural_posterior.sample(num_sims, x=self._x_o)
+            theta = self._neural_posterior.sample(
+                num_sims, x=self._x_o, show_progressbar=self._show_progressbar
+            )
             x = self._batched_simulator(theta)
 
         return theta, x, self._mask_sims_from_prior(round_, theta.size(0))
@@ -259,6 +285,7 @@ class SnpeBase(NeuralInference, ABC):
         learning_rate,
         validation_fraction,
         stop_after_epochs,
+        max_num_epochs,
         clip_grad_norm,
     ):
         r"""Train
@@ -332,7 +359,7 @@ class SnpeBase(NeuralInference, ABC):
                     log_prob = self._neural_posterior.neural_net.log_prob(
                         theta_batch, x_batch
                     )
-                else:  # Or call the APT loss.
+                else:  # or call the SnpeC loss
                     log_prob = self._get_log_prob_proposal_posterior(
                         theta_batch, x_batch, masks
                     )
@@ -369,6 +396,25 @@ class SnpeBase(NeuralInference, ABC):
                     log_prob_sum += log_prob.sum().item()
 
             self._val_log_prob = log_prob_sum / num_validation_examples
+
+            if self._show_progressbar:
+                # end="\r" deletes the print statement when a new one appears.
+                # https://stackoverflow.com/questions/3419984/
+                print("Training neural network. Epochs trained: ", epoch, end="\r")
+
+        if self._show_progressbar and self._has_converged(epoch, stop_after_epochs):
+            # network has converged, we print this summary.
+            print("Neural network successfully converged after", epoch, "epochs.")
+        elif self._show_progressbar and max_num_epochs == epoch:
+            # training has stopped because of max_num_epochs argument.
+            print("Stopping neural network training after", epoch, "epochs.")
+
+        if max_num_epochs == epoch:
+            # warn if training was not stopped by early stopping
+            warnings.warn(
+                "Maximum number of epochs reached, but network has not yet "
+                "fully converged. Consider increasing the value of max_num_epochs."
+            )
 
         # Update summary.
         self._summary["epochs"].append(epoch)

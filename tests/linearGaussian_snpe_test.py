@@ -174,7 +174,7 @@ def test_multi_round_snpe_on_linearGaussian_based_on_mmd(algorithm_str: str, set
 
     # Compute the mmd, and check if larger than expected.
     mmd = utils.unbiased_mmd_squared(target_samples, samples)
-    max_mmd = 0.02
+    max_mmd = 0.027
 
     print(f"mmd for {algorithm_str} is {mmd}.")
 

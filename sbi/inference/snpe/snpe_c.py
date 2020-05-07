@@ -29,6 +29,8 @@ class SnpeC(SnpeBase):
         sample_with_mcmc: bool = False,
         mcmc_method: str = "slice-np",
         skip_input_checks: bool = False,
+        show_progressbar: Optional[bool] = True,
+        show_round_summary: Optional[bool] = False,
     ):
         r"""SNPE-C / APT [1]
 
@@ -36,7 +38,7 @@ class SnpeC(SnpeBase):
             Greenberg et al., ICML 2019, https://arxiv.org/abs/1905.07488.
 
         Args:
-            use_combined_loss: Whether to train the neural_net jointly on prior samples 
+            use_combined_loss: Whether to train the neural_net jointly on prior samples
                 using maximum likelihood and on all samples using atomic loss. Useful to prevent density leaking when using bounded priors.
             num_atoms: Number of atoms to use for classification. If None, use all
                 other parameters $\theta$ in minibatch.
@@ -62,6 +64,8 @@ class SnpeC(SnpeBase):
             sample_with_mcmc=sample_with_mcmc,
             mcmc_method=mcmc_method,
             skip_input_checks=skip_input_checks,
+            show_progressbar=show_progressbar,
+            show_round_summary=show_round_summary,
         )
 
     def _get_log_prob_proposal_posterior(
@@ -84,7 +88,7 @@ class SnpeC(SnpeBase):
             masks: Whetherto retrain with prior loss (for each prior sample).
 
         Returns:
-            Log-probability of the proposal posterior. 
+            Log-probability of the proposal posterior.
         """
 
         batch_size = theta.shape[0]

@@ -26,13 +26,15 @@ class NeuralInference(ABC):
         summary_writer: Optional[SummaryWriter] = None,
         simulator_name: Optional[str] = "simulator",
         skip_input_checks: bool = False,
+        show_progressbar: Optional[bool] = True,
+        show_round_summary: Optional[bool] = False,
     ):
         r"""
         Args:
-            simulator: A regular callable $f(\theta)\to x$. Both parameter $\theta$ and 
+            simulator: A regular callable $f(\theta)\to x$. Both parameter $\theta$ and
                 simulation $x$ can be multi-dimensional.
             prior: Distribution-like object with `log_prob`and `sample` methods.
-            x_o: Observation $x_o$. If it has more than one dimension, the leading 
+            x_o: Observation $x_o$. If it has more than one dimension, the leading
                 dimension will be interpreted as a batch dimension but *currently* only the first batch element will be used to condition on.
             simulation_batch_size: Number of parameter sets that the
                 simulator accepts maps to data x at once. If None, we simulate
@@ -41,16 +43,23 @@ class NeuralInference(ABC):
             device: torch.device on which to compute (optional).
             summary_writer: An optional SummaryWriter to control, among others, log
                 file location (default is <current working directory>/logs.)
-            skip_input_checks: Whether to turn off input checks. This saves     
+            skip_input_checks: Whether to turn off input checks. This saves
                 simulation time because the input checks test-run the simulator to ensure it's correct.
+            show_progressbar: whether to show a progressbar during simulating, training,
+                sampling
+            show_round_summary: whether to print the validation loss and leakage after
+                each round
         """
 
         self._simulator, self._prior, self._x_o = prepare_sbi_problem(
             simulator, prior, x_o, skip_input_checks
         )
 
+        self._show_progressbar = show_progressbar
+        self._show_round_summary = show_round_summary
+
         self._batched_simulator = lambda theta: simulate_in_batches(
-            self._simulator, theta, simulation_batch_size
+            self._simulator, theta, simulation_batch_size, self._show_progressbar
         )
 
         self._device = get_default_device() if device is None else device
@@ -133,6 +142,15 @@ class NeuralInference(ABC):
     def _describe_round(round_: int, summary: Dict[str, list]) -> str:
         epochs = summary["epochs"][-1]
         best_validation_log_probs = summary["best_validation_log_probs"][-1]
+        if "rejection_sampling_acceptance_rates" in summary:
+            # if this key exists, we are using SNPE
+            posterior_acceptance_prob = summary["rejection_sampling_acceptance_rates"][
+                -1
+            ]
+        else:
+            # for all other methods, rejection_sampling_acceptance_rates is not logged
+            # because the acceptance probability is by definition 1.0
+            posterior_acceptance_prob = 1.0
 
         description = f"""
         -------------------------
@@ -140,8 +158,8 @@ class NeuralInference(ABC):
         -------------------------
         Epochs trained: {epochs}
         Best validation performance: {best_validation_log_probs:.4f}
-
-
+        Leakage: {1.-posterior_acceptance_prob:.4f}
+        -------------------------
         """
 
         return description

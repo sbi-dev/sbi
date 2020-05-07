@@ -1,4 +1,4 @@
-from typing import Callable, Optional
+from typing import Callable, Optional, Union
 from warnings import warn
 
 from pyro.infer.mcmc import HMC, NUTS
@@ -151,7 +151,11 @@ class Posterior:
         return self._log_prob_classifier(theta, x)
 
     def get_leakage_correction(
-        self, x: Tensor, num_rejection_samples: int = 10000
+        self,
+        x: Tensor,
+        num_rejection_samples: int = 10000,
+        force_update: bool = False,
+        show_progressbar: Union[bool, str] = False,
     ) -> Tensor:
         r"""Return leakage-correction factor for a leaky posterior density.
         
@@ -165,9 +169,14 @@ class Posterior:
         
         Arguments:
             x: conditioning context for posterior $p(\theta|x)$. If None, uses self.x_o.
-        
             num_rejection_samples: number of samples used to estimate the factor
              (default: 10000).
+            force_update: if False, we do not re-evaluate the leakage correction if
+                the context is the same as self.x_o. If True, we always re-evaluate.
+                This is needed to enforce a new estimate of the leakage after later
+                rounds, i.e. round 2, 3, ...
+            show_progressbar: whether to show a progressbar or not. If string, we show a
+                progressbar and add the str to the description
         
         Returns:
             Saved or newly estimated correction factor (scalar Tensor).
@@ -177,25 +186,40 @@ class Posterior:
 
         if is_new_x:
             _, acceptance_rate = utils.sample_posterior_within_prior(
-                self.neural_net, self._prior, x, num_samples=num_rejection_samples
+                self.neural_net,
+                self._prior,
+                x,
+                num_samples=num_rejection_samples,
+                show_progressbar=show_progressbar,
             )
-            return torch.as_tensor(acceptance_rate)
         # If factor for x_o wasn't estimated yet, estimate and set.
-        elif self._leakage_density_correction_factor is None:
+        elif self._leakage_density_correction_factor is None or force_update:
             _, acceptance_rate = utils.sample_posterior_within_prior(
                 self.neural_net,
                 self._prior,
                 self.x_o,
                 num_samples=num_rejection_samples,
+                show_progressbar=show_progressbar,
             )
             self._leakage_density_correction_factor = acceptance_rate
-            # XXX merge with next return (move out)
-            return torch.as_tensor(self._leakage_density_correction_factor)
         # otherwise just return the saved correction factor
         else:
-            return torch.as_tensor(self._leakage_density_correction_factor)
+            acceptance_rate = self._leakage_density_correction_factor
 
-    def sample(self, num_samples: int, x: Tensor = None, **kwargs) -> Tensor:
+        if acceptance_rate < 0.01:
+            warn(
+                "Leakage >99% detected. This will drastically slow down sampling."
+                "Consider switching to sample_with_mcmc=True"
+            )
+        return torch.as_tensor(acceptance_rate)
+
+    def sample(
+        self,
+        num_samples: int,
+        x: Tensor = None,
+        show_progressbar: bool = False,
+        **kwargs,
+    ) -> Tensor:
         r"""
         Return samples from posterior distribution $p(\theta|x)$.
 
@@ -203,6 +227,8 @@ class Posterior:
             num_samples: number of samples
             x: conditioning context for posterior $p(\theta|x)$. Will be self.x_o if
              None
+            show_progressbar: whether to plot a progressbar showing how many samples have already
+             been drawn
             **kwargs:
                 Additional parameters passed to MCMC sampler (thin and warmup)
 
@@ -218,12 +244,17 @@ class Posterior:
                     x=x,
                     num_samples=num_samples,
                     mcmc_method=self._mcmc_method,
+                    show_progressbar=show_progressbar,
                     **kwargs,
                 )
             else:
                 # rejection sampling
                 samples, _ = utils.sample_posterior_within_prior(
-                    self.neural_net, self._prior, x, num_samples=num_samples
+                    self.neural_net,
+                    self._prior,
+                    x,
+                    num_samples=num_samples,
+                    show_progressbar=show_progressbar,
                 )
 
         return samples
@@ -236,6 +267,7 @@ class Posterior:
         thin: int = 10,
         warmup: int = 20,
         num_chains: Optional[int] = 1,
+        show_progressbar: Optional[int] = True,
     ) -> Tensor:
         r"""
         Return MCMC samples from posterior $p(\theta|x)$.
@@ -249,6 +281,8 @@ class Posterior:
             
             thin: thinning factor for the chain, e.g. for thin=3 only every
                 third sample will be returned, until a total of num_samples
+
+            show_progressbar: whether to show a progressbar during sampling
 
         Returns:
             tensor of shape (num_samples, shape_of_single_theta)
@@ -277,6 +311,7 @@ class Posterior:
                 thin,
                 warmup,
                 num_chains,
+                show_progressbar=show_progressbar,
             )
 
         return samples
@@ -319,6 +354,7 @@ class Posterior:
         thin: int = 10,
         warmup_steps: int = 200,
         num_chains: Optional[int] = 1,
+        show_progressbar: Optional[bool] = True,
     ):
         r"""Return samples obtained using Pyro's HMC, NUTS or slice kernels.
 
@@ -333,6 +369,7 @@ class Posterior:
             warmup_steps: initial samples to discard (defaults to 200)
             num_chains: whether to sample in parallel. If None, will use all
                 CPUs except one (default 1)
+            show_progressbar: whether to show a progressbar during sampling
 
         Returns: tensor of shape (num_samples, shape_of_single_theta)
         """
@@ -358,6 +395,7 @@ class Posterior:
             initial_params={"": initial_params},
             num_chains=num_chains,
             mp_context="fork",
+            disable_progbar=not show_progressbar,
         )
         sampler.run()
         samples = next(iter(sampler.get_samples().values())).reshape(
