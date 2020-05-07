@@ -7,6 +7,7 @@ import torch.nn as nn
 from torch import Tensor
 
 import sbi.utils as utils
+from tqdm.auto import tqdm
 
 
 class Standardize(nn.Module):
@@ -108,7 +109,7 @@ def sample_posterior_within_prior(
     prior: torch.distributions.Distribution,
     x: Tensor,
     num_samples: int = 1,
-    patience: int = 5,
+    show_progressbar: bool = False,
 ) -> Tuple[Tensor, float]:
     r"""Return samples from a posterior $p(\theta|x)$ within the support of the prior
      via rejection sampling.
@@ -126,8 +127,7 @@ def sample_posterior_within_prior(
         prior: torch distribution prior
         x: conditioning variable $x$ for the posterior $p(\theta|x)$
         num_samples: number of sample to generate
-        patience: upper time bound in minutes, in case sampling takes too long
-         due to strong leakage
+        show_progressbar: whether to show a progressbar during sampling
 
     Returns:
         Accepted samples, and estimated acceptance
@@ -141,40 +141,56 @@ def sample_posterior_within_prior(
     samples = []
     num_remaining = num_samples
     num_sampled_total = 0
-    tstart = time.time()
-    time_over = time.time() - tstart > (patience * 60)
+    leakage_warning_raised = False
 
-    while num_remaining > 0 and not time_over:
+    # we might not always want a progressbar for sampling. E.g. we want to display that,
+    # after each round, we also draw samples just for logging. Thus, the progressbar
+    # can be turned off with the show_progressbar argument.
+    pbar = tqdm(total=num_remaining, disable=not show_progressbar)
+    desc = "Drawing {0} posterior samples".format(num_remaining)
+    if type(show_progressbar) == str:
+        desc += show_progressbar
+    pbar.set_description(desc)
 
-        # XXX: we need this reshape here because posterior_nn.sample sometimes return
-        # leading singleton dimension instead of (num_samples), e.g., (1, 10000, 4)
-        # instead of (10000, 4). and this can't be handled by MultipleIndependent. issue #141
-        sample = posterior_nn.sample(num_remaining, context=x).reshape(
-            num_remaining, -1
-        )
-        num_sampled_total += num_remaining
+    with pbar:
+        while num_remaining > 0:
 
-        is_within_prior = torch.isfinite(prior.log_prob(sample))
-        num_in_prior = is_within_prior.sum().item()
+            # XXX: we need this reshape here because posterior_nn.sample sometimes return
+            # leading singleton dimension instead of (num_samples), e.g., (1, 10000, 4)
+            # instead of (10000, 4). and this can't be handled by MultipleIndependent. issue #141
+            sample = posterior_nn.sample(num_remaining, context=x).reshape(
+                num_remaining, -1
+            )
+            num_sampled_total += num_remaining
 
-        if num_in_prior > 0:
-            samples.append(sample[is_within_prior,].reshape(num_in_prior, -1))
-            num_remaining -= num_in_prior
+            is_within_prior = torch.isfinite(prior.log_prob(sample))
+            num_in_prior = is_within_prior.sum().item()
 
-        # update timer
-        time_over = time.time() - tstart > (patience * 60)
+            if num_in_prior > 0:
+                samples.append(sample[is_within_prior,].reshape(num_in_prior, -1))
+                num_remaining -= num_in_prior
+
+            # If leakage is very high, we might be caught in an infinite loop here.
+            # So, after at least 1000 drawn samples, we evaluate if less than 1% were
+            # accepted at this point. If so, we raise a warning.
+            num_accepted_total = num_samples - num_remaining
+            if (
+                num_sampled_total > 1000
+                and num_accepted_total < num_sampled_total * 0.01
+                and not leakage_warning_raised
+            ):
+                warnings.warn(
+                    "Leakage >99% detected. This will drastically slow down sampling."
+                    "Consider switching to sample_with_mcmc=True"
+                )
+                leakage_warning_raised = True  # make sure warning is raised just once
+
+            pbar.update(num_in_prior)
 
     # collect all samples in the list into one tensor
     samples = torch.cat(samples)
 
     # estimate acceptance probability
     acceptance_prob = float((samples.shape[0]) / num_sampled_total)
-
-    if num_remaining > 0:
-        warnings.warn(
-            f"""Beware: Rejection sampling resulted in only {samples.shape[0]} samples
-            within patience of {patience} min. Consider having more patience, leakage
-            is {1-acceptance_prob}."""
-        )
 
     return samples, acceptance_prob

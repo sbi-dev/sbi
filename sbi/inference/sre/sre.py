@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from copy import deepcopy
 from typing import Callable, Dict, List, Optional, Union
+import math
+import warnings
+from tqdm.auto import tqdm
 
 import numpy as np
 import torch
@@ -9,7 +12,6 @@ from torch import Tensor, nn, optim, ones
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
-from tqdm import tqdm
 
 import sbi.utils as utils
 from sbi.inference.base import NeuralInference
@@ -33,6 +35,8 @@ class SRE(NeuralInference):
         summary_writer: Optional[SummaryWriter] = None,
         device: Optional[torch.device] = None,
         skip_input_checks: bool = False,
+        show_progressbar: Optional[bool] = True,
+        show_round_summary: Optional[bool] = False,
     ):
         r"""Sequential Ratio Estimation [1]
 
@@ -66,6 +70,8 @@ class SRE(NeuralInference):
             device,
             summary_writer,
             skip_input_checks=skip_input_checks,
+            show_progressbar=show_progressbar,
+            show_round_summary=show_round_summary,
         )
 
         self._classifier_loss = classifier_loss
@@ -116,6 +122,7 @@ class SRE(NeuralInference):
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
         stop_after_epochs: int = 20,
+        max_num_epochs: Optional[int] = None,
     ) -> Posterior:
         """Run SRE
 
@@ -130,21 +137,29 @@ class SRE(NeuralInference):
             validation_fraction: The fraction of data to use for validation.
             stop_after_epochs: The number of epochs to wait for improvement on the
                 validation set before terminating training.
-            
+            max_num_epochs: maximal number of epochs to run. If max_num_epochs
+                is reached, we stop training even if the validation loss is still
+                decreasing.
+
         Returns: 
             Posterior that can be sampled and evaluated.
         """
+
+        if max_num_epochs is None:
+            max_num_epochs = float("Inf")
+
         num_sims_per_round = self._ensure_list(num_simulations_per_round, num_rounds)
 
-        tbar = tqdm(enumerate(num_sims_per_round))
-        for round_, num_sims in tbar:
+        for round_, num_sims in enumerate(num_sims_per_round):
 
             # Generate theta from prior in first round, and from most recent posterior
             # estimate in subsequent rounds.
             if round_ == 0:
                 theta = self._prior.sample((num_sims,))
             else:
-                theta = self._neural_posterior.sample(num_sims)
+                theta = self._neural_posterior.sample(
+                    num_sims, show_progressbar=self._show_progressbar
+                )
 
             x = self._batched_simulator(theta)
 
@@ -158,10 +173,12 @@ class SRE(NeuralInference):
                 learning_rate=learning_rate,
                 validation_fraction=validation_fraction,
                 stop_after_epochs=stop_after_epochs,
+                max_num_epochs=max_num_epochs,
             )
 
             # Update description for progress bar.
-            tbar.set_description(self._describe_round(round_, self._summary))
+            if self._show_round_summary:
+                print(self._describe_round(round_, self._summary))
 
             # Update tensorboard and summary dict.
             self._summary_writer, self._summary = utils.summarize(
@@ -178,7 +195,12 @@ class SRE(NeuralInference):
         return self._neural_posterior
 
     def _train(
-        self, batch_size, learning_rate, validation_fraction, stop_after_epochs,
+        self,
+        batch_size,
+        learning_rate,
+        validation_fraction,
+        stop_after_epochs,
+        max_num_epochs,
     ):
         r"""
         Trains the classifier by maximizing a Bernoulli likelihood which distinguishes
@@ -309,6 +331,25 @@ class SRE(NeuralInference):
                     log_prob = _get_loss(theta_batch, x_batch)
                     log_prob_sum -= log_prob.sum().item()
                 self._val_log_prob = log_prob_sum / num_validation_examples
+
+            if self._show_progressbar:
+                # end="\r" deletes the print statement when a new one appears.
+                # https://stackoverflow.com/questions/3419984/
+                print("Training neural network. Epochs trained: ", epoch, end="\r")
+
+        if self._show_progressbar and self._has_converged(epoch, stop_after_epochs):
+            # network has converged, we print this summary.
+            print("Neural network successfully converged after", epoch, "epochs.")
+        elif self._show_progressbar and max_num_epochs == epoch:
+            # training has stopped because of max_num_epochs argument.
+            print("Stopping neural network training after", epoch, "epochs.")
+
+        if max_num_epochs == epoch:
+            # warn if training was not stopped by early stopping
+            warnings.warn(
+                "Maximum number of epochs reached, but network has not yet "
+                "fully converged. Consider increasing the value of max_num_epochs."
+            )
 
         # Update summary.
         self._summary["epochs"].append(epoch)

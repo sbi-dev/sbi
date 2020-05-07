@@ -1,6 +1,9 @@
 from __future__ import annotations
 from copy import deepcopy
 from typing import Any, Callable, Dict, List, Optional, Union
+import math
+import warnings
+from tqdm.auto import tqdm
 
 import numpy as np
 import torch
@@ -9,7 +12,6 @@ from torch.nn.utils import clip_grad_norm_
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
-from tqdm import tqdm
 
 from sbi.inference.base import NeuralInference
 from sbi.inference.posteriors.sbi_posterior import Posterior
@@ -28,6 +30,8 @@ class SNL(NeuralInference):
         device: torch.device = None,
         mcmc_method: str = "slice-np",
         skip_input_checks: bool = False,
+        show_progressbar: Optional[bool] = True,
+        show_round_summary: Optional[bool] = False,
     ):
         r"""Sequential Neural Likelihood
         
@@ -41,6 +45,10 @@ class SNL(NeuralInference):
             skip_simulator_checks: Flag to turn off input checks,
                 e.g., for saving simulation budget as the input checks run the
                 simulator a couple of times.
+            show_progressbar: whether to show a progressbar during simulating, training,
+                sampling
+            show_round_summary: whether to print the validation loss and leakage after
+                each round
         """
 
         super().__init__(
@@ -51,6 +59,8 @@ class SNL(NeuralInference):
             device,
             summary_writer,
             skip_input_checks=skip_input_checks,
+            show_progressbar=show_progressbar,
+            show_round_summary=show_round_summary,
         )
 
         if density_estimator is None:
@@ -84,6 +94,7 @@ class SNL(NeuralInference):
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
         stop_after_epochs: int = 20,
+        max_num_epochs: Optional[int] = None,
     ) -> Posterior:
         r"""Run SNL
 
@@ -98,21 +109,30 @@ class SNL(NeuralInference):
             validation_fraction: The fraction of data to use for validation.
             stop_after_epochs: The number of epochs to wait for improvement on the
                 validation set before terminating training.
+            max_num_epochs: maximal number of epochs to run. If max_num_epochs
+                is reached, we stop training even if the validation loss is still
+                decreasing. If None, we train until validation loss increases (see
+                argument stop_after_epochs)
 
         Returns:
             Posterior $p(\theta|x_o)$ that can be sampled and evaluated
         """
+
+        if max_num_epochs is None:
+            max_num_epochs = float("Inf")
+
         num_sims_per_round = self._ensure_list(num_simulations_per_round, num_rounds)
 
-        tbar = tqdm(enumerate(num_sims_per_round))
-        for round_, num_sims in tbar:
+        for round_, num_sims in enumerate(num_sims_per_round):
 
             # Generate parameters theta from prior in first round, and from most recent
             # posterior estimate in subsequent rounds.
             if round_ == 0:
                 theta = self._prior.sample((num_sims,))
             else:
-                theta = self._neural_posterior.sample(num_sims)
+                theta = self._neural_posterior.sample(
+                    num_sims, show_progressbar=self._show_progressbar
+                )
 
             x = self._batched_simulator(theta)
             # Store (theta, x) pairs.
@@ -125,10 +145,12 @@ class SNL(NeuralInference):
                 learning_rate=learning_rate,
                 validation_fraction=validation_fraction,
                 stop_after_epochs=stop_after_epochs,
+                max_num_epochs=max_num_epochs,
             )
 
             # Update description for progress bar.
-            tbar.set_description(self._describe_round(round_, self._summary))
+            if self._show_round_summary:
+                print(self._describe_round(round_, self._summary))
 
             # Update TensorBoard and summary dict.
             self._summary_writer, self._summary = utils.summarize(
@@ -144,7 +166,14 @@ class SNL(NeuralInference):
         self._neural_posterior._num_trained_rounds = num_rounds
         return self._neural_posterior
 
-    def _train(self, batch_size, learning_rate, validation_fraction, stop_after_epochs):
+    def _train(
+        self,
+        batch_size,
+        learning_rate,
+        validation_fraction,
+        stop_after_epochs,
+        max_num_epochs,
+    ):
         r"""
         Trains the conditional density estimator for the likelihood by maximum
          likelihood on the most recently aggregated bank of $(\theta, x)$ pairs.
@@ -224,6 +253,25 @@ class SNL(NeuralInference):
                     )
                     log_prob_sum += log_prob.sum().item()
             self._val_log_prob = log_prob_sum / num_validation_examples
+
+            if self._show_progressbar:
+                # end="\r" deletes the print statement when a new one appears.
+                # https://stackoverflow.com/questions/3419984/
+                print("Training neural network. Epochs trained: ", epoch, end="\r")
+
+        if self._show_progressbar and self._has_converged(epoch, stop_after_epochs):
+            # network has converged, we print this summary.
+            print("Neural network successfully converged after", epoch, "epochs.")
+        elif self._show_progressbar and max_num_epochs == epoch:
+            # training has stopped because of max_num_epochs argument.
+            print("Stopping neural network training after", epoch, "epochs.")
+
+        if max_num_epochs == epoch:
+            # warn if training was not stopped by early stopping
+            warnings.warn(
+                "Maximum number of epochs reached, but network has not yet "
+                "fully converged. Consider increasing the value of max_num_epochs."
+            )
 
         # Update summary.
         self._summary["epochs"].append(epoch)
