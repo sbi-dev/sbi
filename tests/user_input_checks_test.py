@@ -197,9 +197,7 @@ def test_process_matrix_observation():
         (linear_gaussian, BoxUniform(zeros(2), ones(2))),
         (numpy_linear_gaussian, UserNumpyUniform(zeros(2), ones(2), True)),
         (linear_gaussian_no_batch, BoxUniform(zeros(2), ones(2))),
-        pytest.param(
-            list_simulator, BoxUniform(zeros(2), ones(2)), marks=pytest.mark.xfail,
-        ),
+        pytest.param(list_simulator, BoxUniform(zeros(2), ones(2)),),
     ),
 )
 def test_process_simulator(simulator: Callable, prior: Distribution):
@@ -207,7 +205,7 @@ def test_process_simulator(simulator: Callable, prior: Distribution):
     prior, theta_dim, prior_returns_numpy = process_prior(prior)
     simulator = process_simulator(simulator, prior, prior_returns_numpy)
 
-    n_batch = 2
+    n_batch = 1
     x = simulator(prior.sample((n_batch,)))
 
     assert isinstance(x, Tensor), "Processed simulator must return Tensor."
@@ -231,24 +229,12 @@ def test_process_simulator(simulator: Callable, prior: Distribution):
             BoxUniform(zeros(3, dtype=torch.float64), ones(3, dtype=torch.float64)),
             zeros(3),
         ),
-        pytest.param(
-            list_simulator,
-            BoxUniform(zeros(3), ones(3)),
-            zeros(1, 3),
-            marks=pytest.mark.xfail,
-        ),
         (
             numpy_linear_gaussian,
             UserNumpyUniform(zeros(3), ones(3), return_numpy=True),
             np.zeros((1, 3)),
         ),
-        pytest.param(  # test simulator always returning batch dim.
-            lambda _: zeros(1, 480),
-            BoxUniform(zeros(2), ones(2)),
-            zeros(1, 480),
-            marks=pytest.mark.xfail,
-        ),
-        pytest.param(
+        (
             linear_gaussian,
             [
                 Gamma(ones(1), ones(1)),
@@ -257,6 +243,7 @@ def test_process_simulator(simulator: Callable, prior: Distribution):
             ],
             zeros(1, 4),
         ),
+        pytest.param(list_simulator, BoxUniform(zeros(3), ones(3)), zeros(1, 3),),
     ),
 )
 def test_prepare_sbi_problem(
@@ -273,7 +260,7 @@ def test_prepare_sbi_problem(
     simulator, prior, x_o = prepare_sbi_problem(simulator, prior, x_o)
 
     # check batch sims and type
-    n_batch = 2
+    n_batch = 1
     assert simulator(prior.sample((n_batch,))).shape[0] == n_batch
     assert isinstance(simulator(prior.sample((1,))), Tensor)
     assert prior.sample().dtype == torch.float32
@@ -294,12 +281,8 @@ def test_prepare_sbi_problem(
             np.zeros((1, 3)),
         ),
         (linear_gaussian, BoxUniform(zeros(3), ones(3)), zeros(1, 3)),
-        pytest.param(
-            list_simulator,
-            BoxUniform(zeros(3), ones(3)),
-            zeros(1, 3),
-            marks=pytest.mark.xfail,
-        ),  # list simulator.
+        (linear_gaussian_no_batch, BoxUniform(zeros(3), ones(3)), zeros(1, 3)),
+        pytest.param(list_simulator, BoxUniform(zeros(3), ones(3)), zeros(1, 3),),
         (
             numpy_linear_gaussian,
             UserNumpyUniform(zeros(3), ones(3), return_numpy=True),
@@ -333,7 +316,7 @@ def test_inference_with_user_sbi_problems(
         simulator=user_simulator,
         x_o=user_x_o,
         prior=user_prior,
-        simulation_batch_size=100,
+        simulation_batch_size=1,
     )
 
     # Run inference.

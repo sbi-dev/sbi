@@ -373,22 +373,22 @@ def wrap_as_pytorch_simulator(
         f"{type(theta)}"
 
         # Define a wrapper function to PyTorch
-        def pytorch_simulator(theta: Tensor):
+        def pytorch_simulator(theta: Tensor) -> Tensor:
             return torch.as_tensor(simulator(theta.numpy()), dtype=float32)
 
     else:
         # Define a wrapper to make sure that the output of the simulator is float32
-        def pytorch_simulator(theta: Tensor):
+        def pytorch_simulator(theta: Tensor) -> Tensor:
             return torch.as_tensor(simulator(theta), dtype=float32)
 
     return pytorch_simulator
 
 
 def wrap_as_batch_simulator(simulator: Callable, prior) -> Callable:
-    """Return a batch simulator.
+    """Return simulator with batch dimension.
 
-    A batch simulator can handle a batch of parameters and return the
-    corresponding batch of simulated data.
+    Return the unchanged simulator if it can simulate multiple parameter vectors per
+    call. Otherwise, wrap to simulator returning a leading batch dimension of shape [1].
     """
 
     is_batched_simulator = True
@@ -399,32 +399,24 @@ def wrap_as_batch_simulator(simulator: Callable, prior) -> Callable:
         assert simulator_batch_size == batch_size
     except:
         is_batched_simulator = False
-        warnings.warn(
-            """Simulator can't handle batches of parameters. It will loop over batches
-            in Python with `map`. Consider vectorising the simulator natively for
-            performance."""
-        )
-        # make sure the simulator does not return batch dim.
-        single_simulation = simulator(prior.sample())
-        assert (
-            not single_simulation.shape[0] == 1
-        ), f"""The simulator can't handle batches and returns a singleton batch
-            dimension: {single_simulation.shape}. A simulator that can't handle batches
-            of parameters must not return a batch dim."""
 
-    return simulator if is_batched_simulator else get_batched_simulator(simulator)
+    return simulator if is_batched_simulator else get_batch_dim_simulator(simulator)
 
 
-def get_batched_simulator(simulator: Callable) -> Callable:
+def get_batch_dim_simulator(simulator: Callable) -> Callable:
     """Return simulator wrapped with `map` to handle batches of parameters."""
 
-    def batched_simulator(theta: Tensor) -> Tensor:
-        theta = ensure_theta_batched(theta)
-        # XXX: this should be handled with more care, e.g., enable multiprocessing
-        # XXX: with Pool() as p: p.map(...)
-        return torch.stack(list(map(simulator, theta)))
+    def batch_dim_simulator(theta: Tensor) -> Tensor:
+        batch_shape, *_ = theta.shape
+        assert (
+            batch_shape == 1
+        ), f"This simulator can handle one single thetas, theta.shape={theta.shape}"
+        # Remove possible singleton dimensions in the user-simulator.
+        simulation = simulator(theta.squeeze()).squeeze()
+        # Return with leading batch dimennsion.
+        return simulation.unsqueeze(0)
 
-    return batched_simulator
+    return batch_dim_simulator
 
 
 def process_x_o(
@@ -434,7 +426,7 @@ def process_x_o(
 
     Args:
         x_o: observed data as provided by the user.
-        simulator: simulator function as provided by the user.
+        simulator: simulator function as processed with sbi checks.
         prior: prior object with .sample() and .log_prob() methods.
 
     Returns:
@@ -450,9 +442,9 @@ def process_x_o(
 
     # Get unbatched simulated data by sampling from prior and simulator.
     # cast to tensor for comparison
-    simulated_data = torch.as_tensor(simulator(prior.sample()), dtype=float32).squeeze(
-        0
-    )
+    simulated_data = torch.as_tensor(
+        simulator(prior.sample((1,))), dtype=float32
+    ).squeeze(0)
 
     # Get data shape by ommitting the batch dimension.
     x_o_shape = x_o.shape[1:]
@@ -531,7 +523,7 @@ def check_sbi_problem(simulator: Callable, prior, x_o: Tensor):
         prior: prior (Distribution like)
         x_o: observed data
     """
-    num_prior_samples = 2
+    num_prior_samples = 1
     theta = prior.sample((num_prior_samples,))
     theta_batch_shape, *_ = theta.shape
     simulation = simulator(theta)
