@@ -14,11 +14,11 @@ jobs:
     runs-on: ubuntu-18.04
 
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v2
       with:
         lfs: true
         
-    - uses: actions/setup-python@v1
+    - uses: actions/setup-python@v2
       with:
         python-version: '3.7.6'
         architecture: 'x64'
@@ -32,4 +32,4 @@ jobs:
       run: |
         pip install torchtestcase
         pip install pytest
-        pytest -m "not slow"
+        pytest -m "not slow" tests/

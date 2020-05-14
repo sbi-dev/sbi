@@ -7,7 +7,7 @@ from torch import Tensor
 from torch.utils.tensorboard import SummaryWriter
 
 from copy import deepcopy
-from sbi.simulators.simutils import simulate_in_batches, simulate_mp_in_batches
+from sbi.simulators.simutils import simulate_in_batches, simulate_in_batches_mp
 from sbi.user_input.user_input_checks import prepare_sbi_problem
 from sbi.utils import get_log_root, get_timestamp
 from sbi.utils.torchutils import get_default_device
@@ -47,9 +47,12 @@ class NeuralInference(ABC):
             summary_writer: An optional SummaryWriter to control, among others, log
                 file location (default is <current working directory>/logs.)
             num_workers: number of parallel workers to start
-            worker_batch_size: how many params are processed on each worker. This number is
-                thetas will then be handled by simulate_in_batches()
-            skip_input_checks: Whether to disable input checks. This saves simulation
+            worker_batch_size: Number of parameters that are processed per worker. A
+                worker will receive this many parameters to simulate per call. Needs to
+                be larger than simulation_batch_size. A lower value creates overhead
+                from starting workers frequently. A higher value leads to the simulation
+                progressbar being updated less frequently (updates only happen after a
+                worker is finished).skip_input_checks: Whether to disable input checks. This saves simulation
                 time because they test-run the simulator to ensure it's correct.
             show_progressbar: Whether to show a progressbar during simulation, training,
                 and sampling.
@@ -65,7 +68,7 @@ class NeuralInference(ABC):
         self._show_round_summary = show_round_summary
 
         if num_workers > 1:
-            self._batched_simulator = lambda theta: simulate_mp_in_batches(
+            self._batched_simulator = lambda theta: simulate_in_batches_mp(
                 self._simulator,
                 theta,
                 simulation_batch_size,

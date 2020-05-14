@@ -31,8 +31,6 @@ def test_sre_on_linearGaussian_api(num_dim: int):
         loc=zeros(num_dim), covariance_matrix=eye(num_dim)
     )
 
-    # XXX this breaks the test! (and #76 doesn't seem to fix)
-
     simulator, prior, x_o = prepare_sbi_problem(linear_gaussian, prior, x_o)
 
     infer = SRE(
@@ -47,9 +45,6 @@ def test_sre_on_linearGaussian_api(num_dim: int):
     posterior = infer(num_rounds=1, num_simulations_per_round=1000)
 
     posterior.sample(num_samples=10, num_chains=2)
-
-    # XXX log_prob is not implemented yet for SRE
-    # posterior.log_prob(samples)
 
 
 @pytest.mark.slow
@@ -186,6 +181,3 @@ def test_sre_posterior_correction(mcmc_method: str, prior_str: str, set_seed):
     posterior = infer(num_rounds=1, num_simulations_per_round=1000)
 
     _ = posterior.sample(num_samples=50)
-
-    # TODO No log prob for SRE yet - see #73.
-    # posterior.log_prob(samples)

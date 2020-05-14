@@ -259,7 +259,10 @@ class SnpeBase(NeuralInference, ABC):
                 num_sims, x=self._x_o, show_progressbar=self._show_progressbar
             )
 
-            # why do we return theta just below? See above in if round_ == 0 case.
+            # why do we return theta just below? When using multiprocessing, the thetas
+            # are not handled sequentially anymore. Hence, the x that are returned do
+            # not necessarily have the same order as the theta we define above. We
+            # therefore return a theta vector with the same ordering as x.
             theta, x = self._batched_simulator(theta)
 
         return theta, x, self._mask_sims_from_prior(round_, theta.size(0))
