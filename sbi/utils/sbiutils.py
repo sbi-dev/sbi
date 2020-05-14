@@ -146,11 +146,11 @@ def sample_posterior_within_prior(
     # we might not always want a progressbar for sampling. E.g. we want to display that,
     # after each round, we also draw samples just for logging. Thus, the progressbar
     # can be turned off with the show_progressbar argument.
-    pbar = tqdm(total=num_remaining, disable=not show_progressbar)
-    desc = "Drawing {0} posterior samples".format(num_remaining)
-    if type(show_progressbar) == str:
-        desc += show_progressbar
-    pbar.set_description(desc)
+    pbar = tqdm(
+        total=num_remaining,
+        disable=not show_progressbar,
+        desc="Drawing {0} posterior samples".format(num_remaining),
+    )
 
     with pbar:
         while num_remaining > 0:

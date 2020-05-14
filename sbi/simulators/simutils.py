@@ -1,22 +1,24 @@
 from __future__ import annotations
 
-from typing import Callable, Optional
+from typing import Callable, Optional, Tuple
 
 import torch
 from torch import Tensor
 from tqdm.auto import tqdm
-from sbi.simulators.mp_simulator import simulate_mp
+from sbi.simulators.mp_simutils import simulate_mp
 
 
-def simulate_mp_in_batches(
+def simulate_in_batches_mp(
     simulator: Callable,
     theta: Tensor,
     sim_batch_size: Optional[int],
     number_of_workers: int = 4,
     worker_batch_size: int = 20,
     show_progressbar: Optional[bool] = True,
-):
+) -> Tuple[Tensor, Tensor]:
     """
+    Return parameters $\theta$ and data $x$ simulated using multiprocessing.
+
     Distributes all parameters theta to simulate_in_batches, i.e. splits them between
      cores and then processes them in batches.
 
@@ -35,14 +37,14 @@ def simulate_mp_in_batches(
     """
 
     assert worker_batch_size >= sim_batch_size, (
-        "worker_batch_size has to be smaller than simulation_batch_size when using"
+        "worker_batch_size has to be larger than simulation_batch_size when using"
         " multiprocessing."
     )
 
     batched_simulator = lambda theta_: simulate_in_batches(
         simulator, theta_, sim_batch_size, show_progressbar=False
     )
-    theta, data = simulate_mp(
+    theta, x = simulate_mp(
         simulator=batched_simulator,
         theta=theta,
         num_workers=number_of_workers,
@@ -52,7 +54,7 @@ def simulate_mp_in_batches(
         show_progressbar=show_progressbar,
     )
 
-    return theta, data
+    return theta, x
 
 
 def simulate_in_batches(
@@ -60,7 +62,7 @@ def simulate_in_batches(
     theta: Tensor,
     sim_batch_size: Optional[int],
     show_progressbar: Optional[bool] = True,
-) -> (Tensor, Tensor):
+) -> Tuple[Tensor, Tensor]:
     r"""
     Return simulations $x$ for parameters $\theta$ conducted batchwise.
     
@@ -74,7 +76,7 @@ def simulate_in_batches(
         show_progressbar: whether to show a progressbar during simulating
 
     Returns:
-        Parameters theta and simulations $x$ with shape (num_sims, shape_of_single_x)
+        Parameters theta and simulations $x$
     """
 
     num_sims, *_ = theta.shape
@@ -86,11 +88,11 @@ def simulate_in_batches(
         # as of PyTorch 1.4.0, see https://github.com/microsoft/pyright/issues/291
         batches = torch.split(theta, sim_batch_size, dim=0)
 
-        pbar = tqdm(total=num_sims, disable=not show_progressbar)
-        desc = "Running {0} simulations".format(num_sims)
-        if type(show_progressbar) == str:
-            desc += show_progressbar
-        pbar.set_description(desc)
+        pbar = tqdm(
+            total=num_sims,
+            disable=not show_progressbar,
+            desc="Running {0} simulations".format(num_sims),
+        )
 
         with pbar:
             simulation_outputs = []

@@ -133,6 +133,10 @@ class SNL(NeuralInference):
                     num_sims, show_progressbar=self._show_progressbar
                 )
 
+            # why do we return theta just below? When using multiprocessing, the thetas
+            # are not handled sequentially anymore. Hence, the x that are returned do
+            # not necessarily have the same order as the theta we define above. We
+            # therefore return a theta vector with the same ordering as x.
             theta, x = self._batched_simulator(theta)
             # Store (theta, x) pairs.
             self._theta_bank.append(theta)
