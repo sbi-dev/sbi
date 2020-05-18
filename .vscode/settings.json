@@ -1,10 +1,5 @@
 {
-    "python.envFile": ".env",
-    // XXX Unfortunately, pyright does not play well with the .env file approach for now
-    // see https://github.com/microsoft/pyright/issues/310
-    // One workaround: change manually environment, then back to sbi.
-    // This will taint the current file by inserting here a resolved absolute path
-    "python.pythonPath": "${env:PYTHON}",
+    "python.pythonPath": ".sbi_env/bin/python",
     //
     // Testing: enable only one at a time (pytest, generally)
     //
