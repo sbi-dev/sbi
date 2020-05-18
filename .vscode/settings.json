@@ -27,6 +27,9 @@
         "editor.renderWhitespace": "boundary",
         "editor.wordWrap": "wordWrapColumn",
         "editor.fontLigatures": true,
+        "editor.rulers": [
+            88
+        ],
     },
     //
     // Formatting
@@ -85,5 +88,7 @@
     //
     "autoDocstring.customTemplatePath": ".vscode/autodocstring.template",
     // just showing how customizable this is
-    "window.title": "Simulation Based Inference -- ${dirty}${activeEditorShort}${separator}${rootName}${separator}${appName}",
+    "workbench.colorCustomizations": {
+        "editorRuler.foreground": "#444444"
+    }
 }
