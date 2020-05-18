@@ -69,7 +69,7 @@
         "--settings-path=${workspaceFolder}/setup.cfg"
     ],
     // flake8 works better than pylint, e.g. no need specify generated members.
-    "python.linting.pylintEnabled": true,
+    // "python.linting.pylintEnabled": true,
     // "python.linting.pylintArgs": [
     //     "--generated-members=numpy.* ,torch.*",
     //     "--disable=invalid-name"
