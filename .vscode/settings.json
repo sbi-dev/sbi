@@ -28,27 +28,26 @@
         "rewrap.wholeComment": false,
         "rewrap.doubleSentenceSpacing": true,
         //
-        // Rewrap vscode plugin (stkb.rewrap)
-        // Needs manual installation (!) -- added to recommended extensions
-        // https://marketplace.visualstudio.com/items?itemName=stkb.rewrap
+        // Please add the rewrap vscode plugin (stkb.rewrap)
         // Still pending https://github.com/stkb/Rewrap/issues/88 for full python docstring support
         "rewrap.autoWrap.enabled": true,
         "rewrap.wrappingColumn": 88,
+    },
+    "workbench.colorCustomizations": {
+        "editorRuler.foreground": "#444444"
     },
     //
     // Formatting
     // https://code.visualstudio.com/docs/python/editing#_formatting
     //
     "python.formatting.provider": "black",
-    //"python.formatting.blackPath": "${env:BLACK}",
     "python.formatting.blackArgs": [
         "--line-length=88"
     ],
     //
     // Sort imports
     // https://github.com/microsoft/vscode-python/issues/5840#issuecomment-497321419
-    //
-    //"python.sortImports.path": "${env:ISORT}",
+    // 
     "python.sortImports.args": [
         "--settings-path=${workspaceFolder}/setup.cfg"
     ],
@@ -59,16 +58,9 @@
     "python.linting.enabled": true,
     "python.linting.lintOnSave": true,
     "python.linting.flake8Enabled": true,
-    //"python.linting.flake8Path": "${env:FLAKE8}",
     "python.linting.args": [
         "--settings-path=${workspaceFolder}/setup.cfg"
     ],
-    // flake8 works better than pylint, e.g. no need specify generated members.
-    // "python.linting.pylintEnabled": true,
-    // "python.linting.pylintArgs": [
-    //     "--generated-members=numpy.* ,torch.*",
-    //     "--disable=invalid-name"
-    // ],
     //
     // Files to exclude
     //
@@ -79,14 +71,10 @@
         "**/*.egg-info": true,
     },
     //
-    // autoDocstring vscode plugin (njpwerner.autodocstring)
-    // Needs manual installation (!) -- added to recommended extensions
-    // https://marketplace.visualstudio.com/items?itemName=njpwerner.autodocstring
+    // Please add the autoDocstring vscode plugin (njpwerner.autodocstring)
     //
     "autoDocstring.customTemplatePath": ".vscode/autodocstring.template",
-    // just showing how customizable this is
-    "window.title": "SBI.vscode:: ${dirty}${activeEditorShort}${separator}${rootName}${separator}${appName}",
-    "workbench.colorCustomizations": {
-        "editorRuler.foreground": "#444444"
-    }
+    //
+    // Signal that we are using shared workspace settings in .vscode
+    "window.title": "SBI.vscode:: ${dirty}${activeEditorShort}${separator}${rootName}${separator}${appName}"
 }
