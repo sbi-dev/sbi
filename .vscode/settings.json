@@ -30,6 +30,15 @@
         "editor.rulers": [
             88
         ],
+        "rewrap.wholeComment": false,
+        "rewrap.doubleSentenceSpacing": true,
+        //
+        // Rewrap vscode plugin (stkb.rewrap)
+        // Needs manual installation (!) -- added to recommended extensions
+        // https://marketplace.visualstudio.com/items?itemName=stkb.rewrap
+        // Still pending https://github.com/stkb/Rewrap/issues/88 for full python docstring support
+        "rewrap.autoWrap.enabled": true,
+        "rewrap.wrappingColumn": 88,
     },
     //
     // Formatting
@@ -74,13 +83,6 @@
         "**/.ipynb_checkpoints": true,
         "**/*.egg-info": true,
     },
-    //
-    // Rewrap vscode plugin (stkb.rewrap)
-    // Needs manual installation (!) -- added to recommended extensions
-    // https://marketplace.visualstudio.com/items?itemName=stkb.rewrap
-    //
-    "rewrap.autoWrap.enabled": true,
-    "rewrap.wrappingColumn": 88,
     //
     // autoDocstring vscode plugin (njpwerner.autodocstring)
     // Needs manual installation (!) -- added to recommended extensions
