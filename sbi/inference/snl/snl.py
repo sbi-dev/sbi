@@ -25,13 +25,13 @@ class SNL(NeuralInference):
         prior,
         x_o: Tensor,
         density_estimator: Optional[nn.Module] = None,
-        simulation_batch_size: int = 1,
-        summary_writer: SummaryWriter = None,
-        device: torch.device = None,
+        simulation_batch_size: Optional[int] = 1,
+        summary_writer: Optional[SummaryWriter] = None,
+        device: Optional[torch.device] = None,
         mcmc_method: str = "slice-np",
         skip_input_checks: bool = False,
-        show_progressbar: Optional[bool] = True,
-        show_round_summary: Optional[bool] = False,
+        show_progressbar: bool = True,
+        show_round_summary: bool = False,
     ):
         r"""Sequential Neural Likelihood
         

@@ -35,8 +35,8 @@ class SnpeBase(NeuralInference, ABC):
         mcmc_method: str = "slice-np",
         summary_writer: Optional[SummaryWriter] = None,
         skip_input_checks: bool = False,
-        show_progressbar: Optional[bool] = True,
-        show_round_summary: Optional[bool] = False,
+        show_progressbar: bool = True,
+        show_round_summary: bool = False,
     ):
         """ Base class for Sequential Neural Posterior Estimation algorithms.
 

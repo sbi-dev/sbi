@@ -24,10 +24,10 @@ class NeuralInference(ABC):
         simulation_batch_size: Optional[int] = 1,
         device: Optional[torch.device] = None,
         summary_writer: Optional[SummaryWriter] = None,
-        simulator_name: Optional[str] = "simulator",
+        simulator_name: str = "simulator",
         skip_input_checks: bool = False,
-        show_progressbar: Optional[bool] = True,
-        show_round_summary: Optional[bool] = False,
+        show_progressbar: bool = True,
+        show_round_summary: bool = False,
     ):
         r"""
         Args:
@@ -43,12 +43,12 @@ class NeuralInference(ABC):
             device: torch.device on which to compute (optional).
             summary_writer: An optional SummaryWriter to control, among others, log
                 file location (default is <current working directory>/logs.)
-            skip_input_checks: Whether to turn off input checks. This saves
-                simulation time because the input checks test-run the simulator to ensure it's correct.
-            show_progressbar: whether to show a progressbar during simulating, training,
-                sampling
-            show_round_summary: whether to print the validation loss and leakage after
-                each round
+            skip_input_checks: Whether to disable input checks. This saves simulation
+                time because they test-run the simulator to ensure it's correct.
+            show_progressbar: Whether to show a progressbar during simulation, training,
+                and sampling.
+            show_round_summary: Whether to show the validation loss and leakage after
+                each round.
         """
 
         self._simulator, self._prior, self._x_o = prepare_sbi_problem(
