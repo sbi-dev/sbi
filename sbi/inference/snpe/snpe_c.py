@@ -29,8 +29,8 @@ class SnpeC(SnpeBase):
         sample_with_mcmc: bool = False,
         mcmc_method: str = "slice-np",
         skip_input_checks: bool = False,
-        show_progressbar: Optional[bool] = True,
-        show_round_summary: Optional[bool] = False,
+        show_progressbar: bool = True,
+        show_round_summary: bool = False,
     ):
         r"""SNPE-C / APT [1]
 
@@ -39,11 +39,12 @@ class SnpeC(SnpeBase):
 
         Args:
             use_combined_loss: Whether to train the neural_net jointly on prior samples
-                using maximum likelihood and on all samples using atomic loss. Useful to prevent density leaking when using bounded priors.
+                using maximum likelihood and on all samples using atomic loss. Useful
+                to prevent density leaking when using bounded priors.
             num_atoms: Number of atoms to use for classification. If None, use all
                 other parameters $\theta$ in minibatch.
 
-            See `SnpeBase` and `NeuralInference` docstrings for all other arguments.
+        See docstring of `SnpeBase` class for all other arguments.
         """
 
         self._num_atoms = num_atoms if num_atoms is not None else 0

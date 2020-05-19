@@ -26,9 +26,11 @@ class SnpeA(SnpeBase):
     ):
         """SNPE-A [1] - CURRENTLY NOT IMPLEMENTED.
 
-        [1] _Fast epsilon-free Inference of Simulation Models with Bayesian Conditional 
-            Density Estimation_, Papamakarios et al., NeurIPS 2016, 
+        [1] _Fast epsilon-free Inference of Simulation Models with Bayesian Conditional
+            Density Estimation_, Papamakarios et al., NeurIPS 2016,
             https://arxiv.org/abs/1605.06376.
+
+        See docstring of `SnpeBase` class for all other arguments.
         """
 
         raise NotImplementedError

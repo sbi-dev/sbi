@@ -25,19 +25,19 @@ class SnpeB(SnpeBase):
         summary_writer: Optional[SummaryWriter] = None,
         device: Optional[torch.device] = None,
         skip_input_checks: bool = False,
-        show_progressbar: Optional[bool] = True,
-        show_round_summary: Optional[bool] = False,
+        show_progressbar: bool = True,
+        show_round_summary: bool = False,
     ):
         r"""SNPE-B [1]
 
         [1] _Flexible statistical inference for mechanistic models of neural dynamics_,
             Lueckmann et al., NeurIPS 2017, https://arxiv.org/abs/1711.01861.
-        
-        Args:
-            use_combined_loss: Whether to train jointly on prior samples
-                using maximum likelihood and on all samples using importance-weighted loss.
 
-            See `SnpeBase` and `NeuralInference` docstrings for all other arguments.
+        Args:
+            use_combined_loss: Whether to train jointly on prior samples using maximum
+                likelihood and on all samples using importance-weighted loss.
+
+        See docstring of `SnpeBase` class for all other arguments.
         """
 
         self._use_combined_loss = use_combined_loss

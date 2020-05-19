@@ -1,6 +1,6 @@
 from abc import ABC
 from copy import deepcopy
-from typing import Callable, List, Optional, Union, Tuple, List
+from typing import Callable, List, Optional, Union, Tuple
 import warnings
 
 import numpy as np
@@ -45,15 +45,15 @@ class SnpeBase(NeuralInference, ABC):
             calibration_kernel: A function to calibrate the data x.
             z_score_x: Whether to z-score the data features x, default True.
             z_score_min_std: Minimum value of the standard deviation to use when
-                standardizing inputs. This is typically needed when some simulator outputs are deterministic or nearly so.
+                standardizing inputs. This is typically needed when some simulator
+                outputs are deterministic or nearly so.
             retrain_from_scratch_each_round: Whether to retrain the conditional
                 density estimator for the posterior from scratch each round.
             discard_prior_samples: Whether to discard samples simulated in round 1, i.e.
-                from the prior. Training may be sped up by ignoring such less specific samples
-            show_progressbar: whether to show a progressbar during simulating, training,
-                sampling
-            show_round_summary: whether to print the validation loss and leakage after
-                each round
+                from the prior. Training may be sped up by ignoring such less targeted
+                samples.
+
+        See docstring of `NeuralInference` class for all other arguments.
         """
 
         super().__init__(
@@ -104,7 +104,7 @@ class SnpeBase(NeuralInference, ABC):
         self._untrained_neural_posterior = deepcopy(self._neural_posterior)
 
         # Extra SNPE-specific fields summary_writer.
-        self._summary.update({"rejection_sampling_acceptance_rates": []})
+        self._summary.update({"rejection_sampling_acceptance_rates": []})  # type:ignore
 
     def __call__(
         self,
@@ -122,24 +122,25 @@ class SnpeBase(NeuralInference, ABC):
         Return posterior $p(\theta|x_o)$ after inference over several rounds.
 
         Args:
-            num_rounds: Number of rounds to run
-            num_simulations_per_round: Number of simulator calls per round
+            num_rounds: Number of rounds to run.
+            num_simulations_per_round: Number of simulator calls per round.
             batch_size: Size of batch to use for training.
             learning_rate: Learning rate for Adam optimizer.
             validation_fraction: The fraction of data to use for validation.
             stop_after_epochs: The number of epochs to wait for improvement on the
                 validation set before terminating training.
-            max_num_epochs: maximal number of epochs to run. If max_num_epochs
+            max_num_epochs: Maximum number of epochs to run. If max_num_epochs
                 is reached, we stop training even if the validation loss is still
                 decreasing. If None, we train until validation loss increases (see
+                argument stop_after_epochs).
             clip_max_norm: Value at which to clip the total gradient norm in order to
                 prevent exploding gradients. Use None for no clipping.
+
         Returns:
-            Posterior that can be sampled and evaluated.
+            Posterior $p(\theta|x_o)$ that can be sampled and evaluated.
         """
 
-        if max_num_epochs is None:
-            max_num_epochs = float("Inf")
+        max_num_epochs = 2 ** 31 - 1 if max_num_epochs is None else max_num_epochs
 
         num_sims_per_round = self._ensure_list(num_simulations_per_round, num_rounds)
 
@@ -182,6 +183,7 @@ class SnpeBase(NeuralInference, ABC):
                 print(self._describe_round(round_, self._summary))
 
             # Update tensorboard and summary dict.
+            correction = self._neural_posterior.get_leakage_correction(x=self._x_o,)
             self._summary_writer, self._summary = utils.summarize(
                 summary_writer=self._summary_writer,
                 summary=self._summary,
@@ -190,9 +192,7 @@ class SnpeBase(NeuralInference, ABC):
                 theta_bank=self._theta_bank,
                 x_bank=self._x_bank,
                 simulator=self._simulator,
-                posterior_samples_acceptance_rate=self._neural_posterior.get_leakage_correction(
-                    x=self._x_o,
-                ),
+                posterior_samples_acceptance_rate=correction,
             )
 
         self._neural_posterior._num_trained_rounds = num_rounds
@@ -200,14 +200,14 @@ class SnpeBase(NeuralInference, ABC):
 
     def _get_log_prob_proposal_posterior(self, theta: Tensor, x: Tensor, masks: Tensor):
         """
-        Return the log-probability used for the loss. Depending on the algorithm, this evaluates a different term.
+        Return the log-probability used for the loss.
 
         Args:
-            theta: parameters θ
-            x: simulations
-            masks: binary, indicates whether to use prior samples
+            theta: Parameters θ.
+            x: Simulations.
+            masks: Binary, indicates whether to use prior samples.
 
-        Returns: log-probability
+        Returns: log-probability of the proposal posterior.
         """
         raise NotImplementedError
 
@@ -271,7 +271,8 @@ class SnpeBase(NeuralInference, ABC):
         Args:
             round_: Current training round, starting at 0.
             num_simulations: Actually performed simulations. This number can be below
-                the one fixed for the round if leakage correction through sampling is active and `patience` is not enough to reach it. 
+                the one fixed for the round if leakage correction through sampling is
+                active and `patience` is not enough to reach it.
         """
 
         prior_mask_values = ones if round_ == 0 else zeros
@@ -279,15 +280,21 @@ class SnpeBase(NeuralInference, ABC):
 
     def _train(
         self,
+        round_: int,
+        batch_size: int,
+        learning_rate: float,
+        validation_fraction: float,
+        stop_after_epochs: int,
+        max_num_epochs: Optional[int],
         clip_max_norm: Optional[float],
-    ):
-        r"""Train
+    ) -> None:
+        r"""Train the conditional density estimator for the posterior $p(\theta|x)$.
 
-        Trains the conditional density estimator for the posterior $p(\theta|x)$ by
-         maximizing the proposal posterior using the most recently aggregated bank of
-         $(\theta, x)$ pairs.
-        
-        Uses early stopping on a held-out validation set as a terminating condition.
+        Update the conditional density estimator weights to maximize the proposal
+        posterior using the most recently aggregated bank of $(\theta, x)$ pairs.
+
+        Uses performance on a held-out validation set as a terminating condition (early 
+        stopping).
         """
 
         # Starting index for the training set (1 = discard round-0 samples).
@@ -475,7 +482,7 @@ class PotentialFunctionProvider:
     def pyro_potential(self, theta: dict) -> Tensor:
         r"""Return posterior log prob. of theta $p(\theta|x)$, -inf where outside prior.
         
-        Args:
+        Args:s@
             theta: parameters $\theta$ (from pyro sampler)
         
         Returns:

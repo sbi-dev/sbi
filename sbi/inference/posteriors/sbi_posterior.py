@@ -157,11 +157,11 @@ class Posterior:
         force_update: bool = False,
         show_progressbar: Union[bool, str] = False,
     ) -> Tensor:
-        r"""Return leakage-correction factor for a leaky posterior density.
-        
+        r"""Return leakage correction factor for a leaky posterior density.
+
         The factor is estimated from the acceptance probability during rejection
          sampling from the posterior.
-        
+
         NOTE: This is to avoid re-estimating the acceptance probability from scratch
          whenever log_prob is called and normalize_snpe_density is True. Here, it is
          estimated only once for self.x_o and saved for later. We re-evaluate only
