@@ -1,11 +1,9 @@
 from __future__ import annotations
-from copy import deepcopy
-from typing import Any, Callable, Dict, List, Optional, Union
-import math
+from typing import Callable, Dict, List, Optional, Union
 import warnings
-from tqdm.auto import tqdm
 
 import numpy as np
+from numpy.core.fromnumeric import clip
 import torch
 from torch import Tensor, nn, optim
 from torch.nn.utils import clip_grad_norm_
@@ -34,21 +32,16 @@ class SNL(NeuralInference):
         show_round_summary: bool = False,
     ):
         r"""Sequential Neural Likelihood
-        
-        Implementation of Sequential Neural Likelihood: Fast Likelihood-free Inference
-         with Autoregressive Flows_ by Papamakarios et al., AISTATS 2019,
-         https://arxiv.org/abs/1805.07226
+
+        Sequential Neural Likelihood: Fast Likelihood-free Inference with
+        Autoregressive Flows_ by Papamakarios et al., AISTATS 2019,
+        https://arxiv.org/abs/1805.07226
 
         Args:
             density_estimator: Conditional density estimator $q(x|\theta)$, a nn.Module
                 with `.log_prob()` and `.sample()`
-            skip_simulator_checks: Flag to turn off input checks,
-                e.g., for saving simulation budget as the input checks run the
-                simulator a couple of times.
-            show_progressbar: whether to show a progressbar during simulating, training,
-                sampling
-            show_round_summary: whether to print the validation loss and leakage after
-                each round
+
+        See docstring of `NeuralInference` class for all other arguments.
         """
 
         super().__init__(
@@ -84,7 +77,7 @@ class SNL(NeuralInference):
         self._neural_posterior.neural_net.train(True)
 
         # SNL-specific summary_writer fields
-        self._summary.update({"mcmc_times": []})
+        self._summary.update({"mcmc_times": []})  # type: ignore
 
     def __call__(
         self,
@@ -101,7 +94,7 @@ class SNL(NeuralInference):
 
         This runs SNL for num_rounds rounds, using num_simulations_per_round calls to
         the simulator
-        
+
         Args:
             num_rounds: Number of rounds to run
             num_simulations_per_round: Number of simulator calls per round
@@ -110,9 +103,10 @@ class SNL(NeuralInference):
             validation_fraction: The fraction of data to use for validation.
             stop_after_epochs: The number of epochs to wait for improvement on the
                 validation set before terminating training.
-            max_num_epochs: maximal number of epochs to run. If max_num_epochs
+            max_num_epochs: Maximum number of epochs to run. If max_num_epochs
                 is reached, we stop training even if the validation loss is still
                 decreasing. If None, we train until validation loss increases (see
+                argument stop_after_epochs).
             clip_max_norm: Value at which to clip the total gradient norm in order to
                 prevent exploding gradients. Use None for no clipping.
 
@@ -120,8 +114,7 @@ class SNL(NeuralInference):
             Posterior $p(\theta|x_o)$ that can be sampled and evaluated
         """
 
-        if max_num_epochs is None:
-            max_num_epochs = float("Inf")
+        max_num_epochs = 2 ** 31 - 1 if max_num_epochs is None else max_num_epochs
 
         num_sims_per_round = self._ensure_list(num_simulations_per_round, num_rounds)
 
@@ -171,12 +164,21 @@ class SNL(NeuralInference):
 
     def _train(
         self,
+        batch_size: int,
+        learning_rate: float,
+        validation_fraction: float,
+        stop_after_epochs: int,
+        max_num_epochs: Optional[int],
         clip_max_norm: Optional[float],
-    ):
+    ) -> None:
         r"""
-        Trains the conditional density estimator for the likelihood by maximum
-         likelihood on the most recently aggregated bank of $(\theta, x)$ pairs.
-         Uses early stopping on a held-out validation set as a terminating condition.
+        Train the conditional density estimator for the likelihood.
+
+        Update the conditional density estimator weights to maximize the
+        likelihood on the most recently aggregated bank of $(\theta, x)$ pairs.
+
+        Uses performance on a held-out validation set as a terminating condition (early 
+        stopping).
         """
 
         # Get total number of training examples.

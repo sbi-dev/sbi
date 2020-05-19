@@ -35,7 +35,8 @@ class NeuralInference(ABC):
                 simulation $x$ can be multi-dimensional.
             prior: Distribution-like object with `log_prob`and `sample` methods.
             x_o: Observation $x_o$. If it has more than one dimension, the leading
-                dimension will be interpreted as a batch dimension but *currently* only the first batch element will be used to condition on.
+                dimension will be interpreted as a batch dimension but *currently* only
+                the first batch element will be used to condition on.
             simulation_batch_size: Number of parameter sets that the
                 simulator accepts maps to data x at once. If None, we simulate
                 all parameter sets at the same time. If >= 1, the simulator has to
