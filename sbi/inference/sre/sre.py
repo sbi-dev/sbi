@@ -9,6 +9,8 @@ from tqdm.auto import tqdm
 import numpy as np
 import torch
 from torch import Tensor, nn, optim, ones
+from torch.nn.utils import clip_grad_norm_
+
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
@@ -123,6 +125,7 @@ class SRE(NeuralInference):
         validation_fraction: float = 0.1,
         stop_after_epochs: int = 20,
         max_num_epochs: Optional[int] = None,
+        clip_max_norm: Optional[float] = 5.0,
     ) -> Posterior:
         """Run SRE
 
@@ -140,6 +143,8 @@ class SRE(NeuralInference):
             max_num_epochs: maximal number of epochs to run. If max_num_epochs
                 is reached, we stop training even if the validation loss is still
                 decreasing.
+            clip_max_norm: Value at which to clip the total gradient norm in order to
+                prevent exploding gradients. Use None for no clipping.
 
         Returns: 
             Posterior that can be sampled and evaluated.
@@ -174,6 +179,7 @@ class SRE(NeuralInference):
                 validation_fraction=validation_fraction,
                 stop_after_epochs=stop_after_epochs,
                 max_num_epochs=max_num_epochs,
+                clip_max_norm=clip_max_norm,
             )
 
             # Update description for progress bar.
@@ -201,6 +207,7 @@ class SRE(NeuralInference):
         validation_fraction,
         stop_after_epochs,
         max_num_epochs,
+        clip_max_norm: Optional[float],
     ):
         r"""
         Trains the classifier by maximizing a Bernoulli likelihood which distinguishes
@@ -319,6 +326,11 @@ class SRE(NeuralInference):
                 optimizer.zero_grad()
                 loss = _get_loss(theta_batch, x_batch)
                 loss.backward()
+                if clip_max_norm is not None:
+                    clip_grad_norm_(
+                        self._neural_posterior.neural_net.parameters(),
+                        max_norm=clip_max_norm,
+                    )
                 optimizer.step()
 
             epoch += 1
