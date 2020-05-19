@@ -115,7 +115,7 @@ class SnpeBase(NeuralInference, ABC):
         validation_fraction: float = 0.1,
         stop_after_epochs: int = 20,
         max_num_epochs: Optional[int] = None,
-        clip_grad_norm: bool = True,
+        clip_max_norm: Optional[float] = 5.0,
     ) -> Posterior:
         r"""Run SNPE
 
@@ -132,9 +132,8 @@ class SnpeBase(NeuralInference, ABC):
             max_num_epochs: maximal number of epochs to run. If max_num_epochs
                 is reached, we stop training even if the validation loss is still
                 decreasing. If None, we train until validation loss increases (see
-                argument stop_after_epochs)
-            clip_grad_norm: Whether to clip norm of gradients or not.
-            
+            clip_max_norm: Value at which to clip the total gradient norm in order to
+                prevent exploding gradients. Use None for no clipping.
         Returns:
             Posterior that can be sampled and evaluated.
         """
@@ -161,7 +160,7 @@ class SnpeBase(NeuralInference, ABC):
                 validation_fraction=validation_fraction,
                 stop_after_epochs=stop_after_epochs,
                 max_num_epochs=max_num_epochs,
-                clip_grad_norm=clip_grad_norm,
+                clip_max_norm=clip_max_norm,
             )
 
             # Store models at end of each round.
@@ -280,13 +279,7 @@ class SnpeBase(NeuralInference, ABC):
 
     def _train(
         self,
-        round_,
-        batch_size,
-        learning_rate,
-        validation_fraction,
-        stop_after_epochs,
-        max_num_epochs,
-        clip_grad_norm,
+        clip_max_norm: Optional[float],
     ):
         r"""Train
 
@@ -365,10 +358,10 @@ class SnpeBase(NeuralInference, ABC):
                     )
                 loss = -torch.mean(log_prob)
                 loss.backward()
-                if clip_grad_norm:
-                    # XXX Use default parameter or MODULE_CONSTANT for max_norm.
+                if clip_max_norm is not None:
                     clip_grad_norm_(
-                        self._neural_posterior.neural_net.parameters(), max_norm=5.0
+                        self._neural_posterior.neural_net.parameters(),
+                        max_norm=clip_max_norm,
                     )
                 optimizer.step()
 

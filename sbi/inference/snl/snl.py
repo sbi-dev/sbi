@@ -95,6 +95,7 @@ class SNL(NeuralInference):
         validation_fraction: float = 0.1,
         stop_after_epochs: int = 20,
         max_num_epochs: Optional[int] = None,
+        clip_max_norm: Optional[float] = 5.0,
     ) -> Posterior:
         r"""Run SNL
 
@@ -112,7 +113,8 @@ class SNL(NeuralInference):
             max_num_epochs: maximal number of epochs to run. If max_num_epochs
                 is reached, we stop training even if the validation loss is still
                 decreasing. If None, we train until validation loss increases (see
-                argument stop_after_epochs)
+            clip_max_norm: Value at which to clip the total gradient norm in order to
+                prevent exploding gradients. Use None for no clipping.
 
         Returns:
             Posterior $p(\theta|x_o)$ that can be sampled and evaluated
@@ -146,6 +148,7 @@ class SNL(NeuralInference):
                 validation_fraction=validation_fraction,
                 stop_after_epochs=stop_after_epochs,
                 max_num_epochs=max_num_epochs,
+                clip_max_norm=clip_max_norm,
             )
 
             # Update description for progress bar.
@@ -168,11 +171,7 @@ class SNL(NeuralInference):
 
     def _train(
         self,
-        batch_size,
-        learning_rate,
-        validation_fraction,
-        stop_after_epochs,
-        max_num_epochs,
+        clip_max_norm: Optional[float],
     ):
         r"""
         Trains the conditional density estimator for the likelihood by maximum
@@ -232,9 +231,11 @@ class SNL(NeuralInference):
                 )
                 loss = -torch.mean(log_prob)
                 loss.backward()
-                clip_grad_norm_(
-                    self._neural_posterior.neural_net.parameters(), max_norm=5.0
-                )
+                if clip_max_norm is not None:
+                    clip_grad_norm_(
+                        self._neural_posterior.neural_net.parameters(),
+                        max_norm=clip_max_norm,
+                    )
                 optimizer.step()
 
             epoch += 1
