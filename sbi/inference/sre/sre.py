@@ -35,8 +35,8 @@ class SRE(NeuralInference):
         summary_writer: Optional[SummaryWriter] = None,
         device: Optional[torch.device] = None,
         skip_input_checks: bool = False,
-        show_progressbar: Optional[bool] = True,
-        show_round_summary: Optional[bool] = False,
+        show_progressbar: bool = True,
+        show_round_summary: bool = False,
     ):
         r"""Sequential Ratio Estimation [1]
 
