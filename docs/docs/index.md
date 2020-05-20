@@ -8,8 +8,6 @@ The focus of `sbi` is _Sequential Neural Posterior Estimation_ (SNPE). In SNPE, 
 [Training deep neural density estimators to identify mechanistic models of neural dynamics](https://www.biorxiv.org/content/10.1101/838383v1).
 - To learn more about the general motivation behind simulation-based inference, and algorithms included in `sbi`, keep on reading.
 
-We are working on making tutorials available.
-
 
 ## Motivation and approach
 
