@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import Callable, Optional
+import logging
 
 import torch
 from torch import Tensor, eye, nn, ones
@@ -33,6 +34,7 @@ class SnpeC(SnpeBase):
         skip_input_checks: bool = False,
         show_progressbar: bool = True,
         show_round_summary: bool = False,
+        logging_level: int = logging.WARNING,
     ):
         r"""SNPE-C / APT [1]
 
@@ -71,6 +73,7 @@ class SnpeC(SnpeBase):
             skip_input_checks=skip_input_checks,
             show_progressbar=show_progressbar,
             show_round_summary=show_round_summary,
+            logging_level=logging_level,
         )
 
     def _get_log_prob_proposal_posterior(

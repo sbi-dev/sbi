@@ -3,7 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Callable, Dict, List, Optional, Union
 import warnings
-
+import logging
 import numpy as np
 import torch
 from torch import Tensor, nn, optim, ones
@@ -39,6 +39,7 @@ class SRE(NeuralInference):
         skip_input_checks: bool = False,
         show_progressbar: bool = True,
         show_round_summary: bool = False,
+        logging_level: int = logging.WARNING,
     ):
         r"""Sequential Ratio Estimation [1]
 
@@ -76,6 +77,7 @@ class SRE(NeuralInference):
             skip_input_checks=skip_input_checks,
             show_progressbar=show_progressbar,
             show_round_summary=show_round_summary,
+            logging_level=logging_level,
         )
 
         self._classifier_loss = classifier_loss
