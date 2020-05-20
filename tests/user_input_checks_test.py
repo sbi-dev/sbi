@@ -289,12 +289,6 @@ def test_prepare_sbi_problem(
             np.zeros((1, 3)),
         ),
         pytest.param(
-            lambda _: zeros(1, 480),
-            BoxUniform(zeros(2), ones(2)),
-            zeros(1, 480),
-            marks=pytest.mark.xfail,
-        ),  # test simulator always returning batch dim.
-        pytest.param(
             linear_gaussian,
             (
                 Gamma(ones(1), ones(1)),
