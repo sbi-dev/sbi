@@ -135,7 +135,7 @@ def probs2contours(probs, levels):
 
 def samples_nd(
     samples: np.ndarray,
-    points: Optional[Union[list, np.ndarray]] = None,
+    points: Optional[Union[list, np.ndarray]] = [],
     upper: Optional[str] = "hist",
     diag: Optional[str] = "hist",
     title: Optional[str] = None,
@@ -316,7 +316,8 @@ def samples_nd(
         rows = cols = len(subset)
 
     fig, axes = plt.subplots(rows, cols, figsize=opts["fig_size"], **opts["subplots"])
-    axes = axes.reshape(rows, cols)
+    # Cast to ndarray in case of 1D subplots.
+    axes = np.array(axes).reshape(rows, cols)
 
     # Style figure
     fig.subplots_adjust(**opts["fig_subplots_adjust"])
