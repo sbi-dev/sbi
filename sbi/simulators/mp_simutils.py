@@ -1,10 +1,12 @@
 import multiprocessing as mp
 import numpy as np
 from tqdm.auto import tqdm
-from typing import Callable, Tuple
+from typing import Callable, Tuple, List
 import torch
 from sys import platform
 from torch import Tensor
+from importlib import reload
+import logging
 
 
 def simulate_mp(
@@ -12,43 +14,46 @@ def simulate_mp(
     theta: Tensor,
     num_workers: int = 4,
     worker_batch_size: int = 20,
-    verbose: bool = False,
     show_progressbar: bool = True,
+    logging_level: int = logging.WARNING,
 ) -> Tuple[Tensor, Tensor]:
     """
     Return parameters theta and simulated data x, simulated using multiprocessing on the
         passed simulator.
 
     Args:
-        simulator: simulator function that will be executed on each worker
-        theta: all simulation parameters
-        num_workers: number of parallel workers to start
-        worker_batch_size: Number of parameter sets that are processed per worker. A
-            worker will receive this many parameter sets to simulate per call. Needs
+        simulator: Simulator function that will be executed on each worker.
+        theta: All simulation parameters.
+        num_workers: Number of parallel workers to start.
+        worker_batch_size: Number of parameter sets that are processed per worker. Needs
             to be larger than sim_batch_size. A lower value creates overhead from
             starting workers frequently. A higher value leads to the simulation
             progressbar being updated less frequently (updates only happen after a
             worker is finished).
-        verbose: whether to give information about the current state of the workers
-        show_progressbar: whether to show a progressbar
+        show_progressbar: Whether to show a progressbar.
+        logging_level: The logging level determines the amount of information printed to
+            the user. Currently only used for multiprocessing. One of
+            logging.[INFO|WARNING|DEBUG|ERROR|CRITICAL].
 
     Returns: parameters theta and simulation outputs x. The order of theta is not
         necessarily the same as for the input variable theta, which is why we return it
         here.
     """
 
-    queue, workers, pipes = start_workers(
-        simulator=simulator, num_workers=num_workers, verbose=verbose
-    )
-    log("Started workers", verbose)
-    final_x = []  # list of simulation outputs
-    final_theta = []  # list of parameters
+    reload(logging)  # jupyter notebooks require reload to update the logging level
+    # see here: SO 18786912
+    logging.basicConfig(level=logging_level)
+
+    queue, workers, pipes = start_workers(simulator=simulator, num_workers=num_workers)
+    logging.info("Started workers")
+    final_x = []  # will be filled with simulation outputs at job completion
+    final_theta = []  # # will be filled with parameters theta at job completion
     minibatches = iterate_minibatches(theta, worker_batch_size)
 
     pbar = tqdm(
         total=len(theta),
         disable=not show_progressbar,
-        desc="Running {0} simulations".format(len(theta)),
+        desc=f"Running {len(theta)} simulations",
     )
 
     done = False
@@ -64,61 +69,57 @@ def simulate_mp(
                     break
 
                 active_list.append((worker, pipe))
-                log(
-                    "Dispatching to worker (len = {})".format(len(theta_worker_batch)),
-                    verbose,
-                )
+                logging.info(f"Dispatching to worker (len = {len(theta_worker_batch)})")
                 pipe.send(theta_worker_batch)
-                log("Done", verbose)
+                logging.info("Done")
 
             num_remaining = len(active_list)
             while num_remaining > 0:
-                log("Listening to worker", verbose)
+                logging.info("Listening to worker")
                 msg = queue.get()
                 if isinstance(msg, int):
-                    log("Received int", verbose)
+                    logging.info("Received int")
                 elif isinstance(msg, tuple):
-                    log("Received results", verbose)
+                    logging.info("Received results")
                     x, theta = msg
                     final_x.append(x)
                     final_theta.append(theta)
                     num_remaining -= 1
                     pbar.update(len(theta))
                 else:
-                    log(
-                        "Warning: Received unknown message of type {}".format(
-                            type(msg)
-                        ),
-                        verbose,
+                    logging.info(
+                        f"Warning: Received unknown message of type {type(msg)}"
                     )
 
-    stop_workers(workers, pipes, queue, verbose=verbose)
+    stop_workers(workers, pipes, queue)
 
-    # concatenate to get shape (num_samples, shape_of_single_x)
+    # Concatenate to get shape (num_samples, shape_of_single_x).
     x = torch.cat(final_x, dim=0)
-    # concatenate to get shape (num_samples, shape_of_single_theta)
+    # Concatenate to get shape (num_samples, shape_of_single_theta).
     theta = torch.cat(final_theta, dim=0)
 
     return theta, x
 
 
-def start_workers(simulator: Callable, num_workers: int = 4, verbose: bool = False):
+def start_workers(
+    simulator: Callable, num_workers: int = 4
+) -> Tuple[mp.Queue, List[mp.Process], List[mp.Pipe]]:
     """
     Start all workers.
 
     Args:
-        simulator: simulator function that will be executed on each core
-        num_workers: number of parallel workers to start
-        verbose: whether to give information about the current state of the workers
+        simulator: Simulator function that will be executed on each core.
+        num_workers: Number of parallel workers to start.
 
     Returns: queue, workers, pipes
     """
     try:
-        start_method = dict(linux="fork", darwin="fork", win32="spawn")
-        try:
-            mp.set_start_method(start_method[platform])
-        except:
-            raise KeyError("Platform not supported.")
+        if platform == "win32":
+            # Windows requires spawn start method.
+            mp.set_start_method("spawn")
+        else:
+            # Linux and macOS require fork start method.
+            mp.set_start_method("fork")
     except RuntimeError:
         # try-except because start method can not be set multiple times within the same
         # session. So, if the user runs things outside of a __main__() function, e.g. in
@@ -126,50 +127,38 @@ def start_workers(simulator: Callable, num_workers: int = 4, verbose: bool = Fal
         # set_start_method() function on
         pass
 
-    pipes = [mp.Pipe(duplex=True) for _ in range(num_workers)]
-    queue = mp.Queue()
-    workers = [
-        Worker(
-            i,
-            queue,
-            pipes[i][1],
-            simulator,  # models[i] TODO https://github.com/mackelab/sbi/issues/166
-            seed=None,  # self.rng.randint(low=0, high=2 ** 31), # TODO #166
-            verbose=verbose,
-        )
-        for i in range(num_workers)
-    ]
-    pipes = [p[0] for p in pipes]
+    parents, children = zip(*(mp.Pipe(duplex=True) for _ in range(num_workers)))
+    worker_cfg = dict(queue=mp.Queue(), simulator=simulator, seed=None)  # TODO #166
+    workers = [Worker(i, pipe=child, **worker_cfg) for i, child in enumerate(children)]
 
-    log("Starting workers", verbose)
+    logging.info("Starting workers")
     for w in workers:
         w.start()
 
-    log("Done", verbose)
+    logging.info("Done")
 
-    return queue, workers, pipes
+    return worker_cfg["queue"], workers, parents
 
 
-def stop_workers(workers, pipes, queue, verbose=False):
+def stop_workers(workers, pipes, queue) -> None:
     """
     Stop all workers.
 
     Args:
-        workers: workers
-        pipes: pipes
-        queue: queue
-        verbose: whether to give information about the current state of the workers
+        workers: Workers.
+        pipes: Pipes.
+        queue: Queue.
     """
     if workers is None:
         return
 
-    log("Closing")
+    logging.info("Closing")
     for w, p in zip(workers, pipes):
-        log("Closing pipe", verbose)
+        logging.info("Closing pipe")
         p.close()
 
     for w in workers:
-        log("Joining process", verbose)
+        logging.info("Joining process")
         w.join(timeout=1)
         w.terminate()
 
@@ -182,8 +171,8 @@ def iterate_minibatches(theta: Tensor, worker_batch_size: int = 20) -> Tensor:
     parameter array theta
 
     Args:
-        theta: all input parameters
-        worker_batch_size: size of the minibatch to be passed to each worker
+        theta: All input parameters.
+        worker_batch_size: Size of the minibatch to be passed to each worker.
 
     Returns: iterable where each entry is a minibatch of worker_batch_size thetas
     """
@@ -216,18 +205,6 @@ def iterate_minibatches(theta: Tensor, worker_batch_size: int = 20) -> Tensor:
 #         self.proposal.reseed(self.gen_newseed())
 
 
-def log(msg, verbose: bool = False):
-    """
-    Print information about the current state of the worker.
-
-    Args:
-        msg: message to print
-        verbose: whether to print the information or not.
-    """
-    if verbose:
-        print("Parent: {}".format(msg))
-
-
 class Worker(mp.Process):
     def __init__(
         self,
@@ -236,21 +213,18 @@ class Worker(mp.Process):
         pipe: mp.Pipe,
         simulator: Callable,
         seed: int = None,
-        verbose: bool = False,
     ):
         """
         Args:
-            n: worker index
-            queue: queue
-            pipe: pipe
-            simulator: simulator to run on worker
-            seed: seed
-            verbose: whether to give information about the current state of the worker
+            n: Worker index
+            queue: Queue
+            pipe: Pipe
+            simulator: Simulator to run on worker
+            seed: Seed
         """
         super().__init__()
         self.n = n
         self.queue = queue
-        self.verbose = verbose
         self.pipe = pipe
         self.model = simulator
         self.rng = np.random.RandomState(seed=seed)
@@ -265,33 +239,25 @@ class Worker(mp.Process):
 
         Updates simulation results in queue
         """
-        self.log("Starting worker")
+        logging.info(f"Worker {self.n}: Starting worker")
         while True:
             try:
-                self.log("Listening")
+                logging.info(f"Worker {self.n}: Listening")
                 theta_worker_batch = self.pipe.recv()
             except EOFError:
-                self.log("Leaving")
+                logging.info(f"Worker {self.n}: Leaving")
                 break
             if len(theta_worker_batch) == 0:
-                self.log("Skipping")
+                logging.info(f"Worker {self.n}: Skipping")
                 self.pipe.send(([], []))
                 continue
 
             # run forward model for all params, each n_reps times
-            self.log("Received data of size {}".format(len(theta_worker_batch)))
+            logging.info(
+                f"Worker {self.n}: Received data of size {len(theta_worker_batch)}"
+            )
             _, x = self.model(theta_worker_batch)
 
-            self.log("Sending data")
+            logging.info(f"Worker {self.n}: Sending data")
             self.queue.put((x, theta_worker_batch))
-            self.log("Done")
-
-    def log(self, msg):
-        """
-        Print information about the current state of the worker.
-
-        Args:
-            msg: message to print
-        """
-        if self.verbose:
-            print("Worker {}: {}".format(self.n, msg))
+            logging.info(f"Worker {self.n}: Done")

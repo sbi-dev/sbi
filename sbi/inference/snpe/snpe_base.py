@@ -2,6 +2,7 @@ from abc import ABC
 from copy import deepcopy
 from typing import Callable, List, Optional, Union, Tuple
 import warnings
+import logging
 
 import numpy as np
 import torch
@@ -39,6 +40,7 @@ class SnpeBase(NeuralInference, ABC):
         skip_input_checks: bool = False,
         show_progressbar: bool = True,
         show_round_summary: bool = False,
+        logging_level: int = logging.WARNING,
     ):
         """ Base class for Sequential Neural Posterior Estimation algorithms.
 
@@ -70,6 +72,7 @@ class SnpeBase(NeuralInference, ABC):
             skip_input_checks=skip_input_checks,
             show_progressbar=show_progressbar,
             show_round_summary=show_round_summary,
+            logging_level=logging_level,
         )
 
         if density_estimator is None:
@@ -308,7 +311,7 @@ class SnpeBase(NeuralInference, ABC):
         Update the conditional density estimator weights to maximize the proposal
         posterior using the most recently aggregated bank of $(\theta, x)$ pairs.
 
-        Uses performance on a held-out validation set as a terminating condition (early 
+        Uses performance on a held-out validation set as a terminating condition (early
         stopping).
         """
 

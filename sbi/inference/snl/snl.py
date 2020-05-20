@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import Callable, Dict, List, Optional, Union
 import warnings
+import logging
 
 import numpy as np
 from numpy.core.fromnumeric import clip
@@ -32,6 +33,7 @@ class SNL(NeuralInference):
         skip_input_checks: bool = False,
         show_progressbar: bool = True,
         show_round_summary: bool = False,
+        logging_level: int = logging.WARNING,
     ):
         r"""Sequential Neural Likelihood
 
@@ -58,6 +60,7 @@ class SNL(NeuralInference):
             skip_input_checks=skip_input_checks,
             show_progressbar=show_progressbar,
             show_round_summary=show_round_summary,
+            logging_level=logging_level,
         )
 
         if density_estimator is None:

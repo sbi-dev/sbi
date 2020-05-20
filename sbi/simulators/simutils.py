@@ -6,6 +6,7 @@ import torch
 from torch import Tensor
 from tqdm.auto import tqdm
 from sbi.simulators.mp_simutils import simulate_mp
+import logging
 
 
 def simulate_in_batches_mp(
@@ -15,6 +16,7 @@ def simulate_in_batches_mp(
     number_of_workers: int = 4,
     worker_batch_size: int = 20,
     show_progressbar: Optional[bool] = True,
+    logging_level: int = logging.WARNING,
 ) -> Tuple[Tensor, Tensor]:
     """
     Return parameters $\theta$ and data $x$ simulated using multiprocessing.
@@ -31,6 +33,9 @@ def simulate_in_batches_mp(
         sim_batch_size: number of simulations per batch. Default is to simulate
             the entire theta in a single batch.
         show_progressbar: whether to show a progressbar during simulating
+        logging_level: The logging level determines the amount of information printed to
+            the user. Currently only used for multiprocessing. One of
+            logging.[INFO|WARNING|DEBUG|ERROR|CRITICAL].
 
     Returns: parameters theta and simulation outputs x
 
@@ -49,9 +54,8 @@ def simulate_in_batches_mp(
         theta=theta,
         num_workers=number_of_workers,
         worker_batch_size=worker_batch_size,
-        verbose=False,  # verbose gives a ton of information on what each worker is
-        # currently doing. Not sure if we want to make this an easily accessible kwarg
         show_progressbar=show_progressbar,
+        logging_level=logging_level,
     )
 
     return theta, x
@@ -91,7 +95,7 @@ def simulate_in_batches(
         pbar = tqdm(
             total=num_sims,
             disable=not show_progressbar,
-            desc="Running {0} simulations".format(num_sims),
+            desc=f"Running {num_sims} simulations",
         )
 
         with pbar:
