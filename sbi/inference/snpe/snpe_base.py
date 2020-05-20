@@ -191,14 +191,11 @@ class SnpeBase(NeuralInference, ABC):
 
             # Update tensorboard and summary dict.
             correction = self._neural_posterior.get_leakage_correction(x=self._x_o,)
-            self._summary_writer, self._summary = utils.summarize(
-                summary_writer=self._summary_writer,
-                summary=self._summary,
+            self._summarize(
                 round_=round_,
                 x_o=self._x_o,
                 theta_bank=self._theta_bank,
                 x_bank=self._x_bank,
-                simulator=self._simulator,
                 posterior_samples_acceptance_rate=correction,
             )
 

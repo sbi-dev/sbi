@@ -135,7 +135,7 @@ def probs2contours(probs, levels):
 
 def samples_nd(
     samples: np.ndarray,
-    points: Optional[Union[list, np.ndarray]] = [],
+    points: Optional[Union[list, np.ndarray]] = None,
     upper: Optional[str] = "hist",
     diag: Optional[str] = "hist",
     title: Optional[str] = None,
@@ -249,6 +249,8 @@ def samples_nd(
         samples = [samples]
 
     # Prepare points
+    if points is None: 
+        points = []
     if type(points) != list:
         points = [points]
     points = [np.atleast_2d(p) for p in points]

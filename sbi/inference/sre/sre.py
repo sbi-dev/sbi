@@ -191,14 +191,11 @@ class SRE(NeuralInference):
                 print(self._describe_round(round_, self._summary))
 
             # Update tensorboard and summary dict.
-            self._summary_writer, self._summary = utils.summarize(
-                summary_writer=self._summary_writer,
-                summary=self._summary,
+            self._summarize(
                 round_=round_,
                 x_o=self._x_o,
                 theta_bank=self._theta_bank,
                 x_bank=self._x_bank,
-                simulator=self._simulator,
             )
 
         self._neural_posterior._num_trained_rounds = num_rounds

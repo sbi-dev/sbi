@@ -11,6 +11,7 @@ from sbi.simulators.simutils import simulate_in_batches, simulate_in_batches_mp
 from sbi.user_input.user_input_checks import prepare_sbi_problem
 from sbi.utils import get_log_root, get_timestamp
 from sbi.utils.torchutils import get_default_device
+from sbi.utils.plot.plot import samples_nd
 
 
 class NeuralInference(ABC):
@@ -110,11 +111,7 @@ class NeuralInference(ABC):
 
         # Logging during training (by SummaryWriter).
         self._summary = dict(
-            mmds=[],
-            median_observation_distances=[],
-            negative_log_probs_true_parameters=[],
-            epochs=[],
-            best_validation_log_probs=[],
+            median_observation_distances=[], epochs=[], best_validation_log_probs=[],
         )
 
     def _has_converged(self, epoch: int, stop_after_epochs: int) -> bool:
@@ -194,3 +191,72 @@ class NeuralInference(ABC):
 
         msg = f"NaN/Inf present in {description}."
         assert torch.isfinite(quantity).all(), msg
+
+    def _summarize(
+        self,
+        round_: int,
+        x_o: Tensor,
+        theta_bank: List[Tensor],
+        x_bank: List[Tensor],
+        posterior_samples_acceptance_rate: Optional[float]=None,
+    ) -> None:
+        """Update the summary_writer with statistics for a given round.
+
+        Statistics are extracted from the arguments and from entries in self._summary
+        created during training.
+        """
+        
+        # XXX: This is a subset of the logging from the conormdurkan/lfi. A big
+        # part of the logging was removed because of API changes, e.g., logging
+        # comparisons to ground truth parameters and samples.
+
+        # Median |x - x0| for most recent round.
+        median_observation_distance = torch.median(
+            torch.sqrt(torch.sum((x_bank[-1] - x_o.reshape(1, -1)) ** 2, dim=-1,))
+        )
+        self._summary["median_observation_distances"].append(
+            median_observation_distance.item()
+        )
+
+        self._summary_writer.add_scalar(
+            tag="median_observation_distance",
+            scalar_value=self._summary["median_observation_distances"][-1],
+            global_step=round_ + 1,
+        )
+
+        # Rejection sampling acceptance rate, only for SNPE.
+        if posterior_samples_acceptance_rate is not None:
+            self._summary["rejection_sampling_acceptance_rates"].append(
+                posterior_samples_acceptance_rate
+            )
+
+            self._summary_writer.add_scalar(
+                tag="rejection_sampling_acceptance_rate",
+                scalar_value=self._summary["rejection_sampling_acceptance_rates"][-1],
+                global_step=round_ + 1,
+            )
+
+        # Plot most recently sampled parameters.
+        # XXX: need more plotting kwargs, e.g., prior limits.
+        parameters = theta_bank[-1]
+
+        figure, axes = samples_nd(parameters.numpy())
+
+        self._summary_writer.add_figure(
+            tag="posterior_samples", figure=figure, global_step=round_ + 1
+        )
+
+        # Add most recent training stats to summary writer.
+        self._summary_writer.add_scalar(
+            tag="epochs_trained",
+            scalar_value=self._summary["epochs"][-1],
+            global_step=round_ + 1,
+        )
+
+        self._summary_writer.add_scalar(
+            tag="best_validation_log_prob",
+            scalar_value=self._summary["best_validation_log_probs"][-1],
+            global_step=round_ + 1,
+        )
+
+        self._summary_writer.flush()
