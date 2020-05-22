@@ -103,7 +103,7 @@ class Posterior:
         try:
             log_prob_fn = getattr(self, f"_log_prob_{self._alg_family}")
         except AttributeError:
-            raise ValueError(f"{self.alg_family} cannot evaluate probabilities.")
+            raise ValueError(f"{self._alg_family} cannot evaluate probabilities.")
 
         return log_prob_fn(theta, x, normalize_snpe_density=normalize_snpe_density)
 
