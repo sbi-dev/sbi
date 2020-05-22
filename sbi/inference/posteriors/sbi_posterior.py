@@ -4,7 +4,7 @@ from warnings import warn
 from pyro.infer.mcmc import HMC, NUTS
 from pyro.infer.mcmc.api import MCMC
 import torch
-from torch import nn, Tensor
+from torch import nn, Tensor, log, as_tensor
 from torch import multiprocessing as mp
 
 from sbi.mcmc import Slice, SliceSampler
@@ -13,6 +13,8 @@ from sbi.utils.torchutils import atleast_2d
 
 
 NEG_INF = torch.tensor(float("-inf"), dtype=torch.float32)
+
+Array = Union[torch.Tensor, np.ndarray]
 
 
 class Posterior:
@@ -190,15 +192,6 @@ class Posterior:
             self._leakage_density_correction_factor = acceptance_at(self.x_o)
 
         return self._leakage_density_correction_factor  # type:ignore
-        else:
-            acceptance_rate = self._leakage_density_correction_factor
-
-        if acceptance_rate < 0.01:
-            warn(
-                "Leakage >99% detected. This will drastically slow down sampling."
-                "Consider switching to sample_with_mcmc=True"
-            )
-        return torch.as_tensor(acceptance_rate)
 
     def sample(
         self,
@@ -222,7 +215,7 @@ class Posterior:
         Returns: samples from posterior.
         """
 
-        x = self.x_o if x is None else atleast_2d(x)
+        x = atleast_2d(as_tensor(self._x_else_x_o(x)))
 
         with torch.no_grad():
             if self._sample_with_mcmc:
@@ -399,7 +392,7 @@ class Posterior:
         Set the embedding net that encodes x as an attribute of the neural_net.
 
         Args:
-            embedding_net: neural net to encode x
+            embedding_net: Neural net to encode x.
         """
         assert isinstance(embedding_net, nn.Module), (
             "embedding_net is not a nn.Module. "
@@ -408,3 +401,11 @@ class Posterior:
             "embedding_net=None"
         )
         self.neural_net._embedding_net = embedding_net
+
+    def _x_else_x_o(self, x: Optional[Array]) -> Array:
+        if x is not None:
+            return x
+        elif self.x_o is None:
+            raise ValueError("Context x needed when not preconditioned to x_o.")
+        else:
+            return self.x_o
