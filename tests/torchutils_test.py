@@ -123,11 +123,11 @@ def test_ensure_batch_dim():
     assert t2.ndim == 3
 
 
-def test_atleast_2d():
+def test_atleast_2d_many():
     t1 = np.array([0.0, -1.0, 1.0])
     t2 = torch.tensor([[1, 2, 3]])
 
-    t3, t4 = torchutils.atleast_2d(t1, t2)
+    t3, t4 = torchutils.atleast_2d_many(t1, t2)
 
     assert isinstance(t3, torch.Tensor)
     assert t3.ndim == 2
