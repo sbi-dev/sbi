@@ -247,7 +247,7 @@ def ensure_x_batched(x: Tensor) -> Tensor:
     return x
 
 
-def atleast_2d(*arys: Union[np.array, Tensor]) -> Union[Tensor, List[Tensor]]:
+def atleast_2d_many(*arys: Union[np.array, Tensor]) -> Union[Tensor, List[Tensor]]:
     """Return tensors with at least dimension 2.
 
     Tensors or arrays of dimension 0 or 1 will get additional dimension(s) prepended.
@@ -259,6 +259,10 @@ def atleast_2d(*arys: Union[np.array, Tensor]) -> Union[Tensor, List[Tensor]]:
         arr = arys[0]
         if isinstance(arr, np.ndarray):
             arr = torch.from_numpy(arr)
-        return arr if arr.ndim >= 2 else arr.reshape(1, -1)
+        return atleast_2d(arr)
     else:
-        return [atleast_2d(arr) for arr in arys]
+        return [atleast_2d_many(arr) for arr in arys]
+
+
+def atleast_2d(t: Tensor) -> Tensor:
+    return t if t.ndim >= 2 else t.reshape(1, -1)
