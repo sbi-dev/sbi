@@ -121,10 +121,6 @@ class Posterior:
             warn("No leakage correction was requested.")
             return unnormalized_log_prob
         else:
-            # XXX See above note on defining `correct_leakage`
-            # if x.shape[0] > 1:
-            #     raise ValueError("etc")
-            #
             # Set log-likelihood to -infinity if theta outside prior support.
             is_prior_finite = torch.isfinite(self._prior.log_prob(theta))
             masked_log_prob = torch.where(
@@ -153,9 +149,9 @@ class Posterior:
     def get_leakage_correction(
         self,
         x: Tensor,
-        num_rejection_samples: int = 10000,
+        num_rejection_samples: int = 10_000,
         force_update: bool = False,
-        show_progressbar: Union[bool, str] = False,
+        show_progressbar: bool = False,
     ) -> Tensor:
         r"""Return leakage correction factor for a leaky posterior density.
 
@@ -163,46 +159,37 @@ class Posterior:
          sampling from the posterior.
 
         NOTE: This is to avoid re-estimating the acceptance probability from scratch
-         whenever log_prob is called and normalize_snpe_density is True. Here, it is
-         estimated only once for self.x_o and saved for later. We re-evaluate only
-         whenever a new x is passed.
+              whenever log_prob is called and normalize_snpe_density is True. Here, it
+              is estimated only once for self.x_o and saved for later. We re-evaluate
+              only whenever a new x is passed.
         
         Arguments:
-            x: conditioning context for posterior $p(\theta|x)$. If None, uses self.x_o.
-            num_rejection_samples: number of samples used to estimate the factor
-             (default: 10000).
-            force_update: if False, we do not re-evaluate the leakage correction if
-                the context is the same as self.x_o. If True, we always re-evaluate.
-                This is needed to enforce a new estimate of the leakage after later
-                rounds, i.e. round 2, 3, ...
-            show_progressbar: whether to show a progressbar or not. If string, we show a
-                progressbar and add the str to the description
-        
+            x: Conditioning context for posterior $p(\theta|x)$. If None, use self.x_o.
+            num_rejection_samples: Number of samples used to estimate correction factor.
+            force_update: Whether to force a reevaluation of the leakage correction even
+                if the context x is the same as self.x_o. This is useful to enforce a 
+                new estimate of the leakage after later rounds, i.e. round 2, 3, ...
+            show_progressbar: Whether to show a progressbar during sampling.
+
         Returns:
             Saved or newly estimated correction factor (scalar Tensor).
         """
 
-        is_new_x = (x != self.x_o).all()
+        def acceptance_at(x: Tensor) -> Tensor:
+            return utils.sample_posterior_within_prior(
+                self.neural_net, self._prior, x, num_rejection_samples, show_progressbar
+            )[1]
 
-        if is_new_x:
-            _, acceptance_rate = utils.sample_posterior_within_prior(
-                self.neural_net,
-                self._prior,
-                x,
-                num_samples=num_rejection_samples,
-                show_progressbar=show_progressbar,
-            )
-        # If factor for x_o wasn't estimated yet, estimate and set.
-        elif self._leakage_density_correction_factor is None or force_update:
-            _, acceptance_rate = utils.sample_posterior_within_prior(
-                self.neural_net,
-                self._prior,
-                self.x_o,
-                num_samples=num_rejection_samples,
-                show_progressbar=show_progressbar,
-            )
-            self._leakage_density_correction_factor = acceptance_rate
-        # otherwise just return the saved correction factor
+        # Short-circuit here for performance: if identical no need to check equality.
+        is_new_x = (x is not self.x_o) and (x != self.x_o).all()
+        not_saved_at_x_o = self._leakage_density_correction_factor is None
+
+        if is_new_x:  # Calculate at x; don't save.
+            return acceptance_at(x)
+        elif not_saved_at_x_o or force_update:  # Calculate at x_o; save.
+            self._leakage_density_correction_factor = acceptance_at(self.x_o)
+
+        return self._leakage_density_correction_factor  # type:ignore
         else:
             acceptance_rate = self._leakage_density_correction_factor
 
