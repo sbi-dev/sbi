@@ -1,4 +1,5 @@
 from typing import Callable, Optional, Union
+from numpy import ndarray
 from warnings import warn
 
 from pyro.infer.mcmc import HMC, NUTS
@@ -19,10 +20,10 @@ Array = Union[torch.Tensor, np.ndarray]
 
 class Posterior:
     r"""Posterior $p(\theta|x_o)$ with evaluation and sampling methods.
-    
+
     This class is used by inference algorithms as follows:
-    
-    - SNPE-family algorithms put density outside of the prior. This class uses the  
+
+    - SNPE-family algorithms put density outside of the prior. This class uses the
       prior to adjust evaluation and sampling and correct for that.
     - SNL and and SRE methods don't return posteriors directly. This class provides
       MCMC methods that given the prior, allow to sample from the posterior.
@@ -40,12 +41,11 @@ class Posterior:
     ):
         """
         Args:
-            algorithm_family: one of 'snpe', 'snl', 'sre' or 'aalr'
-            neural_net: a classifier for sre/aalr, a density estimator for snpe/snl   
-            prior: prior distribution with methods `log_prob` and `sample`
-            x_o: observations acting as conditioning context. Absent if None.
-            TODO: Why is x_o optional?
-            sample_with_mcmc: sample with MCMC for leakage
+            algorithm_family: One of 'snpe', 'snl', 'sre' or 'aalr'.
+            neural_net: A classifier for sre/aalr, a density estimator for snpe/snl.
+            prior: Prior distribution with methods `log_prob` and `sample`.
+            x_o: Observation acting as conditioning context. Absent if None.
+            sample_with_mcmc: Whether to sample with MCMC to correct leakage.
         """
 
         self.neural_net = neural_net
@@ -63,7 +63,7 @@ class Posterior:
 
         self._num_trained_rounds = 0
 
-        # correction factor for snpe leakage
+        # Correction factor for snpe leakage.
         self._leakage_density_correction_factor = None
 
     def log_prob(
@@ -74,10 +74,10 @@ class Posterior:
     ) -> Tensor:
         r"""Return posterior $p(\theta|x)$ log probability.
 
-        Args: 
-            theta: parameters $\theta$.
-            x: conditioning context for posterior $p(\theta|x)$.
-                If None, use the observation self.x_o.
+        Args:
+            theta: Parameters $\theta$.
+            x: Conditioning context for posterior $p(\theta|x)$. Per default, use the
+               observation self.x_o.
             normalize_snpe_density:
                 If True, normalize the output density when using snpe (by drawing
                 samples, estimating the acceptance ratio, and then scaling the
@@ -85,9 +85,9 @@ class Posterior:
                 the prior support. If False, directly return the output from the density
                 estimator.
 
-        Returns: 
+        Returns:
             Tensor of shape theta.shape[0], containing the log probability of
-            the posterior $p(\theta|x)$
+            the posterior $p(\theta|x)$.
         """
 
         # XXX I would like to remove this and deal with everything leakage-
@@ -112,9 +112,9 @@ class Posterior:
     def _log_prob_snpe(self, theta: Tensor, x: Tensor, **kwargs) -> Tensor:
         r"""
         Return posterior log probability $p(\theta|x)$ for SNPE.
-
-        TODO: Does it make sense to put this into snpe/snpe_base.py?
         """
+        # TODO: Does it make sense to put this into snpe/snpe_base.py?
+
         unnormalized_log_prob = self.neural_net.log_prob(theta, x)
 
         if not kwargs.get("normalize_snpe_density", True):
@@ -137,14 +137,16 @@ class Posterior:
 
     def _log_prob_sre(self, theta: Tensor, x: Tensor, **kwargs) -> Tensor:
         warn(
-            "The log-probability returned by SRE is only correct up to a normalizing constant."
+            "The log-probability returned by SRE is only correct "
+            "up to a normalizing constant."
         )
         return self._log_prob_classifier(theta, x)
 
     def _log_prob_aalr(self, theta: Tensor, x: Tensor, **kwargs) -> Tensor:
         if self._num_trained_rounds > 1:
             warn(
-                "The log-probability returned by AALR beyond round 1 is only correct up to a normalizing constant."
+                "The log-probability returned by AALR beyond round 1 is only correct "
+                "up to a normalizing constant."
             )
         return self._log_prob_classifier(theta, x)
 
@@ -158,13 +160,13 @@ class Posterior:
         r"""Return leakage correction factor for a leaky posterior density.
 
         The factor is estimated from the acceptance probability during rejection
-         sampling from the posterior.
+        sampling from the posterior.
 
         NOTE: This is to avoid re-estimating the acceptance probability from scratch
               whenever log_prob is called and normalize_snpe_density is True. Here, it
               is estimated only once for self.x_o and saved for later. We re-evaluate
               only whenever a new x is passed.
-        
+
         Arguments:
             x: Conditioning context for posterior $p(\theta|x)$. If None, use self.x_o.
             num_rejection_samples: Number of samples used to estimate correction factor.
@@ -196,7 +198,7 @@ class Posterior:
     def sample(
         self,
         num_samples: int,
-        x: Tensor = None,
+        x: Optional[Tensor] = None,
         show_progressbar: bool = False,
         **kwargs,
     ) -> Tensor:
@@ -204,22 +206,18 @@ class Posterior:
         Return samples from posterior distribution $p(\theta|x)$.
 
         Args:
-            num_samples: number of samples
-            x: conditioning context for posterior $p(\theta|x)$. Will be self.x_o if
-             None
-            show_progressbar: whether to plot a progressbar showing how many samples have already
-             been drawn
-            **kwargs:
-                Additional parameters passed to MCMC sampler (thin and warmup)
+            num_samples: Desired number of samples.
+            x: Conditioning context for posterior $p(\theta|x)$, use self.x_o if None.
+            show_progressbar: Whether to show sampling progress monitor.
+            **kwargs: Additional parameters for the MCMC sampler (`thin` and `warmup`).
 
-        Returns: samples from posterior.
+        Returns: Samples from posterior.
         """
 
         x = atleast_2d(as_tensor(self._x_else_x_o(x)))
 
         with torch.no_grad():
             if self._sample_with_mcmc:
-
                 samples = self._sample_posterior_mcmc(
                     x=x,
                     num_samples=num_samples,
@@ -228,7 +226,7 @@ class Posterior:
                     **kwargs,
                 )
             else:
-                # rejection sampling
+                # Rejection sampling.
                 samples, _ = utils.sample_posterior_within_prior(
                     self.neural_net,
                     self._prior,
@@ -247,32 +245,26 @@ class Posterior:
         thin: int = 10,
         warmup: int = 20,
         num_chains: Optional[int] = 1,
-        show_progressbar: Optional[int] = True,
+        show_progressbar: bool = True,
     ) -> Tensor:
         r"""
         Return MCMC samples from posterior $p(\theta|x)$.
 
         Args:
-            x: conditioning context for posterior $p(\theta|x)$
-            
-            num_samples: desired output samples
-            
-            mcmc_method: one of 'metropolis-hastings', 'slice', 'hmc', 'nuts'
-            
-            thin: thinning factor for the chain, e.g. for thin=3 only every
-                third sample will be returned, until a total of num_samples
-
-            show_progressbar: whether to show a progressbar during sampling
+            x: Conditioning context for posterior $p(\theta|x)$.
+            num_samples: Desired number of samples.
+            mcmc_method: One of `metropolis-hastings`, `slice`, `hmc`, `nuts`.
+            thin: thinning factor for the chain, e.g. for thin=3 only every third
+                sample will be returned, until a total of num_samples.
+            show_progressbar: Whether to show a progressbar during sampling.
 
         Returns:
-            tensor of shape (num_samples, shape_of_single_theta)
+            Tensor of shape (num_samples, shape_of_single_theta)
         """
 
         # when using slice_np as mcmc sampler, we can only have a single chain
         if mcmc_method == "slice_np" and num_chains > 1:
-            warn(
-                "slice_np does not support multiple mcmc chains. Using just a single chain."
-            )
+            warn("`slice_np` does not support multiple mcmc chains. Using just one.")
 
         # XXX: maybe get whole sampler instead of just potential function?
         potential_function = self._get_potential_function(
@@ -300,7 +292,7 @@ class Posterior:
         self,
         num_samples: int,
         potential_function: Callable,
-        x: torch.Tensor,
+        x: Tensor,
         thin: int = 10,
         warmup_steps: int = 20,
     ) -> Tensor:
@@ -338,23 +330,22 @@ class Posterior:
     ):
         r"""Return samples obtained using Pyro's HMC, NUTS or slice kernels.
 
-        Args: 
-            num_samples: desired number of samples  
-            potential_function: defining the potential function as a callable **class**
-                makes it picklable for Pyro's MCMC to use it across chains in parallel,
-                even if the potential function requires evaluating a neural network.
-            x: conditioning context for posterior $p(\theta|x)$
-            mcmc_method: one of "hmc", "nuts" or "slice" (default "slice")
-            thin: thinning (subsampling) factor (default 10)
-            warmup_steps: initial samples to discard (defaults to 200)
-            num_chains: whether to sample in parallel. If None, will use all
-                CPUs except one (default 1)
-            show_progressbar: whether to show a progressbar during sampling
+        Args:
+            num_samples: Desired number of samples.
+            potential_function: A callable **class**. A class, but not a function,
+                is picklable for Pyro's MCMC to use it across chains in parallel,
+                even when the potential function requires evaluating a neural network.
+            x: Conditioning context for posterior $p(\theta|x)$.
+            mcmc_method: One of `hmc`, `nuts` or `slice`.
+            thin: Thinning (subsampling) factor.
+            warmup_steps: Initial snumber of amples to discard.
+            num_chains: Whether to sample in parallel. If None, use all but one CPU.
+            show_progressbar: Whether to show a progressbar during sampling.
 
-        Returns: tensor of shape (num_samples, shape_of_single_theta)
+        Returns: Tensor of shape (num_samples, shape_of_single_theta).
         """
-        if num_chains is None:
-            num_chains = mp.cpu_count - 1
+
+        num_chains = mp.cpu_count - 1 if num_chains is None else num_chains
 
         # XXX move outside function, and assert inside; remember return to train
         # Always sample in eval mode.
