@@ -167,7 +167,7 @@ def sample_posterior_within_prior(
         pbar.update(num_accepted)
 
         # To avoid endless sampling when leakage is high, we raise a warning if the
-        # acceptance rate is too after the first 1.000 samples.
+        # acceptance rate is too low after the first 1_000 samples.
         acceptance_rate = (num_samples - num_remaining) / num_sampled_total
         if (
             num_sampled_total > 1000

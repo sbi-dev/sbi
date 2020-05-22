@@ -298,40 +298,35 @@ class PotentialFunctionProvider:
     This class is initialized without arguments during the initialization of the
      Posterior class. When called, it specializes to the potential function appropriate
      to the requested mcmc_method.
-    
-   
+
     NOTE: Why use a class?
     ----------------------
     During inference, we use deepcopy to save untrained posteriors in memory. deepcopy
     uses pickle which can't serialize nested functions
     (https://stackoverflow.com/a/12022055).
-    
+
     It is important to NOT initialize attributes upon instantiation, because we need the
-    most current trained Posterior.neural_net.
-    
+    most current trained posterior neural_net.
+
     Returns:
-        [Callable]: potential function for use by either numpy or pyro sampler
+        Potential function for use by either numpy or pyro sampler.
     """
 
     def __call__(
         self, prior, likelihood_nn: nn.Module, x: Tensor, mcmc_method: str,
     ) -> Callable:
         r"""Return potential function for posterior $p(\theta|x)$.
-        
+
         Switch on numpy or pyro potential function based on mcmc_method.
-        
+
         Args:
-            prior: prior distribution that can be evaluated
-            likelihood_nn: neural likelihood estimator that can be evaluated
-            x: conditioning variable for posterior $p(\theta|x)$.
-            mcmc_method (str): one of slice-np, slice, hmc or nuts
-        
+            prior: Prior distribution that can be evaluated.
+            likelihood_nn: Neural likelihood estimator that can be evaluated.
+            x: Conditioning variable for posterior $p(\theta|x)$.
+            mcmc_method: One of `slice_np`, `slice`, `hmc` or `nuts`.
+
         Returns:
-            Callable: potential function for sampler.
-        """ """        
-        
-        Args: 
-        
+            Potential function for sampler.
         """
         self.likelihood_nn = likelihood_nn
         self.prior = prior
@@ -344,31 +339,31 @@ class PotentialFunctionProvider:
 
     def np_potential(self, theta: np.array) -> Union[Tensor, float]:
         r"""Return posterior log prob. of theta $p(\theta|x)$"
-        
+
         Args:
-            theta: parameters $\theta$, batch dimension 1
-        
+            theta: Parameters $\theta$, batch dimension 1.
+
         Returns:
-            Posterior log probability of the theta, -Inf if impossible under prior.
+            Posterior log probability of the theta, $-\infty$ if impossible under prior.
         """
         theta = torch.as_tensor(theta, dtype=torch.float32)
         log_likelihood = self.likelihood_nn.log_prob(
             inputs=self.x.reshape(1, -1), context=theta.reshape(1, -1)
         )
 
-        # notice opposite sign to pyro potential
+        # Notice opposite sign to pyro potential.
         return log_likelihood + self.prior.log_prob(theta)
 
     def pyro_potential(self, theta: Dict[str, Tensor]) -> Tensor:
-        r"""Return posterior log prob. of parameters $p(\theta|x)$.
-        
+        r"""Return posterior log probability of parameters $p(\theta|x)$.
+
          Args:
-            theta: parameters $\theta$. The tensor's shape will be
-            (1, shape_of_single_theta) if running a single chain or just
-             (shape_of_single_theta) for multiple  chains.
-        
+            theta: Parameters $\theta$. The tensor's shape will be
+                (1, shape_of_single_theta) if running a single chain or just
+                (shape_of_single_theta) for multiple chains.
+
         Returns:
-            potential: $-[\log r(x_o, \theta) + \log p(\theta)]$
+            The potential $-[\log r(x_o, \theta) + \log p(\theta)]$.
         """
 
         theta = next(iter(theta.values()))
