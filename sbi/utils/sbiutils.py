@@ -120,3 +120,30 @@ def sample_posterior_within_prior(
     pbar.close()
 
     return torch.cat(accepted), as_tensor(acceptance_rate)
+
+
+def find_nan_in_simulations(x: Tensor) -> Tensor:
+    """Return mask for finding simulated data that contain NaNs from a batch of x.
+
+    Args:
+        x: a batch of simulated data x
+
+    Returns:
+        mask: True for NaN simulations.
+    """
+
+    # Check for any NaNs in every simulation (dim 1 checks across columns).
+    return torch.isnan(x).any(dim=1)
+
+
+def warn_on_too_many_nans(x: Tensor, percent_nan_threshold=0.5) -> None:
+    """Raises warning if too many (above threshold) NaNs are in given batch of x."""
+
+    percent_nan = find_nan_in_simulations(x).sum() / float(len(x))
+
+    if percent_nan > percent_nan_threshold:
+        logging.warning(
+            f"""Found {100 * percent_nan} NaNs in simulations. They
+            will be excluded from training which the effective number of
+            training samples and can impact training performance."""
+        )

@@ -14,6 +14,7 @@ from sbi.inference.posterior import NeuralPosterior
 from sbi.inference import NeuralInference
 from sbi.types import ScalarFloat, OneOrMore
 import sbi.utils as utils
+from sbi.utils.sbiutils import find_nan_in_simulations, warn_on_too_many_nans
 
 
 class LikelihoodEstimator(NeuralInference, ABC):
@@ -33,6 +34,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         show_progressbar: bool = True,
         show_round_summary: bool = False,
         logging_level: Union[int, str] = "warning",
+        handle_nans: bool = False,
     ):
         r"""Sequential Neural Likelihood.
 
@@ -60,6 +62,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
             show_progressbar=show_progressbar,
             show_round_summary=show_round_summary,
             logging_level=logging_level,
+            handle_nans=handle_nans,
         )
 
         if density_estimator is None:
@@ -84,6 +87,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
 
         # SNLE-specific summary_writer fields.
         self._summary.update({"mcmc_times": []})  # type: ignore
+        self.handle_nans = handle_nans
 
     def __call__(
         self,
@@ -148,8 +152,19 @@ class LikelihoodEstimator(NeuralInference, ABC):
             # therefore return a theta vector with the same ordering as x.
             theta, x = self._batched_simulator(theta)
             # Store (theta, x) pairs.
-            self._theta_bank.append(theta)
-            self._x_bank.append(x)
+            # Check for NaNs in data.
+            x_not_nan = ~find_nan_in_simulations(x)
+            print(
+                f"""Found {x_not_nan.numel() - x_not_nan.sum()} NaN simulations. They
+                will be exluded from training."""
+            )
+            if not self.handle_nans:
+                assert x_not_nan.all(), "Simulated data must be finite."
+            else:
+                warn_on_too_many_nans(x)
+
+            self._theta_bank.append(theta[x_not_nan])
+            self._x_bank.append(x[x_not_nan])
 
             # Fit neural likelihood to newly aggregated dataset.
             self._train(
