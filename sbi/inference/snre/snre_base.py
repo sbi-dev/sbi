@@ -20,6 +20,7 @@ from sbi.inference.base import NeuralInference
 from sbi.inference.posterior import NeuralPosterior
 from sbi.utils.torchutils import ensure_x_batched, ensure_theta_batched
 from sbi.types import ScalarFloat, OneOrMore
+from sbi.utils.sbiutils import find_nan_in_simulations, warn_on_too_many_nans
 
 
 class RatioEstimator(NeuralInference, ABC):
@@ -41,6 +42,7 @@ class RatioEstimator(NeuralInference, ABC):
         show_progressbar: bool = True,
         show_round_summary: bool = False,
         logging_level: Union[int, str] = "warning",
+        handle_nans: bool = False,
     ):
         r"""Sequential Ratio Estimation [1]
 
@@ -74,6 +76,7 @@ class RatioEstimator(NeuralInference, ABC):
             show_progressbar=show_progressbar,
             show_round_summary=show_round_summary,
             logging_level=logging_level,
+            handle_nans=handle_nans,
         )
 
         if classifier is None:
@@ -111,6 +114,7 @@ class RatioEstimator(NeuralInference, ABC):
 
         # Ratio-based-specific summary_writer fields.
         self._summary.update({"mcmc_times": []})  # type: ignore
+        self.handle_nans = handle_nans
 
     def __call__(
         self,
@@ -176,8 +180,21 @@ class RatioEstimator(NeuralInference, ABC):
             theta, x = self._batched_simulator(theta)
 
             # Store (theta, x) pairs.
-            self._theta_bank.append(theta)
-            self._x_bank.append(x)
+
+            # Check for NaNs in data.
+            x_not_nan = ~find_nan_in_simulations(x)
+            print(
+                f"""Found {x_not_nan.numel() - x_not_nan.sum()} NaN simulations. They
+                will be exluded from training."""
+            )
+
+            if not self.handle_nans:
+                assert x_not_nan.all(), "Simulated data must be finite."
+            else:
+                warn_on_too_many_nans(x)
+
+            self._theta_bank.append(theta[x_not_nan])
+            self._x_bank.append(x[x_not_nan])
 
             # Fit posterior using newly aggregated data set.
             self._train(
