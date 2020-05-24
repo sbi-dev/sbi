@@ -1,32 +1,13 @@
-import numpy as np
-from matplotlib import pyplot as plt
-
 
 import collections
-import matplotlib as mpl
-import six
-from typing import Optional, Tuple, Union
 import inspect
+from typing import Optional, Tuple, Union
 
-# from delfi.utils.conditional_density import eval_conditional_density  # todo should
-# todo:  go back in sometime soon
-
-
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import numpy as np
+import six
 from scipy.stats import gaussian_kde
-
-# from svgutils.compose import Unit
-# def unit(val, to="px"):
-#     assert type(val) == str
-#     return Unit(val).to(to).value
-#
-#
-# def unit2px(val):
-#     return unit(val, to="px")
-#
-#
-# def unit2inches(val):
-#     return unit(val, to="pt")
-
 
 try:
     collectionsAbc = collections.abc
@@ -246,7 +227,7 @@ def samples_nd(
         samples = [samples]
 
     # Prepare points
-    if points is None: 
+    if points is None:
         points = []
     if type(points) != list:
         points = [points]
