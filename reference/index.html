@@ -1949,8 +1949,7 @@ sbi.utils.get_nn_models.posterior_nn<span class="p">(</span><span class="n">mode
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span> 17
- 18
+<pre><span></span> 18
  19
  20
  21
@@ -2098,7 +2097,11 @@ sbi.utils.get_nn_models.posterior_nn<span class="p">(</span><span class="n">mode
 163
 164
 165
-166</pre>
+166
+167
+168
+169
+170</pre>
 </div>
 </td>
 <td class="code">
@@ -2149,6 +2152,9 @@ sbi.utils.get_nn_models.posterior_nn<span class="p">(</span><span class="n">mode
 
     <span class="n">theta_numel</span> <span class="o">=</span> <span class="n">prior_mean</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span>
     <span class="n">x_o_numel</span> <span class="o">=</span> <span class="n">x_o_shape</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">theta_numel</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">_check_1d_flow_limitations</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="s2">"parameter"</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">"mdn"</span><span class="p">:</span>
         <span class="n">neural_net</span> <span class="o">=</span> <span class="n">MultivariateGaussianMDN</span><span class="p">(</span>
@@ -2376,11 +2382,7 @@ sbi.utils.get_nn_models.likelihood_nn<span class="p">(</span><span class="n">mod
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>169
-170
-171
-172
-173
+<pre><span></span>173
 174
 175
 176
@@ -2504,7 +2506,14 @@ sbi.utils.get_nn_models.likelihood_nn<span class="p">(</span><span class="n">mod
 294
 295
 296
-297</pre>
+297
+298
+299
+300
+301
+302
+303
+304</pre>
 </div>
 </td>
 <td class="code">
@@ -2539,6 +2548,9 @@ sbi.utils.get_nn_models.likelihood_nn<span class="p">(</span><span class="n">mod
 
     <span class="n">theta_numel</span> <span class="o">=</span> <span class="n">theta_shape</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span>
     <span class="n">x_o_numel</span> <span class="o">=</span> <span class="n">x_o_shape</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">x_o_numel</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">_check_1d_flow_limitations</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="s2">"data"</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">"mdn"</span><span class="p">:</span>
         <span class="n">neural_net</span> <span class="o">=</span> <span class="n">MultivariateGaussianMDN</span><span class="p">(</span>
@@ -2721,14 +2733,7 @@ sbi.utils.get_nn_models.classifier_nn<span class="p">(</span><span class="n">mod
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>300
-301
-302
-303
-304
-305
-306
-307
+<pre><span></span>307
 308
 309
 310
@@ -2768,7 +2773,14 @@ sbi.utils.get_nn_models.classifier_nn<span class="p">(</span><span class="n">mod
 344
 345
 346
-347</pre>
+347
+348
+349
+350
+351
+352
+353
+354</pre>
 </div>
 </td>
 <td class="code">
