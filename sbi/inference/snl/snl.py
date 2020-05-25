@@ -29,7 +29,7 @@ class SNL(NeuralInference):
         device: Optional[torch.device] = None,
         num_workers: int = 1,
         worker_batch_size: int = 20,
-        mcmc_method: str = "slice-np",
+        mcmc_method: str = "slice_np",
         skip_input_checks: bool = False,
         show_progressbar: bool = True,
         show_round_summary: bool = False,

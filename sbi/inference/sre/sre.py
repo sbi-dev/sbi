@@ -28,7 +28,7 @@ class SRE(NeuralInference):
         classifier: Optional[nn.Module] = None,
         num_atoms: Optional[int] = None,
         simulation_batch_size: int = 1,
-        mcmc_method: str = "slice-np",
+        mcmc_method: str = "slice_np",
         summary_net: Optional[nn.Module] = None,
         classifier_loss: str = "sre",
         retrain_from_scratch_each_round: bool = False,

@@ -39,7 +39,7 @@ def test_snl_on_linearGaussian_api(num_dim: int):
         x_o=x_o,
         density_estimator=None,  # Use default MAF.
         simulation_batch_size=50,
-        mcmc_method="slice-np",
+        mcmc_method="slice_np",
     )
 
     posterior = infer(num_rounds=1, num_simulations_per_round=1000)
@@ -87,7 +87,7 @@ def test_snl_on_linearGaussian_based_on_mmd(num_dim: int, prior_str: str, set_se
         prior=prior,
         x_o=x_o,
         density_estimator=None,  # Use default MAF.
-        mcmc_method="slice-np",
+        mcmc_method="slice_np",
     )
 
     posterior = infer(num_rounds=1, num_simulations_per_round=1000)
@@ -160,8 +160,8 @@ def test_multi_round_snl_on_linearGaussian_based_on_mmd(set_seed):
 @pytest.mark.parametrize(
     "mcmc_method, prior_str",
     (
-        ("slice-np", "gaussian"),
-        ("slice-np", "uniform"),
+        ("slice_np", "gaussian"),
+        ("slice_np", "uniform"),
         ("slice", "gaussian"),
         ("slice", "uniform"),
     ),
@@ -199,7 +199,7 @@ def test_snl_posterior_correction(mcmc_method: str, prior_str: str, set_seed):
         x_o=x_o,
         density_estimator=None,  # Use default MAF.
         simulation_batch_size=50,
-        mcmc_method="slice-np",
+        mcmc_method="slice_np",
     )
 
     posterior = infer(num_rounds=1, num_simulations_per_round=1000)

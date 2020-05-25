@@ -36,7 +36,7 @@ class Posterior:
         prior,
         x_o: Optional[Tensor],
         sample_with_mcmc: bool = True,
-        mcmc_method: str = "slice-np",
+        mcmc_method: str = "slice_np",
         get_potential_function: Optional[Callable] = None,
     ):
         """
@@ -248,36 +248,36 @@ class Posterior:
         Args:
             x: Conditioning context for posterior $p(\theta|x)$.
             num_samples: Desired number of samples.
-            mcmc_method: One of `metropolis-hastings`, `slice`, `hmc`, `nuts`.
-            thin: thinning factor for the chain, e.g. for thin=3 only every third
-                sample will be returned, until a total of num_samples.
+            mcmc_method: Sampling method. Currently defaults to `slice_np` for a custom
+                numpy implementation of slice sampling; select `hmc`, `nuts` or `slice`
+                for Pyro-based sampling.
+            thin: Thinning factor for the chain, e.g. for `thin=3` only every third
+                sample will be returned, until a total of `num_samples`.
             show_progressbar: Whether to show a progressbar during sampling.
 
         Returns:
-            Tensor of shape (num_samples, shape_of_single_theta)
+            Tensor of shape (num_samples, shape_of_single_theta).
         """
 
-        # when using slice_np as mcmc sampler, we can only have a single chain
+        # When using `slice_np` as mcmc sampler, we can only have a single chain.
         if mcmc_method == "slice_np" and num_chains > 1:
             warn("`slice_np` does not support multiple mcmc chains. Using just one.")
 
-        # XXX: maybe get whole sampler instead of just potential function?
-        potential_function = self._get_potential_function(
+        # TODO Maybe get whole sampler instead of just potential function?
+        potential_fn = self._get_potential_function(
             self._prior, self.neural_net, x, mcmc_method
         )
-        if mcmc_method == "slice-np":
-            samples = self.slice_np_mcmc(
-                num_samples, potential_function, x, thin, warmup
-            )
-        else:
+        if mcmc_method == "slice_np":
+            samples = self.slice_np_mcmc(num_samples, potential_fn, x, thin, warmup)
+        elif mcmc_method in ("hmc", "nuts", "slice"):
             samples = self.pyro_mcmc(
-                num_samples,
-                potential_function,
-                x,
-                mcmc_method,
-                thin,
-                warmup,
-                num_chains,
+                num_samples=num_samples,
+                potential_function=potential_fn,
+                x=x,
+                mcmc_method=mcmc_method,
+                thin=thin,
+                warmup=warmup,
+                num_chains=num_chains,
                 show_progressbar=show_progressbar,
             )
 
@@ -342,20 +342,16 @@ class Posterior:
 
         num_chains = mp.cpu_count - 1 if num_chains is None else num_chains
 
-        # XXX move outside function, and assert inside; remember return to train
+        # TODO move outside function, and assert inside; remember return to train
         # Always sample in eval mode.
         self.neural_net.eval()
 
         kernels = dict(slice=Slice, hmc=HMC, nuts=NUTS)
-        try:
-            kernel = kernels[mcmc_method](potential_fn=potential_function)
-        except KeyError:
-            raise ValueError("`mcmc_method` not one of 'slice', 'hmc', 'nuts'.")
 
         initial_params = self._prior.sample((num_chains,))
 
         sampler = MCMC(
-            kernel=kernel,
+            kernel=kernels[mcmc_method](potential_fn=potential_function),
             num_samples=(thin * num_samples) // num_chains + num_chains,
             warmup_steps=warmup_steps,
             initial_params={"": initial_params},

@@ -30,7 +30,7 @@ class SnpeC(SnpeBase):
         worker_batch_size: int = 20,
         device: Optional[torch.device] = None,
         sample_with_mcmc: bool = False,
-        mcmc_method: str = "slice-np",
+        mcmc_method: str = "slice_np",
         skip_input_checks: bool = False,
         show_progressbar: bool = True,
         show_round_summary: bool = False,

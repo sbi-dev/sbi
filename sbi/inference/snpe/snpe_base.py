@@ -33,7 +33,7 @@ class SnpeBase(NeuralInference, ABC):
         discard_prior_samples: bool = False,
         device: Optional[torch.device] = None,
         sample_with_mcmc: bool = False,
-        mcmc_method: str = "slice-np",
+        mcmc_method: str = "slice_np",
         num_workers: int = 1,
         worker_batch_size: int = 20,
         summary_writer: Optional[SummaryWriter] = None,
