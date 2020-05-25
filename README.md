@@ -1,5 +1,13 @@
 ![Tests](https://github.com/mackelab/sbi/workflows/Tests/badge.svg?branch=master)
 
+## Warning: pre-release stage
+
+SBI is currently under very active development leading up to a first stable release planned for early June.
+
+Some aspects of the interface will change, and the documentation for running the inference methods (`SnpeB, SnpeC (APT), SRE, SNL`) is not accessible  at the moment through regular Python introspection - you'll have to look at the superclasses ([`SnpeBase`](https://github.com/mackelab/sbi/blob/master/sbi/inference/snpe/snpe_base.py), [`NeuralInference`](https://github.com/mackelab/sbi/blob/master/sbi/inference/base.py)). Authorship information is also out of date and licensing still pending (it will be free software).
+
+If you'd still like to give it a spin before release, please, by all means! We're glad to engage in conversation about it, please file an issue if you encounter unexpected behaviour or wonder about specific functionality.
+
 ## Description
 
 Building on code for "On Contrastive Learning for Likelihood-free Inference" in <https://github.com/conormdurkan/lfi>.
