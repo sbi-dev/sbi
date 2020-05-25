@@ -22,6 +22,7 @@ setup(
         "matplotlib",
         "nbstripout",
         "numpy",
+        "pillow",
         "pyro-ppl",
         "pyknos@git+https://github.com/mackelab/pyknos.git",
         "scipy",
