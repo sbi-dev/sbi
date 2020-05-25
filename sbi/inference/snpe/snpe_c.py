@@ -76,7 +76,7 @@ class SnpeC(SnpeBase):
             logging_level=logging_level,
         )
 
-    def _get_log_prob_proposal_posterior(
+    def _log_prob_proposal_posterior(
         self, theta: Tensor, x: Tensor, masks: Tensor
     ) -> Tensor:
         """
@@ -138,13 +138,11 @@ class SnpeC(SnpeBase):
         self._assert_all_finite(log_prob_prior, "prior eval")
 
         # Compute unnormalized proposal posterior.
-        unnormalized_log_prob_proposal_posterior = log_prob_posterior - log_prob_prior
+        unnormalized_log_prob = log_prob_posterior - log_prob_prior
 
         # Normalize proposal posterior across discrete set of atoms.
-        log_prob_proposal_posterior = self.calibration_kernel(
-            x
-        ) * unnormalized_log_prob_proposal_posterior[:, 0] - torch.logsumexp(
-            unnormalized_log_prob_proposal_posterior, dim=-1
+        log_prob_proposal_posterior = unnormalized_log_prob[:, 0] - torch.logsumexp(
+            unnormalized_log_prob, dim=-1
         )
         self._assert_all_finite(log_prob_proposal_posterior, "proposal posterior eval")
 
@@ -160,8 +158,6 @@ class SnpeC(SnpeBase):
 
         return log_prob_proposal_posterior
 
-    def _get_log_prob_proposal_MoG(
-        self, theta: Tensor, x: Tensor, masks: Tensor
-    ) -> Tensor:
+    def _log_prob_proposal_MoG(self, theta: Tensor, x: Tensor, masks: Tensor) -> Tensor:
 
         raise NotImplementedError

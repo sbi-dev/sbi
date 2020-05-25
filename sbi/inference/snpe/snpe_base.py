@@ -202,7 +202,7 @@ class SnpeBase(NeuralInference, ABC):
         self._neural_posterior._num_trained_rounds = num_rounds
         return self._neural_posterior
 
-    def _get_log_prob_proposal_posterior(self, theta: Tensor, x: Tensor, masks: Tensor):
+    def _log_prob_proposal_posterior(self, theta: Tensor, x: Tensor, masks: Tensor) -> Tensor:
         """
         Return the log-probability used for the loss.
 
@@ -363,23 +363,16 @@ class SnpeBase(NeuralInference, ABC):
             self._neural_posterior.neural_net.train()
             for batch in train_loader:
                 optimizer.zero_grad()
-                theta_batch, x_batch, masks = (
+                theta_batch, x_batch, masks_batch = (
                     batch[0].to(self._device),
                     batch[1].to(self._device),
                     batch[2].to(self._device),
                 )
 
-                # Just do maximum likelihood in the first round.
-                if round_ == 0:
-                    log_prob = self._neural_posterior.neural_net.log_prob(
-                        theta_batch, x_batch
-                    )
-                else:  # or call the SnpeC loss
-                    log_prob = self._get_log_prob_proposal_posterior(
-                        theta_batch, x_batch, masks
-                    )
-                loss = -torch.mean(log_prob)
-                loss.backward()
+                batch_loss = torch.mean(
+                    self._loss(round_, theta_batch, x_batch, masks_batch)
+                )
+                batch_loss.backward()
                 if clip_max_norm is not None:
                     clip_grad_norm_(
                         self._neural_posterior.neural_net.parameters(),
@@ -394,21 +387,16 @@ class SnpeBase(NeuralInference, ABC):
             log_prob_sum = 0
             with torch.no_grad():
                 for batch in val_loader:
-                    theta_batch, x_batch, masks = (
+                    theta_batch, x_batch, masks_batch = (
                         batch[0].to(self._device),
                         batch[1].to(self._device),
                         batch[2].to(self._device),
                     )
-                    # Just do maximum likelihood in the first round.
-                    if round_ == 0:
-                        log_prob = self._neural_posterior.neural_net.log_prob(
-                            theta_batch, x_batch
-                        )
-                    else:
-                        log_prob = self._get_log_prob_proposal_posterior(
-                            theta_batch, x_batch, masks
-                        )
-                    log_prob_sum += log_prob.sum().item()
+                    # Take negative loss here to get validation log_prob.
+                    batch_log_prob = -self._loss(
+                        round_, theta_batch, x_batch, masks_batch
+                    )
+                    log_prob_sum += batch_log_prob.sum().item()
 
             self._val_log_prob = log_prob_sum / num_validation_examples
 
@@ -434,6 +422,25 @@ class SnpeBase(NeuralInference, ABC):
         # Update summary.
         self._summary["epochs"].append(epoch)
         self._summary["best_validation_log_probs"].append(self._best_val_log_prob)
+
+    def _loss(self, round_idx: int, theta: Tensor, x: Tensor, masks: Tensor) -> Tensor:
+        """Return the right calibrated loss, depending on the round.
+
+        The loss is the negative log prob. Irrespective of the round or SNPE method
+        (A, B, or C) it is weighted with a calibration kernel.
+
+        Returns:
+            Calibration kernel-weighted negative log prob.
+        """
+
+        if round_idx == 0:
+            # Use posterior log prob (without proposal correction) for first round.
+            log_prob = self._neural_posterior.neural_net.log_prob(theta, x)
+        else:
+            # Use proposal posterior log prob tailored to snpe version (B, C).
+            log_prob = self._log_prob_proposal_posterior(theta, x, masks)
+
+        return -(self.calibration_kernel(x) * log_prob)
 
 
 class PotentialFunctionProvider:
