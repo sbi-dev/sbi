@@ -70,7 +70,7 @@ class Posterior:
         self,
         theta: Tensor,
         x: Optional[Tensor] = None,
-        normalize_snpe_density: bool = True,
+        norm_posterior_snpe: bool = True,
     ) -> Tensor:
         r"""Return posterior $p(\theta|x)$ log probability.
 
@@ -78,74 +78,69 @@ class Posterior:
             theta: Parameters $\theta$.
             x: Conditioning context for posterior $p(\theta|x)$. Per default, use the
                observation self.x_o.
-            normalize_snpe_density:
-                If True, normalize the output density when using snpe (by drawing
-                samples, estimating the acceptance ratio, and then scaling the
-                probability with it) and return -infinity where theta is outside of
-                the prior support. If False, directly return the output from the density
-                estimator.
+            norm_posterior_snpe: Whether to enforce a normalized posterior density when
+                using snpe. Renormalization of the posterior is useful when some
+                probability falls out or 'leaks' out of the prescribed prior support.
+                The normalizing factor is calculated via rejection sampling, so if you
+                need speedier but unnormalized log posterior estimates set
+                `norm_posterior_snpe=False`. The returned log posterior is set to
+                $-\infty$ outside of the prior support regardless of this setting.
 
         Returns:
-            Tensor of shape theta.shape[0], containing the log probability of
-            the posterior $p(\theta|x)$.
+            Log posterior probability $p(\theta|x)$ for θ in the support of the prior,
+            $-\infty$ (corresponding to zero probability) outside. Shape `(len(θ),)`.
         """
 
-        # XXX I would like to remove this and deal with everything leakage-
-        # XXX related down locally in the _log_prob_snpe function
-        # XXX See draft code commented down below.
-        correct_leakage = normalize_snpe_density and self._alg_family == "snpe"
+        # TODO Train exited here, entered after sampling?
+        self.neural_net.eval()
 
         theta, x = utils.match_shapes_of_theta_and_x(
-            theta, x, self.x_o, correct_leakage
+            theta, x, self.x_o, norm_posterior_snpe
         )
-
-        # XXX train exited here, entered after sampling?
-        self.neural_net.eval()
 
         try:
             log_prob_fn = getattr(self, f"_log_prob_{self._alg_family}")
         except AttributeError:
             raise ValueError(f"{self._alg_family} cannot evaluate probabilities.")
 
-        return log_prob_fn(theta, x, normalize_snpe_density=normalize_snpe_density)
-
-    def _log_prob_snpe(self, theta: Tensor, x: Tensor, **kwargs) -> Tensor:
-        r"""
-        Return posterior log probability $p(\theta|x)$ for SNPE.
-        """
-        # TODO: Does it make sense to put this into snpe/snpe_base.py?
-
-        unnormalized_log_prob = self.neural_net.log_prob(theta, x)
-
-        if not kwargs.get("normalize_snpe_density", True):
-            # XXX Should we test if a leakage correction is due, warn only then?
-            # XXX or is it too expensive?
-            warn("No leakage correction was requested.")
-            return unnormalized_log_prob
+        if self._alg_family == "snpe":
+            return log_prob_fn(theta, x, norm_posterior=norm_posterior_snpe)
         else:
-            # Set log-likelihood to -infinity if theta outside prior support.
-            is_prior_finite = torch.isfinite(self._prior.log_prob(theta))
-            masked_log_prob = torch.where(
-                is_prior_finite, unnormalized_log_prob, NEG_INF
-            )
-            leakage_correction = self.get_leakage_correction(x=x)
-            return masked_log_prob - torch.log(leakage_correction)
+            return log_prob_fn(theta, x)
 
-    def _log_prob_classifier(self, theta: Tensor, x: Tensor, **kwargs) -> Tensor:
+    # TODO: Move _log_prob_X into the respective inference classes (X)?
+    def _log_prob_snpe(self, theta: Tensor, x: Tensor, norm_posterior: bool) -> Tensor:
+        r"""
+        Return posterior log probability $p(\theta|x)$.
+
+        The posterior probability will be only normalized if explictly requested,
+        but it will always zeroed out($-\infty$ log-prob)outside of the prior support.
+        """
+
+        unnorm_log_prob = self.neural_net.log_prob(theta, x)
+        is_prior_finite = torch.isfinite(self._prior.log_prob(theta))
+
+        # Force probability to be zero outside prior support.
+        masked_log_prob = torch.where(is_prior_finite, unnorm_log_prob, NEG_INF)
+
+        log_factor = log(self.get_leakage_correction(x=x)) if norm_posterior else 0
+
+        return masked_log_prob - log_factor
+
+    def _log_prob_classifier(self, theta: Tensor, x: Tensor) -> Tensor:
         log_ratio = self.neural_net(torch.cat((theta, x)).reshape(1, -1))
         return log_ratio + self._prior.log_prob(theta)
 
-    def _log_prob_sre(self, theta: Tensor, x: Tensor, **kwargs) -> Tensor:
+    def _log_prob_sre(self, theta: Tensor, x: Tensor) -> Tensor:
         warn(
-            "The log-probability returned by SRE is only correct "
-            "up to a normalizing constant."
+            "The log probability from SRE is only correct up to a normalizing constant."
         )
         return self._log_prob_classifier(theta, x)
 
-    def _log_prob_aalr(self, theta: Tensor, x: Tensor, **kwargs) -> Tensor:
+    def _log_prob_aalr(self, theta: Tensor, x: Tensor) -> Tensor:
         if self._num_trained_rounds > 1:
             warn(
-                "The log-probability returned by AALR beyond round 1 is only correct "
+                "The log-probability from AALR beyond round 1 is only correct "
                 "up to a normalizing constant."
             )
         return self._log_prob_classifier(theta, x)
@@ -157,21 +152,21 @@ class Posterior:
         force_update: bool = False,
         show_progressbar: bool = False,
     ) -> Tensor:
-        r"""Return leakage correction factor for a leaky posterior density.
+        r"""Return leakage correction factor for a leaky posterior density estimate.
 
-        The factor is estimated from the acceptance probability during rejection
+        The factor is estimated from the acceptance probability during rejection 
         sampling from the posterior.
 
         NOTE: This is to avoid re-estimating the acceptance probability from scratch
-              whenever log_prob is called and normalize_snpe_density is True. Here, it
-              is estimated only once for self.x_o and saved for later. We re-evaluate
-              only whenever a new x is passed.
+              whenever `log_prob` is called and `norm_posterior_snpe=True`. Here, it
+              is estimated only once for `self.x_o` and saved for later. We re-evaluate
+              only whenever a new `x` is passed.
 
         Arguments:
-            x: Conditioning context for posterior $p(\theta|x)$. If None, use self.x_o.
+            x: Conditioning context for posterior $p(\theta|x)$. Use `self.x_o` if None.
             num_rejection_samples: Number of samples used to estimate correction factor.
             force_update: Whether to force a reevaluation of the leakage correction even
-                if the context x is the same as self.x_o. This is useful to enforce a 
+                if the context x is the same as self.x_o. This is useful to enforce a
                 new estimate of the leakage after later rounds, i.e. round 2, 3, ...
             show_progressbar: Whether to show a progressbar during sampling.
 
