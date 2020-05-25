@@ -66,7 +66,6 @@ def test_snpe_on_linearGaussian_based_on_mmd(
         prior=prior,
         z_score_x=True,
         simulation_batch_size=simulation_batch_size,
-        use_combined_loss=False,
         retrain_from_scratch_each_round=False,
         discard_prior_samples=False,
     )
@@ -154,7 +153,6 @@ def test_multi_round_snpe_on_linearGaussian_based_on_mmd(algorithm_str: str, set
         density_estimator=None,  # Use default MAF.
         prior=prior,
         z_score_x=True,
-        use_combined_loss=False,
         retrain_from_scratch_each_round=False,
         discard_prior_samples=False,
     )
@@ -237,7 +235,6 @@ def test_multi_round_snpe_deterministic_simulator(set_seed, z_score_min_std):
         density_estimator=None,  # Use default MAF.
         prior=prior,
         z_score_x=True,
-        use_combined_loss=False,
         retrain_from_scratch_each_round=False,
         discard_prior_samples=False,
         simulation_batch_size=10,

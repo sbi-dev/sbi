@@ -17,7 +17,6 @@ class SnpeB(SnpeBase):
         x_o: Tensor,
         density_estimator: Optional[nn.Module] = None,
         calibration_kernel: Optional[Callable] = None,
-        use_combined_loss: bool = False,
         z_score_x: bool = True,
         z_score_min_std: float = 1e-7,
         simulation_batch_size: Optional[int] = 1,
@@ -43,8 +42,6 @@ class SnpeB(SnpeBase):
 
         See docstring of `SnpeBase` class for all other arguments.
         """
-
-        self._use_combined_loss = use_combined_loss
 
         super().__init__(
             simulator=simulator,
@@ -102,13 +99,5 @@ class SnpeB(SnpeBase):
             * torch.exp(log_prob_prior - log_prob_proposal)
             * log_prob_posterior
         )
-
-        # XXX This evaluates the posterior on _all_ prior samples.
-        if self._use_combined_loss:
-            log_prob_posterior_non_atomic = self._neural_posterior.neural_net.log_prob(
-                theta, x
-            )
-            masks = masks.reshape(-1)
-            log_prob = masks * log_prob_posterior_non_atomic + log_prob
 
         return log_prob
