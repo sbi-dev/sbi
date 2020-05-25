@@ -1,10 +1,9 @@
 from __future__ import annotations
-from typing import Callable, Dict, List, Optional, Union
+from typing import Callable, Dict, Optional
 import warnings
 import logging
 
 import numpy as np
-from numpy.core.fromnumeric import clip
 import torch
 from torch import Tensor, nn, optim
 from torch.nn.utils import clip_grad_norm_
@@ -14,6 +13,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from sbi.inference.base import NeuralInference
 from sbi.inference.posteriors.sbi_posterior import Posterior
+from sbi.types import ScalarFloat, OneOrMore
 import sbi.utils as utils
 
 
@@ -89,7 +89,7 @@ class SNL(NeuralInference):
     def __call__(
         self,
         num_rounds: int,
-        num_simulations_per_round: Union[List[int], int],
+        num_simulations_per_round: OneOrMore[int],
         batch_size: int = 100,
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
@@ -337,7 +337,7 @@ class PotentialFunctionProvider:
         else:
             return self.np_potential
 
-    def np_potential(self, theta: np.array) -> Union[Tensor, float]:
+    def np_potential(self, theta: np.array) -> ScalarFloat:
         r"""Return posterior log prob. of theta $p(\theta|x)$"
 
         Args:

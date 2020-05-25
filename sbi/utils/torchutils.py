@@ -1,23 +1,22 @@
 """Various PyTorch utility functions."""
 
-from typing import List, Union
-
 import numpy as np
 import torch
 from torch import Tensor
 from torch.distributions import Independent, Uniform
 
 import sbi.utils as utils
+from sbi.types import Array, OneOrMore, ScalarFloat
 
 
 def get_default_device():
-    """Returns default device by creating a tensor for testing"""
+    """Returns default device by creating a tensor for testing."""
     return torch.ones((1,)).device
 
 
 def tile(x, n):
     if not utils.is_positive_int(n):
-        raise TypeError("Argument 'n' must be a positive integer.")
+        raise TypeError("Argument `n` must be a positive integer.")
     x_ = x.reshape(-1)
     x_ = x_.repeat(n)
     x_ = x_.reshape(n, -1)
@@ -183,23 +182,20 @@ def gaussian_kde_log_eval(samples, query):
 
 class BoxUniform(Independent):
     def __init__(
-        self,
-        low: Union[Tensor, float],
-        high: Union[Tensor, float],
-        reinterpreted_batch_ndims: int = 1,
+        self, low: ScalarFloat, high: ScalarFloat, reinterpreted_batch_ndims: int = 1,
     ):
         """Multidimensional uniform distribution defined on a box.
-        
+
         A `Uniform` distribution initialized with e.g. a parameter vector low or high of
          length 3 will result in a /batch/ dimension of length 3. A log_prob evaluation
          will then output three numbers, one for each of the independent Uniforms in
          the batch. Instead, a `BoxUniform` initialized in the same way has three
          /event/ dimensions, and returns a scalar log_prob corresponding to whether
          the evaluated point is in the box defined by low and high or outside.
-    
+
         Refer to torch.distributions.Uniform and torch.distributions.Independent for
          further documentation.
-    
+
         Args:
             low: lower range (inclusive).
             high: upper range (exclusive).
@@ -231,12 +227,12 @@ def ensure_theta_batched(theta: Tensor) -> Tensor:
 def ensure_x_batched(x: Tensor) -> Tensor:
     """
     Return simulation output x that has a batch dimension, i.e. has shape
-    (1, shape_of_single_x)
+    (1, shape_of_single_x).
 
     Args:
-         x: simulation output of shape (n) or (1,n)
+         x: simulation output of shape (n) or (1,n).
      Returns:
-         Batched simulation output x
+         Batched simulation output x.
     """
 
     # ensure x has shape (1, shape_of_single_x). If shape[0] > 1, we assume that
@@ -247,7 +243,7 @@ def ensure_x_batched(x: Tensor) -> Tensor:
     return x
 
 
-def atleast_2d_many(*arys: Union[np.array, Tensor]) -> Union[Tensor, List[Tensor]]:
+def atleast_2d_many(*arys: Array) -> OneOrMore[Tensor]:
     """Return tensors with at least dimension 2.
 
     Tensors or arrays of dimension 0 or 1 will get additional dimension(s) prepended.
