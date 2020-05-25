@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Optional
+from warnings import warn
 
 import torch
 from pyknos.mdn.mdn import MultivariateGaussianMDN
@@ -60,6 +61,9 @@ def posterior_nn(
 
     theta_numel = prior_mean.numel()
     x_o_numel = x_o_shape.numel()
+
+    if theta_numel == 1:
+        _check_1d_flow_limitations(model, "parameter")
 
     if model == "mdn":
         neural_net = MultivariateGaussianMDN(
@@ -196,6 +200,9 @@ def likelihood_nn(
 
     theta_numel = theta_shape.numel()
     x_o_numel = x_o_shape.numel()
+
+    if x_o_numel == 1:
+        _check_1d_flow_limitations(model, "data")
 
     if model == "mdn":
         neural_net = MultivariateGaussianMDN(
@@ -345,3 +352,35 @@ def classifier_nn(
         raise ValueError(f"'model' must be one of ['linear', 'mlp', 'resnet'].")
 
     return neural_net
+
+
+def _check_1d_flow_limitations(model: str, output_space: str) -> None:
+    """
+    Gives a warning or error due to limitations of flows in 1D.
+
+    For MAFs and MADEs this gives a warning, since MAFs and MADEs are inherently limited
+        to Gaussian densities in 1D. For NSFs this raises an error due to implementation
+        issues in 1D.
+
+    Args:
+        model: The used density estimator, one of ['maf'|'mdn'|'made'|'nsf'].
+        output_space: Either of ['parameter'|'data']. Is used to add to the
+            message whether the output of the density estimator is the parameter space
+            theta (which is the case for SNPE) or the data space x (which is the case
+            for SNL).
+    """
+
+    if model == "maf" or model == "made":
+        warn(
+            f"In one-dimensional {output_space} spaces, {model.upper()}s are"
+            " limited to a Gaussian density. Consider setting"
+            ' `density_estimator="mdn"` instead.'
+        )
+    elif model == "nsf":
+        raise NotImplementedError(
+            f"NSFs are not implemented for one-dimensional {output_space}"
+            ' spaces. Please set `density_estimator="mdn"` instead.'
+        )
+    else:
+        # all other density estimators are fine
+        pass
