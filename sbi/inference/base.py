@@ -198,15 +198,15 @@ class NeuralInference(ABC):
         x_o: Tensor,
         theta_bank: List[Tensor],
         x_bank: List[Tensor],
-        posterior_samples_acceptance_rate: Optional[float]=None,
+        posterior_samples_acceptance_rate: Optional[Tensor] = None,
     ) -> None:
         """Update the summary_writer with statistics for a given round.
 
         Statistics are extracted from the arguments and from entries in self._summary
         created during training.
         """
-        
-        # XXX: This is a subset of the logging from the conormdurkan/lfi. A big
+
+        # NB. This is a subset of the logging from the conormdurkan/lfi. A big
         # part of the logging was removed because of API changes, e.g., logging
         # comparisons to ground truth parameters and samples.
 
@@ -227,7 +227,7 @@ class NeuralInference(ABC):
         # Rejection sampling acceptance rate, only for SNPE.
         if posterior_samples_acceptance_rate is not None:
             self._summary["rejection_sampling_acceptance_rates"].append(
-                posterior_samples_acceptance_rate
+                posterior_samples_acceptance_rate.item()
             )
 
             self._summary_writer.add_scalar(
