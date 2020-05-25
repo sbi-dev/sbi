@@ -1,0 +1,65 @@
+a[title="Edit this page"] {
+  display: none;
+}
+
+.md-typeset .admonition, .md-typeset details {
+  box-shadow: none !important;
+  border-top: 1px solid #f0f0f0;
+  border-bottom: 1px solid #f0f0f0;
+  border-right: 1px solid #f0f0f0;
+}
+
+.md-typeset .admonition.info > .admonition-title, .md-typeset .admonition.info > summary, .md-typeset .admonition.todo > .admonition-title, .md-typeset .admonition.todo > summary, .md-typeset details.info > .admonition-title, .md-typeset details.info > summary, .md-typeset details.todo > .admonition-title, .md-typeset details.todo > summary {
+  background-color: #fcfcfc;
+  border-bottom-color: #f0f0f0 !important;
+}
+
+.md-typeset .footnote-ref:before {
+  border-left: none !important; 
+  margin-left: -0.4em !important;
+}
+
+
+/* Indentation. */
+div.doc-contents:not(.first), div.doc-function div.doc-contents {
+  padding-left: 25px;
+  border-left: 4px solid rgba(230, 230, 230);
+  margin-bottom: 80px;
+}
+
+/* Don't capitalize names. */
+h5.doc-heading {
+  text-transform: none !important;
+}
+
+/* Don't use vertical space on hidden ToC entries. */
+h6.hidden-toc {
+  margin: 0 !important;
+  position: relative;
+  top: -70px;
+}
+h6.hidden-toc::before {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+}
+
+/* Don't show permalink of hidden ToC entries. */
+h6.hidden-toc a.headerlink {
+  display: none;
+}
+
+/* Avoid breaking parameters name, etc. in table cells. */
+td code {
+  word-break: normal !important;
+}
+
+/* For pieces of Markdown rendered in table cells. */
+td p {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+/* 100% width tables */
+.md-typeset__table {
+  width: 100%;
+}
