@@ -63,7 +63,7 @@ class SnpeB(SnpeBase):
             logging_level=logging_level,
         )
 
-    def _get_log_prob_proposal_posterior(
+    def _log_prob_proposal_posterior(
         self, theta: Tensor, x: Tensor, masks: Tensor
     ) -> Tensor:
         """
@@ -94,10 +94,6 @@ class SnpeB(SnpeBase):
         self._assert_all_finite(log_prob_proposal, "proposal posterior eval")
 
         # Compute log prob with importance weights.
-        log_prob = (
-            self.calibration_kernel(x)
-            * torch.exp(log_prob_prior - log_prob_proposal)
-            * log_prob_posterior
-        )
+        log_prob = torch.exp(log_prob_prior - log_prob_proposal) * log_prob_posterior
 
         return log_prob
