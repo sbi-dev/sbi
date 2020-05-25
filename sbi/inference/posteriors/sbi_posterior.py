@@ -1,21 +1,19 @@
-from typing import Callable, Optional, Union
-from numpy import ndarray
+from typing import Callable, Optional
 from warnings import warn
 
 from pyro.infer.mcmc import HMC, NUTS
 from pyro.infer.mcmc.api import MCMC
 import torch
-from torch import nn, Tensor, log, as_tensor
+from torch import Tensor, as_tensor, log, nn
 from torch import multiprocessing as mp
 
 from sbi.mcmc import Slice, SliceSampler
+from sbi.types import Array
 import sbi.utils as utils
 from sbi.utils.torchutils import atleast_2d
 
 
 NEG_INF = torch.tensor(float("-inf"), dtype=torch.float32)
-
-Array = Union[torch.Tensor, np.ndarray]
 
 
 class Posterior:

@@ -17,6 +17,7 @@ import sbi.utils as utils
 from sbi.inference.base import NeuralInference
 from sbi.inference.posteriors.sbi_posterior import Posterior
 from sbi.utils.torchutils import ensure_x_batched, ensure_theta_batched
+from sbi.types import ScalarFloat, OneOrMore
 
 
 class SRE(NeuralInference):
@@ -120,7 +121,7 @@ class SRE(NeuralInference):
     def __call__(
         self,
         num_rounds: int,
-        num_simulations_per_round: Union[List[int], int],
+        num_simulations_per_round: OneOrMore[int],
         batch_size: int = 100,
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
@@ -423,7 +424,7 @@ class PotentialFunctionProvider:
         else:
             return self.np_potential
 
-    def np_potential(self, theta: np.array) -> Union[Tensor, float]:
+    def np_potential(self, theta: np.array) -> ScalarFloat:
         """Return potential for Numpy slice sampler."
 
         Args:

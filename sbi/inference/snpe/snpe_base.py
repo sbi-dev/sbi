@@ -1,6 +1,6 @@
 from abc import ABC
 from copy import deepcopy
-from typing import Callable, List, Optional, Union, Tuple
+from typing import Callable, Optional, Tuple, Dict
 import warnings
 import logging
 
@@ -14,6 +14,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from sbi.inference.base import NeuralInference
 from sbi.inference.posteriors.sbi_posterior import Posterior
+from sbi.types import ScalarFloat, OneOrMore
 import sbi.utils as utils
 from sbi.utils import Standardize
 
@@ -116,7 +117,7 @@ class SnpeBase(NeuralInference, ABC):
     def __call__(
         self,
         num_rounds: int,
-        num_simulations_per_round: Union[List[int], int],
+        num_simulations_per_round: OneOrMore[int],
         batch_size: int = 100,
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
@@ -476,7 +477,7 @@ class PotentialFunctionProvider:
         r"""Return posterior theta log prob. $p(\theta|x)$, $-\infty$ if outside prior."
 
         Args:
-            theta: Parameters $\theta$, batch dimension 1
+            theta: Parameters $\theta$, batch dimension 1.
 
         Returns:
             Posterior log probability $\log(p(\theta|x))$.
@@ -493,7 +494,7 @@ class PotentialFunctionProvider:
 
         return target_log_prob
 
-    def pyro_potential(self, theta: dict) -> Tensor:
+    def pyro_potential(self, theta: Dict[str, Tensor]) -> Tensor:
         r"""Return posterior log prob. of theta $p(\theta|x)$, -inf where outside prior.
 
         Args:
