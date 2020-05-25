@@ -39,7 +39,7 @@ def test_sre_on_linearGaussian_api(num_dim: int):
         x_o=x_o,
         classifier=None,  # Use default RESNET.
         simulation_batch_size=50,
-        mcmc_method="slice-np",
+        mcmc_method="slice_np",
     )
 
     posterior = infer(num_rounds=1, num_simulations_per_round=1000)
@@ -101,7 +101,7 @@ def test_sre_on_linearGaussian_based_on_mmd(
         classifier=None,  # Use default RESNET.
         classifier_loss=classifier_loss,
         simulation_batch_size=50,
-        mcmc_method="slice-np",
+        mcmc_method="slice_np",
     )
 
     posterior = infer(num_rounds=1, num_simulations_per_round=1000)
@@ -141,8 +141,8 @@ def test_sre_on_linearGaussian_based_on_mmd(
 @pytest.mark.parametrize(
     "mcmc_method, prior_str",
     (
-        ("slice-np", "gaussian"),
-        ("slice-np", "uniform"),
+        ("slice_np", "gaussian"),
+        ("slice_np", "uniform"),
         ("slice", "gaussian"),
         ("slice", "uniform"),
     ),

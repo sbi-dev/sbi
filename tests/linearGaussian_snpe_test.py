@@ -252,7 +252,7 @@ def test_multi_round_snpe_deterministic_simulator(set_seed, z_score_min_std):
 @pytest.mark.parametrize(
     "sample_with_mcmc, mcmc_method, prior",
     (
-        (True, "slice-np", "gaussian"),
+        (True, "slice_np", "gaussian"),
         (True, "slice", "gaussian"),
         # XXX (True, "slice", "uniform"),
         # XXX takes very long. fix when refactoring pyro sampling
