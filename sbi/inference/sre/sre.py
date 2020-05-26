@@ -17,6 +17,8 @@ import sbi.utils as utils
 from sbi.inference.base import NeuralInference
 from sbi.inference.posteriors.sbi_posterior import Posterior
 from sbi.utils.torchutils import ensure_x_batched, ensure_theta_batched
+from sbi.types import ScalarFloat, OneOrMore
+from sbi.utils.sbiutils import find_nan_in_simulations, warn_on_too_many_nans
 
 
 class SRE(NeuralInference):
@@ -28,7 +30,7 @@ class SRE(NeuralInference):
         classifier: Optional[nn.Module] = None,
         num_atoms: Optional[int] = None,
         simulation_batch_size: int = 1,
-        mcmc_method: str = "slice-np",
+        mcmc_method: str = "slice_np",
         summary_net: Optional[nn.Module] = None,
         classifier_loss: str = "sre",
         retrain_from_scratch_each_round: bool = False,
@@ -40,6 +42,7 @@ class SRE(NeuralInference):
         show_progressbar: bool = True,
         show_round_summary: bool = False,
         logging_level: int = logging.WARNING,
+        handle_nans: bool = True,
     ):
         r"""Sequential Ratio Estimation [1]
 
@@ -61,6 +64,8 @@ class SRE(NeuralInference):
                 evaluation (only up to a normalizing constant), even when training
                 only one round. `aalr` is limited to `num_atoms=2`, but allows for
                 density evaluation when training for one round.
+            handle_nans: If True, NaN simulations are excluded from training, if False
+                an error is raised on NaNs.
 
         See docstring of `NeuralInference` class for all other arguments.
         """
@@ -82,6 +87,7 @@ class SRE(NeuralInference):
 
         self._classifier_loss = classifier_loss
         self._num_atoms = num_atoms if num_atoms is not None else 0
+        self.handle_nans = handle_nans
 
         if classifier is None:
             classifier = utils.classifier_nn(
@@ -114,13 +120,13 @@ class SRE(NeuralInference):
         else:
             self._untrained_classifier = None
 
-        # SRE-specific summary_writer fields
+        # SRE-specific summary_writer fields.
         self._summary.update({"mcmc_times": []})  # type: ignore
 
     def __call__(
         self,
         num_rounds: int,
-        num_simulations_per_round: Union[List[int], int],
+        num_simulations_per_round: OneOrMore[int],
         batch_size: int = 100,
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
@@ -173,8 +179,21 @@ class SRE(NeuralInference):
             theta, x = self._batched_simulator(theta)
 
             # Store (theta, x) pairs.
-            self._theta_bank.append(theta)
-            self._x_bank.append(x)
+
+            # Check for NaNs in data.
+            x_not_nan = ~find_nan_in_simulations(x)
+            logging.info(
+                f"""Found {x_not_nan.numel() - x_not_nan.sum()} NaN simulations. They
+                will be exluded from training."""
+            )
+
+            if not self.handle_nans:
+                assert x_not_nan.all(), "Simulated data must be finite."
+            else:
+                warn_on_too_many_nans(x)
+
+            self._theta_bank.append(theta[x_not_nan])
+            self._x_bank.append(x[x_not_nan])
 
             # Fit posterior using newly aggregated data set.
             self._train(
@@ -380,44 +399,40 @@ class SRE(NeuralInference):
 class PotentialFunctionProvider:
     """
     This class is initialized without arguments during the initialization of the
-     Posterior class. When called, it specializes to the potential function appropriate
-     to the requested mcmc_method.
-    
-   
+    Posterior class. When called, it specializes to the potential function appropriate
+    to the requested `mcmc_method`.
+
     NOTE: Why use a class?
     ----------------------
     During inference, we use deepcopy to save untrained posteriors in memory. deepcopy
-     uses pickle which can't serialize nested functions
-     (https://stackoverflow.com/a/12022055).
-    
+    uses pickle which can't serialize nested functions
+    (https://stackoverflow.com/a/12022055).
+
     It is important to NOT initialize attributes upon instantiation, because we need the
-     most current trained Posterior.neural_net.
-    
+     most current trained posterior neural_net.
+
     Returns:
-        [Callable]: potential function for use by either numpy or pyro sampler
+        Potential function for use by either numpy or pyro sampler
     """
 
     def __call__(
         self, prior, classifier: nn.Module, x: Tensor, mcmc_method: str,
     ) -> Callable:
-        r"""Return potential function for posterior $p(\theta|x)$. 
-        
-        Switch on numpy or pyro potential function based on mcmc_method.
-        
+        r"""Return potential function for posterior $p(\theta|x)$.
+
+        Switch on numpy or pyro potential function based on `mcmc_method`.
+
         Args:
-            prior: prior distribution that can be evaluated.
-            classifier: binary classifier approximating the likelihood up to a constant.
-       
-            x: conditioning variable for posterior $p(\theta|x)$.
-            mcmc_method (str): one of slice-np, slice, hmc or nuts.
-        
+            prior: Prior distribution that can be evaluated.
+            classifier: Binary classifier approximating the likelihood up to a constant.
+
+            x: Conditioning variable for posterior $p(\theta|x)$.
+            mcmc_method: One of `slice_np`, `slice`, `hmc` or `nuts`.
+
         Returns:
-            Callable: potential function for sampler.
-        """ """        
-        
-        Args: 
-        
+            Potential function for sampler.
         """
+
         self.classifier = classifier
         self.prior = prior
         self.x = x
@@ -427,41 +442,41 @@ class PotentialFunctionProvider:
         else:
             return self.np_potential
 
-    def np_potential(self, theta: np.array) -> Union[Tensor, float]:
+    def np_potential(self, theta: np.array) -> ScalarFloat:
         """Return potential for Numpy slice sampler."
-        
+
         Args:
-            theta: parameters $\theta$, batch dimension 1
-        
+            theta: Parameters $\theta$, batch dimension 1.
+
         Returns:
-            [tensor or -inf]: posterior log probability of theta.
+            Posterior log probability of theta.
         """
         theta = torch.as_tensor(theta, dtype=torch.float32)
 
-        # theta and x should have shape (1, dim)
+        # Theta and x should have shape (1, dim).
         theta = ensure_theta_batched(theta)
         x = ensure_x_batched(self.x)
 
         log_ratio = self.classifier(torch.cat((theta, x), dim=1).reshape(1, -1))
 
-        # notice opposite sign to pyro potential
+        # Notice opposite sign to pyro potential.
         return log_ratio + self.prior.log_prob(theta)
 
     def pyro_potential(self, theta: Dict[str, Tensor]) -> Tensor:
         """Return potential for Pyro sampler.
-        
+
         Args:
-            theta: parameters $\theta$. The tensor's shape will be
+            theta: Parameters $\theta$. The tensor's shape will be
              (1, shape_of_single_theta) if running a single chain or just
              (shape_of_single_theta) for multiple chains.
-        
+
         Returns:
-            potential: $-[\log r(x_o, \theta) + \log p(\theta)]$
+            Potential $-[\log r(x_o, \theta) + \log p(\theta)]$.
         """
 
         theta = next(iter(theta.values()))
 
-        # theta and x should have shape (1, dim)
+        # Theta and x should have shape (1, dim).
         theta = ensure_theta_batched(theta)
         x = ensure_x_batched(self.x)
 

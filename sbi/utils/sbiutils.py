@@ -1,10 +1,10 @@
-import time
+import logging
 import warnings
 from typing import Sequence, Tuple, Union
 
 import torch
 import torch.nn as nn
-from torch import Tensor
+from torch import Tensor, as_tensor
 
 import sbi.utils as utils
 from tqdm.auto import tqdm
@@ -31,7 +31,7 @@ def match_shapes_of_theta_and_x(
     x: Union[Sequence[float], float],
     x_o: Tensor,
     correct_for_leakage: bool,
-) -> (Tensor, Tensor):
+) -> Tuple[Tensor, Tensor]:
     r"""
     Formats parameters theta and simulation outputs x into shapes that can be processed
      by neural density estimators for the posterior $p(\theta|x)$.
@@ -85,6 +85,9 @@ def match_shapes_of_theta_and_x(
 
     # if multiple observations, with snpe avoid expensive leakage
     # correction by rejection sampling
+    # TODO: can we move this test to sbi_posterior::get_leakage_correction, or will it
+    # eventually break if run after x = x.repeat(theta.shape[0], 1) below. If so,
+    # consider moving that line to where needed.
     if x.shape[0] > 1 and correct_for_leakage:
         raise ValueError(
             "Only a single conditioning variable x allowed for log-prob when "
@@ -105,92 +108,124 @@ def match_shapes_of_theta_and_x(
 
 
 def sample_posterior_within_prior(
-    posterior_nn: torch.nn.Module,
-    prior: torch.distributions.Distribution,
+    posterior_nn: nn.Module,
+    prior,
     x: Tensor,
     num_samples: int = 1,
     show_progressbar: bool = False,
-) -> Tuple[Tensor, float]:
-    r"""Return samples from a posterior $p(\theta|x)$ within the support of the prior
-     via rejection sampling.
+    warn_acceptance: float = 0.01,
+) -> Tuple[Tensor, Tensor]:
+    r"""Return samples from a posterior $p(\theta|x)$ only within the prior support.
 
     This is relevant for snpe methods and flows for which the posterior tends to have
      mass outside the prior boundaries.
 
-    This function uses rejection sampling with samples from posterior, to do two things:
-        1) obtain posterior samples within the prior support.
+    This function uses rejection sampling with samples from posterior in order to
+        1) obtain posterior samples within the prior support, and
         2) calculate the fraction of accepted samples as a proxy for correcting the
-         density during evaluation of the posterior.
+           density during evaluation of the posterior.
 
     Args:
-        posterior_nn: neural net representing the posterior
-        prior: torch distribution prior
-        x: conditioning variable $x$ for the posterior $p(\theta|x)$
-        num_samples: number of sample to generate
-        show_progressbar: whether to show a progressbar during sampling
+        posterior_nn: Neural net representing the posterior.
+        prior: Distribution-like object that evaluates probabilities with `log_prob`.
+        x: Conditioning variable $x$ for the posterior $p(\theta|x)$.
+        num_samples: Desired number of samples.
+        show_progressbar: Whether to show a progressbar during sampling.
+        warn_acceptance: A minimum acceptance rate under which to warn about slowness.
 
     Returns:
-        Accepted samples, and estimated acceptance
-         probability
+        Accepted samples and acceptance rate as scalar Tensor.
     """
 
-    assert (
-        not posterior_nn.training
-    ), "posterior nn is in training mode, but has to be in eval mode for sampling."
+    assert not posterior_nn.training, "Posterior nn must be in eval mode for sampling."
 
-    samples = []
-    num_remaining = num_samples
-    num_sampled_total = 0
-    leakage_warning_raised = False
-
-    # we might not always want a progressbar for sampling. E.g. we want to display that,
-    # after each round, we also draw samples just for logging. Thus, the progressbar
-    # can be turned off with the show_progressbar argument.
+    # Progress bar can be skipped, e.g. when sampling after each round just for logging.
     pbar = tqdm(
-        total=num_remaining,
         disable=not show_progressbar,
-        desc="Drawing {0} posterior samples".format(num_remaining),
+        total=num_samples,
+        desc=f"Drawing {num_samples} posterior samples",
     )
 
-    with pbar:
-        while num_remaining > 0:
+    num_remaining, num_sampled_total = num_samples, 0
+    accepted, acceptance_rate = [], float("Nan")
+    leakage_warning_raised = False
+    # In each iteration of the loop we sample the remaining number of samples from the
+    # posterior. Some of these samples have 0 probability under the prior, i.e. there
+    # is leakage (acceptance rate<1) so sample again until reaching `num_samples`.
+    while num_remaining > 0:
 
-            # XXX: we need this reshape here because posterior_nn.sample sometimes return
-            # leading singleton dimension instead of (num_samples), e.g., (1, 10000, 4)
-            # instead of (10000, 4). and this can't be handled by MultipleIndependent. issue #141
-            sample = posterior_nn.sample(num_remaining, context=x).reshape(
-                num_remaining, -1
+        candidates = posterior_nn.sample(num_remaining, context=x)
+        # TODO we need this reshape here because posterior_nn.sample sometimes return
+        # leading singleton dimension instead of (num_samples), e.g., (1, 10000, 4)
+        # instead of (10000, 4). This can't be handled by MultipleIndependent, see #141.
+        candidates = candidates.reshape(num_remaining, -1)
+        num_sampled_total += num_remaining
+
+        are_within_prior = torch.isfinite(prior.log_prob(candidates))
+        accepted.append(candidates[are_within_prior])
+
+        num_accepted = are_within_prior.sum().item()
+        pbar.update(num_accepted)
+
+        # To avoid endless sampling when leakage is high, we raise a warning if the
+        # acceptance rate is too low after the first 1_000 samples.
+        acceptance_rate = (num_samples - num_remaining) / num_sampled_total
+        if (
+            num_sampled_total > 1000
+            and acceptance_rate < warn_acceptance
+            and not leakage_warning_raised
+        ):
+            warnings.warn(
+                f"""Only {acceptance_rate:.0%} posterior samples are within the
+                    prior support. It may take a long time to collect the remaining
+                    {num_remaining} samples. Consider interrupting (Ctrl-C)
+                    and switching to `sample_with_mcmc=True`."""
             )
-            num_sampled_total += num_remaining
+            leakage_warning_raised = True  # Ensure warning is raised just once.
 
-            is_within_prior = torch.isfinite(prior.log_prob(sample))
-            num_in_prior = is_within_prior.sum().item()
+        num_remaining -= num_accepted
 
-            if num_in_prior > 0:
-                samples.append(sample[is_within_prior,].reshape(num_in_prior, -1))
-                num_remaining -= num_in_prior
+    pbar.close()
 
-            # If leakage is very high, we might be caught in an infinite loop here.
-            # So, after at least 1000 drawn samples, we evaluate if less than 1% were
-            # accepted at this point. If so, we raise a warning.
-            num_accepted_total = num_samples - num_remaining
-            if (
-                num_sampled_total > 1000
-                and num_accepted_total < num_sampled_total * 0.01
-                and not leakage_warning_raised
-            ):
-                warnings.warn(
-                    "Leakage >99% detected. This will drastically slow down sampling."
-                    "Consider switching to sample_with_mcmc=True"
-                )
-                leakage_warning_raised = True  # make sure warning is raised just once
+    return torch.cat(accepted), as_tensor(acceptance_rate)
 
-            pbar.update(num_in_prior)
 
-    # collect all samples in the list into one tensor
-    samples = torch.cat(samples)
+def find_nan_in_simulations(x: Tensor) -> Tensor:
+    """Return mask for finding simulated data that contain NaNs from a batch of x.
 
-    # estimate acceptance probability
-    acceptance_prob = float((samples.shape[0]) / num_sampled_total)
+    Args:
+        x: a batch of simulated data x
 
-    return samples, acceptance_prob
+    Returns:
+        mask: True for NaN simulations.
+    """
+
+    # Check for any NaNs in every simulation (dim 1 checks across columns).
+    return torch.isnan(x).any(dim=1)
+
+
+def mark_nans_with_zero(x: Tensor) -> Tensor:
+    """Return 0-1 Tensor marking NaN simulations with zero for a batch of x.
+
+    This is used a calibration kernel for the SNPE loss. Simulations containing NaNs 
+    are indicated with zero such that they do not effect the loss term."""
+
+    kernel_vals = torch.ones(len(x))
+    # Set NaN simualtions to zero.
+    x_is_nan = find_nan_in_simulations(x)
+    kernel_vals[x_is_nan] = 0
+
+    return kernel_vals
+
+
+def warn_on_too_many_nans(x: Tensor, percent_nan_threshold=0.5) -> None:
+    """Raises warning if too many (above threshold) NaNs are in given batch of x."""
+
+    percent_nan = find_nan_in_simulations(x).sum() / float(len(x))
+
+    if percent_nan > percent_nan_threshold:
+        logging.warning(
+            f"""Found {100 * percent_nan} NaNs in simulations. They
+            will be excluded from training which the effective number of
+            training samples and can impact training performance."""
+        )

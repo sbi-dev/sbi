@@ -1,6 +1,7 @@
 from abc import ABC
 from copy import deepcopy
-from typing import Callable, List, Optional, Union, Tuple
+from sbi.utils.sbiutils import find_nan_in_simulations
+from typing import Callable, Optional, Tuple, Dict
 import warnings
 import logging
 
@@ -14,8 +15,10 @@ from torch.utils.tensorboard import SummaryWriter
 
 from sbi.inference.base import NeuralInference
 from sbi.inference.posteriors.sbi_posterior import Posterior
+from sbi.types import ScalarFloat, OneOrMore
 import sbi.utils as utils
 from sbi.utils import Standardize
+from sbi.utils.sbiutils import mark_nans_with_zero, warn_on_too_many_nans
 
 
 class SnpeBase(NeuralInference, ABC):
@@ -33,7 +36,7 @@ class SnpeBase(NeuralInference, ABC):
         discard_prior_samples: bool = False,
         device: Optional[torch.device] = None,
         sample_with_mcmc: bool = False,
-        mcmc_method: str = "slice-np",
+        mcmc_method: str = "slice_np",
         num_workers: int = 1,
         worker_batch_size: int = 20,
         summary_writer: Optional[SummaryWriter] = None,
@@ -85,7 +88,8 @@ class SnpeBase(NeuralInference, ABC):
 
         # Calibration kernels proposed in Lueckmann, Goncalves et al 2017.
         if calibration_kernel is None:
-            self.calibration_kernel = lambda x: ones([len(x)])
+            # Set default kernel such that it excludes NaN simulations.
+            self.calibration_kernel = lambda x: ones(len(x))
         else:
             self.calibration_kernel = calibration_kernel
 
@@ -116,7 +120,7 @@ class SnpeBase(NeuralInference, ABC):
     def __call__(
         self,
         num_rounds: int,
-        num_simulations_per_round: Union[List[int], int],
+        num_simulations_per_round: OneOrMore[int],
         batch_size: int = 100,
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
@@ -155,10 +159,19 @@ class SnpeBase(NeuralInference, ABC):
 
             # Run simulations for the round.
             theta, x, prior_mask = self._run_simulations(round_, num_sims)
+
+            # Check for NaNs in data.
+            x_not_nan = ~find_nan_in_simulations(x)
+            logging.info(
+                f"""Found {x_not_nan.numel() - x_not_nan.sum()} NaN simulations. They
+                will be exluded from training."""
+            )
+            warn_on_too_many_nans(x)
+
             # XXX Rename bank -> rounds/roundwise.
-            self._theta_bank.append(theta)
-            self._x_bank.append(x)
-            self._prior_masks.append(prior_mask)
+            self._theta_bank.append(theta[x_not_nan])
+            self._x_bank.append(x[x_not_nan])
+            self._prior_masks.append(prior_mask[x_not_nan])
 
             # Fit posterior using newly aggregated data set.
             self._train(
@@ -273,9 +286,11 @@ class SnpeBase(NeuralInference, ABC):
         # XXX Mouthful, rename self.posterior.nn
         embed_nn = self._neural_posterior.neural_net._embedding_net
 
-        x_std = torch.std(x, dim=0)
+        # Exclude NaNs from zscoring.
+        x_not_nan = ~find_nan_in_simulations(x)
+        x_std = torch.std(x[x_not_nan], dim=0)
         x_std[x_std == 0] = self._z_score_min_std
-        preprocess = Standardize(torch.mean(x, dim=0), x_std)
+        preprocess = Standardize(torch.mean(x[x_not_nan], dim=0), x_std)
 
         # If Sequential has a None component, forward will TypeError.
         return preprocess if embed_nn is None else nn.Sequential(preprocess, embed_nn)
@@ -378,6 +393,8 @@ class SnpeBase(NeuralInference, ABC):
                     log_prob = self._get_log_prob_proposal_posterior(
                         theta_batch, x_batch, masks
                     )
+
+                assert torch.isfinite(log_prob).all()
                 loss = -torch.mean(log_prob)
                 loss.backward()
                 if clip_max_norm is not None:
@@ -439,30 +456,29 @@ class SnpeBase(NeuralInference, ABC):
 class PotentialFunctionProvider:
     """
     This class is initialized without arguments during the initialization of the
-     Posterior class. When called, it specializes to the potential function appropriate
-     to the requested mcmc_method.
-    
-   
+    Posterior class. When called, it specializes to the potential function appropriate
+    to the requested `mcmc_method`.
+
     NOTE: Why use a class?
     ----------------------
     During inference, we use deepcopy to save untrained posteriors in memory. deepcopy
-     uses pickle which can't serialize nested functions
-     (https://stackoverflow.com/a/12022055).
-    
+    uses pickle which can't serialize nested functions
+    (https://stackoverflow.com/a/12022055).
+
     It is important to NOT initialize attributes upon instantiation, because we need the
-     most current trained Posterior.neural_net.
-    
+     most current trained posterior neural_net.
+
     Returns:
-        [Callable]: potential function for use by either numpy or pyro sampler
+        Potential function for use by either numpy or pyro sampler
     """
 
     def __call__(
-        self, prior, posterior_nn: nn.Module, x: Tensor, mcmc_method: str,
+        self, prior, posterior_nn: nn.Module, x: Tensor, mcmc_method: str
     ) -> Callable:
-        """Return potential function. 
-        
-        Switch on numpy or pyro potential function based on mcmc_method.
-        
+        """Return potential function.
+
+        Switch on numpy or pyro potential function based on `mcmc_method`.
+
         """
         self.posterior_nn = posterior_nn
         self.prior = prior
@@ -473,14 +489,14 @@ class PotentialFunctionProvider:
         else:
             return self.np_potential
 
-    def np_potential(self, theta: np.ndarray) -> Union[Tensor, float]:
-        r"""Return posterior log prob. of theta $p(\theta|x)$, -inf if outside prior."
-        
+    def np_potential(self, theta: np.ndarray) -> ScalarFloat:
+        r"""Return posterior theta log prob. $p(\theta|x)$, $-\infty$ if outside prior."
+
         Args:
-            theta: parameters $\theta$, batch dimension 1
-        
+            theta: Parameters $\theta$, batch dimension 1.
+
         Returns:
-            posterior log probability $\log(p(\theta|x))$
+            Posterior log probability $\log(p(\theta|x))$.
         """
         theta = torch.as_tensor(theta, dtype=torch.float32)
 
@@ -494,19 +510,19 @@ class PotentialFunctionProvider:
 
         return target_log_prob
 
-    def pyro_potential(self, theta: dict) -> Tensor:
+    def pyro_potential(self, theta: Dict[str, Tensor]) -> Tensor:
         r"""Return posterior log prob. of theta $p(\theta|x)$, -inf where outside prior.
-        
-        Args:s@
-            theta: parameters $\theta$ (from pyro sampler)
-        
+
+        Args:
+            theta: Parameters $\theta$ (from pyro sampler).
+
         Returns:
-            Posterior log probability $p(\theta|x)$, masked outside of prior
+            Posterior log probability $p(\theta|x)$, masked outside of prior.
         """
 
         theta = next(iter(theta.values()))
-        # XXX: notice sign, check convention pyro vs. numpy
-        log_prob_posterior = -self.posterior_nn.log_prob(inputs=theta, context=self.x,)
+        # Notice opposite sign to numpy.
+        log_prob_posterior = -self.posterior_nn.log_prob(inputs=theta, context=self.x)
         log_prob_prior = self.prior.log_prob(theta)
 
         within_prior = torch.isfinite(log_prob_prior)

@@ -1,10 +1,9 @@
 from __future__ import annotations
-from typing import Callable, Dict, List, Optional, Union
+from typing import Callable, Dict, Optional
 import warnings
 import logging
 
 import numpy as np
-from numpy.core.fromnumeric import clip
 import torch
 from torch import Tensor, nn, optim
 from torch.nn.utils import clip_grad_norm_
@@ -14,7 +13,9 @@ from torch.utils.tensorboard import SummaryWriter
 
 from sbi.inference.base import NeuralInference
 from sbi.inference.posteriors.sbi_posterior import Posterior
+from sbi.types import ScalarFloat, OneOrMore
 import sbi.utils as utils
+from sbi.utils.sbiutils import find_nan_in_simulations, warn_on_too_many_nans
 
 
 class SNL(NeuralInference):
@@ -29,11 +30,12 @@ class SNL(NeuralInference):
         device: Optional[torch.device] = None,
         num_workers: int = 1,
         worker_batch_size: int = 20,
-        mcmc_method: str = "slice-np",
+        mcmc_method: str = "slice_np",
         skip_input_checks: bool = False,
         show_progressbar: bool = True,
         show_round_summary: bool = False,
         logging_level: int = logging.WARNING,
+        handle_nans: bool = True,
     ):
         r"""Sequential Neural Likelihood
 
@@ -44,6 +46,8 @@ class SNL(NeuralInference):
         Args:
             density_estimator: Conditional density estimator $q(x|\theta)$, a nn.Module
                 with `.log_prob()` and `.sample()`
+            handle_nans: If True, NaN simulations are excluded from training, if False
+                an error is raised on NaNs.
 
         See docstring of `NeuralInference` class for all other arguments.
         """
@@ -85,11 +89,12 @@ class SNL(NeuralInference):
 
         # SNL-specific summary_writer fields
         self._summary.update({"mcmc_times": []})  # type: ignore
+        self.handle_nans = handle_nans
 
     def __call__(
         self,
         num_rounds: int,
-        num_simulations_per_round: Union[List[int], int],
+        num_simulations_per_round: OneOrMore[int],
         batch_size: int = 100,
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
@@ -142,8 +147,19 @@ class SNL(NeuralInference):
             # therefore return a theta vector with the same ordering as x.
             theta, x = self._batched_simulator(theta)
             # Store (theta, x) pairs.
-            self._theta_bank.append(theta)
-            self._x_bank.append(x)
+            # Check for NaNs in data.
+            x_not_nan = ~find_nan_in_simulations(x)
+            logging.info(
+                f"""Found {x_not_nan.numel() - x_not_nan.sum()} NaN simulations. They
+                will be exluded from training."""
+            )
+            if not self.handle_nans:
+                assert x_not_nan.all(), "Simulated data must be finite."
+            else:
+                warn_on_too_many_nans(x)
+
+            self._theta_bank.append(theta[x_not_nan])
+            self._x_bank.append(x[x_not_nan])
 
             # Fit neural likelihood to newly aggregated dataset.
             self._train(
@@ -298,40 +314,35 @@ class PotentialFunctionProvider:
     This class is initialized without arguments during the initialization of the
      Posterior class. When called, it specializes to the potential function appropriate
      to the requested mcmc_method.
-    
-   
+
     NOTE: Why use a class?
     ----------------------
     During inference, we use deepcopy to save untrained posteriors in memory. deepcopy
     uses pickle which can't serialize nested functions
     (https://stackoverflow.com/a/12022055).
-    
+
     It is important to NOT initialize attributes upon instantiation, because we need the
-    most current trained Posterior.neural_net.
-    
+    most current trained posterior neural_net.
+
     Returns:
-        [Callable]: potential function for use by either numpy or pyro sampler
+        Potential function for use by either numpy or pyro sampler.
     """
 
     def __call__(
         self, prior, likelihood_nn: nn.Module, x: Tensor, mcmc_method: str,
     ) -> Callable:
         r"""Return potential function for posterior $p(\theta|x)$.
-        
+
         Switch on numpy or pyro potential function based on mcmc_method.
-        
+
         Args:
-            prior: prior distribution that can be evaluated
-            likelihood_nn: neural likelihood estimator that can be evaluated
-            x: conditioning variable for posterior $p(\theta|x)$.
-            mcmc_method (str): one of slice-np, slice, hmc or nuts
-        
+            prior: Prior distribution that can be evaluated.
+            likelihood_nn: Neural likelihood estimator that can be evaluated.
+            x: Conditioning variable for posterior $p(\theta|x)$.
+            mcmc_method: One of `slice_np`, `slice`, `hmc` or `nuts`.
+
         Returns:
-            Callable: potential function for sampler.
-        """ """        
-        
-        Args: 
-        
+            Potential function for sampler.
         """
         self.likelihood_nn = likelihood_nn
         self.prior = prior
@@ -342,33 +353,33 @@ class PotentialFunctionProvider:
         else:
             return self.np_potential
 
-    def np_potential(self, theta: np.array) -> Union[Tensor, float]:
+    def np_potential(self, theta: np.array) -> ScalarFloat:
         r"""Return posterior log prob. of theta $p(\theta|x)$"
-        
+
         Args:
-            theta: parameters $\theta$, batch dimension 1
-        
+            theta: Parameters $\theta$, batch dimension 1.
+
         Returns:
-            Posterior log probability of the theta, -Inf if impossible under prior.
+            Posterior log probability of the theta, $-\infty$ if impossible under prior.
         """
         theta = torch.as_tensor(theta, dtype=torch.float32)
         log_likelihood = self.likelihood_nn.log_prob(
             inputs=self.x.reshape(1, -1), context=theta.reshape(1, -1)
         )
 
-        # notice opposite sign to pyro potential
+        # Notice opposite sign to pyro potential.
         return log_likelihood + self.prior.log_prob(theta)
 
     def pyro_potential(self, theta: Dict[str, Tensor]) -> Tensor:
-        r"""Return posterior log prob. of parameters $p(\theta|x)$.
-        
+        r"""Return posterior log probability of parameters $p(\theta|x)$.
+
          Args:
-            theta: parameters $\theta$. The tensor's shape will be
-            (1, shape_of_single_theta) if running a single chain or just
-             (shape_of_single_theta) for multiple  chains.
-        
+            theta: Parameters $\theta$. The tensor's shape will be
+                (1, shape_of_single_theta) if running a single chain or just
+                (shape_of_single_theta) for multiple chains.
+
         Returns:
-            potential: $-[\log r(x_o, \theta) + \log p(\theta)]$
+            The potential $-[\log r(x_o, \theta) + \log p(\theta)]$.
         """
 
         theta = next(iter(theta.values()))
