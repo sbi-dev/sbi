@@ -8,7 +8,7 @@ import torch
 from scipy.stats._distn_infrastructure import rv_frozen
 from scipy.stats._multivariate import multi_rv_frozen
 from torch import Tensor, float32
-from torch.distributions import Distribution, Uniform, Beta, Independent, Gamma
+from torch.distributions import Distribution
 from sbi.user_input.user_input_checks_utils import (
     CustomPytorchWrapper,
     ScipyPytorchWrapper,
@@ -16,7 +16,7 @@ from sbi.user_input.user_input_checks_utils import (
     MultipleIndependent,
 )
 
-from sbi.utils.torchutils import atleast_2d, ensure_theta_batched
+from sbi.utils.torchutils import atleast_2d
 
 
 def process_prior(prior) -> Tuple[Distribution, int, bool]:
@@ -326,7 +326,7 @@ def check_prior_batch_behavior(prior):
     ), f"""A parameter batch sampled from the prior must be at least 2D,
     (num_samples, parameter_dim), but is {len(theta.shape)}"""
 
-    num_sampled, parameter_dim = theta.shape
+    num_sampled, *parameter_dim = theta.shape
     # Using len here because log_prob could be ndarray or torch.Tensor
     num_log_probs = len(log_probs)
 
