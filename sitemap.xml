@@ -1,22 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url>
-     <loc>http://mackelab.org/sbi/</loc>
+     <loc>https://mackelab.org/sbi/</loc>
      <lastmod>2020-05-26</lastmod>
      <changefreq>daily</changefreq>
     </url><url>
-     <loc>http://mackelab.org/sbi/install/</loc>
+     <loc>https://mackelab.org/sbi/install/</loc>
      <lastmod>2020-05-26</lastmod>
      <changefreq>daily</changefreq>
     </url><url>
-     <loc>http://mackelab.org/sbi/contribute/</loc>
+     <loc>https://mackelab.org/sbi/contribute/</loc>
      <lastmod>2020-05-26</lastmod>
      <changefreq>daily</changefreq>
     </url><url>
-     <loc>http://mackelab.org/sbi/reference/</loc>
+     <loc>https://mackelab.org/sbi/reference/</loc>
      <lastmod>2020-05-26</lastmod>
      <changefreq>daily</changefreq>
     </url><url>
-     <loc>http://mackelab.org/sbi/credits/</loc>
+     <loc>https://mackelab.org/sbi/credits/</loc>
      <lastmod>2020-05-26</lastmod>
      <changefreq>daily</changefreq>
     </url>
