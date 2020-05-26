@@ -420,27 +420,6 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <p>SNPE-B [1]</p>
 <p>[1] <em>Flexible statistical inference for mechanistic models of neural dynamics</em>,
     Lueckmann et al., NeurIPS 2017, <a href="https://arxiv.org/abs/1711.01861">https://arxiv.org/abs/1711.01861</a>.</p>
-<p><strong>Parameters:</strong></p>
-<table>
-<thead>
-<tr>
-<th>Name</th>
-<th>Type</th>
-<th>Description</th>
-<th>Default</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>use_combined_loss</code></td>
-<td><code></code></td>
-<td>
-<p>Whether to train jointly on prior samples using maximum likelihood and on all samples using importance-weighted loss.</p>
-</td>
-<td><em>required</em></td>
-</tr>
-</tbody>
-</table>
 <p>See docstring of <code class="codehilite"><span class="err">SnpeBase</span></code> class for all other arguments.</p>
 <details class="quote">
 <summary>Source code in <code>sbi/inference/snpe/snpe_b.py</code></summary>
@@ -495,11 +474,7 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 57
 58
 59
-60
-61
-62
-63
-64</pre>
+60</pre>
 </div>
 </td>
 <td class="code">
@@ -529,10 +504,6 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 
 <span class="sd">    [1] _Flexible statistical inference for mechanistic models of neural dynamics_,</span>
 <span class="sd">        Lueckmann et al., NeurIPS 2017, https://arxiv.org/abs/1711.01861.</span>
-
-<span class="sd">    Args:</span>
-<span class="sd">        use_combined_loss: Whether to train jointly on prior samples using maximum</span>
-<span class="sd">            likelihood and on all samples using importance-weighted loss.</span>
 
 <span class="sd">    See docstring of `SnpeBase` class for all other arguments.</span>
 <span class="sd">    """</span>
