@@ -17,14 +17,25 @@ NEG_INF = torch.tensor(float("-inf"), dtype=torch.float32)
 
 
 class NeuralPosterior:
-    r"""Posterior $p(\theta|x_o)$ with evaluation and sampling methods.
+    r"""Posterior $p(\theta|x_o)$ with `log_prob()` and `sample()` methods.
 
-    This class is used by inference algorithms as follows:
+    All inference methods in `sbi` train a neural network which is then used to obtain
+    the posterior distribution. The `Posterior` class wraps this neural network such
+    that one can directly evaluate the log probability and draw samples from the
+    posterior. The neural network itself can be accessed via the .net attribute of this
+    class.
 
-    - SNPE-family algorithms put density outside of the prior. This class uses the
-      prior to adjust evaluation and sampling and correct for that.
-    - SNL and and SRE methods don't return posteriors directly. This class provides
-      MCMC methods that given the prior, allow to sample from the posterior.
+    Specifically, this class offers the following functionality:
+    - Correction of leakage (applicable only to SNPE): If the prior is bounded, the
+    posterior resulting from SNPE can generate samples that lie outside of the prior
+    support (i.e. the posterior leaks). This class rejects these samples or,
+    alternatively, allows to sample from the posterior with MCMC. It also corrects the
+    calculation of the log probability such that it compensates for the leakage.
+    - Posterior inference from likelihood (SNL) and likelihood ratio (SRE): SNL and SRE
+    learn to approximate the likelihood and likelihood ratio, which in turn can be used
+    to generate samples from the posterior. This class provides the needed MCMC methods
+    to sample from the posterior and to evaluate the log probability.
+
     """
 
     def __init__(
@@ -42,8 +53,19 @@ class NeuralPosterior:
             algorithm_family: One of 'snpe', 'snl', 'sre' or 'aalr'.
             neural_net: A classifier for sre/aalr, a density estimator for snpe/snl.
             prior: Prior distribution with methods `log_prob` and `sample`.
-            x_o: Observation acting as conditioning context. Absent if None.
-            sample_with_mcmc: Whether to sample with MCMC to correct leakage.
+            x_o: Observation acting as conditioning context. It acts as follows:
+                - Providing a specific $x_o$ allows inference to focus on a particular
+                observation by actively steering simulations over multiple rounds. The
+                provided $x_o$ becomes also the default $x$ at which to evaluate the log
+                probability and to sample parameters. Using $x\neq x_o$ might severely
+                degrade the quality of inference in this multi-round setting.
+                - Not providing a specific $x_o$ ($x_o$=None) provides for 'amortized
+                inference', i.e. the resulting conditional density can be evaluated at
+                any x. However, this only allows for single-round inference, which
+                requires a large number of simulations to provide accurate results.
+            sample_with_mcmc: Whether to sample with MCMC. Will always be `True` for SRE
+                and SNL, but can also be set to `True` for SNPE to use MCMC to deal with
+                leakage.
         """
 
         self.net = neural_net
@@ -74,8 +96,10 @@ class NeuralPosterior:
 
         Args:
             theta: Parameters $\theta$.
-            x: Conditioning context for posterior $p(\theta|x)$. Per default, use the
-               observation self.x_o.
+            x: Conditioning context for posterior $p(\theta|x)$. Can be passed here
+                explicitly to evaluate the posterior at various $x \neq x_o$, e.g. in
+                the case of amortized inference. The default value is the $x_o$ provided
+                upon initialization of the inference method.
             norm_posterior_snpe: Whether to enforce a normalized posterior density when
                 using snpe. Renormalization of the posterior is useful when some
                 probability falls out or 'leaks' out of the prescribed prior support.
@@ -111,8 +135,9 @@ class NeuralPosterior:
         r"""
         Return posterior log probability $p(\theta|x)$.
 
-        The posterior probability will be only normalized if explictly requested,
-        but it will always zeroed out($-\infty$ log-prob)outside of the prior support.
+        The posterior probability will be only normalized if explicitly requested,
+        but it will be always zeroed out ($-\infty$ log-prob) outside of the prior
+        support.
         """
 
         unnorm_log_prob = self.net.log_prob(theta, x)
@@ -142,6 +167,12 @@ class NeuralPosterior:
                 "up to a normalizing constant."
             )
         return self._log_prob_classifier(theta, x)
+
+    def _log_prob_snl(self, theta: Tensor, x: Tensor) -> Tensor:
+        warn(
+            "The log probability from SNL is only correct up to a normalizing constant."
+        )
+        return self.net.log_prob(x, theta) + self._prior.log_prob(theta)
 
     def get_leakage_correction(
         self,
@@ -198,9 +229,16 @@ class NeuralPosterior:
         r"""
         Return samples from posterior distribution $p(\theta|x)$.
 
+        Samples are obtained either with rejection sampling or MCMC. SNPE can use
+        rejection sampling and MCMC (which can help to deal with strong leakage). SNL
+        and SRE are restricted to sampling with MCMC.
+
         Args:
             num_samples: Desired number of samples.
-            x: Conditioning context for posterior $p(\theta|x)$, use self.x_o if None.
+            x: Conditioning context for posterior $p(\theta|x)$. Can be passed here
+                explicitly to sample the posterior at various $x \neq x_o$, e.g. in the
+                case of amortized inference. The default value is the $x_o$ provided
+                upon initialization of the inference method.
             show_progressbar: Whether to show sampling progress monitor.
             **kwargs: Additional parameters for the MCMC sampler (`thin` and `warmup`).
 
@@ -218,7 +256,7 @@ class NeuralPosterior:
                     show_progressbar=show_progressbar,
                     **kwargs,
                 )
-            else:
+            elif self._alg_family == "snpe":
                 # Rejection sampling.
                 samples, _ = utils.sample_posterior_within_prior(
                     self.net,
@@ -226,6 +264,11 @@ class NeuralPosterior:
                     x,
                     num_samples=num_samples,
                     show_progressbar=show_progressbar,
+                )
+            else:
+                raise NameError(
+                    "Only SNPE can use rejection sampling. All other"
+                    "methods require MCMC."
                 )
 
         return samples
@@ -242,6 +285,10 @@ class NeuralPosterior:
     ) -> Tensor:
         r"""
         Return MCMC samples from posterior $p(\theta|x)$.
+
+        This function is used in any case by SNL and SRE, but can also be used by SNPE
+        to deal with strong leakage. Depending on the algorithm, a different potential
+        function for the MCMC sampler is used.
 
         Args:
             x: Conditioning context for posterior $p(\theta|x)$.
@@ -266,18 +313,19 @@ class NeuralPosterior:
             self._prior, self.net, x, mcmc_method
         )
         if mcmc_method == "slice_np":
-            samples = self.slice_np_mcmc(num_samples, potential_fn, x, thin, warmup)
+            samples = self.slice_np_mcmc(num_samples, potential_fn, thin, warmup)
         elif mcmc_method in ("hmc", "nuts", "slice"):
             samples = self.pyro_mcmc(
                 num_samples=num_samples,
                 potential_function=potential_fn,
-                x=x,
                 mcmc_method=mcmc_method,
                 thin=thin,
-                warmup=warmup,
+                warmup_steps=warmup,
                 num_chains=num_chains,
                 show_progressbar=show_progressbar,
             )
+        else:
+            raise NameError
 
         return samples
 
@@ -285,10 +333,21 @@ class NeuralPosterior:
         self,
         num_samples: int,
         potential_function: Callable,
-        x: Tensor,
         thin: int = 10,
         warmup_steps: int = 20,
     ) -> Tensor:
+        """
+        Custom numpy implementation of slice sampling.
+
+        Args:
+            num_samples: Desired number of samples.
+            potential_function: A callable **class**.
+            thin: Thinning (subsampling) factor.
+            warmup_steps: Initial number of samples to discard.
+
+        Returns: Tensor of shape (num_samples, shape_of_single_theta).
+
+        """
 
         # go into eval mode for evaluating during sampling
         # XXX set eval mode outside of calls to sample
@@ -314,7 +373,6 @@ class NeuralPosterior:
         self,
         num_samples: int,
         potential_function: Callable,
-        x: Tensor,
         mcmc_method: str = "slice",
         thin: int = 10,
         warmup_steps: int = 200,
@@ -328,10 +386,9 @@ class NeuralPosterior:
             potential_function: A callable **class**. A class, but not a function,
                 is picklable for Pyro's MCMC to use it across chains in parallel,
                 even when the potential function requires evaluating a neural network.
-            x: Conditioning context for posterior $p(\theta|x)$.
             mcmc_method: One of `hmc`, `nuts` or `slice`.
             thin: Thinning (subsampling) factor.
-            warmup_steps: Initial snumber of amples to discard.
+            warmup_steps: Initial number of samples to discard.
             num_chains: Whether to sample in parallel. If None, use all but one CPU.
             show_progressbar: Whether to show a progressbar during sampling.
 

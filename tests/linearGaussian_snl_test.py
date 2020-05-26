@@ -4,6 +4,7 @@ from torch import distributions, zeros, ones, eye
 
 import sbi.utils as utils
 from sbi.inference.snl.snl import SNL
+import tests.utils_for_testing.linearGaussian_logprob as test_utils
 from sbi.simulators.linear_gaussian import (
     get_true_posterior_samples_linear_gaussian_mvn_prior,
     get_true_posterior_samples_linear_gaussian_uniform_prior,
@@ -104,6 +105,15 @@ def test_snl_on_linearGaussian_based_on_mmd(num_dim: int, prior_str: str, set_se
     assert (
         mmd < max_mmd
     ), f"MMD={mmd} is more than 2 stds above the average performance."
+
+    # TODO: we do not have a test for SNL log_prob(). This is because the output
+    # TODO: density is not normalized, so KLd does not make sense.
+    if prior_str == "uniform":
+        # Check whether the returned probability outside of the support is zero.
+        posterior_prob = test_utils.get_prob_outside_uniform_prior(posterior, num_dim)
+        assert (
+            posterior_prob == 0.0
+        ), "The posterior probability outside of the prior support is not zero"
 
 
 @pytest.mark.slow
