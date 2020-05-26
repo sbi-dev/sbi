@@ -36,10 +36,6 @@ class SnpeB(SnpeBase):
         [1] _Flexible statistical inference for mechanistic models of neural dynamics_,
             Lueckmann et al., NeurIPS 2017, https://arxiv.org/abs/1711.01861.
 
-        Args:
-            use_combined_loss: Whether to train jointly on prior samples using maximum
-                likelihood and on all samples using importance-weighted loss.
-
         See docstring of `SnpeBase` class for all other arguments.
         """
 
