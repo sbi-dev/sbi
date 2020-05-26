@@ -40,6 +40,7 @@ setup(
             "pytest",
             "pyyaml",
             "torchtestcase",
+            "scikit-learn",
         ]
     },
     dependency_links=[],
