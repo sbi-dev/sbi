@@ -81,7 +81,7 @@ class SnpeB(SnpeBase):
         batch_size = theta.shape[0]
 
         # Evaluate posterior.
-        log_prob_posterior = self._neural_posterior.neural_net.log_prob(theta, x)
+        log_prob_posterior = self._posterior.net.log_prob(theta, x)
         log_prob_posterior = log_prob_posterior.reshape(batch_size)
         self._assert_all_finite(log_prob_posterior, "posterior eval")
 
@@ -90,7 +90,7 @@ class SnpeB(SnpeBase):
         self._assert_all_finite(log_prob_prior, "prior eval.")
 
         # Evaluate proposal.
-        log_prob_proposal = self._model_bank[-1].neural_net.log_prob(theta, x)
+        log_prob_proposal = self._model_bank[-1].net.log_prob(theta, x)
         self._assert_all_finite(log_prob_proposal, "proposal posterior eval")
 
         # Compute log prob with importance weights.

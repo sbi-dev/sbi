@@ -13,7 +13,7 @@ from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 
 from sbi.inference.base import NeuralInference
-from sbi.inference.posteriors.sbi_posterior import Posterior
+from sbi.inference.posteriors.sbi_posterior import NeuralPosterior
 from sbi.types import ScalarFloat, OneOrMore
 import sbi.utils as utils
 from sbi.utils import Standardize
@@ -95,7 +95,7 @@ class SnpeBase(NeuralInference, ABC):
         self._discard_prior_samples = discard_prior_samples
 
         # Create a neural posterior which can sample(), log_prob().
-        self._neural_posterior = Posterior(
+        self._posterior = NeuralPosterior(
             algorithm_family="snpe",
             neural_net=density_estimator,
             prior=self._prior,
@@ -109,7 +109,7 @@ class SnpeBase(NeuralInference, ABC):
 
         # If we're retraining from scratch each round, keep a copy
         # of the original untrained model for reinitialization.
-        self._untrained_neural_posterior = deepcopy(self._neural_posterior)
+        self._untrained_neural_posterior = deepcopy(self._posterior)
 
         # Extra SNPE-specific fields summary_writer.
         self._summary.update({"rejection_sampling_acceptance_rates": []})  # type:ignore
@@ -124,7 +124,7 @@ class SnpeBase(NeuralInference, ABC):
         stop_after_epochs: int = 20,
         max_num_epochs: Optional[int] = None,
         clip_max_norm: Optional[float] = 5.0,
-    ) -> Posterior:
+    ) -> NeuralPosterior:
         r"""Run SNPE
 
         Return posterior $p(\theta|x_o)$ after inference over several rounds.
@@ -173,15 +173,15 @@ class SnpeBase(NeuralInference, ABC):
             )
 
             # Store models at end of each round.
-            self._model_bank.append(deepcopy(self._neural_posterior))
-            self._model_bank[-1].neural_net.eval()
+            self._model_bank.append(deepcopy(self._posterior))
+            self._model_bank[-1].net.eval()
 
             # making the call to get_leakage_correction() and the update of
             # self._leakage_density_correction_factor explicit here. This is just
             # to make sure this update never gets lost when we e.g. do not log our
             # things to tensorboard anymore. Calling get_leakage_correction() is needed
             # to update the leakage after each round.
-            acceptance_rate = self._neural_posterior.get_leakage_correction(
+            acceptance_rate = self._posterior.get_leakage_correction(
                 x=self._x_o, force_update=True, show_progressbar=self._show_progressbar,
             )
             self._summary["rejection_sampling_acceptance_rates"].append(acceptance_rate)
@@ -191,7 +191,7 @@ class SnpeBase(NeuralInference, ABC):
                 print(self._describe_round(round_, self._summary))
 
             # Update tensorboard and summary dict.
-            correction = self._neural_posterior.get_leakage_correction(x=self._x_o,)
+            correction = self._posterior.get_leakage_correction(x=self._x_o,)
             self._summarize(
                 round_=round_,
                 x_o=self._x_o,
@@ -200,10 +200,12 @@ class SnpeBase(NeuralInference, ABC):
                 posterior_samples_acceptance_rate=correction,
             )
 
-        self._neural_posterior._num_trained_rounds = num_rounds
-        return self._neural_posterior
+        self._posterior._num_trained_rounds = num_rounds
+        return self._posterior
 
-    def _log_prob_proposal_posterior(self, theta: Tensor, x: Tensor, masks: Tensor) -> Tensor:
+    def _log_prob_proposal_posterior(
+        self, theta: Tensor, x: Tensor, masks: Tensor
+    ) -> Tensor:
         """
         Return the log-probability used for the loss.
 
@@ -252,11 +254,11 @@ class SnpeBase(NeuralInference, ABC):
             # in the Posterior to be this now-normalized embedding net. Perhaps the
             # delayed chaining ideas in thinc can help make this a bit more transparent.
             if self._z_score_x:
-                self._neural_posterior.set_embedding_net(self._z_score_embedding(x))
+                self._posterior.set_embedding_net(self._z_score_embedding(x))
 
         else:
             # XXX Make posterior.sample() accept tuples like prior.sample().
-            theta = self._neural_posterior.sample(
+            theta = self._posterior.sample(
                 num_sims, x=self._x_o, show_progressbar=self._show_progressbar
             )
 
@@ -272,7 +274,7 @@ class SnpeBase(NeuralInference, ABC):
         """Return embedding net with a standardizing step preprended."""
 
         # XXX Mouthful, rename self.posterior.nn
-        embed_nn = self._neural_posterior.neural_net._embedding_net
+        embed_nn = self._posterior.net._embedding_net
 
         x_std = torch.std(x, dim=0)
         x_std[x_std == 0] = self._z_score_min_std
@@ -317,7 +319,7 @@ class SnpeBase(NeuralInference, ABC):
         start_idx = int(self._discard_prior_samples and round_ > 0)
         num_total_examples = sum(len(theta) for theta in self._theta_bank[start_idx:])
 
-        # Select random neural_net and validation splits from (theta, x) pairs.
+        # Select random neural net and validation splits from (theta, x) pairs.
         permuted_indices = torch.randperm(num_total_examples)
         num_training_examples = int((1 - validation_fraction) * num_total_examples)
         num_validation_examples = num_total_examples - num_training_examples
@@ -333,7 +335,7 @@ class SnpeBase(NeuralInference, ABC):
             torch.cat(self._prior_masks[start_idx:]),
         )
 
-        # Create neural_net and validation loaders using a subset sampler.
+        # Create neural net and validation loaders using a subset sampler.
         train_loader = data.DataLoader(
             dataset,
             batch_size=min(batch_size, num_training_examples),
@@ -349,19 +351,19 @@ class SnpeBase(NeuralInference, ABC):
         )
 
         optimizer = optim.Adam(
-            list(self._neural_posterior.neural_net.parameters()), lr=learning_rate,
+            list(self._posterior.net.parameters()), lr=learning_rate,
         )
 
         # If retraining from scratch each round, reset the neural posterior
         # to the untrained copy.
         if self._retrain_from_scratch_each_round and round_ > 0:
-            self._neural_posterior = deepcopy(self._untrained_neural_posterior)
+            self._posterior = deepcopy(self._untrained_neural_posterior)
 
         epoch, self._val_log_prob = 0, float("-Inf")
         while not self._has_converged(epoch, stop_after_epochs):
 
             # Train for a single epoch.
-            self._neural_posterior.neural_net.train()
+            self._posterior.net.train()
             for batch in train_loader:
                 optimizer.zero_grad()
                 theta_batch, x_batch, masks_batch = (
@@ -376,15 +378,14 @@ class SnpeBase(NeuralInference, ABC):
                 batch_loss.backward()
                 if clip_max_norm is not None:
                     clip_grad_norm_(
-                        self._neural_posterior.neural_net.parameters(),
-                        max_norm=clip_max_norm,
+                        self._posterior.net.parameters(), max_norm=clip_max_norm,
                     )
                 optimizer.step()
 
             epoch += 1
 
             # Calculate validation performance.
-            self._neural_posterior.neural_net.eval()
+            self._posterior.net.eval()
             log_prob_sum = 0
             with torch.no_grad():
                 for batch in val_loader:
@@ -436,7 +437,7 @@ class SnpeBase(NeuralInference, ABC):
 
         if round_idx == 0:
             # Use posterior log prob (without proposal correction) for first round.
-            log_prob = self._neural_posterior.neural_net.log_prob(theta, x)
+            log_prob = self._posterior.net.log_prob(theta, x)
         else:
             # Use proposal posterior log prob tailored to snpe version (B, C).
             log_prob = self._log_prob_proposal_posterior(theta, x, masks)
@@ -457,7 +458,7 @@ class PotentialFunctionProvider:
     (https://stackoverflow.com/a/12022055).
 
     It is important to NOT initialize attributes upon instantiation, because we need the
-     most current trained posterior neural_net.
+     most current trained posterior neural net.
 
     Returns:
         Potential function for use by either numpy or pyro sampler

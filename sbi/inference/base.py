@@ -128,7 +128,7 @@ class NeuralInference(ABC):
         """
         converged = False
 
-        posterior_nn = self._neural_posterior.neural_net
+        posterior_nn = self._posterior.net
 
         # (Re)-start the epoch count with the first epoch or any improvement.
         if epoch == 0 or self._val_log_prob > self._best_val_log_prob:

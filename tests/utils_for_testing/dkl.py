@@ -4,12 +4,12 @@ import torch
 from torch import Tensor
 from torch.distributions import Distribution
 
-from sbi.inference.posteriors.sbi_posterior import Posterior
+from sbi.inference.posteriors.sbi_posterior import NeuralPosterior
 
 
 def dkl_via_monte_carlo(
-    p: Union[Posterior, Distribution],
-    q: Union[Posterior, Distribution],
+    p: Union[NeuralPosterior, Distribution],
+    q: Union[NeuralPosterior, Distribution],
     num_samples: int = 1000,
 ) -> Tensor:
     """

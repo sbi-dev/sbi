@@ -5,7 +5,7 @@ from torch import Tensor
 from torch.distributions import Distribution
 import torch.distributions
 
-from sbi.inference.posteriors.sbi_posterior import Posterior
+from sbi.inference.posteriors.sbi_posterior import NeuralPosterior
 from sbi.simulators.linear_gaussian import (
     get_true_posterior_log_prob_linear_gaussian_mvn_prior,
     get_true_posterior_log_prob_linear_gaussian_n_prior,
@@ -14,7 +14,7 @@ from tests.utils_for_testing.dkl import dkl_via_monte_carlo
 
 
 def get_dkl_gaussian_prior(
-    posterior: Posterior, true_observation: Tensor, num_dim: int
+    posterior: NeuralPosterior, true_observation: Tensor, num_dim: int
 ) -> Tensor:
     """
     Return the Kullback-Leibler divergence between estimated posterior (with Gaussian
@@ -38,7 +38,7 @@ def get_dkl_gaussian_prior(
     return dkl_via_monte_carlo(target_dist, posterior, num_samples=200)
 
 
-def get_prob_outside_uniform_prior(posterior: Posterior, num_dim: int) -> Tensor:
+def get_prob_outside_uniform_prior(posterior: NeuralPosterior, num_dim: int) -> Tensor:
     """
     Return posterior probability for a parameter set outside of the prior support.
 
@@ -54,7 +54,7 @@ def get_prob_outside_uniform_prior(posterior: Posterior, num_dim: int) -> Tensor
 
 
 def get_normalization_uniform_prior(
-    posterior: Posterior, prior: Distribution, true_observation: Tensor,
+    posterior: NeuralPosterior, prior: Distribution, true_observation: Tensor,
 ) -> Tuple[Tensor, Tensor, Tensor]:
     """
     Return the unnormalized posterior likelihood, the normalized posterior likelihood,

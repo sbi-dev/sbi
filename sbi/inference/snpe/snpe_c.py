@@ -42,7 +42,7 @@ class SnpeC(SnpeBase):
             Greenberg et al., ICML 2019, https://arxiv.org/abs/1905.07488.
 
         Args:
-            use_combined_loss: Whether to train the neural_net jointly on prior samples
+            use_combined_loss: Whether to train the neural net jointly on prior samples
                 using maximum likelihood and on all samples using atomic loss. Useful
                 to prevent density leaking when using bounded priors.
             num_atoms: Number of atoms to use for classification. If None, use all
@@ -126,9 +126,7 @@ class SnpeC(SnpeBase):
         )
 
         # Evaluate large batch giving (batch_size * num_atoms) log prob posterior evals.
-        log_prob_posterior = self._neural_posterior.neural_net.log_prob(
-            atomic_theta, repeated_x
-        )
+        log_prob_posterior = self._posterior.net.log_prob(atomic_theta, repeated_x)
         self._assert_all_finite(log_prob_posterior, "posterior eval")
         log_prob_posterior = log_prob_posterior.reshape(batch_size, num_atoms)
 
@@ -148,9 +146,7 @@ class SnpeC(SnpeBase):
 
         # XXX This evaluates the posterior on _all_ prior samples
         if self._use_combined_loss:
-            log_prob_posterior_non_atomic = self._neural_posterior.neural_net.log_prob(
-                theta, x
-            )
+            log_prob_posterior_non_atomic = self._posterior.net.log_prob(theta, x)
             masks = masks.reshape(-1)
             log_prob_proposal_posterior = (
                 masks * log_prob_posterior_non_atomic + log_prob_proposal_posterior

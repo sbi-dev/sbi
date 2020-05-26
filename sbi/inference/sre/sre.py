@@ -15,7 +15,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 import sbi.utils as utils
 from sbi.inference.base import NeuralInference
-from sbi.inference.posteriors.sbi_posterior import Posterior
+from sbi.inference.posteriors.sbi_posterior import NeuralPosterior
 from sbi.utils.torchutils import ensure_x_batched, ensure_theta_batched
 from sbi.types import ScalarFloat, OneOrMore
 
@@ -92,7 +92,7 @@ class SRE(NeuralInference):
             )
 
         # Create posterior object which can sample().
-        self._neural_posterior = Posterior(
+        self._posterior = NeuralPosterior(
             algorithm_family=self._classifier_loss,
             neural_net=classifier,
             prior=prior,
@@ -101,7 +101,7 @@ class SRE(NeuralInference):
             get_potential_function=PotentialFunctionProvider(),
         )
 
-        self._neural_posterior.neural_net.train(True)
+        self._posterior.net.train(True)
 
         # We may want to summarize high-dimensional x.
         # This may be either a fixed or learned transformation.
@@ -128,7 +128,7 @@ class SRE(NeuralInference):
         stop_after_epochs: int = 20,
         max_num_epochs: Optional[int] = None,
         clip_max_norm: Optional[float] = 5.0,
-    ) -> Posterior:
+    ) -> NeuralPosterior:
         """Run SRE
 
         This runs SRE for num_rounds rounds, using num_simulations_per_round calls to
@@ -163,7 +163,7 @@ class SRE(NeuralInference):
             if round_ == 0:
                 theta = self._prior.sample((num_sims,))
             else:
-                theta = self._neural_posterior.sample(
+                theta = self._posterior.sample(
                     num_sims, show_progressbar=self._show_progressbar
                 )
 
@@ -199,8 +199,8 @@ class SRE(NeuralInference):
                 x_bank=self._x_bank,
             )
 
-        self._neural_posterior._num_trained_rounds = num_rounds
-        return self._neural_posterior
+        self._posterior._num_trained_rounds = num_rounds
+        return self._posterior
 
     def _train(
         self,
@@ -239,7 +239,7 @@ class SRE(NeuralInference):
             torch.cat(self._theta_bank), torch.cat(self._x_bank)
         )
 
-        # Create neural_net and validation loaders using a subset sampler.
+        # Create neural net and validation loaders using a subset sampler.
 
         # NOTE: The batch_size is clipped to num_validation samples.
         clipped_batch_size = min(batch_size, num_validation_examples)
@@ -258,7 +258,7 @@ class SRE(NeuralInference):
         )
 
         optimizer = optim.Adam(
-            list(self._neural_posterior.neural_net.parameters())
+            list(self._posterior.net.parameters())
             + list(self._summary_net.parameters()),
             lr=learning_rate,
         )
@@ -269,7 +269,7 @@ class SRE(NeuralInference):
         # If we're retraining from scratch each round, reset the neural posterior
         # to the untrained copy we made at the start.
         if self._retrain_from_scratch_each_round:
-            self._neural_posterior = deepcopy(self._neural_posterior)
+            self._posterior = deepcopy(self._posterior)
 
         def _get_loss(theta, x):
 
@@ -301,7 +301,7 @@ class SRE(NeuralInference):
             theta_and_x = torch.cat((atomic_theta, repeated_x), dim=1)
 
             if self._classifier_loss == "aalr":
-                network_outputs = self._neural_posterior.neural_net(theta_and_x)
+                network_outputs = self._posterior.net(theta_and_x)
                 likelihood = torch.squeeze(torch.sigmoid(network_outputs))
 
                 # Alternating pairs where there is one sampled from the joint and one
@@ -313,7 +313,7 @@ class SRE(NeuralInference):
                 # Binary cross entropy to learn the likelihood.
                 loss = criterion(likelihood, labels)
             else:
-                logits = self._neural_posterior.neural_net(theta_and_x).reshape(
+                logits = self._posterior.net(theta_and_x).reshape(
                     clipped_batch_size, num_atoms
                 )
                 # Index 0 is the theta sampled from the joint.
@@ -327,22 +327,21 @@ class SRE(NeuralInference):
         while not self._has_converged(epoch, stop_after_epochs):
 
             # Train for a single epoch.
-            self._neural_posterior.neural_net.train()
+            self._posterior.net.train()
             for theta_batch, x_batch in train_loader:
                 optimizer.zero_grad()
                 loss = _get_loss(theta_batch, x_batch)
                 loss.backward()
                 if clip_max_norm is not None:
                     clip_grad_norm_(
-                        self._neural_posterior.neural_net.parameters(),
-                        max_norm=clip_max_norm,
+                        self._posterior.net.parameters(), max_norm=clip_max_norm,
                     )
                 optimizer.step()
 
             epoch += 1
 
             # Calculate validation performance.
-            self._neural_posterior.neural_net.eval()
+            self._posterior.net.eval()
             log_prob_sum = 0
             with torch.no_grad():
                 for theta_batch, x_batch in val_loader:
@@ -391,7 +390,7 @@ class PotentialFunctionProvider:
     (https://stackoverflow.com/a/12022055).
 
     It is important to NOT initialize attributes upon instantiation, because we need the
-     most current trained posterior neural_net.
+     most current trained posterior neural net.
 
     Returns:
         Potential function for use by either numpy or pyro sampler

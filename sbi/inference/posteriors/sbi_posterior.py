@@ -16,7 +16,7 @@ from sbi.utils.torchutils import atleast_2d
 NEG_INF = torch.tensor(float("-inf"), dtype=torch.float32)
 
 
-class Posterior:
+class NeuralPosterior:
     r"""Posterior $p(\theta|x_o)$ with evaluation and sampling methods.
 
     This class is used by inference algorithms as follows:
@@ -46,7 +46,7 @@ class Posterior:
             sample_with_mcmc: Whether to sample with MCMC to correct leakage.
         """
 
-        self.neural_net = neural_net
+        self.net = neural_net
         self._prior = prior
         self.x_o = x_o
 
@@ -90,7 +90,7 @@ class Posterior:
         """
 
         # TODO Train exited here, entered after sampling?
-        self.neural_net.eval()
+        self.net.eval()
 
         theta, x = utils.match_shapes_of_theta_and_x(
             theta, x, self.x_o, norm_posterior_snpe
@@ -115,7 +115,7 @@ class Posterior:
         but it will always zeroed out($-\infty$ log-prob)outside of the prior support.
         """
 
-        unnorm_log_prob = self.neural_net.log_prob(theta, x)
+        unnorm_log_prob = self.net.log_prob(theta, x)
         is_prior_finite = torch.isfinite(self._prior.log_prob(theta))
 
         # Force probability to be zero outside prior support.
@@ -126,7 +126,7 @@ class Posterior:
         return masked_log_prob - log_factor
 
     def _log_prob_classifier(self, theta: Tensor, x: Tensor) -> Tensor:
-        log_ratio = self.neural_net(torch.cat((theta, x)).reshape(1, -1))
+        log_ratio = self.net(torch.cat((theta, x)).reshape(1, -1))
         return log_ratio + self._prior.log_prob(theta)
 
     def _log_prob_sre(self, theta: Tensor, x: Tensor) -> Tensor:
@@ -174,7 +174,7 @@ class Posterior:
 
         def acceptance_at(x: Tensor) -> Tensor:
             return utils.sample_posterior_within_prior(
-                self.neural_net, self._prior, x, num_rejection_samples, show_progressbar
+                self.net, self._prior, x, num_rejection_samples, show_progressbar
             )[1]
 
         # Short-circuit here for performance: if identical no need to check equality.
@@ -221,7 +221,7 @@ class Posterior:
             else:
                 # Rejection sampling.
                 samples, _ = utils.sample_posterior_within_prior(
-                    self.neural_net,
+                    self.net,
                     self._prior,
                     x,
                     num_samples=num_samples,
@@ -263,7 +263,7 @@ class Posterior:
 
         # TODO Maybe get whole sampler instead of just potential function?
         potential_fn = self._get_potential_function(
-            self._prior, self.neural_net, x, mcmc_method
+            self._prior, self.net, x, mcmc_method
         )
         if mcmc_method == "slice_np":
             samples = self.slice_np_mcmc(num_samples, potential_fn, x, thin, warmup)
@@ -292,7 +292,7 @@ class Posterior:
 
         # go into eval mode for evaluating during sampling
         # XXX set eval mode outside of calls to sample
-        self.neural_net.eval()
+        self.net.eval()
 
         posterior_sampler = SliceSampler(
             utils.tensor2numpy(self._prior.sample((1,))).reshape(-1),
@@ -306,7 +306,7 @@ class Posterior:
 
         # back to training mode
         # XXX train exited in log_prob, entered here?
-        self.neural_net.train(True)
+        self.net.train(True)
 
         return torch.tensor(samples, dtype=torch.float32)
 
@@ -342,7 +342,7 @@ class Posterior:
 
         # TODO move outside function, and assert inside; remember return to train
         # Always sample in eval mode.
-        self.neural_net.eval()
+        self.net.eval()
 
         kernels = dict(slice=Slice, hmc=HMC, nuts=NUTS)
 
@@ -380,7 +380,7 @@ class Posterior:
             "please simply pass the already encoded summary features as input and pass "
             "embedding_net=None"
         )
-        self.neural_net._embedding_net = embedding_net
+        self.net._embedding_net = embedding_net
 
     def _x_else_x_o(self, x: Optional[Array]) -> Array:
         if x is not None:
