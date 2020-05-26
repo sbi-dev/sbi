@@ -1,5 +1,5 @@
 site_name: sbi 
-site_url: "http://mackelab.org/sbi/"
+site_url: "https://mackelab.org/sbi/"
   
 nav:
   - Home: index.md
@@ -22,7 +22,7 @@ theme:
 
 extra:
   social:
-    - type: 'github'
+    - icon: 'fontawesome/brands/github-alt'
       link: 'https://github.com/mackelab/sbi'
 
 markdown_extensions:
