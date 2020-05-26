@@ -7,7 +7,7 @@ import torchtestcase
 
 from sbi.utils import torchutils
 from torch import zeros, ones, eye
-from tests.utils_for_testing.dkl import dkl_via_monte_carlo
+from tests.test_utils import dkl_via_monte_carlo
 
 
 # XXX move to pytest? - investigate how to derive from TorchTestCase
