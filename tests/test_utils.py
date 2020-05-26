@@ -14,8 +14,8 @@ from sbi.simulators.linear_gaussian import (
 
 
 def dkl_via_monte_carlo(
-    p: Union[Posterior, Distribution],
-    q: Union[Posterior, Distribution],
+    p: Union[NeuralPosterior, Distribution],
+    q: Union[NeuralPosterior, Distribution],
     num_samples: int = 1000,
 ) -> Tensor:
     r"""
@@ -128,10 +128,10 @@ def check_c2st(x: Tensor, y: Tensor, alg: str, tol: float = 0.1) -> None:
     """Compute classification based two-sample test accuracy and assert it close to
     chance."""
 
-    score = c2st(x, y)
+    score = c2st(x, y).item()
 
-    print(f"c2st for {alg} is {score}.")
+    print(f"c2st for {alg} is {score:.2f}.")
 
     assert (
         (0.5 - tol) <= score <= (0.5 + tol)
-    ), f"c2st={score} is too far from the desired near-chance performance."
+    ), f"c2st={score:.2f} is too far from the desired near-chance performance."

@@ -2,26 +2,28 @@ import numpy as np
 import torch
 
 from typing import Optional
+from torch import Tensor
 from sklearn.model_selection import KFold, cross_val_score
 from sklearn.neural_network import MLPClassifier
 
 
 def c2st(
-    X: torch.Tensor,
-    Y: torch.Tensor,
+    X: Tensor,
+    Y: Tensor,
     seed: int = 1,
     n_folds: int = 5,
     scoring: str = "accuracy",
     z_score: bool = True,
     noise_scale: Optional[float] = None,
-) -> torch.Tensor:
-    """Classifier-based 2-sample test returning accuracy
+) -> Tensor:
+    """Return accuracy of classifier trained to distinguish samples from two distributions.
+
     Trains classifiers with N-fold cross-validation [1]. Scikit learn MLPClassifier are
     used, with 2 hidden layers of 10x dim each, where dim is the dimensionality of the
     samples X and Y.
     Args:
-        X: Sample 1
-        Y: Sample 2
+        X: Samples from one distribution.
+        Y: Samples from another distribution.
         seed: Seed for sklearn
         n_folds: Number of folds
         z_score: Z-scoring using X
