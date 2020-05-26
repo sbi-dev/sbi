@@ -5,7 +5,7 @@
 The focus of `sbi` is _Sequential Neural Posterior Estimation_ (SNPE). In SNPE, a neural network is trained to perform Bayesian inference on simulated data.
 
 - To see illustrations of SNPE on canonical problems in neuroscience, read our preprint:
-[Training deep neural density estimators to identify mechanistic models of neural dynamics](https://www.biorxiv.org/content/10.1101/838383v1).
+[Training deep neural density estimators to identify mechanistic models of neural dynamics](https://www.biorxiv.org/content/10.1101/838383v3).
 - To learn more about the general motivation behind simulation-based inference, and algorithms included in `sbi`, keep on reading.
 
 
