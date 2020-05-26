@@ -4,7 +4,12 @@ from torch import zeros, ones, eye
 from torch.distributions import MultivariateNormal
 
 import sbi.utils as utils
-import tests.utils_for_testing.linearGaussian_logprob as test_utils
+from tests.test_utils import (
+    check_c2st,
+    get_dkl_gaussian_prior,
+    get_prob_outside_uniform_prior,
+    get_normalization_uniform_prior,
+)
 from sbi.inference.snpe.snpe_b import SnpeB
 from sbi.inference.snpe.snpe_c import SnpeC
 from sbi.simulators.linear_gaussian import (
@@ -12,23 +17,25 @@ from sbi.simulators.linear_gaussian import (
     get_true_posterior_samples_linear_gaussian_uniform_prior,
     linear_gaussian,
 )
-from sbi.user_input.user_input_checks import prepare_sbi_problem
 
 # Use cpu by default.
 torch.set_default_tensor_type("torch.FloatTensor")
+# Seeding:
+# Some tests in this module have "set_seed" as an argument. This argument points to
+# tests/conftest.py to seed the test with the seed set in conftext.py.
 
 
 @pytest.mark.parametrize(
     "num_dim, prior_str, algorithm_str, simulation_batch_size",
     (
-        (3, "gaussian", "snpe_c", 10),
-        (3, "uniform", "snpe_c", 10),
+        (2, "gaussian", "snpe_c", 10),
+        (2, "gaussian", "snpe_c", 1),
+        (2, "uniform", "snpe_c", 10),
         (1, "gaussian", "snpe_c", 10),
-        (3, "gaussian", "snpe_b", 10),
-        (3, "gaussian", "snpe_c", 1),
+        (2, "gaussian", "snpe_b", 10),
     ),
 )
-def test_snpe_on_linearGaussian_based_on_mmd(
+def test_snpe_on_linearGaussian_based_on_c2st(
     num_dim: int,
     prior_str: str,
     algorithm_str: str,
@@ -37,14 +44,12 @@ def test_snpe_on_linearGaussian_based_on_mmd(
 ):
     """Test whether SNPE B/C infer well a simple example with available round truth.
 
-    This test is seeded using the set_seed fixture defined in tests/conftest.py.
-
     Args:
-        set_seed: fixture for manual seeding, see tests/conftest.py
+        set_seed: fixture for manual seeding
     """
 
     x_o = zeros(1, num_dim)
-    num_samples = 100
+    num_samples = 300
 
     if prior_str == "gaussian":
         prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
@@ -57,10 +62,8 @@ def test_snpe_on_linearGaussian_based_on_mmd(
             x_o, num_samples=num_samples, prior=prior
         )
 
-    simulator, prior, x_o = prepare_sbi_problem(linear_gaussian, prior, x_o)
-
     snpe_common_args = dict(
-        simulator=simulator,
+        simulator=linear_gaussian,
         x_o=x_o,
         density_estimator=None,  # Use default MAF.
         prior=prior,
@@ -78,20 +81,13 @@ def test_snpe_on_linearGaussian_based_on_mmd(
     posterior = infer(num_rounds=1, num_simulations_per_round=1000)  # type: ignore
     samples = posterior.sample(num_samples)
 
-    # Compute the mmd, and check if larger than expected
-    mmd = utils.unbiased_mmd_squared(target_samples, samples)
-    max_mmd = 0.03
-
-    print(f"mmd for {algorithm_str} is {mmd}.")
-
-    assert (
-        mmd < max_mmd
-    ), f"MMD={mmd} is more than 2 stds above the average performance."
+    # Compute the c2st and assert it is near chance level of 0.5.
+    check_c2st(samples, target_samples, alg=algorithm_str)
 
     # Checks for log_prob()
     if prior_str == "gaussian":
         # For the Gaussian prior, we compute the KLd between ground truth and posterior.
-        dkl = test_utils.get_dkl_gaussian_prior(posterior, x_o, num_dim)
+        dkl = get_dkl_gaussian_prior(posterior, x_o, num_dim)
 
         max_dkl = 0.05 if num_dim == 1 else 0.8
 
@@ -101,7 +97,7 @@ def test_snpe_on_linearGaussian_based_on_mmd(
 
     elif prior_str == "uniform":
         # Check whether the returned probability outside of the support is zero.
-        posterior_prob = test_utils.get_prob_outside_uniform_prior(posterior, num_dim)
+        posterior_prob = get_prob_outside_uniform_prior(posterior, num_dim)
         assert (
             posterior_prob == 0.0
         ), "The posterior probability outside of the prior support is not zero"
@@ -113,7 +109,7 @@ def test_snpe_on_linearGaussian_based_on_mmd(
             posterior_likelihood_unnorm,
             posterior_likelihood_norm,
             acceptance_prob,
-        ) = test_utils.get_normalization_uniform_prior(posterior, prior, x_o)
+        ) = get_normalization_uniform_prior(posterior, prior, x_o)
         # The acceptance probability should be *exactly* the ratio of the unnormalized
         # and the normalized likelihood. However, we allow for an error margin of 1%,
         # since the estimation of the acceptance probability is random (based on
@@ -127,28 +123,24 @@ def test_snpe_on_linearGaussian_based_on_mmd(
 
 # Test multi-round SNPE.
 @pytest.mark.parametrize("algorithm_str", ("snpe_b", "snpe_c"))
-def test_multi_round_snpe_on_linearGaussian_based_on_mmd(algorithm_str: str, set_seed):
+def test_multi_round_snpe_on_linearGaussian_based_on_c2st(algorithm_str: str, set_seed):
     """Test whether SNPE B/C infer well a simple example with available ground truth.
 
-    This test is seeded using the set_seed fixture defined in tests/conftest.py.
-
     Args:
-        set_seed: fixture for manual seeding, see tests/conftest.py.
+        set_seed: fixture for manual seeding.
     """
 
-    num_dim = 3
+    num_dim = 2
     true_observation = zeros((1, num_dim))
-    num_samples = 100
+    num_samples = 300
 
     prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
     target_samples = get_true_posterior_samples_linear_gaussian_mvn_prior(
         true_observation, num_samples=num_samples
     )
 
-    simulator, prior, _ = prepare_sbi_problem(linear_gaussian, prior, true_observation)
-
     snpe_common_args = dict(
-        simulator=simulator,
+        simulator=linear_gaussian,
         x_o=true_observation,
         density_estimator=None,  # Use default MAF.
         prior=prior,
@@ -170,19 +162,13 @@ def test_multi_round_snpe_on_linearGaussian_based_on_mmd(algorithm_str: str, set
     posterior = infer(num_rounds=2, num_simulations_per_round=1000)  # type: ignore
     samples = posterior.sample(num_samples)
 
-    # Compute the mmd, and check if larger than expected.
-    mmd = utils.unbiased_mmd_squared(target_samples, samples)
-    max_mmd = 0.027
-
-    print(f"mmd for {algorithm_str} is {mmd}.")
-
-    assert (
-        mmd < max_mmd
-    ), f"MMD={mmd} is more than 2 stds above the average performance."
-    samples = posterior.sample(num_samples)
+    # Compute the c2st and assert it is near chance level of 0.5.
+    check_c2st(samples, target_samples, alg=algorithm_str)
 
 
-_fail_reason_deterministic_sim = """If the simulator has truely deterministic (even partial) outputs, the inference can succeed with z_score_std > 0, but the log posterior will have infinites, which we reject."""
+_fail_reason_deterministic_sim = """If the simulator has truely deterministic (even
+partial) outputs, the inference can succeed with z_score_std > 0, but the log posterior
+will have infinites, which we reject."""
 
 
 @pytest.mark.parametrize(
@@ -204,27 +190,19 @@ _fail_reason_deterministic_sim = """If the simulator has truely deterministic (e
 )
 def test_multi_round_snpe_deterministic_simulator(set_seed, z_score_min_std):
     """Test if a deterministic simulator breaks inference for SNPE B.
-    
-    This test is seeded using the set_seed fixture defined in tests/conftest.py.
 
     Args:
-        set_seed: fixture for manual seeding, see tests/conftest.py.
+        set_seed: fixture for manual seeding
     """
 
     num_dim = 3
     true_observation = zeros((1, num_dim))
-    num_samples = 100
 
     prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
-    target_samples = get_true_posterior_samples_linear_gaussian_mvn_prior(
-        true_observation, num_samples=num_samples
-    )
-
-    simulator, prior, _ = prepare_sbi_problem(linear_gaussian, prior, true_observation)
 
     def deterministic_simulator(theta):
         """Simulator with deterministic last output dimension (across batches)."""
-        result = simulator(theta)
+        result = linear_gaussian(theta)
         result[:, num_dim - 1] = 1.0
 
         return result
@@ -261,10 +239,8 @@ def test_snpec_posterior_correction(sample_with_mcmc, mcmc_method, prior, set_se
     """Test that leakage correction applied to sampling works, with both MCMC and
     rejection.
 
-    This test is seeded using the set_seed fixture defined in tests/conftest.py.
-
     Args:
-        set_seed: fixture for manual seeding, see tests/conftest.py.
+        set_seed: fixture for manual seeding
     """
 
     num_dim = 2
@@ -274,11 +250,9 @@ def test_snpec_posterior_correction(sample_with_mcmc, mcmc_method, prior, set_se
     else:
         prior = utils.BoxUniform(low=-1.0 * ones(num_dim), high=ones(num_dim))
 
-    simulator, prior, x_o = prepare_sbi_problem(linear_gaussian, prior, zeros(num_dim))
-
     infer = SnpeC(
-        simulator=simulator,
-        x_o=x_o,
+        simulator=linear_gaussian,
+        x_o=zeros(num_dim),
         density_estimator=None,  # Use default MAF.
         prior=prior,
         num_atoms=None,
