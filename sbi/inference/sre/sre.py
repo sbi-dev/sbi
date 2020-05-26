@@ -17,7 +17,6 @@ import sbi.utils as utils
 from sbi.inference.base import NeuralInference
 from sbi.inference.posteriors.sbi_posterior import Posterior
 from sbi.utils.torchutils import ensure_x_batched, ensure_theta_batched
-from sbi.types import ScalarFloat, OneOrMore
 from sbi.utils.sbiutils import find_nan_in_simulations, warn_on_too_many_nans
 
 
@@ -30,7 +29,7 @@ class SRE(NeuralInference):
         classifier: Optional[nn.Module] = None,
         num_atoms: Optional[int] = None,
         simulation_batch_size: int = 1,
-        mcmc_method: str = "slice_np",
+        mcmc_method: str = "slice-np",
         summary_net: Optional[nn.Module] = None,
         classifier_loss: str = "sre",
         retrain_from_scratch_each_round: bool = False,
@@ -126,7 +125,7 @@ class SRE(NeuralInference):
     def __call__(
         self,
         num_rounds: int,
-        num_simulations_per_round: OneOrMore[int],
+        num_simulations_per_round: Union[List[int], int],
         batch_size: int = 100,
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
@@ -427,7 +426,7 @@ class PotentialFunctionProvider:
             classifier: Binary classifier approximating the likelihood up to a constant.
 
             x: Conditioning variable for posterior $p(\theta|x)$.
-            mcmc_method: One of `slice_np`, `slice`, `hmc` or `nuts`.
+            mcmc_method: One of `slice-np`, `slice`, `hmc` or `nuts`.
 
         Returns:
             Potential function for sampler.
@@ -442,7 +441,7 @@ class PotentialFunctionProvider:
         else:
             return self.np_potential
 
-    def np_potential(self, theta: np.array) -> ScalarFloat:
+    def np_potential(self, theta: np.array) -> Union[Tensor, float]:
         """Return potential for Numpy slice sampler."
 
         Args:

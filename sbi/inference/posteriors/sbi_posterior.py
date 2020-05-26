@@ -263,7 +263,7 @@ class Posterior:
         self,
         num_samples: int,
         x: Tensor,
-        mcmc_method: str = "slice_np",
+        mcmc_method: str = "slice-np",
         thin: int = 10,
         warmup: int = 20,
         num_chains: Optional[int] = 1,
@@ -288,10 +288,10 @@ class Posterior:
             tensor of shape (num_samples, shape_of_single_theta)
         """
 
-        # when using slice_np as mcmc sampler, we can only have a single chain
-        if mcmc_method == "slice_np" and num_chains > 1:
+        # when using slice-np as mcmc sampler, we can only have a single chain
+        if mcmc_method == "slice-np" and num_chains > 1:
             warn(
-                "slice_np does not support multiple mcmc chains. Using just a single chain."
+                "slice-np does not support multiple mcmc chains. Using just a single chain."
             )
 
         # XXX: maybe get whole sampler instead of just potential function?

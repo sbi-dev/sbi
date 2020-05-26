@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Callable, Dict, Optional
+from typing import Callable, Dict, Optional, Union, List
 import warnings
 import logging
 
@@ -13,7 +13,6 @@ from torch.utils.tensorboard import SummaryWriter
 
 from sbi.inference.base import NeuralInference
 from sbi.inference.posteriors.sbi_posterior import Posterior
-from sbi.types import ScalarFloat, OneOrMore
 import sbi.utils as utils
 from sbi.utils.sbiutils import find_nan_in_simulations, warn_on_too_many_nans
 
@@ -30,7 +29,7 @@ class SNL(NeuralInference):
         device: Optional[torch.device] = None,
         num_workers: int = 1,
         worker_batch_size: int = 20,
-        mcmc_method: str = "slice_np",
+        mcmc_method: str = "slice-np",
         skip_input_checks: bool = False,
         show_progressbar: bool = True,
         show_round_summary: bool = False,
@@ -94,7 +93,7 @@ class SNL(NeuralInference):
     def __call__(
         self,
         num_rounds: int,
-        num_simulations_per_round: OneOrMore[int],
+        num_simulations_per_round: Union[List[int], int],
         batch_size: int = 100,
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
@@ -339,7 +338,7 @@ class PotentialFunctionProvider:
             prior: Prior distribution that can be evaluated.
             likelihood_nn: Neural likelihood estimator that can be evaluated.
             x: Conditioning variable for posterior $p(\theta|x)$.
-            mcmc_method: One of `slice_np`, `slice`, `hmc` or `nuts`.
+            mcmc_method: One of `slice-np`, `slice`, `hmc` or `nuts`.
 
         Returns:
             Potential function for sampler.
@@ -353,7 +352,7 @@ class PotentialFunctionProvider:
         else:
             return self.np_potential
 
-    def np_potential(self, theta: np.array) -> ScalarFloat:
+    def np_potential(self, theta: np.array) -> Union[Tensor, float]:
         r"""Return posterior log prob. of theta $p(\theta|x)$"
 
         Args:

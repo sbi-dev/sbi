@@ -1,7 +1,7 @@
 from abc import ABC
 from copy import deepcopy
 from sbi.utils.sbiutils import find_nan_in_simulations
-from typing import Callable, Optional, Tuple, Dict
+from typing import Callable, Optional, Tuple, Dict, Union, List
 import warnings
 import logging
 
@@ -15,10 +15,9 @@ from torch.utils.tensorboard import SummaryWriter
 
 from sbi.inference.base import NeuralInference
 from sbi.inference.posteriors.sbi_posterior import Posterior
-from sbi.types import ScalarFloat, OneOrMore
 import sbi.utils as utils
 from sbi.utils import Standardize
-from sbi.utils.sbiutils import mark_nans_with_zero, warn_on_too_many_nans
+from sbi.utils.sbiutils import warn_on_too_many_nans
 
 
 class SnpeBase(NeuralInference, ABC):
@@ -36,7 +35,7 @@ class SnpeBase(NeuralInference, ABC):
         discard_prior_samples: bool = False,
         device: Optional[torch.device] = None,
         sample_with_mcmc: bool = False,
-        mcmc_method: str = "slice_np",
+        mcmc_method: str = "slice-np",
         num_workers: int = 1,
         worker_batch_size: int = 20,
         summary_writer: Optional[SummaryWriter] = None,
@@ -89,7 +88,7 @@ class SnpeBase(NeuralInference, ABC):
         # Calibration kernels proposed in Lueckmann, Goncalves et al 2017.
         if calibration_kernel is None:
             # Set default kernel such that it excludes NaN simulations.
-            self.calibration_kernel = lambda x: ones(len(x))
+            self.calibration_kernel = lambda x: ones([len(x)])
         else:
             self.calibration_kernel = calibration_kernel
 
@@ -120,7 +119,7 @@ class SnpeBase(NeuralInference, ABC):
     def __call__(
         self,
         num_rounds: int,
-        num_simulations_per_round: OneOrMore[int],
+        num_simulations_per_round: Union[List[int], int],
         batch_size: int = 100,
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
@@ -394,7 +393,6 @@ class SnpeBase(NeuralInference, ABC):
                         theta_batch, x_batch, masks
                     )
 
-                assert torch.isfinite(log_prob).all()
                 loss = -torch.mean(log_prob)
                 loss.backward()
                 if clip_max_norm is not None:
@@ -489,7 +487,7 @@ class PotentialFunctionProvider:
         else:
             return self.np_potential
 
-    def np_potential(self, theta: np.ndarray) -> ScalarFloat:
+    def np_potential(self, theta: np.ndarray) -> Union[Tensor, float]:
         r"""Return posterior theta log prob. $p(\theta|x)$, $-\infty$ if outside prior."
 
         Args:
