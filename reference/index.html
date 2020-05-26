@@ -600,7 +600,7 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <td><code>use_combined_loss</code></td>
 <td><code>bool</code></td>
 <td>
-<p>Whether to train the neural_net jointly on prior samples using maximum likelihood and on all samples using atomic loss. Useful to prevent density leaking when using bounded priors.</p>
+<p>Whether to train the neural net jointly on prior samples using maximum likelihood and on all samples using atomic loss. Useful to prevent density leaking when using bounded priors.</p>
 </td>
 <td><code>False</code></td>
 </tr>
@@ -720,7 +720,7 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <span class="sd">        Greenberg et al., ICML 2019, https://arxiv.org/abs/1905.07488.</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        use_combined_loss: Whether to train the neural_net jointly on prior samples</span>
+<span class="sd">        use_combined_loss: Whether to train the neural net jointly on prior samples</span>
 <span class="sd">            using maximum likelihood and on all samples using atomic loss. Useful</span>
 <span class="sd">            to prevent density leaking when using bounded priors.</span>
 <span class="sd">        num_atoms: Number of atoms to use for classification. If None, use all</span>
@@ -869,7 +869,7 @@ the simulator</p>
 </thead>
 <tbody>
 <tr>
-<td><code>Posterior</code></td>
+<td><code>NeuralPosterior</code></td>
 <td>
 <p>Posterior <span><span class="MathJax_Preview">p(\theta|x_o)</span><script type="math/tex">p(\theta|x_o)</script></span> that can be sampled and evaluated</p>
 </td>
@@ -979,7 +979,7 @@ the simulator</p>
     <span class="n">stop_after_epochs</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">20</span><span class="p">,</span>
     <span class="n">max_num_epochs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">clip_max_norm</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="mf">5.0</span><span class="p">,</span>
-<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Posterior</span><span class="p">:</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NeuralPosterior</span><span class="p">:</span>
     <span class="sa">r</span><span class="sd">"""Run SNL</span>
 
 <span class="sd">    This runs SNL for num_rounds rounds, using num_simulations_per_round calls to</span>
@@ -1015,7 +1015,7 @@ the simulator</p>
         <span class="k">if</span> <span class="n">round_</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
             <span class="n">theta</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_sims</span><span class="p">,))</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="n">theta</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_neural_posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span>
+            <span class="n">theta</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span>
                 <span class="n">num_sims</span><span class="p">,</span> <span class="n">show_progressbar</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_show_progressbar</span>
             <span class="p">)</span>
 
@@ -1050,8 +1050,8 @@ the simulator</p>
             <span class="n">x_bank</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_x_bank</span><span class="p">,</span>
         <span class="p">)</span>
 
-    <span class="bp">self</span><span class="o">.</span><span class="n">_neural_posterior</span><span class="o">.</span><span class="n">_num_trained_rounds</span> <span class="o">=</span> <span class="n">num_rounds</span>
-    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_neural_posterior</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_posterior</span><span class="o">.</span><span class="n">_num_trained_rounds</span> <span class="o">=</span> <span class="n">num_rounds</span>
+    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_posterior</span>
 </code></pre>
 </div>
 </td>
@@ -1225,7 +1225,7 @@ Autoregressive Flows_ by Papamakarios et al., AISTATS 2019,
         <span class="p">)</span>
 
     <span class="c1"># create neural posterior which can sample()</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">_neural_posterior</span> <span class="o">=</span> <span class="n">Posterior</span><span class="p">(</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_posterior</span> <span class="o">=</span> <span class="n">NeuralPosterior</span><span class="p">(</span>
         <span class="n">algorithm_family</span><span class="o">=</span><span class="s2">"snl"</span><span class="p">,</span>
         <span class="n">neural_net</span><span class="o">=</span><span class="n">density_estimator</span><span class="p">,</span>
         <span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span>
@@ -1235,7 +1235,7 @@ Autoregressive Flows_ by Papamakarios et al., AISTATS 2019,
     <span class="p">)</span>
 
     <span class="c1"># XXX why not density_estimator.train(True)???</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">_neural_posterior</span><span class="o">.</span><span class="n">neural_net</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_posterior</span><span class="o">.</span><span class="n">net</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
 
     <span class="c1"># SNL-specific summary_writer fields</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_summary</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s2">"mcmc_times"</span><span class="p">:</span> <span class="p">[]})</span>  <span class="c1"># type: ignore</span>
@@ -1355,7 +1355,7 @@ the simulator</p>
 </thead>
 <tbody>
 <tr>
-<td><code>Posterior</code></td>
+<td><code>NeuralPosterior</code></td>
 <td>
 <p>Posterior that can be sampled and evaluated.</p>
 </td>
@@ -1465,7 +1465,7 @@ the simulator</p>
     <span class="n">stop_after_epochs</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">20</span><span class="p">,</span>
     <span class="n">max_num_epochs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">clip_max_norm</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="mf">5.0</span><span class="p">,</span>
-<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Posterior</span><span class="p">:</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NeuralPosterior</span><span class="p">:</span>
     <span class="sd">"""Run SRE</span>
 
 <span class="sd">    This runs SRE for num_rounds rounds, using num_simulations_per_round calls to</span>
@@ -1500,7 +1500,7 @@ the simulator</p>
         <span class="k">if</span> <span class="n">round_</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
             <span class="n">theta</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_sims</span><span class="p">,))</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="n">theta</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_neural_posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span>
+            <span class="n">theta</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span>
                 <span class="n">num_sims</span><span class="p">,</span> <span class="n">show_progressbar</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_show_progressbar</span>
             <span class="p">)</span>
 
@@ -1536,8 +1536,8 @@ the simulator</p>
             <span class="n">x_bank</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_x_bank</span><span class="p">,</span>
         <span class="p">)</span>
 
-    <span class="bp">self</span><span class="o">.</span><span class="n">_neural_posterior</span><span class="o">.</span><span class="n">_num_trained_rounds</span> <span class="o">=</span> <span class="n">num_rounds</span>
-    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_neural_posterior</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_posterior</span><span class="o">.</span><span class="n">_num_trained_rounds</span> <span class="o">=</span> <span class="n">num_rounds</span>
+    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_posterior</span>
 </code></pre>
 </div>
 </td>
@@ -1789,7 +1789,7 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
         <span class="p">)</span>
 
     <span class="c1"># Create posterior object which can sample().</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">_neural_posterior</span> <span class="o">=</span> <span class="n">Posterior</span><span class="p">(</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_posterior</span> <span class="o">=</span> <span class="n">NeuralPosterior</span><span class="p">(</span>
         <span class="n">algorithm_family</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_classifier_loss</span><span class="p">,</span>
         <span class="n">neural_net</span><span class="o">=</span><span class="n">classifier</span><span class="p">,</span>
         <span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span>
@@ -1798,7 +1798,7 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
         <span class="n">get_potential_function</span><span class="o">=</span><span class="n">PotentialFunctionProvider</span><span class="p">(),</span>
     <span class="p">)</span>
 
-    <span class="bp">self</span><span class="o">.</span><span class="n">_neural_posterior</span><span class="o">.</span><span class="n">neural_net</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_posterior</span><span class="o">.</span><span class="n">net</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
 
     <span class="c1"># We may want to summarize high-dimensional x.</span>
     <span class="c1"># This may be either a fixed or learned transformation.</span>
