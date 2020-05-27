@@ -10,6 +10,7 @@ from sbi.utils.metrics import c2st
 from sbi.simulators.linear_gaussian import (
     get_true_posterior_log_prob_linear_gaussian_mvn_prior,
     get_true_posterior_log_prob_linear_gaussian_n_prior,
+    true_posterior_linear_gaussian_mvn_prior,
 )
 
 
@@ -73,6 +74,30 @@ def get_dkl_gaussian_prior(
         target_dist = get_true_posterior_log_prob_linear_gaussian_mvn_prior(
             true_observation,
         )
+
+    return dkl_via_monte_carlo(target_dist, posterior, num_samples=200)
+
+
+def get_dkl_any_gaussian_prior(
+    posterior: NeuralPosterior,
+    true_observation,
+    likelihood_shift,
+    likelihood_cov,
+    prior_mean,
+    prior_cov,
+) -> Tensor:
+    """
+    Return the Kullback-Leibler divergence between estimated posterior (with Gaussian
+    prior) and ground-truth target posterior.
+
+    Args:
+        posterior: The estimated posterior.
+        true_observation: The observation where we evaluate the posterior.
+    """
+
+    target_dist = true_posterior_linear_gaussian_mvn_prior(
+        true_observation, likelihood_shift, likelihood_cov, prior_mean, prior_cov
+    )
 
     return dkl_via_monte_carlo(target_dist, posterior, num_samples=200)
 

@@ -11,7 +11,7 @@ from torch.distributions import Beta, Distribution, Gamma, MultivariateNormal, U
 from sbi.inference.snpe import SnpeC
 from sbi.inference.snl import SNL
 from sbi.inference.sre import SRE
-from sbi.simulators.linear_gaussian import linear_gaussian
+from sbi.simulators.linear_gaussian import standard_linear_gaussian
 from sbi.user_input.user_input_checks import (
     prepare_sbi_problem,
     process_prior,
@@ -62,7 +62,7 @@ def linear_gaussian_no_batch(theta):
 
 def numpy_linear_gaussian(theta):
     """Linear Gaussian simulator wrapped to get and return numpy."""
-    return linear_gaussian(torch.as_tensor(theta, dtype=torch.float32)).numpy()
+    return standard_linear_gaussian(torch.as_tensor(theta, dtype=torch.float32)).numpy()
 
 
 def list_simulator(theta):
@@ -175,7 +175,7 @@ def test_process_prior(prior):
 def test_process_x_o(
     prior: Distribution,
     x_o: Union[Tensor, np.ndarray],
-    simulator: Optional[Callable] = linear_gaussian,
+    simulator: Optional[Callable] = standard_linear_gaussian,
 ):
     x_o, x_o_dim = process_x_o(x_o, simulator, prior)
 
@@ -193,8 +193,8 @@ def test_process_matrix_observation():
 @pytest.mark.parametrize(
     "simulator, prior",
     (
-        (linear_gaussian, BoxUniform(zeros(1), ones(1))),
-        (linear_gaussian, BoxUniform(zeros(2), ones(2))),
+        (standard_linear_gaussian, BoxUniform(zeros(1), ones(1))),
+        (standard_linear_gaussian, BoxUniform(zeros(2), ones(2))),
         (numpy_linear_gaussian, UserNumpyUniform(zeros(2), ones(2), True)),
         (linear_gaussian_no_batch, BoxUniform(zeros(2), ones(2))),
         pytest.param(list_simulator, BoxUniform(zeros(2), ones(2)),),
@@ -223,9 +223,9 @@ def test_process_simulator(simulator: Callable, prior: Distribution):
             UserNumpyUniform(zeros(3), ones(3), return_numpy=True),
             np.zeros((1, 3)),
         ),
-        (linear_gaussian, BoxUniform(zeros(3), ones(3)), zeros(1, 3)),
+        (standard_linear_gaussian, BoxUniform(zeros(3), ones(3)), zeros(1, 3)),
         (
-            linear_gaussian,
+            standard_linear_gaussian,
             BoxUniform(zeros(3, dtype=torch.float64), ones(3, dtype=torch.float64)),
             zeros(3),
         ),
@@ -235,7 +235,7 @@ def test_process_simulator(simulator: Callable, prior: Distribution):
             np.zeros((1, 3)),
         ),
         (
-            linear_gaussian,
+            standard_linear_gaussian,
             [
                 Gamma(ones(1), ones(1)),
                 Beta(ones(1), ones(1)),
@@ -270,7 +270,7 @@ def test_prepare_sbi_problem(
     "user_simulator, user_prior, user_x_o",
     (
         (
-            linear_gaussian,
+            standard_linear_gaussian,
             BoxUniform(zeros(3, dtype=torch.float64), ones(3, dtype=torch.float64)),
             zeros(3),
         ),
@@ -280,7 +280,7 @@ def test_prepare_sbi_problem(
             UserNumpyUniform(zeros(3), ones(3), return_numpy=True),
             np.zeros((1, 3)),
         ),
-        (linear_gaussian, BoxUniform(zeros(3), ones(3)), zeros(1, 3)),
+        (standard_linear_gaussian, BoxUniform(zeros(3), ones(3)), zeros(1, 3)),
         (linear_gaussian_no_batch, BoxUniform(zeros(3), ones(3)), zeros(1, 3)),
         pytest.param(list_simulator, BoxUniform(zeros(3), ones(3)), zeros(1, 3),),
         (
@@ -289,7 +289,7 @@ def test_prepare_sbi_problem(
             np.zeros((1, 3)),
         ),
         pytest.param(
-            linear_gaussian,
+            standard_linear_gaussian,
             (
                 Gamma(ones(1), ones(1)),
                 Beta(ones(1), ones(1)),
@@ -421,7 +421,7 @@ def test_skip_input_checks(method):
 
     with pytest.warns(UserWarning):
         method(
-            linear_gaussian,
+            standard_linear_gaussian,
             Uniform(zeros(1), ones(1)),
             zeros(1),
             skip_input_checks=True,
