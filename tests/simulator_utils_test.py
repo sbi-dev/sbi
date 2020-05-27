@@ -4,7 +4,7 @@ import pytest
 import torch
 from torch import ones, zeros
 
-from sbi.simulators.linear_gaussian import linear_gaussian
+from sbi.simulators.linear_gaussian import standard_linear_gaussian
 from sbi.simulators.simutils import simulate_in_batches
 from sbi.utils.torchutils import BoxUniform
 
@@ -19,7 +19,7 @@ torch.set_default_tensor_type("torch.FloatTensor")
 def test_simulate_in_batches(
     num_sims,
     batch_size,
-    simulator=linear_gaussian,
+    simulator=standard_linear_gaussian,
     prior=BoxUniform(zeros(5), ones(5)),
 ):
     """Test combinations of num_sims and simulation_batch_size. """
