@@ -1,4 +1,4 @@
-from typing import Callable, Optional
+from typing import Callable, Optional, Union
 from warnings import warn
 
 from pyro.infer.mcmc import HMC, NUTS
@@ -149,7 +149,7 @@ class NeuralPosterior:
         num_rejection_samples: int = 10_000,
         force_update: bool = False,
         show_progressbar: bool = False,
-    ) -> Tensor:
+    ) -> Union[Tensor, None]:
         r"""Return leakage correction factor for a leaky posterior density estimate.
 
         The factor is estimated from the acceptance probability during rejection 
@@ -171,6 +171,9 @@ class NeuralPosterior:
         Returns:
             Saved or newly estimated correction factor (scalar Tensor).
         """
+
+        if x is None:
+            return None
 
         def acceptance_at(x: Tensor) -> Tensor:
             return utils.sample_posterior_within_prior(

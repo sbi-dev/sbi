@@ -181,7 +181,7 @@ class NeuralInference(ABC):
         -------------------------
         Epochs trained: {epochs}
         Best validation performance: {best_validation_log_probs:.4f}
-        Leakage: {1.-posterior_acceptance_prob:.4f}
+        Acceptance rate: {posterior_acceptance_prob:.4f}
         -------------------------
         """
 
@@ -263,12 +263,12 @@ class NeuralInference(ABC):
 
         self._summary_writer.flush()
 
-    def _infer_data_dimension(self) -> Tensor:
+    def _infer_data_dimension(self) -> torch.Size:
         """
         Infers the dimensionality of a single x.
 
-        Returns: ?
-
+        Returns:
+            Shape of simulation output (without batch dimension).
         """
         if self._x_o is None:
             return self._simulator(self._prior.sample((1,))).shape[1:]

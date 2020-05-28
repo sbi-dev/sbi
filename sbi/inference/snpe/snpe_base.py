@@ -81,7 +81,7 @@ class SnpeBase(NeuralInference, ABC):
                 model="maf",
                 prior_mean=self._prior.mean,
                 prior_std=self._prior.stddev,
-                x_o_shape=self._x_o.shape,
+                x_o_shape=self._data_dimension,
             )
 
         # Calibration kernels proposed in Lueckmann, Goncalves et al 2017.
@@ -176,29 +176,7 @@ class SnpeBase(NeuralInference, ABC):
             self._model_bank.append(deepcopy(self._posterior))
             self._model_bank[-1].net.eval()
 
-            # making the call to get_leakage_correction() and the update of
-            # self._leakage_density_correction_factor explicit here. This is just
-            # to make sure this update never gets lost when we e.g. do not log our
-            # things to tensorboard anymore. Calling get_leakage_correction() is needed
-            # to update the leakage after each round.
-            acceptance_rate = self._posterior.get_leakage_correction(
-                x=self._x_o, force_update=True, show_progressbar=self._show_progressbar,
-            )
-            self._summary["rejection_sampling_acceptance_rates"].append(acceptance_rate)
-
-            # Update description for progress bar.
-            if self._show_round_summary:
-                print(self._describe_round(round_, self._summary))
-
-            # Update tensorboard and summary dict.
-            correction = self._posterior.get_leakage_correction(x=self._x_o,)
-            self._summarize(
-                round_=round_,
-                x_o=self._x_o,
-                theta_bank=self._theta_bank,
-                x_bank=self._x_bank,
-                posterior_samples_acceptance_rate=correction,
-            )
+            self._summarize_round(round_)
 
         self._posterior._num_trained_rounds = num_rounds
         return self._posterior
@@ -443,6 +421,31 @@ class SnpeBase(NeuralInference, ABC):
             log_prob = self._log_prob_proposal_posterior(theta, x, masks)
 
         return -(self.calibration_kernel(x) * log_prob)
+
+    def _summarize_round(self, round_):
+        # making the call to get_leakage_correction() and the update of
+        # self._leakage_density_correction_factor explicit here. This is just
+        # to make sure this update never gets lost when we e.g. do not log our
+        # things to tensorboard anymore. Calling get_leakage_correction() is needed
+        # to update the leakage after each round.
+        acceptance_rate = self._posterior.get_leakage_correction(
+            x=self._x_o, force_update=True, show_progressbar=self._show_progressbar,
+        )
+        self._summary["rejection_sampling_acceptance_rates"].append(acceptance_rate)
+
+        # Update description for progress bar.
+        if self._show_round_summary:
+            print(self._describe_round(round_, self._summary))
+
+        # Update tensorboard and summary dict.
+        correction = self._posterior.get_leakage_correction(x=self._x_o,)
+        self._summarize(
+            round_=round_,
+            x_o=self._x_o,
+            theta_bank=self._theta_bank,
+            x_bank=self._x_bank,
+            posterior_samples_acceptance_rate=correction,
+        )
 
 
 class PotentialFunctionProvider:
