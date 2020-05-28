@@ -74,8 +74,8 @@ class SNL(NeuralInference):
         self._posterior = NeuralPosterior(
             algorithm_family="snl",
             neural_net=density_estimator,
-            prior=prior,
-            x_o=x_o,
+            prior=self._prior,
+            x_o=self._x_o,
             mcmc_method=mcmc_method,
             get_potential_function=PotentialFunctionProvider(),
         )
