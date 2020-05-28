@@ -5,13 +5,10 @@ from torch import Tensor
 from torch.distributions import Distribution
 
 from sbi.inference.posteriors.sbi_posterior import NeuralPosterior
+
 from sbi.utils.metrics import c2st
 
-from sbi.simulators.linear_gaussian import (
-    get_true_posterior_log_prob_linear_gaussian_mvn_prior,
-    get_true_posterior_log_prob_linear_gaussian_n_prior,
-    true_posterior_linear_gaussian_mvn_prior,
-)
+from sbi.simulators.linear_gaussian import true_posterior_linear_gaussian_mvn_prior
 
 
 def dkl_via_monte_carlo(
@@ -54,37 +51,12 @@ def dkl_via_monte_carlo(
 
 
 def get_dkl_gaussian_prior(
-    posterior: NeuralPosterior, true_observation: Tensor, num_dim: int
-) -> Tensor:
-    """
-    Return the Kullback-Leibler divergence between estimated posterior (with Gaussian
-    prior) and ground-truth target posterior.
-
-    Args:
-        posterior: estimated posterior
-        true_observation: observation where we evaluate the posterior
-        num_dim: dimensionality of the problem
-    """
-
-    if num_dim == 1:
-        target_dist = get_true_posterior_log_prob_linear_gaussian_n_prior(
-            true_observation,
-        )
-    else:
-        target_dist = get_true_posterior_log_prob_linear_gaussian_mvn_prior(
-            true_observation,
-        )
-
-    return dkl_via_monte_carlo(target_dist, posterior, num_samples=200)
-
-
-def get_dkl_any_gaussian_prior(
     posterior: NeuralPosterior,
-    true_observation,
-    likelihood_shift,
-    likelihood_cov,
-    prior_mean,
-    prior_cov,
+    true_observation: Tensor,
+    likelihood_shift: Tensor,
+    likelihood_cov: Tensor,
+    prior_mean: Tensor,
+    prior_cov: Tensor,
 ) -> Tensor:
     """
     Return the Kullback-Leibler divergence between estimated posterior (with Gaussian
@@ -93,6 +65,10 @@ def get_dkl_any_gaussian_prior(
     Args:
         posterior: The estimated posterior.
         true_observation: The observation where we evaluate the posterior.
+        likelihood_shift: Mean of the likelihood p(x|theta) is likelihood_shift+theta.
+        likelihood_cov: Covariance matrix of likelihood.
+        prior_mean: Mean of prior.
+        prior_cov: Covariance matrix of prior.
     """
 
     target_dist = true_posterior_linear_gaussian_mvn_prior(
