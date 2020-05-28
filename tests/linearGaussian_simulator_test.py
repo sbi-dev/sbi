@@ -1,11 +1,11 @@
 import pytest
 import torch
 
-from sbi.simulators.linear_gaussian import standard_linear_gaussian, linear_gaussian
+from sbi.simulators.linear_gaussian import diagonal_linear_gaussian, linear_gaussian
 
 
 @pytest.mark.parametrize("D, N", ((1, 10000), (5, 100000)))
-def test_linearGaussian_simulator(D: int, N: int):
+def test_standardlinearGaussian_simulator(D: int, N: int):
     """Test linear Gaussian simulator.
 
     Args:
@@ -16,7 +16,7 @@ def test_linearGaussian_simulator(D: int, N: int):
     true_parameters = torch.zeros(D)
     num_simulations = N
     parameters = true_parameters.repeat(num_simulations).reshape(-1, D)
-    xs = standard_linear_gaussian(parameters)
+    xs = diagonal_linear_gaussian(parameters)
 
     # Check shapes.
     assert parameters.shape == torch.Size(
@@ -34,7 +34,7 @@ def test_linearGaussian_simulator(D: int, N: int):
 
 
 @pytest.mark.parametrize("D, N", ((1, 10000), (5, 100000)))
-def test_anylinearGaussian_simulator(D: int, N: int):
+def test_linearGaussian_simulator(D: int, N: int):
     """Test linear Gaussian simulator.
 
     Args:

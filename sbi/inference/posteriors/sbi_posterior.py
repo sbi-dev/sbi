@@ -259,7 +259,6 @@ class NeuralPosterior:
         x = atleast_2d_float32_tensor(self._x_else_x_o(x))
         self._ensure_single_x(x)
         self._ensure_x_consistent_with_x_o(x)
-        
 
         with torch.no_grad():
             if self._sample_with_mcmc:
