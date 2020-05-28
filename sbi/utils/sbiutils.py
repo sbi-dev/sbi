@@ -165,6 +165,7 @@ def sample_posterior_within_prior(
 
         num_accepted = are_within_prior.sum().item()
         pbar.update(num_accepted)
+        num_remaining -= num_accepted
 
         # To avoid endless sampling when leakage is high, we raise a warning if the
         # acceptance rate is too low after the first 1_000 samples.
@@ -181,8 +182,6 @@ def sample_posterior_within_prior(
                     and switching to `sample_with_mcmc=True`."""
             )
             leakage_warning_raised = True  # Ensure warning is raised just once.
-
-        num_remaining -= num_accepted
 
     pbar.close()
 
