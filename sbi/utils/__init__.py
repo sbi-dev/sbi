@@ -4,7 +4,6 @@ from sbi.utils.metrics import biased_mmd, unbiased_mmd_squared, c2st
 from sbi.utils.plot.plot import samples_nd
 from sbi.utils.sbiutils import (
     Standardize,
-    match_shapes_of_theta_and_x,
     sample_posterior_within_prior,
 )
 from sbi.utils.torchutils import (
