@@ -1199,8 +1199,8 @@ Autoregressive Flows_ by Papamakarios et al., AISTATS 2019,
     <span class="bp">self</span><span class="o">.</span><span class="n">_posterior</span> <span class="o">=</span> <span class="n">NeuralPosterior</span><span class="p">(</span>
         <span class="n">algorithm_family</span><span class="o">=</span><span class="s2">"snl"</span><span class="p">,</span>
         <span class="n">neural_net</span><span class="o">=</span><span class="n">density_estimator</span><span class="p">,</span>
-        <span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span>
-        <span class="n">x_o</span><span class="o">=</span><span class="n">x_o</span><span class="p">,</span>
+        <span class="n">prior</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_prior</span><span class="p">,</span>
+        <span class="n">x_o</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_x_o</span><span class="p">,</span>
         <span class="n">mcmc_method</span><span class="o">=</span><span class="n">mcmc_method</span><span class="p">,</span>
         <span class="n">get_potential_function</span><span class="o">=</span><span class="n">PotentialFunctionProvider</span><span class="p">(),</span>
     <span class="p">)</span>
@@ -1763,8 +1763,8 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
     <span class="bp">self</span><span class="o">.</span><span class="n">_posterior</span> <span class="o">=</span> <span class="n">NeuralPosterior</span><span class="p">(</span>
         <span class="n">algorithm_family</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_classifier_loss</span><span class="p">,</span>
         <span class="n">neural_net</span><span class="o">=</span><span class="n">classifier</span><span class="p">,</span>
-        <span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span>
-        <span class="n">x_o</span><span class="o">=</span><span class="n">x_o</span><span class="p">,</span>
+        <span class="n">prior</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_prior</span><span class="p">,</span>
+        <span class="n">x_o</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_x_o</span><span class="p">,</span>
         <span class="n">mcmc_method</span><span class="o">=</span><span class="n">mcmc_method</span><span class="p">,</span>
         <span class="n">get_potential_function</span><span class="o">=</span><span class="n">PotentialFunctionProvider</span><span class="p">(),</span>
     <span class="p">)</span>
