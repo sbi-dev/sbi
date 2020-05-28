@@ -422,7 +422,7 @@ def get_batch_dim_simulator(simulator: Callable) -> Callable:
 
 def process_x_o(
     x_o: Union[Tensor, ndarray], simulator: Callable, prior
-) -> Tuple[Tensor, int]:
+) -> Tuple[Union[Tensor, None], Union[int, None]]:
     """Return observed data to sbi's shape and type requirements.
 
     Args:
@@ -435,6 +435,9 @@ def process_x_o(
         x_o: observed data with shape corrected for usage in SBI.
         x_o_dim: number of elements in a single data point.
     """
+
+    if x_o is None:
+        return None, None
 
     # maybe add batch dimension, cast to tensor
     x_o = atleast_2d(x_o)
@@ -530,23 +533,59 @@ def check_sbi_problem(simulator: Callable, prior, x_o: Tensor):
     theta_batch_shape, *_ = theta.shape
     simulation = simulator(theta)
     sim_batch_shape, *sim_event_shape = simulation.shape
-    _, *obs_event_shape = x_o.shape
 
+    check_prior(theta, theta_batch_shape, num_prior_samples)
+    check_simulator(simulation, sim_batch_shape, num_prior_samples)
+    if x_o is not None:
+        _, *obs_event_shape = x_o.shape
+        check_x_o(x_o, obs_event_shape, sim_event_shape, num_prior_samples, simulation)
+
+
+def check_prior(theta: Tensor, theta_batch_shape: int, num_prior_samples: int):
+    """
+    Check the prior.
+
+    Checks if sampled theta is a tensor and if the number of samples is reflected in the
+    batch shape of the samples.
+    """
     assert isinstance(theta, Tensor), "Parameters theta must be a Tensor."
-    assert isinstance(simulation, Tensor), "Simulator output must be a Tensor."
-    assert isinstance(x_o, Tensor), "Observation must be a Tensor."
-
     assert (
         theta_batch_shape == num_prior_samples
     ), f"""Theta batch shape {theta_batch_shape} must match
-        num_samples={num_prior_samples}."""
+            num_samples={num_prior_samples}."""
+
+
+def check_simulator(simulation: Tensor, sim_batch_shape: int, num_prior_samples: int):
+    """
+    Check the simulator.
+
+    Checks if the simulation output is a tensor and if the batch shape of the simulation
+    output matches that of the prior samples.
+    """
+    assert isinstance(simulation, Tensor), "Simulator output must be a Tensor."
     assert (
         sim_batch_shape == num_prior_samples
     ), f"""Simulation batch shape {sim_batch_shape} must match
-        num_samples={num_prior_samples}."""
+            num_samples={num_prior_samples}."""
+
+
+def check_x_o(
+    x_o: Tensor,
+    obs_event_shape: Sequence[int],
+    sim_event_shape: Sequence[int],
+    num_prior_samples: int,
+    simulation: Tensor,
+):
+    """
+    Check observation x_o.
+
+    Checks if the observation is a tensor and if the shape matches the shape of the
+    simulation outputs.
+    """
+    assert isinstance(x_o, Tensor), "Observation must be a Tensor."
     assert (
         obs_event_shape == sim_event_shape
     ), f"""The shape of a single x_o is {obs_event_shape} and it does not match
-        that of a single simulation {sim_event_shape}. For a batch size of
-        {num_prior_samples} the simulator returns {simulation.shape}
-        (should be ({num_prior_samples}, {obs_event_shape})."""
+            that of a single simulation {sim_event_shape}. For a batch size of
+            {num_prior_samples} the simulator returns {simulation.shape}
+            (should be ({num_prior_samples}, {obs_event_shape})."""
