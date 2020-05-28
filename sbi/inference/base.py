@@ -69,6 +69,8 @@ class NeuralInference(ABC):
             simulator, prior, x_o, skip_input_checks
         )
 
+        self._data_dimension = self._infer_data_dimension()
+
         self._show_progressbar = show_progressbar
         self._show_round_summary = show_round_summary
 
@@ -260,3 +262,15 @@ class NeuralInference(ABC):
         )
 
         self._summary_writer.flush()
+
+    def _infer_data_dimension(self) -> Tensor:
+        """
+        Infers the dimensionality of a single x.
+
+        Returns: ?
+
+        """
+        if self._x_o is None:
+            return self._simulator(self._prior.sample((1,))).shape[1:]
+        else:
+            return self._x_o.shape[1:]
