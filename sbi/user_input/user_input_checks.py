@@ -218,7 +218,7 @@ def check_for_possibly_batched_observations(x_o: Tensor):
             """observed data `x_o` has D>1 dimensions. SBI interprets the leading
                 dimension as a batch dimension, but it *currently* only processes
                 a single observation, a batch of several observation is not supported
-                yet.
+                yet. 
 
                 NOTE: below we use list notation to reduce clutter, but observation
                 should be of type torch.Tensor or ndarray.

@@ -4,13 +4,16 @@ from warnings import warn
 from pyro.infer.mcmc import HMC, NUTS
 from pyro.infer.mcmc.api import MCMC
 import torch
-from torch import Tensor, as_tensor, log, nn
+from torch import Tensor, log, nn
 from torch import multiprocessing as mp
 
 from sbi.mcmc import Slice, SliceSampler
 from sbi.types import Array
 import sbi.utils as utils
-from sbi.utils.torchutils import atleast_2d
+from sbi.utils.torchutils import (
+    ensure_theta_batched,
+    atleast_2d_float32_tensor,
+)
 
 
 NEG_INF = torch.tensor(float("-inf"), dtype=torch.float32)
@@ -116,9 +119,17 @@ class NeuralPosterior:
         # TODO Train exited here, entered after sampling?
         self.net.eval()
 
-        theta, x = utils.match_shapes_of_theta_and_x(
-            theta, x, self.x_o, norm_posterior_snpe
-        )
+        theta = ensure_theta_batched(torch.as_tensor(theta))
+
+        # Select and check x to condition on.
+        x = atleast_2d_float32_tensor(self._x_else_x_o(x))
+        self._ensure_single_x(x)
+        self._ensure_x_consistent_with_x_o(x)
+
+        # Repeat x in case of evaluation on multiple theta. This is needed below in
+        # nflows in order to have matching shapes of theta and context x when
+        # evaluating the NN.
+        x = self._match_x_with_theta_batch_shape(x, theta)
 
         try:
             log_prob_fn = getattr(self, f"_log_prob_{self._alg_family}")
@@ -245,7 +256,10 @@ class NeuralPosterior:
         Returns: Samples from posterior.
         """
 
-        x = atleast_2d(as_tensor(self._x_else_x_o(x)))
+        x = atleast_2d_float32_tensor(self._x_else_x_o(x))
+        self._ensure_single_x(x)
+        self._ensure_x_consistent_with_x_o(x)
+        
 
         with torch.no_grad():
             if self._sample_with_mcmc:
@@ -446,3 +460,72 @@ class NeuralPosterior:
             raise ValueError("Context x needed when not preconditioned to x_o.")
         else:
             return self.x_o
+
+    def _ensure_x_consistent_with_x_o(self, x: Tensor) -> None:
+        """Check consistency with x_o shape if not None."""
+
+        # TODO: This is to check the passed x matches the NN input dimensions by
+        # comparing to x_o, which was checked in user input checkts to match the
+        # simulator output. Later if we might not have self.x_o we might want to
+        # compare to the input dimension of self.net here.
+        if self.x_o is not None:
+            assert (
+                x.shape == self.x_o.shape
+            ), f"""The shape of the passed x ({x.shape}) and must match the shape of x
+            used during training ({self.x_o.shape})."""
+
+    @staticmethod
+    def _ensure_single_x(x: Tensor) -> None:
+        """Raise a ValueError if multiple (a batch of) xs are passed."""
+
+        inferred_batch_size, *_ = x.shape
+
+        if inferred_batch_size > 1:
+
+            raise ValueError(
+                """The x passed to condition the posterior for evaluation or sampling
+                has an inferred batch shape larger than one. This is not supported in
+                SBI for reasons depending on the scenario:
+
+                    - in case you want to evaluate or sample conditioned on several xs
+                    e.g., (p(theta | [x1, x2, x3])), this is not supported yet in SBI.
+
+                    - in case you trained with a single round to do amortized inference
+                    and now you want to evaluate or sample a given theta conditioned on
+                    several xs, one after the other, e.g, p(theta | x1), p(theta | x2),
+                    p(theta| x3): this broadcasting across xs is not supported in SBI.
+                    Instead, what you can do it to call posterior.log_prob(theta, xi)
+                    multiple times with different xi.
+
+                    - finally, if your observation is multidimensional, e.g., an image,
+                    make sure to pass it with a leading batch dimension, e.g., with
+                    shape (1, xdim1, xdim2). Beware that the current implementation
+                    of SBI might not provide stable support for this and result in
+                    shape mismatches.
+                """
+            )
+
+    @staticmethod
+    def _match_x_with_theta_batch_shape(x: Tensor, theta: Tensor) -> Tensor:
+        """Return x with batch shape matched to that of theta.
+
+        This is needed invnflows in order to have matching shapes of theta and context
+        x when evaluating the NN.
+        """
+
+        # Theta and x are ensured to have a batch dim, get the shape.
+        theta_batch_size, *_ = theta.shape
+        x_batch_size, *x_shape = x.shape
+
+        assert x_batch_size == 1, "Batch size 1 should be enforced by caller."
+        if theta_batch_size > x_batch_size:
+            x_matched = x.expand(theta_batch_size, *x_shape)
+
+            # Double check.
+            x_matched_batch_size, *x_matched_shape = x_matched.shape
+            assert x_matched_batch_size == theta_batch_size
+            assert x_matched_shape == x_shape
+        else:
+            x_matched = x
+
+        return x_matched

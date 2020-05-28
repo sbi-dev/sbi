@@ -2,8 +2,9 @@
 
 import numpy as np
 import torch
-from torch import Tensor
+from torch import Tensor, float32
 from torch.distributions import Independent, Uniform
+from typing import Union
 
 import sbi.utils as utils
 from sbi.types import Array, OneOrMore, ScalarFloat
@@ -262,3 +263,7 @@ def atleast_2d_many(*arys: Array) -> OneOrMore[Tensor]:
 
 def atleast_2d(t: Tensor) -> Tensor:
     return t if t.ndim >= 2 else t.reshape(1, -1)
+
+
+def atleast_2d_float32_tensor(arr: Union[Tensor, np.ndarray]) -> Tensor:
+    return atleast_2d(torch.as_tensor(arr, dtype=float32))
