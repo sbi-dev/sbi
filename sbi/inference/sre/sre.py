@@ -18,6 +18,7 @@ from sbi.inference.base import NeuralInference
 from sbi.inference.posteriors.sbi_posterior import NeuralPosterior
 from sbi.utils.torchutils import ensure_x_batched, ensure_theta_batched
 from sbi.types import ScalarFloat, OneOrMore
+from sbi.user_input.user_input_checks import process_x_o
 
 
 class SRE(NeuralInference):
@@ -25,7 +26,7 @@ class SRE(NeuralInference):
         self,
         simulator: Callable,
         prior,
-        x_o: Tensor,
+        x_shape: Optional[torch.Size] = None,
         classifier: Optional[nn.Module] = None,
         num_atoms: Optional[int] = None,
         simulation_batch_size: int = 1,
@@ -69,7 +70,7 @@ class SRE(NeuralInference):
         super().__init__(
             simulator=simulator,
             prior=prior,
-            x_o=x_o,
+            x_shape=x_shape,
             simulation_batch_size=simulation_batch_size,
             device=device,
             summary_writer=summary_writer,
@@ -88,7 +89,7 @@ class SRE(NeuralInference):
             classifier = utils.classifier_nn(
                 model="resnet",
                 theta_shape=self._prior.sample().shape,
-                x_o_shape=self._x_o.shape,
+                x_o_shape=self._x_shape,
             )
 
         # Create posterior object which can sample().
@@ -96,9 +97,9 @@ class SRE(NeuralInference):
             algorithm_family=self._classifier_loss,
             neural_net=classifier,
             prior=self._prior,
-            x_o=self._x_o,
             mcmc_method=mcmc_method,
             get_potential_function=PotentialFunctionProvider(),
+            x_shape=self._x_shape,
         )
 
         self._posterior.net.train(True)
@@ -122,6 +123,7 @@ class SRE(NeuralInference):
         self,
         num_rounds: int,
         num_simulations_per_round: OneOrMore[int],
+        x_o: Optional[Tensor] = None,
         batch_size: int = 100,
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
@@ -137,6 +139,9 @@ class SRE(NeuralInference):
         Args:
             num_rounds: Number of rounds to run
             num_simulations_per_round: Number of simulator calls per round
+            x_o: When SRE is used in a multi-round setting, training samples for every
+                round after the first round are drawn from the most recent posterior
+                estimate given $x_o$, i.e. $p(\theta|x_o)$.
             batch_size: Size of batch to use for training.
             learning_rate: Learning rate for Adam optimizer.
             validation_fraction: The fraction of data to use for validation.
@@ -151,6 +156,8 @@ class SRE(NeuralInference):
         Returns:
             Posterior that can be sampled and evaluated.
         """
+
+        self._handle_x_o_wrt_amortization(x_o, num_rounds)
 
         max_num_epochs = 2 ** 31 - 1 if max_num_epochs is None else max_num_epochs
 
@@ -194,7 +201,7 @@ class SRE(NeuralInference):
             # Update tensorboard and summary dict.
             self._summarize(
                 round_=round_,
-                x_o=self._x_o,
+                x_o=self._posterior.x_o,
                 theta_bank=self._theta_bank,
                 x_bank=self._x_bank,
             )

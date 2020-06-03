@@ -11,7 +11,7 @@ from sbi.utils.metrics import c2st
 from sbi.simulators.linear_gaussian import true_posterior_linear_gaussian_mvn_prior
 
 
-def dkl_via_monte_carlo(
+def kl_d_via_monte_carlo(
     p: Union[NeuralPosterior, Distribution],
     q: Union[NeuralPosterior, Distribution],
     num_samples: int = 1000,
@@ -52,7 +52,7 @@ def dkl_via_monte_carlo(
 
 def get_dkl_gaussian_prior(
     posterior: NeuralPosterior,
-    true_observation: Tensor,
+    x_o: Tensor,
     likelihood_shift: Tensor,
     likelihood_cov: Tensor,
     prior_mean: Tensor,
@@ -64,7 +64,7 @@ def get_dkl_gaussian_prior(
 
     Args:
         posterior: The estimated posterior.
-        true_observation: The observation where we evaluate the posterior.
+        x_o: The observation where we evaluate the posterior.
         likelihood_shift: Mean of the likelihood p(x|theta) is likelihood_shift+theta.
         likelihood_cov: Covariance matrix of likelihood.
         prior_mean: Mean of prior.
@@ -72,10 +72,10 @@ def get_dkl_gaussian_prior(
     """
 
     target_dist = true_posterior_linear_gaussian_mvn_prior(
-        true_observation, likelihood_shift, likelihood_cov, prior_mean, prior_cov
+        x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
     )
 
-    return dkl_via_monte_carlo(target_dist, posterior, num_samples=200)
+    return kl_d_via_monte_carlo(target_dist, posterior, num_samples=200)
 
 
 def get_prob_outside_uniform_prior(posterior: NeuralPosterior, num_dim: int) -> Tensor:

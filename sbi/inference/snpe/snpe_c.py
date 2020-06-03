@@ -15,7 +15,7 @@ class SnpeC(SnpeBase):
         self,
         simulator: Callable,
         prior,
-        x_o: Tensor,
+        x_shape: Optional[torch.Size] = None,
         num_atoms: Optional[int] = None,
         density_estimator: Optional[nn.Module] = None,
         calibration_kernel: Optional[Callable] = None,
@@ -57,7 +57,7 @@ class SnpeC(SnpeBase):
         super().__init__(
             simulator=simulator,
             prior=prior,
-            x_o=x_o,
+            x_shape=x_shape,
             density_estimator=density_estimator,
             calibration_kernel=calibration_kernel,
             z_score_x=z_score_x,
@@ -93,7 +93,8 @@ class SnpeC(SnpeBase):
         Args:
             theta: Batch of parameters θ.
             x: Batch of data.
-            masks: Whetherto retrain with prior loss (for each prior sample).
+            masks: Mask that is True for prior samples in the batch in order to train
+                them with prior loss.
 
         Returns:
             Log-probability of the proposal posterior.

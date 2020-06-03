@@ -29,7 +29,7 @@ torch.set_default_tensor_type("torch.FloatTensor")
 @pytest.mark.parametrize(
     "num_dim, prior_str", ((2, "gaussian"), (2, "uniform"), (1, "gaussian"),),
 )
-def test_snpe_on_linearGaussian_c2st(
+def test_c2st_snpe_on_linearGaussian(
     num_dim: int, prior_str: str, set_seed,
 ):
     """Test whether SNPE C infers well a simple example with available ground truth.
@@ -63,7 +63,6 @@ def test_snpe_on_linearGaussian_c2st(
 
     infer = SnpeC(
         simulator=simulator,
-        x_o=x_o,
         density_estimator=None,  # Use default MAF.
         prior=prior,
         z_score_x=True,
@@ -76,7 +75,8 @@ def test_snpe_on_linearGaussian_c2st(
     )
 
     posterior = infer(num_rounds=1, num_simulations_per_round=2000)  # type: ignore
-    samples = posterior.sample(num_samples)
+    posterior.freeze(x_o=x_o)
+    samples = posterior.sample(num_samples, x=x_o)
 
     # Compute the c2st and assert it is near chance level of 0.5.
     check_c2st(samples, target_samples, alg="snpe_c")
@@ -120,7 +120,7 @@ def test_snpe_on_linearGaussian_c2st(
         ), "Normalizing the posterior density using the acceptance probability failed."
 
 
-def test_snpe_on_linearGaussian_different_dims_c2st(set_seed):
+def test_c2st_snpe_on_linearGaussian_different_dims(set_seed):
     """Test whether SNPE B/C infer well a simple example with available ground truth.
 
     This example has different number of parameters theta than number of x. Also
@@ -160,7 +160,6 @@ def test_snpe_on_linearGaussian_different_dims_c2st(set_seed):
 
     snpe_common_args = dict(
         simulator=simulator,
-        x_o=x_o,
         density_estimator=None,  # Use default MAF.
         prior=prior,
         z_score_x=True,
@@ -173,7 +172,7 @@ def test_snpe_on_linearGaussian_different_dims_c2st(set_seed):
     infer = SnpeC(num_atoms=None, sample_with_mcmc=False, **snpe_common_args)
 
     posterior = infer(num_rounds=1, num_simulations_per_round=2000)  # type: ignore
-    samples = posterior.sample(num_samples)
+    samples = posterior.sample(num_samples, x=x_o)
 
     # Compute the c2st and assert it is near chance level of 0.5.
     check_c2st(samples, target_samples, alg="snpe_c")
@@ -193,7 +192,7 @@ def test_snpe_on_linearGaussian_different_dims_c2st(set_seed):
         "snpe_c",
     ),
 )
-def test_multi_round_snpe_on_linearGaussian_c2st(algorithm_str: str, set_seed):
+def test_c2st_multi_round_snpe_on_linearGaussian(algorithm_str: str, set_seed):
     """Test whether SNPE B/C infer well a simple example with available ground truth.
 
     Args:
@@ -220,7 +219,6 @@ def test_multi_round_snpe_on_linearGaussian_c2st(algorithm_str: str, set_seed):
 
     snpe_common_args = dict(
         simulator=simulator,
-        x_o=x_o,
         density_estimator=None,  # Use default MAF.
         prior=prior,
         z_score_x=True,
@@ -238,7 +236,7 @@ def test_multi_round_snpe_on_linearGaussian_c2st(algorithm_str: str, set_seed):
             **snpe_common_args,
         )
 
-    posterior = infer(num_rounds=2, num_simulations_per_round=1000)  # type: ignore
+    posterior = infer(num_rounds=2, x_o=x_o, num_simulations_per_round=1000)  # type: ignore
     samples = posterior.sample(num_samples)
 
     # Compute the c2st and assert it is near chance level of 0.5.
@@ -276,7 +274,7 @@ def test_multi_round_snpe_deterministic_simulator(set_seed, z_score_min_std):
     """
 
     num_dim = 3
-    true_observation = zeros((1, num_dim))
+    x_o = zeros((1, num_dim))
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(num_dim)
@@ -297,7 +295,6 @@ def test_multi_round_snpe_deterministic_simulator(set_seed, z_score_min_std):
 
     infer = SnpeB(
         simulator=deterministic_simulator,
-        x_o=true_observation,
         density_estimator=None,  # Use default MAF.
         prior=prior,
         z_score_x=True,
@@ -307,7 +304,7 @@ def test_multi_round_snpe_deterministic_simulator(set_seed, z_score_min_std):
         show_progressbar=False,
     )
 
-    infer(num_rounds=2, num_simulations_per_round=1000)
+    infer(num_rounds=2, x_o=x_o, num_simulations_per_round=1000)
 
 
 # Testing rejection and mcmc sampling methods.
@@ -322,7 +319,7 @@ def test_multi_round_snpe_deterministic_simulator(set_seed, z_score_min_std):
         (False, "rejection", "uniform"),
     ),
 )
-def test_snpec_posterior_correction_api(
+def test_api_snpec_posterior_correction(
     sample_with_mcmc, mcmc_method, prior_str, set_seed
 ):
     """Test that leakage correction applied to sampling works, with both MCMC and
@@ -350,7 +347,6 @@ def test_snpec_posterior_correction_api(
 
     infer = SnpeC(
         simulator=simulator,
-        x_o=x_o,
         density_estimator=None,  # Use default MAF.
         prior=prior,
         num_atoms=None,
@@ -367,7 +363,7 @@ def test_snpec_posterior_correction_api(
     posterior = infer(num_rounds=1, num_simulations_per_round=1000)
 
     # Posterior should be corrected for leakage even if num_rounds just 1.
-    samples = posterior.sample(10)
+    samples = posterior.sample(10, x=x_o)
 
     # Evaluate the samples to check correction factor.
-    posterior.log_prob(samples)
+    posterior.log_prob(samples, x=x_o)

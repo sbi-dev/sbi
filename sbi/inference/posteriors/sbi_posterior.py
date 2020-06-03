@@ -13,14 +13,16 @@ import sbi.utils as utils
 from sbi.utils.torchutils import (
     ensure_theta_batched,
     atleast_2d_float32_tensor,
+    batched_first_of_batch,
 )
+from sbi.user_input.user_input_checks import process_x_o
 
 
 NEG_INF = torch.tensor(float("-inf"), dtype=torch.float32)
 
 
 class NeuralPosterior:
-    r"""Posterior $p(\theta|x_o)$ with `log_prob()` and `sample()` methods.
+    r"""Posterior $p(\theta|x)$ with `log_prob()` and `sample()` methods.
 
     All inference methods in `sbi` train a neural network which is then used to obtain
     the posterior distribution. The `Posterior` class wraps this neural network such
@@ -46,10 +48,10 @@ class NeuralPosterior:
         algorithm_family: str,
         neural_net: nn.Module,
         prior,
-        x_o: Optional[Tensor],
         sample_with_mcmc: bool = True,
         mcmc_method: str = "slice_np",
         get_potential_function: Optional[Callable] = None,
+        x_shape: Optional[torch.Size] = None,
     ):
         """
         Args:
@@ -69,15 +71,18 @@ class NeuralPosterior:
             sample_with_mcmc: Whether to sample with MCMC. Will always be `True` for SRE
                 and SNL, but can also be set to `True` for SNPE to use MCMC to deal with
                 leakage.
+            x_shape: Simulator callable. Used only to check whether the $x_o$ passed
+                by the user at freeze() has the correct shape.
         """
 
         self.net = neural_net
         self._prior = prior
-        self.x_o = x_o
+        self.x_o = None
 
         self._sample_with_mcmc = sample_with_mcmc
         self._mcmc_method = mcmc_method
         self._get_potential_function = get_potential_function
+        self._x_shape = x_shape
 
         if algorithm_family in ("snpe", "snl", "sre", "aalr"):
             self._alg_family = algorithm_family
@@ -89,6 +94,23 @@ class NeuralPosterior:
         # Correction factor for snpe leakage.
         self._leakage_density_correction_factor = None
 
+    def freeze(self, x_o):
+        """
+        Sets the default for the observation x_o.
+
+        When sequential methods are used in a single-round setting, the resulting neural
+        network allows for amortized inference, i.e. computing the posterior
+        $p(\theta|x)$ for any x. Hence, when calling `log_prob()` or `sample()`, the
+        user generally needs to specify both $\theta$ and $x$. This function sets a
+        default $x_o$, and thus the user only needs to specify $\theta$ when calling
+        `log_prob()` or `sample()` for it to automatically use the default $x_o$ when
+        evaluating or sampling from $p(\theta|x_o)$.
+
+        Args:
+            x_o: The default observation to set for the posterior $p(theta|x_o)$.
+        """
+        self.x_o = process_x_o(x_o, self._x_shape)
+
     def log_prob(
         self,
         theta: Tensor,
@@ -99,10 +121,9 @@ class NeuralPosterior:
 
         Args:
             theta: Parameters $\theta$.
-            x: Conditioning context for posterior $p(\theta|x)$. Can be passed here
-                explicitly to evaluate the posterior at various $x \neq x_o$, e.g. in
-                the case of amortized inference. The default value is the $x_o$ provided
-                upon initialization of the inference method.
+            x: Conditioning context for posterior $p(\theta|x)$. If x=None, fall back
+                onto $x_o$ that was previously provided either at inference or through
+                the `freeze()` method.
             norm_posterior_snpe: Whether to enforce a normalized posterior density when
                 using snpe. Renormalization of the posterior is useful when some
                 probability falls out or 'leaks' out of the prescribed prior support.
@@ -157,7 +178,11 @@ class NeuralPosterior:
         # Force probability to be zero outside prior support.
         masked_log_prob = torch.where(is_prior_finite, unnorm_log_prob, NEG_INF)
 
-        log_factor = log(self.get_leakage_correction(x=x)) if norm_posterior else 0
+        log_factor = (
+            log(self.get_leakage_correction(x=batched_first_of_batch(x)))
+            if norm_posterior
+            else 0
+        )
 
         return masked_log_prob - log_factor
 
@@ -219,8 +244,11 @@ class NeuralPosterior:
                 self.net, self._prior, x, num_rejection_samples, show_progressbar
             )[1]
 
-        # Short-circuit here for performance: if identical no need to check equality.
-        is_new_x = (x is not self.x_o) and (x != self.x_o).all()
+        # Check if the provided x matches the stored self.x_o by:
+        # is_new_x = x_o_not_provided or (x_nonidentical_x_o and x_different_x_o)
+        # We check x_nonidentical_x_o and x_different_x_o for short circuiting.
+        is_new_x = self.x_o is None or (x is not self.x_o and (x != self.x_o).any())
+
         not_saved_at_x_o = self._leakage_density_correction_factor is None
 
         if is_new_x:  # Calculate at x; don't save.
@@ -246,10 +274,9 @@ class NeuralPosterior:
 
         Args:
             num_samples: Desired number of samples.
-            x: Conditioning context for posterior $p(\theta|x)$. Can be passed here
-                explicitly to sample the posterior at various $x \neq x_o$, e.g. in the
-                case of amortized inference. The default value is the $x_o$ provided
-                upon initialization of the inference method.
+            x: Conditioning context for posterior $p(\theta|x)$. If x==None, fall back
+                onto $x_o$ that was previously provided either at inference or through
+                the `freeze()` method.
             show_progressbar: Whether to show sampling progress monitor.
             **kwargs: Additional parameters for the MCMC sampler (`thin` and `warmup`).
 

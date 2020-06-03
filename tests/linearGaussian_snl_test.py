@@ -23,7 +23,7 @@ torch.set_default_tensor_type("torch.FloatTensor")
 
 
 @pytest.mark.parametrize("num_dim", (1, 3))
-def test_snl_on_linearGaussian_api(num_dim: int, set_seed):
+def test_api_snl_on_linearGaussian(num_dim: int, set_seed):
     """Test API for inference on linear Gaussian model using SNL.
 
     Avoids expensive computations by training on few simulations and generating few
@@ -33,6 +33,7 @@ def test_snl_on_linearGaussian_api(num_dim: int, set_seed):
         num_dim: parameter dimension of the gaussian model
     """
     num_samples = 10
+    x_o = zeros(num_dim)
 
     prior_mean = zeros(num_dim)
     prior_cov = eye(num_dim)
@@ -41,7 +42,6 @@ def test_snl_on_linearGaussian_api(num_dim: int, set_seed):
     infer = SNL(
         simulator=diagonal_linear_gaussian,
         prior=prior,
-        x_o=zeros(num_dim),
         density_estimator=None,  # Use default MAF.
         simulation_batch_size=50,
         mcmc_method="slice_np",
@@ -50,10 +50,10 @@ def test_snl_on_linearGaussian_api(num_dim: int, set_seed):
 
     posterior = infer(num_rounds=1, num_simulations_per_round=1000)
 
-    posterior.sample(num_samples=num_samples, thin=3)
+    posterior.sample(num_samples=num_samples, x=x_o, thin=3)
 
 
-def test_snl_on_linearGaussian_different_dims_c2st(set_seed):
+def test_c2st_snl_on_linearGaussian_different_dims(set_seed):
     """Test whether SNL infers well a simple example with available ground truth.
 
     This example has different number of parameters theta than number of x. This test
@@ -94,7 +94,6 @@ def test_snl_on_linearGaussian_different_dims_c2st(set_seed):
     infer = SNL(
         simulator=simulator,
         prior=prior,
-        x_o=x_o,
         density_estimator=None,  # Use default MAF.
         simulation_batch_size=50,
         mcmc_method="slice_np",
@@ -102,7 +101,7 @@ def test_snl_on_linearGaussian_different_dims_c2st(set_seed):
     )
 
     posterior = infer(num_rounds=1, num_simulations_per_round=3000)  # type: ignore
-    samples = posterior.sample(num_samples, thin=3)
+    samples = posterior.sample(num_samples, x=x_o, thin=3)
 
     # Compute the c2st and assert it is near chance level of 0.5.
     check_c2st(samples, target_samples, alg="snl")
@@ -111,7 +110,7 @@ def test_snl_on_linearGaussian_different_dims_c2st(set_seed):
 @pytest.mark.slow
 @pytest.mark.parametrize("num_dim", (1, 2))
 @pytest.mark.parametrize("prior_str", ("uniform", "gaussian"))
-def test_snl_on_linearGaussian_c2st(num_dim: int, prior_str: str, set_seed):
+def test_c2st_snl_on_linearGaussian(num_dim: int, prior_str: str, set_seed):
     """Test SNL on linear Gaussian, comparing to ground truth posterior via MMD.
 
     Args:
@@ -146,13 +145,13 @@ def test_snl_on_linearGaussian_c2st(num_dim: int, prior_str: str, set_seed):
     infer = SNL(
         simulator=simulator,
         prior=prior,
-        x_o=x_o,
         density_estimator=None,  # Use default MAF.
         mcmc_method="slice_np",
         show_progressbar=False,
     )
 
     posterior = infer(num_rounds=1, num_simulations_per_round=1000)
+    posterior.freeze(x_o)
 
     samples = posterior.sample(num_samples=num_samples, thin=3)
 
@@ -170,7 +169,7 @@ def test_snl_on_linearGaussian_c2st(num_dim: int, prior_str: str, set_seed):
 
 
 @pytest.mark.slow
-def test_multi_round_snl_on_linearGaussian_c2st(set_seed):
+def test_c2st_multi_round_snl_on_linearGaussian(set_seed):
     """Test SNL on linear Gaussian, comparing to ground truth posterior via MMD.
 
     Args:
@@ -198,14 +197,13 @@ def test_multi_round_snl_on_linearGaussian_c2st(set_seed):
     infer = SNL(
         simulator=simulator,
         prior=prior,
-        x_o=x_o,
         density_estimator=None,  # Use default MAF.
         simulation_batch_size=50,
         mcmc_method="slice",
         show_progressbar=False,
     )
 
-    posterior = infer(num_rounds=2, num_simulations_per_round=500)
+    posterior = infer(num_rounds=2, x_o=x_o, num_simulations_per_round=500)
 
     samples = posterior.sample(num_samples=num_samples, thin=3)
 
@@ -217,7 +215,7 @@ def test_multi_round_snl_on_linearGaussian_c2st(set_seed):
 @pytest.mark.parametrize(
     "mcmc_method, prior_str", (("slice", "gaussian"), ("slice", "uniform"),),
 )
-def test_snl_sampling_methods_api(mcmc_method: str, prior_str: str, set_seed):
+def test_api_snl_sampling_methods(mcmc_method: str, prior_str: str, set_seed):
     """Runs SNL on linear Gaussian and tests sampling from posterior via mcmc.
 
     Args:
@@ -238,7 +236,6 @@ def test_snl_sampling_methods_api(mcmc_method: str, prior_str: str, set_seed):
     infer = SNL(
         simulator=diagonal_linear_gaussian,
         prior=prior,
-        x_o=x_o,
         density_estimator=None,  # Use default MAF.
         simulation_batch_size=50,
         mcmc_method="slice_np",
@@ -247,4 +244,4 @@ def test_snl_sampling_methods_api(mcmc_method: str, prior_str: str, set_seed):
 
     posterior = infer(num_rounds=1, num_simulations_per_round=200)
 
-    posterior.sample(num_samples=num_samples, thin=3)
+    posterior.sample(num_samples=num_samples, x=x_o, thin=3)

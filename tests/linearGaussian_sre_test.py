@@ -26,7 +26,7 @@ torch.set_default_tensor_type("torch.FloatTensor")
 
 
 @pytest.mark.parametrize("num_dim", (1, 3))
-def test_sre_on_linearGaussian_api(num_dim: int):
+def test_api_sre_on_linearGaussian(num_dim: int):
     """Test inference API of SRE with linear Gaussian model.
 
     Avoids intense computation for fast testing of API etc.
@@ -41,7 +41,6 @@ def test_sre_on_linearGaussian_api(num_dim: int):
     infer = SRE(
         simulator=diagonal_linear_gaussian,
         prior=prior,
-        x_o=x_o,
         classifier=None,  # Use default RESNET.
         simulation_batch_size=50,
         mcmc_method="slice_np",
@@ -50,10 +49,10 @@ def test_sre_on_linearGaussian_api(num_dim: int):
 
     posterior = infer(num_rounds=1, num_simulations_per_round=1000)
 
-    posterior.sample(num_samples=10, num_chains=2)
+    posterior.sample(num_samples=10, x=x_o, num_chains=2)
 
 
-def test_sre_on_linearGaussian_different_dims_c2st(set_seed):
+def test_c2st_sre_on_linearGaussian_different_dims(set_seed):
     """Test whether SRE infers well a simple example with available ground truth.
 
     This example has different number of parameters theta than number of x. This test
@@ -95,14 +94,13 @@ def test_sre_on_linearGaussian_different_dims_c2st(set_seed):
     infer = SRE(
         simulator=simulator,
         prior=prior,
-        x_o=x_o,
         classifier=None,  # Use default RESNET.
         simulation_batch_size=50,
         show_progressbar=False,
     )
 
     posterior = infer(num_rounds=1, num_simulations_per_round=1000)
-    samples = posterior.sample(num_samples, thin=3)
+    samples = posterior.sample(num_samples, x=x_o, thin=3)
 
     # Compute the c2st and assert it is near chance level of 0.5.
     check_c2st(samples, target_samples, alg="snpe_c")
@@ -118,7 +116,7 @@ def test_sre_on_linearGaussian_different_dims_c2st(set_seed):
         (2, "gaussian", "aalr"),
     ),
 )
-def test_sre_on_linearGaussian_c2st(
+def test_c2st_sre_on_linearGaussian(
     num_dim: int, prior_str: str, classifier_loss: str, set_seed,
 ):
     """Test c2st accuracy of inference with SRE on linear Gaussian model.
@@ -158,7 +156,6 @@ def test_sre_on_linearGaussian_c2st(
     infer = SRE(
         simulator=simulator,
         prior=prior,
-        x_o=x_o,
         num_atoms=num_atoms,
         classifier=None,  # Use default RESNET.
         classifier_loss=classifier_loss,
@@ -168,6 +165,7 @@ def test_sre_on_linearGaussian_c2st(
     )
 
     posterior = infer(num_rounds=1, num_simulations_per_round=1000)
+    posterior.freeze(x_o)
 
     samples = posterior.sample(num_samples=num_samples, thin=3)
 
@@ -208,7 +206,7 @@ def test_sre_on_linearGaussian_c2st(
         ("slice", "uniform"),
     ),
 )
-def test_sre_sampling_methods_api(mcmc_method: str, prior_str: str, set_seed):
+def test_api_sre_sampling_methods(mcmc_method: str, prior_str: str, set_seed):
     """Test leakage correction both for MCMC and rejection sampling.
 
     Args:
@@ -227,7 +225,6 @@ def test_sre_sampling_methods_api(mcmc_method: str, prior_str: str, set_seed):
     infer = SRE(
         simulator=diagonal_linear_gaussian,
         prior=prior,
-        x_o=x_o,
         classifier=None,  # Use default RESNET.
         simulation_batch_size=50,
         mcmc_method=mcmc_method,
@@ -236,4 +233,4 @@ def test_sre_sampling_methods_api(mcmc_method: str, prior_str: str, set_seed):
 
     posterior = infer(num_rounds=1, num_simulations_per_round=200)
 
-    posterior.sample(num_samples=10)
+    posterior.sample(num_samples=10, x=x_o)

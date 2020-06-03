@@ -16,7 +16,7 @@ from sbi.user_input.user_input_checks_utils import (
     MultipleIndependent,
 )
 
-from sbi.utils.torchutils import atleast_2d
+from sbi.utils.torchutils import atleast_2d, maybe_add_batch_dim_to_size
 
 
 def process_prior(prior) -> Tuple[Distribution, int, bool]:
@@ -198,7 +198,7 @@ def check_prior_batch_dims(prior):
         )
 
 
-def check_for_possibly_batched_observations(x_o: Tensor):
+def check_for_possibly_batched_x_shape(x_shape):
     """Raise ValueError if dimensionality of data doesn't match requirements.
 
     SBI does not support multiple observations yet. For 2D observed data the leading
@@ -208,12 +208,13 @@ def check_for_possibly_batched_observations(x_o: Tensor):
     additional leading batch dimension of size 1.
     """
 
+    x_ndim = len(x_shape)
+    inferred_batch_shape, *inferred_data_shape = x_shape
     # Interpret first dimension as batch dimension.
-    inferred_batch_shape, *inferred_data_shape = x_o.shape
-    inferred_data_dim = len(inferred_data_shape)
+    inferred_data_ndim = len(inferred_data_shape)
 
     # Reject multidimensional data with batch_shape > 1.
-    if x_o.ndim > 1 and inferred_batch_shape > 1:
+    if x_ndim > 1 and inferred_batch_shape > 1:
         raise ValueError(
             """observed data `x_o` has D>1 dimensions. SBI interprets the leading
                 dimension as a batch dimension, but it *currently* only processes
@@ -250,7 +251,7 @@ def check_for_possibly_batched_observations(x_o: Tensor):
                 """
         )
     # Warn on multidimensional data with batch_size one.
-    elif inferred_data_dim > 1 and inferred_batch_shape == 1:
+    elif inferred_data_ndim > 1 and inferred_batch_shape == 1:
         warnings.warn(
             f"""Beware: The observed data (x_o) you passed was interpreted to have
             matrix shape: {inferred_data_shape}. The current implementation of SBI
@@ -259,6 +260,18 @@ def check_for_possibly_batched_observations(x_o: Tensor):
         )
     else:
         pass
+
+
+def check_for_possibly_batched_observations(x_o: Tensor):
+    """Raise ValueError if dimensionality of data doesn't match requirements.
+
+    SBI does not support multiple observations yet. For 2D observed data the leading
+    dimension will be interpreted as batch dimension and a ValueError will be raised if
+    the batch dimension is larger than 1.
+    Multidimensional observations e.g., images, are allowed when they are passed with an
+    additional leading batch dimension of size 1.
+    """
+    check_for_possibly_batched_x_shape(x_o.shape)
 
 
 def check_prior_attributes(prior):
@@ -420,20 +433,54 @@ def get_batch_dim_simulator(simulator: Callable) -> Callable:
     return batch_dim_simulator
 
 
-def process_x_o(
-    x_o: Union[Tensor, ndarray], simulator: Callable, prior
-) -> Tuple[Tensor, int]:
+def process_x_shape(
+    simulator: Callable, prior, x_shape: Optional[torch.Size] = None,
+) -> Tuple[torch.Size, int]:
     """Return observed data to sbi's shape and type requirements.
 
     Args:
-        x_o: observed data as provided by the user.
-        simulator: simulator function after ensuring output is batched and of type
+        simulator: Simulator function after ensuring output is batched and of type
             Tensor.
-        prior: prior object with .sample() and .log_prob() methods.
+        prior: Prior object with .sample() and .log_prob() methods.
+        x_shape: Observed data shape as provided by the user.
+
+    Returns:
+        x_o: Observed data with shape corrected for usage in SBI.
+        x_o_dim: Number of elements in a single data point.
+    """
+
+    # Get unbatched simulated data by sampling from prior and simulator.
+    # cast to tensor for comparison
+    simulated_data_batched = torch.as_tensor(
+        simulator(prior.sample((1,))), dtype=float32
+    )
+
+    if x_shape is not None:
+        x_shape = maybe_add_batch_dim_to_size(x_shape)
+        check_for_possibly_batched_x_shape(x_shape)
+        assert x_shape == simulated_data_batched.shape, (
+            f"Observed data shape ({x_shape}) must match "
+            f"simulator output shape ({simulated_data_batched.shape})."
+        )
+    else:
+        # infer the shape of x from simulation.
+        x_shape = simulated_data_batched.shape
+
+    x_o_dim = x_shape[1:].numel()
+
+    return x_shape, x_o_dim
+
+
+def process_x_o(x_o: Tensor, x_shape: torch.Size) -> Tensor:
+    """Return observed data to sbi's shape and type requirements.
+
+    Args:
+        x_o: Observed data as provided by the user.
+        x_shape: The shape that had either been provided by the user at init or had
+            been inferred from a simulation.
 
     Returns:
         x_o: observed data with shape corrected for usage in SBI.
-        x_o_dim: number of elements in a single data point.
     """
 
     # maybe add batch dimension, cast to tensor
@@ -441,32 +488,22 @@ def process_x_o(
     x_o = torch.as_tensor(x_o, dtype=float32)
 
     check_for_possibly_batched_observations(x_o)
+    x_o_shape = x_o.shape
 
-    # Get unbatched simulated data by sampling from prior and simulator.
-    # cast to tensor for comparison
-    simulated_data = torch.as_tensor(
-        simulator(prior.sample((1,))), dtype=float32
-    ).squeeze(0)
-
-    # Get data shape by ommitting the batch dimension.
-    x_o_shape = x_o.shape[1:]
-
-    assert x_o_shape == simulated_data.shape, (
+    assert x_o_shape == x_shape, (
         f"Observed data shape ({x_o_shape}) must match "
-        f"simulator output shape ({simulated_data.shape})."
+        f"the shape of data x ({x_shape})."
     )
 
-    x_o_dim = x_o.shape[1:].numel()
-
-    return x_o, x_o_dim
+    return x_o
 
 
 def prepare_sbi_problem(
     user_simulator: Callable,
     user_prior,
-    user_x_o: Union[Tensor, ndarray],
+    user_x_shape: Optional[torch.Size] = None,
     skip_input_checks: bool = False,
-) -> Tuple[Callable, Callable, Tensor]:
+) -> Tuple[Callable, Distribution, torch.Size]:
     """Prepare simulator, prior and observed data for usage in sbi.
 
     Attempts to meet the following requirements by reshaping and type casting to PyTorch
@@ -480,10 +517,9 @@ def prepare_sbi_problem(
     If this is not possible, a suitable exception will be raised.
 
     Args:
-        user_simulator: simulator as provided by the user.
-        user_prior: prior as provided by the user
-        user_x_o: observed data as
-            provided by the user
+        user_simulator: Simulator as provided by the user.
+        user_prior: Prior as provided by the user.
+        user_x_shape: Shape of a single simulation output, either (1,N) or (N).
         skip_input_checks: Flag to turn off input checks,
             e.g., for saving simulation budget as the input checks run the simulator
             a couple of times.
@@ -500,7 +536,7 @@ def prepare_sbi_problem(
             and x_o. Consult the documentation for the exact requirements.""",
             UserWarning,
         )
-        return user_simulator, user_prior, user_x_o
+        return user_simulator, user_prior, user_x_shape
     else:
         # Check prior, return PyTorch prior.
         prior, _, prior_returns_numpy = process_prior(user_prior)
@@ -509,32 +545,32 @@ def prepare_sbi_problem(
         simulator = process_simulator(user_simulator, prior, prior_returns_numpy)
 
         # Check data, returns data with leading batch dimension.
-        x_o, _ = process_x_o(user_x_o, simulator, prior)
+        x_shape, _ = process_x_shape(simulator, prior, user_x_shape)
 
         # Consistency check after making ready for SBI.
-        check_sbi_problem(simulator, prior, x_o)
+        check_sbi_problem(simulator, prior, x_shape)
 
-        return simulator, prior, x_o
+        return simulator, prior, x_shape
 
 
-def check_sbi_problem(simulator: Callable, prior, x_o: Tensor):
+def check_sbi_problem(simulator: Callable, prior: Distribution, x_shape: torch.Size):
     """Assert requirements for simulator, prior and observation for usage in sbi.
 
     Args:
         simulator: simulator function
         prior: prior (Distribution like)
-        x_o: observed data
+        x_shape: Shape of single simulation output $x$.
     """
     num_prior_samples = 1
     theta = prior.sample((num_prior_samples,))
     theta_batch_shape, *_ = theta.shape
     simulation = simulator(theta)
     sim_batch_shape, *sim_event_shape = simulation.shape
-    _, *obs_event_shape = x_o.shape
+    _, *obs_event_shape = x_shape
 
     assert isinstance(theta, Tensor), "Parameters theta must be a Tensor."
     assert isinstance(simulation, Tensor), "Simulator output must be a Tensor."
-    assert isinstance(x_o, Tensor), "Observation must be a Tensor."
+    assert isinstance(x_shape, torch.Size), "x_shape must be a torch.Size."
 
     assert (
         theta_batch_shape == num_prior_samples

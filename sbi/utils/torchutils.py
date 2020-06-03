@@ -265,5 +265,30 @@ def atleast_2d(t: Tensor) -> Tensor:
     return t if t.ndim >= 2 else t.reshape(1, -1)
 
 
+def maybe_add_batch_dim_to_size(s: torch.Size) -> torch.Size:
+    """
+    Take a torch.Size and add a batch dimension to it if dimensionality of size is 1.
+
+    (N) -> (1,N)
+    (1,N) -> (1,N)
+    (N,M) -> (N,M)
+    (1,N,M) -> (1,N,M)
+
+    Args:
+        s: Input size, possibly without batch dimension.
+
+    Returns: Batch size.
+
+    """
+    return s if len(s) >= 2 else torch.Size([1]) + s
+
+
 def atleast_2d_float32_tensor(arr: Union[Tensor, np.ndarray]) -> Tensor:
     return atleast_2d(torch.as_tensor(arr, dtype=float32))
+
+
+def batched_first_of_batch(t: Tensor):
+    """
+    Takes in a tensor of shape (N, M) and outputs tensor of shape (1,M).
+    """
+    return t[:1]
