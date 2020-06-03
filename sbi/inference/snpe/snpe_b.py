@@ -39,6 +39,10 @@ class SnpeB(SnpeBase):
         See docstring of `SnpeBase` class for all other arguments.
         """
 
+        raise NotImplementedError(
+            "SNPE-B is not yet implemented in the sbi package," " see issue #199."
+        )
+
         super().__init__(
             simulator=simulator,
             prior=prior,
