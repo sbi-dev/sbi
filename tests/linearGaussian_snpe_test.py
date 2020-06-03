@@ -181,7 +181,18 @@ def test_snpe_on_linearGaussian_different_dims_c2st(set_seed):
 
 # Test multi-round SNPE.
 @pytest.mark.slow
-@pytest.mark.parametrize("algorithm_str", ("snpe_b", "snpe_c"))
+@pytest.mark.parametrize(
+    "algorithm_str",
+    (
+        pytest.param(
+            "snpe_b",
+            marks=pytest.mark.xfail(
+                raises=NotImplementedError, reason="""SNPE-B not implemented""",
+            ),
+        ),
+        "snpe_c",
+    ),
+)
 def test_multi_round_snpe_on_linearGaussian_c2st(algorithm_str: str, set_seed):
     """Test whether SNPE B/C infer well a simple example with available ground truth.
 
@@ -246,10 +257,15 @@ will have infinites, which we reject."""
         pytest.param(
             0.0,
             marks=pytest.mark.xfail(
-                raises=AssertionError, reason=_fail_reason_deterministic_sim,
+                raises=NotImplementedError, reason=_fail_reason_deterministic_sim,
             ),
         ),
-        pytest.param(1e-7,),
+        pytest.param(
+            1e-7,
+            marks=pytest.mark.xfail(
+                raises=NotImplementedError, reason="""SNPE-B not implemented""",
+            ),
+        ),
     ),
 )
 def test_multi_round_snpe_deterministic_simulator(set_seed, z_score_min_std):
