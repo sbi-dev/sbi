@@ -474,7 +474,11 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 57
 58
 59
-60</pre>
+60
+61
+62
+63
+64</pre>
 </div>
 </td>
 <td class="code">
@@ -507,6 +511,10 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 
 <span class="sd">    See docstring of `SnpeBase` class for all other arguments.</span>
 <span class="sd">    """</span>
+
+    <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
+        <span class="s2">"SNPE-B is not yet implemented in the sbi package,"</span> <span class="s2">" see issue #199."</span>
+    <span class="p">)</span>
 
     <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
         <span class="n">simulator</span><span class="o">=</span><span class="n">simulator</span><span class="p">,</span>
