@@ -15,6 +15,7 @@ from sbi.inference.base import NeuralInference
 from sbi.inference.posteriors.sbi_posterior import NeuralPosterior
 from sbi.types import ScalarFloat, OneOrMore
 import sbi.utils as utils
+from sbi.user_input.user_input_checks import process_x_o
 
 
 class SNL(NeuralInference):
@@ -22,7 +23,7 @@ class SNL(NeuralInference):
         self,
         simulator: Callable,
         prior,
-        x_o: Tensor,
+        x_shape: Optional[torch.Size] = None,
         density_estimator: Optional[nn.Module] = None,
         simulation_batch_size: Optional[int] = 1,
         summary_writer: Optional[SummaryWriter] = None,
@@ -49,12 +50,12 @@ class SNL(NeuralInference):
         """
 
         super().__init__(
-            simulator,
-            prior,
-            x_o,
-            simulation_batch_size,
-            device,
-            summary_writer,
+            simulator=simulator,
+            prior=prior,
+            x_shape=x_shape,
+            simulation_batch_size=simulation_batch_size,
+            device=device,
+            summary_writer=summary_writer,
             num_workers=num_workers,
             worker_batch_size=worker_batch_size,
             skip_input_checks=skip_input_checks,
@@ -67,7 +68,7 @@ class SNL(NeuralInference):
             density_estimator = utils.likelihood_nn(
                 model="maf",
                 theta_shape=self._prior.sample().shape,
-                x_o_shape=self._x_o.shape,
+                x_o_shape=self._x_shape,
             )
 
         # create neural posterior which can sample()
@@ -75,9 +76,9 @@ class SNL(NeuralInference):
             algorithm_family="snl",
             neural_net=density_estimator,
             prior=self._prior,
-            x_o=self._x_o,
             mcmc_method=mcmc_method,
             get_potential_function=PotentialFunctionProvider(),
+            x_shape=self._x_shape,
         )
 
         # XXX why not density_estimator.train(True)???
@@ -90,6 +91,7 @@ class SNL(NeuralInference):
         self,
         num_rounds: int,
         num_simulations_per_round: OneOrMore[int],
+        x_o: Optional[Tensor] = None,
         batch_size: int = 100,
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
@@ -105,6 +107,9 @@ class SNL(NeuralInference):
         Args:
             num_rounds: Number of rounds to run
             num_simulations_per_round: Number of simulator calls per round
+            x_o: When SNL is used in a multi-round setting, training samples for every
+                round after the first round are drawn from the most recent posterior
+                estimate given $x_o$, i.e. $p(\theta|x_o)$.
             batch_size: Size of batch to use for training.
             learning_rate: Learning rate for Adam optimizer.
             validation_fraction: The fraction of data to use for validation.
@@ -120,6 +125,8 @@ class SNL(NeuralInference):
         Returns:
             Posterior $p(\theta|x_o)$ that can be sampled and evaluated
         """
+
+        self._handle_x_o_wrt_amortization(x_o, num_rounds)
 
         max_num_epochs = 2 ** 31 - 1 if max_num_epochs is None else max_num_epochs
 
@@ -162,7 +169,7 @@ class SNL(NeuralInference):
             # Update TensorBoard and summary dict.
             self._summarize(
                 round_=round_,
-                x_o=self._x_o,
+                x_o=self._posterior.x_o,
                 theta_bank=self._theta_bank,
                 x_bank=self._x_bank,
             )

@@ -14,7 +14,7 @@ class SnpeB(SnpeBase):
         self,
         simulator: Callable,
         prior,
-        x_o: Tensor,
+        x_shape: Optional[torch.Size] = None,
         density_estimator: Optional[nn.Module] = None,
         calibration_kernel: Optional[Callable] = None,
         z_score_x: bool = True,
@@ -46,7 +46,7 @@ class SnpeB(SnpeBase):
         super().__init__(
             simulator=simulator,
             prior=prior,
-            x_o=x_o,
+            x_shape=x_shape,
             density_estimator=density_estimator,
             calibration_kernel=calibration_kernel,
             z_score_x=z_score_x,

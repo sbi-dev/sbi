@@ -24,7 +24,7 @@ class SnpeBase(NeuralInference, ABC):
         self,
         simulator: Callable,
         prior,
-        x_o: Tensor,
+        x_shape: Optional[torch.Size] = None,
         density_estimator: Optional[nn.Module] = None,
         calibration_kernel: Optional[Callable] = None,
         z_score_x: bool = True,
@@ -64,7 +64,7 @@ class SnpeBase(NeuralInference, ABC):
         super().__init__(
             simulator=simulator,
             prior=prior,
-            x_o=x_o,
+            x_shape=x_shape,
             simulation_batch_size=simulation_batch_size,
             device=device,
             summary_writer=summary_writer,
@@ -81,7 +81,7 @@ class SnpeBase(NeuralInference, ABC):
                 model="maf",
                 prior_mean=self._prior.mean,
                 prior_std=self._prior.stddev,
-                x_o_shape=self._x_o.shape,
+                x_o_shape=self._x_shape,
             )
 
         # Calibration kernels proposed in Lueckmann, Goncalves et al 2017.
@@ -99,10 +99,10 @@ class SnpeBase(NeuralInference, ABC):
             algorithm_family="snpe",
             neural_net=density_estimator,
             prior=self._prior,
-            x_o=self._x_o,
             sample_with_mcmc=sample_with_mcmc,
             mcmc_method=mcmc_method,
             get_potential_function=PotentialFunctionProvider(),
+            x_shape=self._x_shape,
         )
 
         self._prior_masks, self._model_bank = [], []
@@ -118,6 +118,7 @@ class SnpeBase(NeuralInference, ABC):
         self,
         num_rounds: int,
         num_simulations_per_round: OneOrMore[int],
+        x_o: Optional[Tensor] = None,
         batch_size: int = 100,
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
@@ -127,11 +128,16 @@ class SnpeBase(NeuralInference, ABC):
     ) -> NeuralPosterior:
         r"""Run SNPE
 
-        Return posterior $p(\theta|x_o)$ after inference over several rounds.
+        Return posterior $p(\theta|x)$ after inference (possibly over several rounds).
 
         Args:
-            num_rounds: Number of rounds to run.
+            num_rounds: Number of rounds to run. `num_rounds=1` leads to an amortized
+                posterior $p(theta|x)$ for any $x$, whereas `num_rounds>1` gives a ]
+                posterior focused on a specific observation $x_o$, $p(theta|x_o)$
             num_simulations_per_round: Number of simulator calls per round.
+            x_o: When SNPE is used in a multi-round setting, training samples for every
+                round after the first round are drawn from the most recent posterior
+                estimate given $x_o$, i.e. $p(\theta|x_o)$.
             batch_size: Size of batch to use for training.
             learning_rate: Learning rate for Adam optimizer.
             validation_fraction: The fraction of data to use for validation.
@@ -145,8 +151,10 @@ class SnpeBase(NeuralInference, ABC):
                 prevent exploding gradients. Use None for no clipping.
 
         Returns:
-            Posterior $p(\theta|x_o)$ that can be sampled and evaluated.
+            Posterior $p(\theta|x)$ that can be sampled and evaluated.
         """
+
+        self._handle_x_o_wrt_amortization(x_o, num_rounds)
 
         max_num_epochs = 2 ** 31 - 1 if max_num_epochs is None else max_num_epochs
 
@@ -181,8 +189,14 @@ class SnpeBase(NeuralInference, ABC):
             # to make sure this update never gets lost when we e.g. do not log our
             # things to tensorboard anymore. Calling get_leakage_correction() is needed
             # to update the leakage after each round.
-            acceptance_rate = self._posterior.get_leakage_correction(
-                x=self._x_o, force_update=True, show_progressbar=self._show_progressbar,
+            acceptance_rate = (
+                torch.as_tensor(float("nan"))
+                if self._posterior.x_o is None
+                else self._posterior.get_leakage_correction(
+                    x=self._posterior.x_o,
+                    force_update=True,
+                    show_progressbar=self._show_progressbar,
+                )
             )
             self._summary["rejection_sampling_acceptance_rates"].append(acceptance_rate)
 
@@ -191,13 +205,17 @@ class SnpeBase(NeuralInference, ABC):
                 print(self._describe_round(round_, self._summary))
 
             # Update tensorboard and summary dict.
-            correction = self._posterior.get_leakage_correction(x=self._x_o,)
+            acceptance_rate = (
+                torch.as_tensor(float("nan"))
+                if self._posterior.x_o is None
+                else self._posterior.get_leakage_correction(x=self._posterior.x_o,)
+            )
             self._summarize(
                 round_=round_,
-                x_o=self._x_o,
+                x_o=self._posterior.x_o,
                 theta_bank=self._theta_bank,
                 x_bank=self._x_bank,
-                posterior_samples_acceptance_rate=correction,
+                posterior_samples_acceptance_rate=acceptance_rate,
             )
 
         self._posterior._num_trained_rounds = num_rounds
@@ -259,7 +277,7 @@ class SnpeBase(NeuralInference, ABC):
         else:
             # XXX Make posterior.sample() accept tuples like prior.sample().
             theta = self._posterior.sample(
-                num_sims, x=self._x_o, show_progressbar=self._show_progressbar
+                num_sims, x=self._posterior.x_o, show_progressbar=self._show_progressbar
             )
 
             # why do we return theta just below? When using multiprocessing, the thetas

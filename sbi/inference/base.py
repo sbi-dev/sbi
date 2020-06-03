@@ -1,6 +1,7 @@
 from abc import ABC
 import os.path
 from typing import Callable, Dict, List, Optional, Union
+import warnings
 
 import torch
 from torch import Tensor
@@ -12,6 +13,7 @@ from sbi.user_input.user_input_checks import prepare_sbi_problem
 from sbi.utils import get_log_root, get_timestamp
 from sbi.utils.torchutils import get_default_device
 from sbi.utils.plot.plot import samples_nd
+from sbi.user_input.user_input_checks import process_x_o
 
 
 class NeuralInference(ABC):
@@ -21,7 +23,7 @@ class NeuralInference(ABC):
         self,
         simulator: Callable,
         prior,
-        x_o: Tensor,
+        x_shape: Optional[torch.Size] = None,
         simulation_batch_size: Optional[int] = 1,
         device: Optional[torch.device] = None,
         summary_writer: Optional[SummaryWriter] = None,
@@ -38,9 +40,9 @@ class NeuralInference(ABC):
             simulator: A regular callable $f(\theta)\to x$. Both parameter $\theta$ and
                 simulation $x$ can be multi-dimensional.
             prior: Distribution-like object with `log_prob`and `sample` methods.
-            x_o: Observation $x_o$. If it has more than one dimension, the leading
-                dimension will be interpreted as a batch dimension but *currently* only
-                the first batch element will be used to condition on.
+            x_shape: Shape of a single simulation output $x$. Can be either (1, N) or
+                (N). Multidimensional observations (e.g. images) are not supported yet.
+                If None, the shape will be inferred by running a single simulation.
             simulation_batch_size: Number of parameter sets that the
                 simulator accepts maps to data x at once. If None, we simulate
                 all parameter sets at the same time. If >= 1, the simulator has to
@@ -65,10 +67,11 @@ class NeuralInference(ABC):
                 logging.[INFO|WARNING|DEBUG|ERROR|CRITICAL].
         """
 
-        self._simulator, self._prior, self._x_o = prepare_sbi_problem(
-            simulator, prior, x_o, skip_input_checks
+        self._simulator, self._prior, self._x_shape = prepare_sbi_problem(
+            simulator, prior, x_shape, skip_input_checks
         )
 
+        self._skip_input_checks = skip_input_checks
         self._show_progressbar = show_progressbar
         self._show_round_summary = show_round_summary
 
@@ -179,7 +182,7 @@ class NeuralInference(ABC):
         -------------------------
         Epochs trained: {epochs}
         Best validation performance: {best_validation_log_probs:.4f}
-        Leakage: {1.-posterior_acceptance_prob:.4f}
+        Acceptance rate: {posterior_acceptance_prob:.4f}
         -------------------------
         """
 
@@ -211,18 +214,19 @@ class NeuralInference(ABC):
         # comparisons to ground truth parameters and samples.
 
         # Median |x - x0| for most recent round.
-        median_observation_distance = torch.median(
-            torch.sqrt(torch.sum((x_bank[-1] - x_o.reshape(1, -1)) ** 2, dim=-1,))
-        )
-        self._summary["median_observation_distances"].append(
-            median_observation_distance.item()
-        )
+        if x_o is not None:
+            median_observation_distance = torch.median(
+                torch.sqrt(torch.sum((x_bank[-1] - x_o.reshape(1, -1)) ** 2, dim=-1,))
+            )
+            self._summary["median_observation_distances"].append(
+                median_observation_distance.item()
+            )
 
-        self._summary_writer.add_scalar(
-            tag="median_observation_distance",
-            scalar_value=self._summary["median_observation_distances"][-1],
-            global_step=round_ + 1,
-        )
+            self._summary_writer.add_scalar(
+                tag="median_observation_distance",
+                scalar_value=self._summary["median_observation_distances"][-1],
+                global_step=round_ + 1,
+            )
 
         # Rejection sampling acceptance rate, only for SNPE.
         if posterior_samples_acceptance_rate is not None:
@@ -260,3 +264,27 @@ class NeuralInference(ABC):
         )
 
         self._summary_writer.flush()
+
+    def _handle_x_o_wrt_amortization(self, x_o: Tensor, num_rounds: int):
+        """
+        Check if x_o is coherent with num_rounds and possibly set it as default x_o.
+
+        Warn if amortized inference (num_rounds==1) and x_o is provided. Raise error if
+        multi-round inference but no x_o is provided.
+
+        For multi-round inference, set x_o as the default observation.
+        """
+
+        if num_rounds == 1 and x_o is not None:
+            warnings.warn("Providing x_o in a single-round scenario has no effect.")
+        elif num_rounds > 1 and x_o is None:
+            raise ValueError(
+                "Observed data x_o is required if num_rounds>1 since"
+                "samples in all rounds after the first one are drawn from"
+                "the posterior p(theta|x_o)."
+            )
+
+        if num_rounds > 1:
+            self._posterior.x_o = (
+                x_o if self._skip_input_checks else process_x_o(x_o, self._x_shape)
+            )
