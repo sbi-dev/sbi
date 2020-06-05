@@ -47,7 +47,7 @@ def test_api_sre_on_linearGaussian(num_dim: int):
         show_progressbar=False,
     )
 
-    posterior = infer(num_rounds=1, num_simulations_per_round=1000)
+    posterior = infer(num_rounds=1, num_simulations_per_round=1000, max_num_epochs=5)
 
     posterior.sample(num_samples=10, x=x_o, num_chains=2)
 
@@ -231,6 +231,6 @@ def test_api_sre_sampling_methods(mcmc_method: str, prior_str: str, set_seed):
         show_progressbar=False,
     )
 
-    posterior = infer(num_rounds=1, num_simulations_per_round=200)
+    posterior = infer(num_rounds=1, num_simulations_per_round=200, max_num_epochs=5)
 
     posterior.sample(num_samples=10, x=x_o)

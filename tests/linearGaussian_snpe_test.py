@@ -360,7 +360,7 @@ def test_api_snpec_posterior_correction(
         show_progressbar=False,
     )
 
-    posterior = infer(num_rounds=1, num_simulations_per_round=1000)
+    posterior = infer(num_rounds=1, num_simulations_per_round=1000, max_num_epochs=5)
 
     # Posterior should be corrected for leakage even if num_rounds just 1.
     samples = posterior.sample(10, x=x_o)

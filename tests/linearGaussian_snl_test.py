@@ -48,7 +48,7 @@ def test_api_snl_on_linearGaussian(num_dim: int, set_seed):
         show_progressbar=False,
     )
 
-    posterior = infer(num_rounds=1, num_simulations_per_round=1000)
+    posterior = infer(num_rounds=1, num_simulations_per_round=1000, max_num_epochs=5)
 
     posterior.sample(num_samples=num_samples, x=x_o, thin=3)
 
@@ -242,6 +242,6 @@ def test_api_snl_sampling_methods(mcmc_method: str, prior_str: str, set_seed):
         show_progressbar=False,
     )
 
-    posterior = infer(num_rounds=1, num_simulations_per_round=200)
+    posterior = infer(num_rounds=1, num_simulations_per_round=200, max_num_epochs=5)
 
     posterior.sample(num_samples=num_samples, x=x_o, thin=3)
