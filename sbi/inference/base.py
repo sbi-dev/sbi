@@ -117,9 +117,7 @@ class NeuralInference(ABC):
             median_observation_distances=[], epochs=[], best_validation_log_probs=[],
         )
 
-    def _has_converged(
-        self, epoch: int, stop_after_epochs: int, max_num_epochs: int
-    ) -> bool:
+    def _has_converged(self, epoch: int, stop_after_epochs: int) -> bool:
         """Return whether the training converged yet and save best model state so far.
 
         Checks for improvement in validation performance over previous epochs.
@@ -146,9 +144,6 @@ class NeuralInference(ABC):
         # If no validation improvement over many epochs, stop training.
         if self._epochs_since_last_improvement > stop_after_epochs - 1:
             posterior_nn.load_state_dict(self._best_model_state_dict)
-            converged = True
-
-        if epoch >= max_num_epochs:
             converged = True
 
         return converged

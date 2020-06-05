@@ -231,7 +231,7 @@ class SNL(NeuralInference):
         optimizer = optim.Adam(self._posterior.net.parameters(), lr=learning_rate)
 
         epoch, self._val_log_prob = 0, float("-Inf")
-        while not self._has_converged(epoch, stop_after_epochs, max_num_epochs):
+        while not self._has_converged(epoch, stop_after_epochs):
 
             # Train for a single epoch.
             self._posterior.net.train()
@@ -272,9 +272,10 @@ class SNL(NeuralInference):
                 # https://stackoverflow.com/questions/3419984/
                 print("Training neural network. Epochs trained: ", epoch, end="\r")
 
-        if self._show_progressbar and self._has_converged(
-            epoch, stop_after_epochs, max_num_epochs
-        ):
+            if epoch >= max_num_epochs:
+                break
+
+        if self._show_progressbar and self._has_converged(epoch, stop_after_epochs):
             # network has converged, we print this summary.
             print("Neural network successfully converged after", epoch, "epochs.")
         elif self._show_progressbar and max_num_epochs == epoch:
