@@ -66,6 +66,7 @@ class SnpeBase(NeuralInference, ABC):
             prior=prior,
             x_shape=x_shape,
             simulation_batch_size=simulation_batch_size,
+            retrain_from_scratch_each_round=retrain_from_scratch_each_round,
             device=device,
             summary_writer=summary_writer,
             num_workers=num_workers,
@@ -91,8 +92,8 @@ class SnpeBase(NeuralInference, ABC):
             self.calibration_kernel = calibration_kernel
 
         self._z_score_x, self._z_score_min_std = z_score_x, z_score_min_std
-        self._retrain_from_scratch_each_round = retrain_from_scratch_each_round
         self._discard_prior_samples = discard_prior_samples
+        self._warn_if_retrain_from_scratch_snpe()
 
         # Create a neural posterior which can sample(), log_prob().
         self._posterior = NeuralPosterior(
@@ -106,10 +107,6 @@ class SnpeBase(NeuralInference, ABC):
         )
 
         self._prior_masks, self._model_bank = [], []
-
-        # If we're retraining from scratch each round, keep a copy
-        # of the original untrained model for reinitialization.
-        self._untrained_neural_posterior = deepcopy(self._posterior)
 
         # Extra SNPE-specific fields summary_writer.
         self._summary.update({"rejection_sampling_acceptance_rates": []})  # type:ignore
@@ -274,6 +271,10 @@ class SnpeBase(NeuralInference, ABC):
             if self._z_score_x:
                 self._posterior.set_embedding_net(self._z_score_embedding(x))
 
+            # If we're retraining from scratch each round, keep a copy
+            # of the original untrained model for reinitialization.
+            self._untrained_neural_posterior = deepcopy(self._posterior)
+
         else:
             # XXX Make posterior.sample() accept tuples like prior.sample().
             theta = self._posterior.sample(
@@ -376,6 +377,9 @@ class SnpeBase(NeuralInference, ABC):
         # to the untrained copy.
         if self._retrain_from_scratch_each_round and round_ > 0:
             self._posterior = deepcopy(self._untrained_neural_posterior)
+            optimizer = optim.Adam(
+                list(self._posterior.net.parameters()), lr=learning_rate,
+            )
 
         epoch, self._val_log_prob = 0, float("-Inf")
         while not self._has_converged(epoch, stop_after_epochs):
@@ -464,6 +468,15 @@ class SnpeBase(NeuralInference, ABC):
             log_prob = self._log_prob_proposal_posterior(theta, x, masks)
 
         return -(self.calibration_kernel(x) * log_prob)
+
+    def _warn_if_retrain_from_scratch_snpe(self):
+        if self._retrain_from_scratch_each_round:
+            warnings.warn(
+                "You specified `retrain_from_scratch_each_round=True`. For "
+                "SNPE, we have experienced very poor performance in this "
+                "scenario and we therefore strongly recommend "
+                "`retrain_from_scratch_each_round=False`."
+            )
 
 
 class PotentialFunctionProvider:

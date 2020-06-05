@@ -18,7 +18,6 @@ from sbi.inference.base import NeuralInference
 from sbi.inference.posteriors.sbi_posterior import NeuralPosterior
 from sbi.utils.torchutils import ensure_x_batched, ensure_theta_batched
 from sbi.types import ScalarFloat, OneOrMore
-from sbi.user_input.user_input_checks import process_x_o
 
 
 class SRE(NeuralInference):
@@ -72,6 +71,7 @@ class SRE(NeuralInference):
             prior=prior,
             x_shape=x_shape,
             simulation_batch_size=simulation_batch_size,
+            retrain_from_scratch_each_round=retrain_from_scratch_each_round,
             device=device,
             summary_writer=summary_writer,
             num_workers=num_workers,
@@ -107,14 +107,6 @@ class SRE(NeuralInference):
         # We may want to summarize high-dimensional x.
         # This may be either a fixed or learned transformation.
         self._summary_net = nn.Identity() if summary_net is None else summary_net
-
-        # If we're retraining from scratch each round,
-        # keep a copy of the original untrained model for reinitialization.
-        self._retrain_from_scratch_each_round = retrain_from_scratch_each_round
-        if self._retrain_from_scratch_each_round:
-            self._untrained_classifier = deepcopy(classifier)
-        else:
-            self._untrained_classifier = None
 
         # SRE-specific summary_writer fields.
         self._summary.update({"mcmc_times": []})  # type: ignore
@@ -158,6 +150,12 @@ class SRE(NeuralInference):
         """
 
         self._handle_x_o_wrt_amortization(x_o, num_rounds)
+
+        # If we're retraining from scratch each round,
+        # keep a copy of the original untrained model for reinitialization.
+        if self._retrain_from_scratch_each_round:
+            self._untrained_posterior = deepcopy(self._posterior)
+            self._untrained_summary_net = deepcopy(self._summary_net)
 
         max_num_epochs = 2 ** 31 - 1 if max_num_epochs is None else max_num_epochs
 
@@ -276,7 +274,13 @@ class SRE(NeuralInference):
         # If we're retraining from scratch each round, reset the neural posterior
         # to the untrained copy we made at the start.
         if self._retrain_from_scratch_each_round:
-            self._posterior = deepcopy(self._posterior)
+            self._posterior = deepcopy(self._untrained_posterior)
+            self._summary_net = deepcopy(self._untrained_summary_net)
+            optimizer = optim.Adam(
+                list(self._posterior.net.parameters())
+                + list(self._summary_net.parameters()),
+                lr=learning_rate,
+            )
 
         def _get_loss(theta, x):
 
