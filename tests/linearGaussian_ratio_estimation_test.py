@@ -10,6 +10,8 @@ from tests.test_utils import (
     get_dkl_gaussian_prior,
 )
 from sbi.inference.sre.sre import SRE
+from sbi.inference.sre.aalr import AALR
+
 from sbi.simulators.linear_gaussian import (
     true_posterior_linear_gaussian_mvn_prior,
     samples_true_posterior_linear_gaussian_uniform_prior,
@@ -108,7 +110,7 @@ def test_c2st_sre_on_linearGaussian_different_dims(set_seed):
 
 @pytest.mark.slow
 @pytest.mark.parametrize(
-    "num_dim, prior_str, classifier_loss",
+    "num_dim, prior_str, algorithm_str",
     (
         (2, "gaussian", "sre"),
         (1, "gaussian", "sre"),
@@ -117,7 +119,7 @@ def test_c2st_sre_on_linearGaussian_different_dims(set_seed):
     ),
 )
 def test_c2st_sre_on_linearGaussian(
-    num_dim: int, prior_str: str, classifier_loss: str, set_seed,
+    num_dim: int, prior_str: str, algorithm_str: str, set_seed,
 ):
     """Test c2st accuracy of inference with SRE on linear Gaussian model.
 
@@ -130,9 +132,8 @@ def test_c2st_sre_on_linearGaussian(
     x_o = zeros(1, num_dim)
     num_samples = 500
 
-    likelihood_shift = -1.0 * ones(
-        num_dim
-    )  # likelihood_mean will be likelihood_shift+theta
+    # `likelihood_mean` will be `likelihood_shift + theta`.
+    likelihood_shift = -1.0 * ones(num_dim)
     likelihood_cov = 0.3 * eye(num_dim)
 
     if prior_str == "gaussian":
@@ -151,18 +152,19 @@ def test_c2st_sre_on_linearGaussian(
 
     simulator = lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    num_atoms = 2 if classifier_loss == "aalr" else None
+    num_atoms = 2 if algorithm_str == "aalr" else None
 
-    infer = SRE(
+    kwargs = dict(
         simulator=simulator,
         prior=prior,
         num_atoms=num_atoms,
         classifier=None,  # Use default RESNET.
-        classifier_loss=classifier_loss,
         simulation_batch_size=50,
         mcmc_method="slice_np",
         show_progressbar=False,
     )
+
+    infer = SRE(**kwargs) if algorithm_str == "sre" else AALR(**kwargs)
 
     posterior = infer(num_rounds=1, num_simulations_per_round=1000)
     posterior.freeze(x_o)
@@ -170,10 +172,10 @@ def test_c2st_sre_on_linearGaussian(
     samples = posterior.sample(num_samples=num_samples, thin=3)
 
     # Check performance based on c2st accuracy.
-    check_c2st(samples, target_samples, alg=f"sre-{prior_str}-{classifier_loss}")
+    check_c2st(samples, target_samples, alg=f"sre-{prior_str}-{algorithm_str}")
 
     # Checks for log_prob()
-    if prior_str == "gaussian" and classifier_loss == "aalr":
+    if prior_str == "gaussian" and algorithm_str == "aalr":
         # For the Gaussian prior, we compute the KLd between ground truth and
         # posterior. We can do this only if the classifier_loss was as described in
         # Hermans et al. 2019 ('aalr') since Durkan et al. 2019 version only allows
