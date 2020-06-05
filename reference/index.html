@@ -411,7 +411,7 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <div class="doc doc-object doc-method">
 <h4 class="doc doc-heading" data-toc-label="__init__()" id="sbi.inference.snpe.snpe_b.SnpeB.__init__">
 <code class="highlight language-python">
-__init__<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">x_o</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">calibration_kernel</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">z_score_x</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">z_score_min_std</span><span class="o">=</span><span class="mf">1e-07</span><span class="p">,</span> <span class="n">simulation_batch_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">retrain_from_scratch_each_round</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">discard_prior_samples</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">summary_writer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">worker_batch_size</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">skip_input_checks</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">show_progressbar</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">show_round_summary</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">logging_level</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span> </code>
+__init__<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">x_shape</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">calibration_kernel</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">z_score_x</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">z_score_min_std</span><span class="o">=</span><span class="mf">1e-07</span><span class="p">,</span> <span class="n">simulation_batch_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">retrain_from_scratch_each_round</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">discard_prior_samples</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">summary_writer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">worker_batch_size</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">skip_input_checks</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">show_progressbar</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">show_round_summary</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">logging_level</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span> </code>
 <span class="doc doc-properties">
 <small class="doc doc-property doc-property-special"><code>special</code></small>
 </span>
@@ -487,7 +487,7 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">simulator</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">,</span>
-    <span class="n">x_o</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
+    <span class="n">x_shape</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">calibration_kernel</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">z_score_x</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
@@ -519,7 +519,7 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
     <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
         <span class="n">simulator</span><span class="o">=</span><span class="n">simulator</span><span class="p">,</span>
         <span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span>
-        <span class="n">x_o</span><span class="o">=</span><span class="n">x_o</span><span class="p">,</span>
+        <span class="n">x_shape</span><span class="o">=</span><span class="n">x_shape</span><span class="p">,</span>
         <span class="n">density_estimator</span><span class="o">=</span><span class="n">density_estimator</span><span class="p">,</span>
         <span class="n">calibration_kernel</span><span class="o">=</span><span class="n">calibration_kernel</span><span class="p">,</span>
         <span class="n">z_score_x</span><span class="o">=</span><span class="n">z_score_x</span><span class="p">,</span>
@@ -555,7 +555,7 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <div class="doc doc-object doc-method">
 <h4 class="doc doc-heading" data-toc-label="__init__()" id="sbi.inference.snpe.snpe_c.SnpeC.__init__">
 <code class="highlight language-python">
-__init__<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">x_o</span><span class="p">,</span> <span class="n">num_atoms</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">calibration_kernel</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">use_combined_loss</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">z_score_x</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">z_score_min_std</span><span class="o">=</span><span class="mf">1e-07</span><span class="p">,</span> <span class="n">simulation_batch_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">retrain_from_scratch_each_round</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">discard_prior_samples</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">summary_writer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">worker_batch_size</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sample_with_mcmc</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">mcmc_method</span><span class="o">=</span><span class="s1">'slice_np'</span><span class="p">,</span> <span class="n">skip_input_checks</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">show_progressbar</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">show_round_summary</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">logging_level</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span> </code>
+__init__<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">x_shape</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_atoms</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">calibration_kernel</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">use_combined_loss</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">z_score_x</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">z_score_min_std</span><span class="o">=</span><span class="mf">1e-07</span><span class="p">,</span> <span class="n">simulation_batch_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">retrain_from_scratch_each_round</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">discard_prior_samples</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">summary_writer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">worker_batch_size</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sample_with_mcmc</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">mcmc_method</span><span class="o">=</span><span class="s1">'slice_np'</span><span class="p">,</span> <span class="n">skip_input_checks</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">show_progressbar</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">show_round_summary</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">logging_level</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span> </code>
 <span class="doc doc-properties">
 <small class="doc doc-property doc-property-special"><code>special</code></small>
 </span>
@@ -672,7 +672,7 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">simulator</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">,</span>
-    <span class="n">x_o</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
+    <span class="n">x_shape</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">num_atoms</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">calibration_kernel</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -714,7 +714,7 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
     <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
         <span class="n">simulator</span><span class="o">=</span><span class="n">simulator</span><span class="p">,</span>
         <span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span>
-        <span class="n">x_o</span><span class="o">=</span><span class="n">x_o</span><span class="p">,</span>
+        <span class="n">x_shape</span><span class="o">=</span><span class="n">x_shape</span><span class="p">,</span>
         <span class="n">density_estimator</span><span class="o">=</span><span class="n">density_estimator</span><span class="p">,</span>
         <span class="n">calibration_kernel</span><span class="o">=</span><span class="n">calibration_kernel</span><span class="p">,</span>
         <span class="n">z_score_x</span><span class="o">=</span><span class="n">z_score_x</span><span class="p">,</span>
@@ -752,7 +752,7 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <div class="doc doc-object doc-method">
 <h4 class="doc doc-heading" data-toc-label="__call__()" id="sbi.inference.snl.snl.SNL.__call__">
 <code class="highlight language-python">
-__call__<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">num_rounds</span><span class="p">,</span> <span class="n">num_simulations_per_round</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.0005</span><span class="p">,</span> <span class="n">validation_fraction</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">stop_after_epochs</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">max_num_epochs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">clip_max_norm</span><span class="o">=</span><span class="mf">5.0</span><span class="p">)</span> </code>
+__call__<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">num_rounds</span><span class="p">,</span> <span class="n">num_simulations_per_round</span><span class="p">,</span> <span class="n">x_o</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.0005</span><span class="p">,</span> <span class="n">validation_fraction</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">stop_after_epochs</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">max_num_epochs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">clip_max_norm</span><span class="o">=</span><span class="mf">5.0</span><span class="p">)</span> </code>
 <span class="doc doc-properties">
 <small class="doc doc-property doc-property-special"><code>special</code></small>
 </span>
@@ -787,6 +787,14 @@ the simulator</p>
 <p>Number of simulator calls per round</p>
 </td>
 <td><em>required</em></td>
+</tr>
+<tr>
+<td><code>x_o</code></td>
+<td><code>Optional[Tensor]</code></td>
+<td>
+<p>When SNL is used in a multi-round setting, training samples for every round after the first round are drawn from the most recent posterior estimate given <span><span class="MathJax_Preview">x_o</span><script type="math/tex">x_o</script></span>, i.e. <span><span class="MathJax_Preview">p(\theta|x_o)</span><script type="math/tex">p(\theta|x_o)</script></span>.</p>
+</td>
+<td><code>None</code></td>
 </tr>
 <tr>
 <td><code>batch_size</code></td>
@@ -861,8 +869,7 @@ the simulator</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span> 89
- 90
+<pre><span></span> 90
  91
  92
  93
@@ -943,7 +950,14 @@ the simulator</p>
 168
 169
 170
-171</pre>
+171
+172
+173
+174
+175
+176
+177
+178</pre>
 </div>
 </td>
 <td class="code">
@@ -952,6 +966,7 @@ the simulator</p>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">num_rounds</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
     <span class="n">num_simulations_per_round</span><span class="p">:</span> <span class="n">OneOrMore</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+    <span class="n">x_o</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">100</span><span class="p">,</span>
     <span class="n">learning_rate</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">5e-4</span><span class="p">,</span>
     <span class="n">validation_fraction</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.1</span><span class="p">,</span>
@@ -967,6 +982,9 @@ the simulator</p>
 <span class="sd">    Args:</span>
 <span class="sd">        num_rounds: Number of rounds to run</span>
 <span class="sd">        num_simulations_per_round: Number of simulator calls per round</span>
+<span class="sd">        x_o: When SNL is used in a multi-round setting, training samples for every</span>
+<span class="sd">            round after the first round are drawn from the most recent posterior</span>
+<span class="sd">            estimate given $x_o$, i.e. $p(\theta|x_o)$.</span>
 <span class="sd">        batch_size: Size of batch to use for training.</span>
 <span class="sd">        learning_rate: Learning rate for Adam optimizer.</span>
 <span class="sd">        validation_fraction: The fraction of data to use for validation.</span>
@@ -982,6 +1000,8 @@ the simulator</p>
 <span class="sd">    Returns:</span>
 <span class="sd">        Posterior $p(\theta|x_o)$ that can be sampled and evaluated</span>
 <span class="sd">    """</span>
+
+    <span class="bp">self</span><span class="o">.</span><span class="n">_handle_x_o_wrt_amortization</span><span class="p">(</span><span class="n">x_o</span><span class="p">,</span> <span class="n">num_rounds</span><span class="p">)</span>
 
     <span class="n">max_num_epochs</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">**</span> <span class="mi">31</span> <span class="o">-</span> <span class="mi">1</span> <span class="k">if</span> <span class="n">max_num_epochs</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">max_num_epochs</span>
 
@@ -1024,7 +1044,7 @@ the simulator</p>
         <span class="c1"># Update TensorBoard and summary dict.</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_summarize</span><span class="p">(</span>
             <span class="n">round_</span><span class="o">=</span><span class="n">round_</span><span class="p">,</span>
-            <span class="n">x_o</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_x_o</span><span class="p">,</span>
+            <span class="n">x_o</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_posterior</span><span class="o">.</span><span class="n">x_o</span><span class="p">,</span>
             <span class="n">theta_bank</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_theta_bank</span><span class="p">,</span>
             <span class="n">x_bank</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_x_bank</span><span class="p">,</span>
         <span class="p">)</span>
@@ -1042,7 +1062,7 @@ the simulator</p>
 <div class="doc doc-object doc-method">
 <h4 class="doc doc-heading" data-toc-label="__init__()" id="sbi.inference.snl.snl.SNL.__init__">
 <code class="highlight language-python">
-__init__<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">x_o</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">simulation_batch_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">summary_writer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">worker_batch_size</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">mcmc_method</span><span class="o">=</span><span class="s1">'slice_np'</span><span class="p">,</span> <span class="n">skip_input_checks</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">show_progressbar</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">show_round_summary</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">logging_level</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span> </code>
+__init__<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">x_shape</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">simulation_batch_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">summary_writer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">worker_batch_size</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">mcmc_method</span><span class="o">=</span><span class="s1">'slice_np'</span><span class="p">,</span> <span class="n">skip_input_checks</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">show_progressbar</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">show_round_summary</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">logging_level</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span> </code>
 <span class="doc doc-properties">
 <small class="doc doc-property doc-property-special"><code>special</code></small>
 </span>
@@ -1080,8 +1100,7 @@ Autoregressive Flows_ by Papamakarios et al., AISTATS 2019,
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>21
-22
+<pre><span></span>22
 23
 24
 25
@@ -1146,7 +1165,8 @@ Autoregressive Flows_ by Papamakarios et al., AISTATS 2019,
 84
 85
 86
-87</pre>
+87
+88</pre>
 </div>
 </td>
 <td class="code">
@@ -1155,7 +1175,7 @@ Autoregressive Flows_ by Papamakarios et al., AISTATS 2019,
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">simulator</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">,</span>
-    <span class="n">x_o</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
+    <span class="n">x_shape</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">simulation_batch_size</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
     <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">SummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -1182,12 +1202,12 @@ Autoregressive Flows_ by Papamakarios et al., AISTATS 2019,
 <span class="sd">    """</span>
 
     <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
-        <span class="n">simulator</span><span class="p">,</span>
-        <span class="n">prior</span><span class="p">,</span>
-        <span class="n">x_o</span><span class="p">,</span>
-        <span class="n">simulation_batch_size</span><span class="p">,</span>
-        <span class="n">device</span><span class="p">,</span>
-        <span class="n">summary_writer</span><span class="p">,</span>
+        <span class="n">simulator</span><span class="o">=</span><span class="n">simulator</span><span class="p">,</span>
+        <span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span>
+        <span class="n">x_shape</span><span class="o">=</span><span class="n">x_shape</span><span class="p">,</span>
+        <span class="n">simulation_batch_size</span><span class="o">=</span><span class="n">simulation_batch_size</span><span class="p">,</span>
+        <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span>
+        <span class="n">summary_writer</span><span class="o">=</span><span class="n">summary_writer</span><span class="p">,</span>
         <span class="n">num_workers</span><span class="o">=</span><span class="n">num_workers</span><span class="p">,</span>
         <span class="n">worker_batch_size</span><span class="o">=</span><span class="n">worker_batch_size</span><span class="p">,</span>
         <span class="n">skip_input_checks</span><span class="o">=</span><span class="n">skip_input_checks</span><span class="p">,</span>
@@ -1200,7 +1220,7 @@ Autoregressive Flows_ by Papamakarios et al., AISTATS 2019,
         <span class="n">density_estimator</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">likelihood_nn</span><span class="p">(</span>
             <span class="n">model</span><span class="o">=</span><span class="s2">"maf"</span><span class="p">,</span>
             <span class="n">theta_shape</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_prior</span><span class="o">.</span><span class="n">sample</span><span class="p">()</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span>
-            <span class="n">x_o_shape</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_x_o</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span>
+            <span class="n">x_o_shape</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_x_shape</span><span class="p">,</span>
         <span class="p">)</span>
 
     <span class="c1"># create neural posterior which can sample()</span>
@@ -1208,9 +1228,9 @@ Autoregressive Flows_ by Papamakarios et al., AISTATS 2019,
         <span class="n">algorithm_family</span><span class="o">=</span><span class="s2">"snl"</span><span class="p">,</span>
         <span class="n">neural_net</span><span class="o">=</span><span class="n">density_estimator</span><span class="p">,</span>
         <span class="n">prior</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_prior</span><span class="p">,</span>
-        <span class="n">x_o</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_x_o</span><span class="p">,</span>
         <span class="n">mcmc_method</span><span class="o">=</span><span class="n">mcmc_method</span><span class="p">,</span>
         <span class="n">get_potential_function</span><span class="o">=</span><span class="n">PotentialFunctionProvider</span><span class="p">(),</span>
+        <span class="n">x_shape</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_x_shape</span><span class="p">,</span>
     <span class="p">)</span>
 
     <span class="c1"># XXX why not density_estimator.train(True)???</span>
@@ -1238,7 +1258,7 @@ Autoregressive Flows_ by Papamakarios et al., AISTATS 2019,
 <div class="doc doc-object doc-method">
 <h4 class="doc doc-heading" data-toc-label="__call__()" id="sbi.inference.sre.sre.SRE.__call__">
 <code class="highlight language-python">
-__call__<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">num_rounds</span><span class="p">,</span> <span class="n">num_simulations_per_round</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.0005</span><span class="p">,</span> <span class="n">validation_fraction</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">stop_after_epochs</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">max_num_epochs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">clip_max_norm</span><span class="o">=</span><span class="mf">5.0</span><span class="p">)</span> </code>
+__call__<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">num_rounds</span><span class="p">,</span> <span class="n">num_simulations_per_round</span><span class="p">,</span> <span class="n">x_o</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.0005</span><span class="p">,</span> <span class="n">validation_fraction</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">stop_after_epochs</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">max_num_epochs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">clip_max_norm</span><span class="o">=</span><span class="mf">5.0</span><span class="p">)</span> </code>
 <span class="doc doc-properties">
 <small class="doc doc-property doc-property-special"><code>special</code></small>
 </span>
@@ -1273,6 +1293,14 @@ the simulator</p>
 <p>Number of simulator calls per round</p>
 </td>
 <td><em>required</em></td>
+</tr>
+<tr>
+<td><code>x_o</code></td>
+<td><code>Optional[Tensor]</code></td>
+<td>
+<p>When SRE is used in a multi-round setting, training samples for every round after the first round are drawn from the most recent posterior estimate given <span><span class="MathJax_Preview">x_o</span><script type="math/tex">x_o</script></span>, i.e. <span><span class="MathJax_Preview">p(  heta|x_o)</span><script type="math/tex">p(  heta|x_o)</script></span>.</p>
+</td>
+<td><code>None</code></td>
 </tr>
 <tr>
 <td><code>batch_size</code></td>
@@ -1347,8 +1375,7 @@ the simulator</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>121
-122
+<pre><span></span>122
 123
 124
 125
@@ -1429,7 +1456,14 @@ the simulator</p>
 200
 201
 202
-203</pre>
+203
+204
+205
+206
+207
+208
+209
+210</pre>
 </div>
 </td>
 <td class="code">
@@ -1438,6 +1472,7 @@ the simulator</p>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">num_rounds</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
     <span class="n">num_simulations_per_round</span><span class="p">:</span> <span class="n">OneOrMore</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+    <span class="n">x_o</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">100</span><span class="p">,</span>
     <span class="n">learning_rate</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">5e-4</span><span class="p">,</span>
     <span class="n">validation_fraction</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.1</span><span class="p">,</span>
@@ -1453,6 +1488,9 @@ the simulator</p>
 <span class="sd">    Args:</span>
 <span class="sd">        num_rounds: Number of rounds to run</span>
 <span class="sd">        num_simulations_per_round: Number of simulator calls per round</span>
+<span class="sd">        x_o: When SRE is used in a multi-round setting, training samples for every</span>
+<span class="sd">            round after the first round are drawn from the most recent posterior</span>
+<span class="sd">            estimate given $x_o$, i.e. $p(\theta|x_o)$.</span>
 <span class="sd">        batch_size: Size of batch to use for training.</span>
 <span class="sd">        learning_rate: Learning rate for Adam optimizer.</span>
 <span class="sd">        validation_fraction: The fraction of data to use for validation.</span>
@@ -1467,6 +1505,8 @@ the simulator</p>
 <span class="sd">    Returns:</span>
 <span class="sd">        Posterior that can be sampled and evaluated.</span>
 <span class="sd">    """</span>
+
+    <span class="bp">self</span><span class="o">.</span><span class="n">_handle_x_o_wrt_amortization</span><span class="p">(</span><span class="n">x_o</span><span class="p">,</span> <span class="n">num_rounds</span><span class="p">)</span>
 
     <span class="n">max_num_epochs</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">**</span> <span class="mi">31</span> <span class="o">-</span> <span class="mi">1</span> <span class="k">if</span> <span class="n">max_num_epochs</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">max_num_epochs</span>
 
@@ -1510,7 +1550,7 @@ the simulator</p>
         <span class="c1"># Update tensorboard and summary dict.</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_summarize</span><span class="p">(</span>
             <span class="n">round_</span><span class="o">=</span><span class="n">round_</span><span class="p">,</span>
-            <span class="n">x_o</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_x_o</span><span class="p">,</span>
+            <span class="n">x_o</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_posterior</span><span class="o">.</span><span class="n">x_o</span><span class="p">,</span>
             <span class="n">theta_bank</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_theta_bank</span><span class="p">,</span>
             <span class="n">x_bank</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_x_bank</span><span class="p">,</span>
         <span class="p">)</span>
@@ -1528,7 +1568,7 @@ the simulator</p>
 <div class="doc doc-object doc-method">
 <h4 class="doc doc-heading" data-toc-label="__init__()" id="sbi.inference.sre.sre.SRE.__init__">
 <code class="highlight language-python">
-__init__<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">x_o</span><span class="p">,</span> <span class="n">classifier</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_atoms</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">simulation_batch_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">mcmc_method</span><span class="o">=</span><span class="s1">'slice_np'</span><span class="p">,</span> <span class="n">summary_net</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">classifier_loss</span><span class="o">=</span><span class="s1">'sre'</span><span class="p">,</span> <span class="n">retrain_from_scratch_each_round</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">worker_batch_size</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">summary_writer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">skip_input_checks</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">show_progressbar</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">show_round_summary</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">logging_level</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span> </code>
+__init__<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">x_shape</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">classifier</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_atoms</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">simulation_batch_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">mcmc_method</span><span class="o">=</span><span class="s1">'slice_np'</span><span class="p">,</span> <span class="n">summary_net</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">classifier_loss</span><span class="o">=</span><span class="s1">'sre'</span><span class="p">,</span> <span class="n">retrain_from_scratch_each_round</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">worker_batch_size</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">summary_writer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">skip_input_checks</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">show_progressbar</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">show_round_summary</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">logging_level</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span> </code>
 <span class="doc doc-properties">
 <small class="doc doc-property doc-property-special"><code>special</code></small>
 </span>
@@ -1597,8 +1637,7 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span> 24
- 25
+<pre><span></span> 25
  26
  27
  28
@@ -1692,7 +1731,8 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 116
 117
 118
-119</pre>
+119
+120</pre>
 </div>
 </td>
 <td class="code">
@@ -1701,7 +1741,7 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">simulator</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">,</span>
-    <span class="n">x_o</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
+    <span class="n">x_shape</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">classifier</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">num_atoms</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">simulation_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
@@ -1745,7 +1785,7 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
     <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
         <span class="n">simulator</span><span class="o">=</span><span class="n">simulator</span><span class="p">,</span>
         <span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span>
-        <span class="n">x_o</span><span class="o">=</span><span class="n">x_o</span><span class="p">,</span>
+        <span class="n">x_shape</span><span class="o">=</span><span class="n">x_shape</span><span class="p">,</span>
         <span class="n">simulation_batch_size</span><span class="o">=</span><span class="n">simulation_batch_size</span><span class="p">,</span>
         <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span>
         <span class="n">summary_writer</span><span class="o">=</span><span class="n">summary_writer</span><span class="p">,</span>
@@ -1764,7 +1804,7 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
         <span class="n">classifier</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">classifier_nn</span><span class="p">(</span>
             <span class="n">model</span><span class="o">=</span><span class="s2">"resnet"</span><span class="p">,</span>
             <span class="n">theta_shape</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_prior</span><span class="o">.</span><span class="n">sample</span><span class="p">()</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span>
-            <span class="n">x_o_shape</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_x_o</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span>
+            <span class="n">x_o_shape</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_x_shape</span><span class="p">,</span>
         <span class="p">)</span>
 
     <span class="c1"># Create posterior object which can sample().</span>
@@ -1772,9 +1812,9 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
         <span class="n">algorithm_family</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_classifier_loss</span><span class="p">,</span>
         <span class="n">neural_net</span><span class="o">=</span><span class="n">classifier</span><span class="p">,</span>
         <span class="n">prior</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_prior</span><span class="p">,</span>
-        <span class="n">x_o</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_x_o</span><span class="p">,</span>
         <span class="n">mcmc_method</span><span class="o">=</span><span class="n">mcmc_method</span><span class="p">,</span>
         <span class="n">get_potential_function</span><span class="o">=</span><span class="n">PotentialFunctionProvider</span><span class="p">(),</span>
+        <span class="n">x_shape</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_x_shape</span><span class="p">,</span>
     <span class="p">)</span>
 
     <span class="bp">self</span><span class="o">.</span><span class="n">_posterior</span><span class="o">.</span><span class="n">net</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
