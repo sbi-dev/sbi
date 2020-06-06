@@ -8,9 +8,8 @@ from scipy.stats import beta, multivariate_normal, uniform
 from torch import Tensor, ones, zeros, eye
 from torch.distributions import Beta, Distribution, Gamma, MultivariateNormal, Uniform
 
-from sbi.inference.snpe import SnpeC
-from sbi.inference.snl import SNL
-from sbi.inference.sre import SRE
+from sbi.inference import SNPE_C, SNL, SRE
+
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
 from sbi.user_input.user_input_checks import (
     prepare_sbi_problem,
@@ -312,7 +311,7 @@ def test_inference_with_user_sbi_problems(
     Test inference with combinations of user defined simulators, priors and x_os.
     """
 
-    infer = SnpeC(
+    infer = SNPE_C(
         simulator=user_simulator,
         prior=user_prior,
         x_shape=user_x_shape,
@@ -423,7 +422,7 @@ def test_invalid_inputs():
         joint.log_prob(ones(10, 4, 1))
 
 
-@pytest.mark.parametrize("method", (SnpeC, SNL, SRE))
+@pytest.mark.parametrize("method", (SNPE_C, SNL, SRE))
 def test_skip_input_checks(method):
 
     with pytest.warns(UserWarning):

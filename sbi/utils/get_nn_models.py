@@ -367,7 +367,7 @@ def _check_1d_flow_limitations(model: str, output_space: str) -> None:
         output_space: Either of ['parameter'|'data']. Is used to add to the
             message whether the output of the density estimator is the parameter space
             theta (which is the case for SNPE) or the data space x (which is the case
-            for SNL).
+            for SNLE).
     """
 
     if model == "maf" or model == "made":

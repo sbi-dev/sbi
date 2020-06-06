@@ -10,8 +10,8 @@ from tests.test_utils import (
     get_prob_outside_uniform_prior,
     get_normalization_uniform_prior,
 )
-from sbi.inference.snpe.snpe_b import SnpeB
-from sbi.inference.snpe.snpe_c import SnpeC
+from sbi.inference import SNPE_B
+from sbi.inference import SNPE_C
 from sbi.simulators.linear_gaussian import (
     true_posterior_linear_gaussian_mvn_prior,
     samples_true_posterior_linear_gaussian_uniform_prior,
@@ -61,7 +61,7 @@ def test_c2st_snpe_on_linearGaussian(
 
     simulator = lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    infer = SnpeC(
+    infer = SNPE_C(
         simulator=simulator,
         density_estimator=None,  # Use default MAF.
         prior=prior,
@@ -169,7 +169,7 @@ def test_c2st_snpe_on_linearGaussian_different_dims(set_seed):
         show_progressbar=False,
     )
 
-    infer = SnpeC(num_atoms=None, sample_with_mcmc=False, **snpe_common_args)
+    infer = SNPE_C(sample_with_mcmc=False, **snpe_common_args)
 
     posterior = infer(num_rounds=1, num_simulations_per_round=2000)  # type: ignore
     samples = posterior.sample(num_samples, x=x_o)
@@ -227,14 +227,13 @@ def test_c2st_multi_round_snpe_on_linearGaussian(algorithm_str: str, set_seed):
     )
 
     if algorithm_str == "snpe_b":
-        infer = SnpeB(simulation_batch_size=10, **snpe_common_args)
+        infer = SNPE_B(simulation_batch_size=10, **creation_args)
+        posterior = infer(**call_args)
     elif algorithm_str == "snpe_c":
-        infer = SnpeC(
-            num_atoms=10,
-            simulation_batch_size=50,
-            sample_with_mcmc=False,
-            **snpe_common_args,
+        infer = SNPE_C(
+            simulation_batch_size=50, sample_with_mcmc=False, **creation_args
         )
+        posterior = infer(num_atoms=10, **call_args)
 
     posterior = infer(num_rounds=2, x_o=x_o, num_simulations_per_round=1000)  # type: ignore
     samples = posterior.sample(num_samples)
@@ -267,7 +266,7 @@ will have infinites, which we reject."""
     ),
 )
 def test_multi_round_snpe_deterministic_simulator(set_seed, z_score_min_std):
-    """Test if a deterministic simulator breaks inference for SNPE B.
+    """Test if a deterministic simulator breaks inference for SNPE-C.
 
     Args:
         set_seed: fixture for manual seeding
@@ -293,7 +292,7 @@ def test_multi_round_snpe_deterministic_simulator(set_seed, z_score_min_std):
 
         return result
 
-    infer = SnpeB(
+    infer = SNPE_C(
         simulator=deterministic_simulator,
         density_estimator=None,  # Use default MAF.
         prior=prior,
@@ -319,7 +318,7 @@ def test_multi_round_snpe_deterministic_simulator(set_seed, z_score_min_std):
         (False, "rejection", "uniform"),
     ),
 )
-def test_api_snpec_posterior_correction(
+def test_api_snpe_c_posterior_correction(
     sample_with_mcmc, mcmc_method, prior_str, set_seed
 ):
     """Test that leakage correction applied to sampling works, with both MCMC and
@@ -345,7 +344,7 @@ def test_api_snpec_posterior_correction(
 
     simulator = lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    infer = SnpeC(
+    infer = SNPE_C(
         simulator=simulator,
         density_estimator=None,  # Use default MAF.
         prior=prior,

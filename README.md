@@ -4,7 +4,13 @@
 
 SBI is currently under very active development leading up to a first stable release on 12th June.
 
-Some aspects of the interface will change, and the documentation for running the inference methods (`SnpeB, SnpeC (APT), SRE, SNL`) is not accessible  at the moment through regular Python introspection - you'll have to look at the superclasses ([`SnpeBase`](https://github.com/mackelab/sbi/blob/master/sbi/inference/snpe/snpe_base.py), [`NeuralInference`](https://github.com/mackelab/sbi/blob/master/sbi/inference/base.py)). Authorship information is also out of date and licensing still pending (it will be free software).
+Some aspects of the interface will change, and the documentation for running the
+inference methods (`SNPE_C / APT, SRE_A / AALR, SRE_B / SRE, SNL`) is not accessible  at the moment through
+regular Python introspection - you'll have to look at the superclasses
+([`PosteriorEstimator`](https://github.com/mackelab/sbi/blob/master/sbi/inference/snpe/snpe_base.py),
+[`NeuralInference`](https://github.com/mackelab/sbi/blob/master/sbi/inference/base.py)).
+Authorship information is also out of date and licensing still pending (it will be free
+software).
 
 If you'd still like to give it a spin before release, please, by all means! We're glad to engage in conversation about it, please file an issue if you encounter unexpected behaviour or wonder about specific functionality.
 

@@ -84,7 +84,7 @@ class NeuralPosterior:
         self._get_potential_function = get_potential_function
         self._x_shape = x_shape
 
-        if algorithm_family in ("snpe", "snl", "sre", "aalr"):
+        if algorithm_family in ("snpe", "snl", "snre_a", "snre_b"):
             self._alg_family = algorithm_family
         else:
             raise ValueError("Algorithm family unsupported.")
@@ -163,6 +163,10 @@ class NeuralPosterior:
             return log_prob_fn(theta, x)
 
     # TODO: Move _log_prob_X into the respective inference classes (X)?
+    # The problem is extensibility. Any third party contributing a method X
+    # will need to also add a `_log_prob_X` here, and that is not nice.
+    # PLAN: pass an instance of the inference object at Posterior creation,
+
     def _log_prob_snpe(self, theta: Tensor, x: Tensor, norm_posterior: bool) -> Tensor:
         r"""
         Return posterior log probability $p(\theta|x)$.
@@ -173,9 +177,9 @@ class NeuralPosterior:
         """
 
         unnorm_log_prob = self.net.log_prob(theta, x)
-        is_prior_finite = torch.isfinite(self._prior.log_prob(theta))
 
         # Force probability to be zero outside prior support.
+        is_prior_finite = torch.isfinite(self._prior.log_prob(theta))
         masked_log_prob = torch.where(is_prior_finite, unnorm_log_prob, NEG_INF)
 
         log_factor = (
@@ -186,23 +190,23 @@ class NeuralPosterior:
 
         return masked_log_prob - log_factor
 
-    def _log_prob_classifier(self, theta: Tensor, x: Tensor) -> Tensor:
+    def _log_prob_ratio_estimator(self, theta: Tensor, x: Tensor) -> Tensor:
         log_ratio = self.net(torch.cat((theta, x)).reshape(1, -1))
         return log_ratio + self._prior.log_prob(theta)
 
-    def _log_prob_sre(self, theta: Tensor, x: Tensor) -> Tensor:
+    def _log_prob_snre_a(self, theta: Tensor, x: Tensor) -> Tensor:
         warn(
             "The log probability from SRE is only correct up to a normalizing constant."
         )
-        return self._log_prob_classifier(theta, x)
+        return self._log_prob_ratio_estimator(theta, x)
 
-    def _log_prob_aalr(self, theta: Tensor, x: Tensor) -> Tensor:
+    def _log_prob_snre_b(self, theta: Tensor, x: Tensor) -> Tensor:
         if self._num_trained_rounds > 1:
             warn(
                 "The log-probability from AALR beyond round 1 is only correct "
                 "up to a normalizing constant."
             )
-        return self._log_prob_classifier(theta, x)
+        return self._log_prob_ratio_estimator(theta, x)
 
     def _log_prob_snl(self, theta: Tensor, x: Tensor) -> Tensor:
         warn(
@@ -219,7 +223,7 @@ class NeuralPosterior:
     ) -> Tensor:
         r"""Return leakage correction factor for a leaky posterior density estimate.
 
-        The factor is estimated from the acceptance probability during rejection 
+        The factor is estimated from the acceptance probability during rejection
         sampling from the posterior.
 
         NOTE: This is to avoid re-estimating the acceptance probability from scratch

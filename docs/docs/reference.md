@@ -2,23 +2,27 @@
 
 ## Inference
 
-::: sbi.inference.snpe.snpe_a.SnpeA
+::: sbi.inference.snpe.snpe_a.SNPE_A
     rendering:
       show_root_heading: true
 
-::: sbi.inference.snpe.snpe_b.SnpeB
+::: sbi.inference.snpe.snpe_b.SNPE_B
     rendering:
       show_root_heading: true
 
-::: sbi.inference.snpe.snpe_c.SnpeC
+::: sbi.inference.snpe.snpe_c.SNPE_C
     rendering:
       show_root_heading: true
 
-::: sbi.inference.snl.snl.SNL
+::: sbi.inference.snle.snle_base.SNLE
     rendering:
       show_root_heading: true
 
-::: sbi.inference.sre.sre.SRE
+::: sbi.inference.snre.snre_a.SNRE_A
+    rendering:
+      show_root_heading: true
+
+::: sbi.inference.snre.snre_a.SNRE_B
     rendering:
       show_root_heading: true
 

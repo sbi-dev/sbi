@@ -12,14 +12,13 @@ from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 
-from sbi.inference.base import NeuralInference
-from sbi.inference.posteriors.sbi_posterior import NeuralPosterior
+from sbi.inference import NeuralInference
 from sbi.types import ScalarFloat, OneOrMore
 import sbi.utils as utils
 from sbi.utils import Standardize
 
 
-class SnpeBase(NeuralInference, ABC):
+class PosteriorEstimator(NeuralInference, ABC):
     def __init__(
         self,
         simulator: Callable,
