@@ -198,7 +198,7 @@ class NeuralInference(ABC):
     def _summarize(
         self,
         round_: int,
-        x_o: Tensor,
+        x_o: Union[Tensor, None],
         theta_bank: List[Tensor],
         x_bank: List[Tensor],
         posterior_samples_acceptance_rate: Optional[Tensor] = None,
