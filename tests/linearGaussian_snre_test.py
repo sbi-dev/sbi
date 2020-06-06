@@ -9,8 +9,7 @@ from tests.test_utils import (
     get_prob_outside_uniform_prior,
     get_dkl_gaussian_prior,
 )
-from sbi.inference.sre.sre import SRE
-from sbi.inference.sre.aalr import AALR
+from sbi.inference import SRE, AALR
 
 from sbi.simulators.linear_gaussian import (
     true_posterior_linear_gaussian_mvn_prior,
@@ -157,7 +156,6 @@ def test_c2st_sre_on_linearGaussian(
     kwargs = dict(
         simulator=simulator,
         prior=prior,
-        num_atoms=num_atoms,
         classifier=None,  # Use default RESNET.
         simulation_batch_size=50,
         mcmc_method="slice_np",
@@ -166,6 +164,7 @@ def test_c2st_sre_on_linearGaussian(
 
     infer = SRE(**kwargs) if algorithm_str == "sre" else AALR(**kwargs)
 
+    # Should use default `num_atoms=10` for SRE; `num_atoms=2` for AALR
     posterior = infer(num_rounds=1, num_simulations_per_round=1000)
     posterior.freeze(x_o)
 

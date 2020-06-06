@@ -5,10 +5,10 @@ import torch
 from torch import Tensor, nn
 from torch.utils.tensorboard import SummaryWriter
 
-from sbi.inference.snpe.snpe_base import SnpeBase
+from sbi.inference.snpe.snpe_base import PosteriorEstimator
 
 
-class SnpeA(SnpeBase):
+class SNPE_A(PosteriorEstimator):
     def __init__(
         self,
         simulator: Callable,
@@ -30,7 +30,7 @@ class SnpeA(SnpeBase):
             Density Estimation_, Papamakarios et al., NeurIPS 2016,
             https://arxiv.org/abs/1605.06376.
 
-        See docstring of `SnpeBase` class for all other arguments.
+        See docstring of `PosteriorEstimator` class for all other arguments.
         """
 
         raise NotImplementedError

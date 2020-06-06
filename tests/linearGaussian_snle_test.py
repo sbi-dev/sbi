@@ -4,7 +4,7 @@ from torch import zeros, ones, eye
 from torch.distributions import MultivariateNormal
 
 import sbi.utils as utils
-from sbi.inference.snl.snl import SNL
+from sbi.inference import SNL
 from sbi.simulators.linear_gaussian import (
     true_posterior_linear_gaussian_mvn_prior,
     samples_true_posterior_linear_gaussian_uniform_prior,
@@ -14,12 +14,15 @@ from sbi.simulators.linear_gaussian import (
 )
 from tests.test_utils import get_prob_outside_uniform_prior, check_c2st
 
-# use cpu by default
+# Use cpu by default.
 torch.set_default_tensor_type("torch.FloatTensor")
 
-# Seeding:
-# Some tests in this module have "set_seed" as an argument. This argument points to
-# tests/conftest.py to seed the test with the seed set in conftext.py.
+"""
+Shared seeding in the module
+-----------------------------
+Some tests in this module have `set_seed` as an argument. This argument points to
+tests/conftest.py to seed the test with the seed set in conftext.py.
+"""
 
 
 @pytest.mark.parametrize("num_dim", (1, 3))
@@ -100,11 +103,11 @@ def test_c2st_snl_on_linearGaussian_different_dims(set_seed):
         show_progressbar=False,
     )
 
-    posterior = infer(num_rounds=1, num_simulations_per_round=3000)  # type: ignore
+    posterior = infer(num_rounds=1, num_simulations_per_round=4000)  # type: ignore
     samples = posterior.sample(num_samples, x=x_o, thin=3)
 
     # Compute the c2st and assert it is near chance level of 0.5.
-    check_c2st(samples, target_samples, alg="snl")
+    check_c2st(samples, target_samples, alg="snle_a")
 
 
 @pytest.mark.slow
@@ -156,7 +159,7 @@ def test_c2st_snl_on_linearGaussian(num_dim: int, prior_str: str, set_seed):
     samples = posterior.sample(num_samples=num_samples, thin=3)
 
     # Check performance based on c2st accuracy.
-    check_c2st(samples, target_samples, alg=f"snl-{prior_str}-prior")
+    check_c2st(samples, target_samples, alg=f"snle_a-{prior_str}-prior")
 
     # TODO: we do not have a test for SNL log_prob(). This is because the output
     # TODO: density is not normalized, so KLd does not make sense.

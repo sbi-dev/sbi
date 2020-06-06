@@ -6,11 +6,11 @@ import torch
 from torch import Tensor, eye, nn, ones
 from torch.utils.tensorboard import SummaryWriter
 
-from sbi.inference.snpe.snpe_base import SnpeBase
+from sbi.inference.snpe.snpe_base import PosteriorEstimator
 import sbi.utils as utils
 
 
-class SnpeC(SnpeBase):
+class SNPE_C(PosteriorEstimator):
     def __init__(
         self,
         simulator: Callable,
@@ -48,7 +48,7 @@ class SnpeC(SnpeBase):
             num_atoms: Number of atoms to use for classification. If None, use all
                 other parameters $\theta$ in minibatch.
 
-        See docstring of `SnpeBase` class for all other arguments.
+        See docstring of `PosteriorEstimator` class for all other arguments.
         """
 
         self._num_atoms = num_atoms if num_atoms is not None else 0

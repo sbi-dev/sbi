@@ -1,68 +1,48 @@
 from __future__ import annotations
-
 from abc import ABC
+from typing import Callable, Dict, Optional, Union
 
-from copy import deepcopy
-from typing import Callable, Dict, Optional
-import warnings
-import logging
 import numpy as np
 import torch
-from torch import Tensor, nn, optim, ones
+from torch import Tensor, nn, optim
 from torch.nn.utils import clip_grad_norm_
-
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 
-import sbi.utils as utils
-from sbi.inference.base import NeuralInference
-from sbi.inference.posteriors.sbi_posterior import NeuralPosterior
-from sbi.utils.torchutils import ensure_x_batched, ensure_theta_batched
+from sbi.inference.posterior import NeuralPosterior
+from sbi.inference import NeuralInference
 from sbi.types import ScalarFloat, OneOrMore
+import sbi.utils as utils
 
 
-class RatioEstimationBase(NeuralInference, ABC):
+class LikelihoodEstimator(NeuralInference, ABC):
     def __init__(
         self,
         simulator: Callable,
         prior,
         x_shape: Optional[torch.Size] = None,
-        classifier: Optional[nn.Module] = None,
-        num_atoms: Optional[int] = None,
-        simulation_batch_size: int = 1,
-        mcmc_method: str = "slice_np",
-        summary_net: Optional[nn.Module] = None,
-        retrain_from_scratch_each_round: bool = False,
-        num_workers: int = 1,
-        worker_batch_size: int = 20,
+        density_estimator: Optional[nn.Module] = None,
+        simulation_batch_size: Optional[int] = 1,
         summary_writer: Optional[SummaryWriter] = None,
         device: Optional[torch.device] = None,
+        num_workers: int = 1,
+        worker_batch_size: int = 20,
+        mcmc_method: str = "slice_np",
         skip_input_checks: bool = False,
         show_progressbar: bool = True,
         show_round_summary: bool = False,
         logging_level: int = logging.WARNING,
     ):
-        r"""Sequential Ratio Estimation [1]
+        r"""Sequential Neural Likelihood.
 
-        [1] _Likelihood-free MCMC with Amortized Approximate Likelihood
-            Ratios_, Hermans et al., Pre-print 2019, https://arxiv.org/abs/1903.04057
+        Sequential Neural Likelihood: Fast Likelihood-free Inference with
+        Autoregressive Flows_ by Papamakarios et al., AISTATS 2019,
+        https://arxiv.org/abs/1805.07226
 
         Args:
-            classifier: Binary classifier.
-            num_atoms: Number of atoms to use for classification. If None, use all
-                other parameters $\theta$ in minibatch.
-            retrain_from_scratch_each_round: Whether to retrain the conditional
-                density estimator for the posterior from scratch each round.
-            summary_net: Optional network which may be used to produce feature
-                vectors f(x) for high-dimensional simulation outputs $x$.
-            classifier_loss: `sre` implements the algorithm suggested in Durkan et al.
-                2019, whereas `aalr` implements the algorithm suggested in
-                Hermans et al. 2019. `sre` can use more than two atoms, potentially
-                boosting performance, but does not allow for exact posterior density
-                evaluation (only up to a normalizing constant), even when training
-                only one round. `aalr` is limited to `num_atoms=2`, but allows for
-                density evaluation when training for one round.
+            density_estimator: Conditional density estimator $q(x|\theta)$, a nn.Module
+                with `.log_prob()` and `.sample()`
 
         See docstring of `NeuralInference` class for all other arguments.
         """
@@ -82,21 +62,18 @@ class RatioEstimationBase(NeuralInference, ABC):
             logging_level=logging_level,
         )
 
-        self._num_atoms = num_atoms if num_atoms is not None else 0
-
-        if classifier is None:
-            classifier = utils.classifier_nn(
-                model="resnet",
+        if density_estimator is None:
+            density_estimator = utils.likelihood_nn(
+                model="maf",
                 theta_shape=self._prior.sample().shape,
                 x_o_shape=self._x_shape,
             )
 
-        # Create posterior object which can sample().
-        algorithm_family = self.__class__.__name__.lower()
-
+        # Create neural posterior which can sample().
+        # TODO Notice use of `snle_a` used, so long as it is the sole descendant.´
         self._posterior = NeuralPosterior(
-            algorithm_family=algorithm_family,
-            neural_net=classifier,
+            algorithm_family="snle_a",
+            neural_net=density_estimator,
             prior=self._prior,
             mcmc_method=mcmc_method,
             get_potential_function=PotentialFunctionProvider(),
@@ -105,19 +82,7 @@ class RatioEstimationBase(NeuralInference, ABC):
 
         self._posterior.net.train(True)
 
-        # We may want to summarize high-dimensional x.
-        # This may be either a fixed or learned transformation.
-        self._summary_net = nn.Identity() if summary_net is None else summary_net
-
-        # If we're retraining from scratch each round,
-        # keep a copy of the original untrained model for reinitialization.
-        self._retrain_from_scratch_each_round = retrain_from_scratch_each_round
-        if self._retrain_from_scratch_each_round:
-            self._untrained_classifier = deepcopy(classifier)
-        else:
-            self._untrained_classifier = None
-
-        # Ratio-based-specific summary_writer fields.
+        # SNLE-specific summary_writer fields.
         self._summary.update({"mcmc_times": []})  # type: ignore
 
     def __call__(
@@ -132,15 +97,15 @@ class RatioEstimationBase(NeuralInference, ABC):
         max_num_epochs: Optional[int] = None,
         clip_max_norm: Optional[float] = 5.0,
     ) -> NeuralPosterior:
-        """Run SRE
+        r"""Run SNLE.
 
-        This runs SRE for num_rounds rounds, using num_simulations_per_round calls to
-        the simulator
+        This runs SNLE for `num_rounds` rounds, using num_simulations_per_round calls to
+        the simulator.
 
         Args:
-            num_rounds: Number of rounds to run
-            num_simulations_per_round: Number of simulator calls per round
-            x_o: When SRE is used in a multi-round setting, training samples for every
+            num_rounds: Number of rounds to run.
+            num_simulations_per_round: Number of simulator calls per round.
+            x_o: When SNLE is used in a multi-round setting, training samples for every
                 round after the first round are drawn from the most recent posterior
                 estimate given $x_o$, i.e. $p(\theta|x_o)$.
             batch_size: Size of batch to use for training.
@@ -148,26 +113,28 @@ class RatioEstimationBase(NeuralInference, ABC):
             validation_fraction: The fraction of data to use for validation.
             stop_after_epochs: The number of epochs to wait for improvement on the
                 validation set before terminating training.
-            max_num_epochs: Maximum number of epochs to run. If max_num_epochs
+            max_num_epochs: Maximum number of epochs to run. If `max_num_epochs`
                 is reached, we stop training even if the validation loss is still
-                decreasing.
+                decreasing. If None, we train until validation loss increases (see
+                argument `stop_after_epochs`).
             clip_max_norm: Value at which to clip the total gradient norm in order to
                 prevent exploding gradients. Use None for no clipping.
 
         Returns:
-            Posterior that can be sampled and evaluated.
+            Posterior $p(\theta|x_o)$ that can be sampled and evaluated.
         """
 
         self._handle_x_o_wrt_amortization(x_o, num_rounds)
 
         max_num_epochs = 2 ** 31 - 1 if max_num_epochs is None else max_num_epochs
 
+        #
         num_sims_per_round = self._ensure_list(num_simulations_per_round, num_rounds)
 
         for round_, num_sims in enumerate(num_sims_per_round):
 
-            # Generate theta from prior in first round, and from most recent posterior
-            # estimate in subsequent rounds.
+            # Generate parameters theta from prior in first round, and from most recent
+            # posterior estimate in subsequent rounds.
             if round_ == 0:
                 theta = self._prior.sample((num_sims,))
             else:
@@ -180,12 +147,11 @@ class RatioEstimationBase(NeuralInference, ABC):
             # not necessarily have the same order as the theta we define above. We
             # therefore return a theta vector with the same ordering as x.
             theta, x = self._batched_simulator(theta)
-
             # Store (theta, x) pairs.
             self._theta_bank.append(theta)
             self._x_bank.append(x)
 
-            # Fit posterior using newly aggregated data set.
+            # Fit neural likelihood to newly aggregated dataset.
             self._train(
                 batch_size=batch_size,
                 learning_rate=learning_rate,
@@ -199,7 +165,7 @@ class RatioEstimationBase(NeuralInference, ABC):
             if self._show_round_summary:
                 print(self._describe_round(round_, self._summary))
 
-            # Update tensorboard and summary dict.
+            # Update TensorBoard and summary dict.
             self._summarize(
                 round_=round_,
                 x_o=self._posterior.x_o,
@@ -216,15 +182,14 @@ class RatioEstimationBase(NeuralInference, ABC):
         learning_rate: float,
         validation_fraction: float,
         stop_after_epochs: int,
-        max_num_epochs: Optional[int],
+        max_num_epochs: int,
         clip_max_norm: Optional[float],
     ) -> None:
         r"""
-        Trains the neural classifier.
+        Train the conditional density estimator for the likelihood.
 
-        Update the classifier weights by maximizing a Bernoulli likelihood which
-        distinguishes between jointly distributed $(\theta, x)$ pairs and randomly
-        chosen $(\theta, x)$ pairs.
+        Update the conditional density estimator weights to maximize the
+        likelihood on the most recently aggregated bank of $(\theta, x)$ pairs.
 
         Uses performance on a held-out validation set as a terminating condition (early
         stopping).
@@ -244,47 +209,39 @@ class RatioEstimationBase(NeuralInference, ABC):
 
         # Dataset is shared for training and validation loaders.
         dataset = data.TensorDataset(
-            torch.cat(self._theta_bank), torch.cat(self._x_bank)
+            torch.cat(self._x_bank), torch.cat(self._theta_bank)
         )
 
         # Create neural net and validation loaders using a subset sampler.
-
-        # NOTE: The batch_size is clipped to num_validation samples.
-        clipped_batch_size = min(batch_size, num_validation_examples)
         train_loader = data.DataLoader(
             dataset,
-            batch_size=clipped_batch_size,
+            batch_size=min(batch_size, num_training_examples),
             drop_last=True,
             sampler=SubsetRandomSampler(train_indices),
         )
         val_loader = data.DataLoader(
             dataset,
-            batch_size=clipped_batch_size,
+            batch_size=min(batch_size, num_validation_examples),
             shuffle=False,
             drop_last=False,
             sampler=SubsetRandomSampler(val_indices),
         )
 
-        optimizer = optim.Adam(
-            list(self._posterior.net.parameters())
-            + list(self._summary_net.parameters()),
-            lr=learning_rate,
-        )
-
-        # If we're retraining from scratch each round, reset the neural posterior
-        # to the untrained copy we made at the start.
-        if self._retrain_from_scratch_each_round:
-            self._posterior = deepcopy(self._posterior)
+        optimizer = optim.Adam(self._posterior.net.parameters(), lr=learning_rate)
 
         epoch, self._val_log_prob = 0, float("-Inf")
-
         while not self._has_converged(epoch, stop_after_epochs):
 
             # Train for a single epoch.
             self._posterior.net.train()
-            for theta_batch, x_batch in train_loader:
+            for batch in train_loader:
                 optimizer.zero_grad()
-                loss = self._loss(theta_batch, x_batch, clipped_batch_size)
+                theta_batch, x_batch = (
+                    batch[0].to(self._device),
+                    batch[1].to(self._device),
+                )
+                log_prob = self._posterior.net.log_prob(theta_batch, context=x_batch)
+                loss = -torch.mean(log_prob)
                 loss.backward()
                 if clip_max_norm is not None:
                     clip_grad_norm_(
@@ -298,10 +255,16 @@ class RatioEstimationBase(NeuralInference, ABC):
             self._posterior.net.eval()
             log_prob_sum = 0
             with torch.no_grad():
-                for theta_batch, x_batch in val_loader:
-                    log_prob = self._loss(theta_batch, x_batch, clipped_batch_size)
-                    log_prob_sum -= log_prob.sum().item()
-                self._val_log_prob = log_prob_sum / num_validation_examples
+                for batch in val_loader:
+                    theta_batch, x_batch = (
+                        batch[0].to(self._device),
+                        batch[1].to(self._device),
+                    )
+                    log_prob = self._posterior.net.log_prob(
+                        theta_batch, context=x_batch
+                    )
+                    log_prob_sum += log_prob.sum().item()
+            self._val_log_prob = log_prob_sum / num_validation_examples
 
             if self._show_progressbar:
                 # end="\r" deletes the print statement when a new one appears.
@@ -312,10 +275,10 @@ class RatioEstimationBase(NeuralInference, ABC):
                 break
 
         if self._show_progressbar and self._has_converged(epoch, stop_after_epochs):
-            # Network has converged, we print this summary.
+            # network has converged, we print this summary.
             print("Neural network successfully converged after", epoch, "epochs.")
         elif self._show_progressbar and max_num_epochs == epoch:
-            # Training has stopped because of max_num_epochs argument.
+            # training has stopped because of max_num_epochs argument.
             print("Stopping neural network training after", epoch, "epochs.")
 
         if max_num_epochs == epoch:
@@ -329,47 +292,12 @@ class RatioEstimationBase(NeuralInference, ABC):
         self._summary["epochs"].append(epoch)
         self._summary["best_validation_log_probs"].append(self._best_val_log_prob)
 
-    def _used_atoms(self, clipped_batch_size):
-        num_atoms = self._num_atoms if self._num_atoms > 0 else clipped_batch_size
-        assert 0 < num_atoms - 1 < clipped_batch_size
-
-        return num_atoms
-
-    def _classifier_logits(self, theta, x, clipped_batch_size):
-
-        # num_atoms = theta.shape[0]
-        num_atoms = self._used_atoms(clipped_batch_size)
-
-        repeated_x = utils.repeat_rows(x, num_atoms)
-
-        # Choose between 1 and num_atoms - 1 thetas from the rest
-        # of the batch for each x.
-        probs = (
-            (1 / (clipped_batch_size - 1))
-            * ones(clipped_batch_size, clipped_batch_size)
-            * (1 - torch.eye(clipped_batch_size))
-        )
-        choices = torch.multinomial(probs, num_samples=num_atoms - 1, replacement=False)
-        contrasting_theta = theta[choices]
-
-        atomic_theta = torch.cat((theta[:, None, :], contrasting_theta), dim=1).reshape(
-            clipped_batch_size * num_atoms, -1
-        )
-
-        theta_and_x = torch.cat((atomic_theta, repeated_x), dim=1)
-
-        return self._posterior.net(theta_and_x)
-
-    @property
-    def summary(self):
-        return self._summary
-
 
 class PotentialFunctionProvider:
     """
     This class is initialized without arguments during the initialization of the
-    Posterior class. When called, it specializes to the potential function appropriate
-    to the requested `mcmc_method`.
+     Posterior class. When called, it specializes to the potential function appropriate
+     to the requested mcmc_method.
 
     NOTE: Why use a class?
     ----------------------
@@ -378,31 +306,29 @@ class PotentialFunctionProvider:
     (https://stackoverflow.com/a/12022055).
 
     It is important to NOT initialize attributes upon instantiation, because we need the
-     most current trained posterior neural net.
+    most current trained posterior neural net.
 
     Returns:
-        Potential function for use by either numpy or pyro sampler
+        Potential function for use by either numpy or pyro sampler.
     """
 
     def __call__(
-        self, prior, classifier: nn.Module, x: Tensor, mcmc_method: str,
+        self, prior, likelihood_nn: nn.Module, x: Tensor, mcmc_method: str,
     ) -> Callable:
         r"""Return potential function for posterior $p(\theta|x)$.
 
-        Switch on numpy or pyro potential function based on `mcmc_method`.
+        Switch on numpy or pyro potential function based on mcmc_method.
 
         Args:
             prior: Prior distribution that can be evaluated.
-            classifier: Binary classifier approximating the likelihood up to a constant.
-
+            likelihood_nn: Neural likelihood estimator that can be evaluated.
             x: Conditioning variable for posterior $p(\theta|x)$.
             mcmc_method: One of `slice_np`, `slice`, `hmc` or `nuts`.
 
         Returns:
             Potential function for sampler.
         """
-
-        self.classifier = classifier
+        self.likelihood_nn = likelihood_nn
         self.prior = prior
         self.x = x
 
@@ -412,43 +338,38 @@ class PotentialFunctionProvider:
             return self.np_potential
 
     def np_potential(self, theta: np.array) -> ScalarFloat:
-        """Return potential for Numpy slice sampler."
+        r"""Return posterior log prob. of theta $p(\theta|x)$"
 
         Args:
             theta: Parameters $\theta$, batch dimension 1.
 
         Returns:
-            Posterior log probability of theta.
+            Posterior log probability of the theta, $-\infty$ if impossible under prior.
         """
         theta = torch.as_tensor(theta, dtype=torch.float32)
-
-        # Theta and x should have shape (1, dim).
-        theta = ensure_theta_batched(theta)
-        x = ensure_x_batched(self.x)
-
-        log_ratio = self.classifier(torch.cat((theta, x), dim=1).reshape(1, -1))
+        log_likelihood = self.likelihood_nn.log_prob(
+            inputs=self.x.reshape(1, -1), context=theta.reshape(1, -1)
+        )
 
         # Notice opposite sign to pyro potential.
-        return log_ratio + self.prior.log_prob(theta)
+        return log_likelihood + self.prior.log_prob(theta)
 
     def pyro_potential(self, theta: Dict[str, Tensor]) -> Tensor:
-        """Return potential for Pyro sampler.
+        r"""Return posterior log probability of parameters $p(\theta|x)$.
 
-        Args:
+         Args:
             theta: Parameters $\theta$. The tensor's shape will be
-             (1, shape_of_single_theta) if running a single chain or just
-             (shape_of_single_theta) for multiple chains.
+                (1, shape_of_single_theta) if running a single chain or just
+                (shape_of_single_theta) for multiple chains.
 
         Returns:
-            Potential $-[\log r(x_o, \theta) + \log p(\theta)]$.
+            The potential $-[\log r(x_o, \theta) + \log p(\theta)]$.
         """
 
         theta = next(iter(theta.values()))
 
-        # Theta and x should have shape (1, dim).
-        theta = ensure_theta_batched(theta)
-        x = ensure_x_batched(self.x)
+        log_likelihood = self.likelihood_nn.log_prob(
+            inputs=self.x.reshape(1, -1), context=theta.reshape(1, -1)
+        )
 
-        log_ratio = self.classifier(torch.cat((theta, x), dim=1).reshape(1, -1))
-
-        return -(log_ratio + self.prior.log_prob(theta))
+        return -(log_likelihood + self.prior.log_prob(theta))

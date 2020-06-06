@@ -6,10 +6,10 @@ import torch
 from torch import Tensor, nn
 from torch.utils.tensorboard import SummaryWriter
 
-from sbi.inference.snpe.snpe_base import SnpeBase
+from sbi.inference.snpe.snpe_base import PosteriorEstimator
 
 
-class SnpeB(SnpeBase):
+class SNPE_B(PosteriorEstimator):
     def __init__(
         self,
         simulator: Callable,
@@ -36,7 +36,7 @@ class SnpeB(SnpeBase):
         [1] _Flexible statistical inference for mechanistic models of neural dynamics_,
             Lueckmann et al., NeurIPS 2017, https://arxiv.org/abs/1711.01861.
 
-        See docstring of `SnpeBase` class for all other arguments.
+        See docstring of `PosteriorEstimator` class for all other arguments.
         """
 
         raise NotImplementedError(
