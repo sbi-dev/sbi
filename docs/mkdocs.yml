@@ -4,7 +4,7 @@ site_url: "https://mackelab.org/sbi/"
 nav:
   - Home: index.md
   - Installation: install.md
-  - Tutorial: https://github.com/mackelab/sbi/blob/master/examples/HH_simulator.ipynb" target="_blank
+  - Tutorial: https://github.com/mackelab/sbi/blob/master/examples/02_HH_simulator.ipynb" target="_blank
   - Contribute: contribute.md
   - API Reference: reference.md
   - Credits: credits.md
