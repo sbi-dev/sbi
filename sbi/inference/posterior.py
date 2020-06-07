@@ -122,6 +122,7 @@ class NeuralPosterior:
         theta: Tensor,
         x: Optional[Tensor] = None,
         norm_posterior_snpe: bool = True,
+        track_gradients: bool = False,
     ) -> Tensor:
         r"""Return posterior $p(\theta|x)$ log probability.
 
@@ -137,6 +138,9 @@ class NeuralPosterior:
                 need speedier but unnormalized log posterior estimates set
                 `norm_posterior_snpe=False`. The returned log posterior is set to
                 $-\infty$ outside of the prior support regardless of this setting.
+            track_gradients: Whether to track the gradients. Tracking gradients can be
+                helpful for e.g. sensitivity analysis, but increases the memory
+                consumption.
 
         Returns:
             Log posterior probability $p(\theta|x)$ for θ in the support of the prior,
@@ -163,10 +167,11 @@ class NeuralPosterior:
         except AttributeError:
             raise ValueError(f"{self._alg_family} cannot evaluate probabilities.")
 
-        if self._alg_family == "snpe":
-            return log_prob_fn(theta, x, norm_posterior=norm_posterior_snpe)
-        else:
-            return log_prob_fn(theta, x)
+        with torch.set_grad_enabled(track_gradients):
+            if self._alg_family == "snpe":
+                return log_prob_fn(theta, x, norm_posterior=norm_posterior_snpe)
+            else:
+                return log_prob_fn(theta, x)
 
     # TODO: Move _log_prob_X into the respective inference classes (X)?
     # The problem is extensibility. Any third party contributing a method X
@@ -220,6 +225,7 @@ class NeuralPosterior:
         )
         return self.net.log_prob(x, theta) + self._prior.log_prob(theta)
 
+    @torch.no_grad()
     def get_leakage_correction(
         self,
         x: Tensor,
@@ -268,6 +274,7 @@ class NeuralPosterior:
 
         return self._leakage_density_correction_factor  # type:ignore
 
+    @torch.no_grad()
     def sample(
         self,
         num_samples: int,
@@ -298,32 +305,32 @@ class NeuralPosterior:
         self._ensure_single_x(x)
         self._ensure_x_consistent_with_x_o(x)
 
-        with torch.no_grad():
-            if self._sample_with_mcmc:
-                samples = self._sample_posterior_mcmc(
-                    x=x,
-                    num_samples=num_samples,
-                    mcmc_method=self._mcmc_method,
-                    show_progressbar=show_progressbar,
-                    **kwargs,
-                )
-            elif self._alg_family == "snpe":
-                # Rejection sampling.
-                samples, _ = utils.sample_posterior_within_prior(
-                    self.net,
-                    self._prior,
-                    x,
-                    num_samples=num_samples,
-                    show_progressbar=show_progressbar,
-                )
-            else:
-                raise NameError(
-                    "Only SNPE can use rejection sampling. All other"
-                    "methods require MCMC."
-                )
+        if self._sample_with_mcmc:
+            samples = self._sample_posterior_mcmc(
+                x=x,
+                num_samples=num_samples,
+                mcmc_method=self._mcmc_method,
+                show_progressbar=show_progressbar,
+                **kwargs,
+            )
+        elif self._alg_family == "snpe":
+            # Rejection sampling.
+            samples, _ = utils.sample_posterior_within_prior(
+                self.net,
+                self._prior,
+                x,
+                num_samples=num_samples,
+                show_progressbar=show_progressbar,
+            )
+        else:
+            raise ValueError(
+                "Only SNPE can use rejection sampling. All other"
+                "methods require MCMC."
+            )
 
         return samples
 
+    @torch.no_grad()
     def _sample_posterior_mcmc(
         self,
         num_samples: int,

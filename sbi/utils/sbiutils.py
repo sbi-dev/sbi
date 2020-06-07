@@ -39,6 +39,7 @@ class Standardize(nn.Module):
         return (tensor - self.mean) / self.std
 
 
+@torch.no_grad()
 def sample_posterior_within_prior(
     posterior_nn: nn.Module,
     prior,
