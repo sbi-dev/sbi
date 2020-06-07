@@ -1,4 +1,4 @@
-from typing import Union, Tuple, Optional
+from typing import Union, Tuple
 
 import torch
 from torch import Tensor
@@ -23,17 +23,16 @@ def linear_gaussian(
     theta: Tensor,
     likelihood_shift: Tensor,
     likelihood_cov: Tensor,
-    num_discarded_dims: Optional[int] = None,
+    num_discarded_dims: int = 0,
 ) -> Tensor:
     """
     Simulator for linear Gaussian.
 
     Uses Cholesky decomposition to transform samples from standard Gaussian.
 
-    If num_discarded_dims is passed, this returns linear Gaussian simulation outputs
-    where some dimensions are discarded. This is implemented by throwing away the last
-    `num_discarded_dims` dimensions of theta and then running the linear Gaussian as
-    always.
+    When `num_discarded_dims>0`, return simulation outputs with as many last dimensions
+    discarded. This is implemented by throwing away the last `num_discarded_dims`
+    dimensions of theta and then running the linear Gaussian as always.
 
     Args:
         theta: Parameter sets to be simulated.
@@ -45,10 +44,11 @@ def linear_gaussian(
     Returns: Simulated data.
     """
 
-    if num_discarded_dims is not None:
+    if num_discarded_dims:
         theta = theta[:, :-num_discarded_dims]
 
     chol_factor = torch.cholesky(likelihood_cov)
+
     return likelihood_shift + theta + torch.mm(chol_factor, torch.randn_like(theta).T).T
 
 

@@ -84,7 +84,7 @@ class NeuralPosterior:
         self._get_potential_function = get_potential_function
         self._x_shape = x_shape
 
-        if algorithm_family in ("snpe", "snl", "snre_a", "snre_b"):
+        if algorithm_family in ("snpe", "snle_a", "snre_a", "snre_b"):
             self._alg_family = algorithm_family
         else:
             raise ValueError("Algorithm family unsupported.")
@@ -288,7 +288,8 @@ class NeuralPosterior:
                 onto $x_o$ that was previously provided either at inference or through
                 the `freeze()` method.
             show_progressbar: Whether to show sampling progress monitor.
-            **kwargs: Additional parameters for the MCMC sampler (`thin` and `warmup`).
+            **kwargs: Additional parameters to be passed to the MCMC sampler, such as
+                `thin` and `warmup_steps`.
 
         Returns: Samples from posterior.
         """
@@ -329,7 +330,7 @@ class NeuralPosterior:
         x: Tensor,
         mcmc_method: str = "slice_np",
         thin: int = 10,
-        warmup: int = 20,
+        warmup_steps: int = 20,
         num_chains: Optional[int] = 1,
         show_progressbar: bool = True,
     ) -> Tensor:
@@ -341,13 +342,15 @@ class NeuralPosterior:
         function for the MCMC sampler is used.
 
         Args:
-            x: Conditioning context for posterior $p(\theta|x)$.
             num_samples: Desired number of samples.
+            x: Conditioning context for posterior $p(\theta|x)$.
             mcmc_method: Sampling method. Currently defaults to `slice_np` for a custom
                 numpy implementation of slice sampling; select `hmc`, `nuts` or `slice`
                 for Pyro-based sampling.
             thin: Thinning factor for the chain, e.g. for `thin=3` only every third
                 sample will be returned, until a total of `num_samples`.
+            warmup_steps: Initial number of samples to discard.
+            num_chains: Whether to sample in parallel. If None, use all but one CPU.
             show_progressbar: Whether to show a progressbar during sampling.
 
         Returns:
@@ -363,14 +366,14 @@ class NeuralPosterior:
             self._prior, self.net, x, mcmc_method
         )
         if mcmc_method == "slice_np":
-            samples = self.slice_np_mcmc(num_samples, potential_fn, thin, warmup)
+            samples = self.slice_np_mcmc(num_samples, potential_fn, thin, warmup_steps)
         elif mcmc_method in ("hmc", "nuts", "slice"):
             samples = self.pyro_mcmc(
                 num_samples=num_samples,
                 potential_function=potential_fn,
                 mcmc_method=mcmc_method,
                 thin=thin,
-                warmup_steps=warmup,
+                warmup_steps=warmup_steps,
                 num_chains=num_chains,
                 show_progressbar=show_progressbar,
             )
@@ -427,7 +430,7 @@ class NeuralPosterior:
         thin: int = 10,
         warmup_steps: int = 200,
         num_chains: Optional[int] = 1,
-        show_progressbar: Optional[bool] = True,
+        show_progressbar: bool = True,
     ):
         r"""Return samples obtained using Pyro's HMC, NUTS or slice kernels.
 

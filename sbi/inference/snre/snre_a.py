@@ -12,7 +12,11 @@ from sbi.utils import del_entries
 
 
 class SNRE_A(RatioEstimator):
-    "AALR, here known as SRE_A."
+    """AALR[1], here known as SNRE_A.
+
+    [1] _Likelihood-free MCMC with Amortized Approximate Likelihood Ratios_, Hermans et
+        al., Pre-print 2019, https://arxiv.org/abs/1903.04057
+    """
 
     def __call__(
         self,
@@ -27,11 +31,14 @@ class SNRE_A(RatioEstimator):
         clip_max_norm: Optional[float] = 5.0,
     ) -> NeuralPosterior:
 
-        # AALR only supports exactly `num_atoms=2`.
+        # AALR is defined for `num_atoms=2`.
+        # Proxy to `super().__call__` to ensure right parameter.
         kwargs = del_entries(locals(), entries=("self", "__class__"))
         return super().__call__(**kwargs, num_atoms=2)
 
-    def _loss(self, theta, x, clipped_batch_size, num_atoms):
+    def _loss(
+        self, theta: Tensor, x: Tensor, clipped_batch_size: int, num_atoms: int
+    ) -> Tensor:
 
         logits = self._classifier_logits(theta, x, clipped_batch_size, num_atoms)
         likelihood = torch.sigmoid(logits).squeeze()

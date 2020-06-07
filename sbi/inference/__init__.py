@@ -5,7 +5,7 @@ from sbi.inference.snle.snle_a import SNLE_A
 
 # Unimplemented: don't export
 # from sbi.inference.snpe.snpe_a import SNPE_A
-# from sbi.inference.snpe.snpe_b import SNPE_B
+from sbi.inference.snpe.snpe_b import SNPE_B
 from sbi.inference.snpe.snpe_c import SNPE_C  # noqa: F401
 
 from sbi.inference.snre import SNRE, SNRE_A, SNRE_B  # noqa: F401

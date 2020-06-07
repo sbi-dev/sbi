@@ -1,7 +1,6 @@
-from abc import ABC
+from abc import ABC, abstractmethod
 from copy import deepcopy
 from typing import Callable, Optional, Tuple, Dict, Union
-import warnings
 
 import numpy as np
 import torch
@@ -219,19 +218,10 @@ class PosteriorEstimator(NeuralInference, ABC):
         self._posterior._num_trained_rounds = num_rounds
         return self._posterior
 
+    @abstractmethod
     def _log_prob_proposal_posterior(
-        self, theta: Tensor, x: Tensor, masks: Tensor
+        self, theta: Tensor, x: Tensor, masks: Tensor, **kwargs
     ) -> Tensor:
-        """
-        Return the log-probability used for the loss.
-
-        Args:
-            theta: Parameters θ.
-            x: Simulations.
-            masks: Binary, indicates whether to use prior samples.
-
-        Returns: log-probability of the proposal posterior.
-        """
         raise NotImplementedError
 
     def _run_simulations(
@@ -253,7 +243,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         if round_ == 0:
             theta = self._prior.sample((num_sims,))
 
-            # why do we return theta just below? When using multiprocessing, the thetas
+            # Why do we return theta just below? When using multiprocessing, the thetas
             # are not handled sequentially anymore. Hence, the x that are returned do
             # not necessarily have the same order as the theta we define above. We
             # therefore return a theta vector with the same ordering as x.
@@ -319,7 +309,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         learning_rate: float,
         validation_fraction: float,
         stop_after_epochs: int,
-        max_num_epochs: Optional[int],
+        max_num_epochs: int,
         clip_max_norm: Optional[float],
     ) -> None:
         r"""Train the conditional density estimator for the posterior $p(\theta|x)$.
@@ -444,11 +434,11 @@ class PosteriorEstimator(NeuralInference, ABC):
         self._summary["epochs"].append(epoch)
         self._summary["best_validation_log_probs"].append(self._best_val_log_prob)
 
-    def _loss(self, round_idx: int, theta: Tensor, x: Tensor, masks: Tensor) -> Tensor:
-        """Return the right calibrated loss, depending on the round.
+    def _loss(self, round_idx: int, theta: Tensor, x: Tensor, masks: Tensor,) -> Tensor:
+        """Return a loss calibrated correctly for the first and for further rounds.
 
         The loss is the negative log prob. Irrespective of the round or SNPE method
-        (A, B, or C) it is weighted with a calibration kernel.
+        (A, B, or C), it is weighted with a calibration kernel.
 
         Returns:
             Calibration kernel-weighted negative log prob.

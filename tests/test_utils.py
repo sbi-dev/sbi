@@ -21,8 +21,8 @@ def kl_d_via_monte_carlo(
     q.
 
     Unlike torch.distributions.kl.kl_divergence(p, q), this function does not require p
-    and q to be torch.Distribution objects, but just to provide sample() and log_prob()
-    methods.
+    and q to be `torch.Distribution` objects, but just to provide `sample()` and 
+    `log_prob()` methods.
 
     For added flexibility, we squeeze the output of log_prob() and hence can handle
     outputs such as torch.tensor([[p_1], [p_2], [p_3]]), instead of just

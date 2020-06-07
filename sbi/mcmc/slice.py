@@ -22,14 +22,14 @@ class Slice(MCMCKernel):
         ignore_jit_warnings=False,
     ):
         """
-        Slice sampling kernel [1]. 
+        Slice sampling kernel [1].
 
         During the warmup phase, the width of the bracket is adapted, starting from
-        the provided initial width. 
-        
+        the provided initial width.
+
         **References**
 
-        [1] `Slice Sampling <https://doi.org/10.1214/aos/1056562461>`_, 
+        [1] `Slice Sampling <https://doi.org/10.1214/aos/1056562461>`_,
             Radford M. Neal
 
         :param model: Python callable containing Pyro primitives.
@@ -152,7 +152,9 @@ class Slice(MCMCKernel):
                             x.reshape(1),
                             params[self._site_name].view(-1)[dim + 1 :],
                         )
-                    ).unsqueeze(0)  # TODO: The unsqueeze seems to give a speed up, figure out when this is the case exactly
+                    ).unsqueeze(
+                        0
+                    )  # TODO: The unsqueeze seems to give a speed up, figure out when this is the case exactly
                 }
             )
 
@@ -162,9 +164,7 @@ class Slice(MCMCKernel):
         )
 
         # Position the bracket randomly around the current sample
-        lower = params[self._site_name].view(-1)[dim] - self._width[dim] * torch.rand(
-            1
-        )
+        lower = params[self._site_name].view(-1)[dim] - self._width[dim] * torch.rand(1)
         upper = lower + self._width[dim]
 
         # Find lower bracket end

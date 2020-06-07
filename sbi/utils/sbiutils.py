@@ -1,10 +1,13 @@
 import logging
 from typing import Tuple, Dict, Sequence, Any
 import warnings
-from typing import Sequence, Tuple, Union
 
 import torch
+from torch import Tensor, as_tensor
 import torch.nn as nn
+from tqdm.auto import tqdm
+
+
 def del_entries(dic: Dict[str, Any], entries: Sequence = ()):
     return {k: v for k, v in dic.items() if k not in entries}
 
@@ -23,7 +26,7 @@ def clamp_and_warn(name: str, value: float, min_val: float, max_val: float) -> f
 class Standardize(nn.Module):
     """
     Standardize inputs, i.e. subtract mean and divide by standard deviation. Inherits
-     from nn.Module so we can use it in nn.Sequential
+    from nn.Module so we can use it in nn.Sequential
     """
 
     def __init__(self, mean, std):
@@ -32,7 +35,7 @@ class Standardize(nn.Module):
         self.std = std
 
     def forward(self, tensor):
-        # XXX guard against std \sim 0 (epsilon or raise)
+        # TODO Guard against std \sim 0 (epsilon or raise).
         return (tensor - self.mean) / self.std
 
 
