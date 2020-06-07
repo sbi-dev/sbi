@@ -151,8 +151,6 @@ def test_c2st_sre_on_linearGaussian(
 
     simulator = lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    num_atoms = 2 if algorithm_str == "aalr" else None
-
     kwargs = dict(
         simulator=simulator,
         prior=prior,

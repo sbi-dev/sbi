@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional, Dict, Any
+from typing import Optional
 from sbi.types import OneOrMore
 
 import torch
@@ -8,6 +8,7 @@ from torch import nn, ones, Tensor
 
 from sbi.inference.posteriors.sbi_posterior import NeuralPosterior
 from sbi.inference.snre.snre_base import RatioEstimator
+from sbi.utils import del_entries
 
 
 class SNRE_A(RatioEstimator):
@@ -27,7 +28,8 @@ class SNRE_A(RatioEstimator):
     ) -> NeuralPosterior:
 
         # AALR only supports exactly `num_atoms=2`.
-        return super().__call__(**collect_method_args(locals()), num_atoms=2)
+        kwargs = del_entries(locals(), entries=("self", "__class__"))
+        return super().__call__(**kwargs, num_atoms=2)
 
     def _loss(self, theta, x, clipped_batch_size, num_atoms):
 
@@ -43,11 +45,3 @@ class SNRE_A(RatioEstimator):
 
         # Binary cross entropy to learn the likelihood (AALR-specific)
         return nn.BCELoss()(likelihood, labels)
-
-
-def collect_method_args(local_args: Dict) -> Dict[str, Any]:
-    """Return a dictionary of all explicitly-passed arguments."""
-
-    implicit_args = ("self", "__class__")
-
-    return {k: v for k, v in local_args.items() if k not in implicit_args}
