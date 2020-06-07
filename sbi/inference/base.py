@@ -33,7 +33,7 @@ class NeuralInference(ABC):
         skip_input_checks: bool = False,
         show_progressbar: bool = True,
         show_round_summary: bool = False,
-        logging_level: Optional[int] = None,
+        logging_level: Union[int, str] = "warning",
     ):
         r"""
         Args:
@@ -62,9 +62,9 @@ class NeuralInference(ABC):
                 and sampling.
             show_round_summary: Whether to print the validation loss and leakage after
                 each round.
-            logging_level: The logging level determines the amount of information
-                printed to the user. Currently only used for multiprocessing. One of
-                logging.[INFO|WARNING|DEBUG|ERROR|CRITICAL].
+            logging_level: Minimum severity of messages to log. One of the strings
+                "info", "warning", "debug", "error" and "critical". Currently only
+                applied when parallelization is requested for the simulator.
         """
 
         self._simulator, self._prior, self._x_shape = prepare_sbi_problem(

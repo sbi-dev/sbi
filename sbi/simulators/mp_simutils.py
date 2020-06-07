@@ -1,7 +1,7 @@
 import multiprocessing as mp
 import numpy as np
 from tqdm.auto import tqdm
-from typing import Callable, Tuple, List
+from typing import Callable, Tuple, List, Union
 import torch
 from sys import platform
 from torch import Tensor
@@ -15,7 +15,7 @@ def simulate_mp(
     num_workers: int = 4,
     worker_batch_size: int = 20,
     show_progressbar: bool = True,
-    logging_level: int = logging.WARNING,
+    logging_level: Union[int, str] = "warning",
 ) -> Tuple[Tensor, Tensor]:
     """
     Return parameters theta and simulated data x, simulated using multiprocessing on the
@@ -31,17 +31,16 @@ def simulate_mp(
             progressbar being updated less frequently (updates only happen after a
             worker is finished).
         show_progressbar: Whether to show a progressbar.
-        logging_level: The logging level determines the amount of information printed to
-            the user. Currently only used for multiprocessing. One of
-            logging.[INFO|WARNING|DEBUG|ERROR|CRITICAL].
+        logging_level: Minimum severity of messages to log. One of the strings
+            "info", "warning", "debug", "error" and "critical".
 
     Returns: parameters theta and simulation outputs x. The order of theta is not
         necessarily the same as for the input variable theta, which is why we return it
         here.
     """
-
-    reload(logging)  # jupyter notebooks require reload to update the logging level
-    # see here: SO 18786912
+    # Jupyter notebooks require reload to update the logging level, see SO 18786912.
+    # TODO Set up project-wide configuration, including option to log to file.
+    reload(logging)
     logging.basicConfig(level=logging_level)
 
     queue, workers, pipes = start_workers(simulator=simulator, num_workers=num_workers)

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import warnings
-from typing import Callable, Optional, Tuple, Union, Sequence
+from typing import Callable, Optional, Tuple, Sequence
 
 from numpy import ndarray
 import torch

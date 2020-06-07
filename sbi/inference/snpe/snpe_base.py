@@ -1,8 +1,7 @@
 from abc import ABC
 from copy import deepcopy
-from typing import Callable, Optional, Tuple, Dict
+from typing import Callable, Optional, Tuple, Dict, Union
 import warnings
-import logging
 
 import numpy as np
 import torch
@@ -40,7 +39,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         skip_input_checks: bool = False,
         show_progressbar: bool = True,
         show_round_summary: bool = False,
-        logging_level: int = logging.WARNING,
+        logging_level: Union[int, str] = "warning",
     ):
         """ Base class for Sequential Neural Posterior Estimation algorithms.
 
