@@ -582,7 +582,7 @@ def check_sbi_problem(simulator: Callable, prior: Distribution, x_shape: torch.S
         num_samples={num_prior_samples}."""
     assert (
         obs_event_shape == sim_event_shape
-    ), f"""The shape of a single x_o is {obs_event_shape} and it does not match
+    ), f"""The x_shape provided {obs_event_shape} does not match
         that of a single simulation {sim_event_shape}. For a batch size of
         {num_prior_samples} the simulator returns {simulation.shape}
         (should be ({num_prior_samples}, {obs_event_shape})."""
