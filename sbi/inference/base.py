@@ -1,7 +1,7 @@
 from abc import ABC
 import os.path
 from typing import Callable, Dict, List, Optional, Union
-import warnings
+from warnings import warn
 
 import torch
 from torch import Tensor
@@ -43,19 +43,19 @@ class NeuralInference(ABC):
             x_shape: Shape of a single simulation output $x$. Can be either (1, N) or
                 (N). Multidimensional observations (e.g. images) are not supported yet.
                 If None, the shape will be inferred by running a single simulation.
-            simulation_batch_size: Number of parameter sets that the
-                simulator accepts maps to data x at once. If None, we simulate
-                all parameter sets at the same time. If >= 1, the simulator has to
-                process data of shape (simulation_batch_size, parameter_dimension).
+            simulation_batch_size: Number of parameter sets that the simulator
+                maps to data x at once. If None, we simulate all parameter sets at the
+                same time. If >= 1, the simulator has to process data of shape
+                (simulation_batch_size, parameter_dimension).
             device: torch.device on which to compute (optional).
             summary_writer: An optional SummaryWriter to control, among others, log
                 file location (default is <current working directory>/logs.)
-            num_workers: number of parallel workers to start
+            num_workers: Number of parallel workers to start.
             worker_batch_size: Number of parameters that are processed per worker. Needs
-                to be larger than simulation_batch_size. A lower value creates overhead
-                from starting workers frequently. A higher value leads to the simulation
-                progressbar being updated less frequently (updates only happen after a
-                worker is finished).
+                to be larger than `simulation_batch_size`. A lower value creates
+            overhead from starting workers frequently. A higher value leads to the
+                simulation progressbar being updated less frequently (updates only
+                happen after a worker is finished).
             skip_input_checks: Whether to disable input checks. This saves simulation
                 time because they test-run the simulator to ensure it's correct.
             show_progressbar: Whether to show a progressbar during simulation, training,
@@ -265,23 +265,28 @@ class NeuralInference(ABC):
 
         self._summary_writer.flush()
 
-    def _handle_x_o_wrt_amortization(self, x_o: Tensor, num_rounds: int):
+    @property
+    def summary(self):
+        return self._summary
+
+    def _handle_x_o_wrt_amortization(self, x_o: Tensor, num_rounds: int) -> None:
         """
-        Check if x_o is coherent with num_rounds and possibly set it as default x_o.
+        Check if `x_o` is consistent with `num_rounds` and maybe set it as default.
 
-        Warn if amortized inference (num_rounds==1) and x_o is provided. Raise error if
-        multi-round inference but no x_o is provided.
+        For multi-round inference, set `x_o` as the default observation.
 
-        For multi-round inference, set x_o as the default observation.
+        Warns: if an `x_o` is provided when doing amortized inference (`num_rounds==1`).
+
+        Raises: if `x_o` is absent but but multi-round inference is requested.
         """
 
         if num_rounds == 1 and x_o is not None:
-            warnings.warn("Providing x_o in a single-round scenario has no effect.")
+            warn("Providing `x_o` in a single-round scenario has no effect.")
         elif num_rounds > 1 and x_o is None:
             raise ValueError(
-                "Observed data x_o is required if num_rounds>1 since"
+                "Observed data `x_o` is required if `num_rounds>1` since"
                 "samples in all rounds after the first one are drawn from"
-                "the posterior p(theta|x_o)."
+                "the posterior `p(theta|x_o)`."
             )
 
         if num_rounds > 1:

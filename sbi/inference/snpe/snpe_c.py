@@ -34,7 +34,7 @@ class SNPE_C(PosteriorEstimator):
         show_round_summary: bool = False,
         logging_level: Union[int, str] = "warning",
     ):
-        r"""SNPE-C / APT [1]
+        r"""SNPE-C / APT [1].
 
         [1] _Automatic Posterior Transformation for Likelihood-free Inference_,
             Greenberg et al., ICML 2019, https://arxiv.org/abs/1905.07488.
@@ -173,5 +173,4 @@ class SNPE_C(PosteriorEstimator):
         return log_prob_proposal_posterior
 
     def _log_prob_proposal_MoG(self, theta: Tensor, x: Tensor, masks: Tensor) -> Tensor:
-
         raise NotImplementedError

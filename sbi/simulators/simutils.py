@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Callable, Optional, Tuple
+from typing import Callable, Optional, Tuple, Union
 
 import torch
 from torch import Tensor
@@ -15,26 +15,28 @@ def simulate_in_batches_mp(
     sim_batch_size: Optional[int],
     number_of_workers: int = 4,
     worker_batch_size: int = 20,
+    show_progressbar: bool = True,
     logging_level: Union[int, str] = "warning",
 ) -> Tuple[Tensor, Tensor]:
     """
     Return parameters $\theta$ and data $x$ simulated using multiprocessing.
 
     Distributes all parameters theta to simulate_in_batches, i.e. splits them between
-     cores and then processes them in batches.
+    cores and then processes them in batches.
 
     Args:
-        simulator: simulator function.
-        theta: parameters $\theta$ sampled from prior or posterior.
-        number_of_workers: how many parallel workers to start
-        worker_batch_size: how many params are processed on each worker. This number is
-            thetas will then be handled by simulate_in_batches()
-        sim_batch_size: number of simulations per batch. Default is to simulate
+        simulator: Simulator function.
+        theta: Parameters $\theta$ sampled from prior or posterior.
+        number_of_workers: Number of parallel workers to start.
+        worker_batch_size: Number of parameters each worker handles. This number of
+            thetas will then be handled by `simulate_in_batches()`.
+        sim_batch_size: Number of simulations per batch. Default is to simulate
             the entire theta in a single batch.
+        show_progressbar: Whether to show a progressbar during simulating.
         logging_level: Minimum severity of messages to log. One of the strings
             "info", "warning", "debug", "error" and "critical".
 
-    Returns: parameters theta and simulation outputs x
+    Returns: Parameters theta and simulation outputs x.
 
     """
 
@@ -61,29 +63,30 @@ def simulate_in_batches_mp(
 def simulate_in_batches(
     simulator: Callable,
     theta: Tensor,
-    sim_batch_size: Optional[int],
-    show_progressbar: Optional[bool] = True,
+    sim_batch_size: Optional[int] = None,
+    show_progressbar: bool = True,
 ) -> Tuple[Tensor, Tensor]:
     r"""
     Return simulations $x$ for parameters $\theta$ conducted batchwise.
-    
+
     Parameters are batched with size `sim_batch_size` (default whole theta at once).
 
     Args:
-        simulator: simulator function.
-        theta: parameters $\theta$ sampled from prior or posterior.
-        sim_batch_size: number of simulations per batch. Default is to simulate  
+        simulator: Simulator callable (a function or a class with `__call__`).
+        theta: Parameters $\theta$ sampled from prior or posterior.
+        sim_batch_size: Number of simulations per batch. Default is to simulate
             the entire theta in a single batch.
-        show_progressbar: whether to show a progressbar during simulating
+        show_progressbar: Whether to show a progressbar during simulation.
 
     Returns:
-        Parameters theta and simulations $x$
+        Parameters theta and simulations $x$.
     """
 
     num_sims, *_ = theta.shape
 
     if num_sims == 0:
-        raise ValueError("Zero-length parameter theta implies zero simulations.")
+        logging.warn("Zero-length parameter theta implies zero simulations.")
+        x = torch.tensor([])
     elif sim_batch_size is not None and sim_batch_size < num_sims:
         # Dev note: pyright complains of torch.split lacking a type stub
         # as of PyTorch 1.4.0, see https://github.com/microsoft/pyright/issues/291
@@ -92,7 +95,7 @@ def simulate_in_batches(
         pbar = tqdm(
             total=num_sims,
             disable=not show_progressbar,
-            desc=f"Running {num_sims} simulations",
+            desc=f"Running {num_sims} simulations.",
         )
 
         with pbar:
@@ -101,6 +104,8 @@ def simulate_in_batches(
                 simulation_outputs.append(simulator(batch))
                 pbar.update(sim_batch_size)
 
-        return theta, torch.cat(simulation_outputs, dim=0)
+        x = torch.cat(simulation_outputs, dim=0)
     else:
-        return theta, simulator(theta)
+        x = simulator(theta)
+
+    return theta, x

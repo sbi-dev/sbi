@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from abc import ABC
+from abc import ABC, abstractmethod
 
 from copy import deepcopy
-from typing import Callable, Dict, Optional
+from typing import Callable, Dict, Optional, Union
 import warnings
 import numpy as np
 import torch
-from torch import Tensor, nn, optim, ones
+from torch import Tensor, nn, optim, ones, eye
 from torch.nn.utils import clip_grad_norm_
 
 from torch.utils import data
@@ -42,9 +42,6 @@ class RatioEstimator(NeuralInference, ABC):
         logging_level: Union[int, str] = "warning",
     ):
         r"""Sequential Ratio Estimation [1]
-
-        [1] _Likelihood-free MCMC with Amortized Approximate Likelihood
-            Ratios_, Hermans et al., Pre-print 2019, https://arxiv.org/abs/1903.04057
 
         Args:
             classifier: Binary classifier.
@@ -214,7 +211,7 @@ class RatioEstimator(NeuralInference, ABC):
         learning_rate: float,
         validation_fraction: float,
         stop_after_epochs: int,
-        max_num_epochs: Optional[int],
+        max_num_epochs: int,
         clip_max_norm: Optional[float],
     ) -> None:
         r"""
@@ -356,6 +353,12 @@ class RatioEstimator(NeuralInference, ABC):
 
         return self._posterior.net(theta_and_x)
 
+    @abstractmethod
+    def _loss(
+        self, theta: Tensor, x: Tensor, clipped_batch_size: int, **kwargs
+    ) -> Tensor:
+        raise NotImplementedError
+
     @property
     def summary(self):
         return self._summary
@@ -436,7 +439,7 @@ class PotentialFunctionProvider:
              (shape_of_single_theta) for multiple chains.
 
         Returns:
-            Potential $-[\log r(x_o, \theta) + \log p(\theta)]$.
+            Potential $-(\log r(x_o, \theta) + \log p(\theta))$.
         """
 
         theta = next(iter(theta.values()))

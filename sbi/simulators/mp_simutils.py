@@ -17,9 +17,12 @@ def simulate_mp(
     show_progressbar: bool = True,
     logging_level: Union[int, str] = "warning",
 ) -> Tuple[Tensor, Tensor]:
-    """
-    Return parameters theta and simulated data x, simulated using multiprocessing on the
-        passed simulator.
+    r"""
+    Return data x simulated via multiprocessing, alongside matching-ordered theta.
+
+    Workers computing in parallel will deliver their outputs `x` in a non-deterministic
+    order. As a convenience for client user, we return here `$\theta$` reordered to
+    match, so that `x[i] = simulator(theta[i])`. 
 
     Args:
         simulator: Simulator function that will be executed on each worker.
@@ -34,9 +37,7 @@ def simulate_mp(
         logging_level: Minimum severity of messages to log. One of the strings
             "info", "warning", "debug", "error" and "critical".
 
-    Returns: parameters theta and simulation outputs x. The order of theta is not
-        necessarily the same as for the input variable theta, which is why we return it
-        here.
+    Returns: Parameters "$\theta$" and simulation outputs x.
     """
     # Jupyter notebooks require reload to update the logging level, see SO 18786912.
     # TODO Set up project-wide configuration, including option to log to file.
