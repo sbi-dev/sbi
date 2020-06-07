@@ -70,7 +70,6 @@ def test_c2st_snpe_on_linearGaussian(
         retrain_from_scratch_each_round=False,
         discard_prior_samples=False,
         show_progressbar=False,
-        num_atoms=None,
         sample_with_mcmc=False,
     )
 
@@ -216,7 +215,7 @@ def test_c2st_multi_round_snpe_on_linearGaussian(algorithm_str: str, set_seed):
 
     simulator = lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    snpe_common_args = dict(
+    creation_args = dict(
         simulator=simulator,
         density_estimator=None,  # Use default MAF.
         prior=prior,
@@ -224,6 +223,7 @@ def test_c2st_multi_round_snpe_on_linearGaussian(algorithm_str: str, set_seed):
         retrain_from_scratch_each_round=False,
         show_progressbar=False,
     )
+    call_args = dict(num_rounds=2, x_o=x_o, num_simulations_per_round=1000)
 
     if algorithm_str == "snpe_b":
         infer = SNPE_B(simulation_batch_size=10, **creation_args)
@@ -234,7 +234,6 @@ def test_c2st_multi_round_snpe_on_linearGaussian(algorithm_str: str, set_seed):
         )
         posterior = infer(num_atoms=10, **call_args)
 
-    posterior = infer(num_rounds=2, x_o=x_o, num_simulations_per_round=1000)  # type: ignore
     samples = posterior.sample(num_samples)
 
     # Compute the c2st and assert it is near chance level of 0.5.
@@ -347,7 +346,6 @@ def test_api_snpe_c_posterior_correction(
         simulator=simulator,
         density_estimator=None,  # Use default MAF.
         prior=prior,
-        num_atoms=None,
         z_score_x=True,
         simulation_batch_size=50,
         use_combined_loss=False,

@@ -120,7 +120,7 @@ class RatioEstimator(NeuralInference, ABC):
         num_rounds: int,
         num_simulations_per_round: OneOrMore[int],
         x_o: Optional[Tensor] = None,
-        num_atoms: Optional[int] = 10,
+        num_atoms: int = 10,
         batch_size: int = 100,
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
@@ -172,7 +172,7 @@ class RatioEstimator(NeuralInference, ABC):
                     num_sims, show_progressbar=self._show_progressbar
                 )
 
-            # why do we return theta just below? When using multiprocessing, the thetas
+            # Why do we return theta just below? When using multiprocessing, the thetas
             # are not handled sequentially anymore. Hence, the x that are returned do
             # not necessarily have the same order as the theta we define above. We
             # therefore return a theta vector with the same ordering as x.
@@ -241,8 +241,10 @@ class RatioEstimator(NeuralInference, ABC):
             permuted_indices[num_training_examples:],
         )
 
-        # NOTE: The batch_size is clipped to num_validation samples.
         clipped_batch_size = min(batch_size, num_validation_examples)
+
+        # num_atoms = theta.shape[0]
+        clamp_and_warn("num_atoms", num_atoms, min_val=2, max_val=clipped_batch_size)
 
         # Dataset is shared for training and validation loaders.
         dataset = data.TensorDataset(
@@ -331,19 +333,19 @@ class RatioEstimator(NeuralInference, ABC):
         self._summary["epochs"].append(epoch)
         self._summary["best_validation_log_probs"].append(self._best_val_log_prob)
 
-    def _classifier_logits(self, theta, x, clipped_batch_size, num_atoms):
-
-        # num_atoms = theta.shape[0]
-        assert 0 < num_atoms - 1 < clipped_batch_size
+    def _classifier_logits(
+        self, theta: Tensor, x: Tensor, clipped_batch_size: int, num_atoms: int
+    ) -> Tensor:
 
         repeated_x = utils.repeat_rows(x, num_atoms)
 
         # Choose `1` or `num_atoms - 1` thetas from the rest of the batch for each x.
         probs = (
-            (1 / (clipped_batch_size - 1))
-            * ones(clipped_batch_size, clipped_batch_size)
-            * (1 - torch.eye(clipped_batch_size))
+            ones(clipped_batch_size, clipped_batch_size)
+            * (1 - eye(clipped_batch_size))
+            / (clipped_batch_size - 1)
         )
+
         choices = torch.multinomial(probs, num_samples=num_atoms - 1, replacement=False)
         contrasting_theta = theta[choices]
 

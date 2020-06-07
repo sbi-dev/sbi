@@ -1,13 +1,12 @@
 from __future__ import annotations
-from typing import Callable, Optional
-import logging
-
+from typing import Callable, Optional, Union
 import torch
 from torch import Tensor, eye, nn, ones
 from torch.utils.tensorboard import SummaryWriter
 
 from sbi.inference.snpe.snpe_base import PosteriorEstimator
-import sbi.utils as utils
+from sbi.inference.posterior import NeuralPosterior
+from sbi.utils import repeat_rows, clamp_and_warn, del_entries
 
 
 class SNPE_C(PosteriorEstimator):
@@ -16,7 +15,6 @@ class SNPE_C(PosteriorEstimator):
         simulator: Callable,
         prior,
         x_shape: Optional[torch.Size] = None,
-        num_atoms: Optional[int] = None,
         density_estimator: Optional[nn.Module] = None,
         calibration_kernel: Optional[Callable] = None,
         use_combined_loss: bool = False,
@@ -45,13 +43,10 @@ class SNPE_C(PosteriorEstimator):
             use_combined_loss: Whether to train the neural net jointly on prior samples
                 using maximum likelihood and on all samples using atomic loss. Useful
                 to prevent density leaking when using bounded priors.
-            num_atoms: Number of atoms to use for classification. If None, use all
-                other parameters $\theta$ in minibatch.
 
         See docstring of `PosteriorEstimator` class for all other arguments.
         """
 
-        self._num_atoms = num_atoms if num_atoms is not None else 0
         self._use_combined_loss = use_combined_loss
 
         super().__init__(
@@ -75,6 +70,30 @@ class SNPE_C(PosteriorEstimator):
             show_round_summary=show_round_summary,
             logging_level=logging_level,
         )
+
+    def __call__(
+        self,
+        num_rounds: int,
+        num_simulations_per_round: OneOrMore[int],
+        x_o: Optional[Tensor] = None,
+        batch_size: int = 100,
+        learning_rate: float = 5e-4,
+        validation_fraction: float = 0.1,
+        stop_after_epochs: int = 20,
+        max_num_epochs: Optional[int] = None,
+        clip_max_norm: Optional[float] = 5.0,
+        num_atoms: int = 10,
+    ) -> NeuralPosterior:
+
+        # WARNING: sneaky trick ahead. We proxy the parent's `__call__` here,
+        # requiring the signature to have `num_atoms`, save it for use below, and
+        # continue. It's sneaky because we are using the object (self) as a namespace
+        # to pass arguments between functions, and that's implicit state management.
+
+        self._num_atoms = num_atoms
+        kwargs = del_entries(locals(), entries=("self", "__class__", "num_atoms"))
+
+        return super().__call__(**kwargs)
 
     def _log_prob_proposal_posterior(
         self, theta: Tensor, x: Tensor, masks: Tensor
@@ -102,21 +121,19 @@ class SNPE_C(PosteriorEstimator):
 
         batch_size = theta.shape[0]
 
-        num_atoms = self._num_atoms if self._num_atoms > 0 else batch_size
+        num_atoms = clamp_and_warn(
+            "num_atoms", self._num_atoms, min_val=2, max_val=batch_size
+        )
 
         # Each set of parameter atoms is evaluated using the same x,
         # so we repeat rows of the data x, e.g. [1, 2] -> [1, 1, 2, 2]
-        repeated_x = utils.repeat_rows(x, num_atoms)
+        repeated_x = repeat_rows(x, num_atoms)
 
         # To generate the full set of atoms for a given item in the batch,
         # we sample without replacement num_atoms - 1 times from the rest
         # of the theta in the batch.
-        assert 0 < num_atoms - 1 < batch_size
-        probs = (
-            (1 / (batch_size - 1))
-            * ones(batch_size, batch_size)
-            * (1 - eye(batch_size))
-        )
+        probs = ones(batch_size, batch_size) * (1 - eye(batch_size)) / (batch_size - 1)
+
         choices = torch.multinomial(probs, num_samples=num_atoms - 1, replacement=False)
         contrasting_theta = theta[choices]
 

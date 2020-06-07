@@ -1,12 +1,23 @@
+import logging
+from typing import Tuple, Dict, Sequence, Any
 import warnings
 from typing import Sequence, Tuple, Union
 
 import torch
 import torch.nn as nn
-from torch import Tensor, as_tensor, kthvalue
+def del_entries(dic: Dict[str, Any], entries: Sequence = ()):
+    return {k: v for k, v in dic.items() if k not in entries}
 
-import sbi.utils as utils
-from tqdm.auto import tqdm
+
+def clamp_and_warn(name: str, value: float, min_val: float, max_val: float) -> float:
+    clamped_val = max(min_val, min(value, max_val))
+    if clamped_val != value:
+        logging.warning(
+            f"{name}={value} was clamped to {clamped_val}; "
+            "must be in [{min_val},{max_val}] range"
+        )
+
+    return clamped_val
 
 
 class Standardize(nn.Module):

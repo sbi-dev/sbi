@@ -5,6 +5,8 @@ from sbi.utils.plot.plot import samples_nd
 from sbi.utils.sbiutils import (
     Standardize,
     sample_posterior_within_prior,
+    del_entries,
+    clamp_and_warn,
 )
 from sbi.utils.torchutils import (
     BoxUniform,
