@@ -7,7 +7,7 @@ from scipy.stats import beta, multivariate_normal, uniform
 from torch import Tensor, ones, zeros, eye
 from torch.distributions import Beta, Distribution, Gamma, MultivariateNormal, Uniform
 
-from sbi.inference import SnpeC, SNL, SRE
+from sbi.inference import SNPE_C, SNL, SRE
 
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
 from sbi.user_input.user_input_checks import (
