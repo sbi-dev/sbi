@@ -17,7 +17,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 import sbi.utils as utils
 from sbi.inference.base import NeuralInference
-from sbi.inference.posteriors.sbi_posterior import NeuralPosterior
+from sbi.inference.posterior import NeuralPosterior
 from sbi.utils.torchutils import ensure_x_batched, ensure_theta_batched
 from sbi.types import ScalarFloat, OneOrMore
 

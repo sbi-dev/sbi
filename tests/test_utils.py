@@ -4,7 +4,7 @@ import torch
 from torch import Tensor
 from torch.distributions import Distribution
 
-from sbi.inference.posteriors.sbi_posterior import NeuralPosterior
+from sbi.inference.posterior import NeuralPosterior
 
 from sbi.utils.metrics import c2st
 

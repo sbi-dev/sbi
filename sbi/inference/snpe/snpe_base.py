@@ -11,6 +11,7 @@ from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 
 from sbi.inference import NeuralInference
+from sbi.inference.posterior import NeuralPosterior
 from sbi.types import ScalarFloat, OneOrMore
 import sbi.utils as utils
 from sbi.utils import Standardize
