@@ -94,22 +94,28 @@ class NeuralPosterior:
         # Correction factor for snpe leakage.
         self._leakage_density_correction_factor = None
 
-    def freeze(self, x_o):
+    def freeze(self, x_o: Tensor):
         """
-        Sets the default for the observation x_o.
+        Return `NeuralPosterior` object with default observation `x_o` set.
 
         When sequential methods are used in a single-round setting, the resulting neural
         network allows for amortized inference, i.e. computing the posterior
         $p(\theta|x)$ for any x. Hence, when calling `log_prob()` or `sample()`, the
         user generally needs to specify both $\theta$ and $x$. This function sets a
-        default $x_o$, and thus the user only needs to specify $\theta$ when calling
-        `log_prob()` or `sample()` for it to automatically use the default $x_o$ when
-        evaluating or sampling from $p(\theta|x_o)$.
+        default $x_o$, and thus the user only needs to specify $\theta$ when later 
+        calling `log_prob()` or `sample()` for it to automatically use the default $x_o$
+        when evaluating or sampling from $p(\theta|x_o)$.
 
         Args:
             x_o: The default observation to set for the posterior $p(theta|x_o)$.
+
+        Returns:
+            `NeuralPosterior` with default `x_o`.
         """
+
         self.x_o = process_x_o(x_o, self._x_shape)
+
+        return self
 
     def log_prob(
         self,
