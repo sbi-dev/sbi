@@ -32,14 +32,14 @@ class NeuralPosterior:
 
     Specifically, this class offers the following functionality:
     - Correction of leakage (applicable only to SNPE): If the prior is bounded, the
-    posterior resulting from SNPE can generate samples that lie outside of the prior
-    support (i.e. the posterior leaks). This class rejects these samples or,
-    alternatively, allows to sample from the posterior with MCMC. It also corrects the
-    calculation of the log probability such that it compensates for the leakage.
+      posterior resulting from SNPE can generate samples that lie outside of the prior
+      support (i.e. the posterior leaks). This class rejects these samples or,
+      alternatively, allows to sample from the posterior with MCMC. It also corrects the
+      calculation of the log probability such that it compensates for the leakage.
     - Posterior inference from likelihood (SNL) and likelihood ratio (SRE): SNL and SRE
-    learn to approximate the likelihood and likelihood ratio, which in turn can be used
-    to generate samples from the posterior. This class provides the needed MCMC methods
-    to sample from the posterior and to evaluate the log probability.
+      learn to approximate the likelihood and likelihood ratio, which in turn can be
+      used to generate samples from the posterior. This class provides the needed MCMC
+      methods to sample from the posterior and to evaluate the log probability.
 
     """
 
@@ -55,7 +55,7 @@ class NeuralPosterior:
     ):
         """
         Args:
-            algorithm_family: One of 'snpe', 'snl', 'sre' or 'aalr'.
+            algorithm_family: One of 'snpe', 'snl', 'snre_a' or 'snre_b'.
             neural_net: A classifier for sre/aalr, a density estimator for snpe/snl.
             prior: Prior distribution with methods `log_prob` and `sample`.
             x_o: Observation acting as conditioning context. It acts as follows:
@@ -214,7 +214,7 @@ class NeuralPosterior:
             )
         return self._log_prob_ratio_estimator(theta, x)
 
-    def _log_prob_snl(self, theta: Tensor, x: Tensor) -> Tensor:
+    def _log_prob_snle_a(self, theta: Tensor, x: Tensor) -> Tensor:
         warn(
             "The log probability from SNL is only correct up to a normalizing constant."
         )

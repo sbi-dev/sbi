@@ -6,7 +6,7 @@ from sbi.types import OneOrMore
 import torch
 from torch import nn, ones, Tensor
 
-from sbi.inference.posteriors.sbi_posterior import NeuralPosterior
+from sbi.inference.posterior import NeuralPosterior
 from sbi.inference.snre.snre_base import RatioEstimator
 from sbi.utils import del_entries
 
