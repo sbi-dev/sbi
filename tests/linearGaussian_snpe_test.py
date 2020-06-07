@@ -74,9 +74,8 @@ def test_c2st_snpe_on_linearGaussian(
         sample_with_mcmc=False,
     )
 
-    posterior = infer(num_rounds=1, num_simulations_per_round=2000)  # type: ignore
-    posterior.freeze(x_o=x_o)
-    samples = posterior.sample(num_samples, x=x_o)
+    posterior = infer(num_rounds=1, num_simulations_per_round=2000).freeze(x_o)
+    samples = posterior.sample(num_samples)
 
     # Compute the c2st and assert it is near chance level of 0.5.
     check_c2st(samples, target_samples, alg="snpe_c")
