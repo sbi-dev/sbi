@@ -117,7 +117,7 @@ class NeuralInference(ABC):
             median_observation_distances=[], epochs=[], best_validation_log_probs=[],
         )
 
-    def _has_converged(self, epoch: int, stop_after_epochs: int) -> bool:
+    def _converged(self, epoch: int, stop_after_epochs: int) -> bool:
         """Return whether the training converged yet and save best model state so far.
 
         Checks for improvement in validation performance over previous epochs.
@@ -187,6 +187,24 @@ class NeuralInference(ABC):
         """
 
         return description
+
+    @staticmethod
+    def _maybe_show_progress(show=bool, epoch=int) -> None:
+        if show:
+            # end="\r" deletes the print statement when a new one appears.
+            # https://stackoverflow.com/questions/3419984/
+            print("Training neural network. Epochs trained: ", epoch, end="\r")
+
+    def _report_convergence_at_end(
+        self, epoch: int, stop_after_epochs: int, max_num_epochs: int
+    ) -> None:
+        if self._converged(epoch, stop_after_epochs):
+            print(f"Neural network successfully converged after {epoch} epochs.")
+        elif max_num_epochs == epoch:
+            warn(
+                "Maximum number of epochs `max_num_epochs={max_num_epochs}` reached,"
+                "but network has not yet fully converged. Consider increasing it."
+            )
 
     @staticmethod
     def _assert_all_finite(quantity: Tensor, description: str = "tensor") -> None:

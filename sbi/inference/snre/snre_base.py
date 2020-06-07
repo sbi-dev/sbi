@@ -3,8 +3,9 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 
 from copy import deepcopy
+from sbi.utils import clamp_and_warn
 from typing import Callable, Dict, Optional, Union
-import warnings
+
 import numpy as np
 import torch
 from torch import Tensor, nn, optim, ones, eye
@@ -276,7 +277,7 @@ class RatioEstimator(NeuralInference, ABC):
 
         epoch, self._val_log_prob = 0, float("-Inf")
 
-        while not self._has_converged(epoch, stop_after_epochs):
+        while epoch <= max_num_epochs and not self._converged(epoch, stop_after_epochs):
 
             # Train for a single epoch.
             self._posterior.net.train()
@@ -303,27 +304,9 @@ class RatioEstimator(NeuralInference, ABC):
                     log_prob_sum -= log_prob.sum().item()
                 self._val_log_prob = log_prob_sum / num_validation_examples
 
-            if self._show_progressbar:
-                # end="\r" deletes the print statement when a new one appears.
-                # https://stackoverflow.com/questions/3419984/
-                print("Training neural network. Epochs trained: ", epoch, end="\r")
+            self._maybe_show_progress(self._show_progressbar, epoch)
 
-            if epoch >= max_num_epochs:
-                break
-
-        if self._show_progressbar and self._has_converged(epoch, stop_after_epochs):
-            # Network has converged, we print this summary.
-            print("Neural network successfully converged after", epoch, "epochs.")
-        elif self._show_progressbar and max_num_epochs == epoch:
-            # Training has stopped because of max_num_epochs argument.
-            print("Stopping neural network training after", epoch, "epochs.")
-
-        if max_num_epochs == epoch:
-            # warn if training was not stopped by early stopping
-            warnings.warn(
-                "Maximum number of epochs reached, but network has not yet "
-                "fully converged. Consider increasing the value of max_num_epochs."
-            )
+        self._report_convergence_at_end(epoch, stop_after_epochs, max_num_epochs)
 
         # Update summary.
         self._summary["epochs"].append(epoch)
@@ -355,13 +338,9 @@ class RatioEstimator(NeuralInference, ABC):
 
     @abstractmethod
     def _loss(
-        self, theta: Tensor, x: Tensor, clipped_batch_size: int, **kwargs
+        self, theta: Tensor, x: Tensor, clipped_batch_size: int, num_atoms: int
     ) -> Tensor:
         raise NotImplementedError
-
-    @property
-    def summary(self):
-        return self._summary
 
 
 class PotentialFunctionProvider:
