@@ -5,7 +5,6 @@ from abc import ABC
 from copy import deepcopy
 from typing import Callable, Dict, Optional
 import warnings
-import logging
 import numpy as np
 import torch
 from torch import Tensor, nn, optim, ones
@@ -40,7 +39,7 @@ class RatioEstimator(NeuralInference, ABC):
         skip_input_checks: bool = False,
         show_progressbar: bool = True,
         show_round_summary: bool = False,
-        logging_level: int = logging.WARNING,
+        logging_level: Union[int, str] = "warning",
     ):
         r"""Sequential Ratio Estimation [1]
 

@@ -32,7 +32,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         skip_input_checks: bool = False,
         show_progressbar: bool = True,
         show_round_summary: bool = False,
-        logging_level: int = logging.WARNING,
+        logging_level: Union[int, str] = "warning",
     ):
         r"""Sequential Neural Likelihood.
 

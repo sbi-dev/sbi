@@ -1,6 +1,5 @@
 from __future__ import annotations
-from typing import Callable, Optional
-import logging
+from typing import Callable, Optional, Union
 
 import torch
 from torch import Tensor, nn
@@ -29,7 +28,7 @@ class SNPE_B(PosteriorEstimator):
         skip_input_checks: bool = False,
         show_progressbar: bool = True,
         show_round_summary: bool = False,
-        logging_level: int = logging.WARNING,
+        logging_level: Union[int, str] = "warning",
     ):
         r"""SNPE-B [1]
 

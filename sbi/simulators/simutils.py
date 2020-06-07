@@ -15,8 +15,7 @@ def simulate_in_batches_mp(
     sim_batch_size: Optional[int],
     number_of_workers: int = 4,
     worker_batch_size: int = 20,
-    show_progressbar: Optional[bool] = True,
-    logging_level: int = logging.WARNING,
+    logging_level: Union[int, str] = "warning",
 ) -> Tuple[Tensor, Tensor]:
     """
     Return parameters $\theta$ and data $x$ simulated using multiprocessing.
@@ -32,10 +31,8 @@ def simulate_in_batches_mp(
             thetas will then be handled by simulate_in_batches()
         sim_batch_size: number of simulations per batch. Default is to simulate
             the entire theta in a single batch.
-        show_progressbar: whether to show a progressbar during simulating
-        logging_level: The logging level determines the amount of information printed to
-            the user. Currently only used for multiprocessing. One of
-            logging.[INFO|WARNING|DEBUG|ERROR|CRITICAL].
+        logging_level: Minimum severity of messages to log. One of the strings
+            "info", "warning", "debug", "error" and "critical".
 
     Returns: parameters theta and simulation outputs x
 
