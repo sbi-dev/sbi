@@ -1,8 +1,8 @@
-
 import collections
 import inspect
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple, Union, List
 
+import torch
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
@@ -111,9 +111,23 @@ def probs2contours(probs, levels):
     return contours
 
 
+def ensure_numpy(t: Union[np.ndarray, torch.Tensor]) -> np.ndarray:
+    """
+    Returns np.ndarray if torch.Tensor was provided.
+
+    Used because samples_nd() can only handle np.ndarray.
+    """
+    if isinstance(t, torch.Tensor):
+        return t.numpy()
+    else:
+        return t
+
+
 def samples_nd(
-    samples: np.ndarray,
-    points: Optional[Union[list, np.ndarray]] = None,
+    samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
+    points: Optional[
+        Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor]
+    ] = None,
     upper: Optional[str] = "hist",
     diag: Optional[str] = "hist",
     title: Optional[str] = None,
@@ -224,14 +238,19 @@ def samples_nd(
 
     # Prepare samples
     if type(samples) != list:
+        samples = ensure_numpy(samples)
         samples = [samples]
+    else:
+        for i, sample_pack in enumerate(samples):
+            samples[i] = ensure_numpy(samples[i])
 
     # Prepare points
     if points is None:
         points = []
     if type(points) != list:
+        points = ensure_numpy(points)
         points = [points]
-    points = [np.atleast_2d(p) for p in points]
+    points = [np.atleast_2d(ensure_numpy(p)) for p in points]
 
     # Dimensions
     dim = samples[0].shape[1]
