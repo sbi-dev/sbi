@@ -2,7 +2,7 @@ import pytest
 import torch
 
 from sbi.inference import SNPE_C, SRE, SNL
-from torch import zeros, ones
+from torch import zeros, ones, eye
 
 import sbi.utils as utils
 
@@ -87,10 +87,10 @@ def test_inference_with_nan_simulator(method, handle_nans, percent_nans, set_see
     )
 
     if method == SNPE_C:
-        infer = method(simulator=linear_gaussian_nan, x_o=x_o, prior=prior)
+        infer = method(simulator=linear_gaussian_nan, prior=prior)
     else:
         infer = method(
-            simulator=linear_gaussian_nan, x_o=x_o, prior=prior, handle_nans=handle_nans
+            simulator=linear_gaussian_nan, prior=prior, handle_nans=handle_nans
         )
 
     posterior = infer(num_rounds=1, num_simulations_per_round=2000).freeze(x_o)
