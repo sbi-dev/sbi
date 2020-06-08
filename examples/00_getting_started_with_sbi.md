@@ -21,7 +21,7 @@ For some observation $x$, you can then sample from the posterior p(\theta|x), ev
 ```
 samples = posterior.sample(1000, x=observation)
 log_probability = posterior.log_prob(samples, x=observation)
-vis_posterior(samples)
+pairplot(samples)
 ```
 
 ### Requirements for the simulator, prior, and observation
