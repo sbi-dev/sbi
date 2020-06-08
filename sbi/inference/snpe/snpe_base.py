@@ -417,17 +417,17 @@ class PosteriorEstimator(NeuralInference, ABC):
         self._summary["epochs"].append(epoch)
         self._summary["best_validation_log_probs"].append(self._best_val_log_prob)
 
-    def _loss(self, round_idx: int, theta: Tensor, x: Tensor, masks: Tensor,) -> Tensor:
-        """Return a loss calibrated correctly for the first and for further rounds.
+    def _loss(self, round_: int, theta: Tensor, x: Tensor, masks: Tensor,) -> Tensor:
+        """Return loss with proposal correction (`round_>0`) or without it (`round_=0`).
 
         The loss is the negative log prob. Irrespective of the round or SNPE method
-        (A, B, or C), it is weighted with a calibration kernel.
+        (A, B, or C), it can be weighted with a calibration kernel.
 
         Returns:
             Calibration kernel-weighted negative log prob.
         """
 
-        if round_idx == 0:
+        if round_ == 0:
             # Use posterior log prob (without proposal correction) for first round.
             log_prob = self._posterior.net.log_prob(theta, x)
         else:
