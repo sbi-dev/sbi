@@ -12,12 +12,14 @@ for line in open(os.path.join(PROJECT_PATH, "sbi", "__version__.py")):
 
 setup(
     name="sbi",
-    version=version_namespace["__version__"],
+    version="0.8-pre",  # version_namespace["__version__"],
     description="Simulation-based inference",
+    download_url="https://github.com/mackelab/sbi/archive/v0.8-pre.tar.gz",
+    keywords="bayesian parameter inference system_identification simulator PyTorch",
     url="https://github.com/mackelab/sbi",
-    author="Conor Durkan, George Papamakarios, Artur Bekasov",
+    author="---pending---",
     packages=find_packages(exclude=["tests"]),
-    license="GPLv3",
+    license="AGPLv3",
     install_requires=[
         "matplotlib",
         "nbstripout",
@@ -44,4 +46,20 @@ setup(
         ]
     },
     dependency_links=[],
+    classifiers=[
+        "Development Status :: 3 - Alpha",
+        "Intended Audience :: Developers",
+        "Intended Audience :: Education",
+        "Intended Audience :: Information Technology",
+        "Intended Audience :: Science/Research",
+        "Topic :: Adaptive Technologies",
+        "Topic :: Scientific/Engineering",
+        "Topic :: Scientific/Engineering :: Artificial Intelligence",
+        "Topic :: Scientific/Engineering :: Mathematics",
+        "Topic :: Games/Entertainment :: Simulation",
+        "Topic :: Software Development :: Build Tools",
+        "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
+        "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8",
+    ],
 )
