@@ -3,6 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 
 from copy import deepcopy
+from sbi.utils.sbiutils import warn_on_invalid_x
 from sbi.utils import clamp_and_warn
 from typing import Callable, Dict, Optional, Union
 
@@ -20,7 +21,7 @@ from sbi.inference.base import NeuralInference
 from sbi.inference.posterior import NeuralPosterior
 from sbi.utils.torchutils import ensure_x_batched, ensure_theta_batched
 from sbi.types import ScalarFloat, OneOrMore
-from sbi.utils.sbiutils import find_nan_in_simulations, warn_on_too_many_nans
+from sbi.utils import handle_invalid_x, warn_on_invalid_x
 
 
 class RatioEstimator(NeuralInference, ABC):
@@ -42,7 +43,7 @@ class RatioEstimator(NeuralInference, ABC):
         show_progressbar: bool = True,
         show_round_summary: bool = False,
         logging_level: Union[int, str] = "warning",
-        handle_nans: bool = False,
+        exclude_invalid_x: bool = False,
     ):
         r"""Sequential Ratio Estimation [1]
 
@@ -76,7 +77,7 @@ class RatioEstimator(NeuralInference, ABC):
             show_progressbar=show_progressbar,
             show_round_summary=show_round_summary,
             logging_level=logging_level,
-            handle_nans=handle_nans,
+            exclude_invalid_x=exclude_invalid_x,
         )
 
         if classifier is None:
@@ -114,7 +115,6 @@ class RatioEstimator(NeuralInference, ABC):
 
         # Ratio-based-specific summary_writer fields.
         self._summary.update({"mcmc_times": []})  # type: ignore
-        self.handle_nans = handle_nans
 
     def __call__(
         self,
@@ -179,22 +179,13 @@ class RatioEstimator(NeuralInference, ABC):
             # therefore return a theta vector with the same ordering as x.
             theta, x = self._batched_simulator(theta)
 
+            # Check for NaNs in simulations.
+            is_valid_x, num_nans, num_infs = handle_invalid_x(x, self.exclude_invalid_x)
+            warn_on_invalid_x(num_nans, num_infs, self.exclude_invalid_x)
+
             # Store (theta, x) pairs.
-
-            # Check for NaNs in data.
-            x_not_nan = ~find_nan_in_simulations(x)
-            print(
-                f"""Found {x_not_nan.numel() - x_not_nan.sum()} NaN simulations. They
-                will be exluded from training."""
-            )
-
-            if not self.handle_nans:
-                assert x_not_nan.all(), "Simulated data must be finite."
-            else:
-                warn_on_too_many_nans(x)
-
-            self._theta_bank.append(theta[x_not_nan])
-            self._x_bank.append(x[x_not_nan])
+            self._theta_bank.append(theta[is_valid_x])
+            self._x_bank.append(x[is_valid_x])
 
             # Fit posterior using newly aggregated data set.
             self._train(
@@ -340,12 +331,7 @@ class RatioEstimator(NeuralInference, ABC):
 
         choices = torch.multinomial(probs, num_samples=num_atoms - 1, replacement=False)
 
-        try:
-            contrasting_theta = theta[choices]
-        except IndexError:
-            import pdb
-
-            pdb.set_trace()
+        contrasting_theta = theta[choices]
 
         atomic_theta = torch.cat((theta[:, None, :], contrasting_theta), dim=1).reshape(
             batch_size * num_atoms, -1

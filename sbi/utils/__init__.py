@@ -7,6 +7,8 @@ from sbi.utils.sbiutils import (
     sample_posterior_within_prior,
     del_entries,
     clamp_and_warn,
+    handle_invalid_x,
+    warn_on_invalid_x,
 )
 from sbi.utils.torchutils import (
     BoxUniform,
