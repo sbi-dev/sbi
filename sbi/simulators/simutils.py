@@ -85,7 +85,7 @@ def simulate_in_batches(
     num_sims, *_ = theta.shape
 
     if num_sims == 0:
-        logging.warn("Zero-length parameter theta implies zero simulations.")
+        logging.warning("Zero-length parameter theta implies zero simulations.")
         x = torch.tensor([])
     elif sim_batch_size is not None and sim_batch_size < num_sims:
         # Dev note: pyright complains of torch.split lacking a type stub
