@@ -20,7 +20,7 @@ def posterior_nn(
     prior_mean: Tensor,
     prior_std: Tensor,
     x_o_shape: torch.Size,
-    embedding: Optional[nn.Module] = None,
+    embedding: nn.Module = nn.Identity(),
     hidden_features: int = 50,
     mdn_num_components: int = 20,
     made_num_mixture_components: int = 10,
