@@ -315,6 +315,10 @@ class RatioEstimator(NeuralInference, ABC):
     def _classifier_logits(
         self, theta: Tensor, x: Tensor, clipped_batch_size: int, num_atoms: int
     ) -> Tensor:
+        """Return logits obtained through classifier forward pass.
+
+        The logits are obtained from atomic sets of (theta,x) pairs.
+        """
 
         repeated_x = utils.repeat_rows(x, num_atoms)
 

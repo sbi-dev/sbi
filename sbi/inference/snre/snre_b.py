@@ -19,8 +19,8 @@ class SNRE_B(RatioEstimator):
         # We have a batch of `clipped_batch_size` such datapoints.
         logits = logits.reshape(clipped_batch_size, num_atoms)
 
-        # Index 0 is the theta sampled from the joint.
-        # The first is the correct one for the 1-out-of-N classification.
+        # Index 0 is the theta-x-pair sampled from the joint p(theta,x) and hence the
+        # "correct" one for the 1-out-of-N classification.
         log_prob = logits[:, 0] - torch.logsumexp(logits, dim=-1)
 
         return -torch.mean(log_prob)
