@@ -60,7 +60,7 @@ Allowed data types and shapes:
 *sbi* implements three classes of algorithms that can be used to obtain the posterior distribution: SNPE, SNL, and SRE. You can try the different algorithms by simply swapping out the name of the inference class:
 ```
 infer = SNPE(prior=prior, simulator=simulator)
-infer = SRE(prior=prior, simulator=simulator)
-infer = SNL(prior=prior, simulator=simulator)
+infer = SNRE(prior=prior, simulator=simulator)
+infer = SNLE(prior=prior, simulator=simulator)
 ```
 You can then infer, sample, evaluate, and plot the posterior as described above.
