@@ -13,7 +13,7 @@ With these two things, *sbi* can run inference with just two lines of code:
 
 ```
 infer = SNPE(prior=prior, simulator=simulator)
-posterior = infer(num_rounds=1, num_simulations_per_round=1000)
+posterior = infer(num_simulations=1000)
 ```
 
 For some observation $x$, you can then sample from the posterior p(\theta|x), evaluate its log-probability, or plot it.
