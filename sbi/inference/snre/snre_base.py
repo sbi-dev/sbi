@@ -51,8 +51,8 @@ class RatioEstimator(NeuralInference, ABC):
             summary_net: Optional network which may be used to produce feature
                 vectors f(x) for high-dimensional simulation outputs $x$.
             classifier_loss: `sre` implements the algorithm suggested in Durkan et al.
-                2019, whereas `aalr` implements the algorithm suggested in
-                Hermans et al. 2019. `sre` can use more than two atoms, potentially
+                2020, whereas `aalr` implements the algorithm suggested in
+                Hermans et al. 2020. `sre` can use more than two atoms, potentially
                 boosting performance, but does not allow for exact posterior density
                 evaluation (only up to a normalizing constant), even when training
                 only one round. `aalr` is limited to `num_atoms=2`, but allows for

@@ -174,7 +174,7 @@ def test_c2st_sre_on_linearGaussian(
     if prior_str == "gaussian" and algorithm_str == "aalr":
         # For the Gaussian prior, we compute the KLd between ground truth and
         # posterior. We can do this only if the classifier_loss was as described in
-        # Hermans et al. 2019 ('aalr') since Durkan et al. 2019 version only allows
+        # Hermans et al. 2020 ('aalr') since Durkan et al. 2020 version only allows
         # evaluation up to a constant.
         # For the Gaussian prior, we compute the KLd between ground truth and posterior
         dkl = get_dkl_gaussian_prior(

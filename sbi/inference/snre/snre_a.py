@@ -15,7 +15,7 @@ class SNRE_A(RatioEstimator):
     """AALR[1], here known as SNRE_A.
 
     [1] _Likelihood-free MCMC with Amortized Approximate Likelihood Ratios_, Hermans et
-        al., Pre-print 2019, https://arxiv.org/abs/1903.04057
+        al., ICML 2020, https://arxiv.org/abs/1903.04057
     """
 
     def __call__(
