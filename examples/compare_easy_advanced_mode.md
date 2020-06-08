@@ -29,3 +29,11 @@ posterior = infer(num_rounds=2, x_o=observation, num_simulations_per_round=1000)
 - in addition `SNPE_easy_interface.__init__()` also runs `prepare_sbi_problem()`
 - by default, we have an alias `SNPE_easy_interface=SNPE`, so we will automatically run the easy interface.
 - calling `sbi.inference.snpe.set_mode('advanced')` changes the alias.
+
+### Single function call
+```
+# single-round
+amortized_post = parameters(simulator, prior, num_simulations=1000, method='SNPE')
+# multi-round (open to having defaults for rounds and method)
+focused_post = parameters(simulator, prior, focus_on=x_o, rounds=3, num_simulations = 1000, method='SNPE')
+```
