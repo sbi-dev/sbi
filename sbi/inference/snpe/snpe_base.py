@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from typing import Callable, Optional, Tuple, Dict, Union
+import warnings
 
 import numpy as np
 import torch
@@ -64,6 +65,7 @@ class PosteriorEstimator(NeuralInference, ABC):
             prior=prior,
             x_shape=x_shape,
             simulation_batch_size=simulation_batch_size,
+            retrain_from_scratch_each_round=retrain_from_scratch_each_round,
             device=device,
             summary_writer=summary_writer,
             num_workers=num_workers,
@@ -91,6 +93,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         self._z_score_x, self._z_score_min_std = z_score_x, z_score_min_std
         self._retrain_from_scratch_each_round = retrain_from_scratch_each_round
         self._discard_prior_samples = discard_prior_samples
+        self._warn_if_retrain_from_scratch_snpe()
 
         # Create a neural posterior which can sample(), log_prob().
         self._posterior = NeuralPosterior(
@@ -262,8 +265,11 @@ class PosteriorEstimator(NeuralInference, ABC):
             # in the Posterior to be this now-normalized embedding net. Perhaps the
             # delayed chaining ideas in thinc can help make this a bit more transparent.
             if self._z_score_x:
-                self._posterior.set_embedding_net(self._z_score_embedding(x))
+                self._posterior.set_embedding_net(self._prepend_z_score(x))
 
+            # If we're retraining from scratch each round, keep a copy
+            # of the original untrained model for reinitialization.
+            self._untrained_neural_posterior = deepcopy(self._posterior)
         else:
             # XXX Make posterior.sample() accept tuples like prior.sample().
             theta = self._posterior.sample(
@@ -274,7 +280,7 @@ class PosteriorEstimator(NeuralInference, ABC):
 
         return theta, x, self._mask_sims_from_prior(round_, theta.size(0))
 
-    def _z_score_embedding(self, x: Tensor) -> nn.Module:
+    def _prepend_z_score(self, x: Tensor) -> nn.Module:
         """Return embedding net with a standardizing step preprended."""
 
         embed_nn = self._posterior.net._embedding_net
@@ -364,6 +370,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         # to the untrained copy.
         if self._retrain_from_scratch_each_round and round_ > 0:
             self._posterior = deepcopy(self._untrained_neural_posterior)
+            optimizer = optim.Adam(self._posterior.net.parameters(), lr=learning_rate,)
 
         epoch, self._val_log_prob = 0, float("-Inf")
         while epoch <= max_num_epochs and not self._converged(epoch, stop_after_epochs):
@@ -434,6 +441,15 @@ class PosteriorEstimator(NeuralInference, ABC):
             log_prob = self._log_prob_proposal_posterior(theta, x, masks)
 
         return -(self.calibration_kernel(x) * log_prob)
+
+    def _warn_if_retrain_from_scratch_snpe(self):
+        if self._retrain_from_scratch_each_round:
+            warnings.warn(
+                "You specified `retrain_from_scratch_each_round=True`. For "
+                "SNPE, we have experienced very poor performance in this "
+                "scenario and we therefore strongly recommend "
+                "`retrain_from_scratch_each_round=False`, see GH #215."
+            )
 
 
 class PotentialFunctionProvider:

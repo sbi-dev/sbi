@@ -33,7 +33,7 @@ class RatioEstimator(NeuralInference, ABC):
         classifier: Optional[nn.Module] = None,
         simulation_batch_size: int = 1,
         mcmc_method: str = "slice_np",
-        summary_net: Optional[nn.Module] = None,
+        embedding_net: nn.Module = nn.Identity(),
         retrain_from_scratch_each_round: bool = False,
         num_workers: int = 1,
         summary_writer: Optional[SummaryWriter] = None,
@@ -44,21 +44,14 @@ class RatioEstimator(NeuralInference, ABC):
         logging_level: Union[int, str] = "warning",
         exclude_invalid_x: bool = False,
     ):
-        r"""Sequential Ratio Estimation [1]
+        r"""Sequential Ratio Estimation [1].
 
         Args:
             classifier: Binary classifier.
             retrain_from_scratch_each_round: Whether to retrain the conditional
                 density estimator for the posterior from scratch each round.
-            summary_net: Optional network which may be used to produce feature
+            embedding_net: Optional network which may be used to produce feature
                 vectors f(x) for high-dimensional simulation outputs $x$.
-            classifier_loss: `sre` implements the algorithm suggested in Durkan et al.
-                2020, whereas `aalr` implements the algorithm suggested in
-                Hermans et al. 2020. `sre` can use more than two atoms, potentially
-                boosting performance, but does not allow for exact posterior density
-                evaluation (only up to a normalizing constant), even when training
-                only one round. `aalr` is limited to `num_atoms=2`, but allows for
-                density evaluation when training for one round.
 
         See docstring of `NeuralInference` class for all other arguments.
         """
@@ -68,6 +61,7 @@ class RatioEstimator(NeuralInference, ABC):
             prior=prior,
             x_shape=x_shape,
             simulation_batch_size=simulation_batch_size,
+            retrain_from_scratch_each_round=retrain_from_scratch_each_round,
             device=device,
             summary_writer=summary_writer,
             num_workers=num_workers,
@@ -101,15 +95,7 @@ class RatioEstimator(NeuralInference, ABC):
 
         # We may want to summarize high-dimensional x.
         # This may be either a fixed or learned transformation.
-        self._summary_net = nn.Identity() if summary_net is None else summary_net
-
-        # If we're retraining from scratch each round,
-        # keep a copy of the original untrained model for reinitialization.
-        self._retrain_from_scratch_each_round = retrain_from_scratch_each_round
-        if self._retrain_from_scratch_each_round:
-            self._untrained_classifier = deepcopy(classifier)
-        else:
-            self._untrained_classifier = None
+        self._summary_net = embedding_net
 
         # Ratio-based-specific summary_writer fields.
         self._summary.update({"mcmc_times": []})  # type: ignore
@@ -155,6 +141,12 @@ class RatioEstimator(NeuralInference, ABC):
         """
 
         self._handle_x_o_wrt_amortization(x_o, num_rounds)
+
+        # If we're retraining from scratch each round,
+        # keep a copy of the original untrained model for reinitialization.
+        if self._retrain_from_scratch_each_round:
+            self._untrained_posterior = deepcopy(self._posterior)
+            self._untrained_summary_net = deepcopy(self._summary_net)
 
         max_num_epochs = 2 ** 31 - 1 if max_num_epochs is None else max_num_epochs
 
@@ -275,7 +267,13 @@ class RatioEstimator(NeuralInference, ABC):
         # If we're retraining from scratch each round, reset the neural posterior
         # to the untrained copy we made at the start.
         if self._retrain_from_scratch_each_round:
-            self._posterior = deepcopy(self._posterior)
+            self._posterior = deepcopy(self._untrained_posterior)
+            self._summary_net = deepcopy(self._untrained_summary_net)
+            optimizer = optim.Adam(
+                list(self._posterior.net.parameters())
+                + list(self._summary_net.parameters()),
+                lr=learning_rate,
+            )
 
         epoch, self._val_log_prob = 0, float("-Inf")
 

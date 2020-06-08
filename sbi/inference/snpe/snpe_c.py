@@ -7,6 +7,7 @@ from torch.utils.tensorboard import SummaryWriter
 from sbi.inference.snpe.snpe_base import PosteriorEstimator
 from sbi.inference.posterior import NeuralPosterior
 from sbi.utils import repeat_rows, clamp_and_warn, del_entries
+from sbi.types import OneOrMore
 
 
 class SNPE_C(PosteriorEstimator):

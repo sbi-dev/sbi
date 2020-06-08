@@ -25,6 +25,7 @@ class NeuralInference(ABC):
         prior,
         x_shape: Optional[torch.Size] = None,
         simulation_batch_size: int = 1,
+        retrain_from_scratch_each_round: bool = False,
         device: Optional[torch.device] = None,
         summary_writer: Optional[SummaryWriter] = None,
         simulator_name: str = "simulator",
@@ -75,6 +76,7 @@ class NeuralInference(ABC):
         self._skip_input_checks = skip_input_checks
         self._show_progressbar = show_progressbar
         self._show_round_summary = show_round_summary
+        self._retrain_from_scratch_each_round = retrain_from_scratch_each_round
 
         self._batched_simulator = lambda theta: simulate_in_batches(
             self._simulator,

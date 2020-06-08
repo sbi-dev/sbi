@@ -1,6 +1,7 @@
 from __future__ import annotations
 from abc import ABC
 from typing import Callable, Dict, Optional, Union
+from copy import deepcopy
 
 import numpy as np
 import torch
@@ -25,6 +26,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         x_shape: Optional[torch.Size] = None,
         density_estimator: Optional[nn.Module] = None,
         simulation_batch_size: Optional[int] = 1,
+        retrain_from_scratch_each_round: bool = False,
         summary_writer: Optional[SummaryWriter] = None,
         device: Optional[torch.device] = None,
         num_workers: int = 1,
@@ -53,6 +55,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
             prior=prior,
             x_shape=x_shape,
             simulation_batch_size=simulation_batch_size,
+            retrain_from_scratch_each_round=retrain_from_scratch_each_round,
             device=device,
             summary_writer=summary_writer,
             num_workers=num_workers,
@@ -126,6 +129,11 @@ class LikelihoodEstimator(NeuralInference, ABC):
         """
 
         self._handle_x_o_wrt_amortization(x_o, num_rounds)
+
+        # If we're retraining from scratch each round,
+        # keep a copy of the original untrained model for reinitialization.
+        if self._retrain_from_scratch_each_round:
+            self._untrained_posterior = deepcopy(self._posterior)
 
         max_num_epochs = 2 ** 31 - 1 if max_num_epochs is None else max_num_epochs
 
@@ -230,6 +238,12 @@ class LikelihoodEstimator(NeuralInference, ABC):
         )
 
         optimizer = optim.Adam(self._posterior.net.parameters(), lr=learning_rate)
+
+        # If we're retraining from scratch each round, reset the neural posterior
+        # to the untrained copy we made at the start.
+        if self._retrain_from_scratch_each_round:
+            self._posterior = deepcopy(self._untrained_posterior)
+            optimizer = optim.Adam(self._posterior.net.parameters(), lr=learning_rate)
 
         epoch, self._val_log_prob = 0, float("-Inf")
         while epoch <= max_num_epochs and not self._converged(epoch, stop_after_epochs):
