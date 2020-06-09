@@ -1,3 +1,4 @@
+## Suggestion 1
 ### Easy/beginner mode
 - automatically runs single round
 - allows for almost no additional arguments (maybe `num_workers` and a string for the nn)
@@ -30,7 +31,8 @@ posterior = infer(num_rounds=2, x_o=observation, num_simulations_per_round=1000)
 - by default, we have an alias `SNPE_easy_interface=SNPE`, so we will automatically run the easy interface.
 - calling `sbi.inference.snpe.set_mode('advanced')` changes the alias.
 
-### Single function call
+# Suggestion 2
+### Single function call (easy mode)
 ```
 # single-round
 amortized_post = parameters(simulator, prior, num_simulations=1000, method='SNPE')
