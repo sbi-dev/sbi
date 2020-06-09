@@ -1,13 +1,7 @@
-"""Utility functions for Input/Output."""
+"""Utility functions for input/output."""
 
 import os
-import time
 from pathlib import Path
-
-def get_timestamp():
-    # TODO make time stamp iso format
-    formatted_time = time.strftime("%d-%b-%y||%H:%M:%S")
-    return formatted_time
 
 
 def get_project_root():

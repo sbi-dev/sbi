@@ -1,5 +1,7 @@
 from abc import ABC
-import os.path
+from copy import deepcopy
+from datetime import datetime
+from pathlib import Path
 from typing import Callable, Dict, List, Optional, Union
 from warnings import warn
 
@@ -7,13 +9,12 @@ import torch
 from torch import Tensor
 from torch.utils.tensorboard import SummaryWriter
 
-from copy import deepcopy
 from sbi.simulators.simutils import simulate_in_batches
 from sbi.user_input.user_input_checks import prepare_sbi_problem
-from sbi.utils import get_log_root, get_timestamp
-from sbi.utils.torchutils import get_default_device
-from sbi.utils.plot import pairplot
 from sbi.user_input.user_input_checks import process_x_o
+from sbi.utils import get_log_root
+from sbi.utils.plot import pairplot
+from sbi.utils.torchutils import get_default_device
 
 
 class NeuralInference(ABC):
@@ -21,52 +22,45 @@ class NeuralInference(ABC):
 
     def __init__(
         self,
-        simulator: Callable,
         prior,
+        simulator: Callable,
         x_shape: Optional[torch.Size] = None,
+        num_workers: int = 1,
         simulation_batch_size: int = 1,
         retrain_from_scratch_each_round: bool = False,
-        device: Optional[torch.device] = None,
-        summary_writer: Optional[SummaryWriter] = None,
-        simulator_name: str = "simulator",
-        num_workers: int = 1,
         skip_input_checks: bool = False,
+        exclude_invalid_x: bool = True,
+        device: Union[torch.device, str] = get_default_device(),
+        logging_level: Union[int, str] = "WARNING",
+        summary_writer: Optional[SummaryWriter] = None,
         show_progressbar: bool = True,
         show_round_summary: bool = False,
-        logging_level: Union[int, str] = "warning",
-        exclude_invalid_x: bool = False,
     ):
         r"""
+        Base class for inference algorithms.
+
         Args:
-            simulator: A regular callable $f(\theta)\to x$. Both parameter $\theta$ and
-                simulation $x$ can be multi-dimensional.
-            prior: Distribution-like object with `log_prob`and `sample` methods.
-            x_shape: Shape of a single simulation output $x$. Can be either (1, N) or
-                (N). Multidimensional observations (e.g. images) are not supported yet.
-                If None, the shape will be inferred by running a single simulation.
+            prior: Distribution-like object with `.log_prob()`and `.sample()`.
+            simulator: A regular callable $\mathrm{sim}(\theta)\to x$.
+            x_shape: Shape of a single simulation output $x$, has to be (1,N).
+            exclude_invalid_x: Whether to exclude simulation outputs `NaN` or ± infinite
+                values from training. Expect errors, silent or explicit, when `False`.
+            num_workers: Number of parallel workers to use for simulations.
             simulation_batch_size: Number of parameter sets that the simulator
                 maps to data x at once. If None, we simulate all parameter sets at the
                 same time. If >= 1, the simulator has to process data of shape
                 (simulation_batch_size, parameter_dimension).
-            device: torch.device on which to compute (optional).
-            summary_writer: An optional SummaryWriter to control, among others, log
-                file location (default is <current working directory>/logs.)
-            num_workers: Number of parallel workers to start.
-            overhead from starting workers frequently. A higher value leads to the
-                simulation progressbar being updated less frequently (updates only
-                happen after a worker is finished).
             skip_input_checks: Whether to disable input checks. This saves simulation
                 time because they test-run the simulator to ensure it's correct.
-            show_progressbar: Whether to show a progressbar during simulation, training,
-                and sampling.
-            show_round_summary: Whether to print the validation loss and leakage after
-                each round.
+            device: torch device on which to compute, e.g. 'cuda', 'cpu'.
             logging_level: Minimum severity of messages to log. One of the strings
-                "info", "warning", "debug", "error" and "critical". Currently only
-                applied when parallelization is requested for the simulator.
-            exclude_invalid_x: If True, simulations containing NaN or infinite values
-                are excluded from training, if False a warning is raised if NaNs or
-                infinite values occur.
+               "INFO", "WARNING", "DEBUG", "ERROR" and "CRITICAL".
+            summary_writer: A `SummaryWriter` to control, among others, log
+                file location (default is `<current working directory>/logs`.)
+            show_progressbar: Whether to show a progressbar during simulation and
+                sampling.
+            show_round_summary: Whether to show the validation loss and leakage after
+                each round.
         """
 
         self._simulator, self._prior, self._x_shape = prepare_sbi_problem(
@@ -86,7 +80,7 @@ class NeuralInference(ABC):
             self._show_progressbar,
         )
 
-        self._device = get_default_device() if device is None else device
+        self._device = device
 
         # Initialize roundwise (theta, x) for storage of parameters and simulations.
         # XXX Rename self._roundwise_* or self._rounds_*
@@ -98,16 +92,9 @@ class NeuralInference(ABC):
         #     2. `alg_family` cannot be resolved only from `self.__class__.__name__`,
         #         since SRE, AALR demand different handling but are both in SRE class.
 
-        if summary_writer is None:
-            log_dir = os.path.join(
-                get_log_root(),
-                self.__class__.__name__,
-                simulator_name,
-                get_timestamp(),
-            )
-            self._summary_writer = SummaryWriter(log_dir)
-        else:
-            self._summary_writer = summary_writer
+        self._summary_writer = (
+            self._default_summary_writer() if summary_writer is None else summary_writer
+        )
 
         # Logging during training (by SummaryWriter).
         self._summary = dict(
@@ -144,6 +131,17 @@ class NeuralInference(ABC):
             converged = True
 
         return converged
+
+    def _default_summary_writer(self) -> SummaryWriter:
+        """Return summary writer logging to method- and simulator-specific directory."""
+        try:
+            simulator = self._simulator.__name__
+        except AttributeError:
+            simulator = self._simulator.__class__.__name__
+
+        method = self.__class__.__name__
+        logdir = Path(get_log_root(), simulator, method, datetime.now().isoformat())
+        return SummaryWriter(logdir)
 
     @staticmethod
     def _ensure_list(

@@ -11,70 +11,67 @@ from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 
-from sbi.inference.posterior import NeuralPosterior
 from sbi.inference import NeuralInference
-from sbi.types import ScalarFloat, OneOrMore
+from sbi.inference.posterior import NeuralPosterior
+from sbi.types import OneOrMore, ScalarFloat
 import sbi.utils as utils
 from sbi.utils import handle_invalid_x, warn_on_invalid_x
+from sbi.utils.torchutils import get_default_device
 
 
 class LikelihoodEstimator(NeuralInference, ABC):
     def __init__(
         self,
-        simulator: Callable,
         prior,
+        simulator: Callable,
         x_shape: Optional[torch.Size] = None,
-        density_estimator: Optional[nn.Module] = None,
-        simulation_batch_size: Optional[int] = 1,
-        retrain_from_scratch_each_round: bool = False,
-        summary_writer: Optional[SummaryWriter] = None,
-        device: Optional[torch.device] = None,
         num_workers: int = 1,
+        simulation_batch_size: int = 1,
+        density_estimator: Union[str, nn.Module] = "maf",
         mcmc_method: str = "slice_np",
         skip_input_checks: bool = False,
+        exclude_invalid_x: bool = True,
+        device: Union[torch.device, str] = get_default_device(),
+        logging_level: Union[int, str] = "WARNING",
+        summary_writer: Optional[SummaryWriter] = None,
         show_progressbar: bool = True,
         show_round_summary: bool = False,
-        logging_level: Union[int, str] = "warning",
-        exclude_invalid_x: bool = False,
     ):
-        r"""Sequential Neural Likelihood.
+        r"""Sequential Neural Likelihood [1].
 
-        Sequential Neural Likelihood: Fast Likelihood-free Inference with
-        Autoregressive Flows_ by Papamakarios et al., AISTATS 2019,
+        [1] Sequential Neural Likelihood: Fast Likelihood-free Inference with
+        Autoregressive Flows_, Papamakarios et al., AISTATS 2019,
         https://arxiv.org/abs/1805.07226
 
         Args:
-            density_estimator: Conditional density estimator $q(x|\theta)$, a nn.Module
-                with `.log_prob()` and `.sample()`
 
         See docstring of `NeuralInference` class for all other arguments.
         """
 
         super().__init__(
-            simulator=simulator,
             prior=prior,
+            simulator=simulator,
             x_shape=x_shape,
-            simulation_batch_size=simulation_batch_size,
-            retrain_from_scratch_each_round=retrain_from_scratch_each_round,
-            device=device,
-            summary_writer=summary_writer,
             num_workers=num_workers,
+            simulation_batch_size=simulation_batch_size,
             skip_input_checks=skip_input_checks,
+            exclude_invalid_x=exclude_invalid_x,
+            device=device,
+            logging_level=logging_level,
+            summary_writer=summary_writer,
             show_progressbar=show_progressbar,
             show_round_summary=show_round_summary,
-            logging_level=logging_level,
-            exclude_invalid_x=exclude_invalid_x,
         )
 
-        if density_estimator is None:
+        if isinstance(density_estimator, str):
             density_estimator = utils.likelihood_nn(
-                model="maf",
+                model=density_estimator,
                 theta_shape=self._prior.sample().shape,
                 x_o_shape=self._x_shape,
             )
 
         # Create neural posterior which can sample().
-        # TODO Notice use of `snle_a` used, so long as it is the sole descendant.´
+        # TODO Notice use of `snle_a`, OK so long as it is the sole descendant.
         self._posterior = NeuralPosterior(
             algorithm_family="snle_a",
             neural_net=density_estimator,
@@ -103,26 +100,9 @@ class LikelihoodEstimator(NeuralInference, ABC):
     ) -> NeuralPosterior:
         r"""Run SNLE.
 
-        This runs SNLE for `num_rounds` rounds, using num_simulations_per_round calls to
-        the simulator.
+        Return posterior $p(\theta|x)$ after inference (possibly over several rounds).
 
         Args:
-            num_rounds: Number of rounds to run.
-            num_simulations_per_round: Number of simulator calls per round.
-            x_o: When SNLE is used in a multi-round setting, training samples for every
-                round after the first round are drawn from the most recent posterior
-                estimate given $x_o$, i.e. $p(\theta|x_o)$.
-            batch_size: Size of batch to use for training.
-            learning_rate: Learning rate for Adam optimizer.
-            validation_fraction: The fraction of data to use for validation.
-            stop_after_epochs: The number of epochs to wait for improvement on the
-                validation set before terminating training.
-            max_num_epochs: Maximum number of epochs to run. If `max_num_epochs`
-                is reached, we stop training even if the validation loss is still
-                decreasing. If None, we train until validation loss increases (see
-                argument `stop_after_epochs`).
-            clip_max_norm: Value at which to clip the total gradient norm in order to
-                prevent exploding gradients. Use None for no clipping.
 
         Returns:
             Posterior $p(\theta|x_o)$ that can be sampled and evaluated.
@@ -137,7 +117,6 @@ class LikelihoodEstimator(NeuralInference, ABC):
 
         max_num_epochs = 2 ** 31 - 1 if max_num_epochs is None else max_num_epochs
 
-        #
         num_sims_per_round = self._ensure_list(num_simulations_per_round, num_rounds)
 
         for round_, num_sims in enumerate(num_sims_per_round):

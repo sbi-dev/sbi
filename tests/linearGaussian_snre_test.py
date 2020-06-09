@@ -40,9 +40,9 @@ def test_api_sre_on_linearGaussian(num_dim: int):
     prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
 
     infer = SRE(
-        simulator=diagonal_linear_gaussian,
         prior=prior,
-        classifier=None,  # Use default RESNET.
+        simulator=diagonal_linear_gaussian,
+        classifier="resnet",
         simulation_batch_size=50,
         mcmc_method="slice_np",
         show_progressbar=False,
@@ -93,9 +93,9 @@ def test_c2st_sre_on_linearGaussian_different_dims(set_seed):
     )
 
     infer = SRE(
-        simulator=simulator,
         prior=prior,
-        classifier=None,  # Use default RESNET.
+        simulator=simulator,
+        classifier="resnet",
         simulation_batch_size=50,
         show_progressbar=False,
     )
@@ -152,9 +152,9 @@ def test_c2st_sre_on_linearGaussian(
     simulator = lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     kwargs = dict(
-        simulator=simulator,
         prior=prior,
-        classifier=None,  # Use default RESNET.
+        simulator=simulator,
+        classifier="resnet",
         simulation_batch_size=50,
         mcmc_method="slice_np",
         show_progressbar=False,

@@ -1,5 +1,7 @@
-from sbi.utils.get_nn_models import classifier_nn, likelihood_nn, posterior_nn
-from sbi.utils.io import get_data_root, get_log_root, get_project_root, get_timestamp
+# flake8: noqa
+from sbi.utils.get_nn_models import classifier_nn, likelihood_nn
+from sbi.utils.get_nn_models import posterior_nn
+from sbi.utils.io import get_data_root, get_log_root, get_project_root
 from sbi.utils.metrics import biased_mmd, unbiased_mmd_squared, c2st
 from sbi.utils.plot import pairplot
 from sbi.utils.sbiutils import (

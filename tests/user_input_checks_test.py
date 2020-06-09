@@ -311,8 +311,8 @@ def test_inference_with_user_sbi_problems(
     """
 
     infer = SNPE_C(
-        simulator=user_simulator,
         prior=user_prior,
+        simulator=user_simulator,
         x_shape=user_x_shape,
         simulation_batch_size=1,
         show_progressbar=False,
@@ -426,8 +426,8 @@ def test_skip_input_checks(method):
 
     with pytest.warns(UserWarning):
         method(
-            diagonal_linear_gaussian,
-            Uniform(zeros(1), ones(1)),
-            zeros(1),
+            prior=Uniform(zeros(1), ones(1)),
+            simulator=diagonal_linear_gaussian,
+            x_shape=zeros(1),
             skip_input_checks=True,
         )

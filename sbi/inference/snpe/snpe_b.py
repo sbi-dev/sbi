@@ -6,58 +6,61 @@ from torch import Tensor, nn
 from torch.utils.tensorboard import SummaryWriter
 
 from sbi.inference.snpe.snpe_base import PosteriorEstimator
+from sbi.utils.torchutils import get_default_device
 
 
 class SNPE_B(PosteriorEstimator):
     def __init__(
         self,
-        simulator: Callable,
         prior,
+        simulator: Callable,
         x_shape: Optional[torch.Size] = None,
-        density_estimator: Optional[nn.Module] = None,
-        calibration_kernel: Optional[Callable] = None,
+        num_workers: int = 1,
+        simulation_batch_size: Optional[int] = 1,
+        density_estimator: Union[str, nn.Module] = "mdn",
         z_score_x: bool = True,
         z_score_min_std: float = 1e-7,
-        simulation_batch_size: Optional[int] = 1,
+        calibration_kernel: Optional[Callable] = None,
         retrain_from_scratch_each_round: bool = False,
         discard_prior_samples: bool = False,
-        summary_writer: Optional[SummaryWriter] = None,
-        num_workers: int = 1,
-        device: Optional[torch.device] = None,
         skip_input_checks: bool = False,
+        exclude_invalid_x: bool = True,
+        device: Union[torch.device, str] = get_default_device(),
+        logging_level: Union[int, str] = "WARNING",
+        summary_writer: Optional[SummaryWriter] = None,
         show_progressbar: bool = True,
         show_round_summary: bool = False,
-        logging_level: Union[int, str] = "warning",
     ):
-        r"""SNPE-B [1]
+        r"""SNPE-B [1]. CURRENTLY NOT IMPLEMENTED.
 
         [1] _Flexible statistical inference for mechanistic models of neural dynamics_,
-            Lueckmann et al., NeurIPS 2017, https://arxiv.org/abs/1711.01861.
+            Lueckmann, Gonçalves et al., NeurIPS 2017, https://arxiv.org/abs/1711.01861.
 
         See docstring of `PosteriorEstimator` class for all other arguments.
         """
 
         raise NotImplementedError(
-            "SNPE-B is not yet implemented in the sbi package," " see issue #199."
+            "SNPE-B is not yet implemented in the sbi package, see issue #199."
         )
 
         super().__init__(
-            simulator=simulator,
             prior=prior,
+            simulator=simulator,
             x_shape=x_shape,
+            num_workers=num_workers,
+            simulation_batch_size=simulation_batch_size,
             density_estimator=density_estimator,
-            calibration_kernel=calibration_kernel,
             z_score_x=z_score_x,
             z_score_min_std=z_score_min_std,
-            simulation_batch_size=simulation_batch_size,
+            calibration_kernel=calibration_kernel,
             retrain_from_scratch_each_round=retrain_from_scratch_each_round,
             discard_prior_samples=discard_prior_samples,
-            num_workers=num_workers,
-            device=device,
             skip_input_checks=skip_input_checks,
+            exclude_invalid_x=exclude_invalid_x,
+            device=device,
+            logging_level=logging_level,
             show_progressbar=show_progressbar,
             show_round_summary=show_round_summary,
-            logging_level=logging_level,
         )
 
     def _log_prob_proposal_posterior(

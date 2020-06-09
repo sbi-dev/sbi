@@ -1,80 +1,83 @@
 from __future__ import annotations
-
 from abc import ABC, abstractmethod
-
 from copy import deepcopy
-from sbi.utils.sbiutils import warn_on_invalid_x
-from sbi.utils import clamp_and_warn
 from typing import Callable, Dict, Optional, Union
 
 import numpy as np
 import torch
-from torch import Tensor, nn, optim, ones, eye
+from torch import Tensor, eye, nn, ones, optim
 from torch.nn.utils import clip_grad_norm_
-
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 
-import sbi.utils as utils
 from sbi.inference.base import NeuralInference
 from sbi.inference.posterior import NeuralPosterior
-from sbi.utils.torchutils import ensure_x_batched, ensure_theta_batched
-from sbi.types import ScalarFloat, OneOrMore
+from sbi.types import OneOrMore, ScalarFloat
+from sbi.utils import clamp_and_warn
 from sbi.utils import handle_invalid_x, warn_on_invalid_x
+import sbi.utils as utils
+from sbi.utils.torchutils import ensure_theta_batched, ensure_x_batched
+from sbi.utils.torchutils import get_default_device
 
 
 class RatioEstimator(NeuralInference, ABC):
     def __init__(
         self,
-        simulator: Callable,
         prior,
+        simulator: Callable,
         x_shape: Optional[torch.Size] = None,
-        classifier: Optional[nn.Module] = None,
-        simulation_batch_size: int = 1,
-        mcmc_method: str = "slice_np",
-        embedding_net: nn.Module = nn.Identity(),
-        retrain_from_scratch_each_round: bool = False,
         num_workers: int = 1,
-        summary_writer: Optional[SummaryWriter] = None,
-        device: Optional[torch.device] = None,
+        simulation_batch_size: int = 1,
+        embedding_net: nn.Module = nn.Identity(),
+        classifier: Union[str, nn.Module] = "resnet",
+        mcmc_method: str = "slice_np",
+        retrain_from_scratch_each_round: bool = False,
         skip_input_checks: bool = False,
+        exclude_invalid_x: bool = True,
+        device: Union[torch.device, str] = get_default_device(),
+        logging_level: Union[int, str] = "warning",
+        summary_writer: Optional[SummaryWriter] = None,
         show_progressbar: bool = True,
         show_round_summary: bool = False,
-        logging_level: Union[int, str] = "warning",
-        exclude_invalid_x: bool = False,
     ):
-        r"""Sequential Ratio Estimation [1].
+        r"""Sequential Neural Ratio Estimation.
 
-        Args:
-            classifier: Binary classifier.
-            retrain_from_scratch_each_round: Whether to retrain the conditional
-                density estimator for the posterior from scratch each round.
-            embedding_net: Optional network which may be used to produce feature
-                vectors f(x) for high-dimensional simulation outputs $x$.
+        We implement two algorithms in the respective subclasses.
+
+        - SNRE_A / AALR is limited to `num_atoms=2`, but allows for density evaluation
+          when training for one round.
+        - SNRE_B / SRE can use more than two atoms, potentially boosting performance,
+          but allows for posterior evaluation **only up to a normalizing constant, even when training only one round.
+
+        Args: 
+            classifier: Binary classifier network.
+            retrain_from_scratch_each_round: Whether to retrain the classifier from 
+                scratch each round.
+            embedding_net: A trainable network that maps high-dimensional simulation
+                outputs $x$ to klower-dimensional feature vectors $f(x)$ to feed the classifier.
 
         See docstring of `NeuralInference` class for all other arguments.
         """
 
         super().__init__(
-            simulator=simulator,
             prior=prior,
+            simulator=simulator,
             x_shape=x_shape,
-            simulation_batch_size=simulation_batch_size,
-            retrain_from_scratch_each_round=retrain_from_scratch_each_round,
-            device=device,
-            summary_writer=summary_writer,
             num_workers=num_workers,
+            simulation_batch_size=simulation_batch_size,
             skip_input_checks=skip_input_checks,
+            exclude_invalid_x=exclude_invalid_x,
+            device=device,
+            logging_level=logging_level,
+            summary_writer=summary_writer,
             show_progressbar=show_progressbar,
             show_round_summary=show_round_summary,
-            logging_level=logging_level,
-            exclude_invalid_x=exclude_invalid_x,
         )
 
-        if classifier is None:
+        if isinstance(classifier, str):
             classifier = utils.classifier_nn(
-                model="resnet",
+                model=classifier,
                 theta_shape=self._prior.sample().shape,
                 x_o_shape=self._x_shape,
             )
@@ -93,9 +96,14 @@ class RatioEstimator(NeuralInference, ABC):
 
         self._posterior.net.train(True)
 
-        # We may want to summarize high-dimensional x.
-        # This may be either a fixed or learned transformation.
-        self._summary_net = embedding_net
+        self._embedding_net = embedding_net
+
+        # If we're retraining from scratch each round,
+        # keep a copy of the original untrained model for reinitialization.
+        if self._retrain_from_scratch_each_round:
+            self._untrained_classifier = deepcopy(classifier)
+        else:
+            self._untrained_classifier = None
 
         # Ratio-based-specific summary_writer fields.
         self._summary.update({"mcmc_times": []})  # type: ignore
@@ -113,31 +121,15 @@ class RatioEstimator(NeuralInference, ABC):
         max_num_epochs: Optional[int] = None,
         clip_max_norm: Optional[float] = 5.0,
     ) -> NeuralPosterior:
-        """Run SRE
+        """Run SNRE.
 
-        This runs SRE for num_rounds rounds, using num_simulations_per_round calls to
-        the simulator
+        Return posterior $p(\theta|x)$ after inference (possibly over several rounds).
 
-        Args:
-            num_rounds: Number of rounds to run
-            num_simulations_per_round: Number of simulator calls per round
-            x_o: When SRE is used in a multi-round setting, training samples for every
-                round after the first round are drawn from the most recent posterior
-                estimate given $x_o$, i.e. $p(\theta|x_o)$.
+        Args: 
             num_atoms: Number of atoms to use for classification.
-            batch_size: Size of batch to use for training.
-            learning_rate: Learning rate for Adam optimizer.
-            validation_fraction: The fraction of data to use for validation.
-            stop_after_epochs: The number of epochs to wait for improvement on the
-                validation set before terminating training.
-            max_num_epochs: Maximum number of epochs to run. If max_num_epochs
-                is reached, we stop training even if the validation loss is still
-                decreasing.
-            clip_max_norm: Value at which to clip the total gradient norm in order to
-                prevent exploding gradients. Use None for no clipping.
 
         Returns:
-            Posterior that can be sampled and evaluated.
+            Posterior $p(\theta|x)$ that can be sampled and evaluated.
         """
 
         self._handle_x_o_wrt_amortization(x_o, num_rounds)
@@ -197,6 +189,7 @@ class RatioEstimator(NeuralInference, ABC):
             )
 
         self._posterior._num_trained_rounds = num_rounds
+
         return self._posterior
 
     def _train(
@@ -260,7 +253,7 @@ class RatioEstimator(NeuralInference, ABC):
 
         optimizer = optim.Adam(
             list(self._posterior.net.parameters())
-            + list(self._summary_net.parameters()),
+            + list(self._embedding_net.parameters()),
             lr=learning_rate,
         )
 
