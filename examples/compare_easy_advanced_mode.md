@@ -39,3 +39,11 @@ amortized_post = parameters(simulator, prior, num_simulations=1000, method='SNPE
 # multi-round (open to having defaults for rounds and method)
 focused_post = parameters(simulator, prior, focus_on=x_o, rounds=3, num_simulations = 1000, method='SNPE')
 ```
+### Coding details
+The `parameters` function handles
+* consistency checking and sanitization (`prepare_sbi_problem`)
+* lookup of neural network if passed, use of a default if not.
+* instantiation of desired algorithm class.
+* training call right after.
+
+*Note*: all kwargs provided to `parameters` are routed to the respective functions, i.e. `num_atoms` would be passed to `SNPE` at train time, if provided. 
