@@ -12,7 +12,7 @@ from sbi.simulators.simutils import simulate_in_batches
 from sbi.user_input.user_input_checks import prepare_sbi_problem
 from sbi.utils import get_log_root, get_timestamp
 from sbi.utils.torchutils import get_default_device
-from sbi.utils.plot.plot import samples_nd
+from sbi.utils.plot import pairplot
 from sbi.user_input.user_input_checks import process_x_o
 
 
@@ -259,7 +259,7 @@ class NeuralInference(ABC):
         # XXX: need more plotting kwargs, e.g., prior limits.
         parameters = theta_bank[-1]
 
-        figure, axes = samples_nd(parameters.numpy())
+        figure, axes = pairplot(parameters.numpy())
 
         self._summary_writer.add_figure(
             tag="posterior_samples", figure=figure, global_step=round_ + 1
