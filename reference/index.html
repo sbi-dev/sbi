@@ -578,8 +578,7 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>13
-14
+<pre><span></span>14
 15
 16
 17
@@ -637,7 +636,8 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 69
 70
 71
-72</pre>
+72
+73</pre>
 </div>
 </td>
 <td class="code">
@@ -732,7 +732,7 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <div class="doc doc-object doc-function">
 <h3 class="doc doc-heading" id="sbi.utils.get_nn_models.posterior_nn">
 <code class="highlight language-python">
-sbi.utils.get_nn_models.posterior_nn<span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">prior_mean</span><span class="p">,</span> <span class="n">prior_std</span><span class="p">,</span> <span class="n">x_o_shape</span><span class="p">,</span> <span class="n">embedding</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">hidden_features</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">mdn_num_components</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">made_num_mixture_components</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">made_num_blocks</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">flow_num_transforms</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span> </code>
+sbi.utils.get_nn_models.posterior_nn<span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">prior_mean</span><span class="p">,</span> <span class="n">prior_std</span><span class="p">,</span> <span class="n">x_o_shape</span><span class="p">,</span> <span class="n">embedding</span><span class="o">=</span><span class="n">Identity</span><span class="p">(),</span> <span class="n">hidden_features</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">mdn_num_components</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">made_num_mixture_components</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">made_num_blocks</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">flow_num_transforms</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span> </code>
 <a class="headerlink" href="#sbi.utils.get_nn_models.posterior_nn" title="Permanent link">¶</a></h3>
 <div class="doc doc-contents first">
 <p>Neural posterior density estimator</p>
@@ -781,11 +781,11 @@ sbi.utils.get_nn_models.posterior_nn<span class="p">(</span><span class="n">mode
 </tr>
 <tr>
 <td><code>embedding</code></td>
-<td><code>Optional[nn.Module]</code></td>
+<td><code>nn.Module</code></td>
 <td>
 <p>Embedding network</p>
 </td>
-<td><code>None</code></td>
+<td><code>Identity()</code></td>
 </tr>
 <tr>
 <td><code>hidden_features</code></td>
@@ -1014,7 +1014,7 @@ sbi.utils.get_nn_models.posterior_nn<span class="p">(</span><span class="n">mode
     <span class="n">prior_mean</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
     <span class="n">prior_std</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
     <span class="n">x_o_shape</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">,</span>
-    <span class="n">embedding</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">embedding</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Identity</span><span class="p">(),</span>
     <span class="n">hidden_features</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">50</span><span class="p">,</span>
     <span class="n">mdn_num_components</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">20</span><span class="p">,</span>
     <span class="n">made_num_mixture_components</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
