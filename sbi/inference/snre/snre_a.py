@@ -37,6 +37,13 @@ class SNRE_A(RatioEstimator):
         return super().__call__(**kwargs, num_atoms=2)
 
     def _loss(self, theta: Tensor, x: Tensor, num_atoms: int) -> Tensor:
+        """
+        Returns the binary cross-entropy loss for the trained classifier.
+
+        The classifier takes as input a $(\theta,x)$ pair. It is trained to predict 1
+        if the pair was sampled from the joint $p(\theta,x)$, and to predict 0 if the
+        pair was sampled from the marginals $p(\theta)p(x)$.
+        """
 
         assert theta.shape[0] == x.shape[0], "Batch sizes for theta and x must match."
         batch_size = theta.shape[0]
