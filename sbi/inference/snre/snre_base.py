@@ -3,6 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 
 from copy import deepcopy
+from sbi.utils.sbiutils import warn_on_invalid_x
 from sbi.utils import clamp_and_warn
 from typing import Callable, Dict, Optional, Union
 
@@ -20,6 +21,7 @@ from sbi.inference.base import NeuralInference
 from sbi.inference.posterior import NeuralPosterior
 from sbi.utils.torchutils import ensure_x_batched, ensure_theta_batched
 from sbi.types import ScalarFloat, OneOrMore
+from sbi.utils import handle_invalid_x, warn_on_invalid_x
 
 
 class RatioEstimator(NeuralInference, ABC):
@@ -41,6 +43,7 @@ class RatioEstimator(NeuralInference, ABC):
         show_progressbar: bool = True,
         show_round_summary: bool = False,
         logging_level: Union[int, str] = "warning",
+        exclude_invalid_x: bool = False,
     ):
         r"""Sequential Ratio Estimation [1]
 
@@ -74,6 +77,7 @@ class RatioEstimator(NeuralInference, ABC):
             show_progressbar=show_progressbar,
             show_round_summary=show_round_summary,
             logging_level=logging_level,
+            exclude_invalid_x=exclude_invalid_x,
         )
 
         if classifier is None:
@@ -175,9 +179,13 @@ class RatioEstimator(NeuralInference, ABC):
             # therefore return a theta vector with the same ordering as x.
             theta, x = self._batched_simulator(theta)
 
+            # Check for NaNs in simulations.
+            is_valid_x, num_nans, num_infs = handle_invalid_x(x, self.exclude_invalid_x)
+            warn_on_invalid_x(num_nans, num_infs, self.exclude_invalid_x)
+
             # Store (theta, x) pairs.
-            self._theta_bank.append(theta)
-            self._x_bank.append(x)
+            self._theta_bank.append(theta[is_valid_x])
+            self._x_bank.append(x[is_valid_x])
 
             # Fit posterior using newly aggregated data set.
             self._train(
@@ -283,7 +291,7 @@ class RatioEstimator(NeuralInference, ABC):
             self._posterior.net.train()
             for theta_batch, x_batch in train_loader:
                 optimizer.zero_grad()
-                loss = self._loss(theta_batch, x_batch, clipped_batch_size, num_atoms)
+                loss = self._loss(theta_batch, x_batch, num_atoms)
                 loss.backward()
                 if clip_max_norm is not None:
                     clip_grad_norm_(
@@ -298,9 +306,7 @@ class RatioEstimator(NeuralInference, ABC):
             log_prob_sum = 0
             with torch.no_grad():
                 for theta_batch, x_batch in val_loader:
-                    log_prob = self._loss(
-                        theta_batch, x_batch, clipped_batch_size, num_atoms
-                    )
+                    log_prob = self._loss(theta_batch, x_batch, num_atoms)
                     log_prob_sum -= log_prob.sum().item()
                 self._val_log_prob = log_prob_sum / num_validation_examples
 
@@ -312,28 +318,23 @@ class RatioEstimator(NeuralInference, ABC):
         self._summary["epochs"].append(epoch)
         self._summary["best_validation_log_probs"].append(self._best_val_log_prob)
 
-    def _classifier_logits(
-        self, theta: Tensor, x: Tensor, clipped_batch_size: int, num_atoms: int
-    ) -> Tensor:
+    def _classifier_logits(self, theta: Tensor, x: Tensor, num_atoms: int) -> Tensor:
         """Return logits obtained through classifier forward pass.
 
         The logits are obtained from atomic sets of (theta,x) pairs.
         """
-
+        batch_size = theta.shape[0]
         repeated_x = utils.repeat_rows(x, num_atoms)
 
         # Choose `1` or `num_atoms - 1` thetas from the rest of the batch for each x.
-        probs = (
-            ones(clipped_batch_size, clipped_batch_size)
-            * (1 - eye(clipped_batch_size))
-            / (clipped_batch_size - 1)
-        )
+        probs = ones(batch_size, batch_size) * (1 - eye(batch_size)) / (batch_size - 1)
 
         choices = torch.multinomial(probs, num_samples=num_atoms - 1, replacement=False)
+
         contrasting_theta = theta[choices]
 
         atomic_theta = torch.cat((theta[:, None, :], contrasting_theta), dim=1).reshape(
-            clipped_batch_size * num_atoms, -1
+            batch_size * num_atoms, -1
         )
 
         theta_and_x = torch.cat((atomic_theta, repeated_x), dim=1)

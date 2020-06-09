@@ -14,6 +14,7 @@ from sbi.inference.posterior import NeuralPosterior
 from sbi.inference import NeuralInference
 from sbi.types import ScalarFloat, OneOrMore
 import sbi.utils as utils
+from sbi.utils import handle_invalid_x, warn_on_invalid_x
 
 
 class LikelihoodEstimator(NeuralInference, ABC):
@@ -33,6 +34,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         show_progressbar: bool = True,
         show_round_summary: bool = False,
         logging_level: Union[int, str] = "warning",
+        exclude_invalid_x: bool = False,
     ):
         r"""Sequential Neural Likelihood.
 
@@ -60,6 +62,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
             show_progressbar=show_progressbar,
             show_round_summary=show_round_summary,
             logging_level=logging_level,
+            exclude_invalid_x=exclude_invalid_x,
         )
 
         if density_estimator is None:
@@ -147,9 +150,14 @@ class LikelihoodEstimator(NeuralInference, ABC):
             # not necessarily have the same order as the theta we define above. We
             # therefore return a theta vector with the same ordering as x.
             theta, x = self._batched_simulator(theta)
+
+            # Check for NaNs in simulations.
+            is_valid_x, num_nans, num_infs = handle_invalid_x(x, self.exclude_invalid_x)
+            warn_on_invalid_x(num_nans, num_infs, self.exclude_invalid_x)
+
             # Store (theta, x) pairs.
-            self._theta_bank.append(theta)
-            self._x_bank.append(x)
+            self._theta_bank.append(theta[is_valid_x])
+            self._x_bank.append(x[is_valid_x])
 
             # Fit neural likelihood to newly aggregated dataset.
             self._train(
