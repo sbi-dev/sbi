@@ -48,13 +48,11 @@ class RatioEstimator(NeuralInference, ABC):
         - SNRE_A / AALR is limited to `num_atoms=2`, but allows for density evaluation
           when training for one round.
         - SNRE_B / SRE can use more than two atoms, potentially boosting performance,
-          but allows for posterior evaluation **only up to a normalizing constant, even
-          when training only one round.
+          but allows for posterior evaluation **only up to a normalizing constant**,
+          even when training only one round.
 
         Args:
             classifier: Binary classifier network.
-            retrain_from_scratch_each_round: Whether to retrain the classifier from
-                scratch each round.
             embedding_net: A trainable network that maps high-dimensional simulation
                 outputs $x$ to klower-dimensional feature vectors $f(x)$ to feed the
                 classifier.

@@ -52,8 +52,6 @@ class PosteriorEstimator(NeuralInference, ABC):
             nearly so.
         calibration_kernel: A function to calibrate the loss with respect to the
             simulations `x`. See Lueckmann, Gonçalves et al., NeurIPS 2017.
-        retrain_from_scratch_each_round: Whether to retrain the conditional
-            density estimator for the posterior from scratch each round.
         discard_prior_samples: Whether to discard samples simulated in round 1, i.e.
             from the prior. Training may be sped up by ignoring such less targeted
             samples.

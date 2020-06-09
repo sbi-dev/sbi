@@ -10,11 +10,62 @@ from torch import Tensor
 from torch.utils.tensorboard import SummaryWriter
 
 from sbi.simulators.simutils import simulate_in_batches
-from sbi.user_input.user_input_checks import prepare_sbi_problem
 from sbi.user_input.user_input_checks import process_x_o
 from sbi.utils import get_log_root
 from sbi.utils.plot import pairplot
 from sbi.utils.torchutils import get_default_device
+
+from typing import Callable
+from sbi.user_input.user_input_checks import prepare_sbi_problem
+import sbi.inference
+
+
+def infer(
+    method: str, prior, simulator: Callable, num_simulations: int, num_workers: int = 1
+):
+    """
+    Return posterior distribution by running simulation-based inference.
+
+    This function provides a simple interface to run sbi. Inference is run for a single
+    round and hence the returned posterior $p(\theta|x)$ can be sampled and evaluated
+    for any $x$ (i.e. it is amortized).
+
+    The scope of this function is limited to the most essential features of sbi. For
+    more flexibility (e.g. multi-round inference, different density estimators, ...)
+    please use the flexible interface described here:
+    mackelab.org/sbi/tutorial/03_flexible_interface.html
+
+    Args:
+        method: What inference algorithm to use. Either of ['SNPE'|'SNLE'|'SNRE'].
+        simulator: A function that takes parameters $\theta$ and maps them to
+            simulations, or observations, `x`, $\mathrm{sim}(\theta)\to x$. Any
+            regular Python callable (i.e. function or class with `__call__` method)
+            can be used.
+        prior: A probability distribution that expresses prior knowledge about the
+            parameters, e.g. which ranges are meaningful for them. Any
+            object with `.log_prob()`and `.sample()` (for example, a PyTorch
+            distribution) can be used.
+        num_simulations: Number of simulation calls. More simulations means a longer
+            runtime, but a better posterior estimate.
+        num_workers: Number of parallel workers to use for simulations.
+
+    Returns: Posterior over parameters conditional on observations (amortized).
+    """
+
+    try:
+        method = getattr(sbi.inference, method.upper())
+    except AttributeError:
+        raise NameError(
+            "Method not available. `method` must be one of 'SNPE', 'SNLE', 'SNRE'."
+        )
+
+    # sanitize inputs
+    prior, simulator, x_shape = prepare_sbi_problem(simulator, prior, None)
+
+    infer_ = method(prior, simulator, x_shape=x_shape, num_workers=num_workers)
+    posterior = infer_(num_rounds=1, num_simulations_per_round=num_simulations)
+
+    return posterior
 
 
 class NeuralInference(ABC):
@@ -56,6 +107,8 @@ class NeuralInference(ABC):
                 maps to data x at once. If None, we simulate all parameter sets at the
                 same time. If >= 1, the simulator has to process data of shape
                 (simulation_batch_size, parameter_dimension).
+            retrain_from_scratch_each_round: Whether to retrain the conditional density
+                estimator for the posterior from scratch each round.
             skip_input_checks: Whether to disable input checks. This saves simulation
                 time because they test-run the simulator to ensure it's correct.
             device: torch device on which to compute, e.g. 'cuda', 'cpu'.
