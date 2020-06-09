@@ -1,5 +1,5 @@
 from typing import List, Type  # noqa: F401
-from sbi.inference.base import NeuralInference  # noqa: F401
+from sbi.inference.base import NeuralInference, infer  # noqa: F401
 
 from sbi.inference.snle.snle_a import SNLE_A
 
