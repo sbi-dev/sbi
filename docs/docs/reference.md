@@ -14,7 +14,7 @@
     rendering:
       show_root_heading: true
 
-::: sbi.inference.snle.snle_base.SNLE
+::: sbi.inference.snle.snle_a.SNLE_A
     rendering:
       show_root_heading: true
 
@@ -22,7 +22,7 @@
     rendering:
       show_root_heading: true
 
-::: sbi.inference.snre.snre_a.SNRE_B
+::: sbi.inference.snre.snre_b.SNRE_B
     rendering:
       show_root_heading: true
 

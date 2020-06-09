@@ -34,8 +34,7 @@ def posterior_nn(
     Args:
         model: Model, one of maf / mdn / made / nsf
         prior: Prior distribution.
-        x_o_numel: Number of elements in the a single observation.
-            Used as input size to the NN.
+        x_o_shape: Shape of a single observation. Used as input size to the NN.
         embedding: Embedding network
         hidden_features: For all, number of hidden features
         mdn_num_components: For MDNs only, number of components
