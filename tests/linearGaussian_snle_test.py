@@ -43,9 +43,8 @@ def test_api_snl_on_linearGaussian(num_dim: int, set_seed):
     prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
 
     infer = SNL(
-        simulator=diagonal_linear_gaussian,
         prior=prior,
-        density_estimator=None,  # Use default MAF.
+        simulator=diagonal_linear_gaussian,
         simulation_batch_size=50,
         mcmc_method="slice_np",
         show_progressbar=False,
@@ -95,9 +94,8 @@ def test_c2st_snl_on_linearGaussian_different_dims(set_seed):
     )
 
     infer = SNL(
-        simulator=simulator,
         prior=prior,
-        density_estimator=None,  # Use default MAF.
+        simulator=simulator,
         simulation_batch_size=50,
         mcmc_method="slice_np",
         show_progressbar=False,
@@ -146,9 +144,8 @@ def test_c2st_snl_on_linearGaussian(num_dim: int, prior_str: str, set_seed):
     simulator = lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     infer = SNL(
-        simulator=simulator,
         prior=prior,
-        density_estimator=None,  # Use default MAF.
+        simulator=simulator,
         mcmc_method="slice_np",
         show_progressbar=False,
     )
@@ -197,9 +194,8 @@ def test_c2st_multi_round_snl_on_linearGaussian(set_seed):
     simulator = lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     infer = SNL(
-        simulator=simulator,
         prior=prior,
-        density_estimator=None,  # Use default MAF.
+        simulator=simulator,
         simulation_batch_size=50,
         mcmc_method="slice",
         show_progressbar=False,
@@ -236,9 +232,8 @@ def test_api_snl_sampling_methods(mcmc_method: str, prior_str: str, set_seed):
         prior = utils.BoxUniform(-1.0 * ones(num_dim), ones(num_dim))
 
     infer = SNL(
-        simulator=diagonal_linear_gaussian,
         prior=prior,
-        density_estimator=None,  # Use default MAF.
+        simulator=diagonal_linear_gaussian,
         simulation_batch_size=50,
         mcmc_method="slice_np",
         show_progressbar=False,

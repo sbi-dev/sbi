@@ -63,7 +63,6 @@ def test_c2st_snpe_on_linearGaussian(
 
     infer = SNPE_C(
         simulator=simulator,
-        density_estimator=None,  # Use default MAF.
         prior=prior,
         z_score_x=True,
         simulation_batch_size=10,
@@ -157,9 +156,9 @@ def test_c2st_snpe_on_linearGaussian_different_dims(set_seed):
     )
 
     snpe_common_args = dict(
-        simulator=simulator,
-        density_estimator=None,  # Use default MAF.
         prior=prior,
+        simulator=simulator,
+        density_estimator="maf",
         z_score_x=True,
         simulation_batch_size=1,
         retrain_from_scratch_each_round=False,
@@ -217,7 +216,7 @@ def test_c2st_multi_round_snpe_on_linearGaussian(algorithm_str: str, set_seed):
 
     creation_args = dict(
         simulator=simulator,
-        density_estimator=None,  # Use default MAF.
+        density_estimator="maf",
         prior=prior,
         z_score_x=True,
         retrain_from_scratch_each_round=False,
@@ -287,7 +286,7 @@ def test_multi_round_snpe_deterministic_simulator(set_seed, z_score_min_std):
 
     infer = SNPE_C(
         simulator=deterministic_simulator,
-        density_estimator=None,  # Use default MAF.
+        density_estimator="maf",
         prior=prior,
         z_score_x=True,
         retrain_from_scratch_each_round=False,
@@ -339,7 +338,7 @@ def test_api_snpe_c_posterior_correction(
 
     infer = SNPE_C(
         simulator=simulator,
-        density_estimator=None,  # Use default MAF.
+        density_estimator="maf",
         prior=prior,
         z_score_x=True,
         simulation_batch_size=50,

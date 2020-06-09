@@ -1,11 +1,11 @@
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Callable, Optional, Tuple, Dict, Union
-import warnings
+from typing import Callable, Dict, Optional, Tuple, Union, cast
+from warnings import warn
 
 import numpy as np
 import torch
-from torch import Tensor, nn, optim, zeros, ones
+from torch import Tensor, nn, ones, optim, zeros
 from torch.nn.utils import clip_grad_norm_
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
@@ -13,85 +13,84 @@ from torch.utils.tensorboard import SummaryWriter
 
 from sbi.inference import NeuralInference
 from sbi.inference.posterior import NeuralPosterior
-from sbi.types import ScalarFloat, OneOrMore
+from sbi.types import OneOrMore, ScalarFloat
 import sbi.utils as utils
 from sbi.utils import Standardize, handle_invalid_x, warn_on_invalid_x
+from sbi.utils.torchutils import get_default_device
 
 
 class PosteriorEstimator(NeuralInference, ABC):
     def __init__(
         self,
-        simulator: Callable,
         prior,
+        simulator: Callable,
         x_shape: Optional[torch.Size] = None,
-        density_estimator: Optional[nn.Module] = None,
-        calibration_kernel: Optional[Callable] = None,
+        num_workers: int = 1,
+        simulation_batch_size: int = 1,
+        density_estimator: Union[str, nn.Module] = "maf",
         z_score_x: bool = True,
         z_score_min_std: float = 1e-7,
-        simulation_batch_size: Optional[int] = 1,
-        retrain_from_scratch_each_round: bool = False,
-        discard_prior_samples: bool = False,
-        device: Optional[torch.device] = None,
         sample_with_mcmc: bool = False,
         mcmc_method: str = "slice_np",
-        num_workers: int = 1,
-        summary_writer: Optional[SummaryWriter] = None,
+        calibration_kernel: Optional[Callable] = None,
+        retrain_from_scratch_each_round: bool = False,
+        discard_prior_samples: bool = False,
         skip_input_checks: bool = False,
+        exclude_invalid_x: bool = True,
+        device: Union[torch.device, str] = get_default_device(),
+        logging_level: Union[int, str] = "WARNING",
+        summary_writer: Optional[SummaryWriter] = None,
         show_progressbar: bool = True,
         show_round_summary: bool = False,
-        logging_level: Union[int, str] = "warning",
-        exclude_invalid_x: bool = False,
     ):
         """ Base class for Sequential Neural Posterior Estimation algorithms.
 
-        Args:
-            density_estimator: Neural density estimator.
-            calibration_kernel: A function to calibrate the data x.
-            z_score_x: Whether to z-score the data features x, default True.
-            z_score_min_std: Minimum value of the standard deviation to use when
-                standardizing inputs. This is typically needed when some simulator
-                outputs are deterministic or nearly so.
-            retrain_from_scratch_each_round: Whether to retrain the conditional
-                density estimator for the posterior from scratch each round.
-            discard_prior_samples: Whether to discard samples simulated in round 1, i.e.
-                from the prior. Training may be sped up by ignoring such less targeted
-                samples.
+        density_estimator: Density estimator that can `.log_prob()` and `.sample()`.
+        z_score_x: Whether to z-score simulations `x`.
+        z_score_min_std: Minimum value of the standard deviation to use when z-scoring
+            `x`. This is typically needed when some simulator outputs are constant or
+            nearly so.
+        calibration_kernel: A function to calibrate the loss with respect to the
+            simulations `x`. See Lueckmann, Gonçalves et al., NeurIPS 2017.
+        retrain_from_scratch_each_round: Whether to retrain the conditional
+            density estimator for the posterior from scratch each round.
+        discard_prior_samples: Whether to discard samples simulated in round 1, i.e.
+            from the prior. Training may be sped up by ignoring such less targeted
+            samples.
 
         See docstring of `NeuralInference` class for all other arguments.
         """
 
         super().__init__(
-            simulator=simulator,
             prior=prior,
+            simulator=simulator,
             x_shape=x_shape,
-            simulation_batch_size=simulation_batch_size,
-            retrain_from_scratch_each_round=retrain_from_scratch_each_round,
-            device=device,
-            summary_writer=summary_writer,
+            exclude_invalid_x=exclude_invalid_x,
             num_workers=num_workers,
+            simulation_batch_size=simulation_batch_size,
             skip_input_checks=skip_input_checks,
+            device=device,
+            logging_level=logging_level,
+            summary_writer=summary_writer,
             show_progressbar=show_progressbar,
             show_round_summary=show_round_summary,
-            logging_level=logging_level,
-            exclude_invalid_x=exclude_invalid_x,
         )
 
-        if density_estimator is None:
+        if isinstance(density_estimator, str):
             density_estimator = utils.posterior_nn(
-                model="maf",
+                model=density_estimator,
                 prior_mean=self._prior.mean,
                 prior_std=self._prior.stddev,
                 x_o_shape=self._x_shape,
             )
 
-        # Calibration kernels proposed in Lueckmann, Goncalves et al 2017.
+        # Calibration kernels proposed in Lueckmann, Gonçalves et al., 2017.
         if calibration_kernel is None:
             self.calibration_kernel = lambda x: ones([len(x)])
         else:
             self.calibration_kernel = calibration_kernel
 
         self._z_score_x, self._z_score_min_std = z_score_x, z_score_min_std
-        self._retrain_from_scratch_each_round = retrain_from_scratch_each_round
         self._discard_prior_samples = discard_prior_samples
         self._warn_if_retrain_from_scratch_snpe()
 
@@ -127,27 +126,31 @@ class PosteriorEstimator(NeuralInference, ABC):
         max_num_epochs: Optional[int] = None,
         clip_max_norm: Optional[float] = 5.0,
     ) -> NeuralPosterior:
-        r"""Run SNPE
+        r"""Run SNPE.
 
         Return posterior $p(\theta|x)$ after inference (possibly over several rounds).
 
         Args:
-            num_rounds: Number of rounds to run. `num_rounds=1` leads to an amortized
-                posterior $p(theta|x)$ for any $x$, whereas `num_rounds>1` gives a ]
-                posterior focused on a specific observation $x_o$, $p(theta|x_o)$
+            num_rounds: Number of rounds to run. Each round consists of a simulation and
+                training phase. `num_rounds=1` leads to a posterior $p(\theta|x)$ valid
+                for _any_ $x$ ("amortized"), but requires many simulations.
+                Alternatively, with `num_rounds>1` the inference returns a posterior
+                $p(\theta|x_o)$ focused on a specific observation `x_o`, potentially
+                requiring less simulations.
             num_simulations_per_round: Number of simulator calls per round.
-            x_o: When SNPE is used in a multi-round setting, training samples for every
-                round after the first round are drawn from the most recent posterior
-                estimate given $x_o$, i.e. $p(\theta|x_o)$.
-            batch_size: Size of batch to use for training.
+            x_o: An observation that is only required when doing inference
+                over multiple rounds. After the first round, `x_o` is used to guide the
+                sampling so that the simulator is run with parameters that are likely
+                for that `x_o`, i.e. they are sampled from the posterior obtained in the
+                previous round $p(\theta|x_o)$.
+            batch_size: Training batch size.
             learning_rate: Learning rate for Adam optimizer.
             validation_fraction: The fraction of data to use for validation.
             stop_after_epochs: The number of epochs to wait for improvement on the
                 validation set before terminating training.
-            max_num_epochs: Maximum number of epochs to run. If max_num_epochs
-                is reached, we stop training even if the validation loss is still
-                decreasing. If None, we train until validation loss increases (see
-                argument stop_after_epochs).
+            max_num_epochs: Maximum number of epochs to run. If reached, we stop 
+                training even when the validation loss is still decreasing. If None, we
+                train until validation loss increases (see also `stop_after_epochs`).
             clip_max_norm: Value at which to clip the total gradient norm in order to
                 prevent exploding gradients. Use None for no clipping.
 
@@ -182,7 +185,7 @@ class PosteriorEstimator(NeuralInference, ABC):
                 learning_rate=learning_rate,
                 validation_fraction=validation_fraction,
                 stop_after_epochs=stop_after_epochs,
-                max_num_epochs=max_num_epochs,
+                max_num_epochs=cast(int, max_num_epochs),
                 clip_max_norm=clip_max_norm,
             )
 
@@ -444,7 +447,7 @@ class PosteriorEstimator(NeuralInference, ABC):
 
     def _warn_if_retrain_from_scratch_snpe(self):
         if self._retrain_from_scratch_each_round:
-            warnings.warn(
+            warn(
                 "You specified `retrain_from_scratch_each_round=True`. For "
                 "SNPE, we have experienced very poor performance in this "
                 "scenario and we therefore strongly recommend "
