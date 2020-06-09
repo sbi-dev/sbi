@@ -43,6 +43,7 @@ setup(
             "pyyaml",
             "torchtestcase",
             "scikit-learn",
+            "twine",
         ]
     },
     dependency_links=[],
