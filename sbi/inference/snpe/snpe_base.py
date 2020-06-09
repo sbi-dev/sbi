@@ -14,7 +14,7 @@ from sbi.inference import NeuralInference
 from sbi.inference.posterior import NeuralPosterior
 from sbi.types import ScalarFloat, OneOrMore
 import sbi.utils as utils
-from sbi.utils import Standardize, handle_invalid_x, warn_on_invalid_x
+from sbi.utils import Standardize
 
 
 class PosteriorEstimator(NeuralInference, ABC):
@@ -40,7 +40,6 @@ class PosteriorEstimator(NeuralInference, ABC):
         show_progressbar: bool = True,
         show_round_summary: bool = False,
         logging_level: Union[int, str] = "warning",
-        exclude_invalid_x: bool = False,
     ):
         """ Base class for Sequential Neural Posterior Estimation algorithms.
 
@@ -73,7 +72,6 @@ class PosteriorEstimator(NeuralInference, ABC):
             show_progressbar=show_progressbar,
             show_round_summary=show_round_summary,
             logging_level=logging_level,
-            exclude_invalid_x=exclude_invalid_x,
         )
 
         if density_estimator is None:
@@ -164,15 +162,10 @@ class PosteriorEstimator(NeuralInference, ABC):
 
             # Run simulations for the round.
             theta, x, prior_mask = self._run_simulations(round_, num_sims)
-
-            # Check for NaNs in simulations.
-            is_valid_x, num_nans, num_infs = handle_invalid_x(x, self.exclude_invalid_x)
-            warn_on_invalid_x(num_nans, num_infs, self.exclude_invalid_x)
-
             # XXX Rename bank -> rounds/roundwise.
-            self._theta_bank.append(theta[is_valid_x])
-            self._x_bank.append(x[is_valid_x])
-            self._prior_masks.append(prior_mask[is_valid_x])
+            self._theta_bank.append(theta)
+            self._x_bank.append(x)
+            self._prior_masks.append(prior_mask)
 
             # Fit posterior using newly aggregated data set.
             self._train(
@@ -287,14 +280,12 @@ class PosteriorEstimator(NeuralInference, ABC):
     def _z_score_embedding(self, x: Tensor) -> nn.Module:
         """Return embedding net with a standardizing step preprended."""
 
+        # XXX Mouthful, rename self.posterior.nn
         embed_nn = self._posterior.net._embedding_net
 
-        # Maybe exclude NaNs and infs from zscoring.
-        # No warning on invalid x here because warning will occur in __call__.
-        is_valid_x, *_ = handle_invalid_x(x, self.exclude_invalid_x)
-        x_std = torch.std(x[is_valid_x], dim=0)
+        x_std = torch.std(x, dim=0)
         x_std[x_std == 0] = self._z_score_min_std
-        preprocess = Standardize(torch.mean(x[is_valid_x], dim=0), x_std)
+        preprocess = Standardize(torch.mean(x, dim=0), x_std)
 
         # If Sequential has a None component, forward will TypeError.
         return preprocess if embed_nn is None else nn.Sequential(preprocess, embed_nn)

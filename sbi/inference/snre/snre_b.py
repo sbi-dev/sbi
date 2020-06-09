@@ -7,17 +7,17 @@ from sbi.inference.snre.snre_base import RatioEstimator
 
 
 class SNRE_B(RatioEstimator):
-    def _loss(self, theta: Tensor, x: Tensor, num_atoms: int) -> Tensor:
+    def _loss(
+        self, theta: Tensor, x: Tensor, clipped_batch_size: int, num_atoms: int
+    ) -> Tensor:
         """Return cross-entropy loss for 1-out-of-`num_atoms` classification."""
 
-        assert theta.shape[0] == x.shape[0], "Batch sizes for theta and x must match."
-        batch_size = theta.shape[0]
-        logits = self._classifier_logits(theta, x, num_atoms)
+        logits = self._classifier_logits(theta, x, clipped_batch_size, num_atoms)
 
         # For 1-out-of-`num_atoms` classification each datapoint consists
         # of `num_atoms` points, with one of them being the correct one.
-        # We have a batch of `batch_size` such datapoints.
-        logits = logits.reshape(batch_size, num_atoms)
+        # We have a batch of `clipped_batch_size` such datapoints.
+        logits = logits.reshape(clipped_batch_size, num_atoms)
 
         # Index 0 is the theta-x-pair sampled from the joint p(theta,x) and hence the
         # "correct" one for the 1-out-of-N classification.

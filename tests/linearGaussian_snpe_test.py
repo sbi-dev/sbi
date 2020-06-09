@@ -252,10 +252,15 @@ will have infinites, which we reject."""
         pytest.param(
             0.0,
             marks=pytest.mark.xfail(
-                raises=AssertionError, reason=_fail_reason_deterministic_sim,
+                raises=NotImplementedError, reason=_fail_reason_deterministic_sim,
             ),
         ),
-        1e-7,
+        pytest.param(
+            1e-7,
+            marks=pytest.mark.xfail(
+                raises=NotImplementedError, reason="""SNPE-B not implemented""",
+            ),
+        ),
     ),
 )
 def test_multi_round_snpe_deterministic_simulator(set_seed, z_score_min_std):

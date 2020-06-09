@@ -33,7 +33,6 @@ class SNPE_C(PosteriorEstimator):
         show_progressbar: bool = True,
         show_round_summary: bool = False,
         logging_level: Union[int, str] = "warning",
-        exclude_invalid_x: bool = False,
     ):
         r"""SNPE-C / APT [1].
 
@@ -70,7 +69,6 @@ class SNPE_C(PosteriorEstimator):
             show_progressbar=show_progressbar,
             show_round_summary=show_round_summary,
             logging_level=logging_level,
-            exclude_invalid_x=exclude_invalid_x,
         )
 
     def __call__(

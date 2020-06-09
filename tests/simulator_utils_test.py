@@ -13,7 +13,7 @@ torch.set_default_tensor_type("torch.FloatTensor")
 
 
 @pytest.mark.parametrize(
-    "num_sims", (0, 100, 1000),
+    "num_sims", (pytest.param(0, marks=pytest.mark.xfail), 100, 1000)
 )
 @pytest.mark.parametrize("batch_size", (1, 100, 1000))
 def test_simulate_in_batches(

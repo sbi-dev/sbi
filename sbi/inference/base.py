@@ -34,7 +34,6 @@ class NeuralInference(ABC):
         show_progressbar: bool = True,
         show_round_summary: bool = False,
         logging_level: Union[int, str] = "warning",
-        exclude_invalid_x: bool = False,
     ):
         r"""
         Args:
@@ -66,9 +65,6 @@ class NeuralInference(ABC):
             logging_level: Minimum severity of messages to log. One of the strings
                 "info", "warning", "debug", "error" and "critical". Currently only
                 applied when parallelization is requested for the simulator.
-            exclude_invalid_x: If True, simulations containing NaN or infinite values
-                are excluded from training, if False a warning is raised if NaNs or
-                infinite values occur.
         """
 
         self._simulator, self._prior, self._x_shape = prepare_sbi_problem(
@@ -99,7 +95,6 @@ class NeuralInference(ABC):
         # Initialize roundwise (theta, x) for storage of parameters and simulations.
         # XXX Rename self._roundwise_* or self._rounds_*
         self._theta_bank, self._x_bank = [], []
-        self.exclude_invalid_x = exclude_invalid_x
 
         # XXX We could instantiate here the Posterior for all children. Two problems:
         #     1. We must dispatch to right PotentialProvider for mcmc based on name

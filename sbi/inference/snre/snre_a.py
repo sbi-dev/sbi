@@ -36,19 +36,18 @@ class SNRE_A(RatioEstimator):
         kwargs = del_entries(locals(), entries=("self", "__class__"))
         return super().__call__(**kwargs, num_atoms=2)
 
-    def _loss(self, theta: Tensor, x: Tensor, num_atoms: int) -> Tensor:
+    def _loss(
+        self, theta: Tensor, x: Tensor, clipped_batch_size: int, num_atoms: int
+    ) -> Tensor:
 
-        assert theta.shape[0] == x.shape[0], "Batch sizes for theta and x must match."
-        batch_size = theta.shape[0]
-
-        logits = self._classifier_logits(theta, x, num_atoms)
+        logits = self._classifier_logits(theta, x, clipped_batch_size, num_atoms)
         likelihood = torch.sigmoid(logits).squeeze()
 
         # Alternating pairs where there is one sampled from the joint and one
         # sampled from the marginals. The first element is sampled from the
         # joint p(theta, x) and is labelled 1. The second element is sampled
         # from the marginals p(theta)p(x) and is labelled 0. And so on.
-        labels = ones(2 * batch_size)  # two atoms
+        labels = ones(2 * clipped_batch_size)  # two atoms
         labels[1::2] = 0.0
 
         # Binary cross entropy to learn the likelihood (AALR-specific)

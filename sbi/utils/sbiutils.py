@@ -1,8 +1,9 @@
 import logging
 from typing import Tuple, Dict, Sequence, Any
+import warnings
 
 import torch
-from torch import Tensor, as_tensor, ones
+from torch import Tensor, as_tensor
 import torch.nn as nn
 from tqdm.auto import tqdm
 
@@ -108,7 +109,7 @@ def sample_posterior_within_prior(
             and acceptance_rate < warn_acceptance
             and not leakage_warning_raised
         ):
-            logging.warning(
+            warnings.warn(
                 f"""Only {acceptance_rate:.0%} posterior samples are within the
                     prior support. It may take a long time to collect the remaining
                     {num_remaining} samples. Consider interrupting (Ctrl-C)
@@ -119,47 +120,3 @@ def sample_posterior_within_prior(
     pbar.close()
 
     return torch.cat(accepted), as_tensor(acceptance_rate)
-
-
-def handle_invalid_x(
-    x: Tensor, exclude_invalid_x: bool = True
-) -> Tuple[Tensor, int, int]:
-    """Return Tensor mask that is True where simulations x are valid.
-
-    Additionally return number of NaNs and Infs that were found.
-
-    Note: If `exclude_invalid` is False, then mask will be True everywhere, ignoring
-    potential NaNs and Infs.
-    """
-
-    batch_size = x.shape[0]
-
-    x_is_nan = torch.isnan(x).any(dim=1)
-    x_is_inf = torch.isinf(x).any(dim=1)
-    num_nans = int(x_is_nan.sum().item())
-    num_infs = int(x_is_inf.sum().item())
-
-    if exclude_invalid_x:
-        x_is_valid = torch.logical_and(
-            torch.logical_not(x_is_nan), torch.logical_not(x_is_inf)
-        )
-    else:
-        x_is_valid = ones(batch_size, dtype=torch.bool)
-
-    return x_is_valid, num_nans, num_infs
-
-
-def warn_on_invalid_x(num_nans: int, num_infs: int, exclude_invalid_x) -> None:
-    """Warn if there are NaNs or Infs. Warning text depends on `exclude_invalid_x`."""
-
-    if num_nans + num_infs > 0:
-        if exclude_invalid_x:
-            logging.warning(
-                f"Found {num_nans} NaN simulations and {num_infs} Inf simulations. "
-                "They will be excluded from training."
-            )
-        else:
-            logging.warning(
-                f"Found {num_nans} NaN simulations and {num_infs} Inf simulations. "
-                "Training might fail. Consider setting `exclude_invalid_x=True`."
-            )
