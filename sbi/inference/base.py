@@ -8,7 +8,7 @@ from torch import Tensor
 from torch.utils.tensorboard import SummaryWriter
 
 from copy import deepcopy
-from sbi.simulators.simutils import simulate_in_batches, simulate_in_batches_joblib
+from sbi.simulators.simutils import simulate_in_batches
 from sbi.user_input.user_input_checks import prepare_sbi_problem
 from sbi.utils import get_log_root, get_timestamp
 from sbi.utils.torchutils import get_default_device
@@ -24,7 +24,7 @@ class NeuralInference(ABC):
         simulator: Callable,
         prior,
         x_shape: Optional[torch.Size] = None,
-        simulation_batch_size: Optional[int] = 1,
+        simulation_batch_size: int = 1,
         device: Optional[torch.device] = None,
         summary_writer: Optional[SummaryWriter] = None,
         simulator_name: str = "simulator",
@@ -76,18 +76,13 @@ class NeuralInference(ABC):
         self._show_progressbar = show_progressbar
         self._show_round_summary = show_round_summary
 
-        if num_workers > 1:
-            self._batched_simulator = lambda theta: simulate_in_batches_joblib(
-                self._simulator,
-                theta,
-                simulation_batch_size,
-                num_workers,
-                self._show_progressbar,
-            )
-        else:
-            self._batched_simulator = lambda theta: simulate_in_batches(
-                self._simulator, theta, simulation_batch_size, self._show_progressbar
-            )
+        self._batched_simulator = lambda theta: simulate_in_batches(
+            self._simulator,
+            theta,
+            simulation_batch_size,
+            num_workers,
+            self._show_progressbar,
+        )
 
         self._device = get_default_device() if device is None else device
 
