@@ -8,7 +8,7 @@ from torch import Tensor
 from torch.utils.tensorboard import SummaryWriter
 
 from copy import deepcopy
-from sbi.simulators.simutils import simulate_in_batches, simulate_in_batches_mp
+from sbi.simulators.simutils import simulate_in_batches, simulate_in_batches_joblib
 from sbi.user_input.user_input_checks import prepare_sbi_problem
 from sbi.utils import get_log_root, get_timestamp
 from sbi.utils.torchutils import get_default_device
@@ -29,7 +29,6 @@ class NeuralInference(ABC):
         summary_writer: Optional[SummaryWriter] = None,
         simulator_name: str = "simulator",
         num_workers: int = 1,
-        worker_batch_size: int = 20,
         skip_input_checks: bool = False,
         show_progressbar: bool = True,
         show_round_summary: bool = False,
@@ -52,8 +51,6 @@ class NeuralInference(ABC):
             summary_writer: An optional SummaryWriter to control, among others, log
                 file location (default is <current working directory>/logs.)
             num_workers: Number of parallel workers to start.
-            worker_batch_size: Number of parameters that are processed per worker. Needs
-                to be larger than `simulation_batch_size`. A lower value creates
             overhead from starting workers frequently. A higher value leads to the
                 simulation progressbar being updated less frequently (updates only
                 happen after a worker is finished).
@@ -80,14 +77,12 @@ class NeuralInference(ABC):
         self._show_round_summary = show_round_summary
 
         if num_workers > 1:
-            self._batched_simulator = lambda theta: simulate_in_batches_mp(
+            self._batched_simulator = lambda theta: simulate_in_batches_joblib(
                 self._simulator,
                 theta,
                 simulation_batch_size,
                 num_workers,
-                worker_batch_size,
                 self._show_progressbar,
-                logging_level=logging_level,
             )
         else:
             self._batched_simulator = lambda theta: simulate_in_batches(
