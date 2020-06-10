@@ -227,18 +227,7 @@ class PosteriorEstimator(NeuralInference, ABC):
                     show_progress_bars=self._show_progress_bars,
                 )
             )
-            self._summary["rejection_sampling_acceptance_rates"].append(acceptance_rate)
 
-            # Update description for progress bar.
-            if self._show_round_summary:
-                print(self._describe_round(round_, self._summary))
-
-            # Update tensorboard and summary dict.
-            acceptance_rate = (
-                torch.as_tensor(float("nan"))
-                if self._posterior.x_o is None
-                else self._posterior.get_leakage_correction(x=self._posterior.x_o,)
-            )
             self._summarize(
                 round_=round_,
                 x_o=self._posterior.x_o,
@@ -246,6 +235,10 @@ class PosteriorEstimator(NeuralInference, ABC):
                 x_bank=self._x_bank,
                 posterior_samples_acceptance_rate=acceptance_rate,
             )
+
+            # Update description for progress bar.
+            if self._show_round_summary:
+                print(self._describe_round(round_, self._summary))
 
         self._posterior._num_trained_rounds = num_rounds
         return self._posterior
