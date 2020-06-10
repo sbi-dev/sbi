@@ -8,10 +8,16 @@ from tqdm.auto import tqdm
 
 
 def del_entries(dic: Dict[str, Any], entries: Sequence = ()):
+    """Delete entries from a dictionary.
+
+    This is typically used to forward arguments to a method selectively, e.g. ignore
+    'self' and '__class__' from `locals()`.
+    """
     return {k: v for k, v in dic.items() if k not in entries}
 
 
 def clamp_and_warn(name: str, value: float, min_val: float, max_val: float) -> float:
+    """Return clamped value, logging an informative warning if different from value."""
     clamped_val = max(min_val, min(value, max_val))
     if clamped_val != value:
         logging.warning(
@@ -25,7 +31,7 @@ def clamp_and_warn(name: str, value: float, min_val: float, max_val: float) -> f
 class Standardize(nn.Module):
     """
     Standardize inputs, i.e. subtract mean and divide by standard deviation. Inherits
-    from nn.Module so we can use it in nn.Sequential
+    from `nn.Module`, hence it can be used as a step in `nn.Sequential`.
     """
 
     def __init__(self, mean, std):
@@ -44,7 +50,7 @@ def sample_posterior_within_prior(
     prior,
     x: Tensor,
     num_samples: int = 1,
-    show_progressbar: bool = False,
+    show_progress_bars: bool = False,
     warn_acceptance: float = 0.01,
 ) -> Tuple[Tensor, Tensor]:
     r"""Return samples from a posterior $p(\theta|x)$ only within the prior support.
@@ -62,7 +68,7 @@ def sample_posterior_within_prior(
         prior: Distribution-like object that evaluates probabilities with `log_prob`.
         x: Conditioning variable $x$ for the posterior $p(\theta|x)$.
         num_samples: Desired number of samples.
-        show_progressbar: Whether to show a progressbar during sampling.
+        show_progress_bars: Whether to show a progressbar during sampling.
         warn_acceptance: A minimum acceptance rate under which to warn about slowness.
 
     Returns:
@@ -73,7 +79,7 @@ def sample_posterior_within_prior(
 
     # Progress bar can be skipped, e.g. when sampling after each round just for logging.
     pbar = tqdm(
-        disable=not show_progressbar,
+        disable=not show_progress_bars,
         total=num_samples,
         desc=f"Drawing {num_samples} posterior samples",
     )
@@ -124,12 +130,12 @@ def sample_posterior_within_prior(
 def handle_invalid_x(
     x: Tensor, exclude_invalid_x: bool = True
 ) -> Tuple[Tensor, int, int]:
-    """Return Tensor mask that is True where simulations x are valid.
+    """Return Tensor mask that is True where simulations `x` are valid.
 
     Additionally return number of NaNs and Infs that were found.
 
-    Note: If `exclude_invalid` is False, then mask will be True everywhere, ignoring
-    potential NaNs and Infs.
+    Note: If `exclude_invalid_x` is False, then mask will be True everywhere, ignoring
+        potential NaNs and Infs.
     """
 
     batch_size = x.shape[0]
@@ -149,7 +155,7 @@ def handle_invalid_x(
     return x_is_valid, num_nans, num_infs
 
 
-def warn_on_invalid_x(num_nans: int, num_infs: int, exclude_invalid_x) -> None:
+def warn_on_invalid_x(num_nans: int, num_infs: int, exclude_invalid_x: bool) -> None:
     """Warn if there are NaNs or Infs. Warning text depends on `exclude_invalid_x`."""
 
     if num_nans + num_infs > 0:

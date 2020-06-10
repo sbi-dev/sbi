@@ -22,8 +22,8 @@ class NeuralInference(ABC):
 
     def __init__(
         self,
-        prior,
         simulator: Callable,
+        prior,
         x_shape: Optional[torch.Size] = None,
         num_workers: int = 1,
         simulation_batch_size: int = 1,
@@ -33,18 +33,24 @@ class NeuralInference(ABC):
         device: Union[torch.device, str] = get_default_device(),
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
-        show_progressbar: bool = True,
+        show_progress_bars: bool = True,
         show_round_summary: bool = False,
     ):
         r"""
         Base class for inference algorithms.
 
         Args:
-            prior: Distribution-like object with `.log_prob()`and `.sample()`.
-            simulator: A regular callable $\mathrm{sim}(\theta)\to x$.
+            simulator: A function that takes parameters $\theta$ and maps them to
+                simulations, or observations, `x`, $\mathrm{sim}(\theta)\to x$. Any
+                regular Python callable (i.e. function or class with `__call__` method)
+                can be used.
+            prior: A probability distribution that expresses prior knowledge about the
+                parameters, e.g. which ranges are meaningful for them. Any
+                object with `.log_prob()`and `.sample()` (for example, a PyTorch
+                distribution) can be used.
             x_shape: Shape of a single simulation output $x$, has to be (1,N).
-            exclude_invalid_x: Whether to exclude simulation outputs `NaN` or ± infinite
-                values from training. Expect errors, silent or explicit, when `False`.
+            exclude_invalid_x: Whether to exclude simulation outputs `x=NaN` or `x=±∞`
+                during training. Expect errors, silent or explicit, when `False`.
             num_workers: Number of parallel workers to use for simulations.
             simulation_batch_size: Number of parameter sets that the simulator
                 maps to data x at once. If None, we simulate all parameter sets at the
@@ -57,7 +63,7 @@ class NeuralInference(ABC):
                "INFO", "WARNING", "DEBUG", "ERROR" and "CRITICAL".
             summary_writer: A `SummaryWriter` to control, among others, log
                 file location (default is `<current working directory>/logs`.)
-            show_progressbar: Whether to show a progressbar during simulation and
+            show_progress_bars: Whether to show a progressbar during simulation and
                 sampling.
             show_round_summary: Whether to show the validation loss and leakage after
                 each round.
@@ -68,7 +74,7 @@ class NeuralInference(ABC):
         )
 
         self._skip_input_checks = skip_input_checks
-        self._show_progressbar = show_progressbar
+        self._show_progress_bars = show_progress_bars
         self._show_round_summary = show_round_summary
         self._retrain_from_scratch_each_round = retrain_from_scratch_each_round
 
@@ -77,7 +83,7 @@ class NeuralInference(ABC):
             theta,
             simulation_batch_size,
             num_workers,
-            self._show_progressbar,
+            self._show_progress_bars,
         )
 
         self._device = device
@@ -150,9 +156,10 @@ class NeuralInference(ABC):
         """Return `num_simulations_per_round` as a list of length `num_rounds`.
         """
         try:
-            assert (
-                len(num_simulations_per_round) == num_rounds
-            ), "Please provide list with number of simulations per round for each round, or a single integer to be used for all rounds."
+            assert len(num_simulations_per_round) == num_rounds, (
+                "Please provide a list with number of simulations per round for each "
+                "round, or a single integer to be used for all rounds."
+            )
         except TypeError:
             num_simulations_per_round = [num_simulations_per_round] * num_rounds
         return num_simulations_per_round
@@ -162,13 +169,13 @@ class NeuralInference(ABC):
         epochs = summary["epochs"][-1]
         best_validation_log_probs = summary["best_validation_log_probs"][-1]
         if "rejection_sampling_acceptance_rates" in summary:
-            # if this key exists, we are using SNPE
+            # If this key exists, we are using SNPE.
             posterior_acceptance_prob = summary["rejection_sampling_acceptance_rates"][
                 -1
             ]
         else:
-            # for all other methods, rejection_sampling_acceptance_rates is not logged
-            # because the acceptance probability is by definition 1.0
+            # For all other methods, `rejection_sampling_acceptance_rates` is not logged
+            # because the acceptance probability is by definition 1.0.
             posterior_acceptance_prob = 1.0
 
         description = f"""

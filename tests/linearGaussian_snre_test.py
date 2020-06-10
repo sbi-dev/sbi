@@ -40,12 +40,12 @@ def test_api_sre_on_linearGaussian(num_dim: int):
     prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
 
     infer = SRE(
-        prior=prior,
         simulator=diagonal_linear_gaussian,
+        prior=prior,
         classifier="resnet",
         simulation_batch_size=50,
         mcmc_method="slice_np",
-        show_progressbar=False,
+        show_progress_bars=False,
     )
 
     posterior = infer(num_rounds=1, num_simulations_per_round=1000, max_num_epochs=5)
@@ -88,16 +88,17 @@ def test_c2st_sre_on_linearGaussian_different_dims(set_seed):
         num_samples=num_samples,
     )
 
-    simulator = lambda theta: linear_gaussian(
-        theta, likelihood_shift, likelihood_cov, num_discarded_dims=discard_dims
-    )
+    def simulator(theta):
+        return linear_gaussian(
+            theta, likelihood_shift, likelihood_cov, num_discarded_dims=discard_dims
+        )
 
     infer = SRE(
-        prior=prior,
         simulator=simulator,
+        prior=prior,
         classifier="resnet",
         simulation_batch_size=50,
-        show_progressbar=False,
+        show_progress_bars=False,
     )
 
     posterior = infer(num_rounds=1, num_simulations_per_round=1000)
@@ -149,15 +150,16 @@ def test_c2st_sre_on_linearGaussian(
             x_o, likelihood_shift, likelihood_cov, prior=prior, num_samples=num_samples
         )
 
-    simulator = lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov)
+    def simulator(theta):
+        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     kwargs = dict(
-        prior=prior,
         simulator=simulator,
+        prior=prior,
         classifier="resnet",
         simulation_batch_size=50,
         mcmc_method="slice_np",
-        show_progressbar=False,
+        show_progress_bars=False,
     )
 
     infer = SRE(**kwargs) if algorithm_str == "sre" else AALR(**kwargs)
@@ -223,10 +225,10 @@ def test_api_sre_sampling_methods(mcmc_method: str, prior_str: str, set_seed):
     infer = SRE(
         simulator=diagonal_linear_gaussian,
         prior=prior,
-        classifier=None,  # Use default RESNET.
+        classifier="resnet",
         simulation_batch_size=50,
         mcmc_method=mcmc_method,
-        show_progressbar=False,
+        show_progress_bars=False,
     )
 
     posterior = infer(num_rounds=1, num_simulations_per_round=200, max_num_epochs=5)

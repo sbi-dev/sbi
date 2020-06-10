@@ -12,8 +12,8 @@ from sbi.utils.torchutils import get_default_device
 class SNPE_B(PosteriorEstimator):
     def __init__(
         self,
-        prior,
         simulator: Callable,
+        prior,
         x_shape: Optional[torch.Size] = None,
         num_workers: int = 1,
         simulation_batch_size: Optional[int] = 1,
@@ -28,7 +28,7 @@ class SNPE_B(PosteriorEstimator):
         device: Union[torch.device, str] = get_default_device(),
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
-        show_progressbar: bool = True,
+        show_progress_bars: bool = True,
         show_round_summary: bool = False,
     ):
         r"""SNPE-B [1]. CURRENTLY NOT IMPLEMENTED.
@@ -44,8 +44,8 @@ class SNPE_B(PosteriorEstimator):
         )
 
         super().__init__(
-            prior=prior,
             simulator=simulator,
+            prior=prior,
             x_shape=x_shape,
             num_workers=num_workers,
             simulation_batch_size=simulation_batch_size,
@@ -59,7 +59,7 @@ class SNPE_B(PosteriorEstimator):
             exclude_invalid_x=exclude_invalid_x,
             device=device,
             logging_level=logging_level,
-            show_progressbar=show_progressbar,
+            show_progress_bars=show_progress_bars,
             show_round_summary=show_round_summary,
         )
 

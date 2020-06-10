@@ -32,7 +32,7 @@ def test_benchmarking_sp(sim_batch_size):
         theta,
         sim_batch_size,
         num_workers=1,
-        show_progressbar=show_pbar,
+        show_progress_bars=show_pbar,
     )
     toc_sp = time.time() - tic
 
@@ -42,7 +42,7 @@ def test_benchmarking_sp(sim_batch_size):
         theta,
         sim_batch_size,
         num_workers=10,
-        show_progressbar=show_pbar,
+        show_progress_bars=show_pbar,
     )
     toc_joblib = time.time() - tic
 

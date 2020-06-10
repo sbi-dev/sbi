@@ -24,8 +24,8 @@ from sbi.utils.torchutils import get_default_device
 class RatioEstimator(NeuralInference, ABC):
     def __init__(
         self,
-        prior,
         simulator: Callable,
+        prior,
         x_shape: Optional[torch.Size] = None,
         num_workers: int = 1,
         simulation_batch_size: int = 1,
@@ -38,7 +38,7 @@ class RatioEstimator(NeuralInference, ABC):
         device: Union[torch.device, str] = get_default_device(),
         logging_level: Union[int, str] = "warning",
         summary_writer: Optional[SummaryWriter] = None,
-        show_progressbar: bool = True,
+        show_progress_bars: bool = True,
         show_round_summary: bool = False,
     ):
         r"""Sequential Neural Ratio Estimation.
@@ -48,21 +48,23 @@ class RatioEstimator(NeuralInference, ABC):
         - SNRE_A / AALR is limited to `num_atoms=2`, but allows for density evaluation
           when training for one round.
         - SNRE_B / SRE can use more than two atoms, potentially boosting performance,
-          but allows for posterior evaluation **only up to a normalizing constant, even when training only one round.
+          but allows for posterior evaluation **only up to a normalizing constant, even
+          when training only one round.
 
-        Args: 
+        Args:
             classifier: Binary classifier network.
-            retrain_from_scratch_each_round: Whether to retrain the classifier from 
+            retrain_from_scratch_each_round: Whether to retrain the classifier from
                 scratch each round.
             embedding_net: A trainable network that maps high-dimensional simulation
-                outputs $x$ to klower-dimensional feature vectors $f(x)$ to feed the classifier.
+                outputs $x$ to klower-dimensional feature vectors $f(x)$ to feed the
+                classifier.
 
         See docstring of `NeuralInference` class for all other arguments.
         """
 
         super().__init__(
-            prior=prior,
             simulator=simulator,
+            prior=prior,
             x_shape=x_shape,
             num_workers=num_workers,
             simulation_batch_size=simulation_batch_size,
@@ -71,7 +73,7 @@ class RatioEstimator(NeuralInference, ABC):
             device=device,
             logging_level=logging_level,
             summary_writer=summary_writer,
-            show_progressbar=show_progressbar,
+            show_progress_bars=show_progress_bars,
             show_round_summary=show_round_summary,
         )
 
@@ -125,7 +127,7 @@ class RatioEstimator(NeuralInference, ABC):
 
         Return posterior $p(\theta|x)$ after inference (possibly over several rounds).
 
-        Args: 
+        Args:
             num_atoms: Number of atoms to use for classification.
 
         Returns:
@@ -152,7 +154,7 @@ class RatioEstimator(NeuralInference, ABC):
                 theta = self._prior.sample((num_sims,))
             else:
                 theta = self._posterior.sample(
-                    num_sims, show_progressbar=self._show_progressbar
+                    num_sims, show_progress_bars=self._show_progress_bars
                 )
 
             x = self._batched_simulator(theta)
@@ -295,7 +297,7 @@ class RatioEstimator(NeuralInference, ABC):
                     log_prob_sum -= log_prob.sum().item()
                 self._val_log_prob = log_prob_sum / num_validation_examples
 
-            self._maybe_show_progress(self._show_progressbar, epoch)
+            self._maybe_show_progress(self._show_progress_bars, epoch)
 
         self._report_convergence_at_end(epoch, stop_after_epochs, max_num_epochs)
 
@@ -400,7 +402,7 @@ class PotentialFunctionProvider:
         return log_ratio + self.prior.log_prob(theta)
 
     def pyro_potential(self, theta: Dict[str, Tensor]) -> Tensor:
-        """Return potential for Pyro sampler.
+        r"""Return potential for Pyro sampler.
 
         Args:
             theta: Parameters $\theta$. The tensor's shape will be

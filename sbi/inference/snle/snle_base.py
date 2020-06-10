@@ -22,8 +22,8 @@ from sbi.utils.torchutils import get_default_device
 class LikelihoodEstimator(NeuralInference, ABC):
     def __init__(
         self,
-        prior,
         simulator: Callable,
+        prior,
         x_shape: Optional[torch.Size] = None,
         num_workers: int = 1,
         simulation_batch_size: int = 1,
@@ -34,7 +34,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         device: Union[torch.device, str] = get_default_device(),
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
-        show_progressbar: bool = True,
+        show_progress_bars: bool = True,
         show_round_summary: bool = False,
     ):
         r"""Sequential Neural Likelihood [1].
@@ -49,8 +49,8 @@ class LikelihoodEstimator(NeuralInference, ABC):
         """
 
         super().__init__(
-            prior=prior,
             simulator=simulator,
+            prior=prior,
             x_shape=x_shape,
             num_workers=num_workers,
             simulation_batch_size=simulation_batch_size,
@@ -59,7 +59,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
             device=device,
             logging_level=logging_level,
             summary_writer=summary_writer,
-            show_progressbar=show_progressbar,
+            show_progress_bars=show_progress_bars,
             show_round_summary=show_round_summary,
         )
 
@@ -127,7 +127,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
                 theta = self._prior.sample((num_sims,))
             else:
                 theta = self._posterior.sample(
-                    num_sims, show_progressbar=self._show_progressbar
+                    num_sims, show_progress_bars=self._show_progress_bars
                 )
 
             x = self._batched_simulator(theta)
@@ -261,7 +261,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
                     log_prob_sum += log_prob.sum().item()
             self._val_log_prob = log_prob_sum / num_validation_examples
 
-            self._maybe_show_progress(self._show_progressbar, epoch)
+            self._maybe_show_progress(self._show_progress_bars, epoch)
 
         self._report_convergence_at_end(epoch, stop_after_epochs, max_num_epochs)
 
