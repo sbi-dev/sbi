@@ -77,7 +77,6 @@ class NeuralInference(ABC):
         num_workers: int = 1,
         simulation_batch_size: int = 1,
         skip_input_checks: bool = False,
-        exclude_invalid_x: bool = True,
         device: Union[torch.device, str] = get_default_device(),
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
@@ -97,8 +96,6 @@ class NeuralInference(ABC):
                 object with `.log_prob()`and `.sample()` (for example, a PyTorch
                 distribution) can be used.
             x_shape: Shape of a single simulation output $x$, has to be (1,N).
-            exclude_invalid_x: Whether to exclude simulation outputs `x=NaN` or `x=±∞`
-                during training. Expect errors, silent or explicit, when `False`.
             num_workers: Number of parallel workers to use for simulations.
             simulation_batch_size: Number of parameter sets that the simulator
                 maps to data x at once. If None, we simulate all parameter sets at the
@@ -138,7 +135,6 @@ class NeuralInference(ABC):
         # Initialize roundwise (theta, x) for storage of parameters and simulations.
         # XXX Rename self._roundwise_* or self._rounds_*
         self._theta_bank, self._x_bank = [], []
-        self.exclude_invalid_x = exclude_invalid_x
 
         # XXX We could instantiate here the Posterior for all children. Two problems:
         #     1. We must dispatch to right PotentialProvider for mcmc based on name

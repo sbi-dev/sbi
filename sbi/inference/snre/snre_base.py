@@ -33,7 +33,6 @@ class RatioEstimator(NeuralInference, ABC):
         classifier: Union[str, nn.Module] = "resnet",
         mcmc_method: str = "slice_np",
         skip_input_checks: bool = False,
-        exclude_invalid_x: bool = True,
         device: Union[torch.device, str] = get_default_device(),
         logging_level: Union[int, str] = "warning",
         summary_writer: Optional[SummaryWriter] = None,
@@ -66,7 +65,6 @@ class RatioEstimator(NeuralInference, ABC):
             num_workers=num_workers,
             simulation_batch_size=simulation_batch_size,
             skip_input_checks=skip_input_checks,
-            exclude_invalid_x=exclude_invalid_x,
             device=device,
             logging_level=logging_level,
             summary_writer=summary_writer,
@@ -112,6 +110,7 @@ class RatioEstimator(NeuralInference, ABC):
         stop_after_epochs: int = 20,
         max_num_epochs: Optional[int] = None,
         clip_max_norm: Optional[float] = 5.0,
+        exclude_invalid_x: bool = True,
         discard_prior_samples: bool = False,
         retrain_from_scratch_each_round: bool = False,
     ) -> NeuralPosterior:
@@ -121,6 +120,8 @@ class RatioEstimator(NeuralInference, ABC):
 
         Args:
             num_atoms: Number of atoms to use for classification.
+            exclude_invalid_x: Whether to exclude simulation outputs `x=NaN` or `x=±∞`
+                during training. Expect errors, silent or explicit, when `False`.
             discard_prior_samples: Whether to discard samples simulated in round 1, i.e.
                 from the prior. Training may be sped up by ignoring such less targeted
                 samples.
@@ -157,8 +158,8 @@ class RatioEstimator(NeuralInference, ABC):
             x = self._batched_simulator(theta)
 
             # Check for NaNs in simulations.
-            is_valid_x, num_nans, num_infs = handle_invalid_x(x, self.exclude_invalid_x)
-            warn_on_invalid_x(num_nans, num_infs, self.exclude_invalid_x)
+            is_valid_x, num_nans, num_infs = handle_invalid_x(x, exclude_invalid_x)
+            warn_on_invalid_x(num_nans, num_infs, exclude_invalid_x)
 
             # Store (theta, x) pairs.
             self._theta_bank.append(theta[is_valid_x])

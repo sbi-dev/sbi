@@ -28,13 +28,9 @@ class PosteriorEstimator(NeuralInference, ABC):
         num_workers: int = 1,
         simulation_batch_size: int = 1,
         density_estimator: Union[str, nn.Module] = "maf",
-        z_score_x: bool = True,
-        z_score_min_std: float = 1e-7,
         sample_with_mcmc: bool = False,
         mcmc_method: str = "slice_np",
-        calibration_kernel: Optional[Callable] = None,
         skip_input_checks: bool = False,
-        exclude_invalid_x: bool = True,
         device: Union[torch.device, str] = get_default_device(),
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
@@ -44,12 +40,6 @@ class PosteriorEstimator(NeuralInference, ABC):
         """ Base class for Sequential Neural Posterior Estimation algorithms.
 
         density_estimator: Density estimator that can `.log_prob()` and `.sample()`.
-        z_score_x: Whether to z-score simulations `x`.
-        z_score_min_std: Minimum value of the standard deviation to use when z-scoring
-            `x`. This is typically needed when some simulator outputs are constant or
-            nearly so.
-        calibration_kernel: A function to calibrate the loss with respect to the
-            simulations `x`. See Lueckmann, Gonçalves et al., NeurIPS 2017.
 
         See docstring of `NeuralInference` class for all other arguments.
         """
@@ -58,7 +48,6 @@ class PosteriorEstimator(NeuralInference, ABC):
             simulator=simulator,
             prior=prior,
             x_shape=x_shape,
-            exclude_invalid_x=exclude_invalid_x,
             num_workers=num_workers,
             simulation_batch_size=simulation_batch_size,
             skip_input_checks=skip_input_checks,
@@ -76,14 +65,6 @@ class PosteriorEstimator(NeuralInference, ABC):
                 prior_std=self._prior.stddev,
                 x_o_shape=self._x_shape,
             )
-
-        # Calibration kernels proposed in Lueckmann, Gonçalves et al., 2017.
-        if calibration_kernel is None:
-            self.calibration_kernel = lambda x: ones([len(x)])
-        else:
-            self.calibration_kernel = calibration_kernel
-
-        self._z_score_x, self._z_score_min_std = z_score_x, z_score_min_std
 
         # Create a neural posterior which can sample(), log_prob().
         self._posterior = NeuralPosterior(
@@ -116,6 +97,10 @@ class PosteriorEstimator(NeuralInference, ABC):
         stop_after_epochs: int = 20,
         max_num_epochs: Optional[int] = None,
         clip_max_norm: Optional[float] = 5.0,
+        calibration_kernel: Optional[Callable] = None,
+        exclude_invalid_x: bool = True,
+        z_score_x: bool = True,
+        z_score_min_std: float = 1e-7,
         discard_prior_samples: bool = False,
         retrain_from_scratch_each_round: bool = False,
     ) -> NeuralPosterior:
@@ -146,6 +131,14 @@ class PosteriorEstimator(NeuralInference, ABC):
                 train until validation loss increases (see also `stop_after_epochs`).
             clip_max_norm: Value at which to clip the total gradient norm in order to
                 prevent exploding gradients. Use None for no clipping.
+            calibration_kernel: A function to calibrate the loss with respect to the
+                simulations `x`. See Lueckmann, Gonçalves et al., NeurIPS 2017.
+            exclude_invalid_x: Whether to exclude simulation outputs `x=NaN` or `x=±∞`
+                during training. Expect errors, silent or explicit, when `False`.
+            z_score_x: Whether to z-score simulations `x`.
+            z_score_min_std: Minimum value of the standard deviation to use when
+                z-scoring `x`. This is typically needed when some simulator outputs are
+                constant or nearly so.
             discard_prior_samples: Whether to discard samples simulated in round 1, i.e.
                 from the prior. Training may be sped up by ignoring such less targeted
                 samples.
@@ -159,6 +152,10 @@ class PosteriorEstimator(NeuralInference, ABC):
         self._handle_x_o_wrt_amortization(x_o, num_rounds)
         self._warn_if_retrain_from_scratch_snpe(retrain_from_scratch_each_round)
 
+        # Calibration kernels proposed in Lueckmann, Gonçalves et al., 2017.
+        if calibration_kernel is None:
+            calibration_kernel = lambda x: ones([len(x)])
+
         max_num_epochs = 2 ** 31 - 1 if max_num_epochs is None else max_num_epochs
 
         num_sims_per_round = self._ensure_list(num_simulations_per_round, num_rounds)
@@ -168,9 +165,30 @@ class PosteriorEstimator(NeuralInference, ABC):
             # Run simulations for the round.
             theta, x, prior_mask = self._run_simulations(round_, num_sims)
 
+            if round_ == 0:
+                # What is happening here? By design, we want the neural net to take care
+                # of normalizing both input and output, x and theta. But since we don't
+                # know the dimensions of these upon instantiation, or in the case of
+                # standardization, the mean and std we need to use, we grab the
+                # embedding net from the posterior (though presumably we could get it
+                # directly here, since what the posterior has is just a reference to the
+                # `density_estimator`), we do things with it (such as prepending a
+                # standardization step) and then we (destructively!) re-set the
+                # attribute in the Posterior to be this now-normalized embedding net.
+                # Perhaps the delayed chaining ideas in thinc can help make this a bit
+                # more transparent.
+                if z_score_x:
+                    self._posterior.set_embedding_net(
+                        self._prepend_z_score(x, z_score_min_std, exclude_invalid_x)
+                    )
+
+                # If we're retraining from scratch each round, keep a copy
+                # of the original untrained model for reinitialization.
+                self._untrained_neural_posterior = deepcopy(self._posterior)
+
             # Check for NaNs in simulations.
-            is_valid_x, num_nans, num_infs = handle_invalid_x(x, self.exclude_invalid_x)
-            warn_on_invalid_x(num_nans, num_infs, self.exclude_invalid_x)
+            is_valid_x, num_nans, num_infs = handle_invalid_x(x, exclude_invalid_x)
+            warn_on_invalid_x(num_nans, num_infs, exclude_invalid_x)
 
             # XXX Rename bank -> rounds/roundwise.
             self._theta_bank.append(theta[is_valid_x])
@@ -186,6 +204,7 @@ class PosteriorEstimator(NeuralInference, ABC):
                 stop_after_epochs=stop_after_epochs,
                 max_num_epochs=cast(int, max_num_epochs),
                 clip_max_norm=clip_max_norm,
+                calibration_kernel=calibration_kernel,
                 discard_prior_samples=discard_prior_samples,
                 retrain_from_scratch_each_round=retrain_from_scratch_each_round,
             )
@@ -257,23 +276,6 @@ class PosteriorEstimator(NeuralInference, ABC):
             theta = self._prior.sample((num_sims,))
 
             x = self._batched_simulator(theta)
-
-            # What is happening here? By design, we want the neural net to take care of
-            # normalizing both input and output, x and theta. But since we don't know
-            # the dimensions of these upon instantiation, or in the case of
-            # standardization, the mean and std we need to use, we grab the embedding
-            # net from the posterior (though presumably we could get it directly here,
-            # since what the posterior has is just a reference to the
-            # `density_estimator`), we do things with it (such as prepending a
-            # standardization step) and then we (destructively!) re-set the attribute
-            # in the Posterior to be this now-normalized embedding net. Perhaps the
-            # delayed chaining ideas in thinc can help make this a bit more transparent.
-            if self._z_score_x:
-                self._posterior.set_embedding_net(self._prepend_z_score(x))
-
-            # If we're retraining from scratch each round, keep a copy
-            # of the original untrained model for reinitialization.
-            self._untrained_neural_posterior = deepcopy(self._posterior)
         else:
             # XXX Make posterior.sample() accept tuples like prior.sample().
             theta = self._posterior.sample(
@@ -286,16 +288,18 @@ class PosteriorEstimator(NeuralInference, ABC):
 
         return theta, x, self._mask_sims_from_prior(round_, theta.size(0))
 
-    def _prepend_z_score(self, x: Tensor) -> nn.Module:
+    def _prepend_z_score(
+        self, x: Tensor, z_score_min_std: float, exclude_invalid_x: bool
+    ) -> nn.Module:
         """Return embedding net with a standardizing step preprended."""
 
         embed_nn = self._posterior.net._embedding_net
 
         # Maybe exclude NaNs and infs from zscoring.
         # No warning on invalid x here because warning will occur in __call__.
-        is_valid_x, *_ = handle_invalid_x(x, self.exclude_invalid_x)
+        is_valid_x, *_ = handle_invalid_x(x, exclude_invalid_x)
         x_std = torch.std(x[is_valid_x], dim=0)
-        x_std[x_std == 0] = self._z_score_min_std
+        x_std[x_std == 0] = z_score_min_std
         preprocess = Standardize(torch.mean(x[is_valid_x], dim=0), x_std)
 
         # If Sequential has a None component, forward will TypeError.
@@ -323,6 +327,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         stop_after_epochs: int,
         max_num_epochs: int,
         clip_max_norm: Optional[float],
+        calibration_kernel: Callable,
         discard_prior_samples: bool,
         retrain_from_scratch_each_round: bool,
     ) -> None:
@@ -394,7 +399,9 @@ class PosteriorEstimator(NeuralInference, ABC):
                 )
 
                 batch_loss = torch.mean(
-                    self._loss(round_, theta_batch, x_batch, masks_batch)
+                    self._loss(
+                        round_, theta_batch, x_batch, masks_batch, calibration_kernel
+                    )
                 )
                 batch_loss.backward()
                 if clip_max_norm is not None:
@@ -417,7 +424,7 @@ class PosteriorEstimator(NeuralInference, ABC):
                     )
                     # Take negative loss here to get validation log_prob.
                     batch_log_prob = -self._loss(
-                        round_, theta_batch, x_batch, masks_batch
+                        round_, theta_batch, x_batch, masks_batch, calibration_kernel
                     )
                     log_prob_sum += batch_log_prob.sum().item()
 
@@ -431,7 +438,14 @@ class PosteriorEstimator(NeuralInference, ABC):
         self._summary["epochs"].append(epoch)
         self._summary["best_validation_log_probs"].append(self._best_val_log_prob)
 
-    def _loss(self, round_: int, theta: Tensor, x: Tensor, masks: Tensor,) -> Tensor:
+    def _loss(
+        self,
+        round_: int,
+        theta: Tensor,
+        x: Tensor,
+        masks: Tensor,
+        calibration_kernel: Callable,
+    ) -> Tensor:
         """Return loss with proposal correction (`round_>0`) or without it (`round_=0`).
 
         The loss is the negative log prob. Irrespective of the round or SNPE method
@@ -448,7 +462,7 @@ class PosteriorEstimator(NeuralInference, ABC):
             # Use proposal posterior log prob tailored to snpe version (B, C).
             log_prob = self._log_prob_proposal_posterior(theta, x, masks)
 
-        return -(self.calibration_kernel(x) * log_prob)
+        return -(calibration_kernel(x) * log_prob)
 
     @staticmethod
     def _warn_if_retrain_from_scratch_snpe(retrain_from_scratch_each_round):
