@@ -33,7 +33,6 @@ class PosteriorEstimator(NeuralInference, ABC):
         sample_with_mcmc: bool = False,
         mcmc_method: str = "slice_np",
         calibration_kernel: Optional[Callable] = None,
-        retrain_from_scratch_each_round: bool = False,
         discard_prior_samples: bool = False,
         skip_input_checks: bool = False,
         exclude_invalid_x: bool = True,
@@ -90,7 +89,6 @@ class PosteriorEstimator(NeuralInference, ABC):
 
         self._z_score_x, self._z_score_min_std = z_score_x, z_score_min_std
         self._discard_prior_samples = discard_prior_samples
-        self._warn_if_retrain_from_scratch_snpe()
 
         # Create a neural posterior which can sample(), log_prob().
         self._posterior = NeuralPosterior(
@@ -122,6 +120,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         validation_fraction: float = 0.1,
         stop_after_epochs: int = 20,
         max_num_epochs: Optional[int] = None,
+        retrain_from_scratch_each_round: bool = False,
         clip_max_norm: Optional[float] = 5.0,
     ) -> NeuralPosterior:
         r"""Run SNPE.
@@ -149,6 +148,8 @@ class PosteriorEstimator(NeuralInference, ABC):
             max_num_epochs: Maximum number of epochs to run. If reached, we stop
                 training even when the validation loss is still decreasing. If None, we
                 train until validation loss increases (see also `stop_after_epochs`).
+            retrain_from_scratch_each_round: Whether to retrain the conditional density
+                estimator for the posterior from scratch each round.
             clip_max_norm: Value at which to clip the total gradient norm in order to
                 prevent exploding gradients. Use None for no clipping.
 
@@ -157,6 +158,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         """
 
         self._handle_x_o_wrt_amortization(x_o, num_rounds)
+        self._warn_if_retrain_from_scratch_snpe(retrain_from_scratch_each_round)
 
         max_num_epochs = 2 ** 31 - 1 if max_num_epochs is None else max_num_epochs
 
@@ -184,6 +186,7 @@ class PosteriorEstimator(NeuralInference, ABC):
                 validation_fraction=validation_fraction,
                 stop_after_epochs=stop_after_epochs,
                 max_num_epochs=cast(int, max_num_epochs),
+                retrain_from_scratch_each_round=retrain_from_scratch_each_round,
                 clip_max_norm=clip_max_norm,
             )
 
@@ -319,6 +322,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         validation_fraction: float,
         stop_after_epochs: int,
         max_num_epochs: int,
+        retrain_from_scratch_each_round: bool,
         clip_max_norm: Optional[float],
     ) -> None:
         r"""Train the conditional density estimator for the posterior $p(\theta|x)$.
@@ -371,7 +375,7 @@ class PosteriorEstimator(NeuralInference, ABC):
 
         # If retraining from scratch each round, reset the neural posterior
         # to the untrained copy.
-        if self._retrain_from_scratch_each_round and round_ > 0:
+        if retrain_from_scratch_each_round and round_ > 0:
             self._posterior = deepcopy(self._untrained_neural_posterior)
             optimizer = optim.Adam(self._posterior.net.parameters(), lr=learning_rate,)
 
@@ -445,8 +449,9 @@ class PosteriorEstimator(NeuralInference, ABC):
 
         return -(self.calibration_kernel(x) * log_prob)
 
-    def _warn_if_retrain_from_scratch_snpe(self):
-        if self._retrain_from_scratch_each_round:
+    @staticmethod
+    def _warn_if_retrain_from_scratch_snpe(retrain_from_scratch_each_round):
+        if retrain_from_scratch_each_round:
             warn(
                 "You specified `retrain_from_scratch_each_round=True`. For "
                 "SNPE, we have experienced very poor performance in this "

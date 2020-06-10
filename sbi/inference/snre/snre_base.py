@@ -32,7 +32,6 @@ class RatioEstimator(NeuralInference, ABC):
         embedding_net: nn.Module = nn.Identity(),
         classifier: Union[str, nn.Module] = "resnet",
         mcmc_method: str = "slice_np",
-        retrain_from_scratch_each_round: bool = False,
         skip_input_checks: bool = False,
         exclude_invalid_x: bool = True,
         device: Union[torch.device, str] = get_default_device(),
@@ -98,13 +97,6 @@ class RatioEstimator(NeuralInference, ABC):
 
         self._embedding_net = embedding_net
 
-        # If we're retraining from scratch each round,
-        # keep a copy of the original untrained model for reinitialization.
-        if self._retrain_from_scratch_each_round:
-            self._untrained_classifier = deepcopy(classifier)
-        else:
-            self._untrained_classifier = None
-
         # Ratio-based-specific summary_writer fields.
         self._summary.update({"mcmc_times": []})  # type: ignore
 
@@ -119,6 +111,7 @@ class RatioEstimator(NeuralInference, ABC):
         validation_fraction: float = 0.1,
         stop_after_epochs: int = 20,
         max_num_epochs: Optional[int] = None,
+        retrain_from_scratch_each_round: bool = False,
         clip_max_norm: Optional[float] = 5.0,
     ) -> NeuralPosterior:
         """Run SNRE.
@@ -136,7 +129,7 @@ class RatioEstimator(NeuralInference, ABC):
 
         # If we're retraining from scratch each round,
         # keep a copy of the original untrained model for reinitialization.
-        if self._retrain_from_scratch_each_round:
+        if retrain_from_scratch_each_round:
             self._untrained_posterior = deepcopy(self._posterior)
             self._untrained_summary_net = deepcopy(self._summary_net)
 
@@ -173,6 +166,7 @@ class RatioEstimator(NeuralInference, ABC):
                 validation_fraction=validation_fraction,
                 stop_after_epochs=stop_after_epochs,
                 max_num_epochs=max_num_epochs,
+                retrain_from_scratch_each_round=retrain_from_scratch_each_round,
                 clip_max_norm=clip_max_norm,
             )
 
@@ -200,6 +194,7 @@ class RatioEstimator(NeuralInference, ABC):
         validation_fraction: float,
         stop_after_epochs: int,
         max_num_epochs: int,
+        retrain_from_scratch_each_round: bool,
         clip_max_norm: Optional[float],
     ) -> None:
         r"""
@@ -259,7 +254,7 @@ class RatioEstimator(NeuralInference, ABC):
 
         # If we're retraining from scratch each round, reset the neural posterior
         # to the untrained copy we made at the start.
-        if self._retrain_from_scratch_each_round:
+        if retrain_from_scratch_each_round:
             self._posterior = deepcopy(self._untrained_posterior)
             self._summary_net = deepcopy(self._untrained_summary_net)
             optimizer = optim.Adam(

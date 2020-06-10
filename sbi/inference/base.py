@@ -76,7 +76,6 @@ class NeuralInference(ABC):
         x_shape: Optional[torch.Size] = None,
         num_workers: int = 1,
         simulation_batch_size: int = 1,
-        retrain_from_scratch_each_round: bool = False,
         skip_input_checks: bool = False,
         exclude_invalid_x: bool = True,
         device: Union[torch.device, str] = get_default_device(),
@@ -105,8 +104,6 @@ class NeuralInference(ABC):
                 maps to data x at once. If None, we simulate all parameter sets at the
                 same time. If >= 1, the simulator has to process data of shape
                 (simulation_batch_size, parameter_dimension).
-            retrain_from_scratch_each_round: Whether to retrain the conditional density
-                estimator for the posterior from scratch each round.
             skip_input_checks: Whether to disable input checks. This saves simulation
                 time because they test-run the simulator to ensure it's correct.
             device: torch device on which to compute, e.g. 'cuda', 'cpu'.
@@ -127,7 +124,6 @@ class NeuralInference(ABC):
         self._skip_input_checks = skip_input_checks
         self._show_progress_bars = show_progress_bars
         self._show_round_summary = show_round_summary
-        self._retrain_from_scratch_each_round = retrain_from_scratch_each_round
 
         self._batched_simulator = lambda theta: simulate_in_batches(
             self._simulator,
