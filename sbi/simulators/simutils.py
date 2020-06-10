@@ -14,7 +14,7 @@ def simulate_in_batches(
     theta: Tensor,
     sim_batch_size: int = 1,
     num_workers: int = 1,
-    show_progressbar: bool = True,
+    show_progress_bars: bool = True,
 ) -> Tensor:
     r"""
     Return simulations $x$ for parameters $\theta$ conducted batchwise.
@@ -28,7 +28,7 @@ def simulate_in_batches(
         sim_batch_size: Number of simulations per batch. Default is to simulate
             the entire theta in a single batch.
         num_workers: Number of workers for multiprocessing.
-        show_progressbar: Whether to show a progressbar during simulation.
+        show_progress_bars: Whether to show a progress bar during simulation.
 
     Returns:
         Parameters theta and simulations $x$.
@@ -54,7 +54,7 @@ def simulate_in_batches(
                 delayed(simulator)(batch)
                 for batch in tqdm(
                     batches,
-                    disable=not show_progressbar,
+                    disable=not show_progress_bars,
                     desc=f"Running {num_sims} simulations in {len(batches)} batches.",
                     total=len(batches),
                 )
@@ -62,7 +62,7 @@ def simulate_in_batches(
         else:
             pbar = tqdm(
                 total=num_sims,
-                disable=not show_progressbar,
+                disable=not show_progress_bars,
                 desc=f"Running {num_sims} simulations.",
             )
 

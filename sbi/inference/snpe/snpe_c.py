@@ -15,8 +15,8 @@ from sbi.utils.torchutils import get_default_device
 class SNPE_C(PosteriorEstimator):
     def __init__(
         self,
-        prior,
         simulator: Callable,
+        prior,
         x_shape: Optional[torch.Size] = None,
         num_workers: int = 1,
         simulation_batch_size: int = 1,
@@ -34,7 +34,7 @@ class SNPE_C(PosteriorEstimator):
         device: Union[torch.device, str] = get_default_device(),
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
-        show_progressbar: bool = True,
+        show_progress_bars: bool = True,
         show_round_summary: bool = False,
     ):
         r"""SNPE-C / APT [1].
@@ -54,8 +54,8 @@ class SNPE_C(PosteriorEstimator):
         self._use_combined_loss = use_combined_loss
 
         super().__init__(
-            prior=prior,
             simulator=simulator,
+            prior=prior,
             x_shape=x_shape,
             num_workers=num_workers,
             simulation_batch_size=simulation_batch_size,
@@ -72,7 +72,7 @@ class SNPE_C(PosteriorEstimator):
             device=device,
             logging_level=logging_level,
             summary_writer=summary_writer,
-            show_progressbar=show_progressbar,
+            show_progress_bars=show_progress_bars,
             show_round_summary=show_round_summary,
         )
 

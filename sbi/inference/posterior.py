@@ -102,7 +102,7 @@ class NeuralPosterior:
         network allows for amortized inference, i.e. computing the posterior
         $p(\theta|x)$ for any x. Hence, when calling `log_prob()` or `sample()`, the
         user generally needs to specify both $\theta$ and $x$. This function sets a
-        default $x_o$, and thus the user only needs to specify $\theta$ when later 
+        default $x_o$, and thus the user only needs to specify $\theta$ when later
         calling `log_prob()` or `sample()` for it to automatically use the default $x_o$
         when evaluating or sampling from $p(\theta|x_o)$.
 
@@ -231,7 +231,7 @@ class NeuralPosterior:
         x: Tensor,
         num_rejection_samples: int = 10_000,
         force_update: bool = False,
-        show_progressbar: bool = False,
+        show_progress_bars: bool = False,
     ) -> Tensor:
         r"""Return leakage correction factor for a leaky posterior density estimate.
 
@@ -249,7 +249,7 @@ class NeuralPosterior:
             force_update: Whether to force a reevaluation of the leakage correction even
                 if the context x is the same as self.x_o. This is useful to enforce a
                 new estimate of the leakage after later rounds, i.e. round 2, 3, ...
-            show_progressbar: Whether to show a progressbar during sampling.
+            show_progress_bars: Whether to show a progressbar during sampling.
 
         Returns:
             Saved or newly estimated correction factor (scalar Tensor).
@@ -257,7 +257,7 @@ class NeuralPosterior:
 
         def acceptance_at(x: Tensor) -> Tensor:
             return utils.sample_posterior_within_prior(
-                self.net, self._prior, x, num_rejection_samples, show_progressbar
+                self.net, self._prior, x, num_rejection_samples, show_progress_bars
             )[1]
 
         # Check if the provided x matches the stored self.x_o by:
@@ -279,7 +279,7 @@ class NeuralPosterior:
         self,
         num_samples: int,
         x: Optional[Tensor] = None,
-        show_progressbar: bool = False,
+        show_progress_bars: bool = False,
         **kwargs,
     ) -> Tensor:
         r"""
@@ -294,7 +294,7 @@ class NeuralPosterior:
             x: Conditioning context for posterior $p(\theta|x)$. If x==None, fall back
                 onto $x_o$ that was previously provided either at inference or through
                 the `freeze()` method.
-            show_progressbar: Whether to show sampling progress monitor.
+            show_progress_bars: Whether to show sampling progress monitor.
             **kwargs: Additional parameters to be passed to the MCMC sampler, such as
                 `thin` and `warmup_steps`.
 
@@ -310,7 +310,7 @@ class NeuralPosterior:
                 x=x,
                 num_samples=num_samples,
                 mcmc_method=self._mcmc_method,
-                show_progressbar=show_progressbar,
+                show_progress_bars=show_progress_bars,
                 **kwargs,
             )
         elif self._alg_family == "snpe":
@@ -320,7 +320,7 @@ class NeuralPosterior:
                 self._prior,
                 x,
                 num_samples=num_samples,
-                show_progressbar=show_progressbar,
+                show_progress_bars=show_progress_bars,
             )
         else:
             raise ValueError(
@@ -339,7 +339,7 @@ class NeuralPosterior:
         thin: int = 10,
         warmup_steps: int = 20,
         num_chains: Optional[int] = 1,
-        show_progressbar: bool = True,
+        show_progress_bars: bool = True,
     ) -> Tensor:
         r"""
         Return MCMC samples from posterior $p(\theta|x)$.
@@ -358,7 +358,7 @@ class NeuralPosterior:
                 sample will be returned, until a total of `num_samples`.
             warmup_steps: Initial number of samples to discard.
             num_chains: Whether to sample in parallel. If None, use all but one CPU.
-            show_progressbar: Whether to show a progressbar during sampling.
+            show_progress_bars: Whether to show a progressbar during sampling.
 
         Returns:
             Tensor of shape (num_samples, shape_of_single_theta).
@@ -382,7 +382,7 @@ class NeuralPosterior:
                 thin=thin,
                 warmup_steps=warmup_steps,
                 num_chains=num_chains,
-                show_progressbar=show_progressbar,
+                show_progress_bars=show_progress_bars,
             )
         else:
             raise NameError
@@ -437,7 +437,7 @@ class NeuralPosterior:
         thin: int = 10,
         warmup_steps: int = 200,
         num_chains: Optional[int] = 1,
-        show_progressbar: bool = True,
+        show_progress_bars: bool = True,
     ):
         r"""Return samples obtained using Pyro's HMC, NUTS or slice kernels.
 
@@ -450,7 +450,7 @@ class NeuralPosterior:
             thin: Thinning (subsampling) factor.
             warmup_steps: Initial number of samples to discard.
             num_chains: Whether to sample in parallel. If None, use all but one CPU.
-            show_progressbar: Whether to show a progressbar during sampling.
+            show_progress_bars: Whether to show a progressbar during sampling.
 
         Returns: Tensor of shape (num_samples, shape_of_single_theta).
         """
@@ -472,7 +472,7 @@ class NeuralPosterior:
             initial_params={"": initial_params},
             num_chains=num_chains,
             mp_context="fork",
-            disable_progbar=not show_progressbar,
+            disable_progbar=not show_progress_bars,
         )
         sampler.run()
         samples = next(iter(sampler.get_samples().values())).reshape(

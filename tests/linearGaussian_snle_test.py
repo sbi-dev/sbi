@@ -43,11 +43,11 @@ def test_api_snl_on_linearGaussian(num_dim: int, set_seed):
     prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
 
     infer = SNL(
-        prior=prior,
         simulator=diagonal_linear_gaussian,
+        prior=prior,
         simulation_batch_size=50,
         mcmc_method="slice_np",
-        show_progressbar=False,
+        show_progress_bars=False,
     )
 
     posterior = infer(num_rounds=1, num_simulations_per_round=1000, max_num_epochs=5)
@@ -94,11 +94,11 @@ def test_c2st_snl_on_linearGaussian_different_dims(set_seed):
     )
 
     infer = SNL(
-        prior=prior,
         simulator=simulator,
+        prior=prior,
         simulation_batch_size=50,
         mcmc_method="slice_np",
-        show_progressbar=False,
+        show_progress_bars=False,
     )
 
     posterior = infer(num_rounds=1, num_simulations_per_round=4000)  # type: ignore
@@ -144,10 +144,10 @@ def test_c2st_snl_on_linearGaussian(num_dim: int, prior_str: str, set_seed):
     simulator = lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     infer = SNL(
-        prior=prior,
         simulator=simulator,
+        prior=prior,
         mcmc_method="slice_np",
-        show_progressbar=False,
+        show_progress_bars=False,
     )
 
     posterior = infer(num_rounds=1, num_simulations_per_round=1000).freeze(x_o)
@@ -198,7 +198,7 @@ def test_c2st_multi_round_snl_on_linearGaussian(set_seed):
         simulator=simulator,
         simulation_batch_size=50,
         mcmc_method="slice",
-        show_progressbar=False,
+        show_progress_bars=False,
     )
 
     posterior = infer(num_rounds=2, x_o=x_o, num_simulations_per_round=500)
@@ -232,11 +232,11 @@ def test_api_snl_sampling_methods(mcmc_method: str, prior_str: str, set_seed):
         prior = utils.BoxUniform(-1.0 * ones(num_dim), ones(num_dim))
 
     infer = SNL(
-        prior=prior,
         simulator=diagonal_linear_gaussian,
+        prior=prior,
         simulation_batch_size=50,
         mcmc_method="slice_np",
-        show_progressbar=False,
+        show_progress_bars=False,
     )
 
     posterior = infer(num_rounds=1, num_simulations_per_round=200, max_num_epochs=5)

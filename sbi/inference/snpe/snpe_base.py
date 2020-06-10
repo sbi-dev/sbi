@@ -22,8 +22,8 @@ from sbi.utils.torchutils import get_default_device
 class PosteriorEstimator(NeuralInference, ABC):
     def __init__(
         self,
-        prior,
         simulator: Callable,
+        prior,
         x_shape: Optional[torch.Size] = None,
         num_workers: int = 1,
         simulation_batch_size: int = 1,
@@ -40,7 +40,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         device: Union[torch.device, str] = get_default_device(),
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
-        show_progressbar: bool = True,
+        show_progress_bars: bool = True,
         show_round_summary: bool = False,
     ):
         """ Base class for Sequential Neural Posterior Estimation algorithms.
@@ -62,8 +62,8 @@ class PosteriorEstimator(NeuralInference, ABC):
         """
 
         super().__init__(
-            prior=prior,
             simulator=simulator,
+            prior=prior,
             x_shape=x_shape,
             exclude_invalid_x=exclude_invalid_x,
             num_workers=num_workers,
@@ -72,7 +72,7 @@ class PosteriorEstimator(NeuralInference, ABC):
             device=device,
             logging_level=logging_level,
             summary_writer=summary_writer,
-            show_progressbar=show_progressbar,
+            show_progress_bars=show_progress_bars,
             show_round_summary=show_round_summary,
         )
 
@@ -148,7 +148,7 @@ class PosteriorEstimator(NeuralInference, ABC):
             validation_fraction: The fraction of data to use for validation.
             stop_after_epochs: The number of epochs to wait for improvement on the
                 validation set before terminating training.
-            max_num_epochs: Maximum number of epochs to run. If reached, we stop 
+            max_num_epochs: Maximum number of epochs to run. If reached, we stop
                 training even when the validation loss is still decreasing. If None, we
                 train until validation loss increases (see also `stop_after_epochs`).
             clip_max_norm: Value at which to clip the total gradient norm in order to
@@ -204,7 +204,7 @@ class PosteriorEstimator(NeuralInference, ABC):
                 else self._posterior.get_leakage_correction(
                     x=self._posterior.x_o,
                     force_update=True,
-                    show_progressbar=self._show_progressbar,
+                    show_progress_bars=self._show_progress_bars,
                 )
             )
             self._summary["rejection_sampling_acceptance_rates"].append(acceptance_rate)
@@ -276,7 +276,9 @@ class PosteriorEstimator(NeuralInference, ABC):
         else:
             # XXX Make posterior.sample() accept tuples like prior.sample().
             theta = self._posterior.sample(
-                num_sims, x=self._posterior.x_o, show_progressbar=self._show_progressbar
+                num_sims,
+                x=self._posterior.x_o,
+                show_progress_bars=self._show_progress_bars,
             )
 
             x = self._batched_simulator(theta)
@@ -418,7 +420,7 @@ class PosteriorEstimator(NeuralInference, ABC):
 
             self._val_log_prob = log_prob_sum / num_validation_examples
 
-            self._maybe_show_progress(self._show_progressbar, epoch)
+            self._maybe_show_progress(self._show_progress_bars, epoch)
 
         self._report_convergence_at_end(epoch, stop_after_epochs, max_num_epochs)
 

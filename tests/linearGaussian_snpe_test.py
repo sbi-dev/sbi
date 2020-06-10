@@ -59,7 +59,8 @@ def test_c2st_snpe_on_linearGaussian(
             x_o, likelihood_shift, likelihood_cov, prior=prior, num_samples=num_samples
         )
 
-    simulator = lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov)
+    def simulator(theta):
+        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     infer = SNPE_C(
         simulator=simulator,
@@ -68,7 +69,7 @@ def test_c2st_snpe_on_linearGaussian(
         simulation_batch_size=10,
         retrain_from_scratch_each_round=False,
         discard_prior_samples=False,
-        show_progressbar=False,
+        show_progress_bars=False,
         sample_with_mcmc=False,
     )
 
@@ -151,19 +152,20 @@ def test_c2st_snpe_on_linearGaussian_different_dims(set_seed):
         num_samples=num_samples,
     )
 
-    simulator = lambda theta: linear_gaussian(
-        theta, likelihood_shift, likelihood_cov, num_discarded_dims=discard_dims
-    )
+    def simulator(theta):
+        return linear_gaussian(
+            theta, likelihood_shift, likelihood_cov, num_discarded_dims=discard_dims
+        )
 
     snpe_common_args = dict(
-        prior=prior,
         simulator=simulator,
+        prior=prior,
         density_estimator="maf",
         z_score_x=True,
         simulation_batch_size=1,
         retrain_from_scratch_each_round=False,
         discard_prior_samples=False,
-        show_progressbar=False,
+        show_progress_bars=False,
     )
 
     infer = SNPE_C(sample_with_mcmc=False, **snpe_common_args)
@@ -212,15 +214,16 @@ def test_c2st_multi_round_snpe_on_linearGaussian(algorithm_str: str, set_seed):
     )
     target_samples = gt_posterior.sample((num_samples,))
 
-    simulator = lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov)
+    def simulator(theta):
+        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     creation_args = dict(
         simulator=simulator,
-        density_estimator="maf",
         prior=prior,
+        density_estimator="maf",
         z_score_x=True,
         retrain_from_scratch_each_round=False,
-        show_progressbar=False,
+        show_progress_bars=False,
     )
     call_args = dict(num_rounds=2, x_o=x_o, num_simulations_per_round=1000)
 
@@ -275,7 +278,8 @@ def test_multi_round_snpe_deterministic_simulator(set_seed, z_score_min_std):
     prior_cov = eye(num_dim)
     prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
 
-    simulator = lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov)
+    def simulator(theta):
+        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     def deterministic_simulator(theta):
         """Simulator with deterministic last output dimension (across batches)."""
@@ -286,13 +290,13 @@ def test_multi_round_snpe_deterministic_simulator(set_seed, z_score_min_std):
 
     infer = SNPE_C(
         simulator=deterministic_simulator,
-        density_estimator="maf",
         prior=prior,
+        density_estimator="maf",
         z_score_x=True,
         retrain_from_scratch_each_round=False,
         simulation_batch_size=10,
         z_score_min_std=z_score_min_std,
-        show_progressbar=False,
+        show_progress_bars=False,
     )
 
     infer(num_rounds=2, x_o=x_o, num_simulations_per_round=1000)
@@ -334,12 +338,13 @@ def test_api_snpe_c_posterior_correction(
     else:
         prior = utils.BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
 
-    simulator = lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov)
+    def simulator(theta):
+        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     infer = SNPE_C(
         simulator=simulator,
-        density_estimator="maf",
         prior=prior,
+        density_estimator="maf",
         z_score_x=True,
         simulation_batch_size=50,
         use_combined_loss=False,
@@ -347,7 +352,7 @@ def test_api_snpe_c_posterior_correction(
         discard_prior_samples=False,
         sample_with_mcmc=sample_with_mcmc,
         mcmc_method=mcmc_method,
-        show_progressbar=False,
+        show_progress_bars=False,
     )
 
     posterior = infer(num_rounds=1, num_simulations_per_round=1000, max_num_epochs=5)

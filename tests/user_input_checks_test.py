@@ -311,11 +311,12 @@ def test_inference_with_user_sbi_problems(
     """
 
     infer = SNPE_C(
-        prior=user_prior,
         simulator=user_simulator,
+        prior=user_prior,
+        density_estimator="maf",
         x_shape=user_x_shape,
         simulation_batch_size=1,
-        show_progressbar=False,
+        show_progress_bars=False,
     )
 
     # Run inference.
@@ -335,21 +336,21 @@ def test_inference_with_user_sbi_problems(
             [
                 Gamma(ones(2), ones(1)),
                 MultipleIndependent(
-                    [Uniform(zeros(1), ones(1)), Uniform(zeros(1), ones(1)),]
+                    [Uniform(zeros(1), ones(1)), Uniform(zeros(1), ones(1))]
                 ),
             ],
             marks=pytest.mark.xfail,
         ),  # nested definition.
         pytest.param(
-            [Uniform(0, 1), Beta(1, 2),], marks=pytest.mark.xfail
+            [Uniform(0, 1), Beta(1, 2)], marks=pytest.mark.xfail
         ),  # scalar dists.
-        [Uniform(zeros(1), ones(1)), Uniform(zeros(1), ones(1)),],
+        [Uniform(zeros(1), ones(1)), Uniform(zeros(1), ones(1))],
         (
             Gamma(ones(1), ones(1)),
             Uniform(zeros(1), ones(1)),
             Beta(ones(1), 2 * ones(1)),
         ),
-        [MultivariateNormal(zeros(3), eye(3)), Gamma(ones(1), ones(1)),],
+        [MultivariateNormal(zeros(3), eye(3)), Gamma(ones(1), ones(1))],
     ],
 )
 def test_independent_joint_shapes_and_samples(dists):
