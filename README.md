@@ -20,14 +20,14 @@ Building on code for "On Contrastive Learning for Likelihood-free Inference" in 
 
 Features neural likelihood-free methods from
 
-> Papamakarios et al., _Sequential Neural Likelihood_ (NSLE_A/SNL), 2019. [[arXiv]](https://arxiv.org/abs/1805.07226)
+> Papamakarios et al., _Sequential Neural Likelihood_ (SNL, "SNLE_A"), 2019. [[arXiv]](https://arxiv.org/abs/1805.07226)
 >
->Greenberg et al., _Automatic Posterior Transformation_ (SNPE_C/APT), 2019. [[arXiv]](https://arxiv.org/abs/1905.07488)
+>Greenberg et al., _Automatic Posterior Transformation_ (APT, "SNPE_C"), 2019. [[arXiv]](https://arxiv.org/abs/1905.07488)
 >
 >Hermans et al., _Likelihood-free Inference with Amortized Approximate Likelihood
->Ratios_ (SNRE_A/AALR), 2020.  [[arXiv]](https://arxiv.org/abs/1903.04057)
+>Ratios_ (AALR, "SNRE_A"), 2020.  [[arXiv]](https://arxiv.org/abs/1903.04057)
 >
->Durkan et al., _On Contrastive Learning for Likelihood-free Inference_, (SNRE_B/SRE), 2020 [[arXiv]](https://arxiv.org/abs/2002.03712) 
+>Durkan et al., _On Contrastive Learning for Likelihood-free Inference_, (SRE, "SNRE_B"), 2020 [[arXiv]](https://arxiv.org/abs/2002.03712) 
 
 ## Setup
 

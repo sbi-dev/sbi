@@ -86,7 +86,7 @@ class NeuralPosterior:
         self._leakage_density_correction_factor = None
 
     # When a type is not yet defined, one uses a string representation.
-    def set_default_x(self, /, x: Tensor) -> "NeuralPosterior":
+    def set_default_x(self, x: Tensor) -> "NeuralPosterior":
         """
         Return `NeuralPosterior` object with default conditioning context `x` set.
 
