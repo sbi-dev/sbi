@@ -46,7 +46,7 @@ def simulate_in_batches(
 
         if num_workers > 1:
             # Parallelize the sequence of batches across workers.
-            # Todo: This usage of tqdm tracks the dispatching of jobs instead of the
+            # TODO: This usage of tqdm tracks the dispatching of jobs instead of the
             # moment when they are done, resulting in waiting time at 100% in case the
             # last jobs takes long. A potential solution can be found here: https://
             # stackoverflow.com/a/61689175

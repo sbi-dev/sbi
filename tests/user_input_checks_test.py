@@ -429,6 +429,6 @@ def test_skip_input_checks(method):
         method(
             prior=Uniform(zeros(1), ones(1)),
             simulator=diagonal_linear_gaussian,
-            x_shape=zeros(1),
+            x_shape=torch.Size(),
             skip_input_checks=True,
         )
