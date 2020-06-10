@@ -310,25 +310,23 @@
 <div class="doc doc-object doc-method">
 <h4 class="doc doc-heading" data-toc-label="__init__()" id="sbi.inference.snpe.snpe_a.SNPE_A.__init__">
 <code class="highlight language-python">
-__init__<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">x_o</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">z_score_x</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">z_score_min_std</span><span class="o">=</span><span class="mf">1e-07</span><span class="p">,</span> <span class="n">simulation_batch_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">retrain_from_scratch_each_round</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">discard_prior_samples</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">summary_writer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">skip_input_checks</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> </code>
+__init__<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">x_shape</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">simulation_batch_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="s1">'mdn'</span><span class="p">,</span> <span class="n">calibration_kernel</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">z_score_x</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">z_score_min_std</span><span class="o">=</span><span class="mf">1e-07</span><span class="p">,</span> <span class="n">exclude_invalid_x</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">'cpu'</span><span class="p">),</span> <span class="n">logging_level</span><span class="o">=</span><span class="s1">'WARNING'</span><span class="p">,</span> <span class="n">summary_writer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">show_round_summary</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> </code>
 <span class="doc doc-properties">
 <small class="doc doc-property doc-property-special"><code>special</code></small>
 </span>
 </h4>
 <div class="doc doc-contents">
-<p>SNPE-A [1] - CURRENTLY NOT IMPLEMENTED.</p>
+<p>SNPE-A [1]. CURRENTLY NOT IMPLEMENTED.</p>
 <p>[1] <em>Fast epsilon-free Inference of Simulation Models with Bayesian Conditional
     Density Estimation</em>, Papamakarios et al., NeurIPS 2016,
     <a href="https://arxiv.org/abs/1605.06376">https://arxiv.org/abs/1605.06376</a>.</p>
-<p>See docstring of <code class="codehilite"><span class="err">PosteriorEstimator</span></code> class for all other arguments.</p>
 <details class="quote">
 <summary>Source code in <code>sbi/inference/snpe/snpe_a.py</code></summary>
 <table class="highlighttable">
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>12
-13
+<pre><span></span>13
 14
 15
 16
@@ -351,7 +349,10 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 33
 34
 35
-36</pre>
+36
+37
+38
+39</pre>
 </div>
 </td>
 <td class="code">
@@ -360,24 +361,26 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">simulator</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">,</span>
-    <span class="n">x_o</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
-    <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">x_shape</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">num_workers</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="n">simulation_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"mdn"</span><span class="p">,</span>
+    <span class="n">calibration_kernel</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">z_score_x</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="n">z_score_min_std</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-7</span><span class="p">,</span>
-    <span class="n">simulation_batch_size</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
-    <span class="n">retrain_from_scratch_each_round</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
-    <span class="n">discard_prior_samples</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">exclude_invalid_x</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">device</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">get_default_device</span><span class="p">(),</span>
+    <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"WARNING"</span><span class="p">,</span>
     <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">SummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">device</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">skip_input_checks</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">show_round_summary</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 <span class="p">):</span>
-    <span class="sd">"""SNPE-A [1] - CURRENTLY NOT IMPLEMENTED.</span>
+    <span class="sd">"""SNPE-A [1]. CURRENTLY NOT IMPLEMENTED.</span>
 
 <span class="sd">    [1] _Fast epsilon-free Inference of Simulation Models with Bayesian Conditional</span>
 <span class="sd">        Density Estimation_, Papamakarios et al., NeurIPS 2016,</span>
 <span class="sd">        https://arxiv.org/abs/1605.06376.</span>
 
-<span class="sd">    See docstring of `PosteriorEstimator` class for all other arguments.</span>
 <span class="sd">    """</span>
 
     <span class="k">raise</span> <span class="ne">NotImplementedError</span>
@@ -401,15 +404,15 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <div class="doc doc-object doc-method">
 <h4 class="doc doc-heading" data-toc-label="__init__()" id="sbi.inference.snpe.snpe_b.SNPE_B.__init__">
 <code class="highlight language-python">
-__init__<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">x_shape</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">calibration_kernel</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">z_score_x</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">z_score_min_std</span><span class="o">=</span><span class="mf">1e-07</span><span class="p">,</span> <span class="n">simulation_batch_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">retrain_from_scratch_each_round</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">discard_prior_samples</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">summary_writer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">skip_input_checks</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">show_progressbar</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">show_round_summary</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">logging_level</span><span class="o">=</span><span class="s1">'warning'</span><span class="p">)</span> </code>
+__init__<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">x_shape</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">simulation_batch_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="s1">'mdn'</span><span class="p">,</span> <span class="n">z_score_x</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">z_score_min_std</span><span class="o">=</span><span class="mf">1e-07</span><span class="p">,</span> <span class="n">calibration_kernel</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">retrain_from_scratch_each_round</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">discard_prior_samples</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">skip_input_checks</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">exclude_invalid_x</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">'cpu'</span><span class="p">),</span> <span class="n">logging_level</span><span class="o">=</span><span class="s1">'WARNING'</span><span class="p">,</span> <span class="n">summary_writer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">show_round_summary</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> </code>
 <span class="doc doc-properties">
 <small class="doc doc-property doc-property-special"><code>special</code></small>
 </span>
 </h4>
 <div class="doc doc-contents">
-<p>SNPE-B [1]</p>
+<p>SNPE-B [1]. CURRENTLY NOT IMPLEMENTED.</p>
 <p>[1] <em>Flexible statistical inference for mechanistic models of neural dynamics</em>,
-    Lueckmann et al., NeurIPS 2017, <a href="https://arxiv.org/abs/1711.01861">https://arxiv.org/abs/1711.01861</a>.</p>
+    Lueckmann, Gonçalves et al., NeurIPS 2017, <a href="https://arxiv.org/abs/1711.01861">https://arxiv.org/abs/1711.01861</a>.</p>
 <p>See docstring of <code class="codehilite"><span class="err">PosteriorEstimator</span></code> class for all other arguments.</p>
 <details class="quote">
 <summary>Source code in <code>sbi/inference/snpe/snpe_b.py</code></summary>
@@ -417,8 +420,7 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>12
-13
+<pre><span></span>13
 14
 15
 16
@@ -466,7 +468,10 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 58
 59
 60
-61</pre>
+61
+62
+63
+64</pre>
 </div>
 </td>
 <td class="code">
@@ -476,50 +481,52 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
     <span class="n">simulator</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">,</span>
     <span class="n">x_shape</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">calibration_kernel</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">num_workers</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="n">simulation_batch_size</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"mdn"</span><span class="p">,</span>
     <span class="n">z_score_x</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="n">z_score_min_std</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-7</span><span class="p">,</span>
-    <span class="n">simulation_batch_size</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="n">calibration_kernel</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">retrain_from_scratch_each_round</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">discard_prior_samples</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
-    <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">SummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">num_workers</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
-    <span class="n">device</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">skip_input_checks</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
-    <span class="n">show_progressbar</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">exclude_invalid_x</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">device</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">get_default_device</span><span class="p">(),</span>
+    <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"WARNING"</span><span class="p">,</span>
+    <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">SummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="n">show_round_summary</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
-    <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"warning"</span><span class="p">,</span>
 <span class="p">):</span>
-    <span class="sa">r</span><span class="sd">"""SNPE-B [1]</span>
+    <span class="sa">r</span><span class="sd">"""SNPE-B [1]. CURRENTLY NOT IMPLEMENTED.</span>
 
 <span class="sd">    [1] _Flexible statistical inference for mechanistic models of neural dynamics_,</span>
-<span class="sd">        Lueckmann et al., NeurIPS 2017, https://arxiv.org/abs/1711.01861.</span>
+<span class="sd">        Lueckmann, Gonçalves et al., NeurIPS 2017, https://arxiv.org/abs/1711.01861.</span>
 
 <span class="sd">    See docstring of `PosteriorEstimator` class for all other arguments.</span>
 <span class="sd">    """</span>
 
     <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
-        <span class="s2">"SNPE-B is not yet implemented in the sbi package,"</span> <span class="s2">" see issue #199."</span>
+        <span class="s2">"SNPE-B is not yet implemented in the sbi package, see issue #199."</span>
     <span class="p">)</span>
 
     <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
         <span class="n">simulator</span><span class="o">=</span><span class="n">simulator</span><span class="p">,</span>
         <span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span>
         <span class="n">x_shape</span><span class="o">=</span><span class="n">x_shape</span><span class="p">,</span>
+        <span class="n">num_workers</span><span class="o">=</span><span class="n">num_workers</span><span class="p">,</span>
+        <span class="n">simulation_batch_size</span><span class="o">=</span><span class="n">simulation_batch_size</span><span class="p">,</span>
         <span class="n">density_estimator</span><span class="o">=</span><span class="n">density_estimator</span><span class="p">,</span>
-        <span class="n">calibration_kernel</span><span class="o">=</span><span class="n">calibration_kernel</span><span class="p">,</span>
         <span class="n">z_score_x</span><span class="o">=</span><span class="n">z_score_x</span><span class="p">,</span>
         <span class="n">z_score_min_std</span><span class="o">=</span><span class="n">z_score_min_std</span><span class="p">,</span>
-        <span class="n">simulation_batch_size</span><span class="o">=</span><span class="n">simulation_batch_size</span><span class="p">,</span>
+        <span class="n">calibration_kernel</span><span class="o">=</span><span class="n">calibration_kernel</span><span class="p">,</span>
         <span class="n">retrain_from_scratch_each_round</span><span class="o">=</span><span class="n">retrain_from_scratch_each_round</span><span class="p">,</span>
         <span class="n">discard_prior_samples</span><span class="o">=</span><span class="n">discard_prior_samples</span><span class="p">,</span>
-        <span class="n">num_workers</span><span class="o">=</span><span class="n">num_workers</span><span class="p">,</span>
-        <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span>
         <span class="n">skip_input_checks</span><span class="o">=</span><span class="n">skip_input_checks</span><span class="p">,</span>
-        <span class="n">show_progressbar</span><span class="o">=</span><span class="n">show_progressbar</span><span class="p">,</span>
-        <span class="n">show_round_summary</span><span class="o">=</span><span class="n">show_round_summary</span><span class="p">,</span>
+        <span class="n">exclude_invalid_x</span><span class="o">=</span><span class="n">exclude_invalid_x</span><span class="p">,</span>
+        <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span>
         <span class="n">logging_level</span><span class="o">=</span><span class="n">logging_level</span><span class="p">,</span>
+        <span class="n">show_progress_bars</span><span class="o">=</span><span class="n">show_progress_bars</span><span class="p">,</span>
+        <span class="n">show_round_summary</span><span class="o">=</span><span class="n">show_round_summary</span><span class="p">,</span>
     <span class="p">)</span>
 </code></pre>
 </div>
@@ -539,9 +546,128 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <div class="doc doc-contents first">
 <div class="doc doc-children">
 <div class="doc doc-object doc-method">
+<h4 class="doc doc-heading" data-toc-label="__call__()" id="sbi.inference.snpe.snpe_c.SNPE_C.__call__">
+<code class="highlight language-python">
+__call__<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">num_rounds</span><span class="p">,</span> <span class="n">num_simulations_per_round</span><span class="p">,</span> <span class="n">x_o</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_atoms</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.0005</span><span class="p">,</span> <span class="n">validation_fraction</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">stop_after_epochs</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">max_num_epochs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">clip_max_norm</span><span class="o">=</span><span class="mf">5.0</span><span class="p">)</span> </code>
+<span class="doc doc-properties">
+<small class="doc doc-property doc-property-special"><code>special</code></small>
+</span>
+</h4>
+<div class="doc doc-contents">
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>num_atoms</code></td>
+<td><code>int</code></td>
+<td>
+<p>Number of atoms to use for classification.</p>
+</td>
+<td><code>10</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>NeuralPosterior</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<details class="quote">
+<summary>Source code in <code>sbi/inference/snpe/snpe_c.py</code></summary>
+<table class="highlighttable">
+<tr>
+<td class="linenos">
+<div class="linenodiv">
+<pre><span></span> 79
+ 80
+ 81
+ 82
+ 83
+ 84
+ 85
+ 86
+ 87
+ 88
+ 89
+ 90
+ 91
+ 92
+ 93
+ 94
+ 95
+ 96
+ 97
+ 98
+ 99
+100
+101
+102
+103
+104
+105
+106</pre>
+</div>
+</td>
+<td class="code">
+<div class="highlight">
+<pre><span></span><code><span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span>
+    <span class="n">num_rounds</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">num_simulations_per_round</span><span class="p">:</span> <span class="n">OneOrMore</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+    <span class="n">x_o</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">num_atoms</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
+    <span class="n">batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">100</span><span class="p">,</span>
+    <span class="n">learning_rate</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">5e-4</span><span class="p">,</span>
+    <span class="n">validation_fraction</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.1</span><span class="p">,</span>
+    <span class="n">stop_after_epochs</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">20</span><span class="p">,</span>
+    <span class="n">max_num_epochs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">clip_max_norm</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="mf">5.0</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NeuralPosterior</span><span class="p">:</span>
+    <span class="sd">"""</span>
+<span class="sd">    Args:</span>
+<span class="sd">        num_atoms: Number of atoms to use for classification.</span>
+<span class="sd">    Returns:</span>
+<span class="sd">    """</span>
+
+    <span class="c1"># WARNING: sneaky trick ahead. We proxy the parent's `__call__` here,</span>
+    <span class="c1"># requiring the signature to have `num_atoms`, save it for use below, and</span>
+    <span class="c1"># continue. It's sneaky because we are using the object (self) as a namespace</span>
+    <span class="c1"># to pass arguments between functions, and that's implicit state management.</span>
+
+    <span class="bp">self</span><span class="o">.</span><span class="n">_num_atoms</span> <span class="o">=</span> <span class="n">num_atoms</span>
+    <span class="n">kwargs</span> <span class="o">=</span> <span class="n">del_entries</span><span class="p">(</span><span class="nb">locals</span><span class="p">(),</span> <span class="n">entries</span><span class="o">=</span><span class="p">(</span><span class="s2">"self"</span><span class="p">,</span> <span class="s2">"__class__"</span><span class="p">,</span> <span class="s2">"num_atoms"</span><span class="p">))</span>
+
+    <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__call__</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+</code></pre>
+</div>
+</td>
+</tr>
+</table>
+</details>
+</div>
+</div>
+<div class="doc doc-object doc-method">
 <h4 class="doc doc-heading" data-toc-label="__init__()" id="sbi.inference.snpe.snpe_c.SNPE_C.__init__">
 <code class="highlight language-python">
-__init__<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">x_shape</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">calibration_kernel</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">use_combined_loss</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">z_score_x</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">z_score_min_std</span><span class="o">=</span><span class="mf">1e-07</span><span class="p">,</span> <span class="n">simulation_batch_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">retrain_from_scratch_each_round</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">discard_prior_samples</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">summary_writer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sample_with_mcmc</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">mcmc_method</span><span class="o">=</span><span class="s1">'slice_np'</span><span class="p">,</span> <span class="n">skip_input_checks</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">show_progressbar</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">show_round_summary</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">logging_level</span><span class="o">=</span><span class="s1">'warning'</span><span class="p">,</span> <span class="n">exclude_invalid_x</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> </code>
+__init__<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">x_shape</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">simulation_batch_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="s1">'maf'</span><span class="p">,</span> <span class="n">z_score_x</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">z_score_min_std</span><span class="o">=</span><span class="mf">1e-07</span><span class="p">,</span> <span class="n">sample_with_mcmc</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">mcmc_method</span><span class="o">=</span><span class="s1">'slice_np'</span><span class="p">,</span> <span class="n">calibration_kernel</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">use_combined_loss</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">retrain_from_scratch_each_round</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">discard_prior_samples</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">skip_input_checks</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">exclude_invalid_x</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">'cpu'</span><span class="p">),</span> <span class="n">logging_level</span><span class="o">=</span><span class="s1">'WARNING'</span><span class="p">,</span> <span class="n">summary_writer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">show_round_summary</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> </code>
 <span class="doc doc-properties">
 <small class="doc doc-property doc-property-special"><code>special</code></small>
 </span>
@@ -565,7 +691,7 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <td><code>use_combined_loss</code></td>
 <td><code>bool</code></td>
 <td>
-<p>Whether to train the neural net jointly on prior samples using maximum likelihood and on all samples using atomic loss. Useful to prevent density leaking when using bounded priors.</p>
+<p>Whether to train the neural net also on prior samples using maximum likelihood in addition to training it on all samples using atomic loss. The extra MLE loss helps prevent density leaking with bounded priors.</p>
 </td>
 <td><code>False</code></td>
 </tr>
@@ -578,9 +704,7 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>14
-15
-16
+<pre><span></span>16
 17
 18
 19
@@ -637,7 +761,11 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 70
 71
 72
-73</pre>
+73
+74
+75
+76
+77</pre>
 </div>
 </td>
 <td class="code">
@@ -647,24 +775,24 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
     <span class="n">simulator</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
     <span class="n">prior</span><span class="p">,</span>
     <span class="n">x_shape</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">calibration_kernel</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">use_combined_loss</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">num_workers</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="n">simulation_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"maf"</span><span class="p">,</span>
     <span class="n">z_score_x</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="n">z_score_min_std</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-7</span><span class="p">,</span>
-    <span class="n">simulation_batch_size</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
-    <span class="n">retrain_from_scratch_each_round</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
-    <span class="n">discard_prior_samples</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
-    <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">SummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">num_workers</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
-    <span class="n">device</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">sample_with_mcmc</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">mcmc_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"slice_np"</span><span class="p">,</span>
+    <span class="n">calibration_kernel</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">use_combined_loss</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">retrain_from_scratch_each_round</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">discard_prior_samples</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">skip_input_checks</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
-    <span class="n">show_progressbar</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">exclude_invalid_x</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">device</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">get_default_device</span><span class="p">(),</span>
+    <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"WARNING"</span><span class="p">,</span>
+    <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">SummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="n">show_round_summary</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
-    <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"warning"</span><span class="p">,</span>
-    <span class="n">exclude_invalid_x</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 <span class="p">):</span>
     <span class="sa">r</span><span class="sd">"""SNPE-C / APT [1].</span>
 
@@ -672,9 +800,10 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <span class="sd">        Greenberg et al., ICML 2019, https://arxiv.org/abs/1905.07488.</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        use_combined_loss: Whether to train the neural net jointly on prior samples</span>
-<span class="sd">            using maximum likelihood and on all samples using atomic loss. Useful</span>
-<span class="sd">            to prevent density leaking when using bounded priors.</span>
+<span class="sd">        use_combined_loss: Whether to train the neural net also on prior samples</span>
+<span class="sd">            using maximum likelihood in addition to training it on all samples using</span>
+<span class="sd">            atomic loss. The extra MLE loss helps prevent density leaking with</span>
+<span class="sd">            bounded priors.</span>
 
 <span class="sd">    See docstring of `PosteriorEstimator` class for all other arguments.</span>
 <span class="sd">    """</span>
@@ -685,22 +814,23 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
         <span class="n">simulator</span><span class="o">=</span><span class="n">simulator</span><span class="p">,</span>
         <span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span>
         <span class="n">x_shape</span><span class="o">=</span><span class="n">x_shape</span><span class="p">,</span>
+        <span class="n">num_workers</span><span class="o">=</span><span class="n">num_workers</span><span class="p">,</span>
+        <span class="n">simulation_batch_size</span><span class="o">=</span><span class="n">simulation_batch_size</span><span class="p">,</span>
         <span class="n">density_estimator</span><span class="o">=</span><span class="n">density_estimator</span><span class="p">,</span>
-        <span class="n">calibration_kernel</span><span class="o">=</span><span class="n">calibration_kernel</span><span class="p">,</span>
         <span class="n">z_score_x</span><span class="o">=</span><span class="n">z_score_x</span><span class="p">,</span>
         <span class="n">z_score_min_std</span><span class="o">=</span><span class="n">z_score_min_std</span><span class="p">,</span>
-        <span class="n">simulation_batch_size</span><span class="o">=</span><span class="n">simulation_batch_size</span><span class="p">,</span>
-        <span class="n">retrain_from_scratch_each_round</span><span class="o">=</span><span class="n">retrain_from_scratch_each_round</span><span class="p">,</span>
-        <span class="n">discard_prior_samples</span><span class="o">=</span><span class="n">discard_prior_samples</span><span class="p">,</span>
-        <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span>
         <span class="n">sample_with_mcmc</span><span class="o">=</span><span class="n">sample_with_mcmc</span><span class="p">,</span>
         <span class="n">mcmc_method</span><span class="o">=</span><span class="n">mcmc_method</span><span class="p">,</span>
-        <span class="n">num_workers</span><span class="o">=</span><span class="n">num_workers</span><span class="p">,</span>
+        <span class="n">calibration_kernel</span><span class="o">=</span><span class="n">calibration_kernel</span><span class="p">,</span>
+        <span class="n">retrain_from_scratch_each_round</span><span class="o">=</span><span class="n">retrain_from_scratch_each_round</span><span class="p">,</span>
+        <span class="n">discard_prior_samples</span><span class="o">=</span><span class="n">discard_prior_samples</span><span class="p">,</span>
         <span class="n">skip_input_checks</span><span class="o">=</span><span class="n">skip_input_checks</span><span class="p">,</span>
-        <span class="n">show_progressbar</span><span class="o">=</span><span class="n">show_progressbar</span><span class="p">,</span>
-        <span class="n">show_round_summary</span><span class="o">=</span><span class="n">show_round_summary</span><span class="p">,</span>
-        <span class="n">logging_level</span><span class="o">=</span><span class="n">logging_level</span><span class="p">,</span>
         <span class="n">exclude_invalid_x</span><span class="o">=</span><span class="n">exclude_invalid_x</span><span class="p">,</span>
+        <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span>
+        <span class="n">logging_level</span><span class="o">=</span><span class="n">logging_level</span><span class="p">,</span>
+        <span class="n">summary_writer</span><span class="o">=</span><span class="n">summary_writer</span><span class="p">,</span>
+        <span class="n">show_progress_bars</span><span class="o">=</span><span class="n">show_progress_bars</span><span class="p">,</span>
+        <span class="n">show_round_summary</span><span class="o">=</span><span class="n">show_round_summary</span><span class="p">,</span>
     <span class="p">)</span>
 </code></pre>
 </div>
