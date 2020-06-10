@@ -93,7 +93,7 @@ class RatioEstimator(NeuralInference, ABC):
 
         self._posterior.net.train(True)
 
-        if embedding_net != nn.Identity():
+        if not isinstance(embedding_net, nn.Identity):
             raise NotImplementedError("Embedding net not yet implemented for SNRE.")
         self._embedding_net = embedding_net
 
@@ -337,9 +337,7 @@ class RatioEstimator(NeuralInference, ABC):
         return self._posterior.net(theta_and_x)
 
     @abstractmethod
-    def _loss(
-        self, theta: Tensor, x: Tensor, clipped_batch_size: int, num_atoms: int
-    ) -> Tensor:
+    def _loss(self, theta: Tensor, x: Tensor, num_atoms: int) -> Tensor:
         raise NotImplementedError
 
 
