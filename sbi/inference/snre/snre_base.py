@@ -93,6 +93,8 @@ class RatioEstimator(NeuralInference, ABC):
 
         self._posterior.net.train(True)
 
+        if embedding_net != nn.Identity():
+            raise NotImplementedError("Embedding net not yet implemented for SNRE.")
         self._embedding_net = embedding_net
 
         # Ratio-based-specific summary_writer fields.
@@ -138,7 +140,7 @@ class RatioEstimator(NeuralInference, ABC):
         # keep a copy of the original untrained model for reinitialization.
         if retrain_from_scratch_each_round:
             self._untrained_posterior = deepcopy(self._posterior)
-            self._untrained_summary_net = deepcopy(self._summary_net)
+            self._untrained_embedding_net = deepcopy(self._embedding_net)
 
         max_num_epochs = 2 ** 31 - 1 if max_num_epochs is None else max_num_epochs
 
@@ -269,10 +271,10 @@ class RatioEstimator(NeuralInference, ABC):
         # to the untrained copy we made at the start.
         if retrain_from_scratch_each_round:
             self._posterior = deepcopy(self._untrained_posterior)
-            self._summary_net = deepcopy(self._untrained_summary_net)
+            self._embedding_net = deepcopy(self._untrained_embedding_net)
             optimizer = optim.Adam(
                 list(self._posterior.net.parameters())
-                + list(self._summary_net.parameters()),
+                + list(self._embedding_net.parameters()),
                 lr=learning_rate,
             )
 
