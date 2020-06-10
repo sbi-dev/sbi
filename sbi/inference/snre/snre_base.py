@@ -41,7 +41,7 @@ class RatioEstimator(NeuralInference, ABC):
     ):
         r"""Sequential Neural Ratio Estimation.
 
-        We implement two algorithms in the respective subclasses.
+        We implement two inference methods in the respective subclasses.
 
         - SNRE_A / AALR is limited to `num_atoms=2`, but allows for density evaluation
           when training for one round.
@@ -80,15 +80,15 @@ class RatioEstimator(NeuralInference, ABC):
             )
 
         # Create posterior object which can sample().
-        algorithm_family = self.__class__.__name__.lower()
+        method_family = self.__class__.__name__.lower()
 
         self._posterior = NeuralPosterior(
-            algorithm_family=algorithm_family,
+            method_family=method_family,
             neural_net=classifier,
             prior=self._prior,
             mcmc_method=mcmc_method,
-            get_potential_function=PotentialFunctionProvider(),
             x_shape=self._x_shape,
+            get_potential_function=PotentialFunctionProvider(),
         )
 
         self._posterior.net.train(True)

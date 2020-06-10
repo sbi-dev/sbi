@@ -23,7 +23,7 @@ from sbi.simulators.linear_gaussian import (
 torch.set_default_tensor_type("torch.FloatTensor")
 # Seeding:
 # Some tests in this module have "set_seed" as an argument. This argument points to
-# tests/conftest.py to seed the test with the seed set in conftext.py.
+# tests/conftest.py to seed the test with the seed set in conftest.py.
 
 
 @pytest.mark.parametrize(
@@ -70,7 +70,7 @@ def test_c2st_snpe_on_linearGaussian(
         sample_with_mcmc=False,
     )
 
-    posterior = infer(num_rounds=1, num_simulations_per_round=2000).freeze(x_o)
+    posterior = infer(num_rounds=1, num_simulations_per_round=2000).set_default_x(x_o)
     samples = posterior.sample(num_samples)
 
     # Compute the c2st and assert it is near chance level of 0.5.
@@ -174,7 +174,7 @@ def test_c2st_snpe_on_linearGaussian_different_dims(set_seed):
 # Test multi-round SNPE.
 @pytest.mark.slow
 @pytest.mark.parametrize(
-    "algorithm_str",
+    "method_str",
     (
         pytest.param(
             "snpe_b",
@@ -185,7 +185,7 @@ def test_c2st_snpe_on_linearGaussian_different_dims(set_seed):
         "snpe_c",
     ),
 )
-def test_c2st_multi_round_snpe_on_linearGaussian(algorithm_str: str, set_seed):
+def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str, set_seed):
     """Test whether SNPE B/C infer well a simple example with available ground truth.
 
     Args:
@@ -219,10 +219,10 @@ def test_c2st_multi_round_snpe_on_linearGaussian(algorithm_str: str, set_seed):
     )
     call_args = dict(num_rounds=2, x_o=x_o, num_simulations_per_round=1000)
 
-    if algorithm_str == "snpe_b":
+    if method_str == "snpe_b":
         infer = SNPE_B(simulation_batch_size=10, **creation_args)
         posterior = infer(**call_args)
-    elif algorithm_str == "snpe_c":
+    elif method_str == "snpe_c":
         infer = SNPE_C(
             simulation_batch_size=50, sample_with_mcmc=False, **creation_args
         )
@@ -231,7 +231,7 @@ def test_c2st_multi_round_snpe_on_linearGaussian(algorithm_str: str, set_seed):
     samples = posterior.sample(num_samples)
 
     # Compute the c2st and assert it is near chance level of 0.5.
-    check_c2st(samples, target_samples, alg=algorithm_str)
+    check_c2st(samples, target_samples, alg=method_str)
 
 
 _fail_reason_deterministic_sim = """If the simulator has truely deterministic (even

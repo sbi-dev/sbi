@@ -67,7 +67,7 @@ def process_custom_prior(prior) -> Tuple[Distribution, int, bool]:
         prior: Prior object with `.sample()` and `.log_prob()` as provided by the user.
 
     Returns:
-        prior: SBI-compatible prior.
+        prior: sbi-compatible prior.
         theta_numel: Number of parameters - elements in a single sample from the prior.
         is_prior_numpy: Whether the prior returned Numpy arrays before wrapping.
     """
@@ -120,7 +120,7 @@ def maybe_wrap_prior_as_pytorch(prior) -> Tuple[Distribution, bool]:
 
 
 def process_pytorch_prior(prior: Distribution) -> Tuple[Distribution, int, bool]:
-    """Return PyTorch prior adapted to the requirements for SBI.
+    """Return PyTorch prior adapted to the requirements for sbi.
 
     Args:
         prior: PyTorch distribution prior provided by the user.
@@ -192,7 +192,7 @@ def check_prior_batch_dims(prior) -> None:
 def check_for_possibly_batched_x_shape(x_shape):
     """Raise `ValueError` if dimensionality of simulations doesn't match requirements.
 
-    SBI does not support multiple observations yet. For 2D observed data the leading
+    sbi does not support multiple observations yet. For 2D observed data the leading
     dimension will be interpreted as batch dimension and a `ValueError` is raised if the
     batch dimension is larger than 1.
 
@@ -208,7 +208,7 @@ def check_for_possibly_batched_x_shape(x_shape):
     # Reject multidimensional data with batch_shape > 1.
     if x_ndim > 1 and inferred_batch_shape > 1:
         raise ValueError(
-            """Observation/simulation `x` has D>1 dimensions. SBI interprets the
+            """Observation/simulation `x` has D>1 dimensions. sbi interprets the
             leading dimension as a batch dimension, but it *currently* only processes a
             single observation, a batch of several is not supported yet.
 
@@ -245,7 +245,7 @@ def check_for_possibly_batched_x_shape(x_shape):
     elif inferred_data_ndim > 1 and inferred_batch_shape == 1:
         warnings.warn(
             f"""Beware: The observed data (x_o) you passed was interpreted to have
-            matrix shape: {inferred_data_shape}. The current implementation of SBI
+            matrix shape: {inferred_data_shape}. The current implementation of sbi
             might not provide stable support for this and result in shape mismatches.
             """
         )
@@ -256,7 +256,7 @@ def check_for_possibly_batched_x_shape(x_shape):
 def check_for_possibly_batched_observations(x_o: Tensor):
     """Raise `ValueError` if dimensionality of data doesn't match requirements.
 
-    SBI does not support multiple observations yet. For 2D observed data the leading
+    sbi does not support multiple observations yet. For 2D observed data the leading
     dimension will be interpreted as batch dimension and a ValueError will be raised if
     the batch dimension is larger than 1.
     Multidimensional observations e.g., images, are allowed when they are passed with an
@@ -346,7 +346,7 @@ def check_prior_batch_behavior(prior) -> None:
 def process_simulator(
     user_simulator: Callable, prior, is_numpy_simulator: bool,
 ) -> Callable:
-    """Return a simulator that meets the requirements for usage in SBI.
+    """Return a simulator that meets the requirements for usage in sbi.
 
     Wraps the simulator to return only `torch.Tensor` and handle batches of parameters.
     """
@@ -464,7 +464,7 @@ def process_x_shape(
 
 
 def process_x_o(x_o: Tensor, x_shape: torch.Size) -> Tensor:
-    """Return observed data to SBI's shape and type requirements.
+    """Return observed data adapted to match sbi's shape and type requirements.
 
     Args:
         x_o: Observed data as provided by the user.
@@ -472,7 +472,7 @@ def process_x_o(x_o: Tensor, x_shape: torch.Size) -> Tensor:
             been inferred from a simulation.
 
     Returns:
-        x_o: Observed data with shape ready for usage in SBI.
+        x_o: Observed data with shape ready for usage in sbi.
     """
 
     # Maybe add batch dimension, cast to tensor.
@@ -496,9 +496,9 @@ def prepare_sbi_problem(
     user_x_shape: Optional[Shape] = None,
     skip_input_checks: bool = False,
 ) -> Tuple[Callable, Distribution, Optional[torch.Size]]:
-    """Prepare simulator, prior and observed data for usage in SBI.
+    """Prepare simulator, prior and observed data for usage in sbi.
 
-    One of the goals is to allow you to use SBI with inputs computed in numpy.
+    One of the goals is to allow you to use sbi with inputs computed in numpy.
 
     Attempts to meet the following requirements by reshaping and type-casting:
     - the simulator function receives as input and returns a Tensor.
@@ -516,12 +516,12 @@ def prepare_sbi_problem(
             budget, as the input checks run the simulator a couple of times.
 
     Returns:
-        Tuple (simulator, prior, x_shape) checked and matching the requirements of SBI.
+        Tuple (simulator, prior, x_shape) checked and matching the requirements of sbi.
     """
 
     if skip_input_checks:
         warnings.warn(
-            """SBI input checks are skipped, make sure to pass a valid prior, simulator
+            """sbi input checks are skipped, make sure to pass a valid prior, simulator
             and output shape. Consult the documentation for the exact requirements.""",
             UserWarning,
         )
@@ -536,7 +536,7 @@ def prepare_sbi_problem(
         # Check data shape, returns shape with leading batch dimension.
         x_shape, _ = process_x_shape(simulator, prior, user_x_shape)
 
-        # Consistency check after making ready for SBI.
+        # Consistency check after making ready for sbi.
         check_sbi_problem(simulator, prior, x_shape)
 
         return simulator, prior, x_shape
@@ -545,7 +545,7 @@ def prepare_sbi_problem(
 def check_sbi_problem(
     simulator: Callable, prior: Distribution, x_shape: torch.Size
 ) -> None:
-    """Assert requirements for simulator, prior and observation for usage in SBI.
+    """Assert requirements for simulator, prior and observation for usage in sbi.
 
     Args:
         simulator: simulator function

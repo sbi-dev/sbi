@@ -9,7 +9,7 @@
 - **observed data `x_o` ** as torch `Tensor` or `np.ndarray`, with non-nil batch shape, i.e., `x_o.shape = (1, obs_dims>=1)` 
   - if `obs dims > 1`, we will have to take care of that at the level of the NN in some cases (some architectures, e.g. convolutional embedding networks, will want to have the original data in its original shape).
 
-## What we require in SBI
+## What we require in sbi
 
 - simulator that takes and returns torch `Tensor`s, batched, e.g., it always assume a batch dimension, taking `(1, param dim)` for a single input and returning `(1, obs dim)`.
 - prior object with behavior as torch `Distribution`.

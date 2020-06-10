@@ -76,5 +76,5 @@
     "autoDocstring.customTemplatePath": ".vscode/autodocstring.template",
     //
     // Signal that we are using shared workspace settings in .vscode
-    "window.title": "SBI.vscode:: ${dirty}${activeEditorShort}${separator}${rootName}${separator}${appName}"
+    "window.title": "sbi.vscode:: ${dirty}${activeEditorShort}${separator}${rootName}${separator}${appName}"
 }

@@ -70,16 +70,14 @@ def test_inference_with_nan_simulator(
         prior=prior,
     )
 
-    if method == SNPE_C:
-        infer = method(simulator=linear_gaussian_nan, prior=prior,)
-    else:
-        infer = method(simulator=linear_gaussian_nan, prior=prior,)
+    infer = method(simulator=linear_gaussian_nan, prior=prior,)
 
     posterior = infer(
         num_rounds=1,
         num_simulations_per_round=num_simulations,
         exclude_invalid_x=exclude_invalid_x,
-    ).freeze(x_o)
+    ).set_default_x(x_o)
+
     samples = posterior.sample(num_samples)
 
     # Compute the c2st and assert it is near chance level of 0.5.

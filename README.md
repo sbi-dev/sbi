@@ -2,7 +2,7 @@
 
 ## Warning: pre-release stage
 
-SBI is currently under very active development leading up to a first stable release on 12th June.
+`sbi` is currently under very active development leading up to a first stable release on 12th June.
 
 Some aspects of the interface will change, and the documentation for running the
 inference methods (`SNPE_C / APT, SRE_A / AALR, SRE_B / SRE, SNL`) is not accessible  at the moment through

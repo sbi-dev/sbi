@@ -150,7 +150,7 @@ def test_c2st_snl_on_linearGaussian(num_dim: int, prior_str: str, set_seed):
         show_progress_bars=False,
     )
 
-    posterior = infer(num_rounds=1, num_simulations_per_round=1000).freeze(x_o)
+    posterior = infer(num_rounds=1, num_simulations_per_round=1000).set_default_x(x_o)
 
     samples = posterior.sample(num_samples=num_samples, thin=3)
 

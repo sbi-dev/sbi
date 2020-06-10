@@ -6,7 +6,7 @@ The focus of `sbi` is _Sequential Neural Posterior Estimation_ (SNPE). In SNPE, 
 
 - To see illustrations of SNPE on canonical problems in neuroscience, read our preprint:
 [Training deep neural density estimators to identify mechanistic models of neural dynamics](https://www.biorxiv.org/content/10.1101/838383v3).
-- To learn more about the general motivation behind simulation-based inference, and algorithms included in `sbi`, keep on reading.
+- To learn more about the general motivation behind simulation-based inference, and inference methods included in `sbi`, keep on reading.
 
 
 ## Motivation and approach
@@ -33,8 +33,7 @@ SNPE takes three inputs: A candidate mechanistic model, prior knowledge or const
 
 ## Publications
 
-Algorithms included in `sbi` were published in the following papers, which provide additional information:
-
+Refer to the following papers for additional details on the inference methods included in `sbi`: 
 
 - **Fast ε-free Inference of Simulation Models with Bayesian Conditional Density Estimation**<br> by Papamakarios & Murray (NeurIPS 2016) <br>[[PDF]](https://papers.nips.cc/paper/6084-fast-free-inference-of-simulation-models-with-bayesian-conditional-density-estimation.pdf) [[BibTeX]](https://papers.nips.cc/paper/6084-fast-free-inference-of-simulation-models-with-bayesian-conditional-density-estimation/bibtex)
 
@@ -45,7 +44,7 @@ Algorithms included in `sbi` were published in the following papers, which provi
 - **On Contrastive Learning for Likelihood-free Inference**<br>Durkan C.,
   Murray I., and Papamakarios G.(ICML 2020) <br>[[PDF]](https://arxiv.org/abs/2002.03712).
 
-We refer to these algorithms as SNPE-A, SNPE-B, and SNPE-C/APT, respectively.
+We refer to these methods as SNPE-A, SNPE-B, and SNPE-C/APT, respectively.
 
 
 As an alternative to directly estimating the posterior on parameters given data, it is also possible to estimate the likelihood of data given parameters, and then subsequently draw posterior samples using MCMC ([Papamakarios, Sterratt & Murray, 2019](http://proceedings.mlr.press/v89/papamakarios19a/papamakarios19a.pdf)[^1], [Lueckmann, Karaletsos, Bassetto, Macke, 2019](http://proceedings.mlr.press/v96/lueckmann19a/lueckmann19a.pdf)). Depending on the problem, approximating the likelihood can be more or less effective than SNPE techniques.
