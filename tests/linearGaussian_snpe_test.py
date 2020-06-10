@@ -67,8 +67,6 @@ def test_c2st_snpe_on_linearGaussian(
         prior=prior,
         z_score_x=True,
         simulation_batch_size=10,
-        retrain_from_scratch_each_round=False,
-        discard_prior_samples=False,
         show_progress_bars=False,
         sample_with_mcmc=False,
     )
@@ -163,8 +161,6 @@ def test_c2st_snpe_on_linearGaussian_different_dims(set_seed):
         density_estimator="maf",
         z_score_x=True,
         simulation_batch_size=1,
-        retrain_from_scratch_each_round=False,
-        discard_prior_samples=False,
         show_progress_bars=False,
     )
 
@@ -222,7 +218,6 @@ def test_c2st_multi_round_snpe_on_linearGaussian(algorithm_str: str, set_seed):
         prior=prior,
         density_estimator="maf",
         z_score_x=True,
-        retrain_from_scratch_each_round=False,
         show_progress_bars=False,
     )
     call_args = dict(num_rounds=2, x_o=x_o, num_simulations_per_round=1000)
@@ -293,7 +288,6 @@ def test_multi_round_snpe_deterministic_simulator(set_seed, z_score_min_std):
         prior=prior,
         density_estimator="maf",
         z_score_x=True,
-        retrain_from_scratch_each_round=False,
         simulation_batch_size=10,
         z_score_min_std=z_score_min_std,
         show_progress_bars=False,
@@ -347,9 +341,6 @@ def test_api_snpe_c_posterior_correction(
         density_estimator="maf",
         z_score_x=True,
         simulation_batch_size=50,
-        use_combined_loss=False,
-        retrain_from_scratch_each_round=False,
-        discard_prior_samples=False,
         sample_with_mcmc=sample_with_mcmc,
         mcmc_method=mcmc_method,
         show_progress_bars=False,

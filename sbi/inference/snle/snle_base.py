@@ -96,14 +96,20 @@ class LikelihoodEstimator(NeuralInference, ABC):
         validation_fraction: float = 0.1,
         stop_after_epochs: int = 20,
         max_num_epochs: Optional[int] = None,
-        retrain_from_scratch_each_round: bool = False,
         clip_max_norm: Optional[float] = 5.0,
+        discard_prior_samples: bool = False,
+        retrain_from_scratch_each_round: bool = False,
     ) -> NeuralPosterior:
         r"""Run SNLE.
 
         Return posterior $p(\theta|x)$ after inference (possibly over several rounds).
 
         Args:
+            discard_prior_samples: Whether to discard samples simulated in round 1, i.e.
+                from the prior. Training may be sped up by ignoring such less targeted
+                samples.
+            retrain_from_scratch_each_round: Whether to retrain the conditional density
+                estimator for the posterior from scratch each round.
 
         Returns:
             Posterior $p(\theta|x_o)$ that can be sampled and evaluated.
@@ -143,13 +149,15 @@ class LikelihoodEstimator(NeuralInference, ABC):
 
             # Fit neural likelihood to newly aggregated dataset.
             self._train(
+                round_=round_,
                 batch_size=batch_size,
                 learning_rate=learning_rate,
                 validation_fraction=validation_fraction,
                 stop_after_epochs=stop_after_epochs,
                 max_num_epochs=max_num_epochs,
-                retrain_from_scratch_each_round=retrain_from_scratch_each_round,
                 clip_max_norm=clip_max_norm,
+                discard_prior_samples=discard_prior_samples,
+                retrain_from_scratch_each_round=retrain_from_scratch_each_round,
             )
 
             # Update description for progress bar.
@@ -169,13 +177,15 @@ class LikelihoodEstimator(NeuralInference, ABC):
 
     def _train(
         self,
+        round_: int,
         batch_size: int,
         learning_rate: float,
         validation_fraction: float,
         stop_after_epochs: int,
         max_num_epochs: int,
-        retrain_from_scratch_each_round: bool,
         clip_max_norm: Optional[float],
+        discard_prior_samples: bool,
+        retrain_from_scratch_each_round: bool,
     ) -> None:
         r"""
         Train the conditional density estimator for the likelihood.
@@ -187,6 +197,8 @@ class LikelihoodEstimator(NeuralInference, ABC):
         stopping).
         """
 
+        # Starting index for the training set (1 = discard round-0 samples).
+        start_idx = int(discard_prior_samples and round_ > 0)
         # Get total number of training examples.
         num_examples = sum(len(theta) for theta in self._theta_bank)
 
@@ -201,7 +213,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
 
         # Dataset is shared for training and validation loaders.
         dataset = data.TensorDataset(
-            torch.cat(self._x_bank), torch.cat(self._theta_bank)
+            torch.cat(self._x_bank[start_idx:]), torch.cat(self._theta_bank[start_idx:])
         )
 
         # Create neural net and validation loaders using a subset sampler.

@@ -33,7 +33,6 @@ class PosteriorEstimator(NeuralInference, ABC):
         sample_with_mcmc: bool = False,
         mcmc_method: str = "slice_np",
         calibration_kernel: Optional[Callable] = None,
-        discard_prior_samples: bool = False,
         skip_input_checks: bool = False,
         exclude_invalid_x: bool = True,
         device: Union[torch.device, str] = get_default_device(),
@@ -51,9 +50,6 @@ class PosteriorEstimator(NeuralInference, ABC):
             nearly so.
         calibration_kernel: A function to calibrate the loss with respect to the
             simulations `x`. See Lueckmann, Gonçalves et al., NeurIPS 2017.
-        discard_prior_samples: Whether to discard samples simulated in round 1, i.e.
-            from the prior. Training may be sped up by ignoring such less targeted
-            samples.
 
         See docstring of `NeuralInference` class for all other arguments.
         """
@@ -88,7 +84,6 @@ class PosteriorEstimator(NeuralInference, ABC):
             self.calibration_kernel = calibration_kernel
 
         self._z_score_x, self._z_score_min_std = z_score_x, z_score_min_std
-        self._discard_prior_samples = discard_prior_samples
 
         # Create a neural posterior which can sample(), log_prob().
         self._posterior = NeuralPosterior(
@@ -120,8 +115,9 @@ class PosteriorEstimator(NeuralInference, ABC):
         validation_fraction: float = 0.1,
         stop_after_epochs: int = 20,
         max_num_epochs: Optional[int] = None,
-        retrain_from_scratch_each_round: bool = False,
         clip_max_norm: Optional[float] = 5.0,
+        discard_prior_samples: bool = False,
+        retrain_from_scratch_each_round: bool = False,
     ) -> NeuralPosterior:
         r"""Run SNPE.
 
@@ -148,10 +144,13 @@ class PosteriorEstimator(NeuralInference, ABC):
             max_num_epochs: Maximum number of epochs to run. If reached, we stop
                 training even when the validation loss is still decreasing. If None, we
                 train until validation loss increases (see also `stop_after_epochs`).
-            retrain_from_scratch_each_round: Whether to retrain the conditional density
-                estimator for the posterior from scratch each round.
             clip_max_norm: Value at which to clip the total gradient norm in order to
                 prevent exploding gradients. Use None for no clipping.
+            discard_prior_samples: Whether to discard samples simulated in round 1, i.e.
+                from the prior. Training may be sped up by ignoring such less targeted
+                samples.
+            retrain_from_scratch_each_round: Whether to retrain the conditional density
+                estimator for the posterior from scratch each round.
 
         Returns:
             Posterior $p(\theta|x)$ that can be sampled and evaluated.
@@ -186,8 +185,9 @@ class PosteriorEstimator(NeuralInference, ABC):
                 validation_fraction=validation_fraction,
                 stop_after_epochs=stop_after_epochs,
                 max_num_epochs=cast(int, max_num_epochs),
-                retrain_from_scratch_each_round=retrain_from_scratch_each_round,
                 clip_max_norm=clip_max_norm,
+                discard_prior_samples=discard_prior_samples,
+                retrain_from_scratch_each_round=retrain_from_scratch_each_round,
             )
 
             # Store models at end of each round.
@@ -322,8 +322,9 @@ class PosteriorEstimator(NeuralInference, ABC):
         validation_fraction: float,
         stop_after_epochs: int,
         max_num_epochs: int,
-        retrain_from_scratch_each_round: bool,
         clip_max_norm: Optional[float],
+        discard_prior_samples: bool,
+        retrain_from_scratch_each_round: bool,
     ) -> None:
         r"""Train the conditional density estimator for the posterior $p(\theta|x)$.
 
@@ -335,7 +336,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         """
 
         # Starting index for the training set (1 = discard round-0 samples).
-        start_idx = int(self._discard_prior_samples and round_ > 0)
+        start_idx = int(discard_prior_samples and round_ > 0)
         num_total_examples = sum(len(theta) for theta in self._theta_bank[start_idx:])
 
         # Select random neural net and validation splits from (theta, x) pairs.
