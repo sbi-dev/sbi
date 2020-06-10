@@ -38,3 +38,5 @@ from sbi.utils.typechecks import (
     is_positive_int,
     is_power_of_two,
 )
+
+from sbi.user_input.user_input_checks_utils import MultipleIndependent

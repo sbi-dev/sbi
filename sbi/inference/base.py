@@ -2,28 +2,26 @@ from abc import ABC
 from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Union
+from typing import cast, Callable, Dict, List, Optional, Union
 from warnings import warn
 
 import torch
 from torch import Tensor
 from torch.utils.tensorboard import SummaryWriter
 
+import sbi.inference
 from sbi.simulators.simutils import simulate_in_batches
 from sbi.user_input.user_input_checks import process_x_o
+from sbi.user_input.user_input_checks import prepare_sbi_problem
 from sbi.utils import get_log_root
 from sbi.utils.plot import pairplot
 from sbi.utils.torchutils import get_default_device
-
-from typing import Callable
-from sbi.user_input.user_input_checks import prepare_sbi_problem
-import sbi.inference
 
 
 def infer(
     method: str, prior, simulator: Callable, num_simulations: int, num_workers: int = 1
 ):
-    """
+    r"""
     Return posterior distribution by running simulation-based inference.
 
     This function provides a simple interface to run sbi. Inference is run for a single
@@ -53,13 +51,13 @@ def infer(
     """
 
     try:
-        method = getattr(sbi.inference, method.upper())
+        method: Callable = getattr(sbi.inference, method.upper())
     except AttributeError:
         raise NameError(
             "Method not available. `method` must be one of 'SNPE', 'SNLE', 'SNRE'."
         )
 
-    # sanitize inputs
+    # Note this typically simulates once to find out the right `x_shape`.
     prior, simulator, x_shape = prepare_sbi_problem(simulator, prior, None)
 
     infer_ = method(prior, simulator, x_shape=x_shape, num_workers=num_workers)
@@ -214,8 +212,9 @@ class NeuralInference(ABC):
                 "round, or a single integer to be used for all rounds."
             )
         except TypeError:
-            num_simulations_per_round = [num_simulations_per_round] * num_rounds
-        return num_simulations_per_round
+            num_simulations_per_round: List = [num_simulations_per_round] * num_rounds
+
+        return cast(list, num_simulations_per_round)
 
     @staticmethod
     def _describe_round(round_: int, summary: Dict[str, list]) -> str:
