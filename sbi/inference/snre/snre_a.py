@@ -29,6 +29,9 @@ class SNRE_A(RatioEstimator):
         stop_after_epochs: int = 20,
         max_num_epochs: Optional[int] = None,
         clip_max_norm: Optional[float] = 5.0,
+        exclude_invalid_x: bool = True,
+        discard_prior_samples: bool = False,
+        retrain_from_scratch_each_round: bool = False,
     ) -> NeuralPosterior:
 
         # AALR is defined for `num_atoms=2`.
