@@ -65,7 +65,6 @@ def test_c2st_snpe_on_linearGaussian(
     infer = SNPE_C(
         simulator=simulator,
         prior=prior,
-        z_score_x=True,
         simulation_batch_size=10,
         show_progress_bars=False,
         sample_with_mcmc=False,
@@ -159,7 +158,6 @@ def test_c2st_snpe_on_linearGaussian_different_dims(set_seed):
         simulator=simulator,
         prior=prior,
         density_estimator="maf",
-        z_score_x=True,
         simulation_batch_size=1,
         show_progress_bars=False,
     )
@@ -217,7 +215,6 @@ def test_c2st_multi_round_snpe_on_linearGaussian(algorithm_str: str, set_seed):
         simulator=simulator,
         prior=prior,
         density_estimator="maf",
-        z_score_x=True,
         show_progress_bars=False,
     )
     call_args = dict(num_rounds=2, x_o=x_o, num_simulations_per_round=1000)
@@ -287,13 +284,16 @@ def test_multi_round_snpe_deterministic_simulator(set_seed, z_score_min_std):
         simulator=deterministic_simulator,
         prior=prior,
         density_estimator="maf",
-        z_score_x=True,
         simulation_batch_size=10,
-        z_score_min_std=z_score_min_std,
         show_progress_bars=False,
     )
 
-    infer(num_rounds=2, x_o=x_o, num_simulations_per_round=1000)
+    infer(
+        num_rounds=2,
+        x_o=x_o,
+        num_simulations_per_round=1000,
+        z_score_min_std=z_score_min_std,
+    )
 
 
 # Testing rejection and mcmc sampling methods.
@@ -339,7 +339,6 @@ def test_api_snpe_c_posterior_correction(
         simulator=simulator,
         prior=prior,
         density_estimator="maf",
-        z_score_x=True,
         simulation_batch_size=50,
         sample_with_mcmc=sample_with_mcmc,
         mcmc_method=mcmc_method,
