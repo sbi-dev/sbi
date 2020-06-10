@@ -503,16 +503,16 @@ def prepare_sbi_problem(
     user_prior,
     user_x_shape: Optional[torch.Size] = None,
     skip_input_checks: bool = False,
-) -> Tuple[Callable, Distribution, torch.Size]:
+) -> Tuple[Callable, Distribution, Optional[torch.Size]]:
     """Prepare simulator, prior and observed data for usage in sbi.
 
-    Attempts to meet the following requirements by reshaping and type casting to PyTorch
-    Tensor:
+    One of the goals is to allow you to use SBI with inputs computed in numpy.
 
+    Attempts to meet the following requirements by reshaping and type-casting:
     - the simulator function receives as input and returns a Tensor.
     - the simulator can simulate batches of parameters and return batches of data.
     - the prior does not produce batches and samples and evaluates to Tensor.
-    - the observed data is a Tensor and has a leading batch dimension of one.
+    - the output shape is a torch.Size((1,N)) (i.e, has a leading batch dimension 1).
 
     If this is not possible, a suitable exception will be raised.
 
@@ -520,20 +520,17 @@ def prepare_sbi_problem(
         user_simulator: Simulator as provided by the user.
         user_prior: Prior as provided by the user.
         user_x_shape: Shape of a single simulation output, either (1,N) or (N).
-        skip_input_checks: Flag to turn off input checks,
-            e.g., for saving simulation budget as the input checks run the simulator
-            a couple of times.
+        skip_input_checks: Flag to turn off input checks. This saves simulation budget,
+            as the input checks run the simulator a couple of times.
 
     Returns:
-        simulator: simulator adapted for sbi.
-        prior: adapted prior.
-        x_o: adapted observed data.
+        Tuple (simulator, prior, x_shape) checked and matching the requirements of SBI.
     """
 
     if skip_input_checks:
         warnings.warn(
             """SBI input checks are skipped, make sure to pass a valid prior, simulator
-            and x_o. Consult the documentation for the exact requirements.""",
+            and output shape. Consult the documentation for the exact requirements.""",
             UserWarning,
         )
         return user_simulator, user_prior, user_x_shape
@@ -544,7 +541,7 @@ def prepare_sbi_problem(
         # Check simulator, returns PyTorch simulator able to simulate batches.
         simulator = process_simulator(user_simulator, prior, prior_returns_numpy)
 
-        # Check data, returns data with leading batch dimension.
+        # Check data shape, returns shape with leading batch dimension.
         x_shape, _ = process_x_shape(simulator, prior, user_x_shape)
 
         # Consistency check after making ready for SBI.
