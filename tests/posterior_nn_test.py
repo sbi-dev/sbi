@@ -20,7 +20,7 @@ def test_log_prob_with_different_x():
     posterior.log_prob(theta, x=ones(num_dim))
     posterior.log_prob(theta, x=ones(num_dim))
     posterior.log_prob(theta, x=ones(1, num_dim))
-    posterior = posterior.freeze(x_o=ones(1, num_dim))
+    posterior = posterior.set_default_x(ones(1, num_dim))
     posterior.log_prob(theta, x=None)
     posterior.sample(10, x=None)
 

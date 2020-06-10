@@ -37,7 +37,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         show_progress_bars: bool = True,
         show_round_summary: bool = False,
     ):
-        """ Base class for Sequential Neural Posterior Estimation algorithms.
+        """ Base class for Sequential Neural Posterior Estimation methods.
 
         density_estimator: Density estimator that can `.log_prob()` and `.sample()`.
 
@@ -68,13 +68,13 @@ class PosteriorEstimator(NeuralInference, ABC):
 
         # Create a neural posterior which can sample(), log_prob().
         self._posterior = NeuralPosterior(
-            algorithm_family="snpe",
+            method_family="snpe",
             neural_net=density_estimator,
             prior=self._prior,
             sample_with_mcmc=sample_with_mcmc,
             mcmc_method=mcmc_method,
-            get_potential_function=PotentialFunctionProvider(),
             x_shape=self._x_shape,
+            get_potential_function=PotentialFunctionProvider(),
         )
 
         self._prior_masks, self._model_bank = [], []
@@ -213,21 +213,21 @@ class PosteriorEstimator(NeuralInference, ABC):
             self._model_bank.append(deepcopy(self._posterior))
             self._model_bank[-1].net.eval()
 
-            # making the call to get_leakage_correction() and the update of
+            # Making the call to `leakage_correction()`` and the update of
             # self._leakage_density_correction_factor explicit here. This is just
             # to make sure this update never gets lost when we e.g. do not log our
-            # things to tensorboard anymore. Calling get_leakage_correction() is needed
+            # things to tensorboard anymore. Calling `leakage_correction()` is needed
             # to update the leakage after each round.
-            acceptance_rate = (
-                torch.as_tensor(float("nan"))
-                if self._posterior.x_o is None
-                else self._posterior.get_leakage_correction(
+            if self._posterior.x_o is None:
+                acceptance_rate = torch.tensor(float("nan"))
+            else:
+                acceptance_rate = self._posterior.leakage_correction(
                     x=self._posterior.x_o,
                     force_update=True,
                     show_progress_bars=self._show_progress_bars,
                 )
-            )
 
+            # Update tensorboard and summary dict.
             self._summarize(
                 round_=round_,
                 x_o=self._posterior.x_o,

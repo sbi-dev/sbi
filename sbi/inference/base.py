@@ -34,7 +34,7 @@ def infer(
     mackelab.org/sbi/tutorial/03_flexible_interface.html
 
     Args:
-        method: What inference algorithm to use. Either of ['SNPE'|'SNLE'|'SNRE'].
+        method: What inference method to use. Either of "SNPE", "SNLE" or "SNRE".
         simulator: A function that takes parameters $\theta$ and maps them to
             simulations, or observations, `x`, $\mathrm{sim}(\theta)\to x$. Any
             regular Python callable (i.e. function or class with `__call__` method)
@@ -84,7 +84,7 @@ class NeuralInference(ABC):
         show_round_summary: bool = False,
     ):
         r"""
-        Base class for inference algorithms.
+        Base class for inference methods.
 
         Args:
             simulator: A function that takes parameters $\theta$ and maps them to
@@ -138,7 +138,7 @@ class NeuralInference(ABC):
 
         # XXX We could instantiate here the Posterior for all children. Two problems:
         #     1. We must dispatch to right PotentialProvider for mcmc based on name
-        #     2. `alg_family` cannot be resolved only from `self.__class__.__name__`,
+        #     2. `method_family` cannot be resolved only from `self.__class__.__name__`,
         #         since SRE, AALR demand different handling but are both in SRE class.
 
         self._summary_writer = (

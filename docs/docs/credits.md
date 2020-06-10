@@ -6,9 +6,9 @@ This code builds heavily on previous work by [Conor Durkan](https://conormdurkan
 Relevant repositories include [bayesiains/nsf](https://github.com/bayesiains/nsf) and [conormdurkan/lfi](https://github.com/conormdurkan/lfi).
 
 
-## Algorithms
+## Inference methods
 
-`sbi` implements algorithms from the following papers:
+`sbi` implements inference methods reported in the following contributions:
 
 - **Fast ε-free Inference of Simulation Models with Bayesian Conditional Density
   Estimation**<br> by Papamakarios G. and Murray I. (NeurIPS 2016)
@@ -25,4 +25,4 @@ Relevant repositories include [bayesiains/nsf](https://github.com/bayesiains/nsf
 - **On Contrastive Learning for Likelihood-free Inference**<br>Durkan C.,
   Murray I., and Papamakarios G.(ICML 2020) <br>[[PDF]](https://arxiv.org/abs/2002.03712).
 
-We refer to these algorithms as SNPE-A, SNPE-B, and SNPE-C/APT, respectively.
+We refer to these methods as SNPE-A, SNPE-B, and SNPE-C/APT, respectively.

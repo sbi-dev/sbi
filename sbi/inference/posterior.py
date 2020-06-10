@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Callable, Optional
 from warnings import warn
 
@@ -24,13 +25,13 @@ NEG_INF = torch.tensor(float("-inf"), dtype=torch.float32)
 class NeuralPosterior:
     r"""Posterior $p(\theta|x)$ with `log_prob()` and `sample()` methods.
 
-    All inference methods in `sbi` train a neural network which is then used to obtain
-    the posterior distribution. The `Posterior` class wraps this neural network such
-    that one can directly evaluate the log probability and draw samples from the
-    posterior. The neural network itself can be accessed via the .net attribute of this
-    class.
+    All inference methods in sbi train a neural network which is then used to obtain
+    the posterior distribution. The `NeuralPosterior` class wraps the trained network
+    such that one can directly evaluate the log probability and draw samples from the
+    posterior. The neural network itself can be accessed via the  `.net` attribute.
 
     Specifically, this class offers the following functionality:
+
     - Correction of leakage (applicable only to SNPE): If the prior is bounded, the
       posterior resulting from SNPE can generate samples that lie outside of the prior
       support (i.e. the posterior leaks). This class rejects these samples or,
@@ -45,34 +46,24 @@ class NeuralPosterior:
 
     def __init__(
         self,
-        algorithm_family: str,
+        method_family: str,
         neural_net: nn.Module,
         prior,
         sample_with_mcmc: bool = True,
         mcmc_method: str = "slice_np",
-        get_potential_function: Optional[Callable] = None,
         x_shape: Optional[torch.Size] = None,
+        get_potential_function: Optional[Callable] = None,
     ):
         """
         Args:
-            algorithm_family: One of 'snpe', 'snl', 'snre_a' or 'snre_b'.
-            neural_net: A classifier for sre/aalr, a density estimator for snpe/snl.
-            prior: Prior distribution with methods `log_prob` and `sample`.
-            x_o: Observation acting as conditioning context. It acts as follows:
-                - Providing a specific $x_o$ allows inference to focus on a particular
-                observation by actively steering simulations over multiple rounds. The
-                provided $x_o$ becomes also the default $x$ at which to evaluate the log
-                probability and to sample parameters. Using $x\neq x_o$ might severely
-                degrade the quality of inference in this multi-round setting.
-                - Not providing a specific $x_o$ ($x_o$=None) provides for 'amortized
-                inference', i.e. the resulting conditional density can be evaluated at
-                any x. However, this only allows for single-round inference, which
-                requires a large number of simulations to provide accurate results.
+            method_family: One of 'snpe', 'snl', 'snre_a' or 'snre_b'.
+            neural_net: A classifier for SNRE, a density estimator for SNPE and SNL.
+            prior: Prior distribution with `.log_prob()` and `.sample()`.
             sample_with_mcmc: Whether to sample with MCMC. Will always be `True` for SRE
-                and SNL, but can also be set to `True` for SNPE to use MCMC to deal with
-                leakage.
-            x_shape: Simulator callable. Used only to check whether the $x_o$ passed
-                by the user at freeze() has the correct shape.
+                and SNL, but can also be set to `True` for SNPE if MCMC is preferred to
+                deal with leakage over rejection sampling.
+            x_shape: Simulator output shape. If present, it is used to check any default
+                `x` set via the `.set_default_x()` method.
         """
 
         self.net = neural_net
@@ -84,36 +75,38 @@ class NeuralPosterior:
         self._get_potential_function = get_potential_function
         self._x_shape = x_shape
 
-        if algorithm_family in ("snpe", "snle_a", "snre_a", "snre_b"):
-            self._alg_family = algorithm_family
+        if method_family in ("snpe", "snle_a", "snre_a", "snre_b"):
+            self._method_family = method_family
         else:
-            raise ValueError("Algorithm family unsupported.")
+            raise ValueError("Method family unsupported.")
 
         self._num_trained_rounds = 0
 
-        # Correction factor for snpe leakage.
+        # Correction factor for SNPE leakage.
         self._leakage_density_correction_factor = None
 
-    def freeze(self, x_o: Tensor):
+    # When a type is not yet defined, one uses a string representation.
+    def set_default_x(self, /, x: Tensor) -> "NeuralPosterior":
         """
-        Return `NeuralPosterior` object with default observation `x_o` set.
+        Return `NeuralPosterior` object with default conditioning context `x` set.
 
         When sequential methods are used in a single-round setting, the resulting neural
         network allows for amortized inference, i.e. computing the posterior
-        $p(\theta|x)$ for any x. Hence, when calling `log_prob()` or `sample()`, the
+        $p(\theta|x)$ for any x. Hence, when calling `.log_prob()` or `.sample()`, the
         user generally needs to specify both $\theta$ and $x$. This function sets a
         default $x_o$, and thus the user only needs to specify $\theta$ when later
-        calling `log_prob()` or `sample()` for it to automatically use the default $x_o$
-        when evaluating or sampling from $p(\theta|x_o)$.
+        calling `.log_prob()` or `.sample()` for it to automatically use the default 
+        $x_o$ when evaluating or sampling from $p(\theta|x_o)$.
 
         Args:
-            x_o: The default observation to set for the posterior $p(theta|x_o)$.
+            x: The default observation to set for the posterior $p(theta|x)$.
 
         Returns:
-            `NeuralPosterior` with default `x_o`.
+            `NeuralPosterior` that will use a default `x` when not explicitly passed.
         """
 
-        self.x_o = process_x_o(x_o, self._x_shape)
+        # TODO `process_x_o` name feels out of place here.
+        self.x_o = process_x_o(x, self._x_shape)
 
         return self
 
@@ -124,27 +117,27 @@ class NeuralPosterior:
         norm_posterior_snpe: bool = True,
         track_gradients: bool = False,
     ) -> Tensor:
-        r"""Return posterior $p(\theta|x)$ log probability.
+        r"""Return posterior log probability  $\log p(\theta|x)$.
 
         Args:
             theta: Parameters $\theta$.
-            x: Conditioning context for posterior $p(\theta|x)$. If x=None, fall back
-                onto $x_o$ that was previously provided either at inference or through
-                the `freeze()` method.
+            x: Conditioning context for posterior $p(\theta|x)$. If not provided,
+                fall back onto `x_o` if previously provided for multiround training, or
+                to a set default (see `set_default_x()` method).
             norm_posterior_snpe: Whether to enforce a normalized posterior density when
-                using snpe. Renormalization of the posterior is useful when some
+                using SNPE. Renormalization of the posterior is useful when some
                 probability falls out or 'leaks' out of the prescribed prior support.
                 The normalizing factor is calculated via rejection sampling, so if you
-                need speedier but unnormalized log posterior estimates set
+                need speedier but unnormalized log posterior estimates set here
                 `norm_posterior_snpe=False`. The returned log posterior is set to
-                $-\infty$ outside of the prior support regardless of this setting.
-            track_gradients: Whether to track the gradients. Tracking gradients can be
-                helpful for e.g. sensitivity analysis, but increases the memory
+                -∞ outside of the prior support regardless of this setting.
+            track_gradients: Whether the returned tensor supports tracking gradients.
+                This can be helpful for e.g. sensitivity analysis, but increases memory 
                 consumption.
 
         Returns:
-            Log posterior probability $p(\theta|x)$ for θ in the support of the prior,
-            $-\infty$ (corresponding to zero probability) outside. Shape `(len(θ),)`.
+            `(len(θ),)`-shaped log posterior probability $\log p(\theta|x)$ for θ in the
+            support of the prior, -∞ (corresponding to 0 probability) outside.
         """
 
         # TODO Train exited here, entered after sampling?
@@ -157,18 +150,18 @@ class NeuralPosterior:
         self._ensure_single_x(x)
         self._ensure_x_consistent_with_x_o(x)
 
-        # Repeat x in case of evaluation on multiple theta. This is needed below in
-        # nflows in order to have matching shapes of theta and context x when
-        # evaluating the NN.
+        # Repeat `x` in case of evaluation on multiple `theta`. This is needed below in
+        # when calling nflows in order to have matching shapes of theta and context x
+        # at neural network evaluation time.
         x = self._match_x_with_theta_batch_shape(x, theta)
 
         try:
-            log_prob_fn = getattr(self, f"_log_prob_{self._alg_family}")
+            log_prob_fn = getattr(self, f"_log_prob_{self._method_family}")
         except AttributeError:
-            raise ValueError(f"{self._alg_family} cannot evaluate probabilities.")
+            raise ValueError(f"{self._method_family} cannot evaluate probabilities.")
 
         with torch.set_grad_enabled(track_gradients):
-            if self._alg_family == "snpe":
+            if self._method_family == "snpe":
                 return log_prob_fn(theta, x, norm_posterior=norm_posterior_snpe)
             else:
                 return log_prob_fn(theta, x)
@@ -183,7 +176,7 @@ class NeuralPosterior:
         Return posterior log probability $p(\theta|x)$.
 
         The posterior probability will be only normalized if explicitly requested,
-        but it will be always zeroed out ($-\infty$ log-prob) outside of the prior
+        but it will be always zeroed out (i.e. given -∞ log-prob) outside the prior
         support.
         """
 
@@ -194,7 +187,7 @@ class NeuralPosterior:
         masked_log_prob = torch.where(is_prior_finite, unnorm_log_prob, NEG_INF)
 
         log_factor = (
-            log(self.get_leakage_correction(x=batched_first_of_batch(x)))
+            log(self.leakage_correction(x=batched_first_of_batch(x)))
             if norm_posterior
             else 0
         )
@@ -226,7 +219,7 @@ class NeuralPosterior:
         return self.net.log_prob(x, theta) + self._prior.log_prob(theta)
 
     @torch.no_grad()
-    def get_leakage_correction(
+    def leakage_correction(
         self,
         x: Tensor,
         num_rejection_samples: int = 10_000,
@@ -249,10 +242,10 @@ class NeuralPosterior:
             force_update: Whether to force a reevaluation of the leakage correction even
                 if the context x is the same as self.x_o. This is useful to enforce a
                 new estimate of the leakage after later rounds, i.e. round 2, 3, ...
-            show_progress_bars: Whether to show a progressbar during sampling.
+            show_progress_bars: Whether to show a progress bar during sampling.
 
         Returns:
-            Saved or newly estimated correction factor (scalar Tensor).
+            Saved or newly-estimated correction factor (as a scalar `Tensor`).
         """
 
         def acceptance_at(x: Tensor) -> Tensor:
@@ -291,9 +284,9 @@ class NeuralPosterior:
 
         Args:
             num_samples: Desired number of samples.
-            x: Conditioning context for posterior $p(\theta|x)$. If x==None, fall back
-                onto $x_o$ that was previously provided either at inference or through
-                the `freeze()` method.
+            x: Conditioning context for posterior $p(\theta|x)$. If not provided,
+                fall back onto `x_o` if previously provided for multiround training, or
+                to a set default (see `set_default_x()` method).
             show_progress_bars: Whether to show sampling progress monitor.
             **kwargs: Additional parameters to be passed to the MCMC sampler, such as
                 `thin` and `warmup_steps`.
@@ -313,7 +306,7 @@ class NeuralPosterior:
                 show_progress_bars=show_progress_bars,
                 **kwargs,
             )
-        elif self._alg_family == "snpe":
+        elif self._method_family == "snpe":
             # Rejection sampling.
             samples, _ = utils.sample_posterior_within_prior(
                 self.net,
@@ -344,9 +337,9 @@ class NeuralPosterior:
         r"""
         Return MCMC samples from posterior $p(\theta|x)$.
 
-        This function is used in any case by SNL and SRE, but can also be used by SNPE
-        to deal with strong leakage. Depending on the algorithm, a different potential
-        function for the MCMC sampler is used.
+        This function is used in any case by SNLE and SNRE, but can also be used by SNPE
+        in order to deal with strong leakage. Depending on the inference method, a
+        different potential function for the MCMC sampler is required.
 
         Args:
             num_samples: Desired number of samples.
@@ -397,7 +390,7 @@ class NeuralPosterior:
         warmup_steps: int = 20,
     ) -> Tensor:
         """
-        Custom numpy implementation of slice sampling.
+        Custom implementation of slice sampling using Numpy.
 
         Args:
             num_samples: Desired number of samples.
@@ -409,7 +402,7 @@ class NeuralPosterior:
 
         """
 
-        # go into eval mode for evaluating during sampling
+        # Go into eval mode for evaluating during sampling
         # XXX set eval mode outside of calls to sample
         self.net.eval()
 
@@ -457,7 +450,7 @@ class NeuralPosterior:
 
         num_chains = mp.cpu_count - 1 if num_chains is None else num_chains
 
-        # TODO move outside function, and assert inside; remember return to train
+        # TODO Move outside function, and assert inside; remember return to train
         # Always sample in eval mode.
         self.net.eval()
 
@@ -484,18 +477,20 @@ class NeuralPosterior:
 
         return samples
 
+    # NOTE: this is done here because NeuralPosterior is created in inference methods
+    # at instantiation, while it could and should be created at training time.
     def set_embedding_net(self, embedding_net: nn.Module) -> None:
         """
-        Set the embedding net that encodes x as an attribute of the neural_net.
+        Set the `embedding_net` as an attribute of the `neural_net`.
 
         Args:
-            embedding_net: Neural net to encode x.
+            embedding_net: Neural net to encode `x`.
         """
         assert isinstance(embedding_net, nn.Module), (
-            "embedding_net is not a nn.Module. "
+            "`embedding_net`is not a `nn.Module`. "
             "If you want to use hard-coded summary features, "
             "please simply pass the already encoded summary features as input and pass "
-            "embedding_net=None"
+            "`embedding_net=None`."
         )
         self.net._embedding_net = embedding_net
 
@@ -503,22 +498,25 @@ class NeuralPosterior:
         if x is not None:
             return x
         elif self.x_o is None:
-            raise ValueError("Context x needed when not preconditioned to x_o.")
+            raise ValueError(
+                "Context `x` needed when a default has not been set."
+                "If you'd like to have a default, use the `.set_default_x()` method."
+            )
         else:
             return self.x_o
 
     def _ensure_x_consistent_with_x_o(self, x: Tensor) -> None:
-        """Check consistency with x_o shape if not None."""
+        """Check consistency with the shape of `x_o` (unless it's None)."""
 
         # TODO: This is to check the passed x matches the NN input dimensions by
-        # comparing to x_o, which was checked in user input checkts to match the
-        # simulator output. Later if we might not have self.x_o we might want to
-        # compare to the input dimension of self.net here.
+        # comparing to `x_o`, which was checked in user input checks to match the
+        # simulator output. Later if we might not have `self.x_o` we might want to
+        # compare to the input dimension of `self.net` here.
         if self.x_o is not None:
             assert (
                 x.shape == self.x_o.shape
-            ), f"""The shape of the passed x ({x.shape}) and must match the shape of x
-            used during training ({self.x_o.shape})."""
+            ), f"""The shape of the passed `x` {x.shape} and must match the shape of `x`
+            used during training, {self.x_o.shape}."""
 
     @staticmethod
     def _ensure_single_x(x: Tensor) -> None:
@@ -529,34 +527,34 @@ class NeuralPosterior:
         if inferred_batch_size > 1:
 
             raise ValueError(
-                """The x passed to condition the posterior for evaluation or sampling
+                """The `x` passed to condition the posterior for evaluation or sampling
                 has an inferred batch shape larger than one. This is not supported in
-                SBI for reasons depending on the scenario:
+                sbi for reasons depending on the scenario:
 
                     - in case you want to evaluate or sample conditioned on several xs
-                    e.g., (p(theta | [x1, x2, x3])), this is not supported yet in SBI.
+                    e.g., (p(theta | [x1, x2, x3])), this is not supported yet in sbi.
 
                     - in case you trained with a single round to do amortized inference
                     and now you want to evaluate or sample a given theta conditioned on
                     several xs, one after the other, e.g, p(theta | x1), p(theta | x2),
-                    p(theta| x3): this broadcasting across xs is not supported in SBI.
+                    p(theta| x3): this broadcasting across xs is not supported in sbi.
                     Instead, what you can do it to call posterior.log_prob(theta, xi)
                     multiple times with different xi.
 
                     - finally, if your observation is multidimensional, e.g., an image,
                     make sure to pass it with a leading batch dimension, e.g., with
                     shape (1, xdim1, xdim2). Beware that the current implementation
-                    of SBI might not provide stable support for this and result in
+                    of sbi might not provide stable support for this and result in
                     shape mismatches.
                 """
             )
 
     @staticmethod
     def _match_x_with_theta_batch_shape(x: Tensor, theta: Tensor) -> Tensor:
-        """Return x with batch shape matched to that of theta.
+        """Return `x` with batch shape matched to that of `theta`.
 
-        This is needed invnflows in order to have matching shapes of theta and context
-        x when evaluating the NN.
+        This is needed in nflows in order to have matching shapes of theta and context
+        `x` when evaluating the neural network.
         """
 
         # Theta and x are ensured to have a batch dim, get the shape.
@@ -575,3 +573,11 @@ class NeuralPosterior:
             x_matched = x
 
         return x_matched
+
+    def __repr__(self):
+        desc = f"""NeuralPosterior(method_family={self._method_family},
+                                net=<a {self.net.__class__.__name__}, see `.net` for details>,
+                                prior={self._prior!r},
+                                x_shape={self._x_shape!r}
+                                ) """
+        return desc

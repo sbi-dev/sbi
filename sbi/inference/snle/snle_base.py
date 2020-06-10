@@ -71,12 +71,12 @@ class LikelihoodEstimator(NeuralInference, ABC):
         # Create neural posterior which can sample().
         # TODO Notice use of `snle_a`, OK so long as it is the sole descendant.
         self._posterior = NeuralPosterior(
-            algorithm_family="snle_a",
+            method_family="snle_a",
             neural_net=density_estimator,
             prior=self._prior,
             mcmc_method=mcmc_method,
-            get_potential_function=PotentialFunctionProvider(),
             x_shape=self._x_shape,
+            get_potential_function=PotentialFunctionProvider(),
         )
 
         self._posterior.net.train(True)
