@@ -12,7 +12,7 @@ from torch.utils.tensorboard import SummaryWriter
 import sbi.inference
 from sbi.simulators.simutils import simulate_in_batches
 from sbi.user_input.user_input_checks import process_x
-from sbi.user_input.user_input_checks import sbi_inputs
+from sbi.user_input.user_input_checks import prepare_for_sbi
 from sbi.utils import get_log_root
 from sbi.utils.plot import pairplot
 from sbi.utils.torchutils import get_default_device
@@ -58,7 +58,7 @@ def infer(
         )
 
     # Note this typically simulates once to find out the right `x_shape`.
-    prior, simulator, x_shape = sbi_inputs(simulator, prior, None)
+    prior, simulator, x_shape = prepare_for_sbi(simulator, prior, None)
 
     infer_ = method_fun(prior, simulator, x_shape=x_shape, num_workers=num_workers)
     posterior = infer_(num_rounds=1, num_simulations_per_round=num_simulations)

@@ -10,7 +10,7 @@ from tests.test_utils import (
     get_prob_outside_uniform_prior,
     get_normalization_uniform_prior,
 )
-from sbi.inference import SNPE_B, SNPE_C, sbi_inputs
+from sbi.inference import SNPE_B, SNPE_C, prepare_for_sbi
 from sbi.simulators.linear_gaussian import (
     true_posterior_linear_gaussian_mvn_prior,
     samples_true_posterior_linear_gaussian_uniform_prior,
@@ -62,7 +62,7 @@ def test_c2st_snpe_on_linearGaussian(
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     infer = SNPE_C(
-        *sbi_inputs(simulator, prior),
+        *prepare_for_sbi(simulator, prior),
         simulation_batch_size=10,
         show_progress_bars=False,
         sample_with_mcmc=False,
@@ -153,7 +153,7 @@ def test_c2st_snpe_on_linearGaussian_different_dims(set_seed):
         )
 
     infer = SNPE_C(
-        *sbi_inputs(simulator, prior),
+        *prepare_for_sbi(simulator, prior),
         density_estimator="maf",
         simulation_batch_size=1,
         show_progress_bars=False,
@@ -207,7 +207,7 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str, set_seed):
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    simulator, prior, x_shape = sbi_inputs(simulator, prior)
+    simulator, prior, x_shape = prepare_for_sbi(simulator, prior)
     creation_args = dict(
         simulator=simulator,
         prior=prior,
@@ -279,7 +279,7 @@ def test_multi_round_snpe_deterministic_simulator(set_seed, z_score_min_std):
         return result
 
     infer = SNPE_C(
-        *sbi_inputs(deterministic_simulator, prior),
+        *prepare_for_sbi(deterministic_simulator, prior),
         density_estimator="maf",
         simulation_batch_size=10,
         show_progress_bars=False,
@@ -333,7 +333,7 @@ def test_api_snpe_c_posterior_correction(
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     infer = SNPE_C(
-        *sbi_inputs(simulator, prior),
+        *prepare_for_sbi(simulator, prior),
         density_estimator="maf",
         simulation_batch_size=50,
         sample_with_mcmc=sample_with_mcmc,
@@ -367,7 +367,7 @@ def example_posterior():
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     infer = SNPE_C(
-        *sbi_inputs(simulator, prior),
+        *prepare_for_sbi(simulator, prior),
         simulation_batch_size=10,
         num_workers=6,
         show_progress_bars=False,
