@@ -20,20 +20,27 @@ dependencies:
   - cudatoolkit
   - flake8
   - isort
+  - joblib
   - jupyter
   - matplotlib
+  - mkdocs
+  - nbconvert
   - nbstripout
   - numpy
   - pillow
   - pip
   - pip:
-    - "pyknos@git+https://github.com/mackelab/pyknos.git@v0.10"
+    - mkdocs-material,
+    - markdown-include,
+    - mkdocs-redirects,
+    - mkdocstrings,
+    - "pyknos==0.11"
     - pyro-ppl
     - torchtestcase
-    - -e .  # install package in development mode
+    - -e .  # Install package in development mode.
   - pytest
   - pytest-pep8
-  - python
+  - "python >= 3.7.0"
   - pytorch
   - pyyaml
   - rope
@@ -42,6 +49,7 @@ dependencies:
   - seaborn
   - tensorboard
   - tqdm
+  - twine
  
 
 # ADDITIONAL INSTRUCTIONS
