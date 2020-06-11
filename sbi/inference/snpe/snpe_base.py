@@ -218,11 +218,11 @@ class PosteriorEstimator(NeuralInference, ABC):
             # to make sure this update never gets lost when we e.g. do not log our
             # things to tensorboard anymore. Calling `leakage_correction()` is needed
             # to update the leakage after each round.
-            if self._posterior.x_o is None:
+            if self._posterior.default_x is None:
                 acceptance_rate = torch.tensor(float("nan"))
             else:
                 acceptance_rate = self._posterior.leakage_correction(
-                    x=self._posterior.x_o,
+                    x=self._posterior.default_x,
                     force_update=True,
                     show_progress_bars=self._show_progress_bars,
                 )
@@ -230,7 +230,7 @@ class PosteriorEstimator(NeuralInference, ABC):
             # Update tensorboard and summary dict.
             self._summarize(
                 round_=round_,
-                x_o=self._posterior.x_o,
+                x_o=self._posterior.default_x,
                 theta_bank=self._theta_bank,
                 x_bank=self._x_bank,
                 posterior_samples_acceptance_rate=acceptance_rate,
@@ -273,7 +273,7 @@ class PosteriorEstimator(NeuralInference, ABC):
             # XXX Make posterior.sample() accept tuples like prior.sample().
             theta = self._posterior.sample(
                 num_sims,
-                x=self._posterior.x_o,
+                x=self._posterior.default_x,
                 show_progress_bars=self._show_progress_bars,
             )
 
