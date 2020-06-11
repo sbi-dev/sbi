@@ -491,7 +491,7 @@ def process_x(x: Tensor, x_shape: torch.Size) -> Tensor:
 def sbi_inputs(
     simulator: Callable, prior, x_shape: Optional[Shape] = None,
 ) -> Tuple[Callable, Distribution, Optional[torch.Size]]:
-    """Prepare simulator, prior and observed data for usage in sbi.
+    """Prepare simulator, prior and shape of the observed data for usage in sbi.
 
     One of the goals is to allow you to use sbi with inputs computed in numpy.
 
