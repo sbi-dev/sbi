@@ -11,7 +11,7 @@ from sbi.inference import SNPE_C, SNL, SRE
 
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
 from sbi.user_input.user_input_checks import (
-    prepare_sbi_problem,
+    sbi_inputs,
     process_prior,
     process_simulator,
     process_x_shape,
@@ -261,7 +261,7 @@ def test_prepare_sbi_problem(simulator: Callable, prior, x_shape: torch.Size):
         x_shape: shape of data as defined by the user.
     """
 
-    simulator, prior, x_shape = prepare_sbi_problem(simulator, prior, x_shape)
+    simulator, prior, x_shape = sbi_inputs(simulator, prior, x_shape)
 
     # check batch sims and type
     n_batch = 1

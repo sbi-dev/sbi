@@ -1,7 +1,9 @@
 from typing import List, Type  # noqa: F401
 from sbi.inference.base import NeuralInference, infer  # noqa: F401
+from sbi.user_input.user_input_checks import sbi_inputs
 
 from sbi.inference.snle.snle_a import SNLE_A
+
 
 # Unimplemented: don't export
 # from sbi.inference.snpe.snpe_a import SNPE_A

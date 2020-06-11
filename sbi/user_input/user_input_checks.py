@@ -488,7 +488,7 @@ def process_x(x: Tensor, x_shape: torch.Size) -> Tensor:
     return x
 
 
-def prepare_sbi_problem(
+def sbi_inputs(
     user_simulator: Callable,
     user_prior,
     user_x_shape: Optional[Shape] = None,
@@ -535,12 +535,12 @@ def prepare_sbi_problem(
         x_shape, _ = process_x_shape(simulator, prior, user_x_shape)
 
         # Consistency check after making ready for sbi.
-        check_sbi_problem(simulator, prior, x_shape)
+        check_sbi_inputs(simulator, prior, x_shape)
 
         return simulator, prior, x_shape
 
 
-def check_sbi_problem(
+def check_sbi_inputs(
     simulator: Callable, prior: Distribution, x_shape: torch.Size
 ) -> None:
     """Assert requirements for simulator, prior and observation for usage in sbi.
