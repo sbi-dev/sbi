@@ -18,6 +18,7 @@ setup(
     keywords="bayesian parameter inference system_identification simulator PyTorch",
     url="https://github.com/mackelab/sbi",
     author="Deistler, Bölts, Lückmann, Durkan, Tejero",
+    author_email="alvaro@minin.es",
     packages=find_packages(exclude=["tests"]),
     license="AGPLv3",
     install_requires=[
