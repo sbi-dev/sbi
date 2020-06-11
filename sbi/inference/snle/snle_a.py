@@ -1,3 +1,4 @@
+from __future__ import annotations
 from sbi.inference.snle.snle_base import LikelihoodEstimator
 
 

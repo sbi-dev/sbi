@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import pytest
 from torch import zeros, ones, eye
 from torch.distributions import MultivariateNormal

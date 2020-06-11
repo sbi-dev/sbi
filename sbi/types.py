@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Sequence, Union, Tuple, TypeVar
 import numpy as np
 import torch
