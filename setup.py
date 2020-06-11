@@ -14,7 +14,7 @@ setup(
     name="sbi",
     version="0.8rc1",  # version_namespace["__version__"],
     description="Simulation-based inference",
-    download_url="https://github.com/mackelab/sbi/archive/v0.8-pre.tar.gz",
+    download_url="https://github.com/mackelab/sbi/archive/v0.8rc1.tar.gz",
     keywords="bayesian parameter inference system_identification simulator PyTorch",
     url="https://github.com/mackelab/sbi",
     author="Deistler, Bölts, Lückmann, Durkan, Tejero",
