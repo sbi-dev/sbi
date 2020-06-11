@@ -49,7 +49,7 @@ def test_api_sre_on_linearGaussian(num_dim: int):
 
     posterior = infer(num_rounds=1, num_simulations_per_round=1000, max_num_epochs=5)
 
-    posterior.sample(num_samples=10, x=x_o, num_chains=2)
+    posterior.sample(sample_shape=10, x=x_o, num_chains=2)
 
 
 def test_c2st_sre_on_linearGaussian_different_dims(set_seed):
@@ -167,7 +167,7 @@ def test_c2st_sre_on_linearGaussian(
     # Should use default `num_atoms=10` for SRE; `num_atoms=2` for AALR
     posterior = infer(num_rounds=1, num_simulations_per_round=1000).set_default_x(x_o)
 
-    samples = posterior.sample(num_samples=num_samples, thin=3)
+    samples = posterior.sample(sample_shape=num_samples, thin=3)
 
     # Check performance based on c2st accuracy.
     check_c2st(samples, target_samples, alg=f"sre-{prior_str}-{method_str}")
@@ -232,4 +232,4 @@ def test_api_sre_sampling_methods(mcmc_method: str, prior_str: str, set_seed):
 
     posterior = infer(num_rounds=1, num_simulations_per_round=200, max_num_epochs=5)
 
-    posterior.sample(num_samples=10, x=x_o)
+    posterior.sample(sample_shape=10, x=x_o)

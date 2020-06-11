@@ -7,6 +7,7 @@ from pyro.infer.mcmc.api import MCMC
 import torch
 from torch import Tensor, log, nn
 from torch import multiprocessing as mp
+from sbi.types import Shape
 
 from sbi.mcmc import Slice, SliceSampler
 from sbi.types import Array
@@ -291,7 +292,7 @@ class NeuralPosterior:
     @torch.no_grad()
     def sample(
         self,
-        num_samples: int,
+        sample_shape: Shape = torch.Size(),
         x: Optional[Tensor] = None,
         show_progress_bars: bool = False,
         **kwargs,
@@ -304,7 +305,7 @@ class NeuralPosterior:
         and SRE are restricted to sampling with MCMC.
 
         Args:
-            num_samples: Desired number of samples.
+            sample_shape: Desired number of samples.
             x: Conditioning context for posterior $p(\theta|x)$. If not provided,
                 fall back onto `x_o` if previously provided for multiround training, or
                 to a set default (see `set_default_x()` method).
@@ -319,6 +320,7 @@ class NeuralPosterior:
         self._ensure_single_x(x)
         self._ensure_x_consistent_with_default_x(x)
         self._warn_if_posterior_was_focused_on_different_x(x)
+        num_samples = torch.Size(sample_shape).numel()
 
         if self._sample_with_mcmc:
             samples = self._sample_posterior_mcmc(
@@ -343,7 +345,7 @@ class NeuralPosterior:
                 "methods require MCMC."
             )
 
-        return samples
+        return samples.reshape((*sample_shape, -1))
 
     @torch.no_grad()
     def _sample_posterior_mcmc(
