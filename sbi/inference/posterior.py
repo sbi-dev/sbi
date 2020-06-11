@@ -591,9 +591,29 @@ class NeuralPosterior:
         return x_matched
 
     def __repr__(self):
-        desc = f"""NeuralPosterior(method_family={self._method_family},
-                                net=<a {self.net.__class__.__name__}, see `.net` for details>,
-                                prior={self._prior!r},
-                                x_shape={self._x_shape!r}
-                                ) """
+        desc = f"""NeuralPosterior(
+               method_family={self._method_family},
+               net=<a {self.net.__class__.__name__}, see `.net` for details>,
+               prior={self._prior!r},
+               x_shape={self._x_shape!r})
+               """
+        return desc
+
+    def __str__(self):
+        msg = {0: "Untrained", 1: "Amortized"}
+
+        default_x_msg = (
+            f" with default evaluation at x={self.default_x.tolist()!r}"
+            if self.default_x is not None
+            else ""
+        )
+
+        desc = (
+            f"{msg.get(self._num_trained_rounds, 'Focused')} posterior conditional "
+            f"density p(θ|x){default_x_msg}.\n\n"
+            f"This neural posterior was obtained with a "
+            f"{self._method_family.upper()}-class "
+            f"method using a {self.net.__class__.__name__.lower()}."
+        )
+
         return desc
