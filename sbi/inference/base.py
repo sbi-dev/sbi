@@ -12,7 +12,7 @@ from torch.utils.tensorboard import SummaryWriter
 import sbi.inference
 from sbi.simulators.simutils import simulate_in_batches
 from sbi.user_input.user_input_checks import process_x
-from sbi.user_input.user_input_checks import prepare_sbi_problem
+from sbi.user_input.user_input_checks import sbi_inputs
 from sbi.utils import get_log_root
 from sbi.utils.plot import pairplot
 from sbi.utils.torchutils import get_default_device
@@ -58,7 +58,7 @@ def infer(
         )
 
     # Note this typically simulates once to find out the right `x_shape`.
-    prior, simulator, x_shape = prepare_sbi_problem(simulator, prior, None)
+    prior, simulator, x_shape = sbi_inputs(simulator, prior, None)
 
     infer_ = method_fun(prior, simulator, x_shape=x_shape, num_workers=num_workers)
     posterior = infer_(num_rounds=1, num_simulations_per_round=num_simulations)
@@ -76,7 +76,6 @@ class NeuralInference(ABC):
         x_shape: Optional[torch.Size] = None,
         num_workers: int = 1,
         simulation_batch_size: int = 1,
-        skip_input_checks: bool = False,
         device: Union[torch.device, str] = get_default_device(),
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
@@ -101,8 +100,6 @@ class NeuralInference(ABC):
                 maps to data x at once. If None, we simulate all parameter sets at the
                 same time. If >= 1, the simulator has to process data of shape
                 (simulation_batch_size, parameter_dimension).
-            skip_input_checks: Whether to disable input checks. This saves simulation
-                time because they test-run the simulator to ensure it's correct.
             device: torch device on which to compute, e.g. 'cuda', 'cpu'.
             logging_level: Minimum severity of messages to log. One of the strings
                "INFO", "WARNING", "DEBUG", "ERROR" and "CRITICAL".
@@ -114,11 +111,8 @@ class NeuralInference(ABC):
                 each round.
         """
 
-        self._simulator, self._prior, self._x_shape = prepare_sbi_problem(
-            simulator, prior, x_shape, skip_input_checks
-        )
+        self._simulator, self._prior, self._x_shape = simulator, prior, x_shape
 
-        self._skip_input_checks = skip_input_checks
         self._show_progress_bars = show_progress_bars
         self._show_round_summary = show_round_summary
 
@@ -355,9 +349,6 @@ class NeuralInference(ABC):
             )
 
         if num_rounds > 1:
-            self._posterior._x_o_training_focused_on = (
-                x_o if self._skip_input_checks else process_x(x_o, self._x_shape)
-            )
-            self._posterior.default_x = (
-                x_o if self._skip_input_checks else process_x(x_o, self._x_shape)
-            )
+            processed_x = process_x(x_o, self._x_shape)
+            self._posterior._x_o_training_focused_on = processed_x
+            self._posterior.default_x = processed_x
