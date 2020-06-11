@@ -271,7 +271,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         else:
             # XXX Make posterior.sample() accept tuples like prior.sample().
             theta = self._posterior.sample(
-                num_sims,
+                (num_sims,),
                 x=self._posterior.default_x,
                 show_progress_bars=self._show_progress_bars,
             )

@@ -136,7 +136,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
                 theta = self._prior.sample((num_sims,))
             else:
                 theta = self._posterior.sample(
-                    num_sims, show_progress_bars=self._show_progress_bars
+                    (num_sims,), show_progress_bars=self._show_progress_bars
                 )
 
             x = self._batched_simulator(theta)
