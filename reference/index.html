@@ -842,7 +842,7 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <div class="doc doc-object doc-function">
 <h3 class="doc doc-heading" id="sbi.utils.get_nn_models.posterior_nn">
 <code class="highlight language-python">
-sbi.utils.get_nn_models.posterior_nn<span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">prior_mean</span><span class="p">,</span> <span class="n">prior_std</span><span class="p">,</span> <span class="n">x_o_shape</span><span class="p">,</span> <span class="n">embedding</span><span class="o">=</span><span class="n">Identity</span><span class="p">(),</span> <span class="n">hidden_features</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">mdn_num_components</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">made_num_mixture_components</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">made_num_blocks</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">flow_num_transforms</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span> </code>
+sbi.utils.get_nn_models.posterior_nn<span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">x_o_shape</span><span class="p">,</span> <span class="n">embedding</span><span class="o">=</span><span class="n">Identity</span><span class="p">(),</span> <span class="n">hidden_features</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">mdn_num_components</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">made_num_mixture_components</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">made_num_blocks</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">flow_num_transforms</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span> </code>
 <a class="headerlink" href="#sbi.utils.get_nn_models.posterior_nn" title="Permanent link">¶</a></h3>
 <div class="doc doc-contents first">
 <p>Neural posterior density estimator</p>
@@ -866,18 +866,10 @@ sbi.utils.get_nn_models.posterior_nn<span class="p">(</span><span class="n">mode
 <td><em>required</em></td>
 </tr>
 <tr>
-<td><code>prior_mean</code></td>
-<td><code>Tensor</code></td>
+<td><code>prior</code></td>
+<td><code></code></td>
 <td>
-<p>Prior mean.</p>
-</td>
-<td><em>required</em></td>
-</tr>
-<tr>
-<td><code>prior_std</code></td>
-<td><code>Tensor</code></td>
-<td>
-<p>Prior standard deviation.</p>
+<p>Prior distribution.</p>
 </td>
 <td><em>required</em></td>
 </tr>
@@ -1121,8 +1113,7 @@ sbi.utils.get_nn_models.posterior_nn<span class="p">(</span><span class="n">mode
 <div class="highlight">
 <pre><span></span><code><span class="k">def</span> <span class="nf">posterior_nn</span><span class="p">(</span>
     <span class="n">model</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
-    <span class="n">prior_mean</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
-    <span class="n">prior_std</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
+    <span class="n">prior</span><span class="p">,</span>
     <span class="n">x_o_shape</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">,</span>
     <span class="n">embedding</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Identity</span><span class="p">(),</span>
     <span class="n">hidden_features</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">50</span><span class="p">,</span>
@@ -1135,8 +1126,7 @@ sbi.utils.get_nn_models.posterior_nn<span class="p">(</span><span class="n">mode
 
 <span class="sd">    Args:</span>
 <span class="sd">        model: Model, one of maf / mdn / made / nsf</span>
-<span class="sd">        prior_mean: Prior mean.</span>
-<span class="sd">        prior_std: Prior standard deviation.</span>
+<span class="sd">        prior: Prior distribution.</span>
 <span class="sd">        x_o_numel: Number of elements in the a single observation.</span>
 <span class="sd">            Used as input size to the NN.</span>
 <span class="sd">        embedding: Embedding network</span>
@@ -1152,6 +1142,8 @@ sbi.utils.get_nn_models.posterior_nn<span class="p">(</span><span class="n">mode
 
     <span class="c1"># We need these asserts because mean and std can be defined outside, prior to user</span>
     <span class="c1"># input checks.</span>
+    <span class="n">prior_mean</span> <span class="o">=</span> <span class="n">prior</span><span class="o">.</span><span class="n">mean</span>
+    <span class="n">prior_std</span> <span class="o">=</span> <span class="n">prior</span><span class="o">.</span><span class="n">stddev</span>
     <span class="k">assert</span> <span class="p">(</span>
         <span class="n">prior_mean</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="n">float32</span>
     <span class="p">),</span> <span class="sa">f</span><span class="s2">"Prior mean must have dtype float32, is </span><span class="si">{</span><span class="n">prior_mean</span><span class="o">.</span><span class="n">dtype</span><span class="si">}</span><span class="s2">."</span>
