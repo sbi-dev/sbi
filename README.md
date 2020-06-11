@@ -1,39 +1,72 @@
 ![Tests](https://github.com/mackelab/sbi/workflows/Tests/badge.svg?branch=master)
+[![PyPI version](https://badge.fury.io/py/sbi.svg)](https://badge.fury.io/py/sbi)
+[![Contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](https://github.com/mackelab/sbi/blob/master/docs/docs/contribute.md)
+[![GitHub license](https://img.shields.io/github/license/mackelab/sbi)](https://github.com/mackelab/sbi/blob/master/LICENSE.txt)
+## sbi: simulation-based inference
 
-## Warning: pre-release stage
+`sbi` is a PyTorch package for simulation-based inference. Simulation-based inference is
+the process of finding the parameters of a simulator given also a prior and
+observations. `sbi` takes a Bayesian approach and returns a full posterior distribution
+over the parameters, conditional on the observations. This posterior can be focused on a
+specific observation of interest, or amortized and ready to be evaluated and sampled for
+any value of the observation.
 
-`sbi` is currently under very active development leading up to a first stable release on 12th June.
+`sbi` offers a simple interface for one-line posterior inference
 
-Some aspects of the interface will change, and the documentation for running the
-inference methods (`SNPE_C / APT, SRE_A / AALR, SRE_B / SRE, SNL`) is not accessible  at the moment through
-regular Python introspection - you'll have to look at the superclasses
-([`PosteriorEstimator`](https://github.com/mackelab/sbi/blob/master/sbi/inference/snpe/snpe_base.py),
-[`NeuralInference`](https://github.com/mackelab/sbi/blob/master/sbi/inference/base.py)).
-Authorship information is also out of date and licensing still pending (it will be free
-software).
+```python
+from sbi inference import infer
+# import your simulator, define your prior
+parameter_posterior = infer(simulator, prior, method='SNPE')
+```
+See below for the available methods of inference, `SNPE`, `SNRE` and `SNLE`.
 
-If you'd still like to give it a spin before release, please, by all means! We're glad to engage in conversation about it, please file an issue if you encounter unexpected behaviour or wonder about specific functionality.
+## Installation
 
-## Description
+```
+pip install sbi
+```
 
-Building on code for "On Contrastive Learning for Likelihood-free Inference" in <https://github.com/conormdurkan/lfi>.
+## Inference methods
+The following methods are currently available
 
-Features neural likelihood-free methods from
+### Sequential Neural Posterior Estimation (SNPE)
 
-> Papamakarios et al., _Sequential Neural Likelihood_ (SNL, "SNLE_A"), 2019. [[arXiv]](https://arxiv.org/abs/1805.07226)
+* `SNPE_C` or [`APT`](https://github.com/mackelab/delfi) from Greenberg D, Nonnenmacher M, and Macke J [_Automatic
+  PosteriorTransformation for likelihood-free
+  inference_](https://arxiv.org/abs/1905.07488)(ICML 2020).
+
+<!-- 
+- **Fast ε-free Inference of Simulation Models with Bayesian Conditional Density
+  Estimation**<br> by Papamakarios G. and Murray I. (NeurIPS 2016)
+  <br>[[PDF]](https://papers.nips.cc/paper/6084-fast-free-inference-of-simulation-models-with-bayesian-conditional-density-estimation.pdf)
+  [[BibTeX]](https://papers.nips.cc/paper/6084-fast-free-inference-of-simulation-models-with-bayesian-conditional-density-estimation/bibtex).
+- Papamakarios, George, and Iain Murray. 2016. “Fast ε-Free Inference of Simulation
+  Models with Bayesian Conditional Density Estimation.” In ArXiv:1605.06376 [Cs, Stat]. http://arxiv.org/abs/1605.06376.
+
+  -->
+
+### Sequential Neural Ratio Estimation (SNRE)
+
+* `SNRE_A` or `AALR` from Hermans J, Begy V, and Louppe G. [_Likelihood-free Inference with Amortized Approximate Likelihood Ratios_](https://arxiv.org/abs/1903.04057)(ICML 2020).
+
+* `SNRE_B` or [`SRE`](https://github.com/bayesiains/lfi) from Durkan C, Murray I, and Papamakarios G. [_On Contrastive Learning for Likelihood-free Inference_](https://arxiv.org/abs/2002.03712)(ICML 2020).
+
+### Sequential Neural Likelihood Estimation (SNRE)
+* `SNLE_A` or just [`SNL`](https://github.com/gpapamak/snl) from Papamakarios G, Sterrat DC and Murray I [_Sequential
+  Neural Likelihood_](https://arxiv.org/abs/1805.07226)(AISTATS 2019).
 >
->Greenberg et al., _Automatic Posterior Transformation_ (APT, "SNPE_C"), 2019. [[arXiv]](https://arxiv.org/abs/1905.07488)
->
->Hermans et al., _Likelihood-free Inference with Amortized Approximate Likelihood
->Ratios_ (AALR, "SNRE_A"), 2020.  [[arXiv]](https://arxiv.org/abs/1903.04057)
->
->Durkan et al., _On Contrastive Learning for Likelihood-free Inference_, (SRE, "SNRE_B"), 2020 [[arXiv]](https://arxiv.org/abs/2002.03712) 
+## Developing
 
-## Setup
+Clone the repo and install all the dependencies using the `environment.yml` file to
+create a conda environment: `conda env create -f environment.yml`. If you already have
+an `sbi` environment and want to refresh dependencies, just run `conda env update -f
+environment.yml --prune`.
 
-Clone the repo and install all the dependencies using the `environment.yml` file to create a conda environment: `conda env create -f environment.yml`. If you already have an `sbi` environment and want to refresh dependencies, just run `conda env update -f environment.yml --prune`.
+Alternatively, you can install via `setup.py` using `pip install -e ".[dev]"` (the dev
+flag installs development and testing dependencies).
 
-Alternatively, you can install via `setup.py` using `pip install -e ".[dev]"` (the dev flag installs development and testing dependencies).
+Issues and pull requests here are welcome! See [contribution
+guidelines](https://github.com/mackelab/sbi/blob/master/docs/docs/contribute.md) for more.
 
 ## Examples
 
@@ -53,5 +86,7 @@ Additionally, to avoid large diffs due to Jupyter notebook outputs we are using 
 
 ## Acknowledgements
 
-This code builds heavily on previous work by [Conor Durkan](https://conormdurkan.github.io/), [George Papamakarios](https://gpapamak.github.io/) and [Artur Bekasov](https://arturbekasov.github.io/).
-Relevant repositories include [bayesiains/nsf](https://github.com/bayesiains/nsf) and [conormdurkan/lfi](https://github.com/conormdurkan/lfi). 
+`sbi` was started from [`lfi`](https://github.com/conormdurkan/lfi) by Conor M Durkan.
+It is currently developed at the [mackelab](https://mackelab.org).
+
+See [credits](https://github.com/mackelab/sbi/blob/master/docs/docs/credits.md).
