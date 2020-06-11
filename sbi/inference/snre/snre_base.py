@@ -188,7 +188,7 @@ class RatioEstimator(NeuralInference, ABC):
             # Update tensorboard and summary dict.
             self._summarize(
                 round_=round_,
-                x_o=self._posterior.x_o,
+                x_o=self._posterior.default_x,
                 theta_bank=self._theta_bank,
                 x_bank=self._x_bank,
             )

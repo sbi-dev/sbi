@@ -335,9 +335,8 @@ class NeuralInference(ABC):
 
     def _handle_x_o_wrt_amortization(self, x_o: Tensor, num_rounds: int) -> None:
         """
-        Check if `x_o` is consistent with `num_rounds` and maybe set it as default.
-
-        For multi-round inference, set `x_o` as the default observation.
+        Check whether provided `x_o` is consistent with `num_rounds`. For multi-round
+        inference, set `x_o` as the default observation in the posterior.
 
         Warns:
             When `x_o` is provided, yet `num_rounds=1`, i.e. inference is amortized.
@@ -356,6 +355,6 @@ class NeuralInference(ABC):
             )
 
         if num_rounds > 1:
-            self._posterior.x_o = (
+            self._posterior.default_x = (
                 x_o if self._skip_input_checks else process_x(x_o, self._x_shape)
             )

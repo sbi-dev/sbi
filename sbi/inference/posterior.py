@@ -68,7 +68,9 @@ class NeuralPosterior:
 
         self.net = neural_net
         self._prior = prior
-        self.x_o = None
+        # This can be changed via `.set_default_x() below.`
+        # TODO: set via default_x directly here? would require process_x to accept None.
+        self._x = None
 
         self._sample_with_mcmc = sample_with_mcmc
         self._mcmc_method = mcmc_method
@@ -85,18 +87,33 @@ class NeuralPosterior:
         # Correction factor for leakage, only applicable to SNPE-family methods.
         self._leakage_density_correction_factor = None
 
+    @property
+    def default_x(self) -> Optional[Tensor]:
+        """Return default x used by `.sample(), .log_prob` as conditioning context."""
+        return self._x
+
+    @default_x.setter
+    def default_x(self, x: Tensor) -> None:
+        """Set new default x for `.sample(), .log_prob` to use as conditioning context.
+
+        See documentation of `.set_default_x()` for rationale and semantics."""
+        self._x = process_x(x, self._x_shape)
+
     # When a type is not yet defined, one uses a string representation.
     def set_default_x(self, x: Tensor) -> "NeuralPosterior":
         """
-        Return `NeuralPosterior` object with default conditioning context `x` set.
+        Return `NeuralPosterior` object with default conditioning context set to `x`.
 
-        When sequential methods are used in a single-round setting, the resulting neural
-        network allows for amortized inference, i.e. computing the posterior
-        $p(\theta|x)$ for any x. Hence, when calling `.log_prob()` or `.sample()`, the
-        user generally needs to specify both $\theta$ and $x$. This function sets a
-        default $x_o$, and thus the user only needs to specify $\theta$ when later
-        calling `.log_prob()` or `.sample()` for it to automatically use the default 
-        $x_o$ when evaluating or sampling from $p(\theta|x_o)$.
+        This is a pure convenience to avoid having to repeatedly specify `x` in calls to
+        `.sample()` and `.log_prob()` - only θ needs to be passed.
+
+        This convenience is particularly useful when the posterior is 'focused', i.e.
+        has been trained over multiple rounds to be accurate in the vicinity of a
+        particular `x=x_o` (you can check if your posterior object is focused by
+        printing it).
+
+        NOTE: this method is chainable, i.e. will return the NeuralPosterior object so
+        that calls like `posterior.set_default_x(my_x).sample(mytheta)` are possible.
 
         Args:
             x: The default observation to set for the posterior $p(theta|x)$.
@@ -105,7 +122,7 @@ class NeuralPosterior:
             `NeuralPosterior` that will use a default `x` when not explicitly passed.
         """
 
-        self.x_o = process_x(x, self._x_shape)
+        self._x = process_x(x, self._x_shape)
 
         return self
 
@@ -120,9 +137,9 @@ class NeuralPosterior:
 
         Args:
             theta: Parameters $\theta$.
-            x: Conditioning context for posterior $p(\theta|x)$. If not provided,
-                fall back onto `x_o` if previously provided for multiround training, or
-                to a set default (see `set_default_x()` method).
+            x: Conditioning context for posterior $p(\theta|x)$. If not provided, fall
+                back onto an `x_o` if previously provided for multi-round training, or
+                to another default if set later for convenience, see `.set_default_x()`.
             norm_posterior_snpe: Whether to enforce a normalized posterior density when
                 using SNPE. Renormalization of the posterior is useful when some
                 probability falls out or 'leaks' out of the prescribed prior support.
@@ -145,9 +162,9 @@ class NeuralPosterior:
         theta = ensure_theta_batched(torch.as_tensor(theta))
 
         # Select and check x to condition on.
-        x = atleast_2d_float32_tensor(self._x_else_x_o(x))
+        x = atleast_2d_float32_tensor(self._x_else_default_x(x))
         self._ensure_single_x(x)
-        self._ensure_x_consistent_with_x_o(x)
+        self._ensure_x_consistent_with_default_x(x)
 
         # Repeat `x` in case of evaluation on multiple `theta`. This is needed below in
         # when calling nflows in order to have matching shapes of theta and context x
@@ -232,15 +249,15 @@ class NeuralPosterior:
 
         NOTE: This is to avoid re-estimating the acceptance probability from scratch
               whenever `log_prob` is called and `norm_posterior_snpe=True`. Here, it
-              is estimated only once for `self.x_o` and saved for later. We re-evaluate
-              only whenever a new `x` is passed.
+              is estimated only once for `self.default_x` and saved for later. We
+              re-evaluate only whenever a new `x` is passed.
 
         Arguments:
-            x: Conditioning context for posterior $p(\theta|x)$. Use `self.x_o` if None.
+            x: Conditioning context for posterior $p(\theta|x)$.
             num_rejection_samples: Number of samples used to estimate correction factor.
             force_update: Whether to force a reevaluation of the leakage correction even
-                if the context x is the same as self.x_o. This is useful to enforce a
-                new estimate of the leakage after later rounds, i.e. round 2, 3, ...
+                if the context `x` is the same as `self.default_x`. This is useful to
+                enforce a new leakage estimate for rounds after the first (2, 3...).
             show_progress_bars: Whether to show a progress bar during sampling.
 
         Returns:
@@ -252,17 +269,17 @@ class NeuralPosterior:
                 self.net, self._prior, x, num_rejection_samples, show_progress_bars
             )[1]
 
-        # Check if the provided x matches the stored self.x_o by:
-        # is_new_x = x_o_not_provided or (x_nonidentical_x_o and x_different_x_o)
-        # We check x_nonidentical_x_o and x_different_x_o for short circuiting.
-        is_new_x = self.x_o is None or (x is not self.x_o and (x != self.x_o).any())
+        # Check if the provided x matches the default x (short-circuit on identity).
+        is_new_x = self.default_x is None or (
+            x is not self.default_x and (x != self.default_x).any()
+        )
 
-        not_saved_at_x_o = self._leakage_density_correction_factor is None
+        not_saved_at_default_x = self._leakage_density_correction_factor is None
 
         if is_new_x:  # Calculate at x; don't save.
             return acceptance_at(x)
-        elif not_saved_at_x_o or force_update:  # Calculate at x_o; save.
-            self._leakage_density_correction_factor = acceptance_at(self.x_o)
+        elif not_saved_at_default_x or force_update:  # Calculate at default_x; save.
+            self._leakage_density_correction_factor = acceptance_at(self.default_x)
 
         return self._leakage_density_correction_factor  # type:ignore
 
@@ -293,9 +310,9 @@ class NeuralPosterior:
         Returns: Samples from posterior.
         """
 
-        x = atleast_2d_float32_tensor(self._x_else_x_o(x))
+        x = atleast_2d_float32_tensor(self._x_else_default_x(x))
         self._ensure_single_x(x)
-        self._ensure_x_consistent_with_x_o(x)
+        self._ensure_x_consistent_with_default_x(x)
 
         if self._sample_with_mcmc:
             samples = self._sample_posterior_mcmc(
@@ -493,29 +510,29 @@ class NeuralPosterior:
         )
         self.net._embedding_net = embedding_net
 
-    def _x_else_x_o(self, x: Optional[Array]) -> Array:
+    def _x_else_default_x(self, x: Optional[Array]) -> Array:
         if x is not None:
             return x
-        elif self.x_o is None:
+        elif self.default_x is None:
             raise ValueError(
                 "Context `x` needed when a default has not been set."
                 "If you'd like to have a default, use the `.set_default_x()` method."
             )
         else:
-            return self.x_o
+            return self.default_x
 
-    def _ensure_x_consistent_with_x_o(self, x: Tensor) -> None:
-        """Check consistency with the shape of `x_o` (unless it's None)."""
+    def _ensure_x_consistent_with_default_x(self, x: Tensor) -> None:
+        """Check consistency with the shape of `self.default_x` (unless it's None)."""
 
         # TODO: This is to check the passed x matches the NN input dimensions by
-        # comparing to `x_o`, which was checked in user input checks to match the
-        # simulator output. Later if we might not have `self.x_o` we might want to
+        # comparing to `default_x`, which was checked in user input checks to match the
+        # simulator output. Later if we might not have `self.default_x` we might want to
         # compare to the input dimension of `self.net` here.
-        if self.x_o is not None:
+        if self.default_x is not None:
             assert (
-                x.shape == self.x_o.shape
+                x.shape == self.default_x.shape
             ), f"""The shape of the passed `x` {x.shape} and must match the shape of `x`
-            used during training, {self.x_o.shape}."""
+            used during training, {self.default_x.shape}."""
 
     @staticmethod
     def _ensure_single_x(x: Tensor) -> None:
