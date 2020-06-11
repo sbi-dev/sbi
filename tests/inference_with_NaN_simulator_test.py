@@ -78,7 +78,7 @@ def test_inference_with_nan_simulator(
         exclude_invalid_x=exclude_invalid_x,
     ).set_default_x(x_o)
 
-    samples = posterior.sample(num_samples)
+    samples = posterior.sample((num_samples,))
 
     # Compute the c2st and assert it is near chance level of 0.5.
     check_c2st(samples, target_samples, alg=f"{method}")

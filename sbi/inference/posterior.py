@@ -305,7 +305,9 @@ class NeuralPosterior:
         and SRE are restricted to sampling with MCMC.
 
         Args:
-            sample_shape: Desired number of samples.
+            sample_shape: Desired shape of samples that are drawn from posterior. If
+                sample_shape is multidimensional we simply draw `sample_shape.numel()`
+                samples and then reshape into the desired shape.
             x: Conditioning context for posterior $p(\theta|x)$. If not provided,
                 fall back onto `x_o` if previously provided for multiround training, or
                 to a set default (see `set_default_x()` method).
