@@ -74,8 +74,8 @@ class LikelihoodEstimator(NeuralInference, ABC):
             method_family="snle_a",
             neural_net=density_estimator,
             prior=self._prior,
-            mcmc_method=mcmc_method,
             x_shape=self._x_shape,
+            mcmc_method=mcmc_method,
             get_potential_function=PotentialFunctionProvider(),
         )
 

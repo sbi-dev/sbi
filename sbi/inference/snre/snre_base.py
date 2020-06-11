@@ -86,8 +86,8 @@ class RatioEstimator(NeuralInference, ABC):
             method_family=method_family,
             neural_net=classifier,
             prior=self._prior,
-            mcmc_method=mcmc_method,
             x_shape=self._x_shape,
+            mcmc_method=mcmc_method,
             get_potential_function=PotentialFunctionProvider(),
         )
 

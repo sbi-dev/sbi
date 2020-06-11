@@ -71,9 +71,9 @@ class PosteriorEstimator(NeuralInference, ABC):
             method_family="snpe",
             neural_net=density_estimator,
             prior=self._prior,
+            x_shape=self._x_shape,
             sample_with_mcmc=sample_with_mcmc,
             mcmc_method=mcmc_method,
-            x_shape=self._x_shape,
             get_potential_function=PotentialFunctionProvider(),
         )
 

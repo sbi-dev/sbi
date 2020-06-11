@@ -49,21 +49,21 @@ class NeuralPosterior:
         method_family: str,
         neural_net: nn.Module,
         prior,
+        x_shape: Optional[torch.Size] = None,
         sample_with_mcmc: bool = True,
         mcmc_method: str = "slice_np",
-        x_shape: Optional[torch.Size] = None,
         get_potential_function: Optional[Callable] = None,
     ):
         """
         Args:
             method_family: One of 'snpe', 'snl', 'snre_a' or 'snre_b'.
             neural_net: A classifier for SNRE, a density estimator for SNPE and SNL.
+            x_shape: Simulator output shape. Provide it if you want any default `x` set 
+                via the `.set_default_x()` method checked against it.
             prior: Prior distribution with `.log_prob()` and `.sample()`.
             sample_with_mcmc: Whether to sample with MCMC. Will always be `True` for SRE
                 and SNL, but can also be set to `True` for SNPE if MCMC is preferred to
                 deal with leakage over rejection sampling.
-            x_shape: Simulator output shape. If present, it is used to check any default
-                `x` set via the `.set_default_x()` method.
         """
 
         self.net = neural_net
@@ -82,7 +82,7 @@ class NeuralPosterior:
 
         self._num_trained_rounds = 0
 
-        # Correction factor for SNPE leakage.
+        # Correction factor for leakage, only applicable to SNPE-family methods.
         self._leakage_density_correction_factor = None
 
     # When a type is not yet defined, one uses a string representation.
@@ -131,7 +131,7 @@ class NeuralPosterior:
                 `norm_posterior_snpe=False`. The returned log posterior is set to
                 -∞ outside of the prior support regardless of this setting.
             track_gradients: Whether the returned tensor supports tracking gradients.
-                This can be helpful for e.g. sensitivity analysis, but increases memory 
+                This can be helpful for e.g. sensitivity analysis, but increases memory
                 consumption.
 
         Returns:
@@ -415,7 +415,7 @@ class NeuralPosterior:
 
         samples = posterior_sampler.gen(num_samples)
 
-        # back to training mode
+        # Back to training mode.
         # XXX train exited in log_prob, entered here?
         self.net.train(True)
 
