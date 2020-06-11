@@ -311,10 +311,8 @@ def test_inference_with_user_sbi_problems(
     """
 
     infer = SNPE_C(
-        simulator=user_simulator,
-        prior=user_prior,
+        *sbi_inputs(user_simulator, user_prior, user_x_shape),
         density_estimator="maf",
-        x_shape=user_x_shape,
         simulation_batch_size=1,
         show_progress_bars=False,
     )
@@ -420,15 +418,3 @@ def test_invalid_inputs():
     # Test 3D value.
     with pytest.raises(AssertionError):
         joint.log_prob(ones(10, 4, 1))
-
-
-@pytest.mark.parametrize("method", (SNPE_C, SNL, SRE))
-def test_skip_input_checks(method):
-
-    with pytest.warns(UserWarning):
-        method(
-            prior=Uniform(zeros(1), ones(1)),
-            simulator=diagonal_linear_gaussian,
-            x_shape=torch.Size(),
-            skip_input_checks=True,
-        )
