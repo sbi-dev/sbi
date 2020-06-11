@@ -90,7 +90,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         num_rounds: int,
         num_simulations_per_round: OneOrMore[int],
         x_o: Optional[Tensor] = None,
-        batch_size: int = 100,
+        batch_size: int = 50,
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
         stop_after_epochs: int = 20,
