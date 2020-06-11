@@ -9,7 +9,7 @@ from tests.test_utils import (
     get_prob_outside_uniform_prior,
     get_dkl_gaussian_prior,
 )
-from sbi.inference import SRE, AALR, sbi_inputs
+from sbi.inference import SRE, AALR, prepare_for_sbi
 
 from sbi.simulators.linear_gaussian import (
     true_posterior_linear_gaussian_mvn_prior,
@@ -40,7 +40,7 @@ def test_api_sre_on_linearGaussian(num_dim: int):
     prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
 
     infer = SRE(
-        *sbi_inputs(diagonal_linear_gaussian, prior),
+        *prepare_for_sbi(diagonal_linear_gaussian, prior),
         classifier="resnet",
         simulation_batch_size=50,
         mcmc_method="slice_np",
@@ -93,7 +93,7 @@ def test_c2st_sre_on_linearGaussian_different_dims(set_seed):
         )
 
     infer = SRE(
-        *sbi_inputs(simulator, prior),
+        *prepare_for_sbi(simulator, prior),
         classifier="resnet",
         simulation_batch_size=50,
         show_progress_bars=False,
@@ -151,8 +151,11 @@ def test_c2st_sre_on_linearGaussian(
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
+    simulator, prior, x_shape = prepare_for_sbi(simulator, prior)
     kwargs = dict(
-        *sbi_inputs(simulator, prior),
+        simulator=simulator,
+        prior=prior,
+        x_shape=x_shape,
         classifier="resnet",
         simulation_batch_size=50,
         mcmc_method="slice_np",
@@ -220,7 +223,7 @@ def test_api_sre_sampling_methods(mcmc_method: str, prior_str: str, set_seed):
         prior = utils.BoxUniform(low=-1.0 * ones(num_dim), high=ones(num_dim))
 
     infer = SRE(
-        *sbi_inputs(diagonal_linear_gaussian, prior),
+        *prepare_for_sbi(diagonal_linear_gaussian, prior),
         classifier="resnet",
         simulation_batch_size=50,
         mcmc_method=mcmc_method,

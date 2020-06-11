@@ -2,7 +2,7 @@ from sbi.utils.sbiutils import handle_invalid_x
 import pytest
 import torch
 
-from sbi.inference import SNPE_C, SRE, SNL, sbi_inputs
+from sbi.inference import SNPE_C, SRE, SNL, prepare_for_sbi
 from torch import zeros, ones, eye
 
 import sbi.utils as utils
@@ -70,7 +70,7 @@ def test_inference_with_nan_simulator(
         prior=prior,
     )
 
-    infer = method(*sbi_inputs(linear_gaussian_nan, prior))
+    infer = method(*prepare_for_sbi(linear_gaussian_nan, prior))
 
     posterior = infer(
         num_rounds=1,

@@ -2,7 +2,7 @@ import pytest
 from torch import zeros, ones, eye
 from torch.distributions import MultivariateNormal
 
-from sbi.inference import SNPE_C, sbi_inputs
+from sbi.inference import SNPE_C, prepare_for_sbi
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
 
 
@@ -11,7 +11,7 @@ def test_log_prob_with_different_x():
     num_dim = 2
 
     prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
-    posterior = SNPE_C(*sbi_inputs(diagonal_linear_gaussian, prior))(
+    posterior = SNPE_C(*prepare_for_sbi(diagonal_linear_gaussian, prior))(
         num_rounds=1, num_simulations_per_round=1000
     )
 

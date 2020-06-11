@@ -4,7 +4,7 @@ from torch import zeros, ones, eye
 from torch.distributions import MultivariateNormal
 
 import sbi.utils as utils
-from sbi.inference import SNL, sbi_inputs
+from sbi.inference import SNL, prepare_for_sbi
 from sbi.simulators.linear_gaussian import (
     true_posterior_linear_gaussian_mvn_prior,
     samples_true_posterior_linear_gaussian_uniform_prior,
@@ -43,7 +43,7 @@ def test_api_snl_on_linearGaussian(num_dim: int, set_seed):
     prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
 
     infer = SNL(
-        *sbi_inputs(diagonal_linear_gaussian, prior),
+        *prepare_for_sbi(diagonal_linear_gaussian, prior),
         simulation_batch_size=50,
         mcmc_method="slice_np",
         show_progress_bars=False,
@@ -93,7 +93,7 @@ def test_c2st_snl_on_linearGaussian_different_dims(set_seed):
     )
 
     infer = SNL(
-        *sbi_inputs(simulator, prior),
+        *prepare_for_sbi(simulator, prior),
         simulation_batch_size=50,
         mcmc_method="slice_np",
         show_progress_bars=False,
@@ -142,7 +142,9 @@ def test_c2st_snl_on_linearGaussian(num_dim: int, prior_str: str, set_seed):
     simulator = lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     infer = SNL(
-        *sbi_inputs(simulator, prior), mcmc_method="slice_np", show_progress_bars=False,
+        *prepare_for_sbi(simulator, prior),
+        mcmc_method="slice_np",
+        show_progress_bars=False,
     )
 
     posterior = infer(num_rounds=1, num_simulations_per_round=1000).set_default_x(x_o)
@@ -189,7 +191,7 @@ def test_c2st_multi_round_snl_on_linearGaussian(set_seed):
     simulator = lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     infer = SNL(
-        *sbi_inputs(simulator, prior),
+        *prepare_for_sbi(simulator, prior),
         simulation_batch_size=50,
         mcmc_method="slice",
         show_progress_bars=False,
@@ -226,7 +228,7 @@ def test_api_snl_sampling_methods(mcmc_method: str, prior_str: str, set_seed):
         prior = utils.BoxUniform(-1.0 * ones(num_dim), ones(num_dim))
 
     infer = SNL(
-        *sbi_inputs(diagonal_linear_gaussian, prior),
+        *prepare_for_sbi(diagonal_linear_gaussian, prior),
         simulation_batch_size=50,
         mcmc_method="slice_np",
         show_progress_bars=False,
