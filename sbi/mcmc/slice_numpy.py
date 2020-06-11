@@ -1,3 +1,6 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+
 import numpy as np
 import os
 import sys
@@ -39,7 +42,7 @@ class MCMCSampler:
         """
         Generates MCMC samples. Should be implemented in a subclass.
         """
-        raise NotImplementedError('Should be implemented as a subclass.')
+        raise NotImplementedError("Should be implemented as a subclass.")
 
 
 class SliceSampler(MCMCSampler):

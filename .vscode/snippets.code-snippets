@@ -7,6 +7,15 @@
 		],
 		"description": "Annotations from future",
 		"scope": "python"
+	},
+	"Short copyright notice": {
+		"prefix": "copyr",
+		"body": [
+			"# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed",
+			"# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.",
+			""
+		],
+		"description": "Short copyright notice"
 	}
 	// Place your sbi workspace snippets here. Each snippet is defined under a snippet name and has a scope, prefix, body and 
 	// description. Add comma separated ids of the languages where the snippet is applicable in the scope field. If scope 
