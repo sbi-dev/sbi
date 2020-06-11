@@ -219,7 +219,7 @@
 <ul>
 <li>To see illustrations of SNPE on canonical problems in neuroscience, read our preprint:
 <a href="https://www.biorxiv.org/content/10.1101/838383v3">Training deep neural density estimators to identify mechanistic models of neural dynamics</a>.</li>
-<li>To learn more about the general motivation behind simulation-based inference, and algorithms included in <code>sbi</code>, keep on reading.</li>
+<li>To learn more about the general motivation behind simulation-based inference, and inference methods included in <code>sbi</code>, keep on reading.</li>
 </ul>
 <h2 id="motivation-and-approach">Motivation and approach<a class="headerlink" href="#motivation-and-approach" title="Permanent link">¶</a></h2>
 <p>Many areas of science and engineering make extensive use of complex, stochastic, numerical simulations to describe the structure and dynamics of the processes being investigated. A key challenge in simulation-based science is linking simulation models to empirical data: Bayesian inference provides a general and powerful framework for identifying the set of parameters which are consistent both with empirical data and prior knowledge.</p>
@@ -236,7 +236,7 @@ simulation-based models, rendering conventional statistical approaches inapplica
 <li>If needed, an initial estimate of the posterior can be used to adaptively generate additional informative simulations.</li>
 </ol>
 <h2 id="publications">Publications<a class="headerlink" href="#publications" title="Permanent link">¶</a></h2>
-<p>Algorithms included in <code>sbi</code> were published in the following papers, which provide additional information:</p>
+<p>Refer to the following papers for additional details on the inference methods included in <code>sbi</code>: </p>
 <ul>
 <li>
 <p><strong>Fast ε-free Inference of Simulation Models with Bayesian Conditional Density Estimation</strong><br/> by Papamakarios &amp; Murray (NeurIPS 2016) <br/><a href="https://papers.nips.cc/paper/6084-fast-free-inference-of-simulation-models-with-bayesian-conditional-density-estimation.pdf">[PDF]</a> <a href="https://papers.nips.cc/paper/6084-fast-free-inference-of-simulation-models-with-bayesian-conditional-density-estimation/bibtex">[BibTeX]</a></p>
@@ -252,7 +252,7 @@ simulation-based models, rendering conventional statistical approaches inapplica
   Murray I., and Papamakarios G.(ICML 2020) <br/><a href="https://arxiv.org/abs/2002.03712">[PDF]</a>.</p>
 </li>
 </ul>
-<p>We refer to these algorithms as SNPE-A, SNPE-B, and SNPE-C/APT, respectively.</p>
+<p>We refer to these methods as SNPE-A, SNPE-B, and SNPE-C/APT, respectively.</p>
 <p>As an alternative to directly estimating the posterior on parameters given data, it is also possible to estimate the likelihood of data given parameters, and then subsequently draw posterior samples using MCMC (<a href="http://proceedings.mlr.press/v89/papamakarios19a/papamakarios19a.pdf">Papamakarios, Sterratt &amp; Murray, 2019</a><sup id="fnref:1"><a class="footnote-ref" href="#fn:1">1</a></sup>, <a href="http://proceedings.mlr.press/v96/lueckmann19a/lueckmann19a.pdf">Lueckmann, Karaletsos, Bassetto, Macke, 2019</a>). Depending on the problem, approximating the likelihood can be more or less effective than SNPE techniques.</p>
 <p>See <a href="https://arxiv.org/abs/1911.01429">Cranmer, Brehmer, Louppe (2019)</a> for a recent review on simulation-based inference and our recent preprint <a href="https://www.biorxiv.org/content/10.1101/838383v1">Training deep neural density estimators to identify mechanistic models of neural dynamics (Goncalves et al., 2019)</a> for applications to canonical problems in neuroscience.</p>
 <div class="footnote">
