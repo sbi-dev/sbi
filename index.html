@@ -155,6 +155,25 @@
 <a class="md-nav__link" href="#publications">
     Publications
   </a>
+<nav class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#snpe">
+    SNPE
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#snle">
+    SNLE
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#snre">
+    SNRE
+  </a>
+</li>
+</ul>
+</nav>
 </li>
 </ul>
 </nav>
@@ -164,10 +183,38 @@
       Installation
     </a>
 </li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="https://github.com/mackelab/sbi/blob/master/examples/HH_simulator.ipynb" target="_blank" title="Tutorial">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-toggle md-nav__toggle" data-md-toggle="nav-3" id="nav-3" type="checkbox"/>
+<label class="md-nav__link" for="nav-3">
       Tutorial
+    </label>
+<nav class="md-nav" data-md-component="collapsible" data-md-level="1">
+<label class="md-nav__title" for="nav-3">
+        Tutorial
+      </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="tutorial/markdown_files/00_getting_started/" title="Getting started">
+      Getting started
     </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="tutorial/markdown_files/01_gaussian_amortized/" title="Amortized inference">
+      Amortized inference
+    </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="tutorial/markdown_files/02_HH_simulator/" title="Hodgkin-Huxley example">
+      Hodgkin-Huxley example
+    </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="tutorial/markdown_files/03_flexible_interface/" title="Flexible interface">
+      Flexible interface
+    </a>
+</li>
+</ul>
+</nav>
 </li>
 <li class="md-nav__item">
 <a class="md-nav__link" href="contribute/" title="Contribute">
@@ -204,6 +251,25 @@
 <a class="md-nav__link" href="#publications">
     Publications
   </a>
+<nav class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#snpe">
+    SNPE
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#snle">
+    SNLE
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#snre">
+    SNRE
+  </a>
+</li>
+</ul>
+</nav>
 </li>
 </ul>
 </nav>
@@ -214,29 +280,41 @@
 <article class="md-content__inner md-typeset">
 <a class="md-icon md-content__icon" href="http://github.com/mackelab/sbi/edit/master/docs/index.md" title="Edit this page"></a>
 <h1 id="sbi"><code>sbi</code><a class="headerlink" href="#sbi" title="Permanent link">¶</a></h1>
-<p><code>sbi</code>: A Python toolbox to perform simulation-based inference using density-estimation approaches.</p>
-<p>The focus of <code>sbi</code> is <em>Sequential Neural Posterior Estimation</em> (SNPE). In SNPE, a neural network is trained to perform Bayesian inference on simulated data.</p>
+<p><code>sbi</code>: A Python toolbox for simulation-based inference. Inference can be run in a single line of code:
+<div class="codehilite"><pre><span></span><code>posterior = infer('SNPE', prior, simulator, num_simulations=1000)
+</code></pre></div></p>
 <ul>
-<li>To see illustrations of SNPE on canonical problems in neuroscience, read our preprint:
-<a href="https://www.biorxiv.org/content/10.1101/838383v3">Training deep neural density estimators to identify mechanistic models of neural dynamics</a>.</li>
-<li>To learn more about the general motivation behind simulation-based inference, and inference methods included in <code>sbi</code>, keep on reading.</li>
+<li>
+<p>To see applications of simulation-based inference to canonical problems in neuroscience, read our preprint:
+<a href="https://www.biorxiv.org/content/10.1101/838383v3">Training deep neural density estimators to identify mechanistic models of neural dynamics</a>.</p>
+</li>
+<li>
+<p>To learn more about the general motivation behind simulation-based inference, and inference methods included in <code>sbi</code>, keep on reading.</p>
+</li>
 </ul>
 <h2 id="motivation-and-approach">Motivation and approach<a class="headerlink" href="#motivation-and-approach" title="Permanent link">¶</a></h2>
 <p>Many areas of science and engineering make extensive use of complex, stochastic, numerical simulations to describe the structure and dynamics of the processes being investigated. A key challenge in simulation-based science is linking simulation models to empirical data: Bayesian inference provides a general and powerful framework for identifying the set of parameters which are consistent both with empirical data and prior knowledge.</p>
 <p>One of the key quantities required for statistical inference, the likelihood of observed data given parameters, <span class="arithmatex">\(\mathcal{L}(\theta) = p(x_o|\theta)\)</span>, is typically intractable for
 simulation-based models, rendering conventional statistical approaches inapplicable.</p>
-<p>Sequential Neural Posterior Estimation (SNPE) is a powerful machine-learning technique to address this problem.</p>
+<p><code>sbi</code> implements three powerful machine-learning methods to address this problem:</p>
+<ul>
+<li>Sequential Neural Posterior Estimation (SNPE)</li>
+<li>Sequential Neural Likelihood Estimation (SNLE)</li>
+<li>Sequential Neural Ratio Estimation (SNRE)</li>
+</ul>
+<p>Depending on the problem, the different methods can be more or less effective.</p>
 <p><img alt="" src="static/goal.png"/></p>
 <p><strong>Goal: Algorithmically identify mechanistic models which are consistent with data.</strong></p>
-<p>SNPE takes three inputs: A candidate mechanistic model, prior knowledge or constraints on model parameters, and data (or summary statistics). SNPE proceeds by:</p>
+<p>Each of the above-described methods has three inputs: A candidate mechanistic model, prior knowledge or constraints on model parameters, and data (or summary statistics). The methods then proceed by:</p>
 <ol>
 <li>sampling parameters from the prior and simulating synthetic datasets from these parameters, and</li>
-<li>using a deep density estimation neural network to learn the (probabilistic) association between data (or data features) and underlying parameters, i.e. to learn statistical inference from simulated data.</li>
-<li>This density estimation network is then applied to empirical data to derive the full space of parameters consistent with the data and the prior, i.e. the posterior distribution. High posterior probability is assigned to parameters which are consistent with both the data and the prior, low probability to inconsistent parameters.</li>
+<li>using a deep density estimation neural network to learn the (probabilistic) association between data (or data features) and underlying parameters, i.e. to learn statistical inference from simulated data. They way in which this association is learned differs between the above methods.</li>
+<li>This learned neural network is then applied to empirical data to derive the full space of parameters consistent with the data and the prior, i.e. the posterior distribution. High posterior probability is assigned to parameters which are consistent with both the data and the prior, low probability to inconsistent parameters. While SNPE directly learns the posterior distribution, SNLE and SNRE need an extra MCMC step to infer the posterior.</li>
 <li>If needed, an initial estimate of the posterior can be used to adaptively generate additional informative simulations.</li>
 </ol>
 <h2 id="publications">Publications<a class="headerlink" href="#publications" title="Permanent link">¶</a></h2>
-<p>Refer to the following papers for additional details on the inference methods included in <code>sbi</code>: </p>
+<p>Refer to the following papers for additional details on the inference methods included in <code>sbi</code>:</p>
+<h3 id="snpe">SNPE<a class="headerlink" href="#snpe" title="Permanent link">¶</a></h3>
 <ul>
 <li>
 <p><strong>Fast ε-free Inference of Simulation Models with Bayesian Conditional Density Estimation</strong><br/> by Papamakarios &amp; Murray (NeurIPS 2016) <br/><a href="https://papers.nips.cc/paper/6084-fast-free-inference-of-simulation-models-with-bayesian-conditional-density-estimation.pdf">[PDF]</a> <a href="https://papers.nips.cc/paper/6084-fast-free-inference-of-simulation-models-with-bayesian-conditional-density-estimation/bibtex">[BibTeX]</a></p>
@@ -247,22 +325,21 @@ simulation-based models, rendering conventional statistical approaches inapplica
 <li>
 <p><strong>Automatic posterior transformation for likelihood-free inference</strong><br/>by Greenberg, Nonnenmacher &amp; Macke (ICML 2019) <br/><a href="http://proceedings.mlr.press/v97/greenberg19a/greenberg19a.pdf">[PDF]</a> <a href="data:text/plain;charset=utf-8,%0A%0A%0A%0A%0A%0A%40InProceedings%7Bpmlr-v97-greenberg19a%2C%0A%20%20title%20%3D%20%09%20%7BAutomatic%20Posterior%20Transformation%20for%20Likelihood-Free%20Inference%7D%2C%0A%20%20author%20%3D%20%09%20%7BGreenberg%2C%20David%20and%20Nonnenmacher%2C%20Marcel%20and%20Macke%2C%20Jakob%7D%2C%0A%20%20booktitle%20%3D%20%09%20%7BProceedings%20of%20the%2036th%20International%20Conference%20on%20Machine%20Learning%7D%2C%0A%20%20pages%20%3D%20%09%20%7B2404--2414%7D%2C%0A%20%20year%20%3D%20%09%20%7B2019%7D%2C%0A%20%20editor%20%3D%20%09%20%7BChaudhuri%2C%20Kamalika%20and%20Salakhutdinov%2C%20Ruslan%7D%2C%0A%20%20volume%20%3D%20%09%20%7B97%7D%2C%0A%20%20series%20%3D%20%09%20%7BProceedings%20of%20Machine%20Learning%20Research%7D%2C%0A%20%20address%20%3D%20%09%20%7BLong%20Beach%2C%20California%2C%20USA%7D%2C%0A%20%20month%20%3D%20%09%20%7B09--15%20Jun%7D%2C%0A%20%20publisher%20%3D%20%09%20%7BPMLR%7D%2C%0A%20%20pdf%20%3D%20%09%20%7Bhttp%3A%2F%2Fproceedings.mlr.press%2Fv97%2Fgreenberg19a%2Fgreenberg19a.pdf%7D%2C%0A%20%20url%20%3D%20%09%20%7Bhttp%3A%2F%2Fproceedings.mlr.press%2Fv97%2Fgreenberg19a.html%7D%2C%0A%20%20abstract%20%3D%20%09%20%7BHow%20can%20one%20perform%20Bayesian%20inference%20on%20stochastic%20simulators%20with%20intractable%20likelihoods%3F%20A%20recent%20approach%20is%20to%20learn%20the%20posterior%20from%20adaptively%20proposed%20simulations%20using%20neural%20network-based%20conditional%20density%20estimators.%20However%2C%20existing%20methods%20are%20limited%20to%20a%20narrow%20range%20of%20proposal%20distributions%20or%20require%20importance%20weighting%20that%20can%20limit%20performance%20in%20practice.%20Here%20we%20present%20automatic%20posterior%20transformation%20(APT)%2C%20a%20new%20sequential%20neural%20posterior%20estimation%20method%20for%20simulation-based%20inference.%20APT%20can%20modify%20the%20posterior%20estimate%20using%20arbitrary%2C%20dynamically%20updated%20proposals%2C%20and%20is%20compatible%20with%20powerful%20flow-based%20density%20estimators.%20It%20is%20more%20flexible%2C%20scalable%20and%20efficient%20than%20previous%20simulation-based%20inference%20techniques.%20APT%20can%20operate%20directly%20on%20high-dimensional%20time%20series%20and%20image%20data%2C%20opening%20up%20new%20applications%20for%20likelihood-free%20inference.%7D%0A%7D%0A">[BibTeX]</a></p>
 </li>
+</ul>
+<h3 id="snle">SNLE<a class="headerlink" href="#snle" title="Permanent link">¶</a></h3>
+<ul>
+<li><strong>Sequential neural likelihood: Fast likelihood-free inference with autoregressive flows</strong><br/>by Papamakarios, Sterratt &amp; Murray (AISTATS 2019) <br/><a href="http://proceedings.mlr.press/v89/papamakarios19a/papamakarios19a.pdf">[PDF]</a> <a href="https://gpapamak.github.io/bibtex/snl.bib">[BibTeX]</a></li>
+</ul>
+<h3 id="snre">SNRE<a class="headerlink" href="#snre" title="Permanent link">¶</a></h3>
+<ul>
 <li>
-<p><strong>On Contrastive Learning for Likelihood-free Inference</strong><br/>Durkan C.,
-  Murray I., and Papamakarios G.(ICML 2020) <br/><a href="https://arxiv.org/abs/2002.03712">[PDF]</a>.</p>
+<p><strong>Likelihood-free MCMC with Amortized Approximate Likelihood Ratios</strong><br/>by Hermans, Begy &amp; Louppe (ICML 2020) <br/><a href="https://pdfs.semanticscholar.org/9702/b20a18475637005288c5f0216e31a0d7bcc7.pdf">[PDF]</a></p>
+</li>
+<li>
+<p><strong>On Contrastive Learning for Likelihood-free Inference</strong><br/>Durkan, Murray &amp; Papamakarios (ICML 2020) <br/><a href="https://arxiv.org/abs/2002.03712">[PDF]</a>.</p>
 </li>
 </ul>
-<p>We refer to these methods as SNPE-A, SNPE-B, and SNPE-C/APT, respectively.</p>
-<p>As an alternative to directly estimating the posterior on parameters given data, it is also possible to estimate the likelihood of data given parameters, and then subsequently draw posterior samples using MCMC (<a href="http://proceedings.mlr.press/v89/papamakarios19a/papamakarios19a.pdf">Papamakarios, Sterratt &amp; Murray, 2019</a><sup id="fnref:1"><a class="footnote-ref" href="#fn:1">1</a></sup>, <a href="http://proceedings.mlr.press/v96/lueckmann19a/lueckmann19a.pdf">Lueckmann, Karaletsos, Bassetto, Macke, 2019</a>). Depending on the problem, approximating the likelihood can be more or less effective than SNPE techniques.</p>
 <p>See <a href="https://arxiv.org/abs/1911.01429">Cranmer, Brehmer, Louppe (2019)</a> for a recent review on simulation-based inference and our recent preprint <a href="https://www.biorxiv.org/content/10.1101/838383v1">Training deep neural density estimators to identify mechanistic models of neural dynamics (Goncalves et al., 2019)</a> for applications to canonical problems in neuroscience.</p>
-<div class="footnote">
-<hr/>
-<ol>
-<li id="fn:1">
-<p>Code for SNL is available from the <a href="https://github.com/gpapamak/snl">original repository</a> or as a <a href="https://github.com/mnonnenm/SNL_py3port/tree/master">python 3 package</a>. <a class="footnote-backref" href="#fnref:1" title="Jump back to footnote 1 in the text">↩</a></p>
-</li>
-</ol>
-</div>
 </article>
 </div>
 </div>

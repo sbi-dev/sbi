@@ -145,10 +145,38 @@
       Installation
     </a>
 </li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="https://github.com/mackelab/sbi/blob/master/examples/HH_simulator.ipynb" target="_blank" title="Tutorial">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-toggle md-nav__toggle" data-md-toggle="nav-3" id="nav-3" type="checkbox"/>
+<label class="md-nav__link" for="nav-3">
       Tutorial
+    </label>
+<nav class="md-nav" data-md-component="collapsible" data-md-level="1">
+<label class="md-nav__title" for="nav-3">
+        Tutorial
+      </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../tutorial/markdown_files/00_getting_started/" title="Getting started">
+      Getting started
     </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../tutorial/markdown_files/01_gaussian_amortized/" title="Amortized inference">
+      Amortized inference
+    </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../tutorial/markdown_files/02_HH_simulator/" title="Hodgkin-Huxley example">
+      Hodgkin-Huxley example
+    </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../tutorial/markdown_files/03_flexible_interface/" title="Flexible interface">
+      Flexible interface
+    </a>
+</li>
+</ul>
+</nav>
 </li>
 <li class="md-nav__item">
 <a class="md-nav__link" href="../contribute/" title="Contribute">
@@ -188,8 +216,18 @@
   </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#sbi.inference.snle.snle_a.SNLE_A">
+    SNLE_A
+  </a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#sbi.inference.snre.snre_a.SNRE_A">
     SNRE_A
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#sbi.inference.snre.snre_b.SNRE_B">
+    SNRE_B
   </a>
 </li>
 </ul>
@@ -260,8 +298,18 @@
   </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#sbi.inference.snle.snle_a.SNLE_A">
+    SNLE_A
+  </a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#sbi.inference.snre.snre_a.SNRE_A">
     SNRE_A
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#sbi.inference.snre.snre_b.SNRE_B">
+    SNRE_B
   </a>
 </li>
 </ul>
@@ -824,6 +872,14 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 </div>
 </div>
 <div class="doc doc-object doc-class">
+<h3 class="doc doc-heading" id="sbi.inference.snle.snle_a.SNLE_A">
+<code>sbi.inference.snle.snle_a.SNLE_A</code>
+<a class="headerlink" href="#sbi.inference.snle.snle_a.SNLE_A" title="Permanent link">¶</a></h3>
+<div class="doc doc-contents first">
+<p>SNL=SNLE_A is the only likelihood-based estimator as of now.</p>
+</div>
+</div>
+<div class="doc doc-object doc-class">
 <h3 class="doc doc-heading" id="sbi.inference.snre.snre_a.SNRE_A">
 <code>sbi.inference.snre.snre_a.SNRE_A</code>
 <a class="headerlink" href="#sbi.inference.snre.snre_a.SNRE_A" title="Permanent link">¶</a></h3>
@@ -836,6 +892,13 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 </div>
 <div class="doc doc-children">
 </div>
+</div>
+</div>
+<div class="doc doc-object doc-class">
+<h3 class="doc doc-heading" id="sbi.inference.snre.snre_b.SNRE_B">
+<code>sbi.inference.snre.snre_b.SNRE_B</code>
+<a class="headerlink" href="#sbi.inference.snre.snre_b.SNRE_B" title="Permanent link">¶</a></h3>
+<div class="doc doc-contents first">
 </div>
 </div>
 <h2 id="models">Models<a class="headerlink" href="#models" title="Permanent link">¶</a></h2>
@@ -874,10 +937,10 @@ sbi.utils.get_nn_models.posterior_nn<span class="p">(</span><span class="n">mode
 <td><em>required</em></td>
 </tr>
 <tr>
-<td><code>x_o_numel</code></td>
-<td><code></code></td>
+<td><code>x_o_shape</code></td>
+<td><code>torch.Size</code></td>
 <td>
-<p>Number of elements in the a single observation. Used as input size to the NN.</p>
+<p>Shape of a single observation. Used as input size to the NN.</p>
 </td>
 <td><em>required</em></td>
 </tr>
@@ -1105,8 +1168,7 @@ sbi.utils.get_nn_models.posterior_nn<span class="p">(</span><span class="n">mode
 169
 170
 171
-172
-173</pre>
+172</pre>
 </div>
 </td>
 <td class="code">
@@ -1127,8 +1189,7 @@ sbi.utils.get_nn_models.posterior_nn<span class="p">(</span><span class="n">mode
 <span class="sd">    Args:</span>
 <span class="sd">        model: Model, one of maf / mdn / made / nsf</span>
 <span class="sd">        prior: Prior distribution.</span>
-<span class="sd">        x_o_numel: Number of elements in the a single observation.</span>
-<span class="sd">            Used as input size to the NN.</span>
+<span class="sd">        x_o_shape: Shape of a single observation. Used as input size to the NN.</span>
 <span class="sd">        embedding: Embedding network</span>
 <span class="sd">        hidden_features: For all, number of hidden features</span>
 <span class="sd">        mdn_num_components: For MDNs only, number of components</span>
@@ -1387,7 +1448,8 @@ sbi.utils.get_nn_models.likelihood_nn<span class="p">(</span><span class="n">mod
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>176
+<pre><span></span>175
+176
 177
 178
 179
@@ -1517,8 +1579,7 @@ sbi.utils.get_nn_models.likelihood_nn<span class="p">(</span><span class="n">mod
 303
 304
 305
-306
-307</pre>
+306</pre>
 </div>
 </td>
 <td class="code">
@@ -1738,7 +1799,8 @@ sbi.utils.get_nn_models.classifier_nn<span class="p">(</span><span class="n">mod
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>310
+<pre><span></span>309
+310
 311
 312
 313
@@ -1784,8 +1846,7 @@ sbi.utils.get_nn_models.classifier_nn<span class="p">(</span><span class="n">mod
 353
 354
 355
-356
-357</pre>
+356</pre>
 </div>
 </td>
 <td class="code">
