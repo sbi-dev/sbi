@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from typing import cast, Callable, Optional, Sequence, Tuple
 import warnings
 
