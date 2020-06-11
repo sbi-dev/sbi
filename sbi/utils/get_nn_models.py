@@ -20,8 +20,7 @@ from sbi.utils.torchutils import create_alternating_binary_mask
 
 def posterior_nn(
     model: str,
-    prior_mean: Tensor,
-    prior_std: Tensor,
+    prior,
     x_o_shape: torch.Size,
     embedding: nn.Module = nn.Identity(),
     hidden_features: int = 50,
@@ -34,8 +33,7 @@ def posterior_nn(
 
     Args:
         model: Model, one of maf / mdn / made / nsf
-        prior_mean: Prior mean.
-        prior_std: Prior standard deviation.
+        prior: Prior distribution.
         x_o_numel: Number of elements in the a single observation.
             Used as input size to the NN.
         embedding: Embedding network
@@ -51,6 +49,8 @@ def posterior_nn(
 
     # We need these asserts because mean and std can be defined outside, prior to user
     # input checks.
+    prior_mean = prior.mean
+    prior_std = prior.stddev
     assert (
         prior_mean.dtype == float32
     ), f"Prior mean must have dtype float32, is {prior_mean.dtype}."

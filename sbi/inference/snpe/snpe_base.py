@@ -62,10 +62,7 @@ class PosteriorEstimator(NeuralInference, ABC):
 
         if isinstance(density_estimator, str):
             density_estimator = utils.posterior_nn(
-                model=density_estimator,
-                prior_mean=self._prior.mean,
-                prior_std=self._prior.stddev,
-                x_o_shape=self._x_shape,
+                model=density_estimator, prior=self._prior, x_o_shape=self._x_shape,
             )
 
         # Create a neural posterior which can sample(), log_prob().
