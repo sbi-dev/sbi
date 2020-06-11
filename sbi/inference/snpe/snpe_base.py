@@ -213,7 +213,7 @@ class PosteriorEstimator(NeuralInference, ABC):
             self._model_bank.append(deepcopy(self._posterior))
             self._model_bank[-1].net.eval()
 
-            # Making the call to `leakage_correction()`` and the update of
+            # Making the call to `leakage_correction()` and the update of
             # self._leakage_density_correction_factor explicit here. This is just
             # to make sure this update never gets lost when we e.g. do not log our
             # things to tensorboard anymore. Calling `leakage_correction()` is needed
