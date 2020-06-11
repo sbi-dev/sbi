@@ -69,7 +69,7 @@ def test_c2st_snpe_on_linearGaussian(
     )
 
     posterior = infer(num_rounds=1, num_simulations_per_round=2000).set_default_x(x_o)
-    samples = posterior.sample(num_samples)
+    samples = posterior.sample((num_samples,))
 
     # Compute the c2st and assert it is near chance level of 0.5.
     check_c2st(samples, target_samples, alg="snpe_c")
@@ -161,7 +161,7 @@ def test_c2st_snpe_on_linearGaussian_different_dims(set_seed):
     )
 
     posterior = infer(num_rounds=1, num_simulations_per_round=2000)  # type: ignore
-    samples = posterior.sample(num_samples, x=x_o)
+    samples = posterior.sample((num_samples,), x=x_o)
 
     # Compute the c2st and assert it is near chance level of 0.5.
     check_c2st(samples, target_samples, alg="snpe_c")
@@ -226,7 +226,7 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str, set_seed):
         )
         posterior = infer(num_atoms=10, **call_args)
 
-    samples = posterior.sample(num_samples)
+    samples = posterior.sample((num_samples,))
 
     # Compute the c2st and assert it is near chance level of 0.5.
     check_c2st(samples, target_samples, alg=method_str)
@@ -344,7 +344,7 @@ def test_api_snpe_c_posterior_correction(
     posterior = infer(num_rounds=1, num_simulations_per_round=1000, max_num_epochs=5)
 
     # Posterior should be corrected for leakage even if num_rounds just 1.
-    samples = posterior.sample(10, x=x_o)
+    samples = posterior.sample((10,), x=x_o)
 
     # Evaluate the samples to check correction factor.
     posterior.log_prob(samples, x=x_o)
