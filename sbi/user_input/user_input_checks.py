@@ -463,31 +463,29 @@ def process_x_shape(
     return x_shape, x_dim
 
 
-def process_x_o(x_o: Tensor, x_shape: torch.Size) -> Tensor:
+def process_x(x: Tensor, x_shape: torch.Size) -> Tensor:
     """Return observed data adapted to match sbi's shape and type requirements.
 
     Args:
-        x_o: Observed data as provided by the user.
-        x_shape: The shape that had either been provided by the user at init or had
-            been inferred from a simulation.
+        x: Observed data as provided by the user.
+        x_shape: Prescribed shape - either directly provided by the user at init or
+            inferred by sbi by running a simulation and checking the output.
 
     Returns:
-        x_o: Observed data with shape ready for usage in sbi.
+        x: Observed data with shape ready for usage in sbi.
     """
 
-    # Maybe add batch dimension, cast to tensor.
-    x_o = atleast_2d(x_o)
-    x_o = torch.as_tensor(x_o, dtype=float32)
+    x = torch.as_tensor(atleast_2d(x), dtype=float32)
 
-    check_for_possibly_batched_observations(x_o)
-    x_o_shape = x_o.shape
+    check_for_possibly_batched_observations(x)
+    input_x_shape = x.shape
 
-    assert x_o_shape == x_shape, (
-        f"Observed data shape ({x_o_shape}) must match "
+    assert input_x_shape == x_shape, (
+        f"Observed data shape ({input_x_shape}) must match "
         f"the shape of simulated data x ({x_shape})."
     )
 
-    return x_o
+    return x
 
 
 def prepare_sbi_problem(

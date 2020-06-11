@@ -11,7 +11,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 import sbi.inference
 from sbi.simulators.simutils import simulate_in_batches
-from sbi.user_input.user_input_checks import process_x_o
+from sbi.user_input.user_input_checks import process_x
 from sbi.user_input.user_input_checks import prepare_sbi_problem
 from sbi.utils import get_log_root
 from sbi.utils.plot import pairplot
@@ -339,9 +339,11 @@ class NeuralInference(ABC):
 
         For multi-round inference, set `x_o` as the default observation.
 
-        Warns: if an `x_o` is provided when doing amortized inference (`num_rounds==1`).
+        Warns:
+            When `x_o` is provided, yet `num_rounds=1`, i.e. inference is amortized.
 
-        Raises: if `x_o` is absent but but multi-round inference is requested.
+        Raises:
+            When `x_o` is absent, yet `num_rounds>1`, i.e. inference is focused.
         """
 
         if num_rounds == 1 and x_o is not None:
@@ -355,5 +357,5 @@ class NeuralInference(ABC):
 
         if num_rounds > 1:
             self._posterior.x_o = (
-                x_o if self._skip_input_checks else process_x_o(x_o, self._x_shape)
+                x_o if self._skip_input_checks else process_x(x_o, self._x_shape)
             )

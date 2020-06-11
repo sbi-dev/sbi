@@ -15,7 +15,7 @@ from sbi.user_input.user_input_checks import (
     process_prior,
     process_simulator,
     process_x_shape,
-    process_x_o,
+    process_x,
 )
 from sbi.user_input.user_input_checks_utils import (
     CustomPytorchWrapper,
@@ -180,10 +180,10 @@ def test_process_x_shape(
 
 
 @pytest.mark.parametrize(
-    "x_o, x_shape", ((ones(3), torch.Size([1, 3])), (ones(1, 3), torch.Size([1, 3])),),
+    "x, x_shape", ((ones(3), torch.Size([1, 3])), (ones(1, 3), torch.Size([1, 3])),),
 )
-def test_process_x_o(x_o, x_shape):
-    process_x_o(x_o, x_shape)
+def test_process_x(x, x_shape):
+    process_x(x, x_shape)
 
 
 def test_process_matrix_observation():

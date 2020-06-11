@@ -16,7 +16,7 @@ from sbi.utils.torchutils import (
     atleast_2d_float32_tensor,
     batched_first_of_batch,
 )
-from sbi.user_input.user_input_checks import process_x_o
+from sbi.user_input.user_input_checks import process_x
 
 
 NEG_INF = torch.tensor(float("-inf"), dtype=torch.float32)
@@ -105,8 +105,7 @@ class NeuralPosterior:
             `NeuralPosterior` that will use a default `x` when not explicitly passed.
         """
 
-        # TODO `process_x_o` name feels out of place here.
-        self.x_o = process_x_o(x, self._x_shape)
+        self.x_o = process_x(x, self._x_shape)
 
         return self
 
