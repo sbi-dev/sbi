@@ -23,7 +23,7 @@ from sbi.utils.torchutils import get_default_device
 
 
 def infer(
-    method: str, prior, simulator: Callable, num_simulations: int, num_workers: int = 1
+    method: str, simulator: Callable, prior, num_simulations: int, num_workers: int = 1
 ):
     r"""
     Return posterior distribution by running simulation-based inference.
