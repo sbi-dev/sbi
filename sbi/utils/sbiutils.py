@@ -146,13 +146,11 @@ def handle_invalid_x(
     num_infs = int(x_is_inf.sum().item())
 
     if exclude_invalid_x:
-        x_is_valid = torch.logical_and(
-            torch.logical_not(x_is_nan), torch.logical_not(x_is_inf)
-        )
+        is_valid_x = ~x_is_nan & ~x_is_inf
     else:
-        x_is_valid = ones(batch_size, dtype=torch.bool)
+        is_valid_x = ones(batch_size, dtype=torch.bool)
 
-    return x_is_valid, num_nans, num_infs
+    return is_valid_x, num_nans, num_infs
 
 
 def warn_on_invalid_x(num_nans: int, num_infs: int, exclude_invalid_x: bool) -> None:
