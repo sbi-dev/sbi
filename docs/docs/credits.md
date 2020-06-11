@@ -1,8 +1,10 @@
 # Credits
 
 `sbi` is licensed under the [Affero General Public License version 3 (AGPLv3)](https://www.gnu.org/licenses/agpl-3.0.html) and 
+```
 Copyright (C) 2020 Michael Deistler, Jan F. Bölts, Jan-Matthis Lückmann, Álvaro Tejero-Cantero.
-Copyright (C) 2020 Conor M. Durkan
+Copyright (C) 2020 Conor M. Durkan.
+```
 
 
 ##  Code
