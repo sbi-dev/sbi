@@ -489,10 +489,7 @@ def process_x(x: Tensor, x_shape: torch.Size) -> Tensor:
 
 
 def sbi_inputs(
-    user_simulator: Callable,
-    user_prior,
-    user_x_shape: Optional[Shape] = None,
-    skip_input_checks: bool = False,
+    simulator: Callable, prior, x_shape: Optional[Shape] = None,
 ) -> Tuple[Callable, Distribution, Optional[torch.Size]]:
     """Prepare simulator, prior and observed data for usage in sbi.
 
@@ -507,37 +504,27 @@ def sbi_inputs(
     If this is not possible, a suitable exception will be raised.
 
     Args:
-        user_simulator: Simulator as provided by the user.
-        user_prior: Prior as provided by the user.
-        user_x_shape: Shape of a single simulation output, either (1,N) or (N).
-        skip_input_checks: Whether to turn off input checks. This saves simulation
-            budget, as the input checks run the simulator a couple of times.
-
+        simulator: Simulator as provided by the user.
+        prior: Prior as provided by the user.
+        x_shape: Shape of a single simulation output, either (1,N) or (N).
+        
     Returns:
         Tuple (simulator, prior, x_shape) checked and matching the requirements of sbi.
     """
 
-    if skip_input_checks:
-        warnings.warn(
-            """sbi input checks are skipped, make sure to pass a valid prior, simulator
-            and output shape. Consult the documentation for the exact requirements.""",
-            UserWarning,
-        )
-        return user_simulator, user_prior, user_x_shape
-    else:
-        # Check prior, return PyTorch prior.
-        prior, _, prior_returns_numpy = process_prior(user_prior)
+    # Check prior, return PyTorch prior.
+    prior, _, prior_returns_numpy = process_prior(prior)
 
-        # Check simulator, returns PyTorch simulator able to simulate batches.
-        simulator = process_simulator(user_simulator, prior, prior_returns_numpy)
+    # Check simulator, returns PyTorch simulator able to simulate batches.
+    simulator = process_simulator(simulator, prior, prior_returns_numpy)
 
-        # Check data shape, returns shape with leading batch dimension.
-        x_shape, _ = process_x_shape(simulator, prior, user_x_shape)
+    # Check data shape, returns shape with leading batch dimension.
+    x_shape, _ = process_x_shape(simulator, prior, x_shape)
 
-        # Consistency check after making ready for sbi.
-        check_sbi_inputs(simulator, prior, x_shape)
+    # Consistency check after making ready for sbi.
+    check_sbi_inputs(simulator, prior, x_shape)
 
-        return simulator, prior, x_shape
+    return simulator, prior, x_shape
 
 
 def check_sbi_inputs(
