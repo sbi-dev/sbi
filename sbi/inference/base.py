@@ -51,7 +51,7 @@ def infer(
     """
 
     try:
-        method: Callable = getattr(sbi.inference, method.upper())
+        method_fun: Callable = getattr(sbi.inference, method.upper())
     except AttributeError:
         raise NameError(
             "Method not available. `method` must be one of 'SNPE', 'SNLE', 'SNRE'."
@@ -60,7 +60,7 @@ def infer(
     # Note this typically simulates once to find out the right `x_shape`.
     prior, simulator, x_shape = prepare_sbi_problem(simulator, prior, None)
 
-    infer_ = method(prior, simulator, x_shape=x_shape, num_workers=num_workers)
+    infer_ = method_fun(prior, simulator, x_shape=x_shape, num_workers=num_workers)
     posterior = infer_(num_rounds=1, num_simulations_per_round=num_simulations)
 
     return posterior
