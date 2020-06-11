@@ -352,3 +352,31 @@ def test_api_snpe_c_posterior_correction(
 
     # Evaluate the samples to check correction factor.
     posterior.log_prob(samples, x=x_o)
+
+
+def example_posterior():
+    """Return an inferred `NeuralPosterior` for interactive examination."""
+    num_dim = 2
+    x_o = zeros(1, num_dim)
+
+    # likelihood_mean will be likelihood_shift+theta
+    likelihood_shift = -1.0 * ones(num_dim)
+    likelihood_cov = 0.3 * eye(num_dim)
+
+    prior_mean = zeros(num_dim)
+    prior_cov = eye(num_dim)
+    prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
+
+    def simulator(theta):
+        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
+
+    infer = SNPE_C(
+        simulator=simulator,
+        prior=prior,
+        simulation_batch_size=10,
+        num_workers=6,
+        show_progress_bars=False,
+        sample_with_mcmc=False,
+    )
+
+    return infer(num_rounds=1, num_simulations_per_round=1000).set_default_x(x_o)
