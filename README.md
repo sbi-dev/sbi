@@ -87,6 +87,6 @@ Additionally, to avoid large diffs due to Jupyter notebook outputs we are using 
 ## Acknowledgements
 
 `sbi` was started from [`lfi`](https://github.com/conormdurkan/lfi) by Conor M Durkan.
-It is currently developed at the [mackelab](https://mackelab.org).
+It is currently developed at the [mackelab](https://uni-tuebingen.de/en/research/core-research/cluster-of-excellence-machine-learning/research/research/cluster-research-groups/professorships/machine-learning-in-science/).
 
 See [credits](https://github.com/mackelab/sbi/blob/master/docs/docs/credits.md).
