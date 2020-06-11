@@ -349,12 +349,15 @@ class NeuralInference(ABC):
             warn("Providing `x_o` in a single-round scenario has no effect.")
         elif num_rounds > 1 and x_o is None:
             raise ValueError(
-                "Observed data `x_o` is required if `num_rounds>1` since"
-                "samples in all rounds after the first one are drawn from"
+                "Observed data `x_o` is required if `num_rounds>1` since "
+                "samples in all rounds after the first one are drawn from "
                 "the posterior `p(theta|x_o)`."
             )
 
         if num_rounds > 1:
+            self._posterior._x_o_training_focused_on = (
+                x_o if self._skip_input_checks else process_x(x_o, self._x_shape)
+            )
             self._posterior.default_x = (
                 x_o if self._skip_input_checks else process_x(x_o, self._x_shape)
             )
