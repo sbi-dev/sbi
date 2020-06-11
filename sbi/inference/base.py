@@ -273,9 +273,9 @@ class NeuralInference(ABC):
         created during training.
         """
 
-        # NB. This is a subset of the logging from the conormdurkan/lfi. A big
+        # NB. This is a subset of the logging as done in `GH:conormdurkan/lfi`. A big
         # part of the logging was removed because of API changes, e.g., logging
-        # comparisons to ground truth parameters and samples.
+        # comparisons to ground-truth parameters and samples.
 
         # Median |x - x0| for most recent round.
         if x_o is not None:
