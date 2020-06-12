@@ -12,6 +12,7 @@ from sbi.inference.posterior import NeuralPosterior
 from sbi.inference.snle.snle_base import LikelihoodEstimator
 from sbi.utils.torchutils import get_default_device
 from sbi.types import OneOrMore
+from sbi.utils import del_entries
 
 
 class SNLE_A(LikelihoodEstimator):
@@ -67,20 +68,8 @@ class SNLE_A(LikelihoodEstimator):
                 each round.
         """
 
-        super().__init__(
-            simulator=simulator,
-            prior=prior,
-            x_shape=x_shape,
-            num_workers=num_workers,
-            simulation_batch_size=simulation_batch_size,
-            density_estimator=density_estimator,
-            mcmc_method=mcmc_method,
-            device=device,
-            logging_level=logging_level,
-            summary_writer=summary_writer,
-            show_progress_bars=show_progress_bars,
-            show_round_summary=show_round_summary,
-        )
+        kwargs = del_entries(locals(), entries=("self", "__class__"))
+        super().__init__(**kwargs)
 
     def __call__(
         self,
@@ -135,17 +124,5 @@ class SNLE_A(LikelihoodEstimator):
         Returns:
             Posterior $p(\theta|x_o)$ that can be sampled and evaluated.
         """
-        return super().__call__(
-            num_rounds=num_rounds,
-            num_simulations_per_round=num_simulations_per_round,
-            x_o=x_o,
-            batch_size=batch_size,
-            learning_rate=learning_rate,
-            validation_fraction=validation_fraction,
-            stop_after_epochs=stop_after_epochs,
-            max_num_epochs=max_num_epochs,
-            clip_max_norm=clip_max_norm,
-            exclude_invalid_x=exclude_invalid_x,
-            discard_prior_samples=discard_prior_samples,
-            retrain_from_scratch_each_round=retrain_from_scratch_each_round,
-        )
+        kwargs = del_entries(locals(), entries=("self", "__class__"))
+        return super().__call__(**kwargs)
