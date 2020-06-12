@@ -115,7 +115,7 @@ def test_c2st_snl_on_linearGaussian_different_dims(set_seed):
 @pytest.mark.parametrize("num_dim", (1, 2))
 @pytest.mark.parametrize("prior_str", ("uniform", "gaussian"))
 def test_c2st_snl_on_linearGaussian(num_dim: int, prior_str: str, set_seed):
-    """Test SNL on linear Gaussian, comparing to ground truth posterior via MMD.
+    """Test SNL on linear Gaussian, comparing to ground truth posterior via c2st.
 
     Args:
         num_dim: parameter dimension of the gaussian model
@@ -171,7 +171,7 @@ def test_c2st_snl_on_linearGaussian(num_dim: int, prior_str: str, set_seed):
 
 @pytest.mark.slow
 def test_c2st_multi_round_snl_on_linearGaussian(set_seed):
-    """Test SNL on linear Gaussian, comparing to ground truth posterior via MMD.
+    """Test SNL on linear Gaussian, comparing to ground truth posterior via c2st.
 
     Args:
         set_seed: fixture for manual seeding
