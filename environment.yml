@@ -19,13 +19,15 @@ dependencies:
   - black
   - cudatoolkit
   - flake8
+  - ipywidgets
   - isort
   - joblib
-  - jupyter
+  - jupyterlab
   - matplotlib
   - mkdocs
   - nbconvert
   - nbstripout
+  - notebook
   - numpy
   - pep517
   - pillow
