@@ -146,11 +146,7 @@ def pairplot(
     tickformatter=mpl.ticker.FormatStrFormatter("%g"),
     tick_labels=None,
     hist_diag={"alpha": 1.0, "bins": 50, "density": False, "histtype": "step"},
-    hist_offdiag={
-        # 'edgecolor': 'none',
-        # 'linewidth': 0.0,
-        "bins": 50,
-    },
+    hist_offdiag={"bins": 50,},
     kde_diag={"bw_method": "scott", "bins": 50, "color": "black"},
     kde_offdiag={"bw_method": "scott", "bins": 50},
     contour_offdiag={"levels": [0.68], "percentile": True},
@@ -170,13 +166,13 @@ def pairplot(
 
     For developers: if you add arguments that expect dictionaries, make sure to access
     them via the opts dictionary instantiated below. E.g. if you want to access the dict
-    stored in the input variable hist_diag, use opts['hist_diag'].
+    stored in the input variable hist_diag, use opts[`hist_diag`].
 
     Args:
         samples: posterior samples used to build the histogram
         points: list of additional points to scatter
-        upper: plotting style for upper diagonal, {'hist', 'scatter', 'contour', None}
-        diag: plotting style for diagonal, {'hist', None}
+        upper: plotting style for upper diagonal, {hist, scatter, contour, None}
+        diag: plotting style for diagonal, {hist, None}
         title: title string
         legend: whether to plot a legend for the points
         labels: np.ndarray of strings specifying the names of the parameters
@@ -186,7 +182,7 @@ def pairplot(
         points_colors: colors of the points
         subset: List containing the dimensions to plot. E.g. subset=[1,3] will plot
             plot only the 1st and 3rd dimension but will discard the 0th and 2nd (and,
-            if they exist, the 4th, 5th...)
+            if they exist, the 4th, 5th and so on)
         limits: array containing the plot xlim for each parameter dimension. If None,
             just use the min and max of the passed samples
         ticks: location of the ticks for each parameter. If None, just use the min and
@@ -197,13 +193,13 @@ def pairplot(
         hist_offdiag: dictionary passed to np.histogram2d() for off diagonal plots
         kde_diag: dictionary passed to gaussian_kde() for diagonal plots
         kde_offdiag: dictionary passed to gaussian_kde() for off diagonal plots
-        contour_offdiag: dictionary that should contain 'percentile' and 'levels' keys.
-            'percentile': bool.
-                If  'percentile'==True,
+        contour_offdiag: dictionary that should contain `percentile` and `levels` keys.
+            `percentile`: bool.
+                If  `percentile`==True,
                 the levels are made with respect to the max probability of the posterior
-                If 'percentile'==False,
+                If `percentile`==False,
                 the levels are drawn at absolute positions
-            'levels': list or np.ndarray: specifies the location where the contours are
+            `levels`: list or np.ndarray: specifies the location where the contours are
                 drawn.
         scatter_offdiag: dictionary for plt.scatter() on off diagonal
         plot_offdiag: dictionary for plt.plot() on off diagonal
@@ -211,7 +207,7 @@ def pairplot(
         points_offdiag: dictionary for plt.plot() used for plotting points on off
             diagonal
         fig_size: size of the entire figure
-        fig_bg_colors: Dictionary that contains 'upper', 'diag', 'lower', and specifies
+        fig_bg_colors: Dictionary that contains `upper`, `diag`, `lower`, and specifies
             the respective background colors. Passed to ax.set_facecolor()
         fig_subplots_adjust: dictionary passed to fig.subplots_adjust()
         subplots: dictionary passed to plt.subplots()
