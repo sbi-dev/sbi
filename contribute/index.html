@@ -196,7 +196,7 @@
 </li>
 <li class="md-nav__item">
 <a class="md-nav__link" href="#code-contributions-pull-requests">
-    Code contributions: pull requests.
+    Code contributions: pull requests
   </a>
 <nav class="md-nav">
 <ul class="md-nav__list">
@@ -206,18 +206,13 @@
   </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="#code-style">
-    Code style
+<a class="md-nav__link" href="#contributing-to-code-style-conventions">
+    Contributing to code: style conventions
   </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="#documentation">
-    Documentation
-  </a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="#binary-files-and-jupyter-notebooks">
-    Binary files and Jupyter notebooks
+<a class="md-nav__link" href="#online-documentation">
+    Online documentation
   </a>
 </li>
 </ul>
@@ -254,7 +249,7 @@
 </li>
 <li class="md-nav__item">
 <a class="md-nav__link" href="#code-contributions-pull-requests">
-    Code contributions: pull requests.
+    Code contributions: pull requests
   </a>
 <nav class="md-nav">
 <ul class="md-nav__list">
@@ -264,18 +259,13 @@
   </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="#code-style">
-    Code style
+<a class="md-nav__link" href="#contributing-to-code-style-conventions">
+    Contributing to code: style conventions
   </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="#documentation">
-    Documentation
-  </a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="#binary-files-and-jupyter-notebooks">
-    Binary files and Jupyter notebooks
+<a class="md-nav__link" href="#online-documentation">
+    Online documentation
   </a>
 </li>
 </ul>
@@ -297,7 +287,7 @@ and tell us more about your use case: the dimensionality of the input parameters
 type of simulator and the dimensionality of the output.</p>
 <p>To report bugs and suggest features (including better documentation), please equally
 head over to <a href="https://github.com/mackelab/sbi/issues">issues on GitHub</a>. </p>
-<h2 id="code-contributions-pull-requests">Code contributions: pull requests.<a class="headerlink" href="#code-contributions-pull-requests" title="Permanent link">¶</a></h2>
+<h2 id="code-contributions-pull-requests">Code contributions: pull requests<a class="headerlink" href="#code-contributions-pull-requests" title="Permanent link">¶</a></h2>
 <p>In general, we use pull requests to make changes to <code>sbi</code>.</p>
 <h3 id="setting-up-a-development-environment">Setting up a development environment<a class="headerlink" href="#setting-up-a-development-environment" title="Permanent link">¶</a></h3>
 <p>Clone <a href="https://github.com/mackelab/sbi">the repo</a> and install all the dependencies using
@@ -306,20 +296,29 @@ environment.yml</code>. If you already have an <code>sbi</code> environment and 
 dependencies, just run <code>conda env update -f environment.yml --prune</code>.</p>
 <p>Alternatively, you can install via <code>setup.py</code> using <code>pip install -e ".[dev]"</code> (the dev
 flag installs development and testing dependencies).</p>
-<h3 id="code-style">Code style<a class="headerlink" href="#code-style" title="Permanent link">¶</a></h3>
-<p>For docstrings and comments, we use <a href="http://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings">Google Style</a>.</p>
-<p>Code needs to pass through the following tools, which are installed along with <code>sbi</code>:</p>
-<p><strong><a href="https://github.com/psf/black">black</a></strong>: Automatic code formatting for Python. You can run black manually from the console using <code>black .</code> in the top directory of the repository, which will format all files. </p>
-<p><strong><a href="https://github.com/timothycrosley/isort">isort</a></strong>: Used to consistently order imports. You can run isort manually from the console using <code>isort -y</code> in the top directory.</p>
-<h3 id="documentation">Documentation<a class="headerlink" href="#documentation" title="Permanent link">¶</a></h3>
-<p>The documentation is entirely written in markdown (<a href="https://guides.github.com/features/mastering-markdown/">basic markdown guide</a>). It would be of great help, if you fixed mistakes, and edited where things are unclear. After a PR with documentation changes has been merged, the online documentation will be updated automatically in a couple of minutes. If you want to test a local build of the documentation, take a look at <code>docs/README.md</code>.</p>
-<p>Examples are collected in notebooks in <code>examples/</code>.</p>
-<h3 id="binary-files-and-jupyter-notebooks">Binary files and Jupyter notebooks<a class="headerlink" href="#binary-files-and-jupyter-notebooks" title="Permanent link">¶</a></h3>
-<h4>Using <code>sbi</code></h4>
-<p>We use git lfs to store large binary files. Those files are not downloaded by cloning the repository, but you have to pull them separately. To do so follow installation instructions here <a href="https://git-lfs.github.com/">https://git-lfs.github.com/</a>. In particular, in a freshly cloned repository on a new machine, you will need to run both <code>git-lfs install</code> and <code>git-lfs pull</code>.</p>
-<h4>Contributing to <code>sbi</code></h4>
-<p>We use a filename filter to track lfs files. Once you installed and pulled git lfs you can add a file to git lfs by appending <code>_gitlfs</code> to the basename, e.g., <code>oldbase_gitlfs.npy</code>. Then add the file to the index, commit, and it will be tracked by git lfs.</p>
-<p>Additionally, to avoid large diffs due to Jupyter notebook outputs we are using <code>nbstripout</code> to remove output from notebooks before every commit. The <code>nbstripout</code> package is downloaded automatically during installation of <code>sbi</code>. However, <strong>please make sure to set up the filter yourself</strong>, e.g., through <code>nbstriout --install</code> or with different options as described <a href="https://github.com/kynan/nbstripout">here</a>.</p>
+<h3 id="contributing-to-code-style-conventions">Contributing to code: style conventions<a class="headerlink" href="#contributing-to-code-style-conventions" title="Permanent link">¶</a></h3>
+<p>For docstrings and comments, we use <a href="http://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings">Google
+Style</a>.</p>
+<p>Code needs to pass through the following tools, which are installed alongside <code>sbi</code>:</p>
+<p><strong><a href="https://github.com/psf/black">black</a></strong>: Automatic code formatting for Python. You can
+run black manually from the console using <code>black .</code> in the top directory of the
+repository, which will format all files. </p>
+<p><strong><a href="https://github.com/timothycrosley/isort">isort</a></strong>: Used to consistently order
+imports. You can run isort manually from the console using <code>isort -y</code> in the top
+directory.</p>
+<h3 id="online-documentation">Online documentation<a class="headerlink" href="#online-documentation" title="Permanent link">¶</a></h3>
+<p>Part of the documentation is written as Jupyter notebooks. If you want to contribute to
+these files, please be sure to strip output before committing, either by hand upon
+saving or using an automated tool such as <code>nbstripout</code>.</p>
+<p>The rest of <a href="http://mackelab.org/sbi">the documentation</a> is written in markdown (<a href="https://guides.github.com/features/mastering-markdown/">basic
+markdown guide</a>).</p>
+<p>You can directly fix mistakes and suggest clearer formulations in markdown files simply
+by initiating a PR on the web. Click on <a href="https://github.com/mackelab/sbi/tree/master/docs/docs">documentation
+file</a> and look for the little
+pencil at top left. </p>
+<p>The online documentation will be updated automatically a couple of minutes after we
+merge your changes. If you want to test a local build of the documentation, take a look
+at <code>docs/README.md</code>.</p>
 </article>
 </div>
 </div>
