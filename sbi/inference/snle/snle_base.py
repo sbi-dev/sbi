@@ -45,8 +45,34 @@ class LikelihoodEstimator(NeuralInference, ABC):
         https://arxiv.org/abs/1805.07226
 
         Args:
-
-        See docstring of `NeuralInference` class for all other arguments.
+            simulator: A function that takes parameters $\theta$ and maps them to
+                simulations, or observations, `x`, $\mathrm{sim}(\theta)\to x$. Any
+                regular Python callable (i.e. function or class with `__call__` method)
+                can be used.
+            prior: A probability distribution that expresses prior knowledge about the
+                parameters, e.g. which ranges are meaningful for them. Any
+                object with `.log_prob()`and `.sample()` (for example, a PyTorch
+                distribution) can be used.
+            x_shape: Shape of a single simulation output $x$, has to be (1,N).
+            num_workers: Number of parallel workers to use for simulations.
+            simulation_batch_size: Number of parameter sets that the simulator
+                maps to data x at once. If None, we simulate all parameter sets at the
+                same time. If >= 1, the simulator has to process data of shape
+                (simulation_batch_size, parameter_dimension).
+            density_estimator: Either a string or a density estimation neural network
+                that can `.log_prob()` and `.sample()`. If it is a string, use a pre-
+                configured network of the provided type (one of nsf, maf, mdn, made).
+            mcmc_method: If MCMC sampling is used, specify the method here: either of
+                slice_np, slice, hmc, nuts.
+            device: torch device on which to compute, e.g. cuda, cpu.
+            logging_level: Minimum severity of messages to log. One of the strings
+                INFO, WARNING, DEBUG, ERROR and CRITICAL.
+            summary_writer: A `SummaryWriter` to control, among others, log
+                file location (default is `<current working directory>/logs`.)
+            show_progress_bars: Whether to show a progressbar during simulation and
+                sampling.
+            show_round_summary: Whether to show the validation loss and leakage after
+                each round.
         """
 
         super().__init__(
