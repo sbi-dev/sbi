@@ -1,7 +1,8 @@
 # Installation
 
-We recommend to use a virtual environment with [`conda`](https://docs.conda.io/en/latest/miniconda.html) with Python >= 3.7.
-If you don't have one, it should work with the following steps
+We recommend to use a [`conda`](https://docs.conda.io/en/latest/miniconda.html) virtual
+environment with Python >= 3.7. If you don't have one, it should work with the following
+steps
 ```shell
 # 1. install miniconda from https://docs.conda.io/en/latest/miniconda.html
 $ (dependent on your system, follow instructions on website)

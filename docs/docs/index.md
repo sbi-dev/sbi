@@ -15,7 +15,7 @@ posterior = infer(prior, simulator, num_simulations=1000, method='SNPE')
   neural dynamics](https://www.biorxiv.org/content/10.1101/838383v3).
 
 - If you want to get started using `sbi` on your own problem, jump to
-  [installation](install.md).
+  [installation](install.md) and then check out the [tutorial](tutorial/markdown_files/00_getting_started.md).
 
 ## Motivation and approach
 
