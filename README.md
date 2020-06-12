@@ -71,10 +71,22 @@ The following methods are currently available
 
 ## Acknowledgements
 
-`sbi` is a community project that started from Conor M. Durkan's `lfi` and continued
-development at the [mackelab](https://uni-tuebingen.de/en/research/core-research/cluster-of-excellence-machine-learning/research/research/cluster-research-groups/professorships/machine-learning-in-science/). 
+`sbi` is the PyTorch-successor of the 
+[`delfi`](https://github.com/mackelab/delfi) package ,and was started as a fork of Conor M. Durkan's `lfi`. It is now
+developed at the
+[mackelab](https://uni-tuebingen.de/en/research/core-research/cluster-of-excellence-machine-learning/research/research/cluster-research-groups/professorships/machine-learning-in-science/)
+as a community project.
 
-We would like to hear how it is working for your simulation as well as receive bug reports, pull requests and other
-feedback (see [contribute](http://www.mackelab.org/sbi/contribute/)).
+We would like to hear how it is working for your simulation as well as receive bug
+reports, pull requests and other feedback (see
+[contribute](http://www.mackelab.org/sbi/contribute/)).
 
 See also [credits](https://github.com/mackelab/sbi/blob/master/docs/docs/credits.md).
+
+## Support
+
+`sbi` has been developed in the context of the [ADIMEM
+grant](https://fit.uni-tuebingen.de/Activity/Details?id=6097), project A. ADIMEM is a
+BMBF grant awarded to groups at the Technical University of Munich, University of
+Tübingen and Research Center caesar of the Max Planck Gesellschaft.
+
