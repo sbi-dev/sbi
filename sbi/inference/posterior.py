@@ -631,7 +631,7 @@ class NeuralPosterior:
 
         focused_msg = (
             f"Focused at x_o={self._x_o_training_focused_on.tolist()!r}"
-            if self._num_trained_rounds > 1
+            if self._x_o_training_focused_on is not None
             else ""
         )
 
