@@ -14,6 +14,7 @@ from torch import Tensor
 from torch.utils.tensorboard import SummaryWriter
 
 import sbi.inference
+from sbi.inference.posterior import NeuralPosterior
 from sbi.simulators.simutils import simulate_in_batches
 from sbi.user_input.user_input_checks import process_x
 from sbi.user_input.user_input_checks import prepare_for_sbi
@@ -24,7 +25,7 @@ from sbi.utils.torchutils import get_default_device
 
 def infer(
     simulator: Callable, prior, method: str, num_simulations: int, num_workers: int = 1
-):
+) -> NeuralPosterior:
     r"""
     Return posterior distribution by running simulation-based inference.
 
@@ -33,8 +34,8 @@ def infer(
     for any $x$ (i.e. it is amortized).
 
     The scope of this function is limited to the most essential features of sbi. For
-    more flexibility (e.g. multi-round inference, different density estimators, ...)
-    please use the flexible interface described here:
+    more flexibility (e.g. multi-round inference, different density estimators) please
+    use the flexible interface described here:
     mackelab.org/sbi/tutorial/03_flexible_interface.html
 
     Args:
@@ -46,7 +47,7 @@ def infer(
             parameters, e.g. which ranges are meaningful for them. Any
             object with `.log_prob()`and `.sample()` (for example, a PyTorch
             distribution) can be used.
-        method: What inference method to use. Either of "SNPE", "SNLE" or "SNRE".
+        method: What inference method to use. Either of SNPE, SNLE or SNRE.
         num_simulations: Number of simulation calls. More simulations means a longer
             runtime, but a better posterior estimate.
         num_workers: Number of parallel workers to use for simulations.
