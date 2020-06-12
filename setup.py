@@ -45,9 +45,12 @@ setup(
     packages=find_packages(exclude=["tests"]),
     license="AGPLv3",
     install_requires=[
+        "ipywidgets",
         "joblib",
+        "jupyterlab",
         "matplotlib",
         "nbstripout",
+        "notebook",
         "numpy",
         "pillow",
         "pyro-ppl",
