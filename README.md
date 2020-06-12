@@ -46,7 +46,7 @@ The following methods are currently available
 
 * [`SNPE_C`](https://www.mackelab.org/sbi/reference/#sbi.inference.snpe.snpe_c.SNPE_C) or `APT` from Greenberg D, Nonnenmacher M, and Macke J [_Automatic
   PosteriorTransformation for likelihood-free
-  inference_](https://arxiv.org/abs/1905.07488)(ICML 2020).
+  inference_](https://arxiv.org/abs/1905.07488) (ICML 2020).
 
 <!-- 
 - **Fast ε-free Inference of Simulation Models with Bayesian Conditional Density
@@ -60,13 +60,13 @@ The following methods are currently available
 
 #### Sequential Neural Ratio Estimation (SNRE)
 
-* [`SNRE_A`](https://www.mackelab.org/sbi/reference/#sbi.inference.snre.snre_a.SNRE_A) or `AALR` from Hermans J, Begy V, and Louppe G. [_Likelihood-free Inference with Amortized Approximate Likelihood Ratios_](https://arxiv.org/abs/1903.04057)(ICML 2020).
+* [`SNRE_A`](https://www.mackelab.org/sbi/reference/#sbi.inference.snre.snre_a.SNRE_A) or `AALR` from Hermans J, Begy V, and Louppe G. [_Likelihood-free Inference with Amortized Approximate Likelihood Ratios_](https://arxiv.org/abs/1903.04057) (ICML 2020).
 
-* [`SNRE_B`](https://www.mackelab.org/sbi/reference/#sbi.inference.snre.snre_b.SNRE_B) or `SRE` from Durkan C, Murray I, and Papamakarios G. [_On Contrastive Learning for Likelihood-free Inference_](https://arxiv.org/abs/2002.03712)(ICML 2020).
+* [`SNRE_B`](https://www.mackelab.org/sbi/reference/#sbi.inference.snre.snre_b.SNRE_B) or `SRE` from Durkan C, Murray I, and Papamakarios G. [_On Contrastive Learning for Likelihood-free Inference_](https://arxiv.org/abs/2002.03712) (ICML 2020).
 
 #### Sequential Neural Likelihood Estimation (SNRE)
 * [`SNLE_A`](https://www.mackelab.org/sbi/reference/#sbi.inference.snle.snle_a.SNLE_A) or just `SNL` from Papamakarios G, Sterrat DC and Murray I [_Sequential
-  Neural Likelihood_](https://arxiv.org/abs/1805.07226)(AISTATS 2019).
+  Neural Likelihood_](https://arxiv.org/abs/1805.07226) (AISTATS 2019).
 >
 
 ## Acknowledgements
