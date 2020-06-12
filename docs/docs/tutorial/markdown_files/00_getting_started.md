@@ -31,16 +31,8 @@ def simulator(parameter_set):
 
 
 ```python
-posterior = infer('SNPE', simulator, prior, num_simulations=1000)
+posterior = infer(simulator, prior, 'SNPE', num_simulations=1000)
 ```
-
-
-    HBox(children=(FloatProgress(value=0.0, description='Running 1000 simulations.', max=1000.0, style=ProgressSty…
-
-
-    
-    Neural network successfully converged after 167 epochs.
-
 
 Let's say we have made some observation $x$:
 
@@ -57,10 +49,6 @@ samples = posterior.sample((10000,), x=observation)
 log_probability = posterior.log_prob(samples, x=observation)
 _ = utils.pairplot(samples, limits=[[-2,2],[-2,2],[-2,2]], fig_size=(6,6))
 ```
-
-
-![png](00_getting_started_files/00_getting_started_10_0.png)
-
 
 ## Requirements for the simulator, prior, and observation
 
@@ -90,9 +78,9 @@ Allowed data types and shapes:
 
 
 ```python
-posterior = infer('SNPE', simulator, prior, num_simulations=1000)
-posterior = infer('SNLE', simulator, prior, num_simulations=1000)
-posterior = infer('SNRE', simulator, prior, num_simulations=1000)
+posterior = infer(simulator, prior, 'SNPE', num_simulations=1000)
+posterior = infer(simulator, prior, 'SNLE', num_simulations=1000)
+posterior = infer(simulator, prior, 'SNRE', num_simulations=1000)
 ```
 
 You can then infer, sample, evaluate, and plot the posterior as described above.

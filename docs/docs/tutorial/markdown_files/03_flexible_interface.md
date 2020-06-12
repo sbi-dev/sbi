@@ -68,10 +68,6 @@ x_o = torch.zeros(3,)
 posterior = inference(num_rounds=2, x_o=x_o, num_simulations_per_round=1000)
 ```
 
-    Neural network successfully converged after 75 epochs.
-    Neural network successfully converged after 27 epochs.
-
-
  Note that, for `num_rounds>1`, the posterior is no longer amortized: it will give good results when sampled around `x=observation`, but bad possibly bad results for other `x`.
 
 Once we have obtained the posterior, we can `.sample()`, `.log_prob()`, or `.pairplot()` in the same way as for the easy interface.
@@ -83,7 +79,3 @@ posterior_samples = posterior.sample((10000,), x=x_o)
 # plot posterior samples
 _ = utils.pairplot(posterior_samples, limits=[[-2,2],[-2,2],[-2,2]], fig_size=(5,5))
 ```
-
-
-![png](03_flexible_interface_files/03_flexible_interface_17_0.png)
-

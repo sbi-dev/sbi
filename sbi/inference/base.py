@@ -23,7 +23,7 @@ from sbi.utils.torchutils import get_default_device
 
 
 def infer(
-    method: str, simulator: Callable, prior, num_simulations: int, num_workers: int = 1
+    simulator: Callable, prior, method: str, num_simulations: int, num_workers: int = 1
 ):
     r"""
     Return posterior distribution by running simulation-based inference.
@@ -38,7 +38,6 @@ def infer(
     mackelab.org/sbi/tutorial/03_flexible_interface.html
 
     Args:
-        method: What inference method to use. Either of "SNPE", "SNLE" or "SNRE".
         simulator: A function that takes parameters $\theta$ and maps them to
             simulations, or observations, `x`, $\mathrm{sim}(\theta)\to x$. Any
             regular Python callable (i.e. function or class with `__call__` method)
@@ -47,6 +46,7 @@ def infer(
             parameters, e.g. which ranges are meaningful for them. Any
             object with `.log_prob()`and `.sample()` (for example, a PyTorch
             distribution) can be used.
+        method: What inference method to use. Either of "SNPE", "SNLE" or "SNRE".
         num_simulations: Number of simulation calls. More simulations means a longer
             runtime, but a better posterior estimate.
         num_workers: Number of parallel workers to use for simulations.
