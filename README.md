@@ -22,7 +22,8 @@ parameter_posterior = infer(simulator, prior, method='SNPE')
 See below for the available methods of inference, `SNPE`, `SNRE` and `SNLE`.
 
 ## Installation
-We recommend to use a virtual environment with [`conda`](https://docs.conda.io/en/latest/miniconda.html) with Python >= 3.7.
+We recommend to use a [`conda`](https://docs.conda.io/en/latest/miniconda.html) virtual
+environment. The Python version must be 3.7 or higher.
 If you don't have one, it should work with the following steps
 ```shell
 # 1. install miniconda from https://docs.conda.io/en/latest/miniconda.html
