@@ -9,7 +9,7 @@ To report bugs and suggest features (including better documentation), please equ
 head over to [issues on GitHub](https://github.com/mackelab/sbi/issues). 
 
 
-## Code contributions: pull requests.
+## Code contributions: pull requests
 
 In general, we use pull requests to make changes to `sbi`.
 
@@ -24,31 +24,36 @@ Alternatively, you can install via `setup.py` using `pip install -e ".[dev]"` (t
 flag installs development and testing dependencies).
 
 
-### Code style
+### Contributing to code: style conventions
 
-For docstrings and comments, we use [Google Style](http://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings).
+For docstrings and comments, we use [Google
+Style](http://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings).
 
-Code needs to pass through the following tools, which are installed along with `sbi`:
+Code needs to pass through the following tools, which are installed alongside `sbi`:
 
-**[black](https://github.com/psf/black)**: Automatic code formatting for Python. You can run black manually from the console using `black .` in the top directory of the repository, which will format all files. 
+**[black](https://github.com/psf/black)**: Automatic code formatting for Python. You can
+run black manually from the console using `black .` in the top directory of the
+repository, which will format all files. 
 
-**[isort](https://github.com/timothycrosley/isort)**: Used to consistently order imports. You can run isort manually from the console using `isort -y` in the top directory.
+**[isort](https://github.com/timothycrosley/isort)**: Used to consistently order
+imports. You can run isort manually from the console using `isort -y` in the top
+directory.
 
 
-### Documentation
+### Online documentation
 
-The documentation is entirely written in markdown ([basic markdown guide](https://guides.github.com/features/mastering-markdown/)). It would be of great help, if you fixed mistakes, and edited where things are unclear. After a PR with documentation changes has been merged, the online documentation will be updated automatically in a couple of minutes. If you want to test a local build of the documentation, take a look at `docs/README.md`.
+Part of the documentation is written as Jupyter notebooks. If you want to contribute to
+these files, please be sure to strip output before committing, either by hand upon
+saving or using an automated tool such as `nbstripout`.
 
-Examples are collected in notebooks in `examples/`.
+The rest of [the documentation](http://mackelab.org/sbi) is written in markdown ([basic
+markdown guide](https://guides.github.com/features/mastering-markdown/)).
 
-### Binary files and Jupyter notebooks
+You can directly fix mistakes and suggest clearer formulations in markdown files simply
+by initiating a PR on the web. Click on [documentation
+file](https://github.com/mackelab/sbi/tree/master/docs/docs) and look for the little
+pencil at top left. 
 
-#### Using `sbi` 
-
-We use git lfs to store large binary files. Those files are not downloaded by cloning the repository, but you have to pull them separately. To do so follow installation instructions here [https://git-lfs.github.com/](https://git-lfs.github.com/). In particular, in a freshly cloned repository on a new machine, you will need to run both `git-lfs install` and `git-lfs pull`.
-
-#### Contributing to `sbi`
-
-We use a filename filter to track lfs files. Once you installed and pulled git lfs you can add a file to git lfs by appending `_gitlfs` to the basename, e.g., `oldbase_gitlfs.npy`. Then add the file to the index, commit, and it will be tracked by git lfs.
-
-Additionally, to avoid large diffs due to Jupyter notebook outputs we are using `nbstripout` to remove output from notebooks before every commit. The `nbstripout` package is downloaded automatically during installation of `sbi`. However, **please make sure to set up the filter yourself**, e.g., through `nbstriout --install` or with different options as described [here](https://github.com/kynan/nbstripout).
+The online documentation will be updated automatically a couple of minutes after we
+merge your changes. If you want to test a local build of the documentation, take a look
+at `docs/README.md`.
