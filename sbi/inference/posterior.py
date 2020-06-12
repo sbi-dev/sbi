@@ -631,7 +631,7 @@ class NeuralPosterior:
         msg = {0: "Untrained", 1: "Amortized"}
 
         focused_msg = (
-            f"Focused at x_o={self._x_o_training_focused_on.tolist()!r}"
+            f"focused at x_o={self._x_o_training_focused_on.tolist()!r}"
             if self._x_o_training_focused_on is not None
             else ""
         )
@@ -643,8 +643,8 @@ class NeuralPosterior:
         )
 
         desc = (
-            f"{msg.get(self._num_trained_rounds, focused_msg)} posterior conditional "
-            f"density p(θ|x){default_x_msg}.\n\n"
+            f"Posterior conditional density p(θ|x) "
+            f"{msg.get(self._num_trained_rounds, focused_msg)} {default_x_msg}.\n\n"
             f"This neural posterior was obtained with a "
             f"{self._method_family.upper()}-class "
             f"method using a {self.net.__class__.__name__.lower()}."
