@@ -77,21 +77,10 @@ class SNPE_C(PosteriorEstimator):
 
         self._use_combined_loss = use_combined_loss
 
-        super().__init__(
-            simulator=simulator,
-            prior=prior,
-            x_shape=x_shape,
-            num_workers=num_workers,
-            simulation_batch_size=simulation_batch_size,
-            density_estimator=density_estimator,
-            sample_with_mcmc=sample_with_mcmc,
-            mcmc_method=mcmc_method,
-            device=device,
-            logging_level=logging_level,
-            summary_writer=summary_writer,
-            show_progress_bars=show_progress_bars,
-            show_round_summary=show_round_summary,
+        kwargs = del_entries(
+            locals(), entries=("self", "__class__", "use_combined_loss")
         )
+        super().__init__(**kwargs)
 
     def __call__(
         self,
