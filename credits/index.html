@@ -200,13 +200,8 @@
 <label class="md-nav__title" for="__toc">Table of contents</label>
 <ul class="md-nav__list" data-md-scrollfix="">
 <li class="md-nav__item">
-<a class="md-nav__link" href="#code">
-    Code
-  </a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="#inference-methods">
-    Inference methods
+<a class="md-nav__link" href="#important-dependencies-and-prior-art">
+    Important dependencies and prior art
   </a>
 </li>
 </ul>
@@ -224,13 +219,8 @@
 <label class="md-nav__title" for="__toc">Table of contents</label>
 <ul class="md-nav__list" data-md-scrollfix="">
 <li class="md-nav__item">
-<a class="md-nav__link" href="#code">
-    Code
-  </a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="#inference-methods">
-    Inference methods
+<a class="md-nav__link" href="#important-dependencies-and-prior-art">
+    Important dependencies and prior art
   </a>
 </li>
 </ul>
@@ -246,33 +236,28 @@
 <div class="codehilite"><pre><span></span><code>Copyright (C) 2020 Álvaro Tejero-Cantero, Jakob H. Macke, Jan-Matthis Lückmann, Michael Deistler, Jan F. Bölts.
 Copyright (C) 2020 Conor M. Durkan.
 </code></pre></div></p>
-<h2 id="code">Code<a class="headerlink" href="#code" title="Permanent link">¶</a></h2>
-<p><code>sbi</code> uses density estimators from <a href="https://github.com/bayesiains/nsf">bayesiains/nflows</a> by <a href="https://conormdurkan.github.io/">Conor M.Durkan</a>, <a href="https://gpapamak.github.io/">George Papamakarios</a> and <a href="https://arturbekasov.github.io/">Artur Bekasov</a>.</p>
-<p><code>sbi</code> started as a fork of <a href="https://github.com/conormdurkan/lfi">conormdurkan/lfi</a>, by [Conor M.Durkan](<a href="https://conormdurkan.github.io/">https://conormdurkan.github.io/</a>.</p>
-<h2 id="inference-methods">Inference methods<a class="headerlink" href="#inference-methods" title="Permanent link">¶</a></h2>
-<p><code>sbi</code> implements inference methods reported in the following contributions:</p>
+<h2 id="important-dependencies-and-prior-art">Important dependencies and prior art<a class="headerlink" href="#important-dependencies-and-prior-art" title="Permanent link">¶</a></h2>
 <ul>
 <li>
-<p><strong>Fast ε-free Inference of Simulation Models with Bayesian Conditional Density
-  Estimation</strong><br/> by Papamakarios G. and Murray I. (NeurIPS 2016)
-  <br/><a href="https://papers.nips.cc/paper/6084-fast-free-inference-of-simulation-models-with-bayesian-conditional-density-estimation.pdf">[PDF]</a>
-<a href="https://papers.nips.cc/paper/6084-fast-free-inference-of-simulation-models-with-bayesian-conditional-density-estimation/bibtex">[BibTeX]</a>.</p>
+<p><code>sbi</code> uses <code>PyTorch</code> and tries to align with the interfaces (e.g. for probability
+  distributions) adopted by <code>PyTorch</code>.</p>
 </li>
 <li>
-<p><strong>Flexible statistical inference for mechanistic models of neural dynamics</strong> <br/> by
-  Lueckmann J-M., Gonçalves P., Bassetto G., Öcal K., Nonnenmacher M. and Macke J. (NeurIPS 2017)
-  <br/><a href="https://papers.nips.cc/paper/6728-flexible-statistical-inference-for-mechanistic-models-of-neural-dynamics.pdf">[PDF]</a>
-<a href="https://papers.nips.cc/paper/6728-flexible-statistical-inference-for-mechanistic-models-of-neural-dynamics/bibtex">[BibTeX]</a>.</p>
+<p><code>sbi</code> uses density estimators from
+<a href="https://github.com/bayesiains/nsf">bayesiains/nflows</a> by <a href="https://conormdurkan.github.io/">Conor
+M.Durkan</a>, <a href="https://gpapamak.github.io/">George
+Papamakarios</a> and <a href="https://arturbekasov.github.io/">Artur
+Bekasov</a>. These are proxied through
+<a href="https://github.com/mackelab/pyknos"><code>pyknos</code></a>, a package focused on density estimation.</p>
 </li>
 <li>
-<p><strong>Automatic posterior transformation for likelihood-free inference</strong><br/>by Greenberg, Nonnenmacher M. and Macke J. (ICML 2019) <br/><a href="http://proceedings.mlr.press/v97/greenberg19a/greenberg19a.pdf">[PDF]</a> <br/> <a href="http://proceedings.mlr.press/v97/greenberg19a.html">[BibTeX]</a>.</p>
+<p><code>sbi</code> started as a fork of <a href="https://github.com/conormdurkan/lfi">conormdurkan/lfi</a>, by <a href="https://conormdurkan.github.io/">Conor M.Durkan</a>.</p>
 </li>
 <li>
-<p><strong>On Contrastive Learning for Likelihood-free Inference</strong><br/>Durkan C.,
-  Murray I., and Papamakarios G.(ICML 2020) <br/><a href="https://arxiv.org/abs/2002.03712">[PDF]</a>.</p>
+<p>See <a href="https://github.com/mackelab/sbi/blob/master/README.md">README.md</a> for a list of
+  methods implemented in <code>sbi</code>.</p>
 </li>
 </ul>
-<p>We refer to these methods as SNPE-A, SNPE-B, and SNPE-C/APT, respectively.</p>
 </article>
 </div>
 </div>
