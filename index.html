@@ -41,7 +41,7 @@
 <input autocomplete="off" class="md-toggle" data-md-toggle="drawer" id="__drawer" type="checkbox"/>
 <input autocomplete="off" class="md-toggle" data-md-toggle="search" id="__search" type="checkbox"/>
 <label class="md-overlay" data-md-component="overlay" for="__drawer"></label>
-<a class="md-skip" href="#sbi" tabindex="0">
+<a class="md-skip" href="#sbi-simulation-based-inference" tabindex="0">
         Skip to content
       </a>
 <header class="md-header" data-md-component="header">
@@ -279,41 +279,73 @@
 <div class="md-content">
 <article class="md-content__inner md-typeset">
 <a class="md-icon md-content__icon" href="http://github.com/mackelab/sbi/edit/master/docs/index.md" title="Edit this page"></a>
-<h1 id="sbi"><code>sbi</code><a class="headerlink" href="#sbi" title="Permanent link">¶</a></h1>
-<p><code>sbi</code>: A Python toolbox for simulation-based inference. Inference can be run in a single line of code:
-<div class="codehilite"><pre><span></span><code>posterior = infer('SNPE', prior, simulator, num_simulations=1000)
-</code></pre></div></p>
+<h1 id="sbi-simulation-based-inference"><code>sbi</code>: simulation-based inference<a class="headerlink" href="#sbi-simulation-based-inference" title="Permanent link">¶</a></h1>
+<p><code>sbi</code>: A Python toolbox for simulation-based inference. Inference can be run in a single
+line of code:</p>
+<div class="codehilite"><pre><span></span><code><span class="n">posterior</span> <span class="o">=</span> <span class="n">infer</span><span class="p">(</span><span class="n">prior</span><span class="p">,</span> <span class="n">simulator</span><span class="p">,</span> <span class="n">num_simulations</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">'SNPE'</span><span class="p">)</span>
+</code></pre></div>
 <ul>
 <li>
-<p>To see applications of simulation-based inference to canonical problems in neuroscience, read our preprint:
-<a href="https://www.biorxiv.org/content/10.1101/838383v3">Training deep neural density estimators to identify mechanistic models of neural dynamics</a>.</p>
+<p>To learn about the general motivation behind simulation-based inference, and the
+  inference methods included in <code>sbi</code>, read on below.</p>
 </li>
 <li>
-<p>To learn more about the general motivation behind simulation-based inference, and inference methods included in <code>sbi</code>, keep on reading.</p>
+<p>For example applications to canonical problems in neuroscience, browse the recent
+  preprint <a href="https://www.biorxiv.org/content/10.1101/838383v3">Training deep neural density estimators to identify mechanistic models of
+  neural dynamics</a>.</p>
+</li>
+<li>
+<p>If you want to get started using <code>sbi</code> on your own problem, jump to
+  <a href="install/">installation</a>.</p>
 </li>
 </ul>
 <h2 id="motivation-and-approach">Motivation and approach<a class="headerlink" href="#motivation-and-approach" title="Permanent link">¶</a></h2>
-<p>Many areas of science and engineering make extensive use of complex, stochastic, numerical simulations to describe the structure and dynamics of the processes being investigated. A key challenge in simulation-based science is linking simulation models to empirical data: Bayesian inference provides a general and powerful framework for identifying the set of parameters which are consistent both with empirical data and prior knowledge.</p>
-<p>One of the key quantities required for statistical inference, the likelihood of observed data given parameters, <span class="arithmatex">\(\mathcal{L}(\theta) = p(x_o|\theta)\)</span>, is typically intractable for
-simulation-based models, rendering conventional statistical approaches inapplicable.</p>
-<p><code>sbi</code> implements three powerful machine-learning methods to address this problem:</p>
+<p>Many areas of science and engineering make extensive use of complex, stochastic,
+numerical simulations to describe the structure and dynamics of the processes being
+investigated. </p>
+<p>A key challenge in simulation-based science is constraining these simulation models’
+parameters, which are intepretable quantities, with observational data. Bayesian
+inference provides a general and powerful framework to invert the simulators, i.e.
+describe the parameters which are consistent both with empirical data and prior
+knowledge.</p>
+<p>In the case of simulators, a key quantity required for statistical inference, the
+likelihood of observed data given parameters, <span class="arithmatex">\(\mathcal{L}(\theta) = p(x_o|\theta)\)</span>, is
+typically intractable, rendering conventional statistical approaches inapplicable.</p>
+<p><code>sbi</code> implements three powerful machine-learning methods that address this problem:</p>
 <ul>
-<li>Sequential Neural Posterior Estimation (SNPE)</li>
-<li>Sequential Neural Likelihood Estimation (SNLE)</li>
-<li>Sequential Neural Ratio Estimation (SNRE)</li>
+<li>Sequential Neural Posterior Estimation (SNPE),</li>
+<li>Sequential Neural Likelihood Estimation (SNLE), and</li>
+<li>Sequential Neural Ratio Estimation (SNRE).</li>
 </ul>
-<p>Depending on the problem, the different methods can be more or less effective.</p>
+<p>Depending on the characteristics of the problem, e.g. the dimensionalities of the
+parameter space and the observation space, one of the methods will be more suitable.</p>
 <p><img alt="" src="static/goal.png"/></p>
 <p><strong>Goal: Algorithmically identify mechanistic models which are consistent with data.</strong></p>
-<p>Each of the above-described methods has three inputs: A candidate mechanistic model, prior knowledge or constraints on model parameters, and data (or summary statistics). The methods then proceed by:</p>
+<p>Each of the methods above needs three inputs: A candidate mechanistic model, prior
+knowledge or constraints on model parameters, and observational data (or summary statistics
+thereof).</p>
+<p>The methods then proceed by</p>
 <ol>
-<li>sampling parameters from the prior and simulating synthetic datasets from these parameters, and</li>
-<li>using a deep density estimation neural network to learn the (probabilistic) association between data (or data features) and underlying parameters, i.e. to learn statistical inference from simulated data. They way in which this association is learned differs between the above methods.</li>
-<li>This learned neural network is then applied to empirical data to derive the full space of parameters consistent with the data and the prior, i.e. the posterior distribution. High posterior probability is assigned to parameters which are consistent with both the data and the prior, low probability to inconsistent parameters. While SNPE directly learns the posterior distribution, SNLE and SNRE need an extra MCMC step to infer the posterior.</li>
-<li>If needed, an initial estimate of the posterior can be used to adaptively generate additional informative simulations.</li>
+<li>sampling parameters from the prior followed by simulating synthetic data from
+   these parameters,</li>
+<li>learning the (probabilistic) association between data (or
+   data features) and underlying parameters, i.e. to learn statistical inference from
+   simulated data. They way in which this association is learned differs between the
+   above methods, but all use deep neural networks.</li>
+<li>This learned neural network is then applied to empirical data to derive the full
+   space of parameters consistent with the data and the prior, i.e. the posterior
+   distribution. High posterior probability is assigned to parameters which are
+   consistent with both the data and the prior, low probability to inconsistent
+   parameters. While SNPE directly learns the posterior distribution, SNLE and SNRE need
+   an extra MCMC sampling step to construct a posterior.</li>
+<li>If needed, an initial estimate of the posterior can be used to adaptively generate
+   additional informative simulations.</li>
 </ol>
 <h2 id="publications">Publications<a class="headerlink" href="#publications" title="Permanent link">¶</a></h2>
-<p>Refer to the following papers for additional details on the inference methods included in <code>sbi</code>:</p>
+<p>See <a href="https://arxiv.org/abs/1911.01429">Cranmer, Brehmer, Louppe (2019)</a> for a recent
+review on simulation-based inference.</p>
+<p>The following papers offer additional details on the inference methods included in
+<code>sbi</code>:</p>
 <h3 id="snpe">SNPE<a class="headerlink" href="#snpe" title="Permanent link">¶</a></h3>
 <ul>
 <li>
@@ -339,7 +371,6 @@ simulation-based models, rendering conventional statistical approaches inapplica
 <p><strong>On Contrastive Learning for Likelihood-free Inference</strong><br/>Durkan, Murray &amp; Papamakarios (ICML 2020) <br/><a href="https://arxiv.org/abs/2002.03712">[PDF]</a>.</p>
 </li>
 </ul>
-<p>See <a href="https://arxiv.org/abs/1911.01429">Cranmer, Brehmer, Louppe (2019)</a> for a recent review on simulation-based inference and our recent preprint <a href="https://www.biorxiv.org/content/10.1101/838383v1">Training deep neural density estimators to identify mechanistic models of neural dynamics (Goncalves et al., 2019)</a> for applications to canonical problems in neuroscience.</p>
 </article>
 </div>
 </div>
