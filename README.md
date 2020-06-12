@@ -74,11 +74,10 @@ The following methods are currently available
 
 ## Acknowledgements
 
-`sbi` is the PyTorch-successor of the 
-[`delfi`](https://github.com/mackelab/delfi) package ,and was started as a fork of Conor M. Durkan's `lfi`. It is now
-developed at the
-[mackelab](https://uni-tuebingen.de/en/research/core-research/cluster-of-excellence-machine-learning/research/research/cluster-research-groups/professorships/machine-learning-in-science/)
-as a community project.
+`sbi` is the successor (using PyTorch) of the 
+[`delfi`](https://github.com/mackelab/delfi) package. It was started as a fork of Conor
+M. Durkan's `lfi`. `sbi` runs as a community project; development is coordinated at the
+[mackelab](https://uni-tuebingen.de/en/research/core-research/cluster-of-excellence-machine-learning/research/research/cluster-research-groups/professorships/machine-learning-in-science/).
 
 We would like to hear how it is working for your simulation as well as receive bug
 reports, pull requests and other feedback (see
