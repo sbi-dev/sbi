@@ -32,7 +32,6 @@ setup(
         "pillow",
         "pyro-ppl",
         "pyknos==0.11",
-        "scikit-learn",
         "scipy",
         "tensorboard",
         "torch>=1.4.0, !=1.5.0",  # See issue #37703 in PyTorch 1.5.0.
@@ -54,6 +53,7 @@ setup(
             "pep517", 
             "pytest",
             "pyyaml",
+            "scikit-learn",
             "torchtestcase",
             "twine",
         ]
