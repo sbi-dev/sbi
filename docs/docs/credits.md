@@ -18,7 +18,15 @@ Papamakarios](https://gpapamak.github.io/) and [Artur
 Bekasov](https://arturbekasov.github.io/). These are proxied through
 [`pyknos`](https://github.com/mackelab/pyknos), a package focused on density estimation.
 
-* `sbi` started as a fork of [conormdurkan/lfi](https://github.com/conormdurkan/lfi), by [Conor M.Durkan](https://conormdurkan.github.io/).
+* `sbi` is the successor to [`delfi`](https://github.com/mackelab/delfi), a Theano-based
+  toolbox developed at mackelab for sequential neural posterior estimation. If you were
+  using `delfi`, we strongly recommend to move your inference over to `sbi`. Please open
+  issues if you find unexpected behaviour or missing features. We will consider these
+  bugs and give them priority.
+
+* `sbi` as a PyTorch-based toolbox started as a fork of
+  [conormdurkan/lfi](https://github.com/conormdurkan/lfi), by [Conor
+  M.Durkan](https://conormdurkan.github.io/).
 
 * See [README.md](https://github.com/mackelab/sbi/blob/master/README.md) for a list of
   methods implemented in `sbi`.
