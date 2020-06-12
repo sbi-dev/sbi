@@ -637,7 +637,7 @@ class NeuralPosterior:
         )
 
         default_x_msg = (
-            f" Evaluates aand samples by default at x={self.default_x.tolist()!r}"
+            f" Evaluates and samples by default at x={self.default_x.tolist()!r}"
             if self.default_x is not None
             else ""
         )
