@@ -34,7 +34,7 @@ for line in open(os.path.join(PROJECT_PATH, "sbi", "__version__.py")):
 
 setup(
     name="sbi",
-    version="0.8rc2",  # version_namespace["__version__"],
+    version=version_namespace["__version__"],
     description="Simulation-based inference.",
     long_description=desc,
     long_description_content_type="text/markdown",
