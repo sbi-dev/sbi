@@ -1,13 +1,20 @@
 # Installation
 
-## Quick start
-
-Clone the repo and install all the dependencies using the `environment.yml` file to create a conda environment: `conda env create -f environment.yml`. If you already have an `sbi` environment and want to refresh dependencies, just run `conda env update -f environment.yml --prune`.
-
-Alternatively, you can install via `setup.py` using `pip install -e ".[dev]"` (the dev flag installs development and testing dependencies).
-
+We recommend to use a virtual environment with [`conda`](https://docs.conda.io/en/latest/miniconda.html) with Python >= 3.7.
+If you don't have one, it should work with the following steps
+```shell
+# 1. install miniconda from https://docs.conda.io/en/latest/miniconda.html
+$ (dependent on your system, follow instructions on website)
+# 2. create an environment for sbi (indicate Python 3.7 or higher); activate it
+$ conda create -n sbi_env python=3.7 && conda activate sbi_env
 ```
-git clone https://github.com/mackelab/sbi.git
-cd sbi
-pip install -e ".dev"
+Then install `sbi`:
+```shell
+$ pip install sbi
 ```
+To test the installation, drop into a python prompt and run 
+```python
+from sbi.example.minimal import simple
+posterior = simple()
+print(posterior)
+``` 
