@@ -15,10 +15,13 @@ from sbi inference import infer
 parameter_posterior = infer(simulator, prior, method='SNPE')
 ```
 
-`sbi` is a community project that started from Conor M. Durkan's `lfi` and continued
-development at the [MackeLab](https://mackelab.org). We would like to hear how it is
-working for your simulation as well as receive bug reports, pull requests and other
-feedback at [github.com/mackelab/sbi](https://github.com/mackelab/sbi).
+`sbi` is a community project. It is the PyTorch successor of
+[`delfi`](https://github.com/mackelab/delfi), and started life as a fork of Conor M. 
+Durkan's `lfi`. Development is currently coordinated at the [mackelab](https://uni-tuebingen.de/en/research/core-research/cluster-of-excellence-machine-learning/research/research/cluster-research-groups/professorships/machine-learning-in-science/).
+
+We would appreciate to hear how `sbi`is working for your simulation problems, and
+welcome also bug reports, pull requests and any other feedback at
+[github.com/mackelab/sbi](https://github.com/mackelab/sbi).
 """
 
 
