@@ -248,10 +248,10 @@
 <p>The flexible interface allows you to customize the following:</p>
 <ul>
 <li>performing sequential posterior estimation by using <code>num_rounds&gt;1</code>. This can decrease the number of simulations one has to run, but the inference procedure is no longer amortized.  </li>
-<li>specify your own density estimator, or change hyperparameters of existing ones (e.g. number of hidden units for ‘NSF’).</li>
+<li>specify your own density estimator, or change hyperparameters of existing ones (e.g. number of hidden units for <a href="https://arxiv.org/abs/1906.04032">NSF</a>).</li>
 <li>run simulations in batches, which can speed up simulations.</li>
-<li>if available, choose between different methods to sample from the posterior.</li>
-<li>use calibration kernels as proposed by Lueckmann, Goncalves et al. 2017</li>
+<li>when it makes sense, choose between different methods to sample from the posterior.</li>
+<li>use calibration kernels as proposed by <a href="https://arxiv.org/abs/1711.01861">Lueckmann, Goncalves et al. 2017</a>.</li>
 </ul>
 <h2 id="linear-gaussian-example">Linear Gaussian example<a class="headerlink" href="#linear-gaussian-example" title="Permanent link">¶</a></h2>
 <div class="codehilite"><pre><span></span><code><span class="kn">import</span> <span class="nn">torch</span>
@@ -260,9 +260,10 @@
 <span class="kn">from</span> <span class="nn">sbi.utils.get_nn_models</span> <span class="kn">import</span> <span class="n">posterior_nn</span>
 <span class="kn">import</span> <span class="nn">sbi.utils</span> <span class="k">as</span> <span class="nn">utils</span>
 </code></pre></div>
-<p>We will show an example of how we can use the flexible interface to infer the posterior for an example with a Gaussian likelihood (same example as before). Let us first import some libraries and define the simulator and prior:</p>
+<p>We will show an example of how we can use the flexible interface to infer the posterior for an example with a Gaussian likelihood (same example as before). After importing the inference method we want, <code>SNPE</code>, a function to prepare the input <code>prepare_for_sbi</code> and a factory for density estimators <code>posterior_nn</code> above, we define the simulator and prior:</p>
 <div class="codehilite"><pre><span></span><code><span class="n">num_dim</span> <span class="o">=</span> <span class="mi">3</span>
-<span class="n">prior</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">BoxUniform</span><span class="p">(</span><span class="n">low</span><span class="o">=-</span><span class="mi">2</span><span class="o">*</span><span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">num_dim</span><span class="p">),</span> <span class="n">high</span><span class="o">=</span><span class="mi">2</span><span class="o">*</span><span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">num_dim</span><span class="p">))</span>
+<span class="n">prior</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">BoxUniform</span><span class="p">(</span><span class="n">low</span><span class="o">=-</span><span class="mi">2</span><span class="o">*</span><span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">num_dim</span><span class="p">),</span> 
+                         <span class="n">high</span><span class="o">=</span><span class="mi">2</span><span class="o">*</span><span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">num_dim</span><span class="p">))</span>
 </code></pre></div>
 <div class="codehilite"><pre><span></span><code><span class="k">def</span> <span class="nf">linear_gaussian</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
     <span class="k">return</span> <span class="n">theta</span> <span class="o">+</span> <span class="mf">1.0</span> <span class="o">+</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn_like</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.1</span>
@@ -270,22 +271,36 @@
 <p>In the advanced mode, you have to ensure that your simulator and prior adhere the requirements of <code>sbi</code>. You can do so with the <code>prepare_for_sbi()</code> function. In addition <code>prepare_for_sbi()</code> returns the <code>x_shape</code>, which is the shape of a single simulation output.</p>
 <div class="codehilite"><pre><span></span><code><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">x_shape</span> <span class="o">=</span> <span class="n">prepare_for_sbi</span><span class="p">(</span><span class="n">linear_gaussian</span><span class="p">,</span> <span class="n">prior</span><span class="p">)</span>
 </code></pre></div>
-<p>You can then use the <code>prior</code> and <code>x_shape</code> object to specify a custom density estimator. Since we use ‘SNPE’, we specifiy a neural network targeting the posterior (hence the call to <code>posterior_nn()</code>). In this example, we will create a neural spline flow (<code>'nsf'</code>) with <code>60</code> hidden units and <code>3</code> transform layers:</p>
-<div class="codehilite"><pre><span></span><code><span class="n">my_density_estimator</span> <span class="o">=</span> <span class="n">posterior_nn</span><span class="p">(</span><span class="s1">'nsf'</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">x_shape</span><span class="p">,</span> <span class="n">hidden_features</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span> <span class="n">flow_num_transforms</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+<p>You can then use the <code>prior</code> and <code>x_shape</code> object to specify a custom density estimator. Since we use S*N*PE, we specifiy a neural network targeting the <em>posterior</em> (hence the call to <code>posterior_nn()</code>). In this example, we will create a neural spline flow (<code>'nsf'</code>) with <code>60</code> hidden units and <code>3</code> transform layers:</p>
+<div class="codehilite"><pre><span></span><code><span class="n">my_density_estimator</span> <span class="o">=</span> <span class="n">posterior_nn</span><span class="p">(</span><span class="s1">'nsf'</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">x_shape</span><span class="p">,</span> <span class="n">hidden_features</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span> 
+                                    <span class="n">flow_num_transforms</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
 </code></pre></div>
-<p>We will set use <code>SNPE</code> with a <code>simulation_batch_size=10</code>, i.e. <code>10</code> simulations will be passed to the simulator which will then handle the simulations in a vectorized way (note that your simulator has to support this in order to use this feature):</p>
-<div class="codehilite"><pre><span></span><code><span class="n">inference</span> <span class="o">=</span> <span class="n">SNPE</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">x_shape</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="n">my_density_estimator</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<p>We will use <code>SNPE</code> with a <code>simulation_batch_size=10</code>, i.e. <code>10</code> simulations will be passed to the simulator which will then handle the simulations in a vectorized way (note that your simulator has to support this in order to use this feature):</p>
+<div class="codehilite"><pre><span></span><code><span class="n">inference</span> <span class="o">=</span> <span class="n">SNPE</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">x_shape</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="n">my_density_estimator</span><span class="p">,</span> 
+                 <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 </code></pre></div>
 <p>And we can run inference. In this example, we will run inference over <code>2</code> rounds, potentially leading to a more focused posterior around the observation <code>x_o</code>.</p>
 <div class="codehilite"><pre><span></span><code><span class="n">x_o</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="p">,)</span>
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="p">(</span><span class="n">num_rounds</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">x_o</span><span class="o">=</span><span class="n">x_o</span><span class="p">,</span> <span class="n">num_simulations_per_round</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
 </code></pre></div>
-<p>Note that, for <code>num_rounds&gt;1</code>, the posterior is no longer amortized: it will give good results when sampled around <code>x=observation</code>, but bad possibly bad results for other <code>x</code>.</p>
+<div class="codehilite"><pre><span></span><code>Neural network successfully converged after 94 epochs.
+Neural network successfully converged after 32 epochs.
+</code></pre></div>
+<p>Note that, for <code>num_rounds&gt;1</code>, the posterior is no longer amortized: it will give good results when sampled around <code>x=observation</code>, but possibly bad results for other <code>x</code>.</p>
 <p>Once we have obtained the posterior, we can <code>.sample()</code>, <code>.log_prob()</code>, or <code>.pairplot()</code> in the same way as for the easy interface.</p>
 <div class="codehilite"><pre><span></span><code><span class="n">posterior_samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_o</span><span class="p">)</span>
 
 <span class="c1"># plot posterior samples</span>
-<span class="n">_</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">pairplot</span><span class="p">(</span><span class="n">posterior_samples</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">],[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">],[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">]],</span> <span class="n">fig_size</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span><span class="mi">5</span><span class="p">))</span>
+<span class="n">_</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">pairplot</span><span class="p">(</span><span class="n">posterior_samples</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">],[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">],[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">]],</span> 
+                   <span class="n">fig_size</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span><span class="mi">5</span><span class="p">))</span>
+</code></pre></div>
+<p><img alt="png" src="../03_flexible_interface_files/03_flexible_interface_17_0.png"/></p>
+<p>We can always print the posterior to know how it was trained:</p>
+<div class="codehilite"><pre><span></span><code><span class="nb">print</span><span class="p">(</span><span class="n">posterior</span><span class="p">)</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>Posterior conditional density p(θ|x) focused at x_o=[[0.0, 0.0, 0.0]]  with default evaluation at x=[[0.0, 0.0, 0.0]].
+
+This neural posterior was obtained with a SNPE-class method using a flow.
 </code></pre></div>
 </article>
 </div>
