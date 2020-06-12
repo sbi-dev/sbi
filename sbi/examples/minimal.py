@@ -20,6 +20,7 @@ def simple():
 
     return posterior
 
+
 def flexible():
     num_dim = 3
     x_o = torch.ones(1, num_dim)
@@ -36,3 +37,10 @@ def flexible():
     posterior.sample((100,), x=x_o)
 
     return posterior
+
+
+if __name__ == "__main__":
+    print("Simple interface with 2 workers:")
+    print(simple())
+    print("Flexible interface:")
+    print(flexible())
