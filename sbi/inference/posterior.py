@@ -628,23 +628,23 @@ class NeuralPosterior:
         return desc
 
     def __str__(self):
-        msg = {0: "Untrained", 1: "Amortized"}
+        msg = {0: "untrained", 1: "amortized"}
 
         focused_msg = (
-            f"focused at x_o={self._x_o_training_focused_on.tolist()!r}"
+            f"focused on x_o={self._x_o_training_focused_on.tolist()!r}"
             if self._x_o_training_focused_on is not None
             else ""
         )
 
         default_x_msg = (
-            f" with default evaluation at x={self.default_x.tolist()!r}"
+            f" Evaluates aand samples by default at x={self.default_x.tolist()!r}"
             if self.default_x is not None
             else ""
         )
 
         desc = (
             f"Posterior conditional density p(θ|x) "
-            f"{msg.get(self._num_trained_rounds, focused_msg)} {default_x_msg}.\n\n"
+            f"({msg.get(self._num_trained_rounds, focused_msg)}.){default_x_msg}.\n\n"
             f"This neural posterior was obtained with a "
             f"{self._method_family.upper()}-class "
             f"method using a {self.net.__class__.__name__.lower()}."
