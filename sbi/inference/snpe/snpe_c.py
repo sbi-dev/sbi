@@ -39,12 +39,40 @@ class SNPE_C(PosteriorEstimator):
             Greenberg et al., ICML 2019, https://arxiv.org/abs/1905.07488.
 
         Args:
+            simulator: A function that takes parameters $\theta$ and maps them to
+                simulations, or observations, `x`, $\mathrm{sim}(\theta)\to x$. Any
+                regular Python callable (i.e. function or class with `__call__` method)
+                can be used.
+            prior: A probability distribution that expresses prior knowledge about the
+                parameters, e.g. which ranges are meaningful for them. Any
+                object with `.log_prob()`and `.sample()` (for example, a PyTorch
+                distribution) can be used.
+            x_shape: Shape of a single simulation output $x$, has to be (1,N).
+            num_workers: Number of parallel workers to use for simulations.
+            simulation_batch_size: Number of parameter sets that the simulator
+                maps to data x at once. If None, we simulate all parameter sets at the
+                same time. If >= 1, the simulator has to process data of shape
+                (simulation_batch_size, parameter_dimension).
+            density_estimator: Either a string or a density estimation neural network
+                that can `.log_prob()` and `.sample()`. If it is a string, use a pre-
+                configured network of the provided type (one of nsf, maf, mdn, made).
+            sample_with_mcmc: Whether to sample with MCMC. MCMC can be used to deal
+                with high leakage.
+            mcmc_method: If MCMC sampling is used, specify the method here: either of
+                slice_np, slice, hmc, nuts.
             use_combined_loss: Whether to train the neural net also on prior samples
                 using maximum likelihood in addition to training it on all samples using
                 atomic loss. The extra MLE loss helps prevent density leaking with
                 bounded priors.
-
-        See docstring of `PosteriorEstimator` class for all other arguments.
+            device: torch device on which to compute, e.g. cuda, cpu.
+            logging_level: Minimum severity of messages to log. One of the strings
+                INFO, WARNING, DEBUG, ERROR and CRITICAL.
+            summary_writer: A `SummaryWriter` to control, among others, log
+                file location (default is `<current working directory>/logs`.)
+            show_progress_bars: Whether to show a progressbar during simulation and
+                sampling.
+            show_round_summary: Whether to show the validation loss and leakage after
+                each round.
         """
 
         self._use_combined_loss = use_combined_loss
@@ -84,10 +112,50 @@ class SNPE_C(PosteriorEstimator):
         discard_prior_samples: bool = False,
         retrain_from_scratch_each_round: bool = False,
     ) -> NeuralPosterior:
-        """
+        r"""Run SNPE.
+
+        Return posterior $p(\theta|x)$ after inference (possibly over several rounds).
+
         Args:
+            num_rounds: Number of rounds to run. Each round consists of a simulation and
+                training phase. `num_rounds=1` leads to a posterior $p(\theta|x)$ valid
+                for _any_ $x$ (amortized), but requires many simulations.
+                Alternatively, with `num_rounds>1` the inference returns a posterior
+                $p(\theta|x_o)$ focused on a specific observation `x_o`, potentially
+                requiring less simulations.
+            num_simulations_per_round: Number of simulator calls per round.
+            x_o: An observation that is only required when doing inference
+                over multiple rounds. After the first round, `x_o` is used to guide the
+                sampling so that the simulator is run with parameters that are likely
+                for that `x_o`, i.e. they are sampled from the posterior obtained in the
+                previous round $p(\theta|x_o)$.
             num_atoms: Number of atoms to use for classification.
+            batch_size: Training batch size.
+            learning_rate: Learning rate for Adam optimizer.
+            validation_fraction: The fraction of data to use for validation.
+            stop_after_epochs: The number of epochs to wait for improvement on the
+                validation set before terminating training.
+            max_num_epochs: Maximum number of epochs to run. If reached, we stop
+                training even when the validation loss is still decreasing. If None, we
+                train until validation loss increases (see also `stop_after_epochs`).
+            clip_max_norm: Value at which to clip the total gradient norm in order to
+                prevent exploding gradients. Use None for no clipping.
+            calibration_kernel: A function to calibrate the loss with respect to the
+                simulations `x`. See Lueckmann, Gonçalves et al., NeurIPS 2017.
+            exclude_invalid_x: Whether to exclude simulation outputs `x=NaN` or `x=±∞`
+                during training. Expect errors, silent or explicit, when `False`.
+            z_score_x: Whether to z-score simulations `x`.
+            z_score_min_std: Minimum value of the standard deviation to use when
+                z-scoring `x`. This is typically needed when some simulator outputs are
+                constant or nearly so.
+            discard_prior_samples: Whether to discard samples simulated in round 1, i.e.
+                from the prior. Training may be sped up by ignoring such less targeted
+                samples.
+            retrain_from_scratch_each_round: Whether to retrain the conditional density
+                estimator for the posterior from scratch each round.
+
         Returns:
+            Posterior $p(\theta|x)$ that can be sampled and evaluated.
         """
 
         # WARNING: sneaky trick ahead. We proxy the parent's `__call__` here,
