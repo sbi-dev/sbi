@@ -27,6 +27,7 @@ dependencies:
   - nbconvert
   - nbstripout
   - numpy
+  - pep517
   - pillow
   - pip
   - pip:
