@@ -1,23 +1,13 @@
 # API Reference
 
 
-## Interface
+## Inference
 
 ::: sbi.inference.base.infer
     rendering:
       show_root_heading: true
       
 ::: sbi.user_input.user_input_checks.prepare_for_sbi
-    rendering:
-      show_root_heading: true
-      
-## Inference
-
-::: sbi.inference.snpe.snpe_a.SNPE_A
-    rendering:
-      show_root_heading: true
-
-::: sbi.inference.snpe.snpe_b.SNPE_B
     rendering:
       show_root_heading: true
 
@@ -34,6 +24,13 @@
       show_root_heading: true
 
 ::: sbi.inference.snre.snre_b.SNRE_B
+    rendering:
+      show_root_heading: true
+      
+      
+## Posterior
+
+::: sbi.inference.posterior.NeuralPosterior
     rendering:
       show_root_heading: true
 

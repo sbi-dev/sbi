@@ -28,20 +28,18 @@ NEG_INF = torch.tensor(float("-inf"), dtype=torch.float32)
 
 
 class NeuralPosterior:
-    r"""Posterior $p(\theta|x)$ with `log_prob()` and `sample()` methods.
-
+    r"""Posterior $p(\theta|x)$ with `log_prob()` and `sample()` methods.<br/><br/>
     All inference methods in sbi train a neural network which is then used to obtain
     the posterior distribution. The `NeuralPosterior` class wraps the trained network
     such that one can directly evaluate the log probability and draw samples from the
-    posterior. The neural network itself can be accessed via the  `.net` attribute.
-
-    Specifically, this class offers the following functionality:
-
+    posterior. The neural network itself can be accessed via the `.net` attribute.
+    <br/><br/>
+    Specifically, this class offers the following functionality:<br/>
     - Correction of leakage (applicable only to SNPE): If the prior is bounded, the
       posterior resulting from SNPE can generate samples that lie outside of the prior
       support (i.e. the posterior leaks). This class rejects these samples or,
       alternatively, allows to sample from the posterior with MCMC. It also corrects the
-      calculation of the log probability such that it compensates for the leakage.
+      calculation of the log probability such that it compensates for the leakage.<br/>
     - Posterior inference from likelihood (SNL) and likelihood ratio (SRE): SNL and SRE
       learn to approximate the likelihood and likelihood ratio, which in turn can be
       used to generate samples from the posterior. This class provides the needed MCMC
@@ -61,7 +59,7 @@ class NeuralPosterior:
     ):
         """
         Args:
-            method_family: One of 'snpe', 'snl', 'snre_a' or 'snre_b'.
+            method_family: One of snpe, snl, snre_a or snre_b.
             neural_net: A classifier for SNRE, a density estimator for SNPE and SNL.
             prior: Prior distribution with `.log_prob()` and `.sample()`.
             x_shape: Shape of a single simulator output.
@@ -69,7 +67,7 @@ class NeuralPosterior:
                 and SNL, but can also be set to `True` for SNPE if MCMC is preferred to
                 deal with leakage over rejection sampling.
             mcmc_method: If MCMC sampling is used, specify the method here: either of
-                'slice_np', 'slice', 'hmc', nuts'.
+                slice_np, slice, hmc, nuts.
             get_potential_function: Callable that returns the potential function used
                 for MCMC sampling.
         """
@@ -118,7 +116,7 @@ class NeuralPosterior:
         This is a pure convenience to avoid having to repeatedly specify `x` in calls to
         `.sample()` and `.log_prob()` - only θ needs to be passed.
 
-        This convenience is particularly useful when the posterior is 'focused', i.e.
+        This convenience is particularly useful when the posterior is focused, i.e.
         has been trained over multiple rounds to be accurate in the vicinity of a
         particular `x=x_o` (you can check if your posterior object is focused by
         printing it).
@@ -154,7 +152,7 @@ class NeuralPosterior:
                 to another default if set later for convenience, see `.set_default_x()`.
             norm_posterior_snpe: Whether to enforce a normalized posterior density when
                 using SNPE. Renormalization of the posterior is useful when some
-                probability falls out or 'leaks' out of the prescribed prior support.
+                probability falls out or leaks out of the prescribed prior support.
                 The normalizing factor is calculated via rejection sampling, so if you
                 need speedier but unnormalized log posterior estimates set here
                 `norm_posterior_snpe=False`. The returned log posterior is set to
@@ -270,7 +268,7 @@ class NeuralPosterior:
             num_rejection_samples: Number of samples used to estimate correction factor.
             force_update: Whether to force a reevaluation of the leakage correction even
                 if the context `x` is the same as `self.default_x`. This is useful to
-                enforce a new leakage estimate for rounds after the first (2, 3...).
+                enforce a new leakage estimate for rounds after the first (2, 3,..).
             show_progress_bars: Whether to show a progress bar during sampling.
 
         Returns:
@@ -399,9 +397,9 @@ class NeuralPosterior:
             self._prior, self.net, x, mcmc_method
         )
         if mcmc_method == "slice_np":
-            samples = self.slice_np_mcmc(num_samples, potential_fn, thin, warmup_steps)
+            samples = self._slice_np_mcmc(num_samples, potential_fn, thin, warmup_steps)
         elif mcmc_method in ("hmc", "nuts", "slice"):
-            samples = self.pyro_mcmc(
+            samples = self._pyro_mcmc(
                 num_samples=num_samples,
                 potential_function=potential_fn,
                 mcmc_method=mcmc_method,
@@ -415,7 +413,7 @@ class NeuralPosterior:
 
         return samples
 
-    def slice_np_mcmc(
+    def _slice_np_mcmc(
         self,
         num_samples: int,
         potential_function: Callable,
@@ -455,7 +453,7 @@ class NeuralPosterior:
 
         return torch.tensor(samples, dtype=torch.float32)
 
-    def pyro_mcmc(
+    def _pyro_mcmc(
         self,
         num_samples: int,
         potential_function: Callable,
@@ -465,12 +463,12 @@ class NeuralPosterior:
         num_chains: Optional[int] = 1,
         show_progress_bars: bool = True,
     ):
-        r"""Return samples obtained using Pyro's HMC, NUTS or slice kernels.
+        r"""Return samples obtained using Pyro HMC, NUTS or slice kernels.
 
         Args:
             num_samples: Desired number of samples.
             potential_function: A callable **class**. A class, but not a function,
-                is picklable for Pyro's MCMC to use it across chains in parallel,
+                is picklable for Pyro MCMC to use it across chains in parallel,
                 even when the potential function requires evaluating a neural network.
             mcmc_method: One of `hmc`, `nuts` or `slice`.
             thin: Thinning (subsampling) factor.
