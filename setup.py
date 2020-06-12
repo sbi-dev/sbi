@@ -2,6 +2,25 @@ import os
 
 from setuptools import find_packages, setup
 
+desc = """`sbi` is a PyTorch package for simulation-based inference. Simulation-based
+inference is the process of finding the parameters of a simulator from observations.
+`sbi` takes a Bayesian approach and returns a full posterior distribution over the
+parameters, conditional on the observations.
+
+`sbi` offers a simple interface for one-line posterior inference
+
+```python
+from sbi inference import infer
+# import your simulator, define your prior on the parameters
+parameter_posterior = infer(simulator, prior, method='SNPE')
+```
+
+`sbi` is a community project that started from Conor M. Durkan's `lfi` and continued
+development at the [MackeLab](https://mackelab.org). We would like to hear how it is
+working for your simulation as well as receive bug reports, pull requests and other
+feedback at [github.com/mackelab/sbi](https://github.com/mackelab/sbi).
+"""
+
 
 PROJECT_PATH = os.path.dirname(os.path.abspath(__file__))
 
@@ -14,9 +33,10 @@ setup(
     name="sbi",
     version="0.8rc2",  # version_namespace["__version__"],
     description="Simulation-based inference.",
-    download_url="https://github.com/mackelab/sbi/archive/v0.8rc2.tar.gz",
+    long_description=desc,
+    long_description_content_type="text/markdown",
     keywords="bayesian parameter inference system_identification simulator PyTorch",
-    url="https://github.com/mackelab/sbi",
+    url="http://mackelab.org/sbi",
     author=(
         "Álvaro Tejero-Cantero, Jakob H. Macke, Jan-Matthis Lückmann,"
         " Conor M. Durkan, Michael Deistler, Jan Bölts."
@@ -70,7 +90,10 @@ setup(
         "Topic :: Scientific/Engineering :: Artificial Intelligence",
         "Topic :: Scientific/Engineering :: Mathematics",
         "Topic :: Games/Entertainment :: Simulation",
-        "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
+        (
+            "License :: OSI Approved :: GNU Affero General Public License v3 or later"
+            "(AGPLv3+)"
+        ),
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
     ],
