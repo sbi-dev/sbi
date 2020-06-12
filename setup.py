@@ -70,7 +70,7 @@ setup(
             "mkdocs-redirects",
             "mkdocstrings",
             "nbconvert",
-            "pep517", 
+            "pep517",
             "pytest",
             "pyyaml",
             "scikit-learn",
