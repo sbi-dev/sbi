@@ -1,5 +1,16 @@
 # API Reference
 
+
+## Interface
+
+::: sbi.inference.base.infer
+    rendering:
+      show_root_heading: true
+      
+::: sbi.user_input.user_input_checks.prepare_for_sbi
+    rendering:
+      show_root_heading: true
+      
 ## Inference
 
 ::: sbi.inference.snpe.snpe_a.SNPE_A
@@ -42,6 +53,14 @@
 
 
 ::: sbi.utils.get_nn_models.classifier_nn
+    rendering:
+      show_root_heading: true
+      show_object_full_path: true
+      
+
+## Utils
+
+::: sbi.utils.plot.pairplot
     rendering:
       show_root_heading: true
       show_object_full_path: true
