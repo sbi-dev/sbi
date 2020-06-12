@@ -187,8 +187,8 @@ def likelihood_nn(
 
     Args:
         model: Model, one of maf / mdn / made / nsf
-        theta_numel: event shape of the prior, number of parameters.
-        x_o_numel: number of elements in a single data point.
+        theta_shape: event shape of the prior, number of parameters.
+        x_o_shape: number of elements in a single data point.
         embedding: Embedding network
         hidden_features: For all, number of hidden features
         mdn_num_components: For MDNs only, number of components
@@ -307,14 +307,17 @@ def likelihood_nn(
 
 
 def classifier_nn(
-    model, theta_shape: torch.Size, x_o_shape: torch.Size, hidden_features: int = 50,
+    model: str,
+    theta_shape: torch.Size,
+    x_o_shape: torch.Size,
+    hidden_features: int = 50,
 ) -> nn.Module:
     """Neural classifier
 
     Args:
         model: Model, one of linear / mlp / resnet
-        theta_numel: event shape of the prior, number of parameters.
-        x_o_numel: number of elements in a single data point.
+        theta_shape: event shape of the prior, number of parameters.
+        x_o_shape: number of elements in a single data point.
         hidden_features: For all, number of hidden features
 
     Returns:
