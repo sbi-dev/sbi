@@ -5,73 +5,85 @@
 <head>
 <meta charset="utf-8"/>
 <meta content="width=device-width,initial-scale=1" name="viewport"/>
+<meta content="ie=edge" http-equiv="x-ua-compatible"/>
 <link href="https://mackelab.org/sbi/reference/" rel="canonical"/>
+<meta content="Copy to clipboard" name="lang:clipboard.copy"/>
+<meta content="Copied to clipboard" name="lang:clipboard.copied"/>
+<meta content="en" name="lang:search.language"/>
+<meta content="True" name="lang:search.pipeline.stopwords"/>
+<meta content="True" name="lang:search.pipeline.trimmer"/>
+<meta content="No matching documents" name="lang:search.result.none"/>
+<meta content="1 matching document" name="lang:search.result.one"/>
+<meta content="# matching documents" name="lang:search.result.other"/>
+<meta content="[\s\-]+" name="lang:search.tokenizer"/>
 <link href="../assets/images/favicon.png" rel="shortcut icon"/>
-<meta content="mkdocs-1.1.2, mkdocs-material-5.2.2" name="generator"/>
+<meta content="mkdocs-1.1, mkdocs-material-4.6.3" name="generator"/>
 <title>API Reference - sbi</title>
-<link href="../assets/stylesheets/main.a2408e81.min.css" rel="stylesheet"/>
-<link href="../assets/stylesheets/palette.a46bcfb3.min.css" rel="stylesheet"/>
+<link href="../assets/stylesheets/application.adb8469c.css" rel="stylesheet"/>
+<link href="../assets/stylesheets/application-palette.a8b3c06d.css" rel="stylesheet"/>
 <meta content="#3f51b5" name="theme-color"/>
+<script src="../assets/javascripts/modernizr.86422ebf.js"></script>
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
 <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,400i,700%7CRoboto+Mono&amp;display=fallback" rel="stylesheet"/>
-<style>body,input{font-family:"Roboto",-apple-system,BlinkMacSystemFont,Helvetica,Arial,sans-serif}code,kbd,pre{font-family:"Roboto Mono",SFMono-Regular,Consolas,Menlo,monospace}</style>
+<style>body,input{font-family:"Roboto","Helvetica Neue",Helvetica,Arial,sans-serif}code,kbd,pre{font-family:"Roboto Mono","Courier New",Courier,monospace}</style>
+<link href="../assets/fonts/material-icons.css" rel="stylesheet"/>
 <link href="../static/global.css" rel="stylesheet"/>
 <link href="../css/ansi-colours.css" rel="stylesheet"/>
 <link href="../css/jupyter-cells.css" rel="stylesheet"/>
 <link href="../css/pandas-dataframe.css" rel="stylesheet"/>
 </head>
-<body data-md-color-accent="indigo" data-md-color-primary="indigo" data-md-color-scheme="" dir="ltr">
+<body data-md-color-accent="indigo" data-md-color-primary="indigo" dir="ltr">
+<svg class="md-svg">
+<defs>
+<svg height="448" id="__github" viewbox="0 0 416 448" width="416" xmlns="http://www.w3.org/2000/svg"><path d="M160 304q0 10-3.125 20.5t-10.75 19T128 352t-18.125-8.5-10.75-19T96 304t3.125-20.5 10.75-19T128 256t18.125 8.5 10.75 19T160 304zm160 0q0 10-3.125 20.5t-10.75 19T288 352t-18.125-8.5-10.75-19T256 304t3.125-20.5 10.75-19T288 256t18.125 8.5 10.75 19T320 304zm40 0q0-30-17.25-51T296 232q-10.25 0-48.75 5.25Q229.5 240 208 240t-39.25-2.75Q130.75 232 120 232q-29.5 0-46.75 21T56 304q0 22 8 38.375t20.25 25.75 30.5 15 35 7.375 37.25 1.75h42q20.5 0 37.25-1.75t35-7.375 30.5-15 20.25-25.75T360 304zm56-44q0 51.75-15.25 82.75-9.5 19.25-26.375 33.25t-35.25 21.5-42.5 11.875-42.875 5.5T212 416q-19.5 0-35.5-.75t-36.875-3.125-38.125-7.5-34.25-12.875T37 371.5t-21.5-28.75Q0 312 0 260q0-59.25 34-99-6.75-20.5-6.75-42.5 0-29 12.75-54.5 27 0 47.5 9.875t47.25 30.875Q171.5 96 212 96q37 0 70 8 26.25-20.5 46.75-30.25T376 64q12.75 25.5 12.75 54.5 0 21.75-6.75 42 34 40 34 99.5z" fill="currentColor"></path></svg>
+</defs>
+</svg>
 <input autocomplete="off" class="md-toggle" data-md-toggle="drawer" id="__drawer" type="checkbox"/>
 <input autocomplete="off" class="md-toggle" data-md-toggle="search" id="__search" type="checkbox"/>
-<label class="md-overlay" for="__drawer"></label>
-<div data-md-component="skip">
-<a class="md-skip" href="#api-reference">
-          Skip to content
-        </a>
-</div>
-<div data-md-component="announce">
-</div>
+<label class="md-overlay" data-md-component="overlay" for="__drawer"></label>
+<a class="md-skip" href="#api-reference" tabindex="0">
+        Skip to content
+      </a>
 <header class="md-header" data-md-component="header">
-<nav aria-label="Header" class="md-header-nav md-grid">
+<nav class="md-header-nav md-grid">
+<div class="md-flex">
+<div class="md-flex__cell md-flex__cell--shrink">
 <a aria-label="sbi" class="md-header-nav__button md-logo" href="https://mackelab.org/sbi/" title="sbi">
-<img alt="logo" src="../static/logo.svg"/>
+<img alt="logo" height="24" src="../static/logo.svg" width="24"/>
 </a>
-<label class="md-header-nav__button md-icon" for="__drawer">
-<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2z"></path></svg>
-</label>
-<div class="md-header-nav__title" data-md-component="header-title">
-<div class="md-header-nav__ellipsis">
-<span class="md-header-nav__topic md-ellipsis">
-            sbi
-          </span>
-<span class="md-header-nav__topic md-ellipsis">
-            
-              API Reference
-            
-          </span>
+</div>
+<div class="md-flex__cell md-flex__cell--shrink">
+<label class="md-icon md-icon--menu md-header-nav__button" for="__drawer"></label>
+</div>
+<div class="md-flex__cell md-flex__cell--stretch">
+<div class="md-flex__ellipsis md-header-nav__title" data-md-component="title">
+<span class="md-header-nav__topic">
+              sbi
+            </span>
+<span class="md-header-nav__topic">
+              
+                API Reference
+              
+            </span>
 </div>
 </div>
-<label class="md-header-nav__button md-icon" for="__search">
-<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 3A6.5 6.5 0 0116 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 019.5 16 6.5 6.5 0 013 9.5 6.5 6.5 0 019.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5z"></path></svg>
-</label>
+<div class="md-flex__cell md-flex__cell--shrink">
+<label class="md-icon md-icon--search md-header-nav__button" for="__search"></label>
 <div class="md-search" data-md-component="search" role="dialog">
 <label class="md-search__overlay" for="__search"></label>
 <div class="md-search__inner" role="search">
 <form class="md-search__form" name="search">
-<input aria-label="Search" autocapitalize="off" autocomplete="off" autocorrect="off" class="md-search__input" data-md-component="search-query" data-md-state="active" name="query" placeholder="Search" spellcheck="false" type="text"/>
-<label class="md-search__icon md-icon" for="__search">
-<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 3A6.5 6.5 0 0116 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 019.5 16 6.5 6.5 0 013 9.5 6.5 6.5 0 019.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5z"></path></svg>
-<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12z"></path></svg>
-</label>
-<button aria-label="Clear" class="md-search__icon md-icon" data-md-component="search-reset" tabindex="-1" type="reset">
-<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"></path></svg>
-</button>
+<input aria-label="search" autocapitalize="off" autocomplete="off" autocorrect="off" class="md-search__input" data-md-component="query" data-md-state="active" name="query" placeholder="Search" spellcheck="false" type="text"/>
+<label class="md-icon md-search__icon" for="__search"></label>
+<button class="md-icon md-search__icon" data-md-component="reset" tabindex="-1" type="reset">
+        
+      </button>
 </form>
 <div class="md-search__output">
 <div class="md-search__scrollwrap" data-md-scrollfix="">
-<div class="md-search-result" data-md-component="search-result">
+<div class="md-search-result" data-md-component="result">
 <div class="md-search-result__meta">
-            Initializing search
+            Type to start searching
           </div>
 <ol class="md-search-result__list"></ol>
 </div>
@@ -79,35 +91,43 @@
 </div>
 </div>
 </div>
+</div>
+<div class="md-flex__cell md-flex__cell--shrink">
 <div class="md-header-nav__source">
-<a class="md-source" href="http://github.com/mackelab/sbi/" title="Go to repository">
-<div class="md-source__icon md-icon">
-<svg viewbox="0 0 448 512" xmlns="http://www.w3.org/2000/svg"><path d="M439.55 236.05L244 40.45a28.87 28.87 0 00-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 01-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 000 40.81l195.61 195.6a28.86 28.86 0 0040.8 0l194.69-194.69a28.86 28.86 0 000-40.81z"></path></svg>
+<a class="md-source" data-md-source="github" href="http://github.com/mackelab/sbi/" title="Go to repository">
+<div class="md-source__icon">
+<svg height="24" viewbox="0 0 24 24" width="24">
+<use height="24" width="24" xlink:href="#__github"></use>
+</svg>
 </div>
 <div class="md-source__repository">
     mackelab/sbi
   </div>
 </a>
 </div>
+</div>
+</div>
 </nav>
 </header>
-<div class="md-container" data-md-component="container">
-<main class="md-main" data-md-component="main">
-<div class="md-main__inner md-grid">
+<div class="md-container">
+<main class="md-main" role="main">
+<div class="md-main__inner md-grid" data-md-component="container">
 <div class="md-sidebar md-sidebar--primary" data-md-component="navigation">
 <div class="md-sidebar__scrollwrap">
 <div class="md-sidebar__inner">
-<nav aria-label="Navigation" class="md-nav md-nav--primary" data-md-level="0">
-<label class="md-nav__title" for="__drawer">
-<a aria-label="sbi" class="md-nav__button md-logo" href="https://mackelab.org/sbi/" title="sbi">
-<img alt="logo" src="../static/logo.svg"/>
+<nav class="md-nav md-nav--primary" data-md-level="0">
+<label class="md-nav__title md-nav__title--site" for="__drawer">
+<a class="md-nav__button md-logo" href="https://mackelab.org/sbi/" title="sbi">
+<img alt="logo" height="48" src="../static/logo.svg" width="48"/>
 </a>
     sbi
   </label>
 <div class="md-nav__source">
-<a class="md-source" href="http://github.com/mackelab/sbi/" title="Go to repository">
-<div class="md-source__icon md-icon">
-<svg viewbox="0 0 448 512" xmlns="http://www.w3.org/2000/svg"><path d="M439.55 236.05L244 40.45a28.87 28.87 0 00-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 01-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 000 40.81l195.61 195.6a28.86 28.86 0 0040.8 0l194.69-194.69a28.86 28.86 0 000-40.81z"></path></svg>
+<a class="md-source" data-md-source="github" href="http://github.com/mackelab/sbi/" title="Go to repository">
+<div class="md-source__icon">
+<svg height="24" viewbox="0 0 24 24" width="24">
+<use height="24" width="24" xlink:href="#__github"></use>
+</svg>
 </div>
 <div class="md-source__repository">
     mackelab/sbi
@@ -126,18 +146,12 @@
     </a>
 </li>
 <li class="md-nav__item md-nav__item--nested">
-<input class="md-nav__toggle md-toggle" data-md-toggle="nav-3" id="nav-3" type="checkbox"/>
+<input class="md-toggle md-nav__toggle" data-md-toggle="nav-3" id="nav-3" type="checkbox"/>
 <label class="md-nav__link" for="nav-3">
       Tutorial
-      <span class="md-nav__icon md-icon">
-<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M8.59 16.58L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.42z"></path></svg>
-</span>
-</label>
-<nav aria-label="Tutorial" class="md-nav" data-md-level="1">
+    </label>
+<nav class="md-nav" data-md-component="collapsible" data-md-level="1">
 <label class="md-nav__title" for="nav-3">
-<span class="md-nav__icon md-icon">
-<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12z"></path></svg>
-</span>
         Tutorial
       </label>
 <ul class="md-nav__list" data-md-scrollfix="">
@@ -170,29 +184,21 @@
     </a>
 </li>
 <li class="md-nav__item md-nav__item--active">
-<input class="md-nav__toggle md-toggle" data-md-toggle="toc" id="__toc" type="checkbox"/>
+<input class="md-toggle md-nav__toggle" data-md-toggle="toc" id="__toc" type="checkbox"/>
 <label class="md-nav__link md-nav__link--active" for="__toc">
         API Reference
-        <span class="md-nav__icon md-icon">
-<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 9h14V7H3v2m0 4h14v-2H3v2m0 4h14v-2H3v2m16 0h2v-2h-2v2m0-10v2h2V7h-2m0 6h2v-2h-2v2z"></path></svg>
-</span>
-</label>
+      </label>
 <a class="md-nav__link md-nav__link--active" href="./" title="API Reference">
       API Reference
     </a>
-<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
-<label class="md-nav__title" for="__toc">
-<span class="md-nav__icon md-icon">
-<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12z"></path></svg>
-</span>
-      Table of contents
-    </label>
+<nav class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">Table of contents</label>
 <ul class="md-nav__list" data-md-scrollfix="">
 <li class="md-nav__item">
 <a class="md-nav__link" href="#inference">
     Inference
   </a>
-<nav aria-label="Inference" class="md-nav">
+<nav class="md-nav">
 <ul class="md-nav__list">
 <li class="md-nav__item">
 <a class="md-nav__link" href="#sbi.inference.base.infer">
@@ -231,7 +237,7 @@
 <a class="md-nav__link" href="#posterior">
     Posterior
   </a>
-<nav aria-label="Posterior" class="md-nav">
+<nav class="md-nav">
 <ul class="md-nav__list">
 <li class="md-nav__item">
 <a class="md-nav__link" href="#sbi.inference.posterior.NeuralPosterior">
@@ -245,7 +251,7 @@
 <a class="md-nav__link" href="#models">
     Models
   </a>
-<nav aria-label="Models" class="md-nav">
+<nav class="md-nav">
 <ul class="md-nav__list">
 <li class="md-nav__item">
 <a class="md-nav__link" href="#sbi.utils.get_nn_models.posterior_nn">
@@ -269,7 +275,7 @@
 <a class="md-nav__link" href="#utils">
     Utils
   </a>
-<nav aria-label="Utils" class="md-nav">
+<nav class="md-nav">
 <ul class="md-nav__list">
 <li class="md-nav__item">
 <a class="md-nav__link" href="#sbi.utils.plot.pairplot">
@@ -295,19 +301,14 @@
 <div class="md-sidebar md-sidebar--secondary" data-md-component="toc">
 <div class="md-sidebar__scrollwrap">
 <div class="md-sidebar__inner">
-<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
-<label class="md-nav__title" for="__toc">
-<span class="md-nav__icon md-icon">
-<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12z"></path></svg>
-</span>
-      Table of contents
-    </label>
+<nav class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">Table of contents</label>
 <ul class="md-nav__list" data-md-scrollfix="">
 <li class="md-nav__item">
 <a class="md-nav__link" href="#inference">
     Inference
   </a>
-<nav aria-label="Inference" class="md-nav">
+<nav class="md-nav">
 <ul class="md-nav__list">
 <li class="md-nav__item">
 <a class="md-nav__link" href="#sbi.inference.base.infer">
@@ -346,7 +347,7 @@
 <a class="md-nav__link" href="#posterior">
     Posterior
   </a>
-<nav aria-label="Posterior" class="md-nav">
+<nav class="md-nav">
 <ul class="md-nav__list">
 <li class="md-nav__item">
 <a class="md-nav__link" href="#sbi.inference.posterior.NeuralPosterior">
@@ -360,7 +361,7 @@
 <a class="md-nav__link" href="#models">
     Models
   </a>
-<nav aria-label="Models" class="md-nav">
+<nav class="md-nav">
 <ul class="md-nav__list">
 <li class="md-nav__item">
 <a class="md-nav__link" href="#sbi.utils.get_nn_models.posterior_nn">
@@ -384,7 +385,7 @@
 <a class="md-nav__link" href="#utils">
     Utils
   </a>
-<nav aria-label="Utils" class="md-nav">
+<nav class="md-nav">
 <ul class="md-nav__list">
 <li class="md-nav__item">
 <a class="md-nav__link" href="#sbi.utils.plot.pairplot">
@@ -401,9 +402,7 @@
 </div>
 <div class="md-content">
 <article class="md-content__inner md-typeset">
-<a class="md-content__button md-icon" href="http://github.com/mackelab/sbi/edit/master/docs/reference.md" title="Edit this page">
-<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75L3 17.25z"></path></svg>
-</a>
+<a class="md-icon md-content__icon" href="http://github.com/mackelab/sbi/edit/master/docs/reference.md" title="Edit this page"></a>
 <h1 id="api-reference">API Reference<a class="headerlink" href="#api-reference" title="Permanent link">¶</a></h1>
 <h2 id="inference">Inference<a class="headerlink" href="#inference" title="Permanent link">¶</a></h2>
 <div class="doc doc-object doc-function">
@@ -435,10 +434,7 @@ mackelab.org/sbi/tutorial/03_flexible_interface.html</p>
 <td><code>simulator</code></td>
 <td><code>Callable</code></td>
 <td>
-<p>A function that takes parameters <span><span class="MathJax_Preview">\theta</span><script type="math/tex">\theta</script></span> and maps them to
-simulations, or observations, <code>x</code>, <span><span class="MathJax_Preview">\mathrm{sim}(\theta)\to x</span><script type="math/tex">\mathrm{sim}(\theta)\to x</script></span>. Any
-regular Python callable (i.e. function or class with <code>__call__</code> method)
-can be used.</p>
+<p>A function that takes parameters <span><span class="MathJax_Preview">\theta</span><script type="math/tex">\theta</script></span> and maps them to simulations, or observations, <code class="codehilite"><span class="err">x</span></code>, <span><span class="MathJax_Preview">\mathrm{sim}(\theta)\to x</span><script type="math/tex">\mathrm{sim}(\theta)\to x</script></span>. Any regular Python callable (i.e. function or class with <code class="codehilite"><span class="err">__call__</span></code> method) can be used.</p>
 </td>
 <td><em>required</em></td>
 </tr>
@@ -446,10 +442,7 @@ can be used.</p>
 <td><code>prior</code></td>
 <td><code></code></td>
 <td>
-<p>A probability distribution that expresses prior knowledge about the
-parameters, e.g. which ranges are meaningful for them. Any
-object with <code>.log_prob()</code>and <code>.sample()</code> (for example, a PyTorch
-distribution) can be used.</p>
+<p>A probability distribution that expresses prior knowledge about the parameters, e.g. which ranges are meaningful for them. Any object with <code class="codehilite"><span class="na">.log_prob</span><span class="p">()</span></code>and <code class="codehilite"><span class="na">.sample</span><span class="p">()</span></code> (for example, a PyTorch distribution) can be used.</p>
 </td>
 <td><em>required</em></td>
 </tr>
@@ -465,8 +458,7 @@ distribution) can be used.</p>
 <td><code>num_simulations</code></td>
 <td><code>int</code></td>
 <td>
-<p>Number of simulation calls. More simulations means a longer
-runtime, but a better posterior estimate.</p>
+<p>Number of simulation calls. More simulations means a longer runtime, but a better posterior estimate.</p>
 </td>
 <td><em>required</em></td>
 </tr>
@@ -603,7 +595,7 @@ sbi.user_input.user_input_checks.prepare_for_sbi<span class="p">(</span><span cl
 - the simulator function receives as input and returns a Tensor.
 - the simulator can simulate batches of parameters and return batches of data.
 - the prior does not produce batches and samples and evaluates to Tensor.
-- the output shape is a <code>torch.Size((1,N))</code> (i.e, has a leading batch dimension 1).</p>
+- the output shape is a <code class="codehilite"><span class="err">torch.Size((1,N))</span></code> (i.e, has a leading batch dimension 1).</p>
 <p>If this is not possible, a suitable exception will be raised.</p>
 <p><strong>Parameters:</strong></p>
 <table>
@@ -783,12 +775,7 @@ __call__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <td><code>num_rounds</code></td>
 <td><code>int</code></td>
 <td>
-<p>Number of rounds to run. Each round consists of a simulation and
-training phase. <code>num_rounds=1</code> leads to a posterior <span><span class="MathJax_Preview">p(\theta|x)</span><script type="math/tex">p(\theta|x)</script></span> valid
-for <em>any</em> <span><span class="MathJax_Preview">x</span><script type="math/tex">x</script></span> (amortized), but requires many simulations.
-Alternatively, with <code>num_rounds&gt;1</code> the inference returns a posterior
-<span><span class="MathJax_Preview">p(\theta|x_o)</span><script type="math/tex">p(\theta|x_o)</script></span> focused on a specific observation <code>x_o</code>, potentially
-requiring less simulations.</p>
+<p>Number of rounds to run. Each round consists of a simulation and training phase. <code class="codehilite"><span class="err">num_rounds=1</span></code> leads to a posterior <span><span class="MathJax_Preview">p(\theta|x)</span><script type="math/tex">p(\theta|x)</script></span> valid for <em>any</em> <span><span class="MathJax_Preview">x</span><script type="math/tex">x</script></span> (amortized), but requires many simulations. Alternatively, with <code class="codehilite"><span class="err">num_rounds&gt;1</span></code> the inference returns a posterior <span><span class="MathJax_Preview">p(\theta|x_o)</span><script type="math/tex">p(\theta|x_o)</script></span> focused on a specific observation <code class="codehilite"><span class="err">x_o</span></code>, potentially requiring less simulations.</p>
 </td>
 <td><em>required</em></td>
 </tr>
@@ -804,11 +791,7 @@ requiring less simulations.</p>
 <td><code>x_o</code></td>
 <td><code>Optional[Tensor]</code></td>
 <td>
-<p>An observation that is only required when doing inference
-over multiple rounds. After the first round, <code>x_o</code> is used to guide the
-sampling so that the simulator is run with parameters that are likely
-for that <code>x_o</code>, i.e. they are sampled from the posterior obtained in the
-previous round <span><span class="MathJax_Preview">p(\theta|x_o)</span><script type="math/tex">p(\theta|x_o)</script></span>.</p>
+<p>An observation that is only required when doing inference over multiple rounds. After the first round, <code class="codehilite"><span class="err">x_o</span></code> is used to guide the sampling so that the simulator is run with parameters that are likely for that <code class="codehilite"><span class="err">x_o</span></code>, i.e. they are sampled from the posterior obtained in the previous round <span><span class="MathJax_Preview">p(\theta|x_o)</span><script type="math/tex">p(\theta|x_o)</script></span>.</p>
 </td>
 <td><code>None</code></td>
 </tr>
@@ -848,8 +831,7 @@ previous round <span><span class="MathJax_Preview">p(\theta|x_o)</span><script t
 <td><code>stop_after_epochs</code></td>
 <td><code>int</code></td>
 <td>
-<p>The number of epochs to wait for improvement on the
-validation set before terminating training.</p>
+<p>The number of epochs to wait for improvement on the validation set before terminating training.</p>
 </td>
 <td><code>20</code></td>
 </tr>
@@ -857,9 +839,7 @@ validation set before terminating training.</p>
 <td><code>max_num_epochs</code></td>
 <td><code>Optional[int]</code></td>
 <td>
-<p>Maximum number of epochs to run. If reached, we stop
-training even when the validation loss is still decreasing. If None, we
-train until validation loss increases (see also <code>stop_after_epochs</code>).</p>
+<p>Maximum number of epochs to run. If reached, we stop training even when the validation loss is still decreasing. If None, we train until validation loss increases (see also <code class="codehilite"><span class="err">stop_after_epochs</span></code>).</p>
 </td>
 <td><code>None</code></td>
 </tr>
@@ -867,8 +847,7 @@ train until validation loss increases (see also <code>stop_after_epochs</code>).
 <td><code>clip_max_norm</code></td>
 <td><code>Optional[float]</code></td>
 <td>
-<p>Value at which to clip the total gradient norm in order to
-prevent exploding gradients. Use None for no clipping.</p>
+<p>Value at which to clip the total gradient norm in order to prevent exploding gradients. Use None for no clipping.</p>
 </td>
 <td><code>5.0</code></td>
 </tr>
@@ -876,8 +855,7 @@ prevent exploding gradients. Use None for no clipping.</p>
 <td><code>calibration_kernel</code></td>
 <td><code>Optional[Callable]</code></td>
 <td>
-<p>A function to calibrate the loss with respect to the
-simulations <code>x</code>. See Lueckmann, Gonçalves et al., NeurIPS 2017.</p>
+<p>A function to calibrate the loss with respect to the simulations <code class="codehilite"><span class="err">x</span></code>. See Lueckmann, Gonçalves et al., NeurIPS 2017.</p>
 </td>
 <td><code>None</code></td>
 </tr>
@@ -885,8 +863,7 @@ simulations <code>x</code>. See Lueckmann, Gonçalves et al., NeurIPS 2017.</p>
 <td><code>exclude_invalid_x</code></td>
 <td><code>bool</code></td>
 <td>
-<p>Whether to exclude simulation outputs <code>x=NaN</code> or <code>x=±∞</code>
-during training. Expect errors, silent or explicit, when <code>False</code>.</p>
+<p>Whether to exclude simulation outputs <code class="codehilite"><span class="err">x=NaN</span></code> or <code class="codehilite"><span class="err">x=±∞</span></code> during training. Expect errors, silent or explicit, when <code class="codehilite"><span class="err">False</span></code>.</p>
 </td>
 <td><code>True</code></td>
 </tr>
@@ -894,7 +871,7 @@ during training. Expect errors, silent or explicit, when <code>False</code>.</p>
 <td><code>z_score_x</code></td>
 <td><code>bool</code></td>
 <td>
-<p>Whether to z-score simulations <code>x</code>.</p>
+<p>Whether to z-score simulations <code class="codehilite"><span class="err">x</span></code>.</p>
 </td>
 <td><code>True</code></td>
 </tr>
@@ -902,9 +879,7 @@ during training. Expect errors, silent or explicit, when <code>False</code>.</p>
 <td><code>z_score_min_std</code></td>
 <td><code>float</code></td>
 <td>
-<p>Minimum value of the standard deviation to use when
-z-scoring <code>x</code>. This is typically needed when some simulator outputs are
-constant or nearly so.</p>
+<p>Minimum value of the standard deviation to use when z-scoring <code class="codehilite"><span class="err">x</span></code>. This is typically needed when some simulator outputs are constant or nearly so.</p>
 </td>
 <td><code>1e-07</code></td>
 </tr>
@@ -912,9 +887,7 @@ constant or nearly so.</p>
 <td><code>discard_prior_samples</code></td>
 <td><code>bool</code></td>
 <td>
-<p>Whether to discard samples simulated in round 1, i.e.
-from the prior. Training may be sped up by ignoring such less targeted
-samples.</p>
+<p>Whether to discard samples simulated in round 1, i.e. from the prior. Training may be sped up by ignoring such less targeted samples.</p>
 </td>
 <td><code>False</code></td>
 </tr>
@@ -922,8 +895,7 @@ samples.</p>
 <td><code>retrain_from_scratch_each_round</code></td>
 <td><code>bool</code></td>
 <td>
-<p>Whether to retrain the conditional density
-estimator for the posterior from scratch each round.</p>
+<p>Whether to retrain the conditional density estimator for the posterior from scratch each round.</p>
 </td>
 <td><code>False</code></td>
 </tr>
@@ -1139,10 +1111,7 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <td><code>simulator</code></td>
 <td><code>Callable</code></td>
 <td>
-<p>A function that takes parameters <span><span class="MathJax_Preview">\theta</span><script type="math/tex">\theta</script></span> and maps them to
-simulations, or observations, <code>x</code>, <span><span class="MathJax_Preview">\mathrm{sim}(\theta)\to x</span><script type="math/tex">\mathrm{sim}(\theta)\to x</script></span>. Any
-regular Python callable (i.e. function or class with <code>__call__</code> method)
-can be used.</p>
+<p>A function that takes parameters <span><span class="MathJax_Preview">\theta</span><script type="math/tex">\theta</script></span> and maps them to simulations, or observations, <code class="codehilite"><span class="err">x</span></code>, <span><span class="MathJax_Preview">\mathrm{sim}(\theta)\to x</span><script type="math/tex">\mathrm{sim}(\theta)\to x</script></span>. Any regular Python callable (i.e. function or class with <code class="codehilite"><span class="err">__call__</span></code> method) can be used.</p>
 </td>
 <td><em>required</em></td>
 </tr>
@@ -1150,10 +1119,7 @@ can be used.</p>
 <td><code>prior</code></td>
 <td><code></code></td>
 <td>
-<p>A probability distribution that expresses prior knowledge about the
-parameters, e.g. which ranges are meaningful for them. Any
-object with <code>.log_prob()</code>and <code>.sample()</code> (for example, a PyTorch
-distribution) can be used.</p>
+<p>A probability distribution that expresses prior knowledge about the parameters, e.g. which ranges are meaningful for them. Any object with <code class="codehilite"><span class="na">.log_prob</span><span class="p">()</span></code>and <code class="codehilite"><span class="na">.sample</span><span class="p">()</span></code> (for example, a PyTorch distribution) can be used.</p>
 </td>
 <td><em>required</em></td>
 </tr>
@@ -1177,10 +1143,7 @@ distribution) can be used.</p>
 <td><code>simulation_batch_size</code></td>
 <td><code>int</code></td>
 <td>
-<p>Number of parameter sets that the simulator
-maps to data x at once. If None, we simulate all parameter sets at the
-same time. If &gt;= 1, the simulator has to process data of shape
-(simulation_batch_size, parameter_dimension).</p>
+<p>Number of parameter sets that the simulator maps to data x at once. If None, we simulate all parameter sets at the same time. If &gt;= 1, the simulator has to process data of shape (simulation_batch_size, parameter_dimension).</p>
 </td>
 <td><code>1</code></td>
 </tr>
@@ -1188,9 +1151,7 @@ same time. If &gt;= 1, the simulator has to process data of shape
 <td><code>density_estimator</code></td>
 <td><code>Union[str, nn.Module]</code></td>
 <td>
-<p>Either a string or a density estimation neural network
-that can <code>.log_prob()</code> and <code>.sample()</code>. If it is a string, use a pre-
-configured network of the provided type (one of nsf, maf, mdn, made).</p>
+<p>Either a string or a density estimation neural network that can <code class="codehilite"><span class="na">.log_prob</span><span class="p">()</span></code> and <code class="codehilite"><span class="na">.sample</span><span class="p">()</span></code>. If it is a string, use a pre- configured network of the provided type (one of nsf, maf, mdn, made).</p>
 </td>
 <td><code>'maf'</code></td>
 </tr>
@@ -1198,8 +1159,7 @@ configured network of the provided type (one of nsf, maf, mdn, made).</p>
 <td><code>sample_with_mcmc</code></td>
 <td><code>bool</code></td>
 <td>
-<p>Whether to sample with MCMC. MCMC can be used to deal
-with high leakage.</p>
+<p>Whether to sample with MCMC. MCMC can be used to deal with high leakage.</p>
 </td>
 <td><code>False</code></td>
 </tr>
@@ -1207,8 +1167,7 @@ with high leakage.</p>
 <td><code>mcmc_method</code></td>
 <td><code>str</code></td>
 <td>
-<p>If MCMC sampling is used, specify the method here: either of
-slice_np, slice, hmc, nuts.</p>
+<p>If MCMC sampling is used, specify the method here: either of slice_np, slice, hmc, nuts.</p>
 </td>
 <td><code>'slice_np'</code></td>
 </tr>
@@ -1216,10 +1175,7 @@ slice_np, slice, hmc, nuts.</p>
 <td><code>use_combined_loss</code></td>
 <td><code>bool</code></td>
 <td>
-<p>Whether to train the neural net also on prior samples
-using maximum likelihood in addition to training it on all samples using
-atomic loss. The extra MLE loss helps prevent density leaking with
-bounded priors.</p>
+<p>Whether to train the neural net also on prior samples using maximum likelihood in addition to training it on all samples using atomic loss. The extra MLE loss helps prevent density leaking with bounded priors.</p>
 </td>
 <td><code>False</code></td>
 </tr>
@@ -1235,8 +1191,7 @@ bounded priors.</p>
 <td><code>logging_level</code></td>
 <td><code>Union[int, str]</code></td>
 <td>
-<p>Minimum severity of messages to log. One of the strings
-INFO, WARNING, DEBUG, ERROR and CRITICAL.</p>
+<p>Minimum severity of messages to log. One of the strings INFO, WARNING, DEBUG, ERROR and CRITICAL.</p>
 </td>
 <td><code>'WARNING'</code></td>
 </tr>
@@ -1244,8 +1199,7 @@ INFO, WARNING, DEBUG, ERROR and CRITICAL.</p>
 <td><code>summary_writer</code></td>
 <td><code>Optional[SummaryWriter]</code></td>
 <td>
-<p>A <code>SummaryWriter</code> to control, among others, log
-file location (default is <code>&lt;current working directory&gt;/logs</code>.)</p>
+<p>A <code class="codehilite"><span class="err">SummaryWriter</span></code> to control, among others, log file location (default is <code class="codehilite"><span class="err">&lt;current working directory&gt;/logs</span></code>.)</p>
 </td>
 <td><code>None</code></td>
 </tr>
@@ -1253,8 +1207,7 @@ file location (default is <code>&lt;current working directory&gt;/logs</code>.)<
 <td><code>show_progress_bars</code></td>
 <td><code>bool</code></td>
 <td>
-<p>Whether to show a progressbar during simulation and
-sampling.</p>
+<p>Whether to show a progressbar during simulation and sampling.</p>
 </td>
 <td><code>True</code></td>
 </tr>
@@ -1262,8 +1215,7 @@ sampling.</p>
 <td><code>show_round_summary</code></td>
 <td><code>bool</code></td>
 <td>
-<p>Whether to show the validation loss and leakage after
-each round.</p>
+<p>Whether to show the validation loss and leakage after each round.</p>
 </td>
 <td><code>False</code></td>
 </tr>
@@ -1452,12 +1404,7 @@ __call__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <td><code>num_rounds</code></td>
 <td><code>int</code></td>
 <td>
-<p>Number of rounds to run. Each round consists of a simulation and
-training phase. <code>num_rounds=1</code> leads to a posterior <span><span class="MathJax_Preview">p(\theta|x)</span><script type="math/tex">p(\theta|x)</script></span> valid
-for <em>any</em> <span><span class="MathJax_Preview">x</span><script type="math/tex">x</script></span> (amortized), but requires many simulations.
-Alternatively, with <code>num_rounds&gt;1</code> the inference returns a posterior
-<span><span class="MathJax_Preview">p(\theta|x_o)</span><script type="math/tex">p(\theta|x_o)</script></span> focused on a specific observation <code>x_o</code>, potentially
-requiring less simulations.</p>
+<p>Number of rounds to run. Each round consists of a simulation and training phase. <code class="codehilite"><span class="err">num_rounds=1</span></code> leads to a posterior <span><span class="MathJax_Preview">p(\theta|x)</span><script type="math/tex">p(\theta|x)</script></span> valid for <em>any</em> <span><span class="MathJax_Preview">x</span><script type="math/tex">x</script></span> (amortized), but requires many simulations. Alternatively, with <code class="codehilite"><span class="err">num_rounds&gt;1</span></code> the inference returns a posterior <span><span class="MathJax_Preview">p(\theta|x_o)</span><script type="math/tex">p(\theta|x_o)</script></span> focused on a specific observation <code class="codehilite"><span class="err">x_o</span></code>, potentially requiring less simulations.</p>
 </td>
 <td><em>required</em></td>
 </tr>
@@ -1473,11 +1420,7 @@ requiring less simulations.</p>
 <td><code>x_o</code></td>
 <td><code>Optional[Tensor]</code></td>
 <td>
-<p>An observation that is only required when doing inference
-over multiple rounds. After the first round, <code>x_o</code> is used to guide the
-sampling so that the simulator is run with parameters that are likely
-for that <code>x_o</code>, i.e. they are sampled from the posterior obtained in the
-previous round <span><span class="MathJax_Preview">p(\theta|x_o)</span><script type="math/tex">p(\theta|x_o)</script></span>.</p>
+<p>An observation that is only required when doing inference over multiple rounds. After the first round, <code class="codehilite"><span class="err">x_o</span></code> is used to guide the sampling so that the simulator is run with parameters that are likely for that <code class="codehilite"><span class="err">x_o</span></code>, i.e. they are sampled from the posterior obtained in the previous round <span><span class="MathJax_Preview">p(\theta|x_o)</span><script type="math/tex">p(\theta|x_o)</script></span>.</p>
 </td>
 <td><code>None</code></td>
 </tr>
@@ -1509,8 +1452,7 @@ previous round <span><span class="MathJax_Preview">p(\theta|x_o)</span><script t
 <td><code>stop_after_epochs</code></td>
 <td><code>int</code></td>
 <td>
-<p>The number of epochs to wait for improvement on the
-validation set before terminating training.</p>
+<p>The number of epochs to wait for improvement on the validation set before terminating training.</p>
 </td>
 <td><code>20</code></td>
 </tr>
@@ -1518,9 +1460,7 @@ validation set before terminating training.</p>
 <td><code>max_num_epochs</code></td>
 <td><code>Optional[int]</code></td>
 <td>
-<p>Maximum number of epochs to run. If reached, we stop
-training even when the validation loss is still decreasing. If None, we
-train until validation loss increases (see also <code>stop_after_epochs</code>).</p>
+<p>Maximum number of epochs to run. If reached, we stop training even when the validation loss is still decreasing. If None, we train until validation loss increases (see also <code class="codehilite"><span class="err">stop_after_epochs</span></code>).</p>
 </td>
 <td><code>None</code></td>
 </tr>
@@ -1528,8 +1468,7 @@ train until validation loss increases (see also <code>stop_after_epochs</code>).
 <td><code>clip_max_norm</code></td>
 <td><code>Optional[float]</code></td>
 <td>
-<p>Value at which to clip the total gradient norm in order to
-prevent exploding gradients. Use None for no clipping.</p>
+<p>Value at which to clip the total gradient norm in order to prevent exploding gradients. Use None for no clipping.</p>
 </td>
 <td><code>5.0</code></td>
 </tr>
@@ -1537,8 +1476,7 @@ prevent exploding gradients. Use None for no clipping.</p>
 <td><code>exclude_invalid_x</code></td>
 <td><code>bool</code></td>
 <td>
-<p>Whether to exclude simulation outputs <code>x=NaN</code> or <code>x=±∞</code>
-during training. Expect errors, silent or explicit, when <code>False</code>.</p>
+<p>Whether to exclude simulation outputs <code class="codehilite"><span class="err">x=NaN</span></code> or <code class="codehilite"><span class="err">x=±∞</span></code> during training. Expect errors, silent or explicit, when <code class="codehilite"><span class="err">False</span></code>.</p>
 </td>
 <td><code>True</code></td>
 </tr>
@@ -1546,9 +1484,7 @@ during training. Expect errors, silent or explicit, when <code>False</code>.</p>
 <td><code>discard_prior_samples</code></td>
 <td><code>bool</code></td>
 <td>
-<p>Whether to discard samples simulated in round 1, i.e.
-from the prior. Training may be sped up by ignoring such less targeted
-samples.</p>
+<p>Whether to discard samples simulated in round 1, i.e. from the prior. Training may be sped up by ignoring such less targeted samples.</p>
 </td>
 <td><code>False</code></td>
 </tr>
@@ -1556,8 +1492,7 @@ samples.</p>
 <td><code>retrain_from_scratch_each_round</code></td>
 <td><code>bool</code></td>
 <td>
-<p>Whether to retrain the conditional density
-estimator for the posterior from scratch each round.</p>
+<p>Whether to retrain the conditional density estimator for the posterior from scratch each round.</p>
 </td>
 <td><code>False</code></td>
 </tr>
@@ -1736,10 +1671,7 @@ Autoregressive Flows_, Papamakarios et al., AISTATS 2019,
 <td><code>simulator</code></td>
 <td><code>Callable</code></td>
 <td>
-<p>A function that takes parameters <span><span class="MathJax_Preview">\theta</span><script type="math/tex">\theta</script></span> and maps them to
-simulations, or observations, <code>x</code>, <span><span class="MathJax_Preview">\text{sim}(\theta)\to x</span><script type="math/tex">\text{sim}(\theta)\to x</script></span>. Any
-regular Python callable (i.e. function or class with <code>__call__</code> method)
-can be used.</p>
+<p>A function that takes parameters <span><span class="MathJax_Preview">\theta</span><script type="math/tex">\theta</script></span> and maps them to simulations, or observations, <code class="codehilite"><span class="err">x</span></code>, <span><span class="MathJax_Preview">\text{sim}(\theta)\to x</span><script type="math/tex">\text{sim}(\theta)\to x</script></span>. Any regular Python callable (i.e. function or class with <code class="codehilite"><span class="err">__call__</span></code> method) can be used.</p>
 </td>
 <td><em>required</em></td>
 </tr>
@@ -1747,10 +1679,7 @@ can be used.</p>
 <td><code>prior</code></td>
 <td><code></code></td>
 <td>
-<p>A probability distribution that expresses prior knowledge about the
-parameters, e.g. which ranges are meaningful for them. Any
-object with <code>.log_prob()</code>and <code>.sample()</code> (for example, a PyTorch
-distribution) can be used.</p>
+<p>A probability distribution that expresses prior knowledge about the parameters, e.g. which ranges are meaningful for them. Any object with <code class="codehilite"><span class="na">.log_prob</span><span class="p">()</span></code>and <code class="codehilite"><span class="na">.sample</span><span class="p">()</span></code> (for example, a PyTorch distribution) can be used.</p>
 </td>
 <td><em>required</em></td>
 </tr>
@@ -1774,10 +1703,7 @@ distribution) can be used.</p>
 <td><code>simulation_batch_size</code></td>
 <td><code>int</code></td>
 <td>
-<p>Number of parameter sets that the simulator
-maps to data x at once. If None, we simulate all parameter sets at the
-same time. If &gt;= 1, the simulator has to process data of shape
-(simulation_batch_size, parameter_dimension).</p>
+<p>Number of parameter sets that the simulator maps to data x at once. If None, we simulate all parameter sets at the same time. If &gt;= 1, the simulator has to process data of shape (simulation_batch_size, parameter_dimension).</p>
 </td>
 <td><code>1</code></td>
 </tr>
@@ -1785,9 +1711,7 @@ same time. If &gt;= 1, the simulator has to process data of shape
 <td><code>density_estimator</code></td>
 <td><code>Union[str, nn.Module]</code></td>
 <td>
-<p>Either a string or a density estimation neural network
-that can <code>.log_prob()</code> and <code>.sample()</code>. If it is a string, use a pre-
-configured network of the provided type (one of nsf, maf, mdn, made).</p>
+<p>Either a string or a density estimation neural network that can <code class="codehilite"><span class="na">.log_prob</span><span class="p">()</span></code> and <code class="codehilite"><span class="na">.sample</span><span class="p">()</span></code>. If it is a string, use a pre- configured network of the provided type (one of nsf, maf, mdn, made).</p>
 </td>
 <td><code>'maf'</code></td>
 </tr>
@@ -1795,8 +1719,7 @@ configured network of the provided type (one of nsf, maf, mdn, made).</p>
 <td><code>mcmc_method</code></td>
 <td><code>str</code></td>
 <td>
-<p>If MCMC sampling is used, specify the method here: either of
-slice_np, slice, hmc, nuts.</p>
+<p>If MCMC sampling is used, specify the method here: either of slice_np, slice, hmc, nuts.</p>
 </td>
 <td><code>'slice_np'</code></td>
 </tr>
@@ -1812,8 +1735,7 @@ slice_np, slice, hmc, nuts.</p>
 <td><code>logging_level</code></td>
 <td><code>Union[int, str]</code></td>
 <td>
-<p>Minimum severity of messages to log. One of the strings
-INFO, WARNING, DEBUG, ERROR and CRITICAL.</p>
+<p>Minimum severity of messages to log. One of the strings INFO, WARNING, DEBUG, ERROR and CRITICAL.</p>
 </td>
 <td><code>'WARNING'</code></td>
 </tr>
@@ -1821,8 +1743,7 @@ INFO, WARNING, DEBUG, ERROR and CRITICAL.</p>
 <td><code>summary_writer</code></td>
 <td><code>Optional[SummaryWriter]</code></td>
 <td>
-<p>A <code>SummaryWriter</code> to control, among others, log
-file location (default is <code>&lt;current working directory&gt;/logs</code>.)</p>
+<p>A <code class="codehilite"><span class="err">SummaryWriter</span></code> to control, among others, log file location (default is <code class="codehilite"><span class="err">&lt;current working directory&gt;/logs</span></code>.)</p>
 </td>
 <td><code>None</code></td>
 </tr>
@@ -1830,8 +1751,7 @@ file location (default is <code>&lt;current working directory&gt;/logs</code>.)<
 <td><code>show_progress_bars</code></td>
 <td><code>bool</code></td>
 <td>
-<p>Whether to show a progressbar during simulation and
-sampling.</p>
+<p>Whether to show a progressbar during simulation and sampling.</p>
 </td>
 <td><code>True</code></td>
 </tr>
@@ -1839,8 +1759,7 @@ sampling.</p>
 <td><code>show_round_summary</code></td>
 <td><code>bool</code></td>
 <td>
-<p>Whether to show the validation loss and leakage after
-each round.</p>
+<p>Whether to show the validation loss and leakage after each round.</p>
 </td>
 <td><code>False</code></td>
 </tr>
@@ -2007,12 +1926,7 @@ __call__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <td><code>num_rounds</code></td>
 <td><code>int</code></td>
 <td>
-<p>Number of rounds to run. Each round consists of a simulation and
-training phase. <code>num_rounds=1</code> leads to a posterior <span><span class="MathJax_Preview">p(\theta|x)</span><script type="math/tex">p(\theta|x)</script></span> valid
-for <em>any</em> <span><span class="MathJax_Preview">x</span><script type="math/tex">x</script></span> (amortized), but requires many simulations.
-Alternatively, with <code>num_rounds&gt;1</code> the inference returns a posterior
-<span><span class="MathJax_Preview">p(\theta|x_o)</span><script type="math/tex">p(\theta|x_o)</script></span> focused on a specific observation <code>x_o</code>, potentially
-requiring less simulations.</p>
+<p>Number of rounds to run. Each round consists of a simulation and training phase. <code class="codehilite"><span class="err">num_rounds=1</span></code> leads to a posterior <span><span class="MathJax_Preview">p(\theta|x)</span><script type="math/tex">p(\theta|x)</script></span> valid for <em>any</em> <span><span class="MathJax_Preview">x</span><script type="math/tex">x</script></span> (amortized), but requires many simulations. Alternatively, with <code class="codehilite"><span class="err">num_rounds&gt;1</span></code> the inference returns a posterior <span><span class="MathJax_Preview">p(\theta|x_o)</span><script type="math/tex">p(\theta|x_o)</script></span> focused on a specific observation <code class="codehilite"><span class="err">x_o</span></code>, potentially requiring less simulations.</p>
 </td>
 <td><em>required</em></td>
 </tr>
@@ -2028,11 +1942,7 @@ requiring less simulations.</p>
 <td><code>x_o</code></td>
 <td><code>Optional[Tensor]</code></td>
 <td>
-<p>An observation that is only required when doing inference
-over multiple rounds. After the first round, <code>x_o</code> is used to guide the
-sampling so that the simulator is run with parameters that are likely
-for that <code>x_o</code>, i.e. they are sampled from the posterior obtained in the
-previous round <span><span class="MathJax_Preview">p(\theta|x_o)</span><script type="math/tex">p(\theta|x_o)</script></span>.</p>
+<p>An observation that is only required when doing inference over multiple rounds. After the first round, <code class="codehilite"><span class="err">x_o</span></code> is used to guide the sampling so that the simulator is run with parameters that are likely for that <code class="codehilite"><span class="err">x_o</span></code>, i.e. they are sampled from the posterior obtained in the previous round <span><span class="MathJax_Preview">p(\theta|x_o)</span><script type="math/tex">p(\theta|x_o)</script></span>.</p>
 </td>
 <td><code>None</code></td>
 </tr>
@@ -2064,8 +1974,7 @@ previous round <span><span class="MathJax_Preview">p(\theta|x_o)</span><script t
 <td><code>stop_after_epochs</code></td>
 <td><code>int</code></td>
 <td>
-<p>The number of epochs to wait for improvement on the
-validation set before terminating training.</p>
+<p>The number of epochs to wait for improvement on the validation set before terminating training.</p>
 </td>
 <td><code>20</code></td>
 </tr>
@@ -2073,9 +1982,7 @@ validation set before terminating training.</p>
 <td><code>max_num_epochs</code></td>
 <td><code>Optional[int]</code></td>
 <td>
-<p>Maximum number of epochs to run. If reached, we stop
-training even when the validation loss is still decreasing. If None, we
-train until validation loss increases (see also <code>stop_after_epochs</code>).</p>
+<p>Maximum number of epochs to run. If reached, we stop training even when the validation loss is still decreasing. If None, we train until validation loss increases (see also <code class="codehilite"><span class="err">stop_after_epochs</span></code>).</p>
 </td>
 <td><code>None</code></td>
 </tr>
@@ -2083,8 +1990,7 @@ train until validation loss increases (see also <code>stop_after_epochs</code>).
 <td><code>clip_max_norm</code></td>
 <td><code>Optional[float]</code></td>
 <td>
-<p>Value at which to clip the total gradient norm in order to
-prevent exploding gradients. Use None for no clipping.</p>
+<p>Value at which to clip the total gradient norm in order to prevent exploding gradients. Use None for no clipping.</p>
 </td>
 <td><code>5.0</code></td>
 </tr>
@@ -2092,8 +1998,7 @@ prevent exploding gradients. Use None for no clipping.</p>
 <td><code>exclude_invalid_x</code></td>
 <td><code>bool</code></td>
 <td>
-<p>Whether to exclude simulation outputs <code>x=NaN</code> or <code>x=±∞</code>
-during training. Expect errors, silent or explicit, when <code>False</code>.</p>
+<p>Whether to exclude simulation outputs <code class="codehilite"><span class="err">x=NaN</span></code> or <code class="codehilite"><span class="err">x=±∞</span></code> during training. Expect errors, silent or explicit, when <code class="codehilite"><span class="err">False</span></code>.</p>
 </td>
 <td><code>True</code></td>
 </tr>
@@ -2101,9 +2006,7 @@ during training. Expect errors, silent or explicit, when <code>False</code>.</p>
 <td><code>discard_prior_samples</code></td>
 <td><code>bool</code></td>
 <td>
-<p>Whether to discard samples simulated in round 1, i.e.
-from the prior. Training may be sped up by ignoring such less targeted
-samples.</p>
+<p>Whether to discard samples simulated in round 1, i.e. from the prior. Training may be sped up by ignoring such less targeted samples.</p>
 </td>
 <td><code>False</code></td>
 </tr>
@@ -2111,8 +2014,7 @@ samples.</p>
 <td><code>retrain_from_scratch_each_round</code></td>
 <td><code>bool</code></td>
 <td>
-<p>Whether to retrain the conditional density
-estimator for the posterior from scratch each round.</p>
+<p>Whether to retrain the conditional density estimator for the posterior from scratch each round.</p>
 </td>
 <td><code>False</code></td>
 </tr>
@@ -2296,10 +2198,7 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <td><code>simulator</code></td>
 <td><code>Callable</code></td>
 <td>
-<p>A function that takes parameters $       heta$ and maps them to
-simulations, or observations, <code>x</code>, <span><span class="MathJax_Preview">\mathrm{sim}(       heta)   o x</span><script type="math/tex">\mathrm{sim}(       heta)   o x</script></span>. Any
-regular Python callable (i.e. function or class with <code>__call__</code> method)
-can be used.</p>
+<p>A function that takes parameters $       heta$ and maps them to simulations, or observations, <code class="codehilite"><span class="err">x</span></code>, <span><span class="MathJax_Preview">\mathrm{sim}(       heta)   o x</span><script type="math/tex">\mathrm{sim}(       heta)   o x</script></span>. Any regular Python callable (i.e. function or class with <code class="codehilite"><span class="err">__call__</span></code> method) can be used.</p>
 </td>
 <td><em>required</em></td>
 </tr>
@@ -2307,10 +2206,7 @@ can be used.</p>
 <td><code>prior</code></td>
 <td><code></code></td>
 <td>
-<p>A probability distribution that expresses prior knowledge about the
-parameters, e.g. which ranges are meaningful for them. Any
-object with <code>.log_prob()</code>and <code>.sample()</code> (for example, a PyTorch
-distribution) can be used.</p>
+<p>A probability distribution that expresses prior knowledge about the parameters, e.g. which ranges are meaningful for them. Any object with <code class="codehilite"><span class="na">.log_prob</span><span class="p">()</span></code>and <code class="codehilite"><span class="na">.sample</span><span class="p">()</span></code> (for example, a PyTorch distribution) can be used.</p>
 </td>
 <td><em>required</em></td>
 </tr>
@@ -2334,10 +2230,7 @@ distribution) can be used.</p>
 <td><code>simulation_batch_size</code></td>
 <td><code>int</code></td>
 <td>
-<p>Number of parameter sets that the simulator
-maps to data x at once. If None, we simulate all parameter sets at the
-same time. If &gt;= 1, the simulator has to process data of shape
-(simulation_batch_size, parameter_dimension).</p>
+<p>Number of parameter sets that the simulator maps to data x at once. If None, we simulate all parameter sets at the same time. If &gt;= 1, the simulator has to process data of shape (simulation_batch_size, parameter_dimension).</p>
 </td>
 <td><code>1</code></td>
 </tr>
@@ -2345,8 +2238,7 @@ same time. If &gt;= 1, the simulator has to process data of shape
 <td><code>embedding_net</code></td>
 <td><code>nn.Module</code></td>
 <td>
-<p>Can be used to encode observations <span><span class="MathJax_Preview">x</span><script type="math/tex">x</script></span>. Currently not
-implemented.</p>
+<p>Can be used to encode observations <span><span class="MathJax_Preview">x</span><script type="math/tex">x</script></span>. Currently not implemented.</p>
 </td>
 <td><code>Identity()</code></td>
 </tr>
@@ -2354,8 +2246,7 @@ implemented.</p>
 <td><code>classifier</code></td>
 <td><code>Union[str, nn.Module]</code></td>
 <td>
-<p>Classifier trained to approximate likelihood rations. If str,
-use a pre-configured neural network.</p>
+<p>Classifier trained to approximate likelihood rations. If str, use a pre-configured neural network.</p>
 </td>
 <td><code>'resnet'</code></td>
 </tr>
@@ -2363,8 +2254,7 @@ use a pre-configured neural network.</p>
 <td><code>mcmc_method</code></td>
 <td><code>str</code></td>
 <td>
-<p>If MCMC sampling is used, specify the method here: either of
-slice_np, slice, hmc, nuts.</p>
+<p>If MCMC sampling is used, specify the method here: either of slice_np, slice, hmc, nuts.</p>
 </td>
 <td><code>'slice_np'</code></td>
 </tr>
@@ -2380,8 +2270,7 @@ slice_np, slice, hmc, nuts.</p>
 <td><code>logging_level</code></td>
 <td><code>Union[int, str]</code></td>
 <td>
-<p>Minimum severity of messages to log. One of the strings
-INFO, WARNING, DEBUG, ERROR and CRITICAL.</p>
+<p>Minimum severity of messages to log. One of the strings INFO, WARNING, DEBUG, ERROR and CRITICAL.</p>
 </td>
 <td><code>'warning'</code></td>
 </tr>
@@ -2389,8 +2278,7 @@ INFO, WARNING, DEBUG, ERROR and CRITICAL.</p>
 <td><code>summary_writer</code></td>
 <td><code>Optional[SummaryWriter]</code></td>
 <td>
-<p>A <code>SummaryWriter</code> to control, among others, log
-file location (default is <code>&lt;current working directory&gt;/logs</code>.)</p>
+<p>A <code class="codehilite"><span class="err">SummaryWriter</span></code> to control, among others, log file location (default is <code class="codehilite"><span class="err">&lt;current working directory&gt;/logs</span></code>.)</p>
 </td>
 <td><code>None</code></td>
 </tr>
@@ -2398,8 +2286,7 @@ file location (default is <code>&lt;current working directory&gt;/logs</code>.)<
 <td><code>show_progress_bars</code></td>
 <td><code>bool</code></td>
 <td>
-<p>Whether to show a progressbar during simulation and
-sampling.</p>
+<p>Whether to show a progressbar during simulation and sampling.</p>
 </td>
 <td><code>True</code></td>
 </tr>
@@ -2407,8 +2294,7 @@ sampling.</p>
 <td><code>show_round_summary</code></td>
 <td><code>bool</code></td>
 <td>
-<p>Whether to show the validation loss and leakage after
-each round.</p>
+<p>Whether to show the validation loss and leakage after each round.</p>
 </td>
 <td><code>False</code></td>
 </tr>
@@ -2577,12 +2463,7 @@ __call__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <td><code>num_rounds</code></td>
 <td><code>int</code></td>
 <td>
-<p>Number of rounds to run. Each round consists of a simulation and
-training phase. <code>num_rounds=1</code> leads to a posterior <span><span class="MathJax_Preview">p(\theta|x)</span><script type="math/tex">p(\theta|x)</script></span> valid
-for <em>any</em> <span><span class="MathJax_Preview">x</span><script type="math/tex">x</script></span> (amortized), but requires many simulations.
-Alternatively, with <code>num_rounds&gt;1</code> the inference returns a posterior
-<span><span class="MathJax_Preview">p(\theta|x_o)</span><script type="math/tex">p(\theta|x_o)</script></span> focused on a specific observation <code>x_o</code>, potentially
-requiring less simulations.</p>
+<p>Number of rounds to run. Each round consists of a simulation and training phase. <code class="codehilite"><span class="err">num_rounds=1</span></code> leads to a posterior <span><span class="MathJax_Preview">p(\theta|x)</span><script type="math/tex">p(\theta|x)</script></span> valid for <em>any</em> <span><span class="MathJax_Preview">x</span><script type="math/tex">x</script></span> (amortized), but requires many simulations. Alternatively, with <code class="codehilite"><span class="err">num_rounds&gt;1</span></code> the inference returns a posterior <span><span class="MathJax_Preview">p(\theta|x_o)</span><script type="math/tex">p(\theta|x_o)</script></span> focused on a specific observation <code class="codehilite"><span class="err">x_o</span></code>, potentially requiring less simulations.</p>
 </td>
 <td><em>required</em></td>
 </tr>
@@ -2598,11 +2479,7 @@ requiring less simulations.</p>
 <td><code>x_o</code></td>
 <td><code>Optional[Tensor]</code></td>
 <td>
-<p>An observation that is only required when doing inference
-over multiple rounds. After the first round, <code>x_o</code> is used to guide the
-sampling so that the simulator is run with parameters that are likely
-for that <code>x_o</code>, i.e. they are sampled from the posterior obtained in the
-previous round <span><span class="MathJax_Preview">p(\theta|x_o)</span><script type="math/tex">p(\theta|x_o)</script></span>.</p>
+<p>An observation that is only required when doing inference over multiple rounds. After the first round, <code class="codehilite"><span class="err">x_o</span></code> is used to guide the sampling so that the simulator is run with parameters that are likely for that <code class="codehilite"><span class="err">x_o</span></code>, i.e. they are sampled from the posterior obtained in the previous round <span><span class="MathJax_Preview">p(\theta|x_o)</span><script type="math/tex">p(\theta|x_o)</script></span>.</p>
 </td>
 <td><code>None</code></td>
 </tr>
@@ -2634,8 +2511,7 @@ previous round <span><span class="MathJax_Preview">p(\theta|x_o)</span><script t
 <td><code>stop_after_epochs</code></td>
 <td><code>int</code></td>
 <td>
-<p>The number of epochs to wait for improvement on the
-validation set before terminating training.</p>
+<p>The number of epochs to wait for improvement on the validation set before terminating training.</p>
 </td>
 <td><code>20</code></td>
 </tr>
@@ -2643,9 +2519,7 @@ validation set before terminating training.</p>
 <td><code>max_num_epochs</code></td>
 <td><code>Optional[int]</code></td>
 <td>
-<p>Maximum number of epochs to run. If reached, we stop
-training even when the validation loss is still decreasing. If None, we
-train until validation loss increases (see also <code>stop_after_epochs</code>).</p>
+<p>Maximum number of epochs to run. If reached, we stop training even when the validation loss is still decreasing. If None, we train until validation loss increases (see also <code class="codehilite"><span class="err">stop_after_epochs</span></code>).</p>
 </td>
 <td><code>None</code></td>
 </tr>
@@ -2653,8 +2527,7 @@ train until validation loss increases (see also <code>stop_after_epochs</code>).
 <td><code>clip_max_norm</code></td>
 <td><code>Optional[float]</code></td>
 <td>
-<p>Value at which to clip the total gradient norm in order to
-prevent exploding gradients. Use None for no clipping.</p>
+<p>Value at which to clip the total gradient norm in order to prevent exploding gradients. Use None for no clipping.</p>
 </td>
 <td><code>5.0</code></td>
 </tr>
@@ -2662,8 +2535,7 @@ prevent exploding gradients. Use None for no clipping.</p>
 <td><code>exclude_invalid_x</code></td>
 <td><code>bool</code></td>
 <td>
-<p>Whether to exclude simulation outputs <code>x=NaN</code> or <code>x=±∞</code>
-during training. Expect errors, silent or explicit, when <code>False</code>.</p>
+<p>Whether to exclude simulation outputs <code class="codehilite"><span class="err">x=NaN</span></code> or <code class="codehilite"><span class="err">x=±∞</span></code> during training. Expect errors, silent or explicit, when <code class="codehilite"><span class="err">False</span></code>.</p>
 </td>
 <td><code>True</code></td>
 </tr>
@@ -2671,9 +2543,7 @@ during training. Expect errors, silent or explicit, when <code>False</code>.</p>
 <td><code>discard_prior_samples</code></td>
 <td><code>bool</code></td>
 <td>
-<p>Whether to discard samples simulated in round 1, i.e.
-from the prior. Training may be sped up by ignoring such less targeted
-samples.</p>
+<p>Whether to discard samples simulated in round 1, i.e. from the prior. Training may be sped up by ignoring such less targeted samples.</p>
 </td>
 <td><code>False</code></td>
 </tr>
@@ -2681,8 +2551,7 @@ samples.</p>
 <td><code>retrain_from_scratch_each_round</code></td>
 <td><code>bool</code></td>
 <td>
-<p>Whether to retrain the conditional density
-estimator for the posterior from scratch each round.</p>
+<p>Whether to retrain the conditional density estimator for the posterior from scratch each round.</p>
 </td>
 <td><code>False</code></td>
 </tr>
@@ -2862,10 +2731,7 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <td><code>simulator</code></td>
 <td><code>Callable</code></td>
 <td>
-<p>A function that takes parameters $       heta$ and maps them to
-simulations, or observations, <code>x</code>, <span><span class="MathJax_Preview">\mathrm{sim}(       heta)   o x</span><script type="math/tex">\mathrm{sim}(       heta)   o x</script></span>. Any
-regular Python callable (i.e. function or class with <code>__call__</code> method)
-can be used.</p>
+<p>A function that takes parameters $       heta$ and maps them to simulations, or observations, <code class="codehilite"><span class="err">x</span></code>, <span><span class="MathJax_Preview">\mathrm{sim}(       heta)   o x</span><script type="math/tex">\mathrm{sim}(       heta)   o x</script></span>. Any regular Python callable (i.e. function or class with <code class="codehilite"><span class="err">__call__</span></code> method) can be used.</p>
 </td>
 <td><em>required</em></td>
 </tr>
@@ -2873,10 +2739,7 @@ can be used.</p>
 <td><code>prior</code></td>
 <td><code></code></td>
 <td>
-<p>A probability distribution that expresses prior knowledge about the
-parameters, e.g. which ranges are meaningful for them. Any
-object with <code>.log_prob()</code>and <code>.sample()</code> (for example, a PyTorch
-distribution) can be used.</p>
+<p>A probability distribution that expresses prior knowledge about the parameters, e.g. which ranges are meaningful for them. Any object with <code class="codehilite"><span class="na">.log_prob</span><span class="p">()</span></code>and <code class="codehilite"><span class="na">.sample</span><span class="p">()</span></code> (for example, a PyTorch distribution) can be used.</p>
 </td>
 <td><em>required</em></td>
 </tr>
@@ -2900,10 +2763,7 @@ distribution) can be used.</p>
 <td><code>simulation_batch_size</code></td>
 <td><code>int</code></td>
 <td>
-<p>Number of parameter sets that the simulator
-maps to data x at once. If None, we simulate all parameter sets at the
-same time. If &gt;= 1, the simulator has to process data of shape
-(simulation_batch_size, parameter_dimension).</p>
+<p>Number of parameter sets that the simulator maps to data x at once. If None, we simulate all parameter sets at the same time. If &gt;= 1, the simulator has to process data of shape (simulation_batch_size, parameter_dimension).</p>
 </td>
 <td><code>1</code></td>
 </tr>
@@ -2911,8 +2771,7 @@ same time. If &gt;= 1, the simulator has to process data of shape
 <td><code>embedding_net</code></td>
 <td><code>nn.Module</code></td>
 <td>
-<p>Can be used to encode observations <span><span class="MathJax_Preview">x</span><script type="math/tex">x</script></span>. Currently not
-implemented.</p>
+<p>Can be used to encode observations <span><span class="MathJax_Preview">x</span><script type="math/tex">x</script></span>. Currently not implemented.</p>
 </td>
 <td><code>Identity()</code></td>
 </tr>
@@ -2920,8 +2779,7 @@ implemented.</p>
 <td><code>classifier</code></td>
 <td><code>Union[str, nn.Module]</code></td>
 <td>
-<p>Classifier trained to approximate likelihood rations. If str,
-use a pre-configured neural network.</p>
+<p>Classifier trained to approximate likelihood rations. If str, use a pre-configured neural network.</p>
 </td>
 <td><code>'resnet'</code></td>
 </tr>
@@ -2929,8 +2787,7 @@ use a pre-configured neural network.</p>
 <td><code>mcmc_method</code></td>
 <td><code>str</code></td>
 <td>
-<p>If MCMC sampling is used, specify the method here: either of
-slice_np, slice, hmc, nuts.</p>
+<p>If MCMC sampling is used, specify the method here: either of slice_np, slice, hmc, nuts.</p>
 </td>
 <td><code>'slice_np'</code></td>
 </tr>
@@ -2946,8 +2803,7 @@ slice_np, slice, hmc, nuts.</p>
 <td><code>logging_level</code></td>
 <td><code>Union[int, str]</code></td>
 <td>
-<p>Minimum severity of messages to log. One of the strings
-INFO, WARNING, DEBUG, ERROR and CRITICAL.</p>
+<p>Minimum severity of messages to log. One of the strings INFO, WARNING, DEBUG, ERROR and CRITICAL.</p>
 </td>
 <td><code>'warning'</code></td>
 </tr>
@@ -2955,8 +2811,7 @@ INFO, WARNING, DEBUG, ERROR and CRITICAL.</p>
 <td><code>summary_writer</code></td>
 <td><code>Optional[SummaryWriter]</code></td>
 <td>
-<p>A <code>SummaryWriter</code> to control, among others, log
-file location (default is <code>&lt;current working directory&gt;/logs</code>.)</p>
+<p>A <code class="codehilite"><span class="err">SummaryWriter</span></code> to control, among others, log file location (default is <code class="codehilite"><span class="err">&lt;current working directory&gt;/logs</span></code>.)</p>
 </td>
 <td><code>None</code></td>
 </tr>
@@ -2964,8 +2819,7 @@ file location (default is <code>&lt;current working directory&gt;/logs</code>.)<
 <td><code>show_progress_bars</code></td>
 <td><code>bool</code></td>
 <td>
-<p>Whether to show a progressbar during simulation and
-sampling.</p>
+<p>Whether to show a progressbar during simulation and sampling.</p>
 </td>
 <td><code>True</code></td>
 </tr>
@@ -2973,8 +2827,7 @@ sampling.</p>
 <td><code>show_round_summary</code></td>
 <td><code>bool</code></td>
 <td>
-<p>Whether to show the validation loss and leakage after
-each round.</p>
+<p>Whether to show the validation loss and leakage after each round.</p>
 </td>
 <td><code>False</code></td>
 </tr>
@@ -3117,13 +2970,13 @@ each round.</p>
 <code>sbi.inference.posterior.NeuralPosterior</code>
 <a class="headerlink" href="#sbi.inference.posterior.NeuralPosterior" title="Permanent link">¶</a></h3>
 <div class="doc doc-contents first">
-<p>Posterior <span><span class="MathJax_Preview">p(\theta|x)</span><script type="math/tex">p(\theta|x)</script></span> with <code>log_prob()</code> and <code>sample()</code> methods.<br/>
+<p>Posterior <span><span class="MathJax_Preview">p(\theta|x)</span><script type="math/tex">p(\theta|x)</script></span> with <code class="codehilite"><span class="err">log_prob()</span></code> and <code class="codehilite"><span class="err">sample()</span></code> methods.<br/>
 <br/>
 
     All inference methods in sbi train a neural network which is then used to obtain
-    the posterior distribution. The <code>NeuralPosterior</code> class wraps the trained network
+    the posterior distribution. The <code class="codehilite"><span class="err">NeuralPosterior</span></code> class wraps the trained network
     such that one can directly evaluate the log probability and draw samples from the
-    posterior. The neural network itself can be accessed via the <code>.net</code> attribute.
+    posterior. The neural network itself can be accessed via the <code class="codehilite"><span class="na">.net</span></code> attribute.
     <br/>
 <br/>
 
@@ -3150,7 +3003,7 @@ default_x: <span class="n">Optional</span><span class="p">[</span><span class="n
 </span>
 </h4>
 <div class="doc doc-contents">
-<p>Return default x used by <code>.sample(), .log_prob</code> as conditioning context.</p>
+<p>Return default x used by <code class="codehilite"><span class="na">.sample</span><span class="p">(),</span> <span class="no">.log_prob</span></code> as conditioning context.</p>
 </div>
 </div>
 <div class="doc doc-object doc-method">
@@ -3193,7 +3046,7 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <td><code>prior</code></td>
 <td><code></code></td>
 <td>
-<p>Prior distribution with <code>.log_prob()</code> and <code>.sample()</code>.</p>
+<p>Prior distribution with <code class="codehilite"><span class="na">.log_prob</span><span class="p">()</span></code> and <code class="codehilite"><span class="na">.sample</span><span class="p">()</span></code>.</p>
 </td>
 <td><em>required</em></td>
 </tr>
@@ -3209,9 +3062,7 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <td><code>sample_with_mcmc</code></td>
 <td><code>bool</code></td>
 <td>
-<p>Whether to sample with MCMC. Will always be <code>True</code> for SRE
-and SNL, but can also be set to <code>True</code> for SNPE if MCMC is preferred to
-deal with leakage over rejection sampling.</p>
+<p>Whether to sample with MCMC. Will always be <code class="codehilite"><span class="err">True</span></code> for SRE and SNL, but can also be set to <code class="codehilite"><span class="err">True</span></code> for SNPE if MCMC is preferred to deal with leakage over rejection sampling.</p>
 </td>
 <td><code>True</code></td>
 </tr>
@@ -3219,8 +3070,7 @@ deal with leakage over rejection sampling.</p>
 <td><code>mcmc_method</code></td>
 <td><code>str</code></td>
 <td>
-<p>If MCMC sampling is used, specify the method here: either of
-slice_np, slice, hmc, nuts.</p>
+<p>If MCMC sampling is used, specify the method here: either of slice_np, slice, hmc, nuts.</p>
 </td>
 <td><code>'slice_np'</code></td>
 </tr>
@@ -3228,8 +3078,7 @@ slice_np, slice, hmc, nuts.</p>
 <td><code>get_potential_function</code></td>
 <td><code>Optional[Callable]</code></td>
 <td>
-<p>Callable that returns the potential function used
-for MCMC sampling.</p>
+<p>Callable that returns the potential function used for MCMC sampling.</p>
 </td>
 <td><code>None</code></td>
 </tr>
@@ -3356,9 +3205,9 @@ leakage_correction<span class="p">(</span><span class="bp">self</span><span clas
 sampling from the posterior.</p>
 <div class="admonition note">
 <p class="admonition-title">This is to avoid re-estimating the acceptance probability from scratch</p>
-<p>whenever <code>log_prob</code> is called and <code>norm_posterior_snpe=True</code>. Here, it
-  is estimated only once for <code>self.default_x</code> and saved for later. We
-  re-evaluate only whenever a new <code>x</code> is passed.</p>
+<p>whenever <code class="codehilite"><span class="err">log_prob</span></code> is called and <code class="codehilite"><span class="err">norm_posterior_snpe=True</span></code>. Here, it
+  is estimated only once for <code class="codehilite"><span class="err">self.default_x</span></code> and saved for later. We
+  re-evaluate only whenever a new <code class="codehilite"><span class="err">x</span></code> is passed.</p>
 </div>
 <p><strong>Parameters:</strong></p>
 <table>
@@ -3391,9 +3240,7 @@ sampling from the posterior.</p>
 <td><code>force_update</code></td>
 <td><code>bool</code></td>
 <td>
-<p>Whether to force a reevaluation of the leakage correction even
-if the context <code>x</code> is the same as <code>self.default_x</code>. This is useful to
-enforce a new leakage estimate for rounds after the first (2, 3,..).</p>
+<p>Whether to force a reevaluation of the leakage correction even if the context <code class="codehilite"><span class="err">x</span></code> is the same as <code class="codehilite"><span class="err">self.default_x</span></code>. This is useful to enforce a new leakage estimate for rounds after the first (2, 3,..).</p>
 </td>
 <td><code>False</code></td>
 </tr>
@@ -3419,7 +3266,7 @@ enforce a new leakage estimate for rounds after the first (2, 3,..).</p>
 <tr>
 <td><code>Tensor</code></td>
 <td>
-<p>Saved or newly-estimated correction factor (as a scalar <code>Tensor</code>).</p>
+<p>Saved or newly-estimated correction factor (as a scalar <code class="codehilite"><span class="err">Tensor</span></code>).</p>
 </td>
 </tr>
 </tbody>
@@ -3568,9 +3415,7 @@ log_prob<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <td><code>x</code></td>
 <td><code>Optional[Tensor]</code></td>
 <td>
-<p>Conditioning context for posterior <span><span class="MathJax_Preview">p(\theta|x)</span><script type="math/tex">p(\theta|x)</script></span>. If not provided, fall
-back onto an <code>x_o</code> if previously provided for multi-round training, or
-to another default if set later for convenience, see <code>.set_default_x()</code>.</p>
+<p>Conditioning context for posterior <span><span class="MathJax_Preview">p(\theta|x)</span><script type="math/tex">p(\theta|x)</script></span>. If not provided, fall back onto an <code class="codehilite"><span class="err">x_o</span></code> if previously provided for multi-round training, or to another default if set later for convenience, see <code class="codehilite"><span class="na">.set_default_x</span><span class="p">()</span></code>.</p>
 </td>
 <td><code>None</code></td>
 </tr>
@@ -3578,13 +3423,7 @@ to another default if set later for convenience, see <code>.set_default_x()</cod
 <td><code>norm_posterior_snpe</code></td>
 <td><code>bool</code></td>
 <td>
-<p>Whether to enforce a normalized posterior density when
-using SNPE. Renormalization of the posterior is useful when some
-probability falls out or leaks out of the prescribed prior support.
-The normalizing factor is calculated via rejection sampling, so if you
-need speedier but unnormalized log posterior estimates set here
-<code>norm_posterior_snpe=False</code>. The returned log posterior is set to
--∞ outside of the prior support regardless of this setting.</p>
+<p>Whether to enforce a normalized posterior density when using SNPE. Renormalization of the posterior is useful when some probability falls out or leaks out of the prescribed prior support. The normalizing factor is calculated via rejection sampling, so if you need speedier but unnormalized log posterior estimates set here <code class="codehilite"><span class="err">norm_posterior_snpe=False</span></code>. The returned log posterior is set to -∞ outside of the prior support regardless of this setting.</p>
 </td>
 <td><code>True</code></td>
 </tr>
@@ -3592,9 +3431,7 @@ need speedier but unnormalized log posterior estimates set here
 <td><code>track_gradients</code></td>
 <td><code>bool</code></td>
 <td>
-<p>Whether the returned tensor supports tracking gradients.
-This can be helpful for e.g. sensitivity analysis, but increases memory
-consumption.</p>
+<p>Whether the returned tensor supports tracking gradients. This can be helpful for e.g. sensitivity analysis, but increases memory consumption.</p>
 </td>
 <td><code>False</code></td>
 </tr>
@@ -3612,7 +3449,7 @@ consumption.</p>
 <tr>
 <td><code>Tensor</code></td>
 <td>
-<p><code>(len(θ),)</code>-shaped log posterior probability <span><span class="MathJax_Preview">\log p(\theta|x)</span><script type="math/tex">\log p(\theta|x)</script></span> for θ in the
+<p><code class="codehilite"><span class="err">(len(θ),)</span></code>-shaped log posterior probability <span><span class="MathJax_Preview">\log p(\theta|x)</span><script type="math/tex">\log p(\theta|x)</script></span> for θ in the
 support of the prior, -∞ (corresponding to 0 probability) outside.</p>
 </td>
 </tr>
@@ -3773,9 +3610,7 @@ and SRE are restricted to sampling with MCMC.</p>
 <td><code>sample_shape</code></td>
 <td><code>Shape</code></td>
 <td>
-<p>Desired shape of samples that are drawn from posterior. If
-sample_shape is multidimensional we simply draw <code>sample_shape.numel()</code>
-samples and then reshape into the desired shape.</p>
+<p>Desired shape of samples that are drawn from posterior. If sample_shape is multidimensional we simply draw <code class="codehilite"><span class="err">sample_shape.numel()</span></code> samples and then reshape into the desired shape.</p>
 </td>
 <td><code>torch.Size([])</code></td>
 </tr>
@@ -3783,9 +3618,7 @@ samples and then reshape into the desired shape.</p>
 <td><code>x</code></td>
 <td><code>Optional[Tensor]</code></td>
 <td>
-<p>Conditioning context for posterior <span><span class="MathJax_Preview">p(\theta|x)</span><script type="math/tex">p(\theta|x)</script></span>. If not provided,
-fall back onto <code>x_o</code> if previously provided for multiround training, or
-to a set default (see <code>set_default_x()</code> method).</p>
+<p>Conditioning context for posterior <span><span class="MathJax_Preview">p(\theta|x)</span><script type="math/tex">p(\theta|x)</script></span>. If not provided, fall back onto <code class="codehilite"><span class="err">x_o</span></code> if previously provided for multiround training, or to a set default (see <code class="codehilite"><span class="err">set_default_x()</span></code> method).</p>
 </td>
 <td><code>None</code></td>
 </tr>
@@ -3801,10 +3634,9 @@ to a set default (see <code>set_default_x()</code> method).</p>
 <td><code>**kwargs</code></td>
 <td><code></code></td>
 <td>
-<p>Additional parameters to be passed to the MCMC sampler, such as
-<code>thin</code> and <code>warmup_steps</code>.</p>
+<p>Additional parameters to be passed to the MCMC sampler, such as <code class="codehilite"><span class="err">thin</span></code> and <code class="codehilite"><span class="err">warmup_steps</span></code>.</p>
 </td>
-<td><code>{}</code></td>
+<td><em>required</em></td>
 </tr>
 </tbody>
 </table>
@@ -3951,15 +3783,15 @@ to a set default (see <code>set_default_x()</code> method).</p>
 set_default_x<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span> </code>
 </h4>
 <div class="doc doc-contents">
-<p>Return <code>NeuralPosterior</code> object with default conditioning context set to <code>x</code>.</p>
-<p>This is a pure convenience to avoid having to repeatedly specify <code>x</code> in calls to
-<code>.sample()</code> and <code>.log_prob()</code> - only θ needs to be passed.</p>
+<p>Return <code class="codehilite"><span class="err">NeuralPosterior</span></code> object with default conditioning context set to <code class="codehilite"><span class="err">x</span></code>.</p>
+<p>This is a pure convenience to avoid having to repeatedly specify <code class="codehilite"><span class="err">x</span></code> in calls to
+<code class="codehilite"><span class="na">.sample</span><span class="p">()</span></code> and <code class="codehilite"><span class="na">.log_prob</span><span class="p">()</span></code> - only θ needs to be passed.</p>
 <p>This convenience is particularly useful when the posterior is focused, i.e.
 has been trained over multiple rounds to be accurate in the vicinity of a
-particular <code>x=x_o</code> (you can check if your posterior object is focused by
+particular <code class="codehilite"><span class="err">x=x_o</span></code> (you can check if your posterior object is focused by
 printing it).</p>
 <p>NOTE: this method is chainable, i.e. will return the NeuralPosterior object so
-that calls like <code>posterior.set_default_x(my_x).sample(mytheta)</code> are possible.</p>
+that calls like <code class="codehilite"><span class="err">posterior.set_default_x(my_x).sample(mytheta)</span></code> are possible.</p>
 <p><strong>Parameters:</strong></p>
 <table>
 <thead>
@@ -3993,7 +3825,7 @@ that calls like <code>posterior.set_default_x(my_x).sample(mytheta)</code> are p
 <tr>
 <td><code>'NeuralPosterior'</code></td>
 <td>
-<p><code>NeuralPosterior</code> that will use a default <code>x</code> when not explicitly passed.</p>
+<p><code class="codehilite"><span class="err">NeuralPosterior</span></code> that will use a default <code class="codehilite"><span class="err">x</span></code> when not explicitly passed.</p>
 </td>
 </tr>
 </tbody>
@@ -4074,7 +3906,7 @@ that calls like <code>posterior.set_default_x(my_x).sample(mytheta)</code> are p
 set_embedding_net<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">embedding_net</span><span class="p">)</span> </code>
 </h4>
 <div class="doc doc-contents">
-<p>Set the <code>embedding_net</code> as an attribute of the <code>neural_net</code>.</p>
+<p>Set the <code class="codehilite"><span class="err">embedding_net</span></code> as an attribute of the <code class="codehilite"><span class="err">neural_net</span></code>.</p>
 <p><strong>Parameters:</strong></p>
 <table>
 <thead>
@@ -4090,7 +3922,7 @@ set_embedding_net<span class="p">(</span><span class="bp">self</span><span class
 <td><code>embedding_net</code></td>
 <td><code>nn.Module</code></td>
 <td>
-<p>Neural net to encode <code>x</code>.</p>
+<p>Neural net to encode <code class="codehilite"><span class="err">x</span></code>.</p>
 </td>
 <td><em>required</em></td>
 </tr>
@@ -5161,13 +4993,13 @@ sbi.utils.get_nn_models.classifier_nn<span class="p">(</span><span class="n">mod
 <div class="doc doc-object doc-function">
 <h3 class="doc doc-heading" id="sbi.utils.plot.pairplot">
 <code class="highlight language-python">
-sbi.utils.plot.pairplot<span class="p">(</span><span class="n">samples</span><span class="p">,</span> <span class="n">points</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">upper</span><span class="o">=</span><span class="s1">'hist'</span><span class="p">,</span> <span class="n">diag</span><span class="o">=</span><span class="s1">'hist'</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">legend</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">labels_points</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">labels_samples</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">samples_colors</span><span class="o">=</span><span class="p">[</span><span class="s1">'#1f77b4'</span><span class="p">,</span> <span class="s1">'#ff7f0e'</span><span class="p">,</span> <span class="s1">'#2ca02c'</span><span class="p">,</span> <span class="s1">'#d62728'</span><span class="p">,</span> <span class="s1">'#9467bd'</span><span class="p">,</span> <span class="s1">'#8c564b'</span><span class="p">,</span> <span class="s1">'#e377c2'</span><span class="p">,</span> <span class="s1">'#7f7f7f'</span><span class="p">,</span> <span class="s1">'#bcbd22'</span><span class="p">,</span> <span class="s1">'#17becf'</span><span class="p">],</span> <span class="n">points_colors</span><span class="o">=</span><span class="p">[</span><span class="s1">'#1f77b4'</span><span class="p">,</span> <span class="s1">'#ff7f0e'</span><span class="p">,</span> <span class="s1">'#2ca02c'</span><span class="p">,</span> <span class="s1">'#d62728'</span><span class="p">,</span> <span class="s1">'#9467bd'</span><span class="p">,</span> <span class="s1">'#8c564b'</span><span class="p">,</span> <span class="s1">'#e377c2'</span><span class="p">,</span> <span class="s1">'#7f7f7f'</span><span class="p">,</span> <span class="s1">'#bcbd22'</span><span class="p">,</span> <span class="s1">'#17becf'</span><span class="p">],</span> <span class="n">subset</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">ticks</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">tickformatter</span><span class="o">=&lt;</span><span class="n">matplotlib</span><span class="o">.</span><span class="n">ticker</span><span class="o">.</span><span class="n">FormatStrFormatter</span> <span class="nb">object</span> <span class="n">at</span> <span class="mh">0x123ced340</span><span class="o">&gt;</span><span class="p">,</span> <span class="n">tick_labels</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">hist_diag</span><span class="o">=</span><span class="p">{</span><span class="s1">'alpha'</span><span class="p">:</span> <span class="mf">1.0</span><span class="p">,</span> <span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span> <span class="s1">'density'</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s1">'histtype'</span><span class="p">:</span> <span class="s1">'step'</span><span class="p">},</span> <span class="n">hist_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">},</span> <span class="n">kde_diag</span><span class="o">=</span><span class="p">{</span><span class="s1">'bw_method'</span><span class="p">:</span> <span class="s1">'scott'</span><span class="p">,</span> <span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span> <span class="s1">'color'</span><span class="p">:</span> <span class="s1">'black'</span><span class="p">},</span> <span class="n">kde_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'bw_method'</span><span class="p">:</span> <span class="s1">'scott'</span><span class="p">,</span> <span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">},</span> <span class="n">contour_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'levels'</span><span class="p">:</span> <span class="p">[</span><span class="mf">0.68</span><span class="p">],</span> <span class="s1">'percentile'</span><span class="p">:</span> <span class="kc">True</span><span class="p">},</span> <span class="n">scatter_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'alpha'</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">,</span> <span class="s1">'edgecolor'</span><span class="p">:</span> <span class="s1">'none'</span><span class="p">,</span> <span class="s1">'rasterized'</span><span class="p">:</span> <span class="kc">False</span><span class="p">},</span> <span class="n">plot_offdiag</span><span class="o">=</span><span class="p">{},</span> <span class="n">points_diag</span><span class="o">=</span><span class="p">{},</span> <span class="n">points_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'marker'</span><span class="p">:</span> <span class="s1">'.'</span><span class="p">,</span> <span class="s1">'markersize'</span><span class="p">:</span> <span class="mi">20</span><span class="p">},</span> <span class="n">fig_size</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">10</span><span class="p">),</span> <span class="n">fig_bg_colors</span><span class="o">=</span><span class="p">{</span><span class="s1">'upper'</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span> <span class="s1">'diag'</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span> <span class="s1">'lower'</span><span class="p">:</span> <span class="kc">None</span><span class="p">},</span> <span class="n">fig_subplots_adjust</span><span class="o">=</span><span class="p">{</span><span class="s1">'top'</span><span class="p">:</span> <span class="mf">0.9</span><span class="p">},</span> <span class="n">subplots</span><span class="o">=</span><span class="p">{},</span> <span class="n">despine</span><span class="o">=</span><span class="p">{</span><span class="s1">'offset'</span><span class="p">:</span> <span class="mi">5</span><span class="p">},</span> <span class="n">title_format</span><span class="o">=</span><span class="p">{</span><span class="s1">'fontsize'</span><span class="p">:</span> <span class="mi">16</span><span class="p">})</span> </code>
+sbi.utils.plot.pairplot<span class="p">(</span><span class="n">samples</span><span class="p">,</span> <span class="n">points</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">upper</span><span class="o">=</span><span class="s1">'hist'</span><span class="p">,</span> <span class="n">diag</span><span class="o">=</span><span class="s1">'hist'</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">legend</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">labels_points</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">labels_samples</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">samples_colors</span><span class="o">=</span><span class="p">[</span><span class="s1">'#1f77b4'</span><span class="p">,</span> <span class="s1">'#ff7f0e'</span><span class="p">,</span> <span class="s1">'#2ca02c'</span><span class="p">,</span> <span class="s1">'#d62728'</span><span class="p">,</span> <span class="s1">'#9467bd'</span><span class="p">,</span> <span class="s1">'#8c564b'</span><span class="p">,</span> <span class="s1">'#e377c2'</span><span class="p">,</span> <span class="s1">'#7f7f7f'</span><span class="p">,</span> <span class="s1">'#bcbd22'</span><span class="p">,</span> <span class="s1">'#17becf'</span><span class="p">],</span> <span class="n">points_colors</span><span class="o">=</span><span class="p">[</span><span class="s1">'#1f77b4'</span><span class="p">,</span> <span class="s1">'#ff7f0e'</span><span class="p">,</span> <span class="s1">'#2ca02c'</span><span class="p">,</span> <span class="s1">'#d62728'</span><span class="p">,</span> <span class="s1">'#9467bd'</span><span class="p">,</span> <span class="s1">'#8c564b'</span><span class="p">,</span> <span class="s1">'#e377c2'</span><span class="p">,</span> <span class="s1">'#7f7f7f'</span><span class="p">,</span> <span class="s1">'#bcbd22'</span><span class="p">,</span> <span class="s1">'#17becf'</span><span class="p">],</span> <span class="n">subset</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">ticks</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">tickformatter</span><span class="o">=&lt;</span><span class="n">matplotlib</span><span class="o">.</span><span class="n">ticker</span><span class="o">.</span><span class="n">FormatStrFormatter</span> <span class="nb">object</span> <span class="n">at</span> <span class="mh">0x7f2c74002850</span><span class="o">&gt;</span><span class="p">,</span> <span class="n">tick_labels</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">hist_diag</span><span class="o">=</span><span class="p">{</span><span class="s1">'alpha'</span><span class="p">:</span> <span class="mf">1.0</span><span class="p">,</span> <span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span> <span class="s1">'density'</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s1">'histtype'</span><span class="p">:</span> <span class="s1">'step'</span><span class="p">},</span> <span class="n">hist_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">},</span> <span class="n">kde_diag</span><span class="o">=</span><span class="p">{</span><span class="s1">'bw_method'</span><span class="p">:</span> <span class="s1">'scott'</span><span class="p">,</span> <span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span> <span class="s1">'color'</span><span class="p">:</span> <span class="s1">'black'</span><span class="p">},</span> <span class="n">kde_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'bw_method'</span><span class="p">:</span> <span class="s1">'scott'</span><span class="p">,</span> <span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">},</span> <span class="n">contour_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'levels'</span><span class="p">:</span> <span class="p">[</span><span class="mf">0.68</span><span class="p">],</span> <span class="s1">'percentile'</span><span class="p">:</span> <span class="kc">True</span><span class="p">},</span> <span class="n">scatter_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'alpha'</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">,</span> <span class="s1">'edgecolor'</span><span class="p">:</span> <span class="s1">'none'</span><span class="p">,</span> <span class="s1">'rasterized'</span><span class="p">:</span> <span class="kc">False</span><span class="p">},</span> <span class="n">plot_offdiag</span><span class="o">=</span><span class="p">{},</span> <span class="n">points_diag</span><span class="o">=</span><span class="p">{},</span> <span class="n">points_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'marker'</span><span class="p">:</span> <span class="s1">'.'</span><span class="p">,</span> <span class="s1">'markersize'</span><span class="p">:</span> <span class="mi">20</span><span class="p">},</span> <span class="n">fig_size</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">10</span><span class="p">),</span> <span class="n">fig_bg_colors</span><span class="o">=</span><span class="p">{</span><span class="s1">'upper'</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span> <span class="s1">'diag'</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span> <span class="s1">'lower'</span><span class="p">:</span> <span class="kc">None</span><span class="p">},</span> <span class="n">fig_subplots_adjust</span><span class="o">=</span><span class="p">{</span><span class="s1">'top'</span><span class="p">:</span> <span class="mf">0.9</span><span class="p">},</span> <span class="n">subplots</span><span class="o">=</span><span class="p">{},</span> <span class="n">despine</span><span class="o">=</span><span class="p">{</span><span class="s1">'offset'</span><span class="p">:</span> <span class="mi">5</span><span class="p">},</span> <span class="n">title_format</span><span class="o">=</span><span class="p">{</span><span class="s1">'fontsize'</span><span class="p">:</span> <span class="mi">16</span><span class="p">})</span> </code>
 <a class="headerlink" href="#sbi.utils.plot.pairplot" title="Permanent link">¶</a></h3>
 <div class="doc doc-contents first">
 <p>Plot samples and points.</p>
 <p>For developers: if you add arguments that expect dictionaries, make sure to access
 them via the opts dictionary instantiated below. E.g. if you want to access the dict
-stored in the input variable hist_diag, use opts[<code>hist_diag</code>].</p>
+stored in the input variable hist_diag, use opts[<code class="codehilite"><span class="err">hist_diag</span></code>].</p>
 <p><strong>Parameters:</strong></p>
 <table>
 <thead>
@@ -5271,9 +5103,7 @@ stored in the input variable hist_diag, use opts[<code>hist_diag</code>].</p>
 <td><code>subset</code></td>
 <td><code></code></td>
 <td>
-<p>List containing the dimensions to plot. E.g. subset=[1,3] will plot
-plot only the 1<sup>st</sup> and 3<sup>rd</sup> dimension but will discard the 0<sup>th</sup> and 2<sup>nd</sup> (and,
-if they exist, the 4<sup>th</sup>, 5<sup>th</sup> and so on)</p>
+<p>List containing the dimensions to plot. E.g. subset=[1,3] will plot plot only the 1<sup>st</sup> and 3<sup>rd</sup> dimension but will discard the 0<sup>th</sup> and 2<sup>nd</sup> (and, if they exist, the 4<sup>th</sup>, 5<sup>th</sup> and so on)</p>
 </td>
 <td><code>None</code></td>
 </tr>
@@ -5281,8 +5111,7 @@ if they exist, the 4<sup>th</sup>, 5<sup>th</sup> and so on)</p>
 <td><code>limits</code></td>
 <td><code></code></td>
 <td>
-<p>array containing the plot xlim for each parameter dimension. If None,
-just use the min and max of the passed samples</p>
+<p>array containing the plot xlim for each parameter dimension. If None, just use the min and max of the passed samples</p>
 </td>
 <td><code>None</code></td>
 </tr>
@@ -5290,8 +5119,7 @@ just use the min and max of the passed samples</p>
 <td><code>ticks</code></td>
 <td><code></code></td>
 <td>
-<p>location of the ticks for each parameter. If None, just use the min and
-max along each parameter dimension</p>
+<p>location of the ticks for each parameter. If None, just use the min and max along each parameter dimension</p>
 </td>
 <td><code>None</code></td>
 </tr>
@@ -5301,7 +5129,7 @@ max along each parameter dimension</p>
 <td>
 <p>passed to _format_axis()</p>
 </td>
-<td><code>&lt;matplotlib.ticker.FormatStrFormatter object at 0x123ced340&gt;</code></td>
+<td><code>&lt;matplotlib.ticker.FormatStrFormatter object at 0x7f2c74002850&gt;</code></td>
 </tr>
 <tr>
 <td><code>tick_labels</code></td>
@@ -5347,14 +5175,7 @@ max along each parameter dimension</p>
 <td><code>contour_offdiag</code></td>
 <td><code></code></td>
 <td>
-<p>dictionary that should contain <code>percentile</code> and <code>levels</code> keys.
-<code>percentile</code>: bool.
-    If  <code>percentile</code>==True,
-    the levels are made with respect to the max probability of the posterior
-    If <code>percentile</code>==False,
-    the levels are drawn at absolute positions
-<code>levels</code>: list or np.ndarray: specifies the location where the contours are
-    drawn.</p>
+<p>dictionary that should contain <code class="codehilite"><span class="err">percentile</span></code> and <code class="codehilite"><span class="err">levels</span></code> keys. <code class="codehilite"><span class="err">percentile</span></code>: bool. If  <code class="codehilite"><span class="err">percentile</span></code>==True, the levels are made with respect to the max probability of the posterior If <code class="codehilite"><span class="err">percentile</span></code>==False, the levels are drawn at absolute positions <code class="codehilite"><span class="err">levels</span></code>: list or np.ndarray: specifies the location where the contours are drawn.</p>
 </td>
 <td><code>{'levels': [0.68], 'percentile': True}</code></td>
 </tr>
@@ -5386,8 +5207,7 @@ max along each parameter dimension</p>
 <td><code>points_offdiag</code></td>
 <td><code></code></td>
 <td>
-<p>dictionary for plt.plot() used for plotting points on off
-diagonal</p>
+<p>dictionary for plt.plot() used for plotting points on off diagonal</p>
 </td>
 <td><code>{'marker': '.', 'markersize': 20}</code></td>
 </tr>
@@ -5403,8 +5223,7 @@ diagonal</p>
 <td><code>fig_bg_colors</code></td>
 <td><code></code></td>
 <td>
-<p>Dictionary that contains <code>upper</code>, <code>diag</code>, <code>lower</code>, and specifies
-the respective background colors. Passed to ax.set_facecolor()</p>
+<p>Dictionary that contains <code class="codehilite"><span class="err">upper</span></code>, <code class="codehilite"><span class="err">diag</span></code>, <code class="codehilite"><span class="err">lower</span></code>, and specifies the respective background colors. Passed to ax.set_facecolor()</p>
 </td>
 <td><code>{'upper': None, 'diag': None, 'lower': None}</code></td>
 </tr>
@@ -6359,31 +6178,31 @@ the respective background colors. Passed to ax.set_facecolor()</p>
 </main>
 <footer class="md-footer">
 <div class="md-footer-nav">
-<nav aria-label="Footer" class="md-footer-nav__inner md-grid">
-<a class="md-footer-nav__link md-footer-nav__link--prev" href="../contribute/" rel="prev" title="Contribute">
-<div class="md-footer-nav__button md-icon">
-<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12z"></path></svg>
+<nav class="md-footer-nav__inner md-grid">
+<a class="md-flex md-footer-nav__link md-footer-nav__link--prev" href="../contribute/" rel="prev" title="Contribute">
+<div class="md-flex__cell md-flex__cell--shrink">
+<i class="md-icon md-icon--arrow-back md-footer-nav__button"></i>
 </div>
-<div class="md-footer-nav__title">
-<div class="md-ellipsis">
+<div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title">
+<span class="md-flex__ellipsis">
 <span class="md-footer-nav__direction">
                   Previous
                 </span>
                 Contribute
-              </div>
+              </span>
 </div>
 </a>
-<a class="md-footer-nav__link md-footer-nav__link--next" href="../credits/" rel="next" title="Credits">
-<div class="md-footer-nav__title">
-<div class="md-ellipsis">
+<a class="md-flex md-footer-nav__link md-footer-nav__link--next" href="../credits/" rel="next" title="Credits">
+<div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title">
+<span class="md-flex__ellipsis">
 <span class="md-footer-nav__direction">
                   Next
                 </span>
                 Credits
-              </div>
+              </span>
 </div>
-<div class="md-footer-nav__button md-icon">
-<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11H4z"></path></svg>
+<div class="md-flex__cell md-flex__cell--shrink">
+<i class="md-icon md-icon--arrow-forward md-footer-nav__button"></i>
 </div>
 </a>
 </nav>
@@ -6392,31 +6211,22 @@ the respective background colors. Passed to ax.set_facecolor()</p>
 <div class="md-footer-meta__inner md-grid">
 <div class="md-footer-copyright">
         
-        Made with
+        powered by
+        <a href="https://www.mkdocs.org" rel="noopener" target="_blank">MkDocs</a>
+        and
         <a href="https://squidfunk.github.io/mkdocs-material/" rel="noopener" target="_blank">
-          Material for MkDocs
-        </a>
+          Material for MkDocs</a>
 </div>
 <div class="md-footer-social">
-<a class="md-footer-social__link" href="https://github.com/mackelab/sbi" rel="noopener" target="_blank" title="github.com">
-<svg viewbox="0 0 480 512" xmlns="http://www.w3.org/2000/svg"><path d="M186.1 328.7c0 20.9-10.9 55.1-36.7 55.1s-36.7-34.2-36.7-55.1 10.9-55.1 36.7-55.1 36.7 34.2 36.7 55.1zM480 278.2c0 31.9-3.2 65.7-17.5 95-37.9 76.6-142.1 74.8-216.7 74.8-75.8 0-186.2 2.7-225.6-74.8-14.6-29-20.2-63.1-20.2-95 0-41.9 13.9-81.5 41.5-113.6-5.2-15.8-7.7-32.4-7.7-48.8 0-21.5 4.9-32.3 14.6-51.8 45.3 0 74.3 9 108.8 36 29-6.9 58.8-10 88.7-10 27 0 54.2 2.9 80.4 9.2 34-26.7 63-35.2 107.8-35.2 9.8 19.5 14.6 30.3 14.6 51.8 0 16.4-2.6 32.7-7.7 48.2 27.5 32.4 39 72.3 39 114.2zm-64.3 50.5c0-43.9-26.7-82.6-73.5-82.6-18.9 0-37 3.4-56 6-14.9 2.3-29.8 3.2-45.1 3.2-15.2 0-30.1-.9-45.1-3.2-18.7-2.6-37-6-56-6-46.8 0-73.5 38.7-73.5 82.6 0 87.8 80.4 101.3 150.4 101.3h48.2c70.3 0 150.6-13.4 150.6-101.3zm-82.6-55.1c-25.8 0-36.7 34.2-36.7 55.1s10.9 55.1 36.7 55.1 36.7-34.2 36.7-55.1-10.9-55.1-36.7-55.1z"></path></svg>
-</a>
+<link href="../assets/fonts/font-awesome.css" rel="stylesheet"/>
+<a class="md-footer-social__link fa fa-" href="https://github.com/mackelab/sbi" rel="noopener" target="_blank" title=""></a>
 </div>
 </div>
 </div>
 </footer>
 </div>
-<script src="../assets/javascripts/vendor.d710d30a.min.js"></script>
-<script src="../assets/javascripts/bundle.5f27aba8.min.js"></script><script id="__lang" type="application/json">{"clipboard.copy": "Copy to clipboard", "clipboard.copied": "Copied to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.result.placeholder": "Type to start searching", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents"}</script>
-<script>
-        app = initialize({
-          base: "..",
-          features: [],
-          search: Object.assign({
-            worker: "../assets/javascripts/worker/search.27c6a5e6.min.js"
-          }, typeof search !== "undefined" && search)
-        })
-      </script>
+<script src="../assets/javascripts/application.c33a9706.js"></script>
+<script>app.initialize({version:"1.1",url:{base:".."}})</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-MML-AM_CHTML"></script>
 </body>
 </html>
