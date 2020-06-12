@@ -280,9 +280,6 @@
 <div class="codehilite"><pre><span></span><code><span class="n">x_o</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="p">,)</span>
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="p">(</span><span class="n">num_rounds</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">x_o</span><span class="o">=</span><span class="n">x_o</span><span class="p">,</span> <span class="n">num_simulations_per_round</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>Neural network successfully converged after 75 epochs.
-Neural network successfully converged after 27 epochs.
-</code></pre></div>
 <p>Note that, for <code>num_rounds&gt;1</code>, the posterior is no longer amortized: it will give good results when sampled around <code>x=observation</code>, but bad possibly bad results for other <code>x</code>.</p>
 <p>Once we have obtained the posterior, we can <code>.sample()</code>, <code>.log_prob()</code>, or <code>.pairplot()</code> in the same way as for the easy interface.</p>
 <div class="codehilite"><pre><span></span><code><span class="n">posterior_samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_o</span><span class="p">)</span>
@@ -290,7 +287,6 @@ Neural network successfully converged after 27 epochs.
 <span class="c1"># plot posterior samples</span>
 <span class="n">_</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">pairplot</span><span class="p">(</span><span class="n">posterior_samples</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">],[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">],[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">]],</span> <span class="n">fig_size</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span><span class="mi">5</span><span class="p">))</span>
 </code></pre></div>
-<p><img alt="png" src="03_flexible_interface_files/03_flexible_interface_17_0.png"/></p>
 </article>
 </div>
 </div>

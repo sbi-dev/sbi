@@ -307,13 +307,7 @@
     <span class="k">return</span> <span class="mf">1.0</span> <span class="o">+</span> <span class="n">parameter_set</span> <span class="o">+</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="n">parameter_set</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.1</span>
 </code></pre></div>
 <p><code>sbi</code> can then run inference:</p>
-<div class="codehilite"><pre><span></span><code><span class="n">posterior</span> <span class="o">=</span> <span class="n">infer</span><span class="p">(</span><span class="s1">'SNPE'</span><span class="p">,</span> <span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">num_simulations</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
-</code></pre></div>
-<div class="codehilite"><pre><span></span><code>HBox(children=(FloatProgress(value=0.0, description='Running 1000 simulations.', max=1000.0, style=ProgressSty…
-
-
-
-Neural network successfully converged after 167 epochs.
+<div class="codehilite"><pre><span></span><code><span class="n">posterior</span> <span class="o">=</span> <span class="n">infer</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="s1">'SNPE'</span><span class="p">,</span> <span class="n">num_simulations</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
 </code></pre></div>
 <p>Let’s say we have made some observation <span class="arithmatex">\(x\)</span>:</p>
 <div class="codehilite"><pre><span></span><code><span class="n">observation</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
@@ -323,7 +317,6 @@ Neural network successfully converged after 167 epochs.
 <span class="n">log_probability</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">log_prob</span><span class="p">(</span><span class="n">samples</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="n">observation</span><span class="p">)</span>
 <span class="n">_</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">pairplot</span><span class="p">(</span><span class="n">samples</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">],[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">],[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">]],</span> <span class="n">fig_size</span><span class="o">=</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span><span class="mi">6</span><span class="p">))</span>
 </code></pre></div>
-<p><img alt="png" src="../00_getting_started_files/00_getting_started_10_0.png"/></p>
 <h2 id="requirements-for-the-simulator-prior-and-observation">Requirements for the simulator, prior, and observation<a class="headerlink" href="#requirements-for-the-simulator-prior-and-observation" title="Permanent link">¶</a></h2>
 <p>For all algorithms, all you need to provide are a prior and a simulator. Let’s talk about what requirements they need to satisfy.</p>
 <h3 id="prior">Prior<a class="headerlink" href="#prior" title="Permanent link">¶</a></h3>
@@ -340,9 +333,9 @@ Neural network successfully converged after 167 epochs.
 - shape must be either <code>(1,N)</code> or <code>(N)</code>.</p>
 <h2 id="running-different-algorithms">Running different algorithms<a class="headerlink" href="#running-different-algorithms" title="Permanent link">¶</a></h2>
 <p><em>sbi</em> implements three classes of algorithms that can be used to obtain the posterior distribution: SNPE, SNL, and SRE. You can try the different algorithms by simply swapping out the <code>method</code>:</p>
-<div class="codehilite"><pre><span></span><code><span class="n">posterior</span> <span class="o">=</span> <span class="n">infer</span><span class="p">(</span><span class="s1">'SNPE'</span><span class="p">,</span> <span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">num_simulations</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
-<span class="n">posterior</span> <span class="o">=</span> <span class="n">infer</span><span class="p">(</span><span class="s1">'SNLE'</span><span class="p">,</span> <span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">num_simulations</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
-<span class="n">posterior</span> <span class="o">=</span> <span class="n">infer</span><span class="p">(</span><span class="s1">'SNRE'</span><span class="p">,</span> <span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">num_simulations</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
+<div class="codehilite"><pre><span></span><code><span class="n">posterior</span> <span class="o">=</span> <span class="n">infer</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="s1">'SNPE'</span><span class="p">,</span> <span class="n">num_simulations</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
+<span class="n">posterior</span> <span class="o">=</span> <span class="n">infer</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="s1">'SNLE'</span><span class="p">,</span> <span class="n">num_simulations</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
+<span class="n">posterior</span> <span class="o">=</span> <span class="n">infer</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="s1">'SNRE'</span><span class="p">,</span> <span class="n">num_simulations</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
 </code></pre></div>
 <p>You can then infer, sample, evaluate, and plot the posterior as described above.</p>
 </article>
