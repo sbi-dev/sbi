@@ -12,13 +12,16 @@ for line in open(os.path.join(PROJECT_PATH, "sbi", "__version__.py")):
 
 setup(
     name="sbi",
-    version="0.8rc1",  # version_namespace["__version__"],
-    description="Simulation-based inference",
-    download_url="https://github.com/mackelab/sbi/archive/v0.8rc1.tar.gz",
+    version="0.8rc2",  # version_namespace["__version__"],
+    description="Simulation-based inference.",
+    download_url="https://github.com/mackelab/sbi/archive/v0.8rc2.tar.gz",
     keywords="bayesian parameter inference system_identification simulator PyTorch",
     url="https://github.com/mackelab/sbi",
-    author="Deistler, Bölts, Lückmann, Durkan, Tejero",
-    author_email="alvaro@minin.es",
+    author=(
+        "Álvaro Tejero-Cantero, Jakob H. Macke, Jan-Matthis Lückmann,"
+        " Conor M. Durkan, Michael Deistler, Jan Bölts."
+    ),
+    author_email="sbi@mackelab.org",
     packages=find_packages(exclude=["tests"]),
     license="AGPLv3",
     install_requires=[
