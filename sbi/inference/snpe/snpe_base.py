@@ -42,7 +42,9 @@ class PosteriorEstimator(NeuralInference, ABC):
     ):
         """ Base class for Sequential Neural Posterior Estimation methods.
 
-        density_estimator: Density estimator that can `.log_prob()` and `.sample()`.
+        density_estimator: Either a string or a density estimation neural network
+                that can `.log_prob()` and `.sample()`. If it is a string, use a pre-
+                configured network of the provided type (one of nsf, maf, mdn, made).
 
         See docstring of `NeuralInference` class for all other arguments.
         """
