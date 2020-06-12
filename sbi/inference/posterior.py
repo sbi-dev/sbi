@@ -628,7 +628,12 @@ class NeuralPosterior:
 
     def __str__(self):
         msg = {0: "Untrained", 1: "Amortized"}
-        focused_msg = f"Focused at x_o={self._x_o_training_focused_on.tolist()!r}"
+
+        focused_msg = (
+            f"Focused at x_o={self._x_o_training_focused_on.tolist()!r}"
+            if self._num_trained_rounds > 1
+            else ""
+        )
 
         default_x_msg = (
             f" with default evaluation at x={self.default_x.tolist()!r}"
