@@ -21,6 +21,6 @@ prior = torch.distributions.MultivariateNormal(
     loc=prior_mean, covariance_matrix=prior_cov
 )
 posterior2 = infer(
-    "snpe", diagonal_linear_gaussian, prior, num_simulations=500, num_workers=2
+    diagonal_linear_gaussian, prior, "snpe", num_simulations=500, num_workers=2
 )
 samples2 = posterior2.sample((100,), x=x_o)
