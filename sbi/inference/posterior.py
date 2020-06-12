@@ -63,12 +63,15 @@ class NeuralPosterior:
         Args:
             method_family: One of 'snpe', 'snl', 'snre_a' or 'snre_b'.
             neural_net: A classifier for SNRE, a density estimator for SNPE and SNL.
-            x_shape: Simulator output shape. Provide it if you want any default `x` set 
-                via the `.set_default_x()` method checked against it.
             prior: Prior distribution with `.log_prob()` and `.sample()`.
+            x_shape: Shape of a single simulator output.
             sample_with_mcmc: Whether to sample with MCMC. Will always be `True` for SRE
                 and SNL, but can also be set to `True` for SNPE if MCMC is preferred to
                 deal with leakage over rejection sampling.
+            mcmc_method: If MCMC sampling is used, specify the method here: either of
+                'slice_np', 'slice', 'hmc', nuts'.
+            get_potential_function: Callable that returns the potential function used
+                for MCMC sampling.
         """
 
         self.net = neural_net
