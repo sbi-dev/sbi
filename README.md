@@ -48,7 +48,7 @@ The following methods are currently available
 #### Sequential Neural Posterior Estimation (SNPE)
 
 * [`SNPE_C`](https://www.mackelab.org/sbi/reference/#sbi.inference.snpe.snpe_c.SNPE_C) or `APT` from Greenberg D, Nonnenmacher M, and Macke J [_Automatic
-  PosteriorTransformation for likelihood-free
+  Posterior Transformation for likelihood-free
   inference_](https://arxiv.org/abs/1905.07488) (ICML 2020).
 
 <!-- 
