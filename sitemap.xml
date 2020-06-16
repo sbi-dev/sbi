@@ -1,39 +1,39 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url>
      <loc>https://mackelab.org/sbi/</loc>
-     <lastmod>2020-06-15</lastmod>
+     <lastmod>2020-06-16</lastmod>
      <changefreq>daily</changefreq>
     </url><url>
      <loc>https://mackelab.org/sbi/install/</loc>
-     <lastmod>2020-06-15</lastmod>
+     <lastmod>2020-06-16</lastmod>
      <changefreq>daily</changefreq>
     </url><url>
      <loc>https://mackelab.org/sbi/tutorial/markdown_files/00_getting_started/</loc>
-     <lastmod>2020-06-15</lastmod>
+     <lastmod>2020-06-16</lastmod>
      <changefreq>daily</changefreq>
     </url><url>
      <loc>https://mackelab.org/sbi/tutorial/markdown_files/01_gaussian_amortized/</loc>
-     <lastmod>2020-06-15</lastmod>
+     <lastmod>2020-06-16</lastmod>
      <changefreq>daily</changefreq>
     </url><url>
      <loc>https://mackelab.org/sbi/tutorial/markdown_files/02_HH_simulator/</loc>
-     <lastmod>2020-06-15</lastmod>
+     <lastmod>2020-06-16</lastmod>
      <changefreq>daily</changefreq>
     </url><url>
      <loc>https://mackelab.org/sbi/tutorial/markdown_files/03_flexible_interface/</loc>
-     <lastmod>2020-06-15</lastmod>
+     <lastmod>2020-06-16</lastmod>
      <changefreq>daily</changefreq>
     </url><url>
      <loc>https://mackelab.org/sbi/contribute/</loc>
-     <lastmod>2020-06-15</lastmod>
+     <lastmod>2020-06-16</lastmod>
      <changefreq>daily</changefreq>
     </url><url>
      <loc>https://mackelab.org/sbi/reference/</loc>
-     <lastmod>2020-06-15</lastmod>
+     <lastmod>2020-06-16</lastmod>
      <changefreq>daily</changefreq>
     </url><url>
      <loc>https://mackelab.org/sbi/credits/</loc>
-     <lastmod>2020-06-15</lastmod>
+     <lastmod>2020-06-16</lastmod>
      <changefreq>daily</changefreq>
     </url>
 </urlset>
