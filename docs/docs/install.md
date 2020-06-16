@@ -15,7 +15,7 @@ $ pip install sbi
 ```
 To test the installation, drop into a python prompt and run 
 ```python
-from sbi.example.minimal import simple
+from sbi.examples.minimal import simple
 posterior = simple()
 print(posterior)
 ``` 
