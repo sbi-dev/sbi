@@ -15,9 +15,9 @@ computational trade-offs.
 `sbi` offers a simple interface for one-line posterior inference
 
 ```python
-from sbi inference import infer
+from sbi.inference import infer
 # import your simulator, define your prior over the parameters
-parameter_posterior = infer(simulator, prior, method='SNPE')
+parameter_posterior = infer(simulator, prior, method='SNPE', num_simulations=100)
 ```
 See below for the available methods of inference, `SNPE`, `SNRE` and `SNLE`.
 
