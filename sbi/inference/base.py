@@ -2,11 +2,12 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 from __future__ import annotations
+
 from abc import ABC
 from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
-from typing import cast, Callable, Dict, List, Optional, Union
+from typing import Callable, Dict, List, Optional, Union, cast
 from warnings import warn
 
 import torch
@@ -16,8 +17,7 @@ from torch.utils.tensorboard import SummaryWriter
 import sbi.inference
 from sbi.inference.posterior import NeuralPosterior
 from sbi.simulators.simutils import simulate_in_batches
-from sbi.user_input.user_input_checks import process_x
-from sbi.user_input.user_input_checks import prepare_for_sbi
+from sbi.user_input.user_input_checks import prepare_for_sbi, process_x
 from sbi.utils import get_log_root
 from sbi.utils.plot import pairplot
 from sbi.utils.torchutils import get_default_device
@@ -188,7 +188,12 @@ class NeuralInference(ABC):
             simulator = self._simulator.__class__.__name__
 
         method = self.__class__.__name__
-        logdir = Path(get_log_root(), simulator, method, datetime.now().isoformat())
+        logdir = Path(
+            get_log_root(),
+            simulator,
+            method,
+            datetime.now().isoformat().replace(":", "_"),
+        )
         return SummaryWriter(logdir)
 
     @staticmethod
