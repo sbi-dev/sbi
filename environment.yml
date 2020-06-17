@@ -62,7 +62,7 @@ dependencies:
 # (adds in ~/.condarc the line: env_prompt '({name}) ')
 #
 # --- Automatic activation of environments upon cd (bash) ---
-# Add the following in your .bashrc
+# Add the following in your .bashrc or .zshrc
 # function cd {
 #          builtin cd "$@"
 #          RET=$?
