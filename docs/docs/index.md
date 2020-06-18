@@ -1,6 +1,10 @@
 # `sbi`: simulation-based inference
 
-`sbi`: A Python toolbox for simulation-based inference. Inference can be run in a single
+`sbi`: A Python toolbox for simulation-based inference.
+
+![using sbi](static/infer_demo.gif)
+
+Inference can be run in a single
 line of code:
 
 ```python
