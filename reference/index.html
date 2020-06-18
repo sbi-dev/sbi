@@ -3090,8 +3090,7 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>50
-51
+<pre><span></span>51
 52
 53
 54
@@ -3135,7 +3134,9 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 92
 93
 94
-95</pre>
+95
+96
+97</pre>
 </div>
 </td>
 <td class="code">
@@ -3174,6 +3175,7 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 
     <span class="bp">self</span><span class="o">.</span><span class="n">_sample_with_mcmc</span> <span class="o">=</span> <span class="n">sample_with_mcmc</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_mcmc_method</span> <span class="o">=</span> <span class="n">mcmc_method</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_mcmc_init_params</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_get_potential_function</span> <span class="o">=</span> <span class="n">get_potential_function</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_x_shape</span> <span class="o">=</span> <span class="n">x_shape</span>
 
@@ -3277,9 +3279,7 @@ sampling from the posterior.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>248
-249
-250
+<pre><span></span>250
 251
 252
 253
@@ -3324,7 +3324,9 @@ sampling from the posterior.</p>
 292
 293
 294
-295</pre>
+295
+296
+297</pre>
 </div>
 </td>
 <td class="code">
@@ -3461,9 +3463,7 @@ support of the prior, -∞ (corresponding to 0 probability) outside.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>139
-140
-141
+<pre><span></span>141
 142
 143
 144
@@ -3516,7 +3516,9 @@ support of the prior, -∞ (corresponding to 0 probability) outside.</p>
 191
 192
 193
-194</pre>
+194
+195
+196</pre>
 </div>
 </td>
 <td class="code">
@@ -3647,9 +3649,7 @@ and SRE are restricted to sampling with MCMC.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>297
-298
-299
+<pre><span></span>299
 300
 301
 302
@@ -3705,7 +3705,9 @@ and SRE are restricted to sampling with MCMC.</p>
 352
 353
 354
-355</pre>
+355
+356
+357</pre>
 </div>
 </td>
 <td class="code">
@@ -3836,9 +3838,7 @@ that calls like <code class="codehilite"><span class="err">posterior.set_default
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>112
-113
-114
+<pre><span></span>114
 115
 116
 117
@@ -3861,7 +3861,9 @@ that calls like <code class="codehilite"><span class="err">posterior.set_default
 134
 135
 136
-137</pre>
+137
+138
+139</pre>
 </div>
 </td>
 <td class="code">
@@ -3934,20 +3936,20 @@ set_embedding_net<span class="p">(</span><span class="bp">self</span><span class
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>513
-514
-515
-516
-517
-518
-519
-520
-521
-522
-523
-524
-525
-526</pre>
+<pre><span></span>562
+563
+564
+565
+566
+567
+568
+569
+570
+571
+572
+573
+574
+575</pre>
 </div>
 </td>
 <td class="code">
@@ -4993,7 +4995,7 @@ sbi.utils.get_nn_models.classifier_nn<span class="p">(</span><span class="n">mod
 <div class="doc doc-object doc-function">
 <h3 class="doc doc-heading" id="sbi.utils.plot.pairplot">
 <code class="highlight language-python">
-sbi.utils.plot.pairplot<span class="p">(</span><span class="n">samples</span><span class="p">,</span> <span class="n">points</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">upper</span><span class="o">=</span><span class="s1">'hist'</span><span class="p">,</span> <span class="n">diag</span><span class="o">=</span><span class="s1">'hist'</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">legend</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">labels_points</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">labels_samples</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">samples_colors</span><span class="o">=</span><span class="p">[</span><span class="s1">'#1f77b4'</span><span class="p">,</span> <span class="s1">'#ff7f0e'</span><span class="p">,</span> <span class="s1">'#2ca02c'</span><span class="p">,</span> <span class="s1">'#d62728'</span><span class="p">,</span> <span class="s1">'#9467bd'</span><span class="p">,</span> <span class="s1">'#8c564b'</span><span class="p">,</span> <span class="s1">'#e377c2'</span><span class="p">,</span> <span class="s1">'#7f7f7f'</span><span class="p">,</span> <span class="s1">'#bcbd22'</span><span class="p">,</span> <span class="s1">'#17becf'</span><span class="p">],</span> <span class="n">points_colors</span><span class="o">=</span><span class="p">[</span><span class="s1">'#1f77b4'</span><span class="p">,</span> <span class="s1">'#ff7f0e'</span><span class="p">,</span> <span class="s1">'#2ca02c'</span><span class="p">,</span> <span class="s1">'#d62728'</span><span class="p">,</span> <span class="s1">'#9467bd'</span><span class="p">,</span> <span class="s1">'#8c564b'</span><span class="p">,</span> <span class="s1">'#e377c2'</span><span class="p">,</span> <span class="s1">'#7f7f7f'</span><span class="p">,</span> <span class="s1">'#bcbd22'</span><span class="p">,</span> <span class="s1">'#17becf'</span><span class="p">],</span> <span class="n">subset</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">ticks</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">tickformatter</span><span class="o">=&lt;</span><span class="n">matplotlib</span><span class="o">.</span><span class="n">ticker</span><span class="o">.</span><span class="n">FormatStrFormatter</span> <span class="nb">object</span> <span class="n">at</span> <span class="mh">0x7f07f3875210</span><span class="o">&gt;</span><span class="p">,</span> <span class="n">tick_labels</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">hist_diag</span><span class="o">=</span><span class="p">{</span><span class="s1">'alpha'</span><span class="p">:</span> <span class="mf">1.0</span><span class="p">,</span> <span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span> <span class="s1">'density'</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s1">'histtype'</span><span class="p">:</span> <span class="s1">'step'</span><span class="p">},</span> <span class="n">hist_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">},</span> <span class="n">kde_diag</span><span class="o">=</span><span class="p">{</span><span class="s1">'bw_method'</span><span class="p">:</span> <span class="s1">'scott'</span><span class="p">,</span> <span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span> <span class="s1">'color'</span><span class="p">:</span> <span class="s1">'black'</span><span class="p">},</span> <span class="n">kde_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'bw_method'</span><span class="p">:</span> <span class="s1">'scott'</span><span class="p">,</span> <span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">},</span> <span class="n">contour_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'levels'</span><span class="p">:</span> <span class="p">[</span><span class="mf">0.68</span><span class="p">],</span> <span class="s1">'percentile'</span><span class="p">:</span> <span class="kc">True</span><span class="p">},</span> <span class="n">scatter_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'alpha'</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">,</span> <span class="s1">'edgecolor'</span><span class="p">:</span> <span class="s1">'none'</span><span class="p">,</span> <span class="s1">'rasterized'</span><span class="p">:</span> <span class="kc">False</span><span class="p">},</span> <span class="n">plot_offdiag</span><span class="o">=</span><span class="p">{},</span> <span class="n">points_diag</span><span class="o">=</span><span class="p">{},</span> <span class="n">points_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'marker'</span><span class="p">:</span> <span class="s1">'.'</span><span class="p">,</span> <span class="s1">'markersize'</span><span class="p">:</span> <span class="mi">20</span><span class="p">},</span> <span class="n">fig_size</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">10</span><span class="p">),</span> <span class="n">fig_bg_colors</span><span class="o">=</span><span class="p">{</span><span class="s1">'upper'</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span> <span class="s1">'diag'</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span> <span class="s1">'lower'</span><span class="p">:</span> <span class="kc">None</span><span class="p">},</span> <span class="n">fig_subplots_adjust</span><span class="o">=</span><span class="p">{</span><span class="s1">'top'</span><span class="p">:</span> <span class="mf">0.9</span><span class="p">},</span> <span class="n">subplots</span><span class="o">=</span><span class="p">{},</span> <span class="n">despine</span><span class="o">=</span><span class="p">{</span><span class="s1">'offset'</span><span class="p">:</span> <span class="mi">5</span><span class="p">},</span> <span class="n">title_format</span><span class="o">=</span><span class="p">{</span><span class="s1">'fontsize'</span><span class="p">:</span> <span class="mi">16</span><span class="p">})</span> </code>
+sbi.utils.plot.pairplot<span class="p">(</span><span class="n">samples</span><span class="p">,</span> <span class="n">points</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">upper</span><span class="o">=</span><span class="s1">'hist'</span><span class="p">,</span> <span class="n">diag</span><span class="o">=</span><span class="s1">'hist'</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">legend</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">labels_points</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">labels_samples</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">samples_colors</span><span class="o">=</span><span class="p">[</span><span class="s1">'#1f77b4'</span><span class="p">,</span> <span class="s1">'#ff7f0e'</span><span class="p">,</span> <span class="s1">'#2ca02c'</span><span class="p">,</span> <span class="s1">'#d62728'</span><span class="p">,</span> <span class="s1">'#9467bd'</span><span class="p">,</span> <span class="s1">'#8c564b'</span><span class="p">,</span> <span class="s1">'#e377c2'</span><span class="p">,</span> <span class="s1">'#7f7f7f'</span><span class="p">,</span> <span class="s1">'#bcbd22'</span><span class="p">,</span> <span class="s1">'#17becf'</span><span class="p">],</span> <span class="n">points_colors</span><span class="o">=</span><span class="p">[</span><span class="s1">'#1f77b4'</span><span class="p">,</span> <span class="s1">'#ff7f0e'</span><span class="p">,</span> <span class="s1">'#2ca02c'</span><span class="p">,</span> <span class="s1">'#d62728'</span><span class="p">,</span> <span class="s1">'#9467bd'</span><span class="p">,</span> <span class="s1">'#8c564b'</span><span class="p">,</span> <span class="s1">'#e377c2'</span><span class="p">,</span> <span class="s1">'#7f7f7f'</span><span class="p">,</span> <span class="s1">'#bcbd22'</span><span class="p">,</span> <span class="s1">'#17becf'</span><span class="p">],</span> <span class="n">subset</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">ticks</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">tickformatter</span><span class="o">=&lt;</span><span class="n">matplotlib</span><span class="o">.</span><span class="n">ticker</span><span class="o">.</span><span class="n">FormatStrFormatter</span> <span class="nb">object</span> <span class="n">at</span> <span class="mh">0x7efe89fbf690</span><span class="o">&gt;</span><span class="p">,</span> <span class="n">tick_labels</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">hist_diag</span><span class="o">=</span><span class="p">{</span><span class="s1">'alpha'</span><span class="p">:</span> <span class="mf">1.0</span><span class="p">,</span> <span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span> <span class="s1">'density'</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s1">'histtype'</span><span class="p">:</span> <span class="s1">'step'</span><span class="p">},</span> <span class="n">hist_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">},</span> <span class="n">kde_diag</span><span class="o">=</span><span class="p">{</span><span class="s1">'bw_method'</span><span class="p">:</span> <span class="s1">'scott'</span><span class="p">,</span> <span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span> <span class="s1">'color'</span><span class="p">:</span> <span class="s1">'black'</span><span class="p">},</span> <span class="n">kde_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'bw_method'</span><span class="p">:</span> <span class="s1">'scott'</span><span class="p">,</span> <span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">},</span> <span class="n">contour_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'levels'</span><span class="p">:</span> <span class="p">[</span><span class="mf">0.68</span><span class="p">],</span> <span class="s1">'percentile'</span><span class="p">:</span> <span class="kc">True</span><span class="p">},</span> <span class="n">scatter_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'alpha'</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">,</span> <span class="s1">'edgecolor'</span><span class="p">:</span> <span class="s1">'none'</span><span class="p">,</span> <span class="s1">'rasterized'</span><span class="p">:</span> <span class="kc">False</span><span class="p">},</span> <span class="n">plot_offdiag</span><span class="o">=</span><span class="p">{},</span> <span class="n">points_diag</span><span class="o">=</span><span class="p">{},</span> <span class="n">points_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'marker'</span><span class="p">:</span> <span class="s1">'.'</span><span class="p">,</span> <span class="s1">'markersize'</span><span class="p">:</span> <span class="mi">20</span><span class="p">},</span> <span class="n">fig_size</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">10</span><span class="p">),</span> <span class="n">fig_bg_colors</span><span class="o">=</span><span class="p">{</span><span class="s1">'upper'</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span> <span class="s1">'diag'</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span> <span class="s1">'lower'</span><span class="p">:</span> <span class="kc">None</span><span class="p">},</span> <span class="n">fig_subplots_adjust</span><span class="o">=</span><span class="p">{</span><span class="s1">'top'</span><span class="p">:</span> <span class="mf">0.9</span><span class="p">},</span> <span class="n">subplots</span><span class="o">=</span><span class="p">{},</span> <span class="n">despine</span><span class="o">=</span><span class="p">{</span><span class="s1">'offset'</span><span class="p">:</span> <span class="mi">5</span><span class="p">},</span> <span class="n">title_format</span><span class="o">=</span><span class="p">{</span><span class="s1">'fontsize'</span><span class="p">:</span> <span class="mi">16</span><span class="p">})</span> </code>
 <a class="headerlink" href="#sbi.utils.plot.pairplot" title="Permanent link">¶</a></h3>
 <div class="doc doc-contents first">
 <p>Plot samples and points.</p>
@@ -5129,7 +5131,7 @@ stored in the input variable hist_diag, use opts[<code class="codehilite"><span 
 <td>
 <p>passed to _format_axis()</p>
 </td>
-<td><code>&lt;matplotlib.ticker.FormatStrFormatter object at 0x7f07f3875210&gt;</code></td>
+<td><code>&lt;matplotlib.ticker.FormatStrFormatter object at 0x7efe89fbf690&gt;</code></td>
 </tr>
 <tr>
 <td><code>tick_labels</code></td>
