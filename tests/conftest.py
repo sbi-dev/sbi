@@ -1,13 +1,16 @@
+import numpy
 import pytest
 import torch
-import numpy
 
-
-# Seed for fixture. Change to change random state of all seeded tests.
+# Seed for `set_seed` fixture. Change to change random state of all seeded tests.
 seed = 1
 
 
-# Fixture will be visible in all test files.
+@pytest.fixture(scope="session", autouse=True)
+def set_default_tensor_type():
+    torch.set_default_tensor_type("torch.FloatTensor")
+
+
 @pytest.fixture(scope="module")
 def set_seed():
     torch.manual_seed(seed)

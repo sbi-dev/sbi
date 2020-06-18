@@ -11,9 +11,6 @@ from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
 from sbi.simulators.simutils import simulate_in_batches
 from sbi.utils.torchutils import BoxUniform
 
-# Use cpu by default.
-torch.set_default_tensor_type("torch.FloatTensor")
-
 
 @pytest.mark.parametrize(
     "num_sims", (0, 100, 1000),
