@@ -8,18 +8,17 @@ from typing import Callable, Optional
 import pytest
 import torch
 from scipy.stats import beta, multivariate_normal, uniform
-from torch import Tensor, ones, zeros, eye
+from torch import Tensor, eye, ones, zeros
 from torch.distributions import Beta, Distribution, Gamma, MultivariateNormal, Uniform
 
-from sbi.inference import SNPE_C, SNL, SRE
-
+from sbi.inference import SNL, SNPE_C, SRE
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
 from sbi.user_input.user_input_checks import (
     prepare_for_sbi,
     process_prior,
     process_simulator,
-    process_x_shape,
     process_x,
+    process_x_shape,
 )
 from sbi.user_input.user_input_checks_utils import (
     CustomPytorchWrapper,
@@ -28,9 +27,6 @@ from sbi.user_input.user_input_checks_utils import (
     ScipyPytorchWrapper,
 )
 from sbi.utils.torchutils import BoxUniform
-
-# use cpu by default
-torch.set_default_tensor_type("torch.FloatTensor")
 
 
 class UserNumpyUniform:

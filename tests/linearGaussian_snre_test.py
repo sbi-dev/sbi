@@ -5,30 +5,23 @@ from __future__ import annotations
 
 import pytest
 import torch
-from torch import eye, zeros, ones
+from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
 import sbi.utils as utils
-from tests.test_utils import (
-    check_c2st,
-    get_prob_outside_uniform_prior,
-    get_dkl_gaussian_prior,
-)
-from sbi.inference import SRE, AALR, prepare_for_sbi
-
+from sbi.inference import AALR, SRE, prepare_for_sbi
 from sbi.simulators.linear_gaussian import (
-    true_posterior_linear_gaussian_mvn_prior,
-    samples_true_posterior_linear_gaussian_uniform_prior,
-    samples_true_posterior_linear_gaussian_mvn_prior_different_dims,
     diagonal_linear_gaussian,
     linear_gaussian,
+    samples_true_posterior_linear_gaussian_mvn_prior_different_dims,
+    samples_true_posterior_linear_gaussian_uniform_prior,
+    true_posterior_linear_gaussian_mvn_prior,
 )
-
-# use cpu by default
-torch.set_default_tensor_type("torch.FloatTensor")
-# Seeding:
-# Some tests in this module have "set_seed" as an argument. This argument points to
-# tests/conftest.py to seed the test with the seed set in conftext.py.
+from tests.test_utils import (
+    check_c2st,
+    get_dkl_gaussian_prior,
+    get_prob_outside_uniform_prior,
+)
 
 
 @pytest.mark.parametrize("num_dim", (1, 3))
