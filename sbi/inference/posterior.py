@@ -6,6 +6,7 @@ from __future__ import annotations
 from typing import Callable, Optional
 from warnings import warn
 
+import numpy as np
 from pyro.infer.mcmc import HMC, NUTS
 from pyro.infer.mcmc.api import MCMC
 import torch
@@ -81,6 +82,7 @@ class NeuralPosterior:
 
         self._sample_with_mcmc = sample_with_mcmc
         self._mcmc_method = mcmc_method
+        self._mcmc_init_params = None
         self._get_potential_function = get_potential_function
         self._x_shape = x_shape
 
@@ -363,6 +365,8 @@ class NeuralPosterior:
         thin: int = 10,
         warmup_steps: int = 20,
         num_chains: Optional[int] = 1,
+        init_strategy: str = "prior",
+        init_strategy_num_candidates: int = 10000,
         show_progress_bars: bool = True,
     ) -> Tensor:
         r"""
@@ -382,22 +386,59 @@ class NeuralPosterior:
                 sample will be returned, until a total of `num_samples`.
             warmup_steps: Initial number of samples to discard.
             num_chains: Whether to sample in parallel. If None, use all but one CPU.
+            init_strategy: Initialisation strategy for chains; `prior` will draw init
+                locations from prior, whereas `sir` will use Sequential-Importance-
+                Resampling using `init_strategy_num_candidates` to find init
+                locations.
+            init_strategy_num_candidates: Number of candidate init locations
+                when `init_strategy` is `sir`.
             show_progress_bars: Whether to show a progressbar during sampling.
 
         Returns:
             Tensor of shape (num_samples, shape_of_single_theta).
         """
+        # Find init points depending on `init_strategy` if no init is set
+        if self._mcmc_init_params is None:
+            if init_strategy == "prior":
+                self._mcmc_init_params = self._prior.sample((num_chains,))
+            elif init_strategy == "sir":
+                self.net.eval()
+                init_param_candidates = self._prior.sample(
+                    (init_strategy_num_candidates,)
+                )
+                potential_function = self._get_potential_function(
+                    self._prior, self.net, x, "slice_np"
+                )
+                log_weights = torch.cat(
+                    [
+                        potential_function(init_param_candidates[i, :])
+                        for i in range(init_strategy_num_candidates)
+                    ]
+                )
+                probs = np.exp(log_weights.view(-1).numpy().astype(np.float64))
+                probs[np.isnan(probs)] = 0.0
+                probs[np.isinf(probs)] = 0.0
+                probs /= probs.sum()
+                idxs = np.random.choice(
+                    a=np.arange(init_strategy_num_candidates),
+                    size=num_chains,
+                    replace=False,
+                    p=probs,
+                )
+                self._mcmc_init_params = init_param_candidates[
+                    torch.from_numpy(idxs.astype(int)), :
+                ]
+                self.net.train(True)
+            else:
+                raise NotImplementedError
 
-        # When using `slice_np` as mcmc sampler, we can only have a single chain.
-        if mcmc_method == "slice_np" and num_chains > 1:
-            warn("`slice_np` does not support multiple mcmc chains. Using just one.")
-
-        # TODO Maybe get whole sampler instead of just potential function?
         potential_fn = self._get_potential_function(
             self._prior, self.net, x, mcmc_method
         )
         if mcmc_method == "slice_np":
-            samples = self._slice_np_mcmc(num_samples, potential_fn, thin, warmup_steps)
+            samples = self._slice_np_mcmc(
+                num_samples, potential_fn, thin, warmup_steps,
+            )
         elif mcmc_method in ("hmc", "nuts", "slice"):
             samples = self._pyro_mcmc(
                 num_samples=num_samples,
@@ -417,8 +458,8 @@ class NeuralPosterior:
         self,
         num_samples: int,
         potential_function: Callable,
-        thin: int = 10,
-        warmup_steps: int = 20,
+        thin: int,
+        warmup_steps: int,
     ) -> Tensor:
         """
         Custom implementation of slice sampling using Numpy.
@@ -430,25 +471,34 @@ class NeuralPosterior:
             warmup_steps: Initial number of samples to discard.
 
         Returns: Tensor of shape (num_samples, shape_of_single_theta).
-
         """
-
         # Go into eval mode for evaluating during sampling
-        # XXX set eval mode outside of calls to sample
         self.net.eval()
 
-        posterior_sampler = SliceSampler(
-            utils.tensor2numpy(self._prior.sample((1,))).reshape(-1),
-            lp_f=potential_function,
-            thin=thin,
-        )
+        num_chains = self._mcmc_init_params.shape[0]
+        dim_samples = self._mcmc_init_params.shape[1]
 
-        posterior_sampler.gen(warmup_steps)
+        all_samples = []
+        for c in range(num_chains):
+            posterior_sampler = SliceSampler(
+                utils.tensor2numpy(self._mcmc_init_params[c, :]).reshape(-1),
+                lp_f=potential_function,
+                thin=thin,
+            )
+            if warmup_steps > 0:
+                posterior_sampler.gen(int(warmup_steps))
+            all_samples.append(posterior_sampler.gen(int(num_samples / num_chains)))
+        all_samples = np.stack(all_samples).astype(np.float32)
 
-        samples = posterior_sampler.gen(num_samples)
+        samples = torch.from_numpy(all_samples)  # chains x samples x dim
 
-        # Back to training mode.
-        # XXX train exited in log_prob, entered here?
+        # Final sample will be next init location
+        self._mcmc_init_params = samples[:, -1, :].reshape(num_chains, dim_samples)
+
+        samples = samples.reshape(-1, dim_samples)[:num_samples, :]
+        assert samples.shape[0] == num_samples
+
+        # Back to training mode
         self.net.train(True)
 
         return torch.tensor(samples, dtype=torch.float32)
@@ -478,22 +528,18 @@ class NeuralPosterior:
 
         Returns: Tensor of shape (num_samples, shape_of_single_theta).
         """
-
         num_chains = mp.cpu_count - 1 if num_chains is None else num_chains
 
-        # TODO Move outside function, and assert inside; remember return to train
-        # Always sample in eval mode.
+        # Go into eval mode for evaluating during sampling
         self.net.eval()
 
         kernels = dict(slice=Slice, hmc=HMC, nuts=NUTS)
-
-        initial_params = self._prior.sample((num_chains,))
 
         sampler = MCMC(
             kernel=kernels[mcmc_method](potential_fn=potential_function),
             num_samples=(thin * num_samples) // num_chains + num_chains,
             warmup_steps=warmup_steps,
-            initial_params={"": initial_params},
+            initial_params={"": self._mcmc_init_params},
             num_chains=num_chains,
             mp_context="fork",
             disable_progbar=not show_progress_bars,
@@ -505,6 +551,9 @@ class NeuralPosterior:
 
         samples = samples[::thin][:num_samples]
         assert samples.shape[0] == num_samples
+
+        # Back to training mode
+        self.net.train(True)
 
         return samples
 
