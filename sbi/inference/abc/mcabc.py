@@ -1,20 +1,20 @@
 from __future__ import annotations
-from abc import ABC
 
 from pyro.distributions.empirical import Empirical
-from torch import log
 from sbi.inference.abc.abc_base import ABCBASE
 from typing import Callable, Optional, Union
 
 import torch
+from torch import Tensor, ones
+from numpy import ndarray
 
 
-class MCABC(ABCBASE, ABC):
+class MCABC(ABCBASE):
     def __init__(
         self,
-        simulator,
+        simulator: Callable,
         prior,
-        x_o,
+        x_o: Union[Tensor, ndarray],
         distance: Union[str, Callable] = "l2",
         num_workers: int = 1,
         simulation_batch_size: int = 1,
@@ -71,9 +71,7 @@ class MCABC(ABCBASE, ABC):
         else:
             raise ValueError("One of epsilon or quantile has to be passed.")
 
-        posterior = Empirical(
-            theta_accepted, log_weights=torch.ones(theta_accepted.shape[0])
-        )
+        posterior = Empirical(theta_accepted, log_weights=ones(theta_accepted.shape[0]))
 
         if return_distances:
             return posterior, distances_accepted

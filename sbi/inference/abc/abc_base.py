@@ -1,15 +1,20 @@
+from __future__ import annotations
+from abc import ABC
+
 import torch
-from typing import Callable, Optional, Union
+from typing import Callable, Union
 
 from sbi.simulators.simutils import simulate_in_batches
+from numpy import ndarray
+from torch import Tensor
 
 
-class ABCBASE:
+class ABCBASE(ABC):
     def __init__(
         self,
-        simulator,
+        simulator: Callable,
         prior,
-        x_o,
+        x_o: Union[Tensor, ndarray],
         distance: Union[str, Callable] = "l2",
         num_workers: int = 1,
         simulation_batch_size: int = 1,
@@ -38,7 +43,7 @@ class ABCBASE:
         )
 
     @staticmethod
-    def mse(observation: torch.Tensor, simulated_data: torch.Tensor) -> torch.Tensor:
+    def mse(observation: Tensor, simulated_data: Tensor) -> Tensor:
         """Take mean squared distance over batch dimension
 
         Args:
@@ -53,7 +58,7 @@ class ABCBASE:
         return torch.mean((observation - simulated_data) ** 2, dim=-1)
 
     @staticmethod
-    def l2(observation: torch.Tensor, simulated_data: torch.Tensor) -> torch.Tensor:
+    def l2(observation: Tensor, simulated_data: Tensor) -> Tensor:
         """Take L2 distance over batch dimension
 
         Args:
@@ -70,7 +75,7 @@ class ABCBASE:
         return torch.norm((observation - simulated_data), dim=-1)
 
     @staticmethod
-    def l1(observation: torch.Tensor, simulated_data: torch.Tensor) -> torch.Tensor:
+    def l1(observation: Tensor, simulated_data: Tensor) -> Tensor:
         """Take mean absolute distance over batch dimension
 
         Args:

@@ -12,6 +12,9 @@ from sbi.inference.snpe.snpe_c import SNPE_C  # noqa: F401
 
 from sbi.inference.snre import SNRE, SNRE_A, SNRE_B  # noqa: F401
 
+from sbi.inference.abc.mcabc import MCABC
+from sbi.inference.abc.smcabc import SMCABC
+
 
 SNL = SNLE = SNLE_A
 _snle_family = ["SNL"]
@@ -24,6 +27,8 @@ _snpe_family = ["SNPE_C", "SNPE", "APT"]
 SRE = SNRE_B
 AALR = SNRE_A
 _snre_family = ["SNRE_A", "AALR", "SNRE_B", "SNRE", "SRE"]
+
+_abc_family = ["MCABC", "SMCABC"]
 
 
 __all__ = _snpe_family + _snre_family + _snle_family
