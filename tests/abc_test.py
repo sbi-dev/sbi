@@ -56,14 +56,16 @@ def test_smcabc_inference_on_linear_gaussian(num_dim):
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    infer = SMCABC(simulator, prior, x_o, simulation_batch_size=10000)
+    infer = SMCABC(
+        simulator, prior, x_o, simulation_batch_size=10000, algorithm_variant="C"
+    )
 
     phat = infer(
         num_particles=1000,
         num_initial_pop=5000,
         epsilon_decay=0.5,
         num_simulation_budget=30000,
-        qt_decay=True,
+        distance_based_decay=True,
     )
 
     check_c2st(phat.sample((num_samples,)), target_samples, alg="SMCABC")
