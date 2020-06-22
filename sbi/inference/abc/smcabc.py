@@ -1,4 +1,5 @@
 from __future__ import annotations
+import pdb
 
 from pyro.distributions.empirical import Empirical
 from sbi.inference.abc.abc_base import ABCBASE
@@ -10,6 +11,18 @@ from torch.distributions import Distribution, Multinomial, MultivariateNormal
 from pyro.distributions import Uniform
 from numpy import ndarray
 import logging
+
+
+"""Notes about differences in SMCABC algorithms:
+We distinguish between three different SMC methods here:
+- A: The one proposed by Toni et al. 2010 (Phd Thesis)
+- B: The one proposed by Sisson et al. 2007 (with correction from 2009)
+- C: The one proposed by Beaumont et al. 2009, called "SMCABC-C"
+
+In Toni et al. 2010 we find an overview of the differences on page 34:
+- B: same as A except for resampling after weight normalization.
+- C: same as A except for calculation of the covariance of the perturbation kernel.
+"""
 
 
 class SMCABC(ABCBASE):
@@ -25,6 +38,7 @@ class SMCABC(ABCBASE):
         num_workers: int = 1,
         simulation_batch_size: int = 1,
         show_progress_bars: bool = True,
+        algorithm_variant: str = "C",
     ):
 
         super().__init__(
@@ -37,7 +51,16 @@ class SMCABC(ABCBASE):
             show_progress_bars=show_progress_bars,
         )
 
-        assert kernel in ("gaussian", "uniform"), f"Kernel '{kernel}' not supported."
+        kernels = ("gaussian", "uniform")
+        assert (
+            kernel in kernels
+        ), f"Kernel '{kernel}' not supported. Choose one from {kernels}."
+        algorithm_variants = ("A", "B", "C")
+        assert algorithm_variant in algorithm_variants, (
+            f"SMCABC variant '{algorithm_variant}' not supported, choose one from"
+            " {algorithm_variants}."
+        )
+        self.algorithm_variant = algorithm_variant
 
         self.distance_to_x0 = lambda x: self.distance(self.x_o, x)
         self.num_simulations = 0
@@ -57,11 +80,11 @@ class SMCABC(ABCBASE):
         self,
         num_particles: int,
         num_initial_pop: int,
-        epsilon_decay: float,
         num_simulation_budget: int,
+        epsilon_decay: float,
+        distance_based_decay: bool = False,
         batch_size: int = 100,
-        qt_decay: bool = False,
-        ess_min: Optional[float] = None,
+        ess_min: Optional[float] = 0.5,
         kernel_variance_scale: float = 1.0,
         use_last_pop_samples: bool = True,
         return_summary: bool = False,
@@ -90,10 +113,12 @@ class SMCABC(ABCBASE):
         while self.num_simulations < num_simulation_budget:
 
             pop_idx += 1
-            if qt_decay:
+            # Decay based on quantile of distances from previous pop.
+            if distance_based_decay:
                 epsilon = self._get_next_epsilon(
                     all_distances[pop_idx - 1], epsilon_decay
                 )
+            # Constant decay.
             else:
                 epsilon *= epsilon_decay
 
@@ -114,15 +139,14 @@ class SMCABC(ABCBASE):
 
             # Resample weights if ess too low.
             ess = (1 / torch.sum(torch.exp(2.0 * log_weights), dim=0)) / num_particles
-            if ess_min is not None:
-                if ess < ess_min:
-                    self.logger.info(
-                        f"ESS={ess:.2f} too low, resampling pop {pop_idx}..."
-                    )
-                    particles = self.sample_from_population_with_weights(
-                        particles, torch.exp(log_weights), num_samples=num_particles
-                    )
-                    log_weights = torch.log(1 / num_particles * ones(num_particles))
+            # Resampling of weights for low ESS only for Sisson et al. 2007.
+            if self.algorithm_variant == "B" and ess < ess_min:
+                self.logger.info(f"ESS={ess:.2f} too low, resampling pop {pop_idx}...")
+                # First resample, then set to uniform weights in in Sisson et al. 2007.
+                particles = self.sample_from_population_with_weights(
+                    particles, torch.exp(log_weights), num_samples=num_particles
+                )
+                log_weights = torch.log(1 / num_particles * ones(num_particles))
 
             self.logger.info(
                 (
@@ -296,22 +320,22 @@ class SMCABC(ABCBASE):
         return distances[qidx].item()
 
     def _calculate_new_log_weights(
-        self, new_particles: Tensor, old_particles: Tensor, log_weights: Tensor,
+        self, new_particles: Tensor, old_particles: Tensor, old_log_weights: Tensor,
     ) -> Tensor:
 
         # Prior can be batched across new particles.
         prior_log_probs = self.prior.log_prob(new_particles)
 
-        # Contstruct function to get kernel log prob for given new particle.
-        # The kernel is centered on each new particle.
+        # Contstruct function to get kernel log prob for given old particle.
+        # The kernel is centered on each old particle as in all three variants (A,B,C).
         def kernel_log_prob(new_particle):
-            return self.get_new_kernel(new_particle).log_prob(old_particles)
+            return self.get_new_kernel(old_particles).log_prob(new_particle)
 
         # We still have to loop over particles here because
         # the kernel log probs are already batched across old particles.
         log_weighted_sum = tensor(
             [
-                torch.logsumexp(log_weights + kernel_log_prob(new_particle), dim=0)
+                torch.logsumexp(old_log_weights + kernel_log_prob(new_particle), dim=0)
                 for new_particle in new_particles
             ],
             dtype=torch.float32,
@@ -379,14 +403,30 @@ class SMCABC(ABCBASE):
         )
 
         if self.kernel == "gaussian":
-            mean = torch.mean(samples, dim=0).unsqueeze(0)
+            # For variant C, Beaumont et al. 2009, the kernel variance comes from the
+            # previous population.
+            if self.algorithm_variant == "C":
+                mean = torch.mean(samples, dim=0).unsqueeze(0)
 
-            # take double the weighted sample cov as proposed in Beaumont 2009
-            population_cov = torch.matmul(samples.T, samples) / (
-                num_samples - 1
-            ) - torch.matmul(mean.T, mean)
-
-            return kernel_variance_scale * population_cov
+                # take double the weighted sample cov as proposed in Beaumont 2009
+                population_cov = torch.matmul(samples.T, samples) / (
+                    num_samples - 1
+                ) - torch.matmul(mean.T, mean)
+                return kernel_variance_scale * population_cov
+            # While for Toni et al. and Sisson et al. it comes from the parameter
+            # ranges.
+            elif self.algorithm_variant in ("A", "B"):
+                # Variance spans the range of parameters for every dimension.
+                parameter_ranges = tensor(
+                    [
+                        max(theta_column) - min(theta_column)
+                        for theta_column in samples.T
+                    ]
+                )
+                assert parameter_ranges.ndim < 2
+                return kernel_variance_scale * torch.diag(parameter_ranges)
+            else:
+                raise ValueError(f"Variant, '{self.algorithm_variant}' not supported.")
 
         elif self.kernel == "uniform":
             # Variance spans the range of parameters for every dimension.
@@ -400,6 +440,7 @@ class SMCABC(ABCBASE):
         """Return new kernel distribution for a given set of paramters."""
 
         if self.kernel == "gaussian":
+            assert self.kernel_variance.ndim == 2
             return MultivariateNormal(
                 loc=thetas, covariance_matrix=self.kernel_variance
             )
