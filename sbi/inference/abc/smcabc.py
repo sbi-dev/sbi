@@ -1,5 +1,4 @@
 from __future__ import annotations
-import pdb
 
 from pyro.distributions.empirical import Empirical
 from sbi.inference.abc.abc_base import ABCBASE
@@ -13,33 +12,39 @@ from numpy import ndarray
 import logging
 
 
-"""Notes about differences in SMCABC algorithms:
-We distinguish between three different SMC methods here:
-- A: The one proposed by Toni et al. 2010 (Phd Thesis)
-- B: The one proposed by Sisson et al. 2007 (with correction from 2009)
-- C: The one proposed by Beaumont et al. 2009, called "SMCABC-C"
-
-In Toni et al. 2010 we find an overview of the differences on page 34:
-- B: same as A except for resampling after weight normalization.
-- C: same as A except for calculation of the covariance of the perturbation kernel.
-"""
-
-
 class SMCABC(ABCBASE):
-    """ABC PMC as in Beaumont 2002 and 2009."""
-
     def __init__(
         self,
         simulator: Callable,
         prior: Distribution,
         x_o: Union[Tensor, ndarray],
         distance: Union[str, Callable] = "l2",
-        kernel: Optional[str] = "gaussian",
         num_workers: int = 1,
         simulation_batch_size: int = 1,
         show_progress_bars: bool = True,
+        kernel: Optional[str] = "gaussian",
         algorithm_variant: str = "C",
     ):
+        r"""Sequential Monte Carlo Approximate Bayesian Computation.
+
+        We distinguish between three different SMC methods here:
+            - A: Toni et al. 2010 (Phd Thesis)
+            - B: Sisson et al. 2007 (with correction from 2009)
+            - C: Beaumont et al. 2009
+
+        In Toni et al. 2010 we find an overview of the differences on page 34:
+            - B: same as A except for resampling of weights if the effective sampling
+                size is too small.
+            - C: same as A except for calculation of the covariance of the perturbation
+                kernel: the kernel covariance is a scaled version of the covariance of
+                the previous population.
+
+        Args:
+            kernel: Perturbation kernel.
+            algorithm_variant: Indicating the choice of algorithm variant, A, B, or C.
+
+        See docstring of `PosteriorEstimator` class for all other arguments.
+        """
 
         super().__init__(
             simulator=simulator,
@@ -55,17 +60,17 @@ class SMCABC(ABCBASE):
         assert (
             kernel in kernels
         ), f"Kernel '{kernel}' not supported. Choose one from {kernels}."
+        self.kernel = kernel
+
         algorithm_variants = ("A", "B", "C")
         assert algorithm_variant in algorithm_variants, (
             f"SMCABC variant '{algorithm_variant}' not supported, choose one from"
             " {algorithm_variants}."
         )
         self.algorithm_variant = algorithm_variant
-
         self.distance_to_x0 = lambda x: self.distance(self.x_o, x)
         self.num_simulations = 0
         self.num_simulation_budget = 0
-        self.kernel = kernel
 
         self.logger = logging.getLogger(__name__)
 
@@ -83,12 +88,37 @@ class SMCABC(ABCBASE):
         num_simulation_budget: int,
         epsilon_decay: float,
         distance_based_decay: bool = False,
-        batch_size: int = 100,
         ess_min: Optional[float] = 0.5,
         kernel_variance_scale: float = 1.0,
         use_last_pop_samples: bool = True,
         return_summary: bool = False,
-    ):
+    ) -> Union[Distribution, Tuple[Distribution, dict]]:
+        r"""Run SMCABC.
+
+        Args:
+            num_particles: Number of particles in each population.
+            num_initial_pop: Number of simulations used for initial population.
+            num_simulation_budget: Total number of possible simulations.
+            epsilon_decay: Factor with which the acceptance threshold $\epsilon$ decays.
+            distance_based_decay: Whether the $\epsilon$ decay is constant over
+                populations or calculated from the previous populations distribution of
+                distances.
+            ess_min: Threshold of effective sampling size for resampling weights.
+            kernel_variance_scale: Factor for scaling the perturbation kernel variance.
+            use_last_pop_samples: Whether to fill up the current population with
+                samples from the previous population when the budget is used up. If
+                False, the current population is discarded and the previous population
+                is returned.
+            return_summary: Whether to return a dictionary with all accepted particles, 
+                weights, etc. at the end.
+
+        Returns:
+            posterior: Empirical posterior distribution defined by the accepted
+                particles and their weights.
+            summary (optional): A dictionary containing particles, weights, epsilons
+                and distances of each population.
+        """
+
         pop_idx = 0
         self.num_simulation_budget = num_simulation_budget
 
@@ -179,6 +209,7 @@ class SMCABC(ABCBASE):
     def _sample_initial_population(
         self, num_particles: int, num_initial_pop: int,
     ) -> Tuple[Tensor, float, Tensor]:
+        """Return particles, epsilon and distances of ininital population."""
 
         assert (
             num_particles <= num_initial_pop
@@ -205,9 +236,8 @@ class SMCABC(ABCBASE):
         epsilon: float,
         use_last_pop_samples: bool = True,
     ) -> Tuple[Tensor, Tensor, Tensor]:
+        """Return particles, weights and distances of new population."""
 
-        # new_particles = zeros_like(particles)
-        # new_log_weights = zeros_like(log_weights)
         new_particles = []
         new_log_weights = []
         new_distances = []
@@ -322,6 +352,7 @@ class SMCABC(ABCBASE):
     def _calculate_new_log_weights(
         self, new_particles: Tensor, old_particles: Tensor, old_log_weights: Tensor,
     ) -> Tensor:
+        """Return new log weights following formulas in publications A,B anc C."""
 
         # Prior can be batched across new particles.
         prior_log_probs = self.prior.log_prob(new_particles)
@@ -346,7 +377,8 @@ class SMCABC(ABCBASE):
     @staticmethod
     def sample_from_population_with_weights(
         particles: Tensor, weights: Tensor, num_samples: int = 1
-    ):
+    ) -> Tensor:
+        """Return samples from particles sampled with weights."""
         # define multinomial with weights as probs
         multi = Multinomial(probs=weights)
         # sample num samples, with replacement
@@ -358,7 +390,7 @@ class SMCABC(ABCBASE):
 
     def _sample_and_perturb(
         self, particles: Tensor, weights: Tensor, num_samples: int = 1
-    ):
+    ) -> Tensor:
         """Sample and perturb batch of new parameters from trace.
 
         Reject sampled and perturbed parameters outside of prior.
