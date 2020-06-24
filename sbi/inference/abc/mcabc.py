@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from pyro.distributions.empirical import Empirical
+from torch.distributions.distribution import Distribution
 from sbi.inference.abc.abc_base import ABCBASE
-from typing import Callable, Optional, Union
+from typing import Callable, Optional, Union, Tuple
 
 import torch
 from torch import Tensor, ones
@@ -20,11 +21,11 @@ class MCABC(ABCBASE):
         simulation_batch_size: int = 1,
         show_progress_bars: bool = True,
     ):
-        """ Base class for Sequential Neural Posterior Estimation methods.
+        """Monte-Carlo Approximate Bayesian Computation (Rejection ABC).
 
-        density_estimator: Density estimator that can `.log_prob()` and `.sample()`.
+        Args:
 
-        See docstring of `NeuralInference` class for all other arguments.
+        See docstring of `ABCBASE` class for all arguments.
         """
 
         super().__init__(
@@ -43,8 +44,23 @@ class MCABC(ABCBASE):
         eps: Optional[float] = None,
         quantile: Optional[float] = None,
         return_distances: bool = False,
-    ):
-        # Exactly one of eps or quantile needs to be passed.
+    ) -> Union[Distribution, Tuple[Distribution, Tensor]]:
+        r"""Run MCABC.
+        
+        Args:
+            num_simulations: Number of simulations to run.
+            eps: Acceptance threshold $\epsilon$ for distance between observed and
+                simulated data.
+            quantile: Upper quantile of smallest distances for which the corresponding
+                parameters are returned. Exactly one of quantile or `eps` have to be
+                passed.
+            return_distances: Whether to return the distances corresponding to the
+                selected parameters.
+        Returns:
+            posterior: Empirical distribution based on selected parameters.
+            distances: Tensor of distances of the selected parameters.
+        """
+        # Exactly one of eps or quantile need to be passed.
         assert (eps is not None) ^ (
             quantile is not None
         ), "Eps xor quantile must be passed."
@@ -54,6 +70,7 @@ class MCABC(ABCBASE):
         x = self._batched_simulator(theta)
         distances = self.distance(self.x_o, x)
 
+        # Select based on acceptance threshold epsilon.
         if eps is not None:
             is_accepted = distances < eps
             num_accepted = is_accepted.sum().item()
@@ -62,6 +79,7 @@ class MCABC(ABCBASE):
             theta_accepted = theta[is_accepted]
             distances_accepted = distances[is_accepted]
 
+        # Select based on quantile on sorted distances.
         elif quantile is not None:
             num_top_samples = int(num_simulations * quantile)
             sort_idx = torch.argsort(distances)

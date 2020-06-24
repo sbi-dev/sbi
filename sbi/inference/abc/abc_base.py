@@ -5,6 +5,7 @@ import torch
 from typing import Callable, Union
 
 from sbi.simulators.simutils import simulate_in_batches
+from sbi.user_input.user_input_checks import process_x, prepare_for_sbi
 from numpy import ndarray
 from torch import Tensor
 
@@ -20,73 +21,79 @@ class ABCBASE(ABC):
         simulation_batch_size: int = 1,
         show_progress_bars: bool = True,
     ) -> None:
+        r"""Base class for Approximate Bayesian Computation methods.
 
-        # TODO: User input checks
+        Args:
+            simulator: A function that takes parameters $\theta$ and maps them to
+                simulations, or observations, `x`, $\mathrm{sim}(\theta)\to x$. Any
+                regular Python callable (i.e. function or class with `__call__` method)
+                can be used.
+            prior: A probability distribution that expresses prior knowledge about the
+                parameters, e.g. which ranges are meaningful for them. Any
+                object with `.log_prob()`and `.sample()` (for example, a PyTorch
+                distribution) can be used.
+            x_o: Observed data.
+            distance: Distance function to compare observed and simulated data. Can be  
+                a custom function or one of "l1", "l2", "mse".
+            num_workers: Number of parallel workers to use for simulations.
+            simulation_batch_size: Number of parameter sets that the simulator
+                maps to data x at once. If None, we simulate all parameter sets at the
+                same time. If >= 1, the simulator has to process data of shape
+                (simulation_batch_size, parameter_dimension).
+            show_progress_bars: Whether to show a progressbar during simulation and
+                sampling.
+        """
+
+        # User input checks.
+        simulator, prior, x_shape = prepare_for_sbi(simulator, prior)
+        x_o = process_x(x_o, x_shape)
 
         self.prior = prior
         self._simulator = simulator
         self.x_o = x_o
         self._show_progress_bars = show_progress_bars
+
+        # Select distance function.
         if type(distance) == str:
             distances = ["l1", "l2", "mse"]
             assert (
                 distance in distances
             ), f"Distance function str must be one of {distances}."
-            self.distance = eval(f"self.{distance}")
+            self.distance = self.choose_distance_function(distance_type=distance)
 
         self._batched_simulator = lambda theta: simulate_in_batches(
-            self._simulator,
-            theta,
-            simulation_batch_size,
-            num_workers,
-            self._show_progress_bars,
+            simulator=self._simulator,
+            theta=theta,
+            sim_batch_size=simulation_batch_size,
+            num_workers=num_workers,
+            show_progress_bars=self._show_progress_bars,
         )
 
     @staticmethod
-    def mse(observation: Tensor, simulated_data: Tensor) -> Tensor:
-        """Take mean squared distance over batch dimension
+    def choose_distance_function(distance_type: str = "l2") -> Callable:
+        """Return distance function for given distance type."""
 
-        Args:
-            observation: observed data, could be 1D
-            simulated_data: batch of simulated data, has batch dimension
+        if distance_type == "mse":
+            distance = lambda xo, x: torch.mean((xo - x) ** 2, dim=-1)
+        elif distance_type == "l2":
+            distance = lambda xo, x: torch.norm((xo - x), dim=-1)
+        elif distance_type == "l1":
+            distance = lambda xo, x: torch.mean(abs(xo - x), dim=-1)
+        else:
+            raise ValueError(r"Distance {distance_type} not supported.")
 
-        Returns:
-            Torch tensor with batch of distances
-        """
-        assert simulated_data.ndim == 2, "simulated data needs batch dimension"
+        def distance_fun(observed_data: Tensor, simulated_data: Tensor) -> Tensor:
+            """Take distance over batch dimension
 
-        return torch.mean((observation - simulated_data) ** 2, dim=-1)
+            Args:
+                observed_data: observed data, could be 1D
+                simulated_data: batch of simulated data, has batch dimension
 
-    @staticmethod
-    def l2(observation: Tensor, simulated_data: Tensor) -> Tensor:
-        """Take L2 distance over batch dimension
+            Returns:
+                Torch tensor with batch of distances
+            """
+            assert simulated_data.ndim == 2, "simulated data needs batch dimension"
 
-        Args:
-            observation: observed data, could be 1D
-            simulated_data: batch of simulated data, has batch dimension
+            return distance(observed_data, simulated_data)
 
-        Returns:
-            Torch tensor with batch of distances
-        """
-        assert (
-            simulated_data.ndim == 2
-        ), f"Simulated data needs batch dimension, is {simulated_data.shape}."
-
-        return torch.norm((observation - simulated_data), dim=-1)
-
-    @staticmethod
-    def l1(observation: Tensor, simulated_data: Tensor) -> Tensor:
-        """Take mean absolute distance over batch dimension
-
-        Args:
-            observation: observed data, could be 1D
-            simulated_data: batch of simulated data, has batch dimension
-
-        Returns:
-            Torch tensor with batch of distances
-        """
-        assert (
-            simulated_data.ndim == 2
-        ), f"Simulated data needs batch dimension, is {simulated_data.shape}."
-
-        return torch.mean(abs(observation - simulated_data), dim=-1)
+        return distance_fun
