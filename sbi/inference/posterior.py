@@ -296,12 +296,11 @@ class NeuralPosterior:
 
         return self._leakage_density_correction_factor  # type:ignore
 
-    @torch.no_grad()
     def sample(
         self,
         sample_shape: Shape = torch.Size(),
         x: Optional[Tensor] = None,
-        show_progress_bars: bool = False,
+        show_progress_bars: bool = True,
         **kwargs,
     ) -> Tensor:
         r"""
@@ -356,7 +355,6 @@ class NeuralPosterior:
 
         return samples.reshape((*sample_shape, -1))
 
-    @torch.no_grad()
     def _sample_posterior_mcmc(
         self,
         num_samples: int,
@@ -435,22 +433,24 @@ class NeuralPosterior:
         potential_fn = self._get_potential_function(
             self._prior, self.net, x, mcmc_method
         )
-        if mcmc_method == "slice_np":
-            samples = self._slice_np_mcmc(
-                num_samples, potential_fn, thin, warmup_steps,
-            )
-        elif mcmc_method in ("hmc", "nuts", "slice"):
-            samples = self._pyro_mcmc(
-                num_samples=num_samples,
-                potential_function=potential_fn,
-                mcmc_method=mcmc_method,
-                thin=thin,
-                warmup_steps=warmup_steps,
-                num_chains=num_chains,
-                show_progress_bars=show_progress_bars,
-            )
-        else:
-            raise NameError
+        track_gradients = mcmc_method != "slice" and mcmc_method != "slice_np"
+        with torch.set_grad_enabled(track_gradients):
+            if mcmc_method == "slice_np":
+                samples = self._slice_np_mcmc(
+                    num_samples, potential_fn, thin, warmup_steps,
+                )
+            elif mcmc_method in ("hmc", "nuts", "slice"):
+                samples = self._pyro_mcmc(
+                    num_samples=num_samples,
+                    potential_function=potential_fn,
+                    mcmc_method=mcmc_method,
+                    thin=thin,
+                    warmup_steps=warmup_steps,
+                    num_chains=num_chains,
+                    show_progress_bars=show_progress_bars,
+                ).detach()
+            else:
+                raise NameError
 
         return samples
 
@@ -501,7 +501,7 @@ class NeuralPosterior:
         # Back to training mode
         self.net.train(True)
 
-        return torch.tensor(samples, dtype=torch.float32)
+        return samples.type(torch.float32)
 
     def _pyro_mcmc(
         self,
