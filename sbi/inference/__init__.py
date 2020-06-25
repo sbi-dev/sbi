@@ -28,7 +28,9 @@ SRE = SNRE_B
 AALR = SNRE_A
 _snre_family = ["SNRE_A", "AALR", "SNRE_B", "SNRE", "SRE"]
 
-_abc_family = ["MCABC", "SMCABC"]
+ABC = MCABC
+SMC = SMCABC
+_abc_family = ["ABC", "MCABC", "SMC", "SMCABC"]
 
 
-__all__ = _snpe_family + _snre_family + _snle_family
+__all__ = _snpe_family + _snre_family + _snle_family + _abc_family
