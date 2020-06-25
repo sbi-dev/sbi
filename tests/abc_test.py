@@ -63,7 +63,7 @@ def test_smcabc_inference_on_linear_gaussian(num_dim):
         num_particles=1000,
         num_initial_pop=5000,
         epsilon_decay=0.5,
-        num_simulation_budget=30000,
+        num_simulations=30000,
         distance_based_decay=True,
     )
 

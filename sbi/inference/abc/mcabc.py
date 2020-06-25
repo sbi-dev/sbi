@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-from typing import Callable, Optional, Union, Tuple
-from pyro.distributions.empirical import Empirical
-from torch.distributions.distribution import Distribution
-from sbi.inference.abc.abc_base import ABCBASE
-from sbi.user_input.user_input_checks import process_x, process_x_shape
+from typing import Callable, Optional, Tuple, Union
 
 import torch
-from torch import Tensor, ones
 from numpy import ndarray
+from pyro.distributions.empirical import Empirical
+from torch import Tensor, ones
+from torch.distributions.distribution import Distribution
+
+from sbi.inference.abc.abc_base import ABCBASE
+from sbi.user_input.user_input_checks import process_x, process_x_shape
 
 
 class MCABC(ABCBASE):
@@ -68,7 +69,7 @@ class MCABC(ABCBASE):
         # Exactly one of eps or quantile need to be passed.
         assert (eps is not None) ^ (
             quantile is not None
-        ), "Eps xor quantile must be passed."
+        ), "Eps or quantile must be passed, but not both."
 
         self.x_shape, _ = process_x_shape(self._simulator, self.prior)
         self.x_o = process_x(x_o, self.x_shape)

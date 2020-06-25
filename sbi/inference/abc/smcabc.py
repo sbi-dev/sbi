@@ -1,16 +1,17 @@
 from __future__ import annotations
 
-from pyro.distributions.empirical import Empirical
-from sbi.inference.abc.abc_base import ABCBASE
+import logging
 from typing import Callable, Optional, Tuple, Union
 
 import torch
+from numpy import ndarray
+from pyro.distributions import Uniform
+from pyro.distributions.empirical import Empirical
 from torch import Tensor, ones, tensor
 from torch.distributions import Distribution, Multinomial, MultivariateNormal
-from pyro.distributions import Uniform
+
+from sbi.inference.abc.abc_base import ABCBASE
 from sbi.user_input.user_input_checks import process_x, process_x_shape
-import logging
-from numpy import ndarray
 
 
 class SMCABC(ABCBASE):
@@ -68,14 +69,14 @@ class SMCABC(ABCBASE):
         )
         self.algorithm_variant = algorithm_variant
         self.distance_to_x0 = None
+        self.simulation_counter = 0
         self.num_simulations = 0
-        self.num_simulation_budget = 0
 
         self.logger = logging.getLogger(__name__)
 
         # Define simulator that keeps track of budget.
         def simulate_with_budget(theta):
-            self.num_simulations += theta.shape[0]
+            self.simulation_counter += theta.shape[0]
             return self._batched_simulator(theta)
 
         self._simulate_with_budget = simulate_with_budget
@@ -85,7 +86,7 @@ class SMCABC(ABCBASE):
         x_o: Union[Tensor, ndarray],
         num_particles: int,
         num_initial_pop: int,
-        num_simulation_budget: int,
+        num_simulations: int,
         epsilon_decay: float,
         distance_based_decay: bool = False,
         ess_min: float = 0.5,
@@ -99,7 +100,7 @@ class SMCABC(ABCBASE):
             x_o: Observed data.
             num_particles: Number of particles in each population.
             num_initial_pop: Number of simulations used for initial population.
-            num_simulation_budget: Total number of possible simulations.
+            num_simulations: Total number of possible simulations.
             epsilon_decay: Factor with which the acceptance threshold $\epsilon$ decays.
             distance_based_decay: Whether the $\epsilon$ decay is constant over
                 populations or calculated from the previous populations distribution of
@@ -121,7 +122,7 @@ class SMCABC(ABCBASE):
         """
 
         pop_idx = 0
-        self.num_simulation_budget = num_simulation_budget
+        self.num_simulations = num_simulations
         self.x_shape, _ = process_x_shape(self._simulator, self.prior)
         self.x_o = process_x(x_o, self.x_shape)
         self.distance_to_x0 = lambda x: self.distance(self.x_o, x)
@@ -144,7 +145,7 @@ class SMCABC(ABCBASE):
         all_distances = [distances]
         all_epsilons = [epsilon]
 
-        while self.num_simulations < num_simulation_budget:
+        while self.simulation_counter < num_simulations:
 
             pop_idx += 1
             # Decay based on quantile of distances from previous pop.
@@ -180,7 +181,7 @@ class SMCABC(ABCBASE):
             self.logger.info(
                 (
                     f"population={pop_idx} done: eps={epsilon:.6f},"
-                    " num_sims={self.num_simulations}, acc={acc:.4f}."
+                    " num_sims={self.simulation_counter}, acc={acc:.4f}."
                 )
             )
 
@@ -208,7 +209,7 @@ class SMCABC(ABCBASE):
     def _sample_initial_population(
         self, num_particles: int, num_initial_pop: int,
     ) -> Tuple[Tensor, float, Tensor]:
-        """Return particles, epsilon and distances of ininital population."""
+        """Return particles, epsilon and distances of initial population."""
 
         assert (
             num_particles <= num_initial_pop
@@ -249,7 +250,7 @@ class SMCABC(ABCBASE):
             # Upperbound for batch size to not exceed simulation budget.
             num_batch = min(
                 num_particles - num_accepted_particles,
-                self.num_simulation_budget - self.num_simulations,
+                self.num_simulations - self.simulation_counter,
             )
 
             # Sample from previous population and perturb.
@@ -275,7 +276,7 @@ class SMCABC(ABCBASE):
             # If simulation budget was exceeded and we still need particles, take
             # previous population or fill up with previous population.
             if (
-                self.num_simulations >= self.num_simulation_budget
+                self.simulation_counter >= self.num_simulations
                 and num_accepted_particles < num_particles
             ):
                 if use_last_pop_samples:
@@ -327,10 +328,8 @@ class SMCABC(ABCBASE):
         Returns:
             epsilon: Epsilon for the next population.
         """
-        # Make distances unique to skip simulations with same outcome.
-        # NOTE: unique sorts the input already, so no sorting needed below?
+        # Take unique distances to skip same distances simulations (return is sorted).
         distances = torch.unique(distances)
-        distances = distances[torch.argsort(distances)]
         # Cumsum as cdf proxy.
         distances_cdf = torch.cumsum(distances, dim=0) / distances.sum()
         # Take the q quantile of distances.
@@ -339,7 +338,7 @@ class SMCABC(ABCBASE):
         except IndexError:
             self.logger.warning(
                 (
-                    f"Accepted unique distances={distances} dont match "
+                    f"Accepted unique distances={distances} don't match "
                     "quantile={quantile:.2f}. Selecting last distance."
                 )
             )

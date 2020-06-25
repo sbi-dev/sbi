@@ -1,13 +1,12 @@
 from __future__ import annotations
-from abc import ABC
 
-import torch
+from abc import ABC
 from typing import Callable, Union
 
-from sbi.simulators.simutils import simulate_in_batches
-from sbi.user_input.user_input_checks import process_x, prepare_for_sbi
-from numpy import ndarray
+import torch
 from torch import Tensor
+
+from sbi.simulators.simutils import simulate_in_batches
 
 
 class ABCBASE(ABC):
