@@ -15,7 +15,6 @@ class ABCBASE(ABC):
         self,
         simulator: Callable,
         prior,
-        x_o: Union[Tensor, ndarray],
         distance: Union[str, Callable] = "l2",
         num_workers: int = 1,
         simulation_batch_size: int = 1,
@@ -32,9 +31,8 @@ class ABCBASE(ABC):
                 parameters, e.g. which ranges are meaningful for them. Any
                 object with `.log_prob()`and `.sample()` (for example, a PyTorch
                 distribution) can be used.
-            x_o: Observed data.
-            distance: Distance function to compare observed and simulated data. Can be  
-                a custom function or one of "l1", "l2", "mse".
+            distance: Distance function to compare observed and simulated data. Can be
+                a custom function or one of `l1`, `l2`, `mse`.
             num_workers: Number of parallel workers to use for simulations.
             simulation_batch_size: Number of parameter sets that the simulator
                 maps to data x at once. If None, we simulate all parameter sets at the
@@ -44,13 +42,8 @@ class ABCBASE(ABC):
                 sampling.
         """
 
-        # User input checks.
-        simulator, prior, x_shape = prepare_for_sbi(simulator, prior)
-        x_o = process_x(x_o, x_shape)
-
         self.prior = prior
         self._simulator = simulator
-        self.x_o = x_o
         self._show_progress_bars = show_progress_bars
 
         # Select distance function.
@@ -83,14 +76,14 @@ class ABCBASE(ABC):
             raise ValueError(r"Distance {distance_type} not supported.")
 
         def distance_fun(observed_data: Tensor, simulated_data: Tensor) -> Tensor:
-            """Take distance over batch dimension
+            """Return distance over batch dimension.
 
             Args:
-                observed_data: observed data, could be 1D
-                simulated_data: batch of simulated data, has batch dimension
+                observed_data: Observed data, could be 1D.
+                simulated_data: Batch of simulated data, has batch dimension.
 
             Returns:
-                Torch tensor with batch of distances
+                Torch tensor with batch of distances.
             """
             assert simulated_data.ndim == 2, "simulated data needs batch dimension"
 

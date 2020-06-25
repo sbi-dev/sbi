@@ -6,7 +6,7 @@ from sbi.simulators.linear_gaussian import (
     true_posterior_linear_gaussian_mvn_prior,
 )
 
-from sbi.inference import MCABC, SMCABC
+from sbi.inference import ABC, SMC
 from torch.distributions import MultivariateNormal
 from tests.test_utils import check_c2st
 
@@ -31,9 +31,9 @@ def test_mcabc_inference_on_linear_gaussian(num_dim):
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    infer = MCABC(simulator, prior, x_o, simulation_batch_size=10000)
+    infer = ABC(simulator, prior, simulation_batch_size=10000)
 
-    phat = infer(1000000, quantile=0.001)
+    phat = infer(x_o, 100000, quantile=0.01)
 
     check_c2st(phat.sample((num_samples,)), target_samples, alg="MCABC")
 
@@ -56,11 +56,10 @@ def test_smcabc_inference_on_linear_gaussian(num_dim):
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    infer = SMCABC(
-        simulator, prior, x_o, simulation_batch_size=10000, algorithm_variant="C"
-    )
+    infer = SMC(simulator, prior, simulation_batch_size=10000, algorithm_variant="C")
 
     phat = infer(
+        x_o,
         num_particles=1000,
         num_initial_pop=5000,
         epsilon_decay=0.5,

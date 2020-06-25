@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from typing import Callable, Optional, Union, Tuple
 from pyro.distributions.empirical import Empirical
 from torch.distributions.distribution import Distribution
 from sbi.inference.abc.abc_base import ABCBASE
-from typing import Callable, Optional, Union, Tuple
+from sbi.user_input.user_input_checks import process_x, process_x_shape
 
 import torch
 from torch import Tensor, ones
@@ -15,13 +16,16 @@ class MCABC(ABCBASE):
         self,
         simulator: Callable,
         prior,
-        x_o: Union[Tensor, ndarray],
         distance: Union[str, Callable] = "l2",
         num_workers: int = 1,
         simulation_batch_size: int = 1,
         show_progress_bars: bool = True,
     ):
-        """Monte-Carlo Approximate Bayesian Computation (Rejection ABC).
+        """Monte-Carlo Approximate Bayesian Computation (Rejection ABC) [1].
+
+        [1] Pritchard, J. K., Seielstad, M. T., Perez-Lezaun, A., & Feldman, M. W.
+        (1999). Population growth of human Y chromosomes: a study of Y chromosome
+        microsatellites. Molecular biology and evolution, 16(12), 1791-1798.
 
         Args:
 
@@ -31,7 +35,6 @@ class MCABC(ABCBASE):
         super().__init__(
             simulator=simulator,
             prior=prior,
-            x_o=x_o,
             distance=distance,
             num_workers=num_workers,
             simulation_batch_size=simulation_batch_size,
@@ -40,20 +43,22 @@ class MCABC(ABCBASE):
 
     def __call__(
         self,
+        x_o: Union[Tensor, ndarray],
         num_simulations: int,
         eps: Optional[float] = None,
         quantile: Optional[float] = None,
         return_distances: bool = False,
     ) -> Union[Distribution, Tuple[Distribution, Tensor]]:
         r"""Run MCABC.
-        
+
         Args:
+            x_o: Observed data.
             num_simulations: Number of simulations to run.
             eps: Acceptance threshold $\epsilon$ for distance between observed and
                 simulated data.
             quantile: Upper quantile of smallest distances for which the corresponding
-                parameters are returned. Exactly one of quantile or `eps` have to be
-                passed.
+                parameters are returned, e.g, q=0.01 will return the top 1%. Exactly
+                one of quantile or `eps` have to be passed.
             return_distances: Whether to return the distances corresponding to the
                 selected parameters.
         Returns:
@@ -64,6 +69,9 @@ class MCABC(ABCBASE):
         assert (eps is not None) ^ (
             quantile is not None
         ), "Eps xor quantile must be passed."
+
+        self.x_shape, _ = process_x_shape(self._simulator, self.prior)
+        self.x_o = process_x(x_o, self.x_shape)
 
         # Simulate and calculate distances.
         theta = self.prior.sample((num_simulations,))

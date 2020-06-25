@@ -8,8 +8,9 @@ import torch
 from torch import Tensor, ones, tensor
 from torch.distributions import Distribution, Multinomial, MultivariateNormal
 from pyro.distributions import Uniform
-from numpy import ndarray
+from sbi.user_input.user_input_checks import process_x, process_x_shape
 import logging
+from numpy import ndarray
 
 
 class SMCABC(ABCBASE):
@@ -17,7 +18,6 @@ class SMCABC(ABCBASE):
         self,
         simulator: Callable,
         prior: Distribution,
-        x_o: Union[Tensor, ndarray],
         distance: Union[str, Callable] = "l2",
         num_workers: int = 1,
         simulation_batch_size: int = 1,
@@ -49,7 +49,6 @@ class SMCABC(ABCBASE):
         super().__init__(
             simulator=simulator,
             prior=prior,
-            x_o=x_o,
             distance=distance,
             num_workers=num_workers,
             simulation_batch_size=simulation_batch_size,
@@ -68,7 +67,7 @@ class SMCABC(ABCBASE):
             " {algorithm_variants}."
         )
         self.algorithm_variant = algorithm_variant
-        self.distance_to_x0 = lambda x: self.distance(self.x_o, x)
+        self.distance_to_x0 = None
         self.num_simulations = 0
         self.num_simulation_budget = 0
 
@@ -83,12 +82,13 @@ class SMCABC(ABCBASE):
 
     def __call__(
         self,
+        x_o: Union[Tensor, ndarray],
         num_particles: int,
         num_initial_pop: int,
         num_simulation_budget: int,
         epsilon_decay: float,
         distance_based_decay: bool = False,
-        ess_min: Optional[float] = 0.5,
+        ess_min: float = 0.5,
         kernel_variance_scale: float = 1.0,
         use_last_pop_samples: bool = True,
         return_summary: bool = False,
@@ -96,6 +96,7 @@ class SMCABC(ABCBASE):
         r"""Run SMCABC.
 
         Args:
+            x_o: Observed data.
             num_particles: Number of particles in each population.
             num_initial_pop: Number of simulations used for initial population.
             num_simulation_budget: Total number of possible simulations.
@@ -121,6 +122,9 @@ class SMCABC(ABCBASE):
 
         pop_idx = 0
         self.num_simulation_budget = num_simulation_budget
+        self.x_shape, _ = process_x_shape(self._simulator, self.prior)
+        self.x_o = process_x(x_o, self.x_shape)
+        self.distance_to_x0 = lambda x: self.distance(self.x_o, x)
 
         # run initial population
         particles, epsilon, distances = self._sample_initial_population(
@@ -167,20 +171,15 @@ class SMCABC(ABCBASE):
                 use_last_pop_samples=use_last_pop_samples,
             )
 
-            # Resample weights if ess too low.
-            ess = (1 / torch.sum(torch.exp(2.0 * log_weights), dim=0)) / num_particles
-            # Resampling of weights for low ESS only for Sisson et al. 2007.
-            if self.algorithm_variant == "B" and ess < ess_min:
-                self.logger.info(f"ESS={ess:.2f} too low, resampling pop {pop_idx}...")
-                # First resample, then set to uniform weights in in Sisson et al. 2007.
-                particles = self.sample_from_population_with_weights(
-                    particles, torch.exp(log_weights), num_samples=num_particles
+            # Resample population if effective sampling size is too small.
+            if self.algorithm_variant == "B":
+                particles, log_weights = self.resample_if_ess_too_small(
+                    particles, log_weights, num_particles, ess_min, pop_idx
                 )
-                log_weights = torch.log(1 / num_particles * ones(num_particles))
 
             self.logger.info(
                 (
-                    f"population={pop_idx} done: eps={epsilon:.6f}, ess={ess:.2f},"
+                    f"population={pop_idx} done: eps={epsilon:.6f},"
                     " num_sims={self.num_simulations}, acc={acc:.4f}."
                 )
             )
@@ -321,12 +320,12 @@ class SMCABC(ABCBASE):
         Note: distances are made unique to avoid repeated distances from simulations
         that result in the same observation.
 
-        Arguments:
-            distances  -- The distances accepted in this round.
-            quantile -- quantile in the distance distribution to determine new epsilon
+        Args:
+            distances: The distances accepted in this round.
+            quantile: Quantile in the distance distribution to determine new epsilon.
 
         Returns:
-            epsilon -- epsilon for the next population.
+            epsilon: Epsilon for the next population.
         """
         # Make distances unique to skip simulations with same outcome.
         # NOTE: unique sorts the input already, so no sorting needed below?
@@ -379,6 +378,7 @@ class SMCABC(ABCBASE):
         particles: Tensor, weights: Tensor, num_samples: int = 1
     ) -> Tensor:
         """Return samples from particles sampled with weights."""
+
         # define multinomial with weights as probs
         multi = Multinomial(probs=weights)
         # sample num samples, with replacement
@@ -394,13 +394,6 @@ class SMCABC(ABCBASE):
         """Sample and perturb batch of new parameters from trace.
 
         Reject sampled and perturbed parameters outside of prior.
-
-        Args:
-            trace {Tensor} -- [description]
-            weights {Tensor} -- [description]
-
-        Kwargs:
-            num_samples {int} -- [description] (default: {1})
         """
 
         num_accepted = 0
@@ -485,3 +478,27 @@ class SMCABC(ABCBASE):
             return Uniform(low=low, high=high).to_event(1)
         else:
             raise ValueError(f"Kernel, '{self.kernel}' not supported.")
+
+    def resample_if_ess_too_small(
+        self,
+        particles: Tensor,
+        log_weights: Tensor,
+        num_particles: int,
+        ess_min: float,
+        pop_idx: int,
+    ) -> Tuple[Tensor, Tensor]:
+        """Return resampled particles and uniform weights if effectice sampling size is
+        too small.
+        """
+
+        ess = (1 / torch.sum(torch.exp(2.0 * log_weights), dim=0)) / num_particles
+        # Resampling of weights for low ESS only for Sisson et al. 2007.
+        if ess < ess_min:
+            self.logger.info(f"ESS={ess:.2f} too low, resampling pop {pop_idx}...")
+            # First resample, then set to uniform weights in in Sisson et al. 2007.
+            particles = self.sample_from_population_with_weights(
+                particles, torch.exp(log_weights), num_samples=num_particles
+            )
+            log_weights = torch.log(1 / num_particles * ones(num_particles))
+
+        return particles, log_weights
