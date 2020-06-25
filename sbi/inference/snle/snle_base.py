@@ -115,7 +115,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         num_rounds: int,
         num_simulations_per_round: OneOrMore[int],
         x_o: Optional[Tensor] = None,
-        batch_size: int = 50,
+        training_batch_size: int = 50,
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
         stop_after_epochs: int = 20,
@@ -177,7 +177,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
             # Fit neural likelihood to newly aggregated dataset.
             self._train(
                 round_=round_,
-                batch_size=batch_size,
+                training_batch_size=training_batch_size,
                 learning_rate=learning_rate,
                 validation_fraction=validation_fraction,
                 stop_after_epochs=stop_after_epochs,
@@ -205,7 +205,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
     def _train(
         self,
         round_: int,
-        batch_size: int,
+        training_batch_size: int,
         learning_rate: float,
         validation_fraction: float,
         stop_after_epochs: int,
@@ -246,13 +246,13 @@ class LikelihoodEstimator(NeuralInference, ABC):
         # Create neural net and validation loaders using a subset sampler.
         train_loader = data.DataLoader(
             dataset,
-            batch_size=min(batch_size, num_training_examples),
+            batch_size=min(training_batch_size, num_training_examples),
             drop_last=True,
             sampler=SubsetRandomSampler(train_indices),
         )
         val_loader = data.DataLoader(
             dataset,
-            batch_size=min(batch_size, num_validation_examples),
+            batch_size=min(training_batch_size, num_validation_examples),
             shuffle=False,
             drop_last=False,
             sampler=SubsetRandomSampler(val_indices),

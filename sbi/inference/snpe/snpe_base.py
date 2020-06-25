@@ -91,7 +91,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         num_rounds: int,
         num_simulations_per_round: OneOrMore[int],
         x_o: Optional[Tensor] = None,
-        batch_size: int = 50,
+        training_batch_size: int = 50,
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
         stop_after_epochs: int = 20,
@@ -121,7 +121,7 @@ class PosteriorEstimator(NeuralInference, ABC):
                 sampling so that the simulator is run with parameters that are likely
                 for that `x_o`, i.e. they are sampled from the posterior obtained in the
                 previous round $p(\theta|x_o)$.
-            batch_size: Training batch size.
+            training_batch_size: Training batch size.
             learning_rate: Learning rate for Adam optimizer.
             validation_fraction: The fraction of data to use for validation.
             stop_after_epochs: The number of epochs to wait for improvement on the
@@ -198,7 +198,7 @@ class PosteriorEstimator(NeuralInference, ABC):
             # Fit posterior using newly aggregated data set.
             self._train(
                 round_=round_,
-                batch_size=batch_size,
+                training_batch_size=training_batch_size,
                 learning_rate=learning_rate,
                 validation_fraction=validation_fraction,
                 stop_after_epochs=stop_after_epochs,
@@ -314,7 +314,7 @@ class PosteriorEstimator(NeuralInference, ABC):
     def _train(
         self,
         round_: int,
-        batch_size: int,
+        training_batch_size: int,
         learning_rate: float,
         validation_fraction: float,
         stop_after_epochs: int,
@@ -356,13 +356,13 @@ class PosteriorEstimator(NeuralInference, ABC):
         # Create neural net and validation loaders using a subset sampler.
         train_loader = data.DataLoader(
             dataset,
-            batch_size=min(batch_size, num_training_examples),
+            batch_size=min(training_batch_size, num_training_examples),
             drop_last=True,
             sampler=SubsetRandomSampler(train_indices),
         )
         val_loader = data.DataLoader(
             dataset,
-            batch_size=min(batch_size, num_validation_examples),
+            batch_size=min(training_batch_size, num_validation_examples),
             shuffle=False,
             drop_last=True,
             sampler=SubsetRandomSampler(val_indices),

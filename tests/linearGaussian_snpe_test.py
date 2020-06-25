@@ -71,7 +71,7 @@ def test_c2st_snpe_on_linearGaussian(
     )
 
     posterior = infer(
-        num_rounds=1, num_simulations_per_round=2000, batch_size=100
+        num_rounds=1, num_simulations_per_round=2000, training_batch_size=100
     ).set_default_x(x_o)
     samples = posterior.sample((num_samples,))
 
