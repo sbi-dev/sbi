@@ -19,7 +19,6 @@ from sbi.utils import clamp_and_warn
 from sbi.utils import handle_invalid_x, warn_on_invalid_x
 import sbi.utils as utils
 from sbi.utils.torchutils import ensure_theta_batched, ensure_x_batched
-from sbi.utils.torchutils import get_default_device
 
 
 class RatioEstimator(NeuralInference, ABC):
@@ -33,7 +32,7 @@ class RatioEstimator(NeuralInference, ABC):
         embedding_net: nn.Module = nn.Identity(),
         classifier: Union[str, nn.Module] = "resnet",
         mcmc_method: str = "slice_np",
-        device: Union[torch.device, str] = get_default_device(),
+        device: str = "cpu",
         logging_level: Union[int, str] = "warning",
         summary_writer: Optional[SummaryWriter] = None,
         show_progress_bars: bool = True,

@@ -20,7 +20,6 @@ from sbi.inference.posterior import NeuralPosterior
 from sbi.types import OneOrMore, ScalarFloat
 import sbi.utils as utils
 from sbi.utils import Standardize, handle_invalid_x, warn_on_invalid_x
-from sbi.utils.torchutils import get_default_device
 
 
 class PosteriorEstimator(NeuralInference, ABC):
@@ -34,7 +33,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         density_estimator: Union[str, nn.Module] = "maf",
         sample_with_mcmc: bool = False,
         mcmc_method: str = "slice_np",
-        device: Union[torch.device, str] = get_default_device(),
+        device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
         show_progress_bars: bool = True,

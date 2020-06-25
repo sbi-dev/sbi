@@ -9,7 +9,6 @@ from torch import Tensor, nn
 from torch.utils.tensorboard import SummaryWriter
 
 from sbi.inference.snpe.snpe_base import PosteriorEstimator
-from sbi.utils.torchutils import get_default_device
 
 
 class SNPE_B(PosteriorEstimator):
@@ -27,7 +26,7 @@ class SNPE_B(PosteriorEstimator):
         retrain_from_scratch_each_round: bool = False,
         discard_prior_samples: bool = False,
         exclude_invalid_x: bool = True,
-        device: Union[torch.device, str] = get_default_device(),
+        device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
         show_progress_bars: bool = True,

@@ -9,7 +9,6 @@ from torch.utils.tensorboard import SummaryWriter
 from sbi.inference.posterior import NeuralPosterior
 from sbi.types import OneOrMore
 from sbi.inference.snre.snre_base import RatioEstimator
-from sbi.utils.torchutils import get_default_device
 from sbi.utils import del_entries
 
 
@@ -24,7 +23,7 @@ class SNRE_B(RatioEstimator):
         embedding_net: nn.Module = nn.Identity(),
         classifier: Union[str, nn.Module] = "resnet",
         mcmc_method: str = "slice_np",
-        device: Union[torch.device, str] = get_default_device(),
+        device: str = "cpu",
         logging_level: Union[int, str] = "warning",
         summary_writer: Optional[SummaryWriter] = None,
         show_progress_bars: bool = True,
@@ -56,7 +55,7 @@ class SNRE_B(RatioEstimator):
                 use a pre-configured neural network.
             mcmc_method: If MCMC sampling is used, specify the method here: either of
                 slice_np, slice, hmc, nuts.
-            device: torch device on which to compute, e.g. cuda, cpu.
+            device: torch device on which to compute, e.g. gpu, cpu.
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
             summary_writer: A `SummaryWriter` to control, among others, log

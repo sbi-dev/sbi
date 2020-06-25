@@ -8,9 +8,30 @@ import torch
 from torch import Tensor, float32
 from torch.distributions import Independent, Uniform
 from typing import Union
+import warnings
 
 import sbi.utils as utils
 from sbi.types import Array, OneOrMore, ScalarFloat
+
+
+def set_default_device(device: str) -> None:
+    """Set the default device to `cpu` or `gpu`."""
+
+    if device == "cpu":
+        torch.set_default_tensor_type("torch.FloatTensor")
+    elif device == "gpu":
+        warnings.warn(
+            """Gpu was selected as device, the default tensor type will be set to cuda.
+            Note that currently we do not expect computation speed improvements by
+            moving computation to the GPU. This is partially because the regime we are
+            working in (neural networks are not very broad, nor deep; batch sizes are
+            rather small) is not the regime we would expect GPUs to give a big speed
+            up. We are working on a better solution and recommend to use device='cpu'
+            for now."""
+        )
+        torch.set_default_tensor_type("torch.cuda.FloatTensor")
+    else:
+        raise ValueError(f"Device '{device}' not supported, use 'cpu' or 'gpu'.")
 
 
 def get_default_device():

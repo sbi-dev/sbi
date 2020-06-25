@@ -2,9 +2,9 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 from __future__ import annotations
+from sbi.utils.torchutils import set_default_device
 
 import pytest
-import torch
 from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
@@ -36,6 +36,8 @@ def test_c2st_snpe_on_linearGaussian(
         set_seed: fixture for manual seeding
     """
 
+    device = "cpu"
+    set_default_device(device)
     x_o = zeros(1, num_dim)
     num_samples = 1000
 
@@ -62,12 +64,15 @@ def test_c2st_snpe_on_linearGaussian(
 
     infer = SNPE_C(
         *prepare_for_sbi(simulator, prior),
-        simulation_batch_size=10,
+        simulation_batch_size=1000,
         show_progress_bars=False,
         sample_with_mcmc=False,
+        device=device,
     )
 
-    posterior = infer(num_rounds=1, num_simulations_per_round=2000).set_default_x(x_o)
+    posterior = infer(
+        num_rounds=1, num_simulations_per_round=2000, batch_size=100
+    ).set_default_x(x_o)
     samples = posterior.sample((num_samples,))
 
     # Compute the c2st and assert it is near chance level of 0.5.
