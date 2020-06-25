@@ -20,7 +20,7 @@ from sbi.simulators.simutils import simulate_in_batches
 from sbi.user_input.user_input_checks import prepare_for_sbi, process_x
 from sbi.utils import get_log_root
 from sbi.utils.plot import pairplot
-from sbi.utils.torchutils import get_default_device
+from sbi.utils.torchutils import get_default_device, set_default_device
 
 
 def infer(
@@ -81,7 +81,7 @@ class NeuralInference(ABC):
         x_shape: Optional[torch.Size] = None,
         num_workers: int = 1,
         simulation_batch_size: int = 1,
-        device: Union[torch.device, str] = get_default_device(),
+        device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
         show_progress_bars: bool = True,
@@ -105,7 +105,7 @@ class NeuralInference(ABC):
                 maps to data x at once. If None, we simulate all parameter sets at the
                 same time. If >= 1, the simulator has to process data of shape
                 (simulation_batch_size, parameter_dimension).
-            device: torch device on which to compute, e.g. 'cuda', 'cpu'.
+            device: torch device on which to compute, e.g. `gpu` or `cpu`.
             logging_level: Minimum severity of messages to log. One of the strings
                "INFO", "WARNING", "DEBUG", "ERROR" and "CRITICAL".
             summary_writer: A `SummaryWriter` to control, among others, log
@@ -115,6 +115,14 @@ class NeuralInference(ABC):
             show_round_summary: Whether to show the validation loss and leakage after
                 each round.
         """
+
+        # We set the device globally by setting the default tensor type for all tensors.
+        assert device in (
+            "gpu",
+            "cpu",
+        ), "Currently, only 'gpu' or 'cpu' are supported as devices."
+        set_default_device(device)
+        self._device = get_default_device()
 
         self._simulator, self._prior, self._x_shape = simulator, prior, x_shape
 
@@ -128,8 +136,6 @@ class NeuralInference(ABC):
             num_workers,
             self._show_progress_bars,
         )
-
-        self._device = device
 
         # Initialize roundwise (theta, x) for storage of parameters and simulations.
         # XXX Rename self._roundwise_* or self._rounds_*
@@ -312,7 +318,7 @@ class NeuralInference(ABC):
         # XXX: need more plotting kwargs, e.g., prior limits.
         parameters = theta_bank[-1]
 
-        figure, axes = pairplot(parameters.numpy())
+        figure, axes = pairplot(parameters.to("cpu").numpy())
 
         self._summary_writer.add_figure(
             tag="posterior_samples", figure=figure, global_step=round_ + 1

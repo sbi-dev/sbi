@@ -27,7 +27,7 @@ class SNPE_C(PosteriorEstimator):
         sample_with_mcmc: bool = False,
         mcmc_method: str = "slice_np",
         use_combined_loss: bool = False,
-        device: Union[torch.device, str] = get_default_device(),
+        device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
         show_progress_bars: bool = True,
@@ -64,7 +64,7 @@ class SNPE_C(PosteriorEstimator):
                 using maximum likelihood in addition to training it on all samples using
                 atomic loss. The extra MLE loss helps prevent density leaking with
                 bounded priors.
-            device: torch device on which to compute, e.g. cuda, cpu.
+            device: torch device on which to compute, e.g. gpu, cpu.
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
             summary_writer: A `SummaryWriter` to control, among others, log

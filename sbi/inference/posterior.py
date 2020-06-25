@@ -25,9 +25,6 @@ from sbi.utils.torchutils import (
 from sbi.user_input.user_input_checks import process_x
 
 
-NEG_INF = torch.tensor(float("-inf"), dtype=torch.float32)
-
-
 class NeuralPosterior:
     r"""Posterior $p(\theta|x)$ with `log_prob()` and `sample()` methods.<br/><br/>
     All inference methods in sbi train a neural network which is then used to obtain
@@ -213,7 +210,12 @@ class NeuralPosterior:
 
         # Force probability to be zero outside prior support.
         is_prior_finite = torch.isfinite(self._prior.log_prob(theta))
-        masked_log_prob = torch.where(is_prior_finite, unnorm_log_prob, NEG_INF)
+
+        masked_log_prob = torch.where(
+            is_prior_finite,
+            unnorm_log_prob,
+            torch.tensor(float("-inf"), dtype=torch.float32),
+        )
 
         log_factor = (
             log(self.leakage_correction(x=batched_first_of_batch(x)))
