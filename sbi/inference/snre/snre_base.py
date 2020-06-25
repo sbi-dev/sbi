@@ -104,7 +104,7 @@ class RatioEstimator(NeuralInference, ABC):
         num_simulations_per_round: OneOrMore[int],
         x_o: Optional[Tensor] = None,
         num_atoms: int = 10,
-        batch_size: int = 50,
+        training_batch_size: int = 50,
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
         stop_after_epochs: int = 20,
@@ -169,7 +169,7 @@ class RatioEstimator(NeuralInference, ABC):
             self._train(
                 round_=round_,
                 num_atoms=num_atoms,
-                batch_size=batch_size,
+                training_batch_size=training_batch_size,
                 learning_rate=learning_rate,
                 validation_fraction=validation_fraction,
                 stop_after_epochs=stop_after_epochs,
@@ -199,7 +199,7 @@ class RatioEstimator(NeuralInference, ABC):
         self,
         round_: int,
         num_atoms: int,
-        batch_size: int,
+        training_batch_size: int,
         learning_rate: float,
         validation_fraction: float,
         stop_after_epochs: int,
@@ -233,7 +233,7 @@ class RatioEstimator(NeuralInference, ABC):
             permuted_indices[num_training_examples:],
         )
 
-        clipped_batch_size = min(batch_size, num_validation_examples)
+        clipped_batch_size = min(training_batch_size, num_validation_examples)
 
         # num_atoms = theta.shape[0]
         clamp_and_warn("num_atoms", num_atoms, min_val=2, max_val=clipped_batch_size)

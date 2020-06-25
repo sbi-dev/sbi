@@ -74,7 +74,7 @@ class SNRE_A(RatioEstimator):
         num_rounds: int,
         num_simulations_per_round: OneOrMore[int],
         x_o: Optional[Tensor] = None,
-        batch_size: int = 50,
+        training_batch_size: int = 50,
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
         stop_after_epochs: int = 20,
@@ -101,7 +101,7 @@ class SNRE_A(RatioEstimator):
                 sampling so that the simulator is run with parameters that are likely
                 for that `x_o`, i.e. they are sampled from the posterior obtained in the
                 previous round $p(\theta|x_o)$.
-            batch_size: Training batch size.
+            training_batch_size: Training batch size.
             learning_rate: Learning rate for Adam optimizer.
             validation_fraction: The fraction of data to use for validation.
             stop_after_epochs: The number of epochs to wait for improvement on the
