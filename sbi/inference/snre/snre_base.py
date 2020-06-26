@@ -282,8 +282,12 @@ class RatioEstimator(NeuralInference, ABC):
 
             # Train for a single epoch.
             self._posterior.net.train()
-            for theta_batch, x_batch in train_loader:
+            for batch in train_loader:
                 optimizer.zero_grad()
+                theta_batch, x_batch = (
+                    batch[0].to(self._device),
+                    batch[1].to(self._device),
+                )
                 loss = self._loss(theta_batch, x_batch, num_atoms)
                 loss.backward()
                 if clip_max_norm is not None:
@@ -298,7 +302,11 @@ class RatioEstimator(NeuralInference, ABC):
             self._posterior.net.eval()
             log_prob_sum = 0
             with torch.no_grad():
-                for theta_batch, x_batch in val_loader:
+                for batch in val_loader:
+                    theta_batch, x_batch = (
+                        batch[0].to(self._device),
+                        batch[1].to(self._device),
+                    )
                     log_prob = self._loss(theta_batch, x_batch, num_atoms)
                     log_prob_sum -= log_prob.sum().item()
                 self._val_log_prob = log_prob_sum / num_validation_examples

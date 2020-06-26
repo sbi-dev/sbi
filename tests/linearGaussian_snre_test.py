@@ -22,6 +22,7 @@ from tests.test_utils import (
     get_dkl_gaussian_prior,
     get_prob_outside_uniform_prior,
 )
+from sbi.utils.torchutils import set_default_device
 
 
 @pytest.mark.parametrize("num_dim", (1, 3))
@@ -60,6 +61,8 @@ def test_c2st_sre_on_linearGaussian_different_dims(set_seed):
         set_seed: fixture for manual seeding
     """
 
+    device = "cpu"
+    set_default_device(device)
     theta_dim = 3
     x_dim = 2
     discard_dims = theta_dim - x_dim
@@ -95,9 +98,10 @@ def test_c2st_sre_on_linearGaussian_different_dims(set_seed):
         classifier="resnet",
         simulation_batch_size=50,
         show_progress_bars=False,
+        device=device,
     )
 
-    posterior = infer(num_rounds=1, num_simulations_per_round=1000)
+    posterior = infer(num_rounds=1, num_simulations_per_round=5000)
     samples = posterior.sample((num_samples,), x=x_o, thin=3)
 
     # Compute the c2st and assert it is near chance level of 0.5.
