@@ -4,7 +4,8 @@ from sbi.utils.get_nn_models import posterior_nn
 from sbi.utils.io import get_data_root, get_log_root, get_project_root
 from sbi.utils.plot import pairplot
 from sbi.utils.sbiutils import (
-    Standardize,
+    standardizing_transform,
+    standardizing_net,
     sample_posterior_within_prior,
     del_entries,
     clamp_and_warn,

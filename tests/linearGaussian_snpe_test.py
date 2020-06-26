@@ -236,67 +236,6 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str, set_seed):
     check_c2st(samples, target_samples, alg=method_str)
 
 
-_fail_reason_deterministic_sim = """If the simulator has truely deterministic (even
-partial) outputs, the inference can succeed with z_score_std > 0, but the log posterior
-will have infinites, which we reject."""
-
-
-@pytest.mark.slow
-@pytest.mark.parametrize(
-    "z_score_min_std",
-    (
-        pytest.param(
-            0.0,
-            marks=pytest.mark.xfail(
-                raises=AssertionError, reason=_fail_reason_deterministic_sim,
-            ),
-        ),
-        1e-7,
-    ),
-)
-def test_multi_round_snpe_deterministic_simulator(set_seed, z_score_min_std):
-    """Test if a deterministic simulator breaks inference for SNPE-C.
-
-    Args:
-        set_seed: fixture for manual seeding
-    """
-
-    num_dim = 3
-    x_o = zeros((1, num_dim))
-
-    # likelihood_mean will be likelihood_shift+theta
-    likelihood_shift = -1.0 * ones(num_dim)
-    likelihood_cov = 0.3 * eye(num_dim)
-
-    prior_mean = zeros(num_dim)
-    prior_cov = eye(num_dim)
-    prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
-
-    def simulator(theta):
-        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
-
-    def deterministic_simulator(theta):
-        """Simulator with deterministic last output dimension (across batches)."""
-        result = simulator(theta)
-        result[:, num_dim - 1] = 1.0
-
-        return result
-
-    infer = SNPE_C(
-        *prepare_for_sbi(deterministic_simulator, prior),
-        density_estimator="maf",
-        simulation_batch_size=10,
-        show_progress_bars=False,
-    )
-
-    infer(
-        num_rounds=2,
-        x_o=x_o,
-        num_simulations_per_round=1000,
-        z_score_min_std=z_score_min_std,
-    )
-
-
 # Testing rejection and mcmc sampling methods.
 @pytest.mark.slow
 @pytest.mark.parametrize(

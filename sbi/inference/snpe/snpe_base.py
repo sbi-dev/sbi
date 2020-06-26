@@ -2,6 +2,7 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from typing import Callable, Dict, Optional, Tuple, Union, cast
@@ -15,11 +16,11 @@ from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 
+import sbi.utils as utils
 from sbi.inference import NeuralInference
 from sbi.inference.posterior import NeuralPosterior
 from sbi.types import OneOrMore, ScalarFloat
-import sbi.utils as utils
-from sbi.utils import Standardize, handle_invalid_x, warn_on_invalid_x
+from sbi.utils import handle_invalid_x, warn_on_invalid_x
 
 
 class PosteriorEstimator(NeuralInference, ABC):
@@ -30,7 +31,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         x_shape: Optional[torch.Size] = None,
         num_workers: int = 1,
         simulation_batch_size: int = 1,
-        density_estimator: Union[str, nn.Module] = "maf",
+        density_estimator: Union[str, Callable] = "maf",
         sample_with_mcmc: bool = False,
         mcmc_method: str = "slice_np",
         device: str = "cpu",
@@ -39,11 +40,21 @@ class PosteriorEstimator(NeuralInference, ABC):
         show_progress_bars: bool = True,
         show_round_summary: bool = False,
     ):
-        """ Base class for Sequential Neural Posterior Estimation methods.
+        """Base class for Sequential Neural Posterior Estimation methods.
 
-        density_estimator: Either a string or a density estimation neural network
-                that can `.log_prob()` and `.sample()`. If it is a string, use a pre-
-                configured network of the provided type (one of nsf, maf, mdn, made).
+        Args:
+            density_estimator: If it is a string, use a pre-configured network of the
+                provided type (one of nsf, maf, mdn, made). Alternatively, a function
+                that builds a custom neural network can be provided. The function will
+                be called with the first batch of simulations (theta, x), which can
+                thus be used for shape inference and potentially for z-scoring. It
+                needs to return a PyTorch `nn.Module` implementing the density
+                estimator. The density estimator needs to provide the methods
+                `.log_prob` and `.sample()`.
+            sample_with_mcmc: Whether to sample with MCMC. MCMC can be used to deal
+                with high leakage.
+            mcmc_method: If MCMC sampling is used, specify the method here: either of
+                slice_np, slice, hmc, nuts.
 
         See docstring of `NeuralInference` class for all other arguments.
         """
@@ -61,27 +72,20 @@ class PosteriorEstimator(NeuralInference, ABC):
             show_round_summary=show_round_summary,
         )
 
+        # As detailed in the docstring, density estimator is either a string or
+        # a callable. The function creating the neural network is attached to
+        # `_build_neural_net`. It will be called in the first round and receive
+        # thetas and xs as inputs, so that they can be used for shape inference and
+        # potentially for z-scoring.
         if isinstance(density_estimator, str):
-            density_estimator = utils.posterior_nn(
-                model=density_estimator, prior=self._prior, x_o_shape=self._x_shape,
-            )
-
-        # Create a neural posterior which can sample(), log_prob().
-        self._posterior = NeuralPosterior(
-            method_family="snpe",
-            neural_net=density_estimator,
-            prior=self._prior,
-            x_shape=self._x_shape,
-            sample_with_mcmc=sample_with_mcmc,
-            mcmc_method=mcmc_method,
-            get_potential_function=PotentialFunctionProvider(),
-        )
+            self._build_neural_net = utils.posterior_nn(model=density_estimator)
+        else:
+            self._build_neural_net = density_estimator
+        self._posterior = None
+        self._sample_with_mcmc = sample_with_mcmc
+        self._mcmc_method = mcmc_method
 
         self._prior_masks, self._model_bank = [], []
-
-        # If we're retraining from scratch each round, keep a copy
-        # of the original untrained model for reinitialization.
-        self._untrained_neural_posterior = deepcopy(self._posterior)
 
         # Extra SNPE-specific fields summary_writer.
         self._summary.update({"rejection_sampling_acceptance_rates": []})  # type:ignore
@@ -99,8 +103,6 @@ class PosteriorEstimator(NeuralInference, ABC):
         clip_max_norm: Optional[float] = 5.0,
         calibration_kernel: Optional[Callable] = None,
         exclude_invalid_x: bool = True,
-        z_score_x: bool = True,
-        z_score_min_std: float = 1e-7,
         discard_prior_samples: bool = False,
         retrain_from_scratch_each_round: bool = False,
     ) -> NeuralPosterior:
@@ -135,10 +137,6 @@ class PosteriorEstimator(NeuralInference, ABC):
                 simulations `x`. See Lueckmann, Gonçalves et al., NeurIPS 2017.
             exclude_invalid_x: Whether to exclude simulation outputs `x=NaN` or `x=±∞`
                 during training. Expect errors, silent or explicit, when `False`.
-            z_score_x: Whether to z-score simulations `x`.
-            z_score_min_std: Minimum value of the standard deviation to use when
-                z-scoring `x`. This is typically needed when some simulator outputs are
-                constant or nearly so.
             discard_prior_samples: Whether to discard samples simulated in round 1, i.e.
                 from the prior. Training may be sped up by ignoring such less targeted
                 samples.
@@ -149,7 +147,6 @@ class PosteriorEstimator(NeuralInference, ABC):
             Posterior $p(\theta|x)$ that can be sampled and evaluated.
         """
 
-        self._handle_x_o_wrt_amortization(x_o, num_rounds)
         self._warn_if_retrain_from_scratch_snpe(retrain_from_scratch_each_round)
 
         # Calibration kernels proposed in Lueckmann, Gonçalves et al., 2017.
@@ -165,26 +162,22 @@ class PosteriorEstimator(NeuralInference, ABC):
             # Run simulations for the round.
             theta, x, prior_mask = self._run_simulations(round_, num_sims)
 
-            if round_ == 0:
-                # What is happening here? By design, we want the neural net to take care
-                # of normalizing both input and output, x and theta. But since we don't
-                # know the dimensions of these upon instantiation, or in the case of
-                # standardization, the mean and std we need to use, we grab the
-                # embedding net from the posterior (though presumably we could get it
-                # directly here, since what the posterior has is just a reference to the
-                # `density_estimator`), we do things with it (such as prepending a
-                # standardization step) and then we (destructively!) re-set the
-                # attribute in the Posterior to be this now-normalized embedding net.
-                # Perhaps the delayed chaining ideas in thinc can help make this a bit
-                # more transparent.
-                if z_score_x:
-                    self._posterior.set_embedding_net(
-                        self._prepend_z_score(x, z_score_min_std, exclude_invalid_x)
-                    )
-
-                # If we're retraining from scratch each round, keep a copy
-                # of the original untrained model for reinitialization.
-                self._untrained_neural_posterior = deepcopy(self._posterior)
+            # First round or if retraining from scratch:
+            # Call the `self._build_neural_net` with the rounds' thetas and xs as
+            # arguments, which will build the neural network
+            # This is passed into NeuralPosterior, to create a neural posterior which
+            # can `sample()` and `log_prob()`. The network is accessible via `.net`.
+            if round_ == 0 or retrain_from_scratch_each_round:
+                self._posterior = NeuralPosterior(
+                    method_family="snpe",
+                    neural_net=self._build_neural_net(theta, x),
+                    prior=self._prior,
+                    x_shape=self._x_shape,
+                    sample_with_mcmc=self._sample_with_mcmc,
+                    mcmc_method=self._mcmc_method,
+                    get_potential_function=PotentialFunctionProvider(),
+                )
+                self._handle_x_o_wrt_amortization(x_o, num_rounds)
 
             # Check for NaNs in simulations.
             is_valid_x, num_nans, num_infs = handle_invalid_x(x, exclude_invalid_x)
@@ -206,7 +199,6 @@ class PosteriorEstimator(NeuralInference, ABC):
                 clip_max_norm=clip_max_norm,
                 calibration_kernel=calibration_kernel,
                 discard_prior_samples=discard_prior_samples,
-                retrain_from_scratch_each_round=retrain_from_scratch_each_round,
             )
 
             # Store models at end of each round.
@@ -281,23 +273,6 @@ class PosteriorEstimator(NeuralInference, ABC):
 
         return theta, x, self._mask_sims_from_prior(round_, theta.size(0))
 
-    def _prepend_z_score(
-        self, x: Tensor, z_score_min_std: float, exclude_invalid_x: bool
-    ) -> nn.Module:
-        """Return embedding net with a standardizing step preprended."""
-
-        embed_nn = self._posterior.net._embedding_net
-
-        # Maybe exclude NaNs and infs from zscoring.
-        # No warning on invalid x here because warning will occur in __call__.
-        is_valid_x, *_ = handle_invalid_x(x, exclude_invalid_x)
-        x_std = torch.std(x[is_valid_x], dim=0)
-        x_std[x_std == 0] = z_score_min_std
-        preprocess = Standardize(torch.mean(x[is_valid_x], dim=0), x_std)
-
-        # If Sequential has a None component, forward will TypeError.
-        return preprocess if embed_nn is None else nn.Sequential(preprocess, embed_nn)
-
     def _mask_sims_from_prior(self, round_: int, num_simulations: int) -> Tensor:
         """Returns Tensor True where simulated from prior parameters.
 
@@ -322,7 +297,6 @@ class PosteriorEstimator(NeuralInference, ABC):
         clip_max_norm: Optional[float],
         calibration_kernel: Callable,
         discard_prior_samples: bool,
-        retrain_from_scratch_each_round: bool,
     ) -> None:
         r"""Train the conditional density estimator for the posterior $p(\theta|x)$.
 
@@ -371,12 +345,6 @@ class PosteriorEstimator(NeuralInference, ABC):
         optimizer = optim.Adam(
             list(self._posterior.net.parameters()), lr=learning_rate,
         )
-
-        # If retraining from scratch each round, reset the neural posterior
-        # to the untrained copy.
-        if retrain_from_scratch_each_round and round_ > 0:
-            self._posterior = deepcopy(self._untrained_neural_posterior)
-            optimizer = optim.Adam(self._posterior.net.parameters(), lr=learning_rate,)
 
         epoch, self._val_log_prob = 0, float("-Inf")
         while epoch <= max_num_epochs and not self._converged(epoch, stop_after_epochs):

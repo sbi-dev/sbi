@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-from typing import Optional, Callable, Union
+from typing import Callable, Optional, Union
 
 import torch
-from torch import nn, ones, Tensor
+from torch import Tensor
 from torch.utils.tensorboard import SummaryWriter
 
 from sbi.inference.posterior import NeuralPosterior
-from sbi.types import OneOrMore
 from sbi.inference.snre.snre_base import RatioEstimator
+from sbi.types import OneOrMore
 from sbi.utils import del_entries
 
 
@@ -20,8 +20,7 @@ class SNRE_B(RatioEstimator):
         x_shape: Optional[torch.Size] = None,
         num_workers: int = 1,
         simulation_batch_size: int = 1,
-        embedding_net: nn.Module = nn.Identity(),
-        classifier: Union[str, nn.Module] = "resnet",
+        classifier: Union[str, Callable] = "resnet",
         mcmc_method: str = "slice_np",
         device: str = "cpu",
         logging_level: Union[int, str] = "warning",
@@ -49,11 +48,14 @@ class SNRE_B(RatioEstimator):
                 maps to data x at once. If None, we simulate all parameter sets at the
                 same time. If >= 1, the simulator has to process data of shape
                 (simulation_batch_size, parameter_dimension).
-            embedding_net: Can be used to encode observations $x$. Currently not
-                implemented.
-            classifier: Classifier trained to approximate likelihood rations. If str,
-                use a pre-configured neural network.
-            mcmc_method: If MCMC sampling is used, specify the method here: either of
+            classifier: Classifier trained to approximate likelihood rations. If it is
+                a string, use a pre-configured network of the provided type (one of
+                linear, mlp, resnet). Alternatively, a function that builds a custom
+                neural network can be provided. The function will be called with the
+                first batch of simulations (theta, x), which can thus be used for shape
+                inference and potentially for z-scoring. It needs to return a PyTorch
+                `nn.Module` implementing the classifier.
+            mcmc_method: Specify the method for MCMC sampling, either either of:
                 slice_np, slice, hmc, nuts.
             device: torch device on which to compute, e.g. gpu, cpu.
             logging_level: Minimum severity of messages to log. One of the strings

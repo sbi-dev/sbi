@@ -83,7 +83,7 @@ class NeuralPosterior:
         self._get_potential_function = get_potential_function
         self._x_shape = x_shape
 
-        if method_family in ("snpe", "snle_a", "snre_a", "snre_b"):
+        if method_family in ("snpe", "snle", "snre_a", "snre_b"):
             self._method_family = method_family
         else:
             raise ValueError("Method family unsupported.")

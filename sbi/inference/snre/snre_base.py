@@ -12,13 +12,15 @@ from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 
+import sbi.utils as utils
 from sbi.inference.base import NeuralInference
 from sbi.inference.posterior import NeuralPosterior
 from sbi.types import OneOrMore, ScalarFloat
-from sbi.utils import clamp_and_warn
-from sbi.utils import handle_invalid_x, warn_on_invalid_x
-import sbi.utils as utils
-from sbi.utils.torchutils import ensure_theta_batched, ensure_x_batched
+from sbi.utils import clamp_and_warn, handle_invalid_x, warn_on_invalid_x
+from sbi.utils.torchutils import (
+    ensure_theta_batched,
+    ensure_x_batched,
+)
 
 
 class RatioEstimator(NeuralInference, ABC):
@@ -29,8 +31,7 @@ class RatioEstimator(NeuralInference, ABC):
         x_shape: Optional[torch.Size] = None,
         num_workers: int = 1,
         simulation_batch_size: int = 1,
-        embedding_net: nn.Module = nn.Identity(),
-        classifier: Union[str, nn.Module] = "resnet",
+        classifier: Union[str, Callable] = "resnet",
         mcmc_method: str = "slice_np",
         device: str = "cpu",
         logging_level: Union[int, str] = "warning",
@@ -49,10 +50,15 @@ class RatioEstimator(NeuralInference, ABC):
           even when training only one round.
 
         Args:
-            classifier: Binary classifier network.
-            embedding_net: A trainable network that maps high-dimensional simulation
-                outputs $x$ to lower-dimensional feature vectors $f(x)$ to feed the
-                classifier.
+            classifier: Classifier trained to approximate likelihood rations. If it is
+                a string, use a pre-configured network of the provided type (one of
+                linear, mlp, resnet). Alternatively, a function that builds a custom
+                neural network can be provided. The function will be called with the
+                first batch of simulations (theta, x), which can thus be used for shape
+                inference and potentially for z-scoring. It needs to return a PyTorch
+                `nn.Module` implementing the classifier.
+            mcmc_method: Specify the method for MCMC sampling, either either of:
+                slice_np, slice, hmc, nuts.
 
         See docstring of `NeuralInference` class for all other arguments.
         """
@@ -70,30 +76,18 @@ class RatioEstimator(NeuralInference, ABC):
             show_round_summary=show_round_summary,
         )
 
+        # As detailed in the docstring, density estimator is either a string or
+        # a callable. The function creating the neural network is attached to
+        # `_build_neural_net`. It will be called in the first round and receive
+        # thetas and xs as inputs, so that they can be used for shape inference and
+        # potentially for z-scoring.
         if isinstance(classifier, str):
-            classifier = utils.classifier_nn(
-                model=classifier,
-                theta_shape=self._prior.sample().shape,
-                x_o_shape=self._x_shape,
-            )
-
-        # Create posterior object which can sample().
-        method_family = self.__class__.__name__.lower()
-
-        self._posterior = NeuralPosterior(
-            method_family=method_family,
-            neural_net=classifier,
-            prior=self._prior,
-            x_shape=self._x_shape,
-            mcmc_method=mcmc_method,
-            get_potential_function=PotentialFunctionProvider(),
-        )
-
-        self._posterior.net.train(True)
-
-        if not isinstance(embedding_net, nn.Identity):
-            raise NotImplementedError("Embedding net not yet implemented for SNRE.")
-        self._embedding_net = embedding_net
+            self._build_neural_net = utils.classifier_nn(model=classifier)
+        else:
+            self._build_neural_net = classifier
+        self._posterior = None
+        self._sample_with_mcmc = True
+        self._mcmc_method = mcmc_method
 
         # Ratio-based-specific summary_writer fields.
         self._summary.update({"mcmc_times": []})  # type: ignore
@@ -132,14 +126,6 @@ class RatioEstimator(NeuralInference, ABC):
             Posterior $p(\theta|x)$ that can be sampled and evaluated.
         """
 
-        self._handle_x_o_wrt_amortization(x_o, num_rounds)
-
-        # If we're retraining from scratch each round,
-        # keep a copy of the original untrained model for reinitialization.
-        if retrain_from_scratch_each_round:
-            self._untrained_posterior = deepcopy(self._posterior)
-            self._untrained_embedding_net = deepcopy(self._embedding_net)
-
         max_num_epochs = 2 ** 31 - 1 if max_num_epochs is None else max_num_epochs
 
         num_sims_per_round = self._ensure_list(num_simulations_per_round, num_rounds)
@@ -156,6 +142,23 @@ class RatioEstimator(NeuralInference, ABC):
                 )
 
             x = self._batched_simulator(theta)
+
+            # First round or if retraining from scratch:
+            # Call the `self._build_neural_net` with the rounds' thetas and xs as
+            # arguments, which will build the neural network
+            # This is passed into NeuralPosterior, to create a neural posterior which
+            # can `sample()` and `log_prob()`. The network is accessible via `.net`.
+            if round_ == 0 or retrain_from_scratch_each_round:
+                self._posterior = NeuralPosterior(
+                    method_family=self.__class__.__name__.lower(),
+                    neural_net=self._build_neural_net(theta, x),
+                    prior=self._prior,
+                    x_shape=self._x_shape,
+                    sample_with_mcmc=self._sample_with_mcmc,
+                    mcmc_method=self._mcmc_method,
+                    get_potential_function=PotentialFunctionProvider(),
+                )
+                self._handle_x_o_wrt_amortization(x_o, num_rounds)
 
             # Check for NaNs in simulations.
             is_valid_x, num_nans, num_infs = handle_invalid_x(x, exclude_invalid_x)
@@ -176,7 +179,6 @@ class RatioEstimator(NeuralInference, ABC):
                 max_num_epochs=max_num_epochs,
                 clip_max_norm=clip_max_norm,
                 discard_prior_samples=discard_prior_samples,
-                retrain_from_scratch_each_round=retrain_from_scratch_each_round,
             )
 
             # Update description for progress bar.
@@ -206,7 +208,6 @@ class RatioEstimator(NeuralInference, ABC):
         max_num_epochs: int,
         clip_max_norm: Optional[float],
         discard_prior_samples: bool,
-        retrain_from_scratch_each_round: bool,
     ) -> None:
         r"""
         Trains the neural classifier.
@@ -244,7 +245,6 @@ class RatioEstimator(NeuralInference, ABC):
         )
 
         # Create neural net and validation loaders using a subset sampler.
-
         train_loader = data.DataLoader(
             dataset,
             batch_size=clipped_batch_size,
@@ -260,21 +260,8 @@ class RatioEstimator(NeuralInference, ABC):
         )
 
         optimizer = optim.Adam(
-            list(self._posterior.net.parameters())
-            + list(self._embedding_net.parameters()),
-            lr=learning_rate,
+            list(self._posterior.net.parameters()), lr=learning_rate,
         )
-
-        # If we're retraining from scratch each round, reset the neural posterior
-        # to the untrained copy we made at the start.
-        if retrain_from_scratch_each_round:
-            self._posterior = deepcopy(self._untrained_posterior)
-            self._embedding_net = deepcopy(self._untrained_embedding_net)
-            optimizer = optim.Adam(
-                list(self._posterior.net.parameters())
-                + list(self._embedding_net.parameters()),
-                lr=learning_rate,
-            )
 
         epoch, self._val_log_prob = 0, float("-Inf")
 
