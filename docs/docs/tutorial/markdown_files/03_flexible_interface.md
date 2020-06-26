@@ -47,12 +47,11 @@ In the advanced mode, you have to ensure that your simulator and prior adhere th
 simulator, prior, x_shape = prepare_for_sbi(linear_gaussian, prior)
 ```
 
-You can then use the `prior` and `x_shape` object to specify a custom density estimator. Since we use S*N*PE, we specifiy a neural network targeting the *posterior* (hence the call to `posterior_nn()`). In this example, we will create a neural spline flow (`'nsf'`) with `60` hidden units and `3` transform layers:
+You can specify a custom density estimator. Since we use S*N*PE, we specifiy a neural network targeting the *posterior* (hence the call to `posterior_nn()`). In this example, we will create a neural spline flow (`'nsf'`) with `60` hidden units and `3` transform layers:
 
 
 ```python
-my_density_estimator = posterior_nn('nsf', prior, x_shape, hidden_features=60, 
-                                    flow_num_transforms=3)
+my_density_estimator = posterior_nn('nsf', hidden_features=60, num_transforms=3)
 ```
 
 We will use `SNPE` with a `simulation_batch_size=10`, i.e. `10` simulations will be passed to the simulator which will then handle the simulations in a vectorized way (note that your simulator has to support this in order to use this feature):

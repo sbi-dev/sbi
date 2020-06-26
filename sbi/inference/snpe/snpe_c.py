@@ -2,6 +2,7 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 from __future__ import annotations
+
 from typing import Callable, Optional, Union
 
 import torch
@@ -52,9 +53,14 @@ class SNPE_C(PosteriorEstimator):
                 maps to data x at once. If None, we simulate all parameter sets at the
                 same time. If >= 1, the simulator has to process data of shape
                 (simulation_batch_size, parameter_dimension).
-            density_estimator: Either a string or a density estimation neural network
-                that can `.log_prob()` and `.sample()`. If it is a string, use a pre-
-                configured network of the provided type (one of nsf, maf, mdn, made).
+            density_estimator: If it is a string, use a pre-configured network of the
+                provided type (one of nsf, maf, mdn, made). Alternatively, a function
+                that builds a custom neural network can be provided. The function will
+                be called with the first batch of simulations (theta, x), which can
+                thus be used for shape inference and potentially for z-scoring. It
+                needs to return a PyTorch `nn.Module` implementing the density
+                estimator. The density estimator needs to provide the methods
+                `.log_prob` and `.sample()`.
             sample_with_mcmc: Whether to sample with MCMC. MCMC can be used to deal
                 with high leakage.
             mcmc_method: If MCMC sampling is used, specify the method here: either of
@@ -95,8 +101,6 @@ class SNPE_C(PosteriorEstimator):
         clip_max_norm: Optional[float] = 5.0,
         calibration_kernel: Optional[Callable] = None,
         exclude_invalid_x: bool = True,
-        z_score_x: bool = True,
-        z_score_min_std: float = 1e-7,
         discard_prior_samples: bool = False,
         retrain_from_scratch_each_round: bool = False,
     ) -> NeuralPosterior:
@@ -132,10 +136,6 @@ class SNPE_C(PosteriorEstimator):
                 simulations `x`. See Lueckmann, Gonçalves et al., NeurIPS 2017.
             exclude_invalid_x: Whether to exclude simulation outputs `x=NaN` or `x=±∞`
                 during training. Expect errors, silent or explicit, when `False`.
-            z_score_x: Whether to z-score simulations `x`.
-            z_score_min_std: Minimum value of the standard deviation to use when
-                z-scoring `x`. This is typically needed when some simulator outputs are
-                constant or nearly so.
             discard_prior_samples: Whether to discard samples simulated in round 1, i.e.
                 from the prior. Training may be sped up by ignoring such less targeted
                 samples.

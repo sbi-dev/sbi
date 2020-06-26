@@ -2,9 +2,9 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 from __future__ import annotations
+
 from abc import ABC
 from typing import Callable, Dict, Optional, Union
-from copy import deepcopy
 
 import numpy as np
 import torch
@@ -14,10 +14,10 @@ from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 
+import sbi.utils as utils
 from sbi.inference import NeuralInference
 from sbi.inference.posterior import NeuralPosterior
 from sbi.types import OneOrMore, ScalarFloat
-import sbi.utils as utils
 from sbi.utils import handle_invalid_x, warn_on_invalid_x
 
 
@@ -29,7 +29,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         x_shape: Optional[torch.Size] = None,
         num_workers: int = 1,
         simulation_batch_size: int = 1,
-        density_estimator: Union[str, nn.Module] = "maf",
+        density_estimator: Union[str, Callable] = "maf",
         mcmc_method: str = "slice_np",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
@@ -37,41 +37,21 @@ class LikelihoodEstimator(NeuralInference, ABC):
         show_progress_bars: bool = True,
         show_round_summary: bool = False,
     ):
-        r"""Sequential Neural Likelihood [1].
-
-        [1] Sequential Neural Likelihood: Fast Likelihood-free Inference with
-        Autoregressive Flows_, Papamakarios et al., AISTATS 2019,
-        https://arxiv.org/abs/1805.07226
+        r"""Base class for Sequential Neural Likelihood Estimation methods.
 
         Args:
-            simulator: A function that takes parameters $\theta$ and maps them to
-                simulations, or observations, `x`, $\mathrm{sim}(\theta)\to x$. Any
-                regular Python callable (i.e. function or class with `__call__` method)
-                can be used.
-            prior: A probability distribution that expresses prior knowledge about the
-                parameters, e.g. which ranges are meaningful for them. Any
-                object with `.log_prob()`and `.sample()` (for example, a PyTorch
-                distribution) can be used.
-            x_shape: Shape of a single simulation output $x$, has to be (1,N).
-            num_workers: Number of parallel workers to use for simulations.
-            simulation_batch_size: Number of parameter sets that the simulator
-                maps to data x at once. If None, we simulate all parameter sets at the
-                same time. If >= 1, the simulator has to process data of shape
-                (simulation_batch_size, parameter_dimension).
-            density_estimator: Either a string or a density estimation neural network
-                that can `.log_prob()` and `.sample()`. If it is a string, use a pre-
-                configured network of the provided type (one of nsf, maf, mdn, made).
-            mcmc_method: If MCMC sampling is used, specify the method here: either of
+            density_estimator: If it is a string, use a pre-configured network of the
+                provided type (one of nsf, maf, mdn, made). Alternatively, a function
+                that builds a custom neural network can be provided. The function will
+                be called with the first batch of simulations (theta, x), which can
+                thus be used for shape inference and potentially for z-scoring. It
+                needs to return a PyTorch `nn.Module` implementing the density
+                estimator. The density estimator needs to provide the methods
+                `.log_prob` and `.sample()`.
+            mcmc_method: Specify the method for MCMC sampling, either either of:
                 slice_np, slice, hmc, nuts.
-            device: torch device on which to compute, e.g. gpu, cpu.
-            logging_level: Minimum severity of messages to log. One of the strings
-                INFO, WARNING, DEBUG, ERROR and CRITICAL.
-            summary_writer: A `SummaryWriter` to control, among others, log
-                file location (default is `<current working directory>/logs`.)
-            show_progress_bars: Whether to show a progressbar during simulation and
-                sampling.
-            show_round_summary: Whether to show the validation loss and leakage after
-                each round.
+
+        See docstring of `NeuralInference` class for all other arguments.
         """
 
         super().__init__(
@@ -87,25 +67,18 @@ class LikelihoodEstimator(NeuralInference, ABC):
             show_round_summary=show_round_summary,
         )
 
+        # As detailed in the docstring, density estimator is either a string or
+        # a callable. The function creating the neural network is attached to
+        # `_build_neural_net`. It will be called in the first round and receive
+        # thetas and xs as inputs, so that they can be used for shape inference and
+        # potentially for z-scoring.
         if isinstance(density_estimator, str):
-            density_estimator = utils.likelihood_nn(
-                model=density_estimator,
-                theta_shape=self._prior.sample().shape,
-                x_o_shape=self._x_shape,
-            )
-
-        # Create neural posterior which can sample().
-        # TODO Notice use of `snle_a`, OK so long as it is the sole descendant.
-        self._posterior = NeuralPosterior(
-            method_family="snle_a",
-            neural_net=density_estimator,
-            prior=self._prior,
-            x_shape=self._x_shape,
-            mcmc_method=mcmc_method,
-            get_potential_function=PotentialFunctionProvider(),
-        )
-
-        self._posterior.net.train(True)
+            self._build_neural_net = utils.likelihood_nn(model=density_estimator)
+        else:
+            self._build_neural_net = density_estimator
+        self._posterior = None
+        self._sample_with_mcmc = True
+        self._mcmc_method = mcmc_method
 
         # SNLE-specific summary_writer fields.
         self._summary.update({"mcmc_times": []})  # type: ignore
@@ -142,13 +115,6 @@ class LikelihoodEstimator(NeuralInference, ABC):
             Posterior $p(\theta|x_o)$ that can be sampled and evaluated.
         """
 
-        self._handle_x_o_wrt_amortization(x_o, num_rounds)
-
-        # If we're retraining from scratch each round,
-        # keep a copy of the original untrained model for reinitialization.
-        if retrain_from_scratch_each_round:
-            self._untrained_posterior = deepcopy(self._posterior)
-
         max_num_epochs = 2 ** 31 - 1 if max_num_epochs is None else max_num_epochs
 
         num_sims_per_round = self._ensure_list(num_simulations_per_round, num_rounds)
@@ -165,6 +131,23 @@ class LikelihoodEstimator(NeuralInference, ABC):
                 )
 
             x = self._batched_simulator(theta)
+
+            # First round or if retraining from scratch:
+            # Call the `self._build_neural_net` with the rounds' thetas and xs as
+            # arguments, which will build the neural network
+            # This is passed into NeuralPosterior, to create a neural posterior which
+            # can `sample()` and `log_prob()`. The network is accessible via `.net`.
+            if round_ == 0 or retrain_from_scratch_each_round:
+                self._posterior = NeuralPosterior(
+                    method_family="snle",
+                    neural_net=self._build_neural_net(theta, x),
+                    prior=self._prior,
+                    x_shape=self._x_shape,
+                    sample_with_mcmc=self._sample_with_mcmc,
+                    mcmc_method=self._mcmc_method,
+                    get_potential_function=PotentialFunctionProvider(),
+                )
+                self._handle_x_o_wrt_amortization(x_o, num_rounds)
 
             # Check for NaNs in simulations.
             is_valid_x, num_nans, num_infs = handle_invalid_x(x, exclude_invalid_x)
@@ -184,7 +167,6 @@ class LikelihoodEstimator(NeuralInference, ABC):
                 max_num_epochs=max_num_epochs,
                 clip_max_norm=clip_max_norm,
                 discard_prior_samples=discard_prior_samples,
-                retrain_from_scratch_each_round=retrain_from_scratch_each_round,
             )
 
             # Update description for progress bar.
@@ -212,7 +194,6 @@ class LikelihoodEstimator(NeuralInference, ABC):
         max_num_epochs: int,
         clip_max_norm: Optional[float],
         discard_prior_samples: bool,
-        retrain_from_scratch_each_round: bool,
     ) -> None:
         r"""
         Train the conditional density estimator for the likelihood.
@@ -258,13 +239,9 @@ class LikelihoodEstimator(NeuralInference, ABC):
             sampler=SubsetRandomSampler(val_indices),
         )
 
-        optimizer = optim.Adam(self._posterior.net.parameters(), lr=learning_rate)
-
-        # If we're retraining from scratch each round, reset the neural posterior
-        # to the untrained copy we made at the start.
-        if retrain_from_scratch_each_round:
-            self._posterior = deepcopy(self._untrained_posterior)
-            optimizer = optim.Adam(self._posterior.net.parameters(), lr=learning_rate)
+        optimizer = optim.Adam(
+            list(self._posterior.net.parameters()), lr=learning_rate,
+        )
 
         epoch, self._val_log_prob = 0, float("-Inf")
         while epoch <= max_num_epochs and not self._converged(epoch, stop_after_epochs):

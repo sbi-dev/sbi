@@ -2,6 +2,7 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 from __future__ import annotations
+
 from typing import Callable, Optional, Union
 
 import torch
@@ -19,9 +20,7 @@ class SNPE_B(PosteriorEstimator):
         x_shape: Optional[torch.Size] = None,
         num_workers: int = 1,
         simulation_batch_size: Optional[int] = 1,
-        density_estimator: Union[str, nn.Module] = "mdn",
-        z_score_x: bool = True,
-        z_score_min_std: float = 1e-7,
+        density_estimator: Union[str, Callable] = "mdn",
         calibration_kernel: Optional[Callable] = None,
         retrain_from_scratch_each_round: bool = False,
         discard_prior_samples: bool = False,
@@ -51,8 +50,6 @@ class SNPE_B(PosteriorEstimator):
             num_workers=num_workers,
             simulation_batch_size=simulation_batch_size,
             density_estimator=density_estimator,
-            z_score_x=z_score_x,
-            z_score_min_std=z_score_min_std,
             calibration_kernel=calibration_kernel,
             retrain_from_scratch_each_round=retrain_from_scratch_each_round,
             discard_prior_samples=discard_prior_samples,

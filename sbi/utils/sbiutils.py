@@ -2,8 +2,9 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 import logging
-from typing import Tuple, Dict, Sequence, Any
+from typing import Tuple, Dict, Sequence, Any, Union
 
+from pyknos.nflows import transforms
 import torch
 from torch import Tensor, as_tensor, ones
 import torch.nn as nn
@@ -31,20 +32,59 @@ def clamp_and_warn(name: str, value: float, min_val: float, max_val: float) -> f
     return clamped_val
 
 
-class Standardize(nn.Module):
-    """
-    Standardize inputs, i.e. subtract mean and divide by standard deviation. Inherits
-    from `nn.Module`, hence it can be used as a step in `nn.Sequential`.
+def standardizing_transform(
+    batch_t: Tensor, min_std: float = 1e-7
+) -> transforms.AffineTransform:
+    """Builds standardizing transform
+
+    Args:
+        batch_t: Batched tensor from which mean and std deviation (across 
+            first dimension) are computed.
+        min_std:  Minimum value of the standard deviation to use when z-scoring to
+            avoid division by zero.
+
+    Returns:
+        Affine transform for z-scoring
     """
 
-    def __init__(self, mean, std):
-        super(Standardize, self).__init__()
-        self.mean = mean
-        self.std = std
+    is_valid_t, *_ = handle_invalid_x(batch_t, True)
 
-    def forward(self, tensor):
-        # TODO Guard against std \sim 0 (epsilon or raise).
-        return (tensor - self.mean) / self.std
+    t_mean = torch.mean(batch_t[is_valid_t], dim=0)
+    t_std = torch.std(batch_t[is_valid_t], dim=0)
+    t_std[t_std < min_std] = min_std
+
+    return transforms.AffineTransform(shift=-t_mean / t_std, scale=1 / t_std)
+
+
+def standardizing_net(batch_t: Tensor, min_std: float = 1e-7) -> nn.Module:
+    """Builds standardizing network
+
+    Args:
+        batch_t: Batched tensor from which mean and std deviation (across 
+            first dimension) are computed.
+        min_std:  Minimum value of the standard deviation to use when z-scoring to
+            avoid division by zero.
+
+    Returns:
+        Neural network module for z-scoring
+    """
+
+    class Standardize(nn.Module):
+        def __init__(self, mean, std):
+            super(Standardize, self).__init__()
+            self.mean = mean
+            self.std = std
+
+        def forward(self, tensor):
+            return (tensor - self.mean) / self.std
+
+    is_valid_t, *_ = handle_invalid_x(batch_t, True)
+
+    t_mean = torch.mean(batch_t[is_valid_t], dim=0)
+    t_std = torch.std(batch_t[is_valid_t], dim=0)
+    t_std[t_std < min_std] = min_std
+
+    return Standardize(t_mean, t_std)
 
 
 @torch.no_grad()

@@ -305,7 +305,7 @@ def atleast_2d_float32_tensor(arr: Union[Tensor, np.ndarray]) -> Tensor:
     return atleast_2d(torch.as_tensor(arr, dtype=float32))
 
 
-def batched_first_of_batch(t: Tensor):
+def batched_first_of_batch(t: Tensor) -> Tensor:
     """
     Takes in a tensor of shape (N, M) and outputs tensor of shape (1,M).
     """
