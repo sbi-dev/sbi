@@ -60,7 +60,7 @@ class SNLE_A(LikelihoodEstimator):
                 needs to return a PyTorch `nn.Module` implementing the density
                 estimator. The density estimator needs to provide the methods
                 `.log_prob` and `.sample()`.
-            mcmc_method: Specify the method for MCMC sampling, either either of:
+            mcmc_method: Specify the method for MCMC sampling, either of:
                 slice_np, slice, hmc, nuts.
             device: torch device on which to compute, e.g. gpu, cpu.
             logging_level: Minimum severity of messages to log. One of the strings

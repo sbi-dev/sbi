@@ -33,12 +33,12 @@ def clamp_and_warn(name: str, value: float, min_val: float, max_val: float) -> f
 
 
 def standardizing_transform(
-    batch_t: Tensor, min_std: float = 1e-7
+    batch_t: Tensor, min_std: float = 1e-14
 ) -> transforms.AffineTransform:
     """Builds standardizing transform
 
     Args:
-        batch_t: Batched tensor from which mean and std deviation (across 
+        batch_t: Batched tensor from which mean and std deviation (across
             first dimension) are computed.
         min_std:  Minimum value of the standard deviation to use when z-scoring to
             avoid division by zero.
@@ -60,7 +60,7 @@ def standardizing_net(batch_t: Tensor, min_std: float = 1e-7) -> nn.Module:
     """Builds standardizing network
 
     Args:
-        batch_t: Batched tensor from which mean and std deviation (across 
+        batch_t: Batched tensor from which mean and std deviation (across
             first dimension) are computed.
         min_std:  Minimum value of the standard deviation to use when z-scoring to
             avoid division by zero.

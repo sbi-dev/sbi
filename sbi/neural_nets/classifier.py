@@ -16,7 +16,9 @@ def build_input_layer(
     z_score_x: bool = True,
     z_score_y: bool = True,
 ) -> nn.Module:
-    """Builds input layer for classifers that optionally z-scores
+    """Builds input layer for classifiers that optionally z-scores
+
+    In SNRE, the classifier will receive batches of thetas and xs.
 
     Args:
         batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring
@@ -39,25 +41,26 @@ def build_input_layer(
         embedding_net_y = nn.Identity()
 
     class StandardizeInputs(nn.Module):
-        def __init__(self, embedding_net_x, embedding_net_y):
+        def __init__(self, embedding_net_x, embedding_net_y, dim_x, dim_y):
             super().__init__()
             self.embedding_net_x = embedding_net_x
             self.embedding_net_y = embedding_net_y
+            self.dim_x = dim_x
+            self.dim_y = dim_y
 
         def forward(self, t):
-            numel = t[0].numel()
             out = torch.cat(
                 [
-                    self.embedding_net_x(t[:, : numel // 2]),
-                    self.embedding_net_y(t[:, numel // 2 :]),
+                    self.embedding_net_x(t[:, : self.dim_x]),
+                    self.embedding_net_y(t[:, self.dim_x : self.dim_x + self.dim_y]),
                 ],
                 dim=1,
             )
             return out
 
-    input_layer = StandardizeInputs(embedding_net_x, embedding_net_y)
-
-    # xxx
+    input_layer = StandardizeInputs(
+        embedding_net_x, embedding_net_y, dim_x=batch_x.shape[1], dim_y=batch_y.shape[1]
+    )
 
     return input_layer
 
@@ -68,7 +71,9 @@ def build_linear_classifier(
     z_score_x: bool = True,
     z_score_y: bool = True,
 ) -> nn.Module:
-    """Builds linear classifier for SNRE
+    """Builds linear classifier
+
+    In SNRE, the classifier will receive batches of thetas and xs.
 
     Args:
         batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring
@@ -98,7 +103,9 @@ def build_mlp_classifier(
     z_score_y: bool = True,
     hidden_features: int = 50,
 ) -> nn.Module:
-    """Builds MLP classifier for SNRE
+    """Builds MLP classifier
+
+    In SNRE, the classifier will receive batches of thetas and xs.
 
     Args:
         batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring
@@ -137,7 +144,9 @@ def build_resnet_classifier(
     z_score_y: bool = True,
     hidden_features: int = 50,
 ) -> nn.Module:
-    """Builds ResNet classifier for SNRE
+    """Builds ResNet classifier
+
+    In SNRE, the classifier will receive batches of thetas and xs.
 
     Args:
         batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring

@@ -48,14 +48,14 @@ class SNRE_B(RatioEstimator):
                 maps to data x at once. If None, we simulate all parameter sets at the
                 same time. If >= 1, the simulator has to process data of shape
                 (simulation_batch_size, parameter_dimension).
-            classifier: Classifier trained to approximate likelihood rations. If it is
+            classifier: Classifier trained to approximate likelihood ratios. If it is
                 a string, use a pre-configured network of the provided type (one of
                 linear, mlp, resnet). Alternatively, a function that builds a custom
                 neural network can be provided. The function will be called with the
                 first batch of simulations (theta, x), which can thus be used for shape
                 inference and potentially for z-scoring. It needs to return a PyTorch
                 `nn.Module` implementing the classifier.
-            mcmc_method: Specify the method for MCMC sampling, either either of:
+            mcmc_method: Specify the method for MCMC sampling, either of:
                 slice_np, slice, hmc, nuts.
             device: torch device on which to compute, e.g. gpu, cpu.
             logging_level: Minimum severity of messages to log. One of the strings
