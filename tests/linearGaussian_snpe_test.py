@@ -2,7 +2,7 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 from __future__ import annotations
-from sbi.utils.torchutils import set_default_device
+from sbi.utils.torchutils import configure_default_device
 
 import pytest
 from torch import eye, ones, zeros
@@ -37,7 +37,7 @@ def test_c2st_snpe_on_linearGaussian(
     """
 
     device = "cpu"
-    set_default_device(device)
+    configure_default_device(device)
     x_o = zeros(1, num_dim)
     num_samples = 1000
 

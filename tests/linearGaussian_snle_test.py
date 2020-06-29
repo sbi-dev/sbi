@@ -18,7 +18,7 @@ from sbi.simulators.linear_gaussian import (
     true_posterior_linear_gaussian_mvn_prior,
 )
 from tests.test_utils import check_c2st, get_prob_outside_uniform_prior
-from sbi.utils.torchutils import set_default_device
+from sbi.utils.torchutils import configure_default_device
 
 
 @pytest.mark.parametrize("num_dim", (1, 3))
@@ -61,7 +61,7 @@ def test_c2st_snl_on_linearGaussian_different_dims(set_seed):
     """
 
     device = "cpu"
-    set_default_device(device)
+    configure_default_device(device)
     theta_dim = 3
     x_dim = 2
     discard_dims = theta_dim - x_dim
@@ -98,7 +98,7 @@ def test_c2st_snl_on_linearGaussian_different_dims(set_seed):
         device=device,
     )
 
-    posterior = infer(num_rounds=1, num_simulations_per_round=4000)  # type: ignore
+    posterior = infer(num_rounds=1, num_simulations_per_round=5000)  # type: ignore
     samples = posterior.sample((num_samples,), x=x_o, thin=3)
 
     # Compute the c2st and assert it is near chance level of 0.5.
