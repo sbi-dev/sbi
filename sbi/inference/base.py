@@ -20,7 +20,7 @@ from sbi.simulators.simutils import simulate_in_batches
 from sbi.user_input.user_input_checks import prepare_for_sbi, process_x
 from sbi.utils import get_log_root
 from sbi.utils.plot import pairplot
-from sbi.utils.torchutils import get_default_device, set_default_device
+from sbi.utils.torchutils import configure_default_device
 
 
 def infer(
@@ -105,7 +105,7 @@ class NeuralInference(ABC):
                 maps to data x at once. If None, we simulate all parameter sets at the
                 same time. If >= 1, the simulator has to process data of shape
                 (simulation_batch_size, parameter_dimension).
-            device: torch device on which to compute, e.g. `gpu` or `cpu`.
+            device: torch device on which to compute, e.g. gpu or cpu.
             logging_level: Minimum severity of messages to log. One of the strings
                "INFO", "WARNING", "DEBUG", "ERROR" and "CRITICAL".
             summary_writer: A `SummaryWriter` to control, among others, log
@@ -121,8 +121,8 @@ class NeuralInference(ABC):
             "gpu",
             "cpu",
         ), "Currently, only 'gpu' or 'cpu' are supported as devices."
-        set_default_device(device)
-        self._device = get_default_device()
+
+        self._device = configure_default_device(device)
 
         self._simulator, self._prior, self._x_shape = simulator, prior, x_shape
 

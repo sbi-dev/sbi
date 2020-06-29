@@ -12,7 +12,6 @@ from sbi.inference.posterior import NeuralPosterior
 from sbi.inference.snpe.snpe_base import PosteriorEstimator
 from sbi.types import OneOrMore
 from sbi.utils import clamp_and_warn, del_entries, repeat_rows
-from sbi.utils.torchutils import get_default_device
 
 
 class SNPE_C(PosteriorEstimator):

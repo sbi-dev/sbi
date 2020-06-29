@@ -22,7 +22,7 @@ from tests.test_utils import (
     get_dkl_gaussian_prior,
     get_prob_outside_uniform_prior,
 )
-from sbi.utils.torchutils import set_default_device
+from sbi.utils.torchutils import configure_default_device
 
 
 @pytest.mark.parametrize("num_dim", (1, 3))
@@ -62,7 +62,7 @@ def test_c2st_sre_on_linearGaussian_different_dims(set_seed):
     """
 
     device = "cpu"
-    set_default_device(device)
+    configure_default_device(device)
     theta_dim = 3
     x_dim = 2
     discard_dims = theta_dim - x_dim
