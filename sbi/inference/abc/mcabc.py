@@ -29,8 +29,23 @@ class MCABC(ABCBASE):
         microsatellites. Molecular biology and evolution, 16(12), 1791-1798.
 
         Args:
-
-        See docstring of `ABCBASE` class for all arguments.
+            simulator: A function that takes parameters $\theta$ and maps them to
+                simulations, or observations, `x`, $\mathrm{sim}(\theta)\to x$. Any
+                regular Python callable (i.e. function or class with `__call__` method)
+                can be used.
+            prior: A probability distribution that expresses prior knowledge about the
+                parameters, e.g. which ranges are meaningful for them. Any
+                object with `.log_prob()`and `.sample()` (for example, a PyTorch
+                distribution) can be used.
+            distance: Distance function to compare observed and simulated data. Can be
+                a custom function or one of `l1`, `l2`, `mse`.
+            num_workers: Number of parallel workers to use for simulations.
+            simulation_batch_size: Number of parameter sets that the simulator
+                maps to data x at once. If None, we simulate all parameter sets at the
+                same time. If >= 1, the simulator has to process data of shape
+                (simulation_batch_size, parameter_dimension).
+            show_progress_bars: Whether to show a progressbar during simulation and
+                sampling.
         """
 
         super().__init__(
