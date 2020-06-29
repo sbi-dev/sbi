@@ -50,14 +50,14 @@ class RatioEstimator(NeuralInference, ABC):
           even when training only one round.
 
         Args:
-            classifier: Classifier trained to approximate likelihood rations. If it is
+            classifier: Classifier trained to approximate likelihood ratios. If it is
                 a string, use a pre-configured network of the provided type (one of
                 linear, mlp, resnet). Alternatively, a function that builds a custom
                 neural network can be provided. The function will be called with the
                 first batch of simulations (theta, x), which can thus be used for shape
                 inference and potentially for z-scoring. It needs to return a PyTorch
                 `nn.Module` implementing the classifier.
-            mcmc_method: Specify the method for MCMC sampling, either either of:
+            mcmc_method: Specify the method for MCMC sampling, either of:
                 slice_np, slice, hmc, nuts.
 
         See docstring of `NeuralInference` class for all other arguments.
@@ -76,7 +76,7 @@ class RatioEstimator(NeuralInference, ABC):
             show_round_summary=show_round_summary,
         )
 
-        # As detailed in the docstring, density estimator is either a string or
+        # As detailed in the docstring, `density_estimator` is either a string or
         # a callable. The function creating the neural network is attached to
         # `_build_neural_net`. It will be called in the first round and receive
         # thetas and xs as inputs, so that they can be used for shape inference and
@@ -158,7 +158,7 @@ class RatioEstimator(NeuralInference, ABC):
                     mcmc_method=self._mcmc_method,
                     get_potential_function=PotentialFunctionProvider(),
                 )
-                self._handle_x_o_wrt_amortization(x_o, num_rounds)
+            self._handle_x_o_wrt_amortization(x_o, num_rounds)
 
             # Check for NaNs in simulations.
             is_valid_x, num_nans, num_infs = handle_invalid_x(x, exclude_invalid_x)

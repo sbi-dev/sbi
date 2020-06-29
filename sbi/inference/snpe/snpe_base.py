@@ -72,7 +72,7 @@ class PosteriorEstimator(NeuralInference, ABC):
             show_round_summary=show_round_summary,
         )
 
-        # As detailed in the docstring, density estimator is either a string or
+        # As detailed in the docstring, `density_estimator` is either a string or
         # a callable. The function creating the neural network is attached to
         # `_build_neural_net`. It will be called in the first round and receive
         # thetas and xs as inputs, so that they can be used for shape inference and
@@ -177,7 +177,7 @@ class PosteriorEstimator(NeuralInference, ABC):
                     mcmc_method=self._mcmc_method,
                     get_potential_function=PotentialFunctionProvider(),
                 )
-                self._handle_x_o_wrt_amortization(x_o, num_rounds)
+            self._handle_x_o_wrt_amortization(x_o, num_rounds)
 
             # Check for NaNs in simulations.
             is_valid_x, num_nans, num_infs = handle_invalid_x(x, exclude_invalid_x)
