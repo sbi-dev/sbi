@@ -36,7 +36,7 @@ def infer(
     The scope of this function is limited to the most essential features of sbi. For
     more flexibility (e.g. multi-round inference, different density estimators) please
     use the flexible interface described here:
-    mackelab.org/sbi/tutorial/03_flexible_interface.html
+    https://www.mackelab.org/sbi/tutorial/markdown_files/03_flexible_interface/
 
     Args:
         simulator: A function that takes parameters $\theta$ and maps them to
