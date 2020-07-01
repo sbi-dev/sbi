@@ -9,7 +9,7 @@ from torch import Tensor, ones
 from torch.distributions.distribution import Distribution
 
 from sbi.inference.abc.abc_base import ABCBASE
-from sbi.user_input.user_input_checks import process_x, process_x_shape
+from sbi.user_input.user_input_checks import process_x
 
 
 class MCABC(ABCBASE):
@@ -86,12 +86,14 @@ class MCABC(ABCBASE):
             quantile is not None
         ), "Eps or quantile must be passed, but not both."
 
-        self.x_shape, _ = process_x_shape(self._simulator, self.prior)
-        self.x_o = process_x(x_o, self.x_shape)
-
         # Simulate and calculate distances.
         theta = self.prior.sample((num_simulations,))
         x = self._batched_simulator(theta)
+
+        # Infer shape of x to test and set x_o.
+        self.x_shape = x[0].unsqueeze(0).shape
+        self.x_o = process_x(x_o, self.x_shape)
+
         distances = self.distance(self.x_o, x)
 
         # Select based on acceptance threshold epsilon.

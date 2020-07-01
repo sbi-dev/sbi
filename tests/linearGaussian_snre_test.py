@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import pytest
-import torch
 from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
@@ -153,11 +152,10 @@ def test_c2st_sre_on_linearGaussian(
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    simulator, prior, x_shape = prepare_for_sbi(simulator, prior)
+    simulator, prior = prepare_for_sbi(simulator, prior)
     kwargs = dict(
         simulator=simulator,
         prior=prior,
-        x_shape=x_shape,
         classifier="resnet",
         simulation_batch_size=50,
         mcmc_method="slice_np",

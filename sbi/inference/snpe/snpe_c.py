@@ -20,7 +20,6 @@ class SNPE_C(PosteriorEstimator):
         self,
         simulator: Callable,
         prior,
-        x_shape: Optional[torch.Size] = None,
         num_workers: int = 1,
         simulation_batch_size: int = 1,
         density_estimator: Union[str, nn.Module] = "maf",
@@ -47,7 +46,6 @@ class SNPE_C(PosteriorEstimator):
                 parameters, e.g. which ranges are meaningful for them. Any
                 object with `.log_prob()`and `.sample()` (for example, a PyTorch
                 distribution) can be used.
-            x_shape: Shape of a single simulation output $x$, has to be (1,N).
             num_workers: Number of parallel workers to use for simulations.
             simulation_batch_size: Number of parameter sets that the simulator
                 maps to data x at once. If None, we simulate all parameter sets at the

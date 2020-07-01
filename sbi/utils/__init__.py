@@ -11,6 +11,7 @@ from sbi.utils.sbiutils import (
     clamp_and_warn,
     handle_invalid_x,
     warn_on_invalid_x,
+    x_shape_from_simulated_data,
 )
 from sbi.utils.torchutils import (
     BoxUniform,

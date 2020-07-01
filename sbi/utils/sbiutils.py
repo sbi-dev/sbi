@@ -11,6 +11,11 @@ import torch.nn as nn
 from tqdm.auto import tqdm
 
 
+def x_shape_from_simulated_data(batch_x):
+    assert batch_x.ndim == 2, "Simulated data must be a batch with two dimensions."
+    return batch_x[0].unsqueeze(0).shape
+
+
 def del_entries(dic: Dict[str, Any], entries: Sequence = ()):
     """Delete entries from a dictionary.
 

@@ -62,10 +62,9 @@ def infer(
             "Method not available. `method` must be one of 'SNPE', 'SNLE', 'SNRE'."
         )
 
-    # Note this typically simulates once to find out the right `x_shape`.
-    prior, simulator, x_shape = prepare_for_sbi(simulator, prior, None)
+    simulator, prior = prepare_for_sbi(simulator, prior)
 
-    infer_ = method_fun(prior, simulator, x_shape=x_shape, num_workers=num_workers)
+    infer_ = method_fun(simulator, prior, num_workers=num_workers)
     posterior = infer_(num_rounds=1, num_simulations_per_round=num_simulations)
 
     return posterior
@@ -78,7 +77,6 @@ class NeuralInference(ABC):
         self,
         simulator: Callable,
         prior,
-        x_shape: Optional[torch.Size] = None,
         num_workers: int = 1,
         simulation_batch_size: int = 1,
         device: str = "cpu",
@@ -99,7 +97,6 @@ class NeuralInference(ABC):
                 parameters, e.g. which ranges are meaningful for them. Any
                 object with `.log_prob()`and `.sample()` (for example, a PyTorch
                 distribution) can be used.
-            x_shape: Shape of a single simulation output $x$, has to be (1,N).
             num_workers: Number of parallel workers to use for simulations.
             simulation_batch_size: Number of parameter sets that the simulator
                 maps to data x at once. If None, we simulate all parameter sets at the
@@ -124,7 +121,7 @@ class NeuralInference(ABC):
 
         self._device = configure_default_device(device)
 
-        self._simulator, self._prior, self._x_shape = simulator, prior, x_shape
+        self._simulator, self._prior = simulator, prior
 
         self._show_progress_bars = show_progress_bars
         self._show_round_summary = show_round_summary

@@ -31,8 +31,8 @@ def flexible():
     prior = torch.distributions.MultivariateNormal(
         loc=prior_mean, covariance_matrix=prior_cov
     )
-    simulator, prior, x_shape = prepare_for_sbi(diagonal_linear_gaussian, prior)
-    inference = SNPE(simulator, prior, x_shape)
+    simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior)
+    inference = SNPE(simulator, prior)
     posterior = inference(num_rounds=1, num_simulations_per_round=500)
     posterior.sample((100,), x=x_o)
 
