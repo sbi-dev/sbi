@@ -50,7 +50,7 @@ class NeuralPosterior:
         method_family: str,
         neural_net: nn.Module,
         prior,
-        x_shape: Optional[torch.Size] = None,
+        x_shape: torch.Size,
         sample_with_mcmc: bool = True,
         mcmc_method: str = "slice_np",
         get_potential_function: Optional[Callable] = None,
