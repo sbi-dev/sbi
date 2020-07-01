@@ -1,12 +1,11 @@
 # API Reference
 
-
 ## Inference
 
 ::: sbi.inference.base.infer
     rendering:
       show_root_heading: true
-      
+
 ::: sbi.user_input.user_input_checks.prepare_for_sbi
     rendering:
       show_root_heading: true
@@ -26,14 +25,20 @@
 ::: sbi.inference.snre.snre_b.SNRE_B
     rendering:
       show_root_heading: true
-      
-      
+
+::: sbi.inference.abc.mcabc.MCABC
+    rendering:
+      show_root_heading: true
+
+::: sbi.inference.abc.smcabc.SABC
+    rendering:
+      show_root_heading: true
+
 ## Posterior
 
 ::: sbi.inference.posterior.NeuralPosterior
     rendering:
       show_root_heading: true
-
 
 ## Models
 
@@ -42,18 +47,15 @@
       show_root_heading: true
       show_object_full_path: true
 
-
 ::: sbi.utils.get_nn_models.likelihood_nn
     rendering:
       show_root_heading: true
       show_object_full_path: true
 
-
 ::: sbi.utils.get_nn_models.classifier_nn
     rendering:
       show_root_heading: true
       show_object_full_path: true
-      
 
 ## Utils
 
