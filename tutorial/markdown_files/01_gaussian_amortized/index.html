@@ -267,7 +267,7 @@
 Neural network successfully converged after 70 epochs.
 </code></pre></div>
 <h2 id="amortized-inference">Amortized inference<a class="headerlink" href="#amortized-inference" title="Permanent link">¶</a></h2>
-<p>As it can be seen above, we have not yet provided an observation to the inference procedure. In fact, we can evaluate the posterior for different observations without having to re-run inference. This is called amortization. An amortized posterior is one that is not focused on any particular observation. Naturally, if the dimensionality of <span class="arithmatex">\(x\)</span> is large any of the inference methods will need to run many simulations for the resulting posterior to perform well in <span class="arithmatex">\(x\)</span> space.</p>
+<p>Note that we have not yet provided an observation to the inference procedure. In fact, we can evaluate the posterior for different observations without having to re-run inference. This is called amortization. An amortized posterior is one that is not focused on any particular observation. Naturally, if the diversity of observations is large, any of the inference methods will need to run many simulations for the resulting posterior to perform well across these diverse observations.</p>
 <p>Let’s say we have two observations <code>x_o_1 = [0,0,0]</code> and <code>x_o_2 = [2,2,2]</code>:</p>
 <div class="codehilite"><pre><span></span><code><span class="n">x_o_1</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="p">,)</span>
 <span class="n">x_o_2</span> <span class="o">=</span> <span class="mf">2.0</span><span class="o">*</span><span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">3</span><span class="p">,)</span>
@@ -281,7 +281,7 @@ Neural network successfully converged after 70 epochs.
 <p><img alt="png" src="../01_gaussian_amortized_files/01_gaussian_amortized_13_0.png"/></p>
 <p>As it can be seen, the posterior samples are centered around <code>[-1,-1,-1]</code> in each dimension. 
 This makes sense because the simulator always adds <code>1.0</code> in each dimension and we have observed <code>x_o_1 = [0,0,0]</code>.</p>
-<p>Since the learned posterior is amortized, we can also draw samples from the posterior given the second observation without having to re-run interence:</p>
+<p>Since the learned posterior is amortized, we can also draw samples from the posterior given the second observation without having to re-run inference:</p>
 <div class="codehilite"><pre><span></span><code><span class="n">posterior_samples_2</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_o_2</span><span class="p">)</span>
 
 <span class="c1"># plot posterior samples</span>
