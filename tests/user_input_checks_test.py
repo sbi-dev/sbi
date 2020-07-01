@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Callable, Optional
+from typing import Callable
 
 import pytest
 import torch
@@ -11,14 +11,13 @@ from scipy.stats import beta, multivariate_normal, uniform
 from torch import Tensor, eye, ones, zeros
 from torch.distributions import Beta, Distribution, Gamma, MultivariateNormal, Uniform
 
-from sbi.inference import SNL, SNPE_C, SRE
+from sbi.inference import SNPE_C
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
 from sbi.user_input.user_input_checks import (
     prepare_for_sbi,
     process_prior,
     process_simulator,
     process_x,
-    process_x_shape,
 )
 from sbi.user_input.user_input_checks_utils import (
     CustomPytorchWrapper,
@@ -155,43 +154,10 @@ def test_process_prior(prior):
 
 
 @pytest.mark.parametrize(
-    "prior, x_shape",
-    (
-        (BoxUniform(zeros(3), ones(3)), torch.Size([3])),
-        pytest.param(
-            BoxUniform(zeros(1), ones(1)), 2.0, marks=pytest.mark.xfail
-        ),  # scalar observation.
-        pytest.param(
-            BoxUniform(zeros(3), ones(3)), [2.0], marks=pytest.mark.xfail
-        ),  # list observation.
-        (BoxUniform(zeros(3), ones(3)), torch.Size([1, 3])),
-        (BoxUniform(zeros(3), ones(3)), None),
-        (BoxUniform(zeros(1), ones(1)), torch.Size([1, 1])),
-    ),
-)
-def test_process_x_shape(
-    prior: Distribution,
-    x_shape: torch.Size,
-    simulator: Optional[Callable] = diagonal_linear_gaussian,
-):
-    x_shape, x_o_dim = process_x_shape(simulator, prior, x_shape)
-
-    assert x_shape == torch.Size([1, x_o_dim])
-
-
-@pytest.mark.parametrize(
     "x, x_shape", ((ones(3), torch.Size([1, 3])), (ones(1, 3), torch.Size([1, 3])),),
 )
 def test_process_x(x, x_shape):
     process_x(x, x_shape)
-
-
-def test_process_matrix_observation():
-    prior = BoxUniform(zeros(4), ones(4))
-    x_shape = torch.Size([1, 2, 2])
-    simulator = matrix_simulator
-
-    x_o, x_o_dim = process_x_shape(simulator, prior, x_shape)
 
 
 @pytest.mark.parametrize(
@@ -219,24 +185,21 @@ def test_process_simulator(simulator: Callable, prior: Distribution):
 
 
 @pytest.mark.parametrize(
-    "simulator, prior, x_shape",
+    "simulator, prior",
     (
-        (linear_gaussian_no_batch, BoxUniform(zeros(3), ones(3)), torch.Size([3]),),
+        (linear_gaussian_no_batch, BoxUniform(zeros(3), ones(3)),),
         (
             numpy_linear_gaussian,
             UserNumpyUniform(zeros(3), ones(3), return_numpy=True),
-            torch.Size([1, 3]),
         ),
-        (diagonal_linear_gaussian, BoxUniform(zeros(3), ones(3)), torch.Size([3])),
+        (diagonal_linear_gaussian, BoxUniform(zeros(3), ones(3))),
         (
             diagonal_linear_gaussian,
             BoxUniform(zeros(3, dtype=torch.float64), ones(3, dtype=torch.float64)),
-            torch.Size([3]),
         ),
         (
             numpy_linear_gaussian,
             UserNumpyUniform(zeros(3), ones(3), return_numpy=True),
-            torch.Size([1, 3]),
         ),
         (
             diagonal_linear_gaussian,
@@ -245,14 +208,11 @@ def test_process_simulator(simulator: Callable, prior: Distribution):
                 Beta(ones(1), ones(1)),
                 MultivariateNormal(zeros(2), eye(2)),
             ],
-            torch.Size([1, 4]),
         ),
-        pytest.param(
-            list_simulator, BoxUniform(zeros(3), ones(3)), torch.Size([1, 3]),
-        ),
+        pytest.param(list_simulator, BoxUniform(zeros(3), ones(3)),),
     ),
 )
-def test_prepare_sbi_problem(simulator: Callable, prior, x_shape: torch.Size):
+def test_prepare_sbi_problem(simulator: Callable, prior):
     """Test user interface by passing different kinds of simulators, prior and data.
 
     Args:
@@ -261,7 +221,7 @@ def test_prepare_sbi_problem(simulator: Callable, prior, x_shape: torch.Size):
         x_shape: shape of data as defined by the user.
     """
 
-    simulator, prior, x_shape = prepare_for_sbi(simulator, prior, x_shape)
+    simulator, prior = prepare_for_sbi(simulator, prior)
 
     # check batch sims and type
     n_batch = 1
@@ -271,26 +231,23 @@ def test_prepare_sbi_problem(simulator: Callable, prior, x_shape: torch.Size):
 
 
 @pytest.mark.parametrize(
-    "user_simulator, user_prior, user_x_shape",
+    "user_simulator, user_prior",
     (
         (
             diagonal_linear_gaussian,
             BoxUniform(zeros(3, dtype=torch.float64), ones(3, dtype=torch.float64)),
-            torch.Size([3]),
         ),
-        (linear_gaussian_no_batch, BoxUniform(zeros(3), ones(3)), torch.Size([1, 3])),
+        (linear_gaussian_no_batch, BoxUniform(zeros(3), ones(3))),
         (
             numpy_linear_gaussian,
             UserNumpyUniform(zeros(3), ones(3), return_numpy=True),
-            torch.Size([1, 3]),
         ),
-        (diagonal_linear_gaussian, BoxUniform(zeros(3), ones(3)), torch.Size([1, 3])),
-        (linear_gaussian_no_batch, BoxUniform(zeros(3), ones(3)), torch.Size([1, 3])),
-        (list_simulator, BoxUniform(-ones(3), ones(3)), torch.Size([1, 3])),
+        (diagonal_linear_gaussian, BoxUniform(zeros(3), ones(3))),
+        (linear_gaussian_no_batch, BoxUniform(zeros(3), ones(3))),
+        (list_simulator, BoxUniform(-ones(3), ones(3))),
         (
             numpy_linear_gaussian,
             UserNumpyUniform(zeros(3), ones(3), return_numpy=True),
-            torch.Size([1, 3]),
         ),
         (
             diagonal_linear_gaussian,
@@ -299,19 +256,16 @@ def test_prepare_sbi_problem(simulator: Callable, prior, x_shape: torch.Size):
                 Beta(ones(1), ones(1)),
                 MultivariateNormal(zeros(2), eye(2)),
             ),
-            torch.Size([1, 4]),
         ),
     ),
 )
-def test_inference_with_user_sbi_problems(
-    user_simulator: Callable, user_prior, user_x_shape: torch.Size
-):
+def test_inference_with_user_sbi_problems(user_simulator: Callable, user_prior):
     """
     Test inference with combinations of user defined simulators, priors and x_os.
     """
 
     infer = SNPE_C(
-        *prepare_for_sbi(user_simulator, user_prior, user_x_shape),
+        *prepare_for_sbi(user_simulator, user_prior),
         density_estimator="maf",
         simulation_batch_size=1,
         show_progress_bars=False,

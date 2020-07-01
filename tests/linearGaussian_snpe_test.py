@@ -211,11 +211,10 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str, set_seed):
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    simulator, prior, x_shape = prepare_for_sbi(simulator, prior)
+    simulator, prior = prepare_for_sbi(simulator, prior)
     creation_args = dict(
         simulator=simulator,
         prior=prior,
-        x_shape=x_shape,
         density_estimator="maf",
         show_progress_bars=False,
     )

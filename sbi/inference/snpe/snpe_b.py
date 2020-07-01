@@ -17,7 +17,6 @@ class SNPE_B(PosteriorEstimator):
         self,
         simulator: Callable,
         prior,
-        x_shape: Optional[torch.Size] = None,
         num_workers: int = 1,
         simulation_batch_size: Optional[int] = 1,
         density_estimator: Union[str, Callable] = "mdn",
@@ -46,7 +45,6 @@ class SNPE_B(PosteriorEstimator):
         super().__init__(
             simulator=simulator,
             prior=prior,
-            x_shape=x_shape,
             num_workers=num_workers,
             simulation_batch_size=simulation_batch_size,
             density_estimator=density_estimator,

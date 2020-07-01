@@ -13,14 +13,13 @@ import torch
 from torch import Tensor, float32
 from torch.distributions import Distribution
 
-from sbi.types import Shape
 from sbi.user_input.user_input_checks_utils import (
     CustomPytorchWrapper,
     MultipleIndependent,
     PytorchReturnTypeWrapper,
     ScipyPytorchWrapper,
 )
-from sbi.utils.torchutils import atleast_2d, maybe_add_batch_dim_to_size
+from sbi.utils.torchutils import atleast_2d
 
 
 def process_prior(prior) -> Tuple[Distribution, int, bool]:
@@ -430,43 +429,6 @@ def get_batch_dim_simulator(simulator: Callable) -> Callable:
     return batch_dim_simulator
 
 
-def process_x_shape(
-    simulator: Callable, prior, x_shape: Optional[Shape] = None,
-) -> Tuple[torch.Size, int]:
-    """Return shape of simulator output and number of elements in a batch.
-
-    Args:
-        simulator: Simulator function after ensuring output is a batched `Tensor`.
-        prior: Prior object with `.sample()` and `.log_prob()` methods.
-        x_shape: Simulation output shape as provided by the user.
-
-    Returns:
-        (x_shape, x_dim) - checked against simulator and inferred if not provided.
-    """
-
-    # Get unbatched simulated data by sampling from prior and simulator.
-    # Cast to tensor for comparison.
-    simulated_data_batched = torch.as_tensor(
-        simulator(prior.sample((1,))), dtype=float32
-    )
-
-    if x_shape is not None:
-        x_shape = torch.Size(x_shape)
-        x_shape = maybe_add_batch_dim_to_size(x_shape)
-        check_for_possibly_batched_x_shape(x_shape)
-        assert x_shape == simulated_data_batched.shape, (
-            f"Observed data shape {x_shape} must match "
-            f"simulator output shape {simulated_data_batched.shape}."
-        )
-    else:
-        # Adopt the shape of x from simulation.
-        x_shape = torch.Size(simulated_data_batched.shape)
-
-    x_dim = x_shape[1:].numel()
-
-    return x_shape, x_dim
-
-
 def process_x(x: Tensor, x_shape: torch.Size) -> Tensor:
     """Return observed data adapted to match sbi's shape and type requirements.
 
@@ -492,10 +454,8 @@ def process_x(x: Tensor, x_shape: torch.Size) -> Tensor:
     return x
 
 
-def prepare_for_sbi(
-    simulator: Callable, prior, x_shape: Optional[Shape] = None,
-) -> Tuple[Callable, Distribution, Optional[torch.Size]]:
-    """Prepare simulator, prior and shape of the observed data for usage in sbi.
+def prepare_for_sbi(simulator: Callable, prior,) -> Tuple[Callable, Distribution]:
+    """Prepare simulator, prior and for usage in sbi.
 
     One of the goals is to allow you to use sbi with inputs computed in numpy.
 
@@ -510,8 +470,7 @@ def prepare_for_sbi(
     Args:
         simulator: Simulator as provided by the user.
         prior: Prior as provided by the user.
-        x_shape: Shape of a single simulation output, either (1,N) or (N).
-        
+
     Returns:
         Tuple (simulator, prior, x_shape) checked and matching the requirements of sbi.
     """
@@ -522,18 +481,13 @@ def prepare_for_sbi(
     # Check simulator, returns PyTorch simulator able to simulate batches.
     simulator = process_simulator(simulator, prior, prior_returns_numpy)
 
-    # Check data shape, returns shape with leading batch dimension.
-    x_shape, _ = process_x_shape(simulator, prior, x_shape)
-
     # Consistency check after making ready for sbi.
-    check_sbi_inputs(simulator, prior, x_shape)
+    check_sbi_inputs(simulator, prior)
 
-    return simulator, prior, x_shape
+    return simulator, prior
 
 
-def check_sbi_inputs(
-    simulator: Callable, prior: Distribution, x_shape: torch.Size
-) -> None:
+def check_sbi_inputs(simulator: Callable, prior: Distribution) -> None:
     """Assert requirements for simulator, prior and observation for usage in sbi.
 
     Args:
@@ -546,11 +500,9 @@ def check_sbi_inputs(
     theta_batch_shape, *_ = theta.shape
     simulation = simulator(theta)
     sim_batch_shape, *sim_event_shape = simulation.shape
-    _, *obs_event_shape = x_shape
 
     assert isinstance(theta, Tensor), "Parameters theta must be a `Tensor`."
     assert isinstance(simulation, Tensor), "Simulator output must be a `Tensor`."
-    assert isinstance(x_shape, torch.Size), "x_shape must be a `torch.Size`."
 
     assert (
         theta_batch_shape == num_prior_samples
@@ -560,9 +512,3 @@ def check_sbi_inputs(
         sim_batch_shape == num_prior_samples
     ), f"""Simulation batch shape {sim_batch_shape} must match
         num_samples={num_prior_samples}."""
-    assert (
-        obs_event_shape == sim_event_shape
-    ), f"""The x_shape provided {obs_event_shape} does not match
-        that of a single simulation {sim_event_shape}. For a batch size of
-        {num_prior_samples} the simulator returns {simulation.shape}
-        (should be ({num_prior_samples}, {obs_event_shape})."""
