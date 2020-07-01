@@ -2,7 +2,7 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 import logging
-from typing import Tuple, Dict, Sequence, Any, Union
+from typing import Tuple, Dict, Sequence, Any
 
 from pyknos.nflows import transforms
 import torch
@@ -11,7 +11,7 @@ import torch.nn as nn
 from tqdm.auto import tqdm
 
 
-def x_shape_from_simulated_data(batch_x):
+def x_shape_from_simulation(batch_x: Tensor) -> torch.Size:
     assert batch_x.ndim == 2, "Simulated data must be a batch with two dimensions."
     return batch_x[0].unsqueeze(0).shape
 

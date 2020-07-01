@@ -19,7 +19,7 @@ from sbi.utils import (
     clamp_and_warn,
     handle_invalid_x,
     warn_on_invalid_x,
-    x_shape_from_simulated_data,
+    x_shape_from_simulation,
 )
 from sbi.utils.torchutils import (
     ensure_theta_batched,
@@ -144,7 +144,7 @@ class RatioEstimator(NeuralInference, ABC):
                 )
 
             x = self._batched_simulator(theta)
-            x_shape = x_shape_from_simulated_data(x)
+            x_shape = x_shape_from_simulation(x)
 
             # First round or if retraining from scratch:
             # Call the `self._build_neural_net` with the rounds' thetas and xs as

@@ -341,7 +341,7 @@ class NeuralInference(ABC):
         return self._summary
 
     def _handle_x_o_wrt_amortization(
-        self, x_o: Union[None, Tensor], x_shape: torch.Size, num_rounds: int
+        self, x_o: Optional[Tensor], x_shape: torch.Size, num_rounds: int
     ) -> None:
         """
         Check whether provided `x_o` is consistent with `num_rounds`. For multi-round
