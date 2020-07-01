@@ -74,7 +74,7 @@ The methods then proceed by
 
 ## Publications
 
-See [Cranmer, Brehmer, Louppe (2019)](https://www.pnas.org/content/early/2020/05/28/1912789117) for a recent
+See [Cranmer, Brehmer, Louppe (2020)](https://www.pnas.org/content/early/2020/05/28/1912789117) for a recent
 review on simulation-based inference.
 
 The following papers offer additional details on the inference methods included in
