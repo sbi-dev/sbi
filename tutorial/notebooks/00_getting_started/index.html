@@ -393,7 +393,7 @@ Let’s say we have made some observation <span class="arithmatex">\(x\)</span>:
 <p><div class="inner_cell" markdown="1">
 <div class="text_cell_render border-box-sizing rendered_html" markdown="1"></div></div></p>
 <h3 id="prior">Prior<a class="headerlink" href="#prior" title="Permanent link">¶</a></h3>
-<p>A prior is a distribution objects that allows to sample parameter sets. Any class for the prior is allowed as long as it allows to call <code>prior.sample()</code> and <code>prior.log_prob()</code>.
+<p>A prior is a distribution object that allows to sample parameter sets. Any class for the prior is allowed as long as it allows to call <code>prior.sample()</code> and <code>prior.log_prob()</code>.
 </p>
 
 <div class="cell border-box-sizing text_cell rendered">
@@ -412,9 +412,9 @@ Let’s say we have made some observation <span class="arithmatex">\(x\)</span>:
 <p><div class="inner_cell" markdown="1">
 <div class="text_cell_render border-box-sizing rendered_html" markdown="1"></div></div></p>
 <h3 id="observation">Observation<a class="headerlink" href="#observation" title="Permanent link">¶</a></h3>
-<p>Once you have a trained posterior you will want to evaluate or sample the posterior <span class="arithmatex">\(p(\theta|x_o)\)</span> at certain observed values <span class="arithmatex">\(x_o\)</span>.
+<p>Once you have a trained posterior, you will want to evaluate or sample the posterior <span class="arithmatex">\(p(\theta|x_o)\)</span> at certain observed values <span class="arithmatex">\(x_o\)</span>.
 - The allowable data types are either Numpy <code>np.ndarray</code> or a torch <code>torch.Tensor</code>.
-- The shape must be either <code>(1,N)</code> or just <code>(N)</code>.
+- The shape must be either <code>(1,M)</code> or just <code>(M)</code>.
 </p></div>
 
 
