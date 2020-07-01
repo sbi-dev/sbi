@@ -401,9 +401,11 @@ Let’s say we have made some observation <span class="arithmatex">\(x\)</span>:
 <div class="text_cell_render border-box-sizing rendered_html" markdown="1"></div></div></p>
 <h3 id="simulator">Simulator<a class="headerlink" href="#simulator" title="Permanent link">¶</a></h3>
 <p>The simulator is a Python callable that takes in a parameter set and outputs data with some (even if very small) stochasticity.</p>
-<p>Allowed data types and shapes for input and output:
-- the input parameter set and the output have to be either a <code>np.ndarray</code> or a <code>torch.Tensor</code>. 
-- the input parameter set should have either shape <code>(1,N)</code> or <code>(N)</code>, and the output must have shape <code>(1,M)</code> or <code>(M)</code>.</p>
+<p>Allowed data types and shapes for input and output:</p>
+<ul>
+<li>the input parameter set and the output have to be either a <code>np.ndarray</code> or a <code>torch.Tensor</code>. </li>
+<li>the input parameter set should have either shape <code>(1,N)</code> or <code>(N)</code>, and the output must have shape <code>(1,M)</code> or <code>(M)</code>.</li>
+</ul>
 <p>You can call simulators not written in Python as long as you wrap them in a Python function.
 </p></div>
 
@@ -412,10 +414,12 @@ Let’s say we have made some observation <span class="arithmatex">\(x\)</span>:
 <p><div class="inner_cell" markdown="1">
 <div class="text_cell_render border-box-sizing rendered_html" markdown="1"></div></div></p>
 <h3 id="observation">Observation<a class="headerlink" href="#observation" title="Permanent link">¶</a></h3>
-<p>Once you have a trained posterior, you will want to evaluate or sample the posterior <span class="arithmatex">\(p(\theta|x_o)\)</span> at certain observed values <span class="arithmatex">\(x_o\)</span>.
-- The allowable data types are either Numpy <code>np.ndarray</code> or a torch <code>torch.Tensor</code>.
-- The shape must be either <code>(1,M)</code> or just <code>(M)</code>.
-</p></div>
+<p>Once you have a trained posterior, you will want to evaluate or sample the posterior <span class="arithmatex">\(p(\theta|x_o)\)</span> at certain observed values <span class="arithmatex">\(x_o\)</span>:</p>
+<ul>
+<li>The allowable data types are either Numpy <code>np.ndarray</code> or a torch <code>torch.Tensor</code>.</li>
+<li>The shape must be either <code>(1,M)</code> or just <code>(M)</code>.
+</li></ul></div>
+
 
 
 <div class="cell border-box-sizing text_cell rendered">
