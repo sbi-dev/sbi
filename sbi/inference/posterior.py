@@ -243,7 +243,7 @@ class NeuralPosterior:
             )
         return self._log_prob_ratio_estimator(theta, x)
 
-    def _log_prob_snle_a(self, theta: Tensor, x: Tensor) -> Tensor:
+    def _log_prob_snle(self, theta: Tensor, x: Tensor) -> Tensor:
         warn(
             "The log probability from SNL is only correct up to a normalizing constant."
         )
