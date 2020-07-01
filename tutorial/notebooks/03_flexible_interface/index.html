@@ -327,14 +327,13 @@ In the advanced mode, you have to ensure that your simulator and prior adhere th
 <div class="cell border-box-sizing text_cell rendered">
 <p><div class="inner_cell" markdown="1">
 <div class="text_cell_render border-box-sizing rendered_html" markdown="1">
-You can then use the <code>prior</code> and <code>x_shape</code> object to specify a custom density estimator. Since we use S*N*PE, we specifiy a neural network targeting the <em>posterior</em> (hence the call to <code>posterior_nn()</code>). In this example, we will create a neural spline flow (<code>'nsf'</code>) with <code>60</code> hidden units and <code>3</code> transform layers:
+You can specify a custom density estimator. Since we use S*N*PE, we specifiy a neural network targeting the <em>posterior</em> (hence the call to <code>posterior_nn()</code>). In this example, we will create a neural spline flow (<code>'nsf'</code>) with <code>60</code> hidden units and <code>3</code> transform layers:
 </div>
 </div></p>
 </div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="codehilite"><pre><span></span><code><span class="n">my_density_estimator</span> <span class="o">=</span> <span class="n">posterior_nn</span><span class="p">(</span><span class="s1">'nsf'</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">x_shape</span><span class="p">,</span> <span class="n">hidden_features</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span> 
-                                    <span class="n">flow_num_transforms</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+<div class="codehilite"><pre><span></span><code><span class="n">my_density_estimator</span> <span class="o">=</span> <span class="n">posterior_nn</span><span class="p">(</span><span class="s1">'nsf'</span><span class="p">,</span> <span class="n">hidden_features</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span> <span class="n">num_transforms</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
 </code></pre></div>
 </div>
 </div>

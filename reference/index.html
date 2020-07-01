@@ -752,7 +752,7 @@ sbi.user_input.user_input_checks.prepare_for_sbi<span class="p">(</span><span cl
 <div class="doc doc-object doc-method">
 <h4 class="doc doc-heading" data-toc-label="__call__()" id="sbi.inference.snpe.snpe_c.SNPE_C.__call__">
 <code class="highlight language-python">
-__call__<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">num_rounds</span><span class="p">,</span> <span class="n">num_simulations_per_round</span><span class="p">,</span> <span class="n">x_o</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_atoms</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">training_batch_size</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.0005</span><span class="p">,</span> <span class="n">validation_fraction</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">stop_after_epochs</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">max_num_epochs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">clip_max_norm</span><span class="o">=</span><span class="mf">5.0</span><span class="p">,</span> <span class="n">calibration_kernel</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">exclude_invalid_x</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">z_score_x</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">z_score_min_std</span><span class="o">=</span><span class="mf">1e-07</span><span class="p">,</span> <span class="n">discard_prior_samples</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">retrain_from_scratch_each_round</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> </code>
+__call__<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">num_rounds</span><span class="p">,</span> <span class="n">num_simulations_per_round</span><span class="p">,</span> <span class="n">x_o</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_atoms</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">training_batch_size</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.0005</span><span class="p">,</span> <span class="n">validation_fraction</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">stop_after_epochs</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">max_num_epochs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">clip_max_norm</span><span class="o">=</span><span class="mf">5.0</span><span class="p">,</span> <span class="n">calibration_kernel</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">exclude_invalid_x</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">discard_prior_samples</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">retrain_from_scratch_each_round</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> </code>
 <span class="doc doc-properties">
 <small class="doc doc-property doc-property-special"><code>special</code></small>
 </span>
@@ -868,22 +868,6 @@ __call__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <td><code>True</code></td>
 </tr>
 <tr>
-<td><code>z_score_x</code></td>
-<td><code>bool</code></td>
-<td>
-<p>Whether to z-score simulations <code class="codehilite"><span class="err">x</span></code>.</p>
-</td>
-<td><code>True</code></td>
-</tr>
-<tr>
-<td><code>z_score_min_std</code></td>
-<td><code>float</code></td>
-<td>
-<p>Minimum value of the standard deviation to use when z-scoring <code class="codehilite"><span class="err">x</span></code>. This is typically needed when some simulator outputs are constant or nearly so.</p>
-</td>
-<td><code>1e-07</code></td>
-</tr>
-<tr>
 <td><code>discard_prior_samples</code></td>
 <td><code>bool</code></td>
 <td>
@@ -924,13 +908,7 @@ __call__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span> 84
- 85
- 86
- 87
- 88
- 89
- 90
+<pre><span></span> 90
  91
  92
  93
@@ -1016,8 +994,6 @@ __call__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
     <span class="n">clip_max_norm</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="mf">5.0</span><span class="p">,</span>
     <span class="n">calibration_kernel</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">exclude_invalid_x</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
-    <span class="n">z_score_x</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
-    <span class="n">z_score_min_std</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-7</span><span class="p">,</span>
     <span class="n">discard_prior_samples</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">retrain_from_scratch_each_round</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NeuralPosterior</span><span class="p">:</span>
@@ -1053,10 +1029,6 @@ __call__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <span class="sd">            simulations `x`. See Lueckmann, Gonçalves et al., NeurIPS 2017.</span>
 <span class="sd">        exclude_invalid_x: Whether to exclude simulation outputs `x=NaN` or `x=±∞`</span>
 <span class="sd">            during training. Expect errors, silent or explicit, when `False`.</span>
-<span class="sd">        z_score_x: Whether to z-score simulations `x`.</span>
-<span class="sd">        z_score_min_std: Minimum value of the standard deviation to use when</span>
-<span class="sd">            z-scoring `x`. This is typically needed when some simulator outputs are</span>
-<span class="sd">            constant or nearly so.</span>
 <span class="sd">        discard_prior_samples: Whether to discard samples simulated in round 1, i.e.</span>
 <span class="sd">            from the prior. Training may be sped up by ignoring such less targeted</span>
 <span class="sd">            samples.</span>
@@ -1151,7 +1123,7 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <td><code>density_estimator</code></td>
 <td><code>Union[str, nn.Module]</code></td>
 <td>
-<p>Either a string or a density estimation neural network that can <code class="codehilite"><span class="na">.log_prob</span><span class="p">()</span></code> and <code class="codehilite"><span class="na">.sample</span><span class="p">()</span></code>. If it is a string, use a pre- configured network of the provided type (one of nsf, maf, mdn, made).</p>
+<p>If it is a string, use a pre-configured network of the provided type (one of nsf, maf, mdn, made). Alternatively, a function that builds a custom neural network can be provided. The function will be called with the first batch of simulations (theta, x), which can thus be used for shape inference and potentially for z-scoring. It needs to return a PyTorch <code class="codehilite"><span class="err">nn.Module</span></code> implementing the density estimator. The density estimator needs to provide the methods <code class="codehilite"><span class="na">.log_prob</span></code> and <code class="codehilite"><span class="na">.sample</span><span class="p">()</span></code>.</p>
 </td>
 <td><code>'maf'</code></td>
 </tr>
@@ -1227,8 +1199,7 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>18
-19
+<pre><span></span>19
 20
 21
 22
@@ -1291,7 +1262,13 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 79
 80
 81
-82</pre>
+82
+83
+84
+85
+86
+87
+88</pre>
 </div>
 </td>
 <td class="code">
@@ -1333,9 +1310,14 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <span class="sd">            maps to data x at once. If None, we simulate all parameter sets at the</span>
 <span class="sd">            same time. If &gt;= 1, the simulator has to process data of shape</span>
 <span class="sd">            (simulation_batch_size, parameter_dimension).</span>
-<span class="sd">        density_estimator: Either a string or a density estimation neural network</span>
-<span class="sd">            that can `.log_prob()` and `.sample()`. If it is a string, use a pre-</span>
-<span class="sd">            configured network of the provided type (one of nsf, maf, mdn, made).</span>
+<span class="sd">        density_estimator: If it is a string, use a pre-configured network of the</span>
+<span class="sd">            provided type (one of nsf, maf, mdn, made). Alternatively, a function</span>
+<span class="sd">            that builds a custom neural network can be provided. The function will</span>
+<span class="sd">            be called with the first batch of simulations (theta, x), which can</span>
+<span class="sd">            thus be used for shape inference and potentially for z-scoring. It</span>
+<span class="sd">            needs to return a PyTorch `nn.Module` implementing the density</span>
+<span class="sd">            estimator. The density estimator needs to provide the methods</span>
+<span class="sd">            `.log_prob` and `.sample()`.</span>
 <span class="sd">        sample_with_mcmc: Whether to sample with MCMC. MCMC can be used to deal</span>
 <span class="sd">            with high leakage.</span>
 <span class="sd">        mcmc_method: If MCMC sampling is used, specify the method here: either of</span>
@@ -1521,13 +1503,7 @@ __call__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span> 73
- 74
- 75
- 76
- 77
- 78
- 79
+<pre><span></span> 79
  80
  81
  82
@@ -1575,7 +1551,13 @@ __call__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 124
 125
 126
-127</pre>
+127
+128
+129
+130
+131
+132
+133</pre>
 </div>
 </td>
 <td class="code">
@@ -1709,9 +1691,9 @@ Autoregressive Flows_, Papamakarios et al., AISTATS 2019,
 </tr>
 <tr>
 <td><code>density_estimator</code></td>
-<td><code>Union[str, nn.Module]</code></td>
+<td><code>Union[str, Callable]</code></td>
 <td>
-<p>Either a string or a density estimation neural network that can <code class="codehilite"><span class="na">.log_prob</span><span class="p">()</span></code> and <code class="codehilite"><span class="na">.sample</span><span class="p">()</span></code>. If it is a string, use a pre- configured network of the provided type (one of nsf, maf, mdn, made).</p>
+<p>If it is a string, use a pre-configured network of the provided type (one of nsf, maf, mdn, made). Alternatively, a function that builds a custom neural network can be provided. The function will be called with the first batch of simulations (theta, x), which can thus be used for shape inference and potentially for z-scoring. It needs to return a PyTorch <code class="codehilite"><span class="err">nn.Module</span></code> implementing the density estimator. The density estimator needs to provide the methods <code class="codehilite"><span class="na">.log_prob</span></code> and <code class="codehilite"><span class="na">.sample</span><span class="p">()</span></code>.</p>
 </td>
 <td><code>'maf'</code></td>
 </tr>
@@ -1719,7 +1701,7 @@ Autoregressive Flows_, Papamakarios et al., AISTATS 2019,
 <td><code>mcmc_method</code></td>
 <td><code>str</code></td>
 <td>
-<p>If MCMC sampling is used, specify the method here: either of slice_np, slice, hmc, nuts.</p>
+<p>Specify the method for MCMC sampling, either of: slice_np, slice, hmc, nuts.</p>
 </td>
 <td><code>'slice_np'</code></td>
 </tr>
@@ -1771,8 +1753,7 @@ Autoregressive Flows_, Papamakarios et al., AISTATS 2019,
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>18
-19
+<pre><span></span>19
 20
 21
 22
@@ -1824,7 +1805,13 @@ Autoregressive Flows_, Papamakarios et al., AISTATS 2019,
 68
 69
 70
-71</pre>
+71
+72
+73
+74
+75
+76
+77</pre>
 </div>
 </td>
 <td class="code">
@@ -1836,7 +1823,7 @@ Autoregressive Flows_, Papamakarios et al., AISTATS 2019,
     <span class="n">x_shape</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">num_workers</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
     <span class="n">simulation_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
-    <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"maf"</span><span class="p">,</span>
+    <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"maf"</span><span class="p">,</span>
     <span class="n">mcmc_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"slice_np"</span><span class="p">,</span>
     <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"cpu"</span><span class="p">,</span>
     <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"WARNING"</span><span class="p">,</span>
@@ -1865,10 +1852,15 @@ Autoregressive Flows_, Papamakarios et al., AISTATS 2019,
 <span class="sd">            maps to data x at once. If None, we simulate all parameter sets at the</span>
 <span class="sd">            same time. If &gt;= 1, the simulator has to process data of shape</span>
 <span class="sd">            (simulation_batch_size, parameter_dimension).</span>
-<span class="sd">        density_estimator: Either a string or a density estimation neural network</span>
-<span class="sd">            that can `.log_prob()` and `.sample()`. If it is a string, use a pre-</span>
-<span class="sd">            configured network of the provided type (one of nsf, maf, mdn, made).</span>
-<span class="sd">        mcmc_method: If MCMC sampling is used, specify the method here: either of</span>
+<span class="sd">        density_estimator: If it is a string, use a pre-configured network of the</span>
+<span class="sd">            provided type (one of nsf, maf, mdn, made). Alternatively, a function</span>
+<span class="sd">            that builds a custom neural network can be provided. The function will</span>
+<span class="sd">            be called with the first batch of simulations (theta, x), which can</span>
+<span class="sd">            thus be used for shape inference and potentially for z-scoring. It</span>
+<span class="sd">            needs to return a PyTorch `nn.Module` implementing the density</span>
+<span class="sd">            estimator. The density estimator needs to provide the methods</span>
+<span class="sd">            `.log_prob` and `.sample()`.</span>
+<span class="sd">        mcmc_method: Specify the method for MCMC sampling, either of:</span>
 <span class="sd">            slice_np, slice, hmc, nuts.</span>
 <span class="sd">        device: torch device on which to compute, e.g. gpu, cpu.</span>
 <span class="sd">        logging_level: Minimum severity of messages to log. One of the strings</span>
@@ -2043,9 +2035,7 @@ __call__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span> 72
- 73
- 74
+<pre><span></span> 74
  75
  76
  77
@@ -2100,7 +2090,9 @@ __call__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 126
 127
 128
-129</pre>
+129
+130
+131</pre>
 </div>
 </td>
 <td class="code">
@@ -2174,7 +2166,7 @@ __call__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <div class="doc doc-object doc-method">
 <h4 class="doc doc-heading" data-toc-label="__init__()" id="sbi.inference.snre.snre_a.SNRE_A.__init__">
 <code class="highlight language-python">
-__init__<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">x_shape</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">simulation_batch_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">embedding_net</span><span class="o">=</span><span class="n">Identity</span><span class="p">(),</span> <span class="n">classifier</span><span class="o">=</span><span class="s1">'resnet'</span><span class="p">,</span> <span class="n">mcmc_method</span><span class="o">=</span><span class="s1">'slice_np'</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s1">'cpu'</span><span class="p">,</span> <span class="n">logging_level</span><span class="o">=</span><span class="s1">'warning'</span><span class="p">,</span> <span class="n">summary_writer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">show_round_summary</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> </code>
+__init__<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">x_shape</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">simulation_batch_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">classifier</span><span class="o">=</span><span class="s1">'resnet'</span><span class="p">,</span> <span class="n">mcmc_method</span><span class="o">=</span><span class="s1">'slice_np'</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s1">'cpu'</span><span class="p">,</span> <span class="n">logging_level</span><span class="o">=</span><span class="s1">'warning'</span><span class="p">,</span> <span class="n">summary_writer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">show_round_summary</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> </code>
 <span class="doc doc-properties">
 <small class="doc doc-property doc-property-special"><code>special</code></small>
 </span>
@@ -2235,18 +2227,10 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <td><code>1</code></td>
 </tr>
 <tr>
-<td><code>embedding_net</code></td>
-<td><code>nn.Module</code></td>
-<td>
-<p>Can be used to encode observations <span><span class="MathJax_Preview">x</span><script type="math/tex">x</script></span>. Currently not implemented.</p>
-</td>
-<td><code>Identity()</code></td>
-</tr>
-<tr>
 <td><code>classifier</code></td>
-<td><code>Union[str, nn.Module]</code></td>
+<td><code>Union[str, Callable]</code></td>
 <td>
-<p>Classifier trained to approximate likelihood rations. If str, use a pre-configured neural network.</p>
+<p>Classifier trained to approximate likelihood ratios. If it is a string, use a pre-configured network of the provided type (one of linear, mlp, resnet). Alternatively, a function that builds a custom neural network can be provided. The function will be called with the first batch of simulations (theta, x), which can thus be used for shape inference and potentially for z-scoring. It needs to return a PyTorch <code class="codehilite"><span class="err">nn.Module</span></code> implementing the classifier.</p>
 </td>
 <td><code>'resnet'</code></td>
 </tr>
@@ -2254,7 +2238,7 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <td><code>mcmc_method</code></td>
 <td><code>str</code></td>
 <td>
-<p>If MCMC sampling is used, specify the method here: either of slice_np, slice, hmc, nuts.</p>
+<p>Specify the method for MCMC sampling, either of: slice_np, slice, hmc, nuts.</p>
 </td>
 <td><code>'slice_np'</code></td>
 </tr>
@@ -2360,7 +2344,9 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 67
 68
 69
-70</pre>
+70
+71
+72</pre>
 </div>
 </td>
 <td class="code">
@@ -2372,8 +2358,7 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
     <span class="n">x_shape</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">num_workers</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
     <span class="n">simulation_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
-    <span class="n">embedding_net</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Identity</span><span class="p">(),</span>
-    <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"resnet"</span><span class="p">,</span>
+    <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"resnet"</span><span class="p">,</span>
     <span class="n">mcmc_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"slice_np"</span><span class="p">,</span>
     <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"cpu"</span><span class="p">,</span>
     <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"warning"</span><span class="p">,</span>
@@ -2401,11 +2386,14 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <span class="sd">            maps to data x at once. If None, we simulate all parameter sets at the</span>
 <span class="sd">            same time. If &gt;= 1, the simulator has to process data of shape</span>
 <span class="sd">            (simulation_batch_size, parameter_dimension).</span>
-<span class="sd">        embedding_net: Can be used to encode observations $x$. Currently not</span>
-<span class="sd">            implemented.</span>
-<span class="sd">        classifier: Classifier trained to approximate likelihood rations. If str,</span>
-<span class="sd">            use a pre-configured neural network.</span>
-<span class="sd">        mcmc_method: If MCMC sampling is used, specify the method here: either of</span>
+<span class="sd">        classifier: Classifier trained to approximate likelihood ratios. If it is</span>
+<span class="sd">            a string, use a pre-configured network of the provided type (one of</span>
+<span class="sd">            linear, mlp, resnet). Alternatively, a function that builds a custom</span>
+<span class="sd">            neural network can be provided. The function will be called with the</span>
+<span class="sd">            first batch of simulations (theta, x), which can thus be used for shape</span>
+<span class="sd">            inference and potentially for z-scoring. It needs to return a PyTorch</span>
+<span class="sd">            `nn.Module` implementing the classifier.</span>
+<span class="sd">        mcmc_method: Specify the method for MCMC sampling, either of:</span>
 <span class="sd">            slice_np, slice, hmc, nuts.</span>
 <span class="sd">        device: torch device on which to compute, e.g. gpu, cpu.</span>
 <span class="sd">        logging_level: Minimum severity of messages to log. One of the strings</span>
@@ -2580,9 +2568,7 @@ __call__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span> 72
- 73
- 74
+<pre><span></span> 74
  75
  76
  77
@@ -2635,7 +2621,9 @@ __call__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 124
 125
 126
-127</pre>
+127
+128
+129</pre>
 </div>
 </td>
 <td class="code">
@@ -2707,7 +2695,7 @@ __call__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <div class="doc doc-object doc-method">
 <h4 class="doc doc-heading" data-toc-label="__init__()" id="sbi.inference.snre.snre_b.SNRE_B.__init__">
 <code class="highlight language-python">
-__init__<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">x_shape</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">simulation_batch_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">embedding_net</span><span class="o">=</span><span class="n">Identity</span><span class="p">(),</span> <span class="n">classifier</span><span class="o">=</span><span class="s1">'resnet'</span><span class="p">,</span> <span class="n">mcmc_method</span><span class="o">=</span><span class="s1">'slice_np'</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s1">'cpu'</span><span class="p">,</span> <span class="n">logging_level</span><span class="o">=</span><span class="s1">'warning'</span><span class="p">,</span> <span class="n">summary_writer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">show_round_summary</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> </code>
+__init__<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">x_shape</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">simulation_batch_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">classifier</span><span class="o">=</span><span class="s1">'resnet'</span><span class="p">,</span> <span class="n">mcmc_method</span><span class="o">=</span><span class="s1">'slice_np'</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s1">'cpu'</span><span class="p">,</span> <span class="n">logging_level</span><span class="o">=</span><span class="s1">'warning'</span><span class="p">,</span> <span class="n">summary_writer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">show_round_summary</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> </code>
 <span class="doc doc-properties">
 <small class="doc doc-property doc-property-special"><code>special</code></small>
 </span>
@@ -2768,18 +2756,10 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <td><code>1</code></td>
 </tr>
 <tr>
-<td><code>embedding_net</code></td>
-<td><code>nn.Module</code></td>
-<td>
-<p>Can be used to encode observations <span><span class="MathJax_Preview">x</span><script type="math/tex">x</script></span>. Currently not implemented.</p>
-</td>
-<td><code>Identity()</code></td>
-</tr>
-<tr>
 <td><code>classifier</code></td>
-<td><code>Union[str, nn.Module]</code></td>
+<td><code>Union[str, Callable]</code></td>
 <td>
-<p>Classifier trained to approximate likelihood rations. If str, use a pre-configured neural network.</p>
+<p>Classifier trained to approximate likelihood ratios. If it is a string, use a pre-configured network of the provided type (one of linear, mlp, resnet). Alternatively, a function that builds a custom neural network can be provided. The function will be called with the first batch of simulations (theta, x), which can thus be used for shape inference and potentially for z-scoring. It needs to return a PyTorch <code class="codehilite"><span class="err">nn.Module</span></code> implementing the classifier.</p>
 </td>
 <td><code>'resnet'</code></td>
 </tr>
@@ -2787,7 +2767,7 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <td><code>mcmc_method</code></td>
 <td><code>str</code></td>
 <td>
-<p>If MCMC sampling is used, specify the method here: either of slice_np, slice, hmc, nuts.</p>
+<p>Specify the method for MCMC sampling, either of: slice_np, slice, hmc, nuts.</p>
 </td>
 <td><code>'slice_np'</code></td>
 </tr>
@@ -2893,7 +2873,9 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 67
 68
 69
-70</pre>
+70
+71
+72</pre>
 </div>
 </td>
 <td class="code">
@@ -2905,8 +2887,7 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
     <span class="n">x_shape</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">num_workers</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
     <span class="n">simulation_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
-    <span class="n">embedding_net</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Identity</span><span class="p">(),</span>
-    <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"resnet"</span><span class="p">,</span>
+    <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"resnet"</span><span class="p">,</span>
     <span class="n">mcmc_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"slice_np"</span><span class="p">,</span>
     <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"cpu"</span><span class="p">,</span>
     <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"warning"</span><span class="p">,</span>
@@ -2934,11 +2915,14 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <span class="sd">            maps to data x at once. If None, we simulate all parameter sets at the</span>
 <span class="sd">            same time. If &gt;= 1, the simulator has to process data of shape</span>
 <span class="sd">            (simulation_batch_size, parameter_dimension).</span>
-<span class="sd">        embedding_net: Can be used to encode observations $x$. Currently not</span>
-<span class="sd">            implemented.</span>
-<span class="sd">        classifier: Classifier trained to approximate likelihood rations. If str,</span>
-<span class="sd">            use a pre-configured neural network.</span>
-<span class="sd">        mcmc_method: If MCMC sampling is used, specify the method here: either of</span>
+<span class="sd">        classifier: Classifier trained to approximate likelihood ratios. If it is</span>
+<span class="sd">            a string, use a pre-configured network of the provided type (one of</span>
+<span class="sd">            linear, mlp, resnet). Alternatively, a function that builds a custom</span>
+<span class="sd">            neural network can be provided. The function will be called with the</span>
+<span class="sd">            first batch of simulations (theta, x), which can thus be used for shape</span>
+<span class="sd">            inference and potentially for z-scoring. It needs to return a PyTorch</span>
+<span class="sd">            `nn.Module` implementing the classifier.</span>
+<span class="sd">        mcmc_method: Specify the method for MCMC sampling, either of:</span>
 <span class="sd">            slice_np, slice, hmc, nuts.</span>
 <span class="sd">        device: torch device on which to compute, e.g. gpu, cpu.</span>
 <span class="sd">        logging_level: Minimum severity of messages to log. One of the strings</span>
@@ -3179,7 +3163,7 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
     <span class="bp">self</span><span class="o">.</span><span class="n">_get_potential_function</span> <span class="o">=</span> <span class="n">get_potential_function</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_x_shape</span> <span class="o">=</span> <span class="n">x_shape</span>
 
-    <span class="k">if</span> <span class="n">method_family</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"snpe"</span><span class="p">,</span> <span class="s2">"snle_a"</span><span class="p">,</span> <span class="s2">"snre_a"</span><span class="p">,</span> <span class="s2">"snre_b"</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">method_family</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"snpe"</span><span class="p">,</span> <span class="s2">"snle"</span><span class="p">,</span> <span class="s2">"snre_a"</span><span class="p">,</span> <span class="s2">"snre_b"</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_method_family</span> <span class="o">=</span> <span class="n">method_family</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Method family unsupported."</span><span class="p">)</span>
@@ -3981,426 +3965,47 @@ set_embedding_net<span class="p">(</span><span class="bp">self</span><span class
 <div class="doc doc-object doc-function">
 <h3 class="doc doc-heading" id="sbi.utils.get_nn_models.posterior_nn">
 <code class="highlight language-python">
-sbi.utils.get_nn_models.posterior_nn<span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">x_o_shape</span><span class="p">,</span> <span class="n">embedding</span><span class="o">=</span><span class="n">Identity</span><span class="p">(),</span> <span class="n">hidden_features</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">mdn_num_components</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">made_num_mixture_components</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">made_num_blocks</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">flow_num_transforms</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span> </code>
+sbi.utils.get_nn_models.posterior_nn<span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> </code>
 <a class="headerlink" href="#sbi.utils.get_nn_models.posterior_nn" title="Permanent link">¶</a></h3>
 <div class="doc doc-contents first">
-<p>Neural posterior density estimator</p>
-<p><strong>Parameters:</strong></p>
-<table>
-<thead>
-<tr>
-<th>Name</th>
-<th>Type</th>
-<th>Description</th>
-<th>Default</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>model</code></td>
-<td><code>str</code></td>
-<td>
-<p>Model, one of maf / mdn / made / nsf</p>
-</td>
-<td><em>required</em></td>
-</tr>
-<tr>
-<td><code>prior</code></td>
-<td><code></code></td>
-<td>
-<p>Prior distribution.</p>
-</td>
-<td><em>required</em></td>
-</tr>
-<tr>
-<td><code>x_o_shape</code></td>
-<td><code>torch.Size</code></td>
-<td>
-<p>Shape of a single observation. Used as input size to the NN.</p>
-</td>
-<td><em>required</em></td>
-</tr>
-<tr>
-<td><code>embedding</code></td>
-<td><code>nn.Module</code></td>
-<td>
-<p>Embedding network</p>
-</td>
-<td><code>Identity()</code></td>
-</tr>
-<tr>
-<td><code>hidden_features</code></td>
-<td><code>int</code></td>
-<td>
-<p>For all, number of hidden features</p>
-</td>
-<td><code>50</code></td>
-</tr>
-<tr>
-<td><code>mdn_num_components</code></td>
-<td><code>int</code></td>
-<td>
-<p>For MDNs only, number of components</p>
-</td>
-<td><code>20</code></td>
-</tr>
-<tr>
-<td><code>made_num_mixture_components</code></td>
-<td><code>int</code></td>
-<td>
-<p>For MADEs only, number of mixture components</p>
-</td>
-<td><code>10</code></td>
-</tr>
-<tr>
-<td><code>made_num_blocks</code></td>
-<td><code>int</code></td>
-<td>
-<p>For MADEs only, number of blocks</p>
-</td>
-<td><code>4</code></td>
-</tr>
-<tr>
-<td><code>flow_num_transforms</code></td>
-<td><code>int</code></td>
-<td>
-<p>For flows only, number of transforms</p>
-</td>
-<td><code>5</code></td>
-</tr>
-</tbody>
-</table>
-<p><strong>Returns:</strong></p>
-<table>
-<thead>
-<tr>
-<th>Type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>nn.Module</code></td>
-<td>
-<p>Neural network</p>
-</td>
-</tr>
-</tbody>
-</table>
 <details class="quote">
 <summary>Source code in <code>sbi/utils/get_nn_models.py</code></summary>
 <table class="highlighttable">
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span> 21
- 22
- 23
- 24
- 25
- 26
- 27
- 28
- 29
- 30
- 31
- 32
- 33
- 34
- 35
- 36
- 37
- 38
- 39
- 40
- 41
- 42
- 43
- 44
- 45
- 46
- 47
- 48
- 49
- 50
- 51
- 52
- 53
- 54
- 55
- 56
- 57
- 58
- 59
- 60
- 61
- 62
- 63
- 64
- 65
- 66
- 67
- 68
- 69
- 70
- 71
- 72
- 73
- 74
- 75
- 76
- 77
- 78
- 79
- 80
- 81
- 82
- 83
- 84
- 85
- 86
- 87
- 88
- 89
- 90
- 91
- 92
- 93
- 94
- 95
- 96
- 97
- 98
- 99
-100
-101
-102
-103
-104
-105
-106
-107
-108
-109
-110
-111
-112
-113
-114
-115
-116
-117
-118
-119
-120
-121
-122
-123
-124
-125
-126
-127
-128
-129
-130
-131
-132
-133
-134
-135
-136
-137
-138
-139
-140
-141
-142
-143
-144
-145
-146
-147
-148
-149
-150
-151
-152
-153
-154
-155
-156
-157
-158
-159
-160
-161
-162
-163
-164
-165
-166
-167
-168
-169
-170
-171
-172</pre>
+<pre><span></span>49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62</pre>
 </div>
 </td>
 <td class="code">
 <div class="highlight">
-<pre><span></span><code><span class="k">def</span> <span class="nf">posterior_nn</span><span class="p">(</span>
-    <span class="n">model</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
-    <span class="n">prior</span><span class="p">,</span>
-    <span class="n">x_o_shape</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">,</span>
-    <span class="n">embedding</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Identity</span><span class="p">(),</span>
-    <span class="n">hidden_features</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">50</span><span class="p">,</span>
-    <span class="n">mdn_num_components</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">20</span><span class="p">,</span>
-    <span class="n">made_num_mixture_components</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
-    <span class="n">made_num_blocks</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">4</span><span class="p">,</span>
-    <span class="n">flow_num_transforms</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">5</span><span class="p">,</span>
-<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">:</span>
-    <span class="sd">"""Neural posterior density estimator</span>
+<pre><span></span><code><span class="k">def</span> <span class="nf">posterior_nn</span><span class="p">(</span><span class="n">model</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">:</span>
+    <span class="k">def</span> <span class="nf">build_fn</span><span class="p">(</span><span class="n">batch_theta</span><span class="p">,</span> <span class="n">batch_x</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">"mdn"</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">build_mdn</span><span class="p">(</span><span class="n">batch_x</span><span class="o">=</span><span class="n">batch_theta</span><span class="p">,</span> <span class="n">batch_y</span><span class="o">=</span><span class="n">batch_x</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">"made"</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">build_made</span><span class="p">(</span><span class="n">batch_x</span><span class="o">=</span><span class="n">batch_theta</span><span class="p">,</span> <span class="n">batch_y</span><span class="o">=</span><span class="n">batch_x</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">"maf"</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">build_maf</span><span class="p">(</span><span class="n">batch_x</span><span class="o">=</span><span class="n">batch_theta</span><span class="p">,</span> <span class="n">batch_y</span><span class="o">=</span><span class="n">batch_x</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">"nsf"</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">build_nsf</span><span class="p">(</span><span class="n">batch_x</span><span class="o">=</span><span class="n">batch_theta</span><span class="p">,</span> <span class="n">batch_y</span><span class="o">=</span><span class="n">batch_x</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span>
 
-<span class="sd">    Args:</span>
-<span class="sd">        model: Model, one of maf / mdn / made / nsf</span>
-<span class="sd">        prior: Prior distribution.</span>
-<span class="sd">        x_o_shape: Shape of a single observation. Used as input size to the NN.</span>
-<span class="sd">        embedding: Embedding network</span>
-<span class="sd">        hidden_features: For all, number of hidden features</span>
-<span class="sd">        mdn_num_components: For MDNs only, number of components</span>
-<span class="sd">        made_num_mixture_components: For MADEs only, number of mixture components</span>
-<span class="sd">        made_num_blocks: For MADEs only, number of blocks</span>
-<span class="sd">        flow_num_transforms: For flows only, number of transforms</span>
-
-<span class="sd">    Returns:</span>
-<span class="sd">        Neural network</span>
-<span class="sd">    """</span>
-
-    <span class="c1"># We need these asserts because mean and std can be defined outside, prior to user</span>
-    <span class="c1"># input checks.</span>
-    <span class="n">prior_mean</span> <span class="o">=</span> <span class="n">prior</span><span class="o">.</span><span class="n">mean</span>
-    <span class="n">prior_std</span> <span class="o">=</span> <span class="n">prior</span><span class="o">.</span><span class="n">stddev</span>
-    <span class="k">assert</span> <span class="p">(</span>
-        <span class="n">prior_mean</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="n">float32</span>
-    <span class="p">),</span> <span class="sa">f</span><span class="s2">"Prior mean must have dtype float32, is </span><span class="si">{</span><span class="n">prior_mean</span><span class="o">.</span><span class="n">dtype</span><span class="si">}</span><span class="s2">."</span>
-    <span class="k">assert</span> <span class="p">(</span>
-        <span class="n">prior_std</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="n">float32</span>
-    <span class="p">),</span> <span class="sa">f</span><span class="s2">"Prior std must have dtype float32, is </span><span class="si">{</span><span class="n">prior_std</span><span class="o">.</span><span class="n">dtype</span><span class="si">}</span><span class="s2">."</span>
-
-    <span class="n">standardizing_transform</span> <span class="o">=</span> <span class="n">transforms</span><span class="o">.</span><span class="n">AffineTransform</span><span class="p">(</span>
-        <span class="n">shift</span><span class="o">=-</span><span class="n">prior_mean</span> <span class="o">/</span> <span class="n">prior_std</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="mi">1</span> <span class="o">/</span> <span class="n">prior_std</span>
-    <span class="p">)</span>
-
-    <span class="n">theta_numel</span> <span class="o">=</span> <span class="n">prior_mean</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span>
-    <span class="n">x_o_numel</span> <span class="o">=</span> <span class="n">x_o_shape</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span>
-
-    <span class="k">if</span> <span class="n">theta_numel</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
-        <span class="n">_check_1d_flow_limitations</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="s2">"parameter"</span><span class="p">)</span>
-
-    <span class="k">if</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">"mdn"</span><span class="p">:</span>
-        <span class="n">neural_net</span> <span class="o">=</span> <span class="n">MultivariateGaussianMDN</span><span class="p">(</span>
-            <span class="n">features</span><span class="o">=</span><span class="n">theta_numel</span><span class="p">,</span>
-            <span class="n">context_features</span><span class="o">=</span><span class="n">x_o_numel</span><span class="p">,</span>
-            <span class="n">hidden_features</span><span class="o">=</span><span class="n">hidden_features</span><span class="p">,</span>
-            <span class="n">hidden_net</span><span class="o">=</span><span class="n">nn</span><span class="o">.</span><span class="n">Sequential</span><span class="p">(</span>
-                <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">x_o_numel</span><span class="p">,</span> <span class="n">hidden_features</span><span class="p">),</span>
-                <span class="n">nn</span><span class="o">.</span><span class="n">ReLU</span><span class="p">(),</span>
-                <span class="n">nn</span><span class="o">.</span><span class="n">Dropout</span><span class="p">(</span><span class="n">p</span><span class="o">=</span><span class="mf">0.0</span><span class="p">),</span>
-                <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">hidden_features</span><span class="p">,</span> <span class="n">hidden_features</span><span class="p">),</span>
-                <span class="n">nn</span><span class="o">.</span><span class="n">ReLU</span><span class="p">(),</span>
-                <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">hidden_features</span><span class="p">,</span> <span class="n">hidden_features</span><span class="p">),</span>
-                <span class="n">nn</span><span class="o">.</span><span class="n">ReLU</span><span class="p">(),</span>
-            <span class="p">),</span>
-            <span class="n">num_components</span><span class="o">=</span><span class="n">mdn_num_components</span><span class="p">,</span>
-            <span class="n">custom_initialization</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-        <span class="p">)</span>
-
-    <span class="k">elif</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">"made"</span><span class="p">:</span>
-        <span class="n">transform</span> <span class="o">=</span> <span class="n">standardizing_transform</span>
-        <span class="n">distribution</span> <span class="o">=</span> <span class="n">distributions_</span><span class="o">.</span><span class="n">MADEMoG</span><span class="p">(</span>
-            <span class="n">features</span><span class="o">=</span><span class="n">theta_numel</span><span class="p">,</span>
-            <span class="n">hidden_features</span><span class="o">=</span><span class="n">hidden_features</span><span class="p">,</span>
-            <span class="n">context_features</span><span class="o">=</span><span class="n">x_o_numel</span><span class="p">,</span>
-            <span class="n">num_blocks</span><span class="o">=</span><span class="n">made_num_blocks</span><span class="p">,</span>
-            <span class="n">num_mixture_components</span><span class="o">=</span><span class="n">made_num_mixture_components</span><span class="p">,</span>
-            <span class="n">use_residual_blocks</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-            <span class="n">random_mask</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-            <span class="n">activation</span><span class="o">=</span><span class="n">relu</span><span class="p">,</span>
-            <span class="n">dropout_probability</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
-            <span class="n">use_batch_norm</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-            <span class="n">custom_initialization</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-        <span class="p">)</span>
-        <span class="n">neural_net</span> <span class="o">=</span> <span class="n">flows</span><span class="o">.</span><span class="n">Flow</span><span class="p">(</span><span class="n">transform</span><span class="p">,</span> <span class="n">distribution</span><span class="p">,</span> <span class="n">embedding</span><span class="p">)</span>
-
-    <span class="k">elif</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">"maf"</span><span class="p">:</span>
-        <span class="n">transform</span> <span class="o">=</span> <span class="n">transforms</span><span class="o">.</span><span class="n">CompositeTransform</span><span class="p">(</span>
-            <span class="p">[</span>
-                <span class="n">transforms</span><span class="o">.</span><span class="n">CompositeTransform</span><span class="p">(</span>
-                    <span class="p">[</span>
-                        <span class="n">transforms</span><span class="o">.</span><span class="n">MaskedAffineAutoregressiveTransform</span><span class="p">(</span>
-                            <span class="n">features</span><span class="o">=</span><span class="n">theta_numel</span><span class="p">,</span>
-                            <span class="n">hidden_features</span><span class="o">=</span><span class="n">hidden_features</span><span class="p">,</span>
-                            <span class="n">context_features</span><span class="o">=</span><span class="n">x_o_numel</span><span class="p">,</span>
-                            <span class="n">num_blocks</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
-                            <span class="n">use_residual_blocks</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-                            <span class="n">random_mask</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-                            <span class="n">activation</span><span class="o">=</span><span class="n">tanh</span><span class="p">,</span>
-                            <span class="n">dropout_probability</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
-                            <span class="n">use_batch_norm</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-                        <span class="p">),</span>
-                        <span class="n">transforms</span><span class="o">.</span><span class="n">RandomPermutation</span><span class="p">(</span><span class="n">features</span><span class="o">=</span><span class="n">theta_numel</span><span class="p">),</span>
-                    <span class="p">]</span>
-                <span class="p">)</span>
-                <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">flow_num_transforms</span><span class="p">)</span>
-            <span class="p">]</span>
-        <span class="p">)</span>
-
-        <span class="n">transform</span> <span class="o">=</span> <span class="n">transforms</span><span class="o">.</span><span class="n">CompositeTransform</span><span class="p">([</span><span class="n">standardizing_transform</span><span class="p">,</span> <span class="n">transform</span><span class="p">,])</span>
-
-        <span class="n">distribution</span> <span class="o">=</span> <span class="n">distributions_</span><span class="o">.</span><span class="n">StandardNormal</span><span class="p">((</span><span class="n">theta_numel</span><span class="p">,))</span>
-        <span class="n">neural_net</span> <span class="o">=</span> <span class="n">flows</span><span class="o">.</span><span class="n">Flow</span><span class="p">(</span><span class="n">transform</span><span class="p">,</span> <span class="n">distribution</span><span class="p">,</span> <span class="n">embedding</span><span class="p">)</span>
-
-    <span class="k">elif</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">"nsf"</span><span class="p">:</span>
-        <span class="n">transform</span> <span class="o">=</span> <span class="n">transforms</span><span class="o">.</span><span class="n">CompositeTransform</span><span class="p">(</span>
-            <span class="p">[</span>
-                <span class="n">transforms</span><span class="o">.</span><span class="n">CompositeTransform</span><span class="p">(</span>
-                    <span class="p">[</span>
-                        <span class="n">transforms</span><span class="o">.</span><span class="n">PiecewiseRationalQuadraticCouplingTransform</span><span class="p">(</span>
-                            <span class="n">mask</span><span class="o">=</span><span class="n">create_alternating_binary_mask</span><span class="p">(</span>
-                                <span class="n">features</span><span class="o">=</span><span class="n">theta_numel</span><span class="p">,</span> <span class="n">even</span><span class="o">=</span><span class="p">(</span><span class="n">i</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span>
-                            <span class="p">),</span>
-                            <span class="n">transform_net_create_fn</span><span class="o">=</span><span class="k">lambda</span> <span class="n">in_features</span><span class="p">,</span> <span class="n">out_features</span><span class="p">:</span> <span class="n">nets</span><span class="o">.</span><span class="n">ResidualNet</span><span class="p">(</span>
-                                <span class="n">in_features</span><span class="o">=</span><span class="n">in_features</span><span class="p">,</span>
-                                <span class="n">out_features</span><span class="o">=</span><span class="n">out_features</span><span class="p">,</span>
-                                <span class="n">hidden_features</span><span class="o">=</span><span class="n">hidden_features</span><span class="p">,</span>
-                                <span class="n">context_features</span><span class="o">=</span><span class="n">x_o_numel</span><span class="p">,</span>
-                                <span class="n">num_blocks</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
-                                <span class="n">activation</span><span class="o">=</span><span class="n">relu</span><span class="p">,</span>
-                                <span class="n">dropout_probability</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
-                                <span class="n">use_batch_norm</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-                            <span class="p">),</span>
-                            <span class="n">num_bins</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
-                            <span class="n">tails</span><span class="o">=</span><span class="s2">"linear"</span><span class="p">,</span>
-                            <span class="n">tail_bound</span><span class="o">=</span><span class="mf">3.0</span><span class="p">,</span>
-                            <span class="n">apply_unconditional_transform</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-                        <span class="p">),</span>
-                        <span class="n">transforms</span><span class="o">.</span><span class="n">LULinear</span><span class="p">(</span><span class="n">theta_numel</span><span class="p">,</span> <span class="n">identity_init</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
-                    <span class="p">]</span>
-                <span class="p">)</span>
-                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">flow_num_transforms</span><span class="p">)</span>
-            <span class="p">]</span>
-        <span class="p">)</span>
-
-        <span class="n">transform</span> <span class="o">=</span> <span class="n">transforms</span><span class="o">.</span><span class="n">CompositeTransform</span><span class="p">([</span><span class="n">standardizing_transform</span><span class="p">,</span> <span class="n">transform</span><span class="p">,])</span>
-
-        <span class="n">distribution</span> <span class="o">=</span> <span class="n">distributions_</span><span class="o">.</span><span class="n">StandardNormal</span><span class="p">((</span><span class="n">theta_numel</span><span class="p">,))</span>
-        <span class="n">neural_net</span> <span class="o">=</span> <span class="n">flows</span><span class="o">.</span><span class="n">Flow</span><span class="p">(</span><span class="n">transform</span><span class="p">,</span> <span class="n">distribution</span><span class="p">,</span> <span class="n">embedding</span><span class="p">)</span>
-
-    <span class="k">else</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span>
-
-    <span class="k">return</span> <span class="n">neural_net</span>
+    <span class="k">return</span> <span class="n">build_fn</span>
 </code></pre>
 </div>
 </td>
@@ -4412,386 +4017,47 @@ sbi.utils.get_nn_models.posterior_nn<span class="p">(</span><span class="n">mode
 <div class="doc doc-object doc-function">
 <h3 class="doc doc-heading" id="sbi.utils.get_nn_models.likelihood_nn">
 <code class="highlight language-python">
-sbi.utils.get_nn_models.likelihood_nn<span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">theta_shape</span><span class="p">,</span> <span class="n">x_o_shape</span><span class="p">,</span> <span class="n">embedding</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">hidden_features</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">mdn_num_components</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">made_num_mixture_components</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">made_num_blocks</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">flow_num_transforms</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span> </code>
+sbi.utils.get_nn_models.likelihood_nn<span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> </code>
 <a class="headerlink" href="#sbi.utils.get_nn_models.likelihood_nn" title="Permanent link">¶</a></h3>
 <div class="doc doc-contents first">
-<p>Neural likelihood density estimator</p>
-<p><strong>Parameters:</strong></p>
-<table>
-<thead>
-<tr>
-<th>Name</th>
-<th>Type</th>
-<th>Description</th>
-<th>Default</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>model</code></td>
-<td><code>str</code></td>
-<td>
-<p>Model, one of maf / mdn / made / nsf</p>
-</td>
-<td><em>required</em></td>
-</tr>
-<tr>
-<td><code>theta_shape</code></td>
-<td><code>torch.Size</code></td>
-<td>
-<p>event shape of the prior, number of parameters.</p>
-</td>
-<td><em>required</em></td>
-</tr>
-<tr>
-<td><code>x_o_shape</code></td>
-<td><code>torch.Size</code></td>
-<td>
-<p>number of elements in a single data point.</p>
-</td>
-<td><em>required</em></td>
-</tr>
-<tr>
-<td><code>embedding</code></td>
-<td><code>Optional[nn.Module]</code></td>
-<td>
-<p>Embedding network</p>
-</td>
-<td><code>None</code></td>
-</tr>
-<tr>
-<td><code>hidden_features</code></td>
-<td><code>int</code></td>
-<td>
-<p>For all, number of hidden features</p>
-</td>
-<td><code>50</code></td>
-</tr>
-<tr>
-<td><code>mdn_num_components</code></td>
-<td><code>int</code></td>
-<td>
-<p>For MDNs only, number of components</p>
-</td>
-<td><code>20</code></td>
-</tr>
-<tr>
-<td><code>made_num_mixture_components</code></td>
-<td><code>int</code></td>
-<td>
-<p>For MADEs only, number of mixture components</p>
-</td>
-<td><code>10</code></td>
-</tr>
-<tr>
-<td><code>made_num_blocks</code></td>
-<td><code>int</code></td>
-<td>
-<p>For MADEs only, number of blocks</p>
-</td>
-<td><code>4</code></td>
-</tr>
-<tr>
-<td><code>flow_num_transforms</code></td>
-<td><code>int</code></td>
-<td>
-<p>For flows only, number of transforms</p>
-</td>
-<td><code>5</code></td>
-</tr>
-</tbody>
-</table>
-<p><strong>Returns:</strong></p>
-<table>
-<thead>
-<tr>
-<th>Type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>nn.Module</code></td>
-<td>
-<p>Neural network</p>
-</td>
-</tr>
-</tbody>
-</table>
 <details class="quote">
 <summary>Source code in <code>sbi/utils/get_nn_models.py</code></summary>
 <table class="highlighttable">
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>175
-176
-177
-178
-179
-180
-181
-182
-183
-184
-185
-186
-187
-188
-189
-190
-191
-192
-193
-194
-195
-196
-197
-198
-199
-200
-201
-202
-203
-204
-205
-206
-207
-208
-209
-210
-211
-212
-213
-214
-215
-216
-217
-218
-219
-220
-221
-222
-223
-224
-225
-226
-227
-228
-229
-230
-231
-232
-233
-234
-235
-236
-237
-238
-239
-240
-241
-242
-243
-244
-245
-246
-247
-248
-249
-250
-251
-252
-253
-254
-255
-256
-257
-258
-259
-260
-261
-262
-263
-264
-265
-266
-267
-268
-269
-270
-271
-272
-273
-274
-275
-276
-277
-278
-279
-280
-281
-282
-283
-284
-285
-286
-287
-288
-289
-290
-291
-292
-293
-294
-295
-296
-297
-298
-299
-300
-301
-302
-303
-304
-305
-306</pre>
+<pre><span></span>33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46</pre>
 </div>
 </td>
 <td class="code">
 <div class="highlight">
-<pre><span></span><code><span class="k">def</span> <span class="nf">likelihood_nn</span><span class="p">(</span>
-    <span class="n">model</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
-    <span class="n">theta_shape</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">,</span>
-    <span class="n">x_o_shape</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">,</span>
-    <span class="n">embedding</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">hidden_features</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">50</span><span class="p">,</span>
-    <span class="n">mdn_num_components</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">20</span><span class="p">,</span>
-    <span class="n">made_num_mixture_components</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
-    <span class="n">made_num_blocks</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">4</span><span class="p">,</span>
-    <span class="n">flow_num_transforms</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">5</span><span class="p">,</span>
-<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">:</span>
-    <span class="sd">"""Neural likelihood density estimator</span>
+<pre><span></span><code><span class="k">def</span> <span class="nf">likelihood_nn</span><span class="p">(</span><span class="n">model</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">:</span>
+    <span class="k">def</span> <span class="nf">build_fn</span><span class="p">(</span><span class="n">batch_theta</span><span class="p">,</span> <span class="n">batch_x</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">"mdn"</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">build_mdn</span><span class="p">(</span><span class="n">batch_x</span><span class="o">=</span><span class="n">batch_x</span><span class="p">,</span> <span class="n">batch_y</span><span class="o">=</span><span class="n">batch_theta</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">"made"</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">build_made</span><span class="p">(</span><span class="n">batch_x</span><span class="o">=</span><span class="n">batch_x</span><span class="p">,</span> <span class="n">batch_y</span><span class="o">=</span><span class="n">batch_theta</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">"maf"</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">build_maf</span><span class="p">(</span><span class="n">batch_x</span><span class="o">=</span><span class="n">batch_x</span><span class="p">,</span> <span class="n">batch_y</span><span class="o">=</span><span class="n">batch_theta</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">"nsf"</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">build_nsf</span><span class="p">(</span><span class="n">batch_x</span><span class="o">=</span><span class="n">batch_x</span><span class="p">,</span> <span class="n">batch_y</span><span class="o">=</span><span class="n">batch_theta</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span>
 
-<span class="sd">    Args:</span>
-<span class="sd">        model: Model, one of maf / mdn / made / nsf</span>
-<span class="sd">        theta_shape: event shape of the prior, number of parameters.</span>
-<span class="sd">        x_o_shape: number of elements in a single data point.</span>
-<span class="sd">        embedding: Embedding network</span>
-<span class="sd">        hidden_features: For all, number of hidden features</span>
-<span class="sd">        mdn_num_components: For MDNs only, number of components</span>
-<span class="sd">        made_num_mixture_components: For MADEs only, number of mixture components</span>
-<span class="sd">        made_num_blocks: For MADEs only, number of blocks</span>
-<span class="sd">        flow_num_transforms: For flows only, number of transforms</span>
-
-<span class="sd">    Returns:</span>
-<span class="sd">        Neural network</span>
-<span class="sd">    """</span>
-
-    <span class="n">theta_numel</span> <span class="o">=</span> <span class="n">theta_shape</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span>
-    <span class="n">x_o_numel</span> <span class="o">=</span> <span class="n">x_o_shape</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span>
-
-    <span class="k">if</span> <span class="n">x_o_numel</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
-        <span class="n">_check_1d_flow_limitations</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="s2">"data"</span><span class="p">)</span>
-
-    <span class="k">if</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">"mdn"</span><span class="p">:</span>
-        <span class="n">neural_net</span> <span class="o">=</span> <span class="n">MultivariateGaussianMDN</span><span class="p">(</span>
-            <span class="n">features</span><span class="o">=</span><span class="n">x_o_numel</span><span class="p">,</span>
-            <span class="n">context_features</span><span class="o">=</span><span class="n">theta_numel</span><span class="p">,</span>
-            <span class="n">hidden_features</span><span class="o">=</span><span class="n">hidden_features</span><span class="p">,</span>
-            <span class="n">hidden_net</span><span class="o">=</span><span class="n">nn</span><span class="o">.</span><span class="n">Sequential</span><span class="p">(</span>
-                <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">theta_numel</span><span class="p">,</span> <span class="n">hidden_features</span><span class="p">),</span>
-                <span class="n">nn</span><span class="o">.</span><span class="n">BatchNorm1d</span><span class="p">(</span><span class="n">hidden_features</span><span class="p">),</span>
-                <span class="n">nn</span><span class="o">.</span><span class="n">ReLU</span><span class="p">(),</span>
-                <span class="n">nn</span><span class="o">.</span><span class="n">Dropout</span><span class="p">(</span><span class="n">p</span><span class="o">=</span><span class="mf">0.0</span><span class="p">),</span>
-                <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">hidden_features</span><span class="p">,</span> <span class="n">hidden_features</span><span class="p">),</span>
-                <span class="n">nn</span><span class="o">.</span><span class="n">BatchNorm1d</span><span class="p">(</span><span class="n">hidden_features</span><span class="p">),</span>
-                <span class="n">nn</span><span class="o">.</span><span class="n">ReLU</span><span class="p">(),</span>
-                <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">hidden_features</span><span class="p">,</span> <span class="n">hidden_features</span><span class="p">),</span>
-                <span class="n">nn</span><span class="o">.</span><span class="n">BatchNorm1d</span><span class="p">(</span><span class="n">hidden_features</span><span class="p">),</span>
-                <span class="n">nn</span><span class="o">.</span><span class="n">ReLU</span><span class="p">(),</span>
-            <span class="p">),</span>
-            <span class="n">num_components</span><span class="o">=</span><span class="n">mdn_num_components</span><span class="p">,</span>
-            <span class="n">custom_initialization</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-        <span class="p">)</span>
-
-    <span class="k">elif</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">"made"</span><span class="p">:</span>
-        <span class="n">neural_net</span> <span class="o">=</span> <span class="n">MixtureOfGaussiansMADE</span><span class="p">(</span>
-            <span class="n">features</span><span class="o">=</span><span class="n">x_o_numel</span><span class="p">,</span>
-            <span class="n">hidden_features</span><span class="o">=</span><span class="n">hidden_features</span><span class="p">,</span>
-            <span class="n">context_features</span><span class="o">=</span><span class="n">theta_numel</span><span class="p">,</span>
-            <span class="n">num_blocks</span><span class="o">=</span><span class="n">made_num_blocks</span><span class="p">,</span>
-            <span class="n">num_mixture_components</span><span class="o">=</span><span class="n">made_num_mixture_components</span><span class="p">,</span>
-            <span class="n">use_residual_blocks</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-            <span class="n">random_mask</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-            <span class="n">activation</span><span class="o">=</span><span class="n">relu</span><span class="p">,</span>
-            <span class="n">use_batch_norm</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-            <span class="n">dropout_probability</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
-            <span class="n">custom_initialization</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-        <span class="p">)</span>
-
-    <span class="k">elif</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">"maf"</span><span class="p">:</span>
-        <span class="n">transform</span> <span class="o">=</span> <span class="n">transforms</span><span class="o">.</span><span class="n">CompositeTransform</span><span class="p">(</span>
-            <span class="p">[</span>
-                <span class="n">transforms</span><span class="o">.</span><span class="n">CompositeTransform</span><span class="p">(</span>
-                    <span class="p">[</span>
-                        <span class="n">transforms</span><span class="o">.</span><span class="n">MaskedAffineAutoregressiveTransform</span><span class="p">(</span>
-                            <span class="n">features</span><span class="o">=</span><span class="n">x_o_numel</span><span class="p">,</span>
-                            <span class="n">hidden_features</span><span class="o">=</span><span class="n">hidden_features</span><span class="p">,</span>
-                            <span class="n">context_features</span><span class="o">=</span><span class="n">theta_numel</span><span class="p">,</span>
-                            <span class="n">num_blocks</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
-                            <span class="n">use_residual_blocks</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-                            <span class="n">random_mask</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-                            <span class="n">activation</span><span class="o">=</span><span class="n">tanh</span><span class="p">,</span>
-                            <span class="n">dropout_probability</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
-                            <span class="n">use_batch_norm</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-                        <span class="p">),</span>
-                        <span class="n">transforms</span><span class="o">.</span><span class="n">RandomPermutation</span><span class="p">(</span><span class="n">features</span><span class="o">=</span><span class="n">x_o_numel</span><span class="p">),</span>
-                    <span class="p">]</span>
-                <span class="p">)</span>
-                <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">flow_num_transforms</span><span class="p">)</span>
-            <span class="p">]</span>
-        <span class="p">)</span>
-        <span class="n">distribution</span> <span class="o">=</span> <span class="n">distributions_</span><span class="o">.</span><span class="n">StandardNormal</span><span class="p">((</span><span class="n">x_o_numel</span><span class="p">,))</span>
-        <span class="n">neural_net</span> <span class="o">=</span> <span class="n">flows</span><span class="o">.</span><span class="n">Flow</span><span class="p">(</span><span class="n">transform</span><span class="p">,</span> <span class="n">distribution</span><span class="p">,</span> <span class="n">embedding</span><span class="p">)</span>
-
-    <span class="k">elif</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">"nsf"</span><span class="p">:</span>
-        <span class="n">transform</span> <span class="o">=</span> <span class="n">transforms</span><span class="o">.</span><span class="n">CompositeTransform</span><span class="p">(</span>
-            <span class="p">[</span>
-                <span class="n">transforms</span><span class="o">.</span><span class="n">CompositeTransform</span><span class="p">(</span>
-                    <span class="p">[</span>
-                        <span class="n">transforms</span><span class="o">.</span><span class="n">PiecewiseRationalQuadraticCouplingTransform</span><span class="p">(</span>
-                            <span class="n">mask</span><span class="o">=</span><span class="n">create_alternating_binary_mask</span><span class="p">(</span>
-                                <span class="n">features</span><span class="o">=</span><span class="n">x_o_numel</span><span class="p">,</span> <span class="n">even</span><span class="o">=</span><span class="p">(</span><span class="n">i</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span>
-                            <span class="p">),</span>
-                            <span class="n">transform_net_create_fn</span><span class="o">=</span><span class="k">lambda</span> <span class="n">in_features</span><span class="p">,</span> <span class="n">out_features</span><span class="p">:</span> <span class="n">nets</span><span class="o">.</span><span class="n">ResidualNet</span><span class="p">(</span>
-                                <span class="n">in_features</span><span class="o">=</span><span class="n">in_features</span><span class="p">,</span>
-                                <span class="n">out_features</span><span class="o">=</span><span class="n">out_features</span><span class="p">,</span>
-                                <span class="n">hidden_features</span><span class="o">=</span><span class="n">hidden_features</span><span class="p">,</span>
-                                <span class="n">context_features</span><span class="o">=</span><span class="n">theta_numel</span><span class="p">,</span>
-                                <span class="n">num_blocks</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
-                                <span class="n">activation</span><span class="o">=</span><span class="n">relu</span><span class="p">,</span>
-                                <span class="n">dropout_probability</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
-                                <span class="n">use_batch_norm</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-                            <span class="p">),</span>
-                            <span class="n">num_bins</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
-                            <span class="n">tails</span><span class="o">=</span><span class="s2">"linear"</span><span class="p">,</span>
-                            <span class="n">tail_bound</span><span class="o">=</span><span class="mf">3.0</span><span class="p">,</span>
-                            <span class="n">apply_unconditional_transform</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-                        <span class="p">),</span>
-                        <span class="n">transforms</span><span class="o">.</span><span class="n">LULinear</span><span class="p">(</span><span class="n">x_o_numel</span><span class="p">,</span> <span class="n">identity_init</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
-                    <span class="p">]</span>
-                <span class="p">)</span>
-                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">flow_num_transforms</span><span class="p">)</span>
-            <span class="p">]</span>
-        <span class="p">)</span>
-        <span class="n">distribution</span> <span class="o">=</span> <span class="n">distributions_</span><span class="o">.</span><span class="n">StandardNormal</span><span class="p">((</span><span class="n">x_o_numel</span><span class="p">,))</span>
-        <span class="n">neural_net</span> <span class="o">=</span> <span class="n">flows</span><span class="o">.</span><span class="n">Flow</span><span class="p">(</span><span class="n">transform</span><span class="p">,</span> <span class="n">distribution</span><span class="p">)</span>
-
-    <span class="k">else</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span>
-
-    <span class="k">return</span> <span class="n">neural_net</span>
+    <span class="k">return</span> <span class="n">build_fn</span>
 </code></pre>
 </div>
 </td>
@@ -4803,184 +4069,49 @@ sbi.utils.get_nn_models.likelihood_nn<span class="p">(</span><span class="n">mod
 <div class="doc doc-object doc-function">
 <h3 class="doc doc-heading" id="sbi.utils.get_nn_models.classifier_nn">
 <code class="highlight language-python">
-sbi.utils.get_nn_models.classifier_nn<span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">theta_shape</span><span class="p">,</span> <span class="n">x_o_shape</span><span class="p">,</span> <span class="n">hidden_features</span><span class="o">=</span><span class="mi">50</span><span class="p">)</span> </code>
+sbi.utils.get_nn_models.classifier_nn<span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> </code>
 <a class="headerlink" href="#sbi.utils.get_nn_models.classifier_nn" title="Permanent link">¶</a></h3>
 <div class="doc doc-contents first">
-<p>Neural classifier</p>
-<p><strong>Parameters:</strong></p>
-<table>
-<thead>
-<tr>
-<th>Name</th>
-<th>Type</th>
-<th>Description</th>
-<th>Default</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>model</code></td>
-<td><code>str</code></td>
-<td>
-<p>Model, one of linear / mlp / resnet</p>
-</td>
-<td><em>required</em></td>
-</tr>
-<tr>
-<td><code>theta_shape</code></td>
-<td><code>torch.Size</code></td>
-<td>
-<p>event shape of the prior, number of parameters.</p>
-</td>
-<td><em>required</em></td>
-</tr>
-<tr>
-<td><code>x_o_shape</code></td>
-<td><code>torch.Size</code></td>
-<td>
-<p>number of elements in a single data point.</p>
-</td>
-<td><em>required</em></td>
-</tr>
-<tr>
-<td><code>hidden_features</code></td>
-<td><code>int</code></td>
-<td>
-<p>For all, number of hidden features</p>
-</td>
-<td><code>50</code></td>
-</tr>
-</tbody>
-</table>
-<p><strong>Returns:</strong></p>
-<table>
-<thead>
-<tr>
-<th>Type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>nn.Module</code></td>
-<td>
-<p>Neural network</p>
-</td>
-</tr>
-</tbody>
-</table>
 <details class="quote">
 <summary>Source code in <code>sbi/utils/get_nn_models.py</code></summary>
 <table class="highlighttable">
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>309
-310
-311
-312
-313
-314
-315
-316
-317
-318
-319
-320
-321
-322
-323
-324
-325
-326
-327
-328
-329
-330
-331
-332
-333
-334
-335
-336
-337
-338
-339
-340
-341
-342
-343
-344
-345
-346
-347
-348
-349
-350
-351
-352
-353
-354
-355
-356
-357
-358
-359</pre>
+<pre><span></span>16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30</pre>
 </div>
 </td>
 <td class="code">
 <div class="highlight">
-<pre><span></span><code><span class="k">def</span> <span class="nf">classifier_nn</span><span class="p">(</span>
-    <span class="n">model</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
-    <span class="n">theta_shape</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">,</span>
-    <span class="n">x_o_shape</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">,</span>
-    <span class="n">hidden_features</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">50</span><span class="p">,</span>
-<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">:</span>
-    <span class="sd">"""Neural classifier</span>
+<pre><span></span><code><span class="k">def</span> <span class="nf">classifier_nn</span><span class="p">(</span><span class="n">model</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">:</span>
+    <span class="k">def</span> <span class="nf">build_fn</span><span class="p">(</span><span class="n">batch_theta</span><span class="p">,</span> <span class="n">batch_x</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">"linear"</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">build_linear_classifier</span><span class="p">(</span>
+                <span class="n">batch_x</span><span class="o">=</span><span class="n">batch_x</span><span class="p">,</span> <span class="n">batch_y</span><span class="o">=</span><span class="n">batch_theta</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">"mlp"</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">build_mlp_classifier</span><span class="p">(</span><span class="n">batch_x</span><span class="o">=</span><span class="n">batch_x</span><span class="p">,</span> <span class="n">batch_y</span><span class="o">=</span><span class="n">batch_theta</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">"resnet"</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">build_resnet_classifier</span><span class="p">(</span>
+                <span class="n">batch_x</span><span class="o">=</span><span class="n">batch_x</span><span class="p">,</span> <span class="n">batch_y</span><span class="o">=</span><span class="n">batch_theta</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
+            <span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span>
 
-<span class="sd">    Args:</span>
-<span class="sd">        model: Model, one of linear / mlp / resnet</span>
-<span class="sd">        theta_shape: event shape of the prior, number of parameters.</span>
-<span class="sd">        x_o_shape: number of elements in a single data point.</span>
-<span class="sd">        hidden_features: For all, number of hidden features</span>
-
-<span class="sd">    Returns:</span>
-<span class="sd">        Neural network</span>
-<span class="sd">    """</span>
-
-    <span class="n">theta_numel</span> <span class="o">=</span> <span class="n">theta_shape</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span>
-    <span class="n">x_o_numel</span> <span class="o">=</span> <span class="n">x_o_shape</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span>
-
-    <span class="k">if</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">"linear"</span><span class="p">:</span>
-        <span class="n">neural_net</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">theta_numel</span> <span class="o">+</span> <span class="n">x_o_numel</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
-
-    <span class="k">elif</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">"mlp"</span><span class="p">:</span>
-        <span class="n">neural_net</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Sequential</span><span class="p">(</span>
-            <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">theta_numel</span> <span class="o">+</span> <span class="n">x_o_numel</span><span class="p">,</span> <span class="n">hidden_features</span><span class="p">),</span>
-            <span class="n">nn</span><span class="o">.</span><span class="n">BatchNorm1d</span><span class="p">(</span><span class="n">hidden_features</span><span class="p">),</span>
-            <span class="n">nn</span><span class="o">.</span><span class="n">ReLU</span><span class="p">(),</span>
-            <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">hidden_features</span><span class="p">,</span> <span class="n">hidden_features</span><span class="p">),</span>
-            <span class="n">nn</span><span class="o">.</span><span class="n">BatchNorm1d</span><span class="p">(</span><span class="n">hidden_features</span><span class="p">),</span>
-            <span class="n">nn</span><span class="o">.</span><span class="n">ReLU</span><span class="p">(),</span>
-            <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">hidden_features</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
-        <span class="p">)</span>
-
-    <span class="k">elif</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">"resnet"</span><span class="p">:</span>
-        <span class="n">neural_net</span> <span class="o">=</span> <span class="n">nets</span><span class="o">.</span><span class="n">ResidualNet</span><span class="p">(</span>
-            <span class="n">in_features</span><span class="o">=</span><span class="n">theta_numel</span> <span class="o">+</span> <span class="n">x_o_numel</span><span class="p">,</span>
-            <span class="n">out_features</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
-            <span class="n">hidden_features</span><span class="o">=</span><span class="n">hidden_features</span><span class="p">,</span>
-            <span class="n">context_features</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-            <span class="n">num_blocks</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
-            <span class="n">activation</span><span class="o">=</span><span class="n">relu</span><span class="p">,</span>
-            <span class="n">dropout_probability</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
-            <span class="n">use_batch_norm</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-        <span class="p">)</span>
-
-    <span class="k">else</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"'model' must be one of ['linear', 'mlp', 'resnet']."</span><span class="p">)</span>
-
-    <span class="k">return</span> <span class="n">neural_net</span>
+    <span class="k">return</span> <span class="n">build_fn</span>
 </code></pre>
 </div>
 </td>
@@ -4993,7 +4124,7 @@ sbi.utils.get_nn_models.classifier_nn<span class="p">(</span><span class="n">mod
 <div class="doc doc-object doc-function">
 <h3 class="doc doc-heading" id="sbi.utils.plot.pairplot">
 <code class="highlight language-python">
-sbi.utils.plot.pairplot<span class="p">(</span><span class="n">samples</span><span class="p">,</span> <span class="n">points</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">upper</span><span class="o">=</span><span class="s1">'hist'</span><span class="p">,</span> <span class="n">diag</span><span class="o">=</span><span class="s1">'hist'</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">legend</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">labels_points</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">labels_samples</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">samples_colors</span><span class="o">=</span><span class="p">[</span><span class="s1">'#1f77b4'</span><span class="p">,</span> <span class="s1">'#ff7f0e'</span><span class="p">,</span> <span class="s1">'#2ca02c'</span><span class="p">,</span> <span class="s1">'#d62728'</span><span class="p">,</span> <span class="s1">'#9467bd'</span><span class="p">,</span> <span class="s1">'#8c564b'</span><span class="p">,</span> <span class="s1">'#e377c2'</span><span class="p">,</span> <span class="s1">'#7f7f7f'</span><span class="p">,</span> <span class="s1">'#bcbd22'</span><span class="p">,</span> <span class="s1">'#17becf'</span><span class="p">],</span> <span class="n">points_colors</span><span class="o">=</span><span class="p">[</span><span class="s1">'#1f77b4'</span><span class="p">,</span> <span class="s1">'#ff7f0e'</span><span class="p">,</span> <span class="s1">'#2ca02c'</span><span class="p">,</span> <span class="s1">'#d62728'</span><span class="p">,</span> <span class="s1">'#9467bd'</span><span class="p">,</span> <span class="s1">'#8c564b'</span><span class="p">,</span> <span class="s1">'#e377c2'</span><span class="p">,</span> <span class="s1">'#7f7f7f'</span><span class="p">,</span> <span class="s1">'#bcbd22'</span><span class="p">,</span> <span class="s1">'#17becf'</span><span class="p">],</span> <span class="n">subset</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">ticks</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">tickformatter</span><span class="o">=&lt;</span><span class="n">matplotlib</span><span class="o">.</span><span class="n">ticker</span><span class="o">.</span><span class="n">FormatStrFormatter</span> <span class="nb">object</span> <span class="n">at</span> <span class="mh">0x7fe0d4b83350</span><span class="o">&gt;</span><span class="p">,</span> <span class="n">tick_labels</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">hist_diag</span><span class="o">=</span><span class="p">{</span><span class="s1">'alpha'</span><span class="p">:</span> <span class="mf">1.0</span><span class="p">,</span> <span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span> <span class="s1">'density'</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s1">'histtype'</span><span class="p">:</span> <span class="s1">'step'</span><span class="p">},</span> <span class="n">hist_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">},</span> <span class="n">kde_diag</span><span class="o">=</span><span class="p">{</span><span class="s1">'bw_method'</span><span class="p">:</span> <span class="s1">'scott'</span><span class="p">,</span> <span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span> <span class="s1">'color'</span><span class="p">:</span> <span class="s1">'black'</span><span class="p">},</span> <span class="n">kde_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'bw_method'</span><span class="p">:</span> <span class="s1">'scott'</span><span class="p">,</span> <span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">},</span> <span class="n">contour_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'levels'</span><span class="p">:</span> <span class="p">[</span><span class="mf">0.68</span><span class="p">],</span> <span class="s1">'percentile'</span><span class="p">:</span> <span class="kc">True</span><span class="p">},</span> <span class="n">scatter_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'alpha'</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">,</span> <span class="s1">'edgecolor'</span><span class="p">:</span> <span class="s1">'none'</span><span class="p">,</span> <span class="s1">'rasterized'</span><span class="p">:</span> <span class="kc">False</span><span class="p">},</span> <span class="n">plot_offdiag</span><span class="o">=</span><span class="p">{},</span> <span class="n">points_diag</span><span class="o">=</span><span class="p">{},</span> <span class="n">points_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'marker'</span><span class="p">:</span> <span class="s1">'.'</span><span class="p">,</span> <span class="s1">'markersize'</span><span class="p">:</span> <span class="mi">20</span><span class="p">},</span> <span class="n">fig_size</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">10</span><span class="p">),</span> <span class="n">fig_bg_colors</span><span class="o">=</span><span class="p">{</span><span class="s1">'upper'</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span> <span class="s1">'diag'</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span> <span class="s1">'lower'</span><span class="p">:</span> <span class="kc">None</span><span class="p">},</span> <span class="n">fig_subplots_adjust</span><span class="o">=</span><span class="p">{</span><span class="s1">'top'</span><span class="p">:</span> <span class="mf">0.9</span><span class="p">},</span> <span class="n">subplots</span><span class="o">=</span><span class="p">{},</span> <span class="n">despine</span><span class="o">=</span><span class="p">{</span><span class="s1">'offset'</span><span class="p">:</span> <span class="mi">5</span><span class="p">},</span> <span class="n">title_format</span><span class="o">=</span><span class="p">{</span><span class="s1">'fontsize'</span><span class="p">:</span> <span class="mi">16</span><span class="p">})</span> </code>
+sbi.utils.plot.pairplot<span class="p">(</span><span class="n">samples</span><span class="p">,</span> <span class="n">points</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">upper</span><span class="o">=</span><span class="s1">'hist'</span><span class="p">,</span> <span class="n">diag</span><span class="o">=</span><span class="s1">'hist'</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">legend</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">labels_points</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">labels_samples</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">samples_colors</span><span class="o">=</span><span class="p">[</span><span class="s1">'#1f77b4'</span><span class="p">,</span> <span class="s1">'#ff7f0e'</span><span class="p">,</span> <span class="s1">'#2ca02c'</span><span class="p">,</span> <span class="s1">'#d62728'</span><span class="p">,</span> <span class="s1">'#9467bd'</span><span class="p">,</span> <span class="s1">'#8c564b'</span><span class="p">,</span> <span class="s1">'#e377c2'</span><span class="p">,</span> <span class="s1">'#7f7f7f'</span><span class="p">,</span> <span class="s1">'#bcbd22'</span><span class="p">,</span> <span class="s1">'#17becf'</span><span class="p">],</span> <span class="n">points_colors</span><span class="o">=</span><span class="p">[</span><span class="s1">'#1f77b4'</span><span class="p">,</span> <span class="s1">'#ff7f0e'</span><span class="p">,</span> <span class="s1">'#2ca02c'</span><span class="p">,</span> <span class="s1">'#d62728'</span><span class="p">,</span> <span class="s1">'#9467bd'</span><span class="p">,</span> <span class="s1">'#8c564b'</span><span class="p">,</span> <span class="s1">'#e377c2'</span><span class="p">,</span> <span class="s1">'#7f7f7f'</span><span class="p">,</span> <span class="s1">'#bcbd22'</span><span class="p">,</span> <span class="s1">'#17becf'</span><span class="p">],</span> <span class="n">subset</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">ticks</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">tickformatter</span><span class="o">=&lt;</span><span class="n">matplotlib</span><span class="o">.</span><span class="n">ticker</span><span class="o">.</span><span class="n">FormatStrFormatter</span> <span class="nb">object</span> <span class="n">at</span> <span class="mh">0x7fb045211c90</span><span class="o">&gt;</span><span class="p">,</span> <span class="n">tick_labels</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">hist_diag</span><span class="o">=</span><span class="p">{</span><span class="s1">'alpha'</span><span class="p">:</span> <span class="mf">1.0</span><span class="p">,</span> <span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span> <span class="s1">'density'</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s1">'histtype'</span><span class="p">:</span> <span class="s1">'step'</span><span class="p">},</span> <span class="n">hist_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">},</span> <span class="n">kde_diag</span><span class="o">=</span><span class="p">{</span><span class="s1">'bw_method'</span><span class="p">:</span> <span class="s1">'scott'</span><span class="p">,</span> <span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span> <span class="s1">'color'</span><span class="p">:</span> <span class="s1">'black'</span><span class="p">},</span> <span class="n">kde_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'bw_method'</span><span class="p">:</span> <span class="s1">'scott'</span><span class="p">,</span> <span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">},</span> <span class="n">contour_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'levels'</span><span class="p">:</span> <span class="p">[</span><span class="mf">0.68</span><span class="p">],</span> <span class="s1">'percentile'</span><span class="p">:</span> <span class="kc">True</span><span class="p">},</span> <span class="n">scatter_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'alpha'</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">,</span> <span class="s1">'edgecolor'</span><span class="p">:</span> <span class="s1">'none'</span><span class="p">,</span> <span class="s1">'rasterized'</span><span class="p">:</span> <span class="kc">False</span><span class="p">},</span> <span class="n">plot_offdiag</span><span class="o">=</span><span class="p">{},</span> <span class="n">points_diag</span><span class="o">=</span><span class="p">{},</span> <span class="n">points_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'marker'</span><span class="p">:</span> <span class="s1">'.'</span><span class="p">,</span> <span class="s1">'markersize'</span><span class="p">:</span> <span class="mi">20</span><span class="p">},</span> <span class="n">fig_size</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">10</span><span class="p">),</span> <span class="n">fig_bg_colors</span><span class="o">=</span><span class="p">{</span><span class="s1">'upper'</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span> <span class="s1">'diag'</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span> <span class="s1">'lower'</span><span class="p">:</span> <span class="kc">None</span><span class="p">},</span> <span class="n">fig_subplots_adjust</span><span class="o">=</span><span class="p">{</span><span class="s1">'top'</span><span class="p">:</span> <span class="mf">0.9</span><span class="p">},</span> <span class="n">subplots</span><span class="o">=</span><span class="p">{},</span> <span class="n">despine</span><span class="o">=</span><span class="p">{</span><span class="s1">'offset'</span><span class="p">:</span> <span class="mi">5</span><span class="p">},</span> <span class="n">title_format</span><span class="o">=</span><span class="p">{</span><span class="s1">'fontsize'</span><span class="p">:</span> <span class="mi">16</span><span class="p">})</span> </code>
 <a class="headerlink" href="#sbi.utils.plot.pairplot" title="Permanent link">¶</a></h3>
 <div class="doc doc-contents first">
 <p>Plot samples and points.</p>
@@ -5129,7 +4260,7 @@ stored in the input variable hist_diag, use opts[<code class="codehilite"><span 
 <td>
 <p>passed to _format_axis()</p>
 </td>
-<td><code>&lt;matplotlib.ticker.FormatStrFormatter object at 0x7fe0d4b83350&gt;</code></td>
+<td><code>&lt;matplotlib.ticker.FormatStrFormatter object at 0x7fb045211c90&gt;</code></td>
 </tr>
 <tr>
 <td><code>tick_labels</code></td>
