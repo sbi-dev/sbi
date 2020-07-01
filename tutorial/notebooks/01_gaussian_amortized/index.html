@@ -333,7 +333,7 @@ We can then run inference:
 <p><div class="inner_cell" markdown="1">
 <div class="text_cell_render border-box-sizing rendered_html" markdown="1"></div></div></p>
 <h2 id="amortized-inference">Amortized inference<a class="headerlink" href="#amortized-inference" title="Permanent link">¶</a></h2>
-<p>As it can be seen above, we have not yet provided an observation to the inference procedure. In fact, we can evaluate the posterior for different observations without having to re-run inference. This is called amortization. An amortized posterior is one that is not focused on any particular observation. Naturally, if the dimensionality of <span class="arithmatex">\(x\)</span> is large any of the inference methods will need to run many simulations for the resulting posterior to perform well in <span class="arithmatex">\(x\)</span> space.
+<p>Note that we have not yet provided an observation to the inference procedure. In fact, we can evaluate the posterior for different observations without having to re-run inference. This is called amortization. An amortized posterior is one that is not focused on any particular observation. Naturally, if the diversity of observations is large, any of the inference methods will need to run many simulations for the resulting posterior to perform well across these diverse observations.
 </p></div>
 </div>
 
@@ -387,7 +387,7 @@ This makes sense because the simulator always adds <code>1.0</code> in each dime
 <div class="cell border-box-sizing text_cell rendered">
 <p><div class="inner_cell" markdown="1">
 <div class="text_cell_render border-box-sizing rendered_html" markdown="1">
-Since the learned posterior is amortized, we can also draw samples from the posterior given the second observation without having to re-run interence:
+Since the learned posterior is amortized, we can also draw samples from the posterior given the second observation without having to re-run inference:
 </div>
 </div></p>
 </div>
