@@ -42,7 +42,7 @@ posterior = infer(linear_gaussian, prior, 'SNPE', num_simulations=1000)
 
 
 ## Amortized inference
-As it can be seen above, we have not yet provided an observation to the inference procedure. In fact, we can evaluate the posterior for different observations without having to re-run inference. This is called amortization. An amortized posterior is one that is not focused on any particular observation. Naturally, if the dimensionality of $x$ is large any of the inference methods will need to run many simulations for the resulting posterior to perform well in $x$ space.
+Note that we have not yet provided an observation to the inference procedure. In fact, we can evaluate the posterior for different observations without having to re-run inference. This is called amortization. An amortized posterior is one that is not focused on any particular observation. Naturally, if the diversity of observations is large, any of the inference methods will need to run many simulations for the resulting posterior to perform well across these diverse observations.
 
 Let's say we have two observations `x_o_1 = [0,0,0]` and `x_o_2 = [2,2,2]`:
 
@@ -69,7 +69,7 @@ _ = utils.pairplot(posterior_samples_1, limits=[[-2,2],[-2,2],[-2,2]], fig_size=
 As it can be seen, the posterior samples are centered around `[-1,-1,-1]` in each dimension. 
 This makes sense because the simulator always adds `1.0` in each dimension and we have observed `x_o_1 = [0,0,0]`.
 
-Since the learned posterior is amortized, we can also draw samples from the posterior given the second observation without having to re-run interence:
+Since the learned posterior is amortized, we can also draw samples from the posterior given the second observation without having to re-run inference:
 
 
 ```python
