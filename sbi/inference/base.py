@@ -340,7 +340,9 @@ class NeuralInference(ABC):
     def summary(self):
         return self._summary
 
-    def _handle_x_o_wrt_amortization(self, x_o: Tensor, num_rounds: int) -> None:
+    def _handle_x_o_wrt_amortization(
+        self, x_o: Union[None, Tensor], x_shape: torch.Size, num_rounds: int
+    ) -> None:
         """
         Check whether provided `x_o` is consistent with `num_rounds`. For multi-round
         inference, set `x_o` as the default observation in the posterior.
@@ -362,6 +364,6 @@ class NeuralInference(ABC):
             )
 
         if num_rounds > 1:
-            processed_x = process_x(x_o, self._x_shape)
+            processed_x = process_x(x_o, x_shape)
             self._posterior._x_o_training_focused_on = processed_x
             self._posterior.default_x = processed_x

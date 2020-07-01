@@ -129,6 +129,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
                 )
 
             x = self._batched_simulator(theta)
+            x_shape = x_shape_from_simulated_data(x)
 
             # First round or if retraining from scratch:
             # Call the `self._build_neural_net` with the rounds' thetas and xs as
@@ -141,12 +142,12 @@ class LikelihoodEstimator(NeuralInference, ABC):
                     neural_net=self._build_neural_net(theta, x),
                     prior=self._prior,
                     # XXX: Here we infer the shape of x from simulated data.
-                    x_shape=x_shape_from_simulated_data(x),
+                    x_shape=x_shape,
                     sample_with_mcmc=self._sample_with_mcmc,
                     mcmc_method=self._mcmc_method,
                     get_potential_function=PotentialFunctionProvider(),
                 )
-            self._handle_x_o_wrt_amortization(x_o, num_rounds)
+            self._handle_x_o_wrt_amortization(x_o, x_shape, num_rounds)
 
             # Check for NaNs in simulations.
             is_valid_x, num_nans, num_infs = handle_invalid_x(x, exclude_invalid_x)
