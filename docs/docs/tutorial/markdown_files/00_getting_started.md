@@ -1,6 +1,5 @@
 # Getting started with `sbi`
 
-
 ```python
 import torch
 import sbi.utils as utils
@@ -18,7 +17,6 @@ For inference, you need to provide two ingredients:
 
 For example, we can have a 3-dimensional parameter space with a uniform prior between [-1,1] and a simple simulator that for the sake of example adds 1.0 and some Gaussian noise to the parameter set:
 
-
 ```python
 num_dim = 3
 prior = utils.BoxUniform(low=-2*torch.ones(num_dim), high=2*torch.ones(num_dim))
@@ -29,7 +27,6 @@ def simulator(parameter_set):
 
 `sbi` can then run inference:
 
-
 ```python
 posterior = infer(simulator, prior, method='SNPE', num_simulations=1000)
 ```
@@ -39,9 +36,7 @@ posterior = infer(simulator, prior, method='SNPE', num_simulations=1000)
 
     Neural network successfully converged after 117 epochs.
 
-
 Let's say we have made some observation $x$:
-
 
 ```python
 observation = torch.zeros(3)
@@ -49,26 +44,24 @@ observation = torch.zeros(3)
 
  Given this observation, we can then sample from the posterior $p(\theta|x)$, evaluate its log-probability, or plot it.
 
-
 ```python
 samples = posterior.sample((10000,), x=observation)
 log_probability = posterior.log_prob(samples, x=observation)
 _ = utils.pairplot(samples, limits=[[-2,2],[-2,2],[-2,2]], fig_size=(6,6))
 ```
 
-
 ![png](00_getting_started_files/00_getting_started_10_0.png)
-
 
 ## Requirements for the simulator, prior, and observation
 
 Regardless of the algorithm you need to provide a prior and a simulator for training. Let's talk about what requirements they need to satisfy.
 
-
 ### Prior
+
 A prior is a distribution object that allows to sample parameter sets. Any class for the prior is allowed as long as it allows to call `prior.sample()` and `prior.log_prob()`.
 
 ### Simulator
+
 The simulator is a Python callable that takes in a parameter set and outputs data with some (even if very small) stochasticity.
 
 Allowed data types and shapes for input and output:
@@ -79,6 +72,7 @@ Allowed data types and shapes for input and output:
 You can call simulators not written in Python as long as you wrap them in a Python function.
 
 ### Observation
+
 Once you have a trained posterior, you will want to evaluate or sample the posterior $p(\theta|x_o)$ at certain observed values $x_o$:
 
 - The allowable data types are either Numpy `np.ndarray` or a torch `torch.Tensor`.
@@ -87,7 +81,6 @@ Once you have a trained posterior, you will want to evaluate or sample the poste
 ## Running different algorithms
 
 `sbi` implements three classes of algorithms that can be used to obtain the posterior distribution: SNPE, SNLE, and SNRE. You can try the different algorithms by simply swapping out the `method`:
-
 
 ```python
 posterior = infer(simulator, prior, method='SNPE', num_simulations=1000)
