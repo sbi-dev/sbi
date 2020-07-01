@@ -22,20 +22,22 @@ def build_made(
     hidden_features: int = 50,
     num_blocks: int = 5,
     num_mixture_components: int = 10,
+    embedding_net: nn.Module = nn.Identity(),
 ) -> nn.Module:
-    """Builds MADE p(x|y)
+    """Builds MADE p(x|y).
 
     Args:
-        batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring
-        batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring
-        z_score_x: Whether to z-score xs passing into the network
-        z_score_y: Whether to z-score ys passing into the network
-        hidden_features: Number of hidden features
-        num_blocks: Number of MADE blocks
-        num_mixture_components: Number of mixture components
+        batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
+        batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
+        z_score_x: Whether to z-score xs passing into the network.
+        z_score_y: Whether to z-score ys passing into the network.
+        hidden_features: Number of hidden features.
+        num_blocks: Number of MADE blocks.
+        num_mixture_components: Number of mixture components.
+        embedding_net: Optional embedding network for y.
 
     Returns:
-        Neural network
+        Neural network.
     """
     x_numel = batch_x[0].numel()
     y_numel = batch_y[0].numel()
@@ -63,9 +65,7 @@ def build_made(
         transform = transforms.CompositeTransform([transform_zx, transform])
 
     if z_score_y:
-        embedding_net = standardizing_net(batch_y)
-    else:
-        embedding_net = nn.Identity()
+        embedding_net = nn.Sequential(standardizing_net(batch_y), embedding_net)
 
     distribution = distributions_.StandardNormal((x_numel,))
     neural_net = flows.Flow(transform, distribution, embedding_net)
@@ -80,19 +80,21 @@ def build_maf(
     z_score_y: bool = True,
     hidden_features: int = 50,
     num_transforms: int = 5,
+    embedding_net: nn.Module = nn.Identity(),
 ) -> nn.Module:
-    """Builds MAF p(x|y)
+    """Builds MAF p(x|y).
 
     Args:
-        batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring
-        batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring
-        z_score_x: Whether to z-score xs passing into the network
-        z_score_y: Whether to z-score ys passing into the network
-        hidden_features: Number of hidden features
-        num_transforms: Number of transforms
+        batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
+        batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
+        z_score_x: Whether to z-score xs passing into the network.
+        z_score_y: Whether to z-score ys passing into the network.
+        hidden_features: Number of hidden features.
+        num_transforms: Number of transforms.
+        embedding_net: Optional embedding network for y.
 
     Returns:
-        Neural network
+        Neural network.
     """
     x_numel = batch_x[0].numel()
     y_numel = batch_y[0].numel()
@@ -127,9 +129,7 @@ def build_maf(
         transform = transforms.CompositeTransform([transform_zx, transform])
 
     if z_score_y:
-        embedding_net = standardizing_net(batch_y)
-    else:
-        embedding_net = nn.Identity()
+        embedding_net = nn.Sequential(standardizing_net(batch_y), embedding_net)
 
     distribution = distributions_.StandardNormal((x_numel,))
     neural_net = flows.Flow(transform, distribution, embedding_net)
@@ -144,19 +144,21 @@ def build_nsf(
     z_score_y: bool = True,
     hidden_features: int = 50,
     num_transforms: int = 5,
+    embedding_net: nn.Module = nn.Identity(),
 ) -> nn.Module:
-    """Builds NSF p(x|y)
+    """Builds NSF p(x|y).
 
     Args:
-        batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring
-        batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring
-        z_score_x: Whether to z-score xs passing into the network
-        z_score_y: Whether to z-score ys passing into the network
-        hidden_features: Number of hidden features
-        num_transforms: Number of transforms
+        batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
+        batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
+        z_score_x: Whether to z-score xs passing into the network.
+        z_score_y: Whether to z-score ys passing into the network.
+        hidden_features: Number of hidden features.
+        num_transforms: Number of transforms.
+        embedding_net: Optional embedding network for y.
 
     Returns:
-        Neural network
+        Neural network.
     """
     x_numel = batch_x[0].numel()
     y_numel = batch_y[0].numel()
@@ -199,9 +201,7 @@ def build_nsf(
         transform = transforms.CompositeTransform([transform_zx, transform])
 
     if z_score_y:
-        embedding_net = standardizing_net(batch_y)
-    else:
-        embedding_net = nn.Identity()
+        embedding_net = nn.Sequential(standardizing_net(batch_y), embedding_net)
 
     distribution = distributions_.StandardNormal((x_numel,))
     neural_net = flows.Flow(transform, distribution, embedding_net)

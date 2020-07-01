@@ -16,19 +16,21 @@ def build_mdn(
     z_score_y: bool = True,
     hidden_features: int = 50,
     num_components: int = 10,
+    embedding_net: nn.Module = nn.Identity(),
 ) -> nn.Module:
-    """Builds MDN p(x|y)
+    """Builds MDN p(x|y).
 
     Args:
-        batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring
-        batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring
-        z_score_x: Whether to z-score xs passing into the network
-        z_score_y: Whether to z-score ys passing into the network
-        hidden_features: Number of hidden features
-        num_components: Number of components
+        batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
+        batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
+        z_score_x: Whether to z-score xs passing into the network.
+        z_score_y: Whether to z-score ys passing into the network.
+        hidden_features: Number of hidden features.
+        num_components: Number of components.
+        embedding_net: Optional embedding network for y.
 
     Returns:
-        Neural network
+        Neural network.
     """
     x_numel = batch_x[0].numel()
     y_numel = batch_y[0].numel()
@@ -56,9 +58,9 @@ def build_mdn(
         embedding_net_x = nn.Identity()
 
     if z_score_y:
-        embedding_net_y = standardizing_net(batch_y)
+        embedding_net_y = nn.Sequential(standardizing_net(batch_y), embedding_net)
     else:
-        embedding_net_y = nn.Identity()
+        embedding_net_y = embedding_net
 
     neural_net = nn.Sequential(embedding_net_y, neural_net, embedding_net_x)
 
