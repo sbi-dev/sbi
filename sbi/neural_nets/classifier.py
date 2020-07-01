@@ -15,30 +15,30 @@ def build_input_layer(
     batch_y: Tensor = None,
     z_score_x: bool = True,
     z_score_y: bool = True,
+    embedding_net_x: nn.Module = nn.Identity(),
+    embedding_net_y: nn.Module = nn.Identity(),
 ) -> nn.Module:
-    """Builds input layer for classifiers that optionally z-scores
+    """Builds input layer for classifiers that optionally z-scores.
 
     In SNRE, the classifier will receive batches of thetas and xs.
 
     Args:
-        batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring
-        batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring
-        z_score_x: Whether to z-score xs passing into the network
-        z_score_y: Whether to z-score ys passing into the network
-        hidden_features: Number of hidden features
+        batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
+        batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
+        z_score_x: Whether to z-score xs passing into the network.
+        z_score_y: Whether to z-score ys passing into the network.
+        hidden_features: Number of hidden features.
+        embedding_net_x: Optional embedding network for x.
+        embedding_net_y: Optional embedding network for y.
 
     Returns:
-        Input layer that optionally z-scores
+        Input layer that optionally z-scores.
     """
     if z_score_x:
-        embedding_net_x = standardizing_net(batch_x)
-    else:
-        embedding_net_x = nn.Identity()
+        embedding_net_x = nn.Sequential(standardizing_net(batch_x), embedding_net_x)
 
     if z_score_y:
-        embedding_net_y = standardizing_net(batch_y)
-    else:
-        embedding_net_y = nn.Identity()
+        embedding_net_y = nn.Sequential(standardizing_net(batch_y), embedding_net_y)
 
     class StandardizeInputs(nn.Module):
         def __init__(self, embedding_net_x, embedding_net_y, dim_x, dim_y):
@@ -70,26 +70,29 @@ def build_linear_classifier(
     batch_y: Tensor = None,
     z_score_x: bool = True,
     z_score_y: bool = True,
+    embedding_net_x: nn.Module = nn.Identity(),
+    embedding_net_y: nn.Module = nn.Identity(),
 ) -> nn.Module:
-    """Builds linear classifier
+    """Builds linear classifier.
 
     In SNRE, the classifier will receive batches of thetas and xs.
 
     Args:
-        batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring
-        batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring
-        z_score_x: Whether to z-score xs passing into the network
-        z_score_y: Whether to z-score ys passing into the network
+        batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
+        batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
+        z_score_x: Whether to z-score xs passing into the network.
+        z_score_y: Whether to z-score ys passing into the network.
+        embedding_net_x: Optional embedding network for x.
+        embedding_net_y: Optional embedding network for y.
 
     Returns:
-        Neural network
+        Neural network.
     """
-    x_numel = batch_x[0].numel()
-    y_numel = batch_y[0].numel()
+    neural_net = nn.Linear(batch_x[0].numel() + batch_y[0].numel(), 1)
 
-    neural_net = nn.Linear(x_numel + y_numel, 1)
-
-    input_layer = build_input_layer(batch_x, batch_y, z_score_x, z_score_y)
+    input_layer = build_input_layer(
+        batch_x, batch_y, z_score_x, z_score_y, embedding_net_x, embedding_net_y
+    )
 
     neural_net = nn.Sequential(input_layer, neural_net)
 
@@ -102,26 +105,27 @@ def build_mlp_classifier(
     z_score_x: bool = True,
     z_score_y: bool = True,
     hidden_features: int = 50,
+    embedding_net_x: nn.Module = nn.Identity(),
+    embedding_net_y: nn.Module = nn.Identity(),
 ) -> nn.Module:
-    """Builds MLP classifier
+    """Builds MLP classifier.
 
     In SNRE, the classifier will receive batches of thetas and xs.
 
     Args:
-        batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring
-        batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring
-        z_score_x: Whether to z-score xs passing into the network
-        z_score_y: Whether to z-score ys passing into the network
-        hidden_features: Number of hidden features
+        batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
+        batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
+        z_score_x: Whether to z-score xs passing into the network.
+        z_score_y: Whether to z-score ys passing into the network.
+        hidden_features: Number of hidden features.
+        embedding_net_x: Optional embedding network for x.
+        embedding_net_y: Optional embedding network for y.
 
     Returns:
-        Neural network
+        Neural network.
     """
-    x_numel = batch_x[0].numel()
-    y_numel = batch_y[0].numel()
-
     neural_net = nn.Sequential(
-        nn.Linear(x_numel + y_numel, hidden_features),
+        nn.Linear(batch_x[0].numel() + batch_y[0].numel(), hidden_features),
         nn.BatchNorm1d(hidden_features),
         nn.ReLU(),
         nn.Linear(hidden_features, hidden_features),
@@ -130,7 +134,9 @@ def build_mlp_classifier(
         nn.Linear(hidden_features, 1),
     )
 
-    input_layer = build_input_layer(batch_x, batch_y, z_score_x, z_score_y)
+    input_layer = build_input_layer(
+        batch_x, batch_y, z_score_x, z_score_y, embedding_net_x, embedding_net_y
+    )
 
     neural_net = nn.Sequential(input_layer, neural_net)
 
@@ -143,26 +149,27 @@ def build_resnet_classifier(
     z_score_x: bool = True,
     z_score_y: bool = True,
     hidden_features: int = 50,
+    embedding_net_x: nn.Module = nn.Identity(),
+    embedding_net_y: nn.Module = nn.Identity(),
 ) -> nn.Module:
-    """Builds ResNet classifier
+    """Builds ResNet classifier.
 
     In SNRE, the classifier will receive batches of thetas and xs.
 
     Args:
-        batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring
-        batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring
-        z_score_x: Whether to z-score xs passing into the network
-        z_score_y: Whether to z-score ys passing into the network
-        hidden_features: Number of hidden features
+        batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
+        batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
+        z_score_x: Whether to z-score xs passing into the network.
+        z_score_y: Whether to z-score ys passing into the network.
+        hidden_features: Number of hidden features.
+        embedding_net_x: Optional embedding network for x.
+        embedding_net_y: Optional embedding network for y.
 
     Returns:
-        Neural network
+        Neural network.
     """
-    x_numel = batch_x[0].numel()
-    y_numel = batch_y[0].numel()
-
     neural_net = nets.ResidualNet(
-        in_features=x_numel + y_numel,
+        in_features=batch_x[0].numel() + batch_y[0].numel(),
         out_features=1,
         hidden_features=hidden_features,
         context_features=None,
@@ -172,7 +179,9 @@ def build_resnet_classifier(
         use_batch_norm=False,
     )
 
-    input_layer = build_input_layer(batch_x, batch_y, z_score_x, z_score_y)
+    input_layer = build_input_layer(
+        batch_x, batch_y, z_score_x, z_score_y, embedding_net_x, embedding_net_y
+    )
 
     neural_net = nn.Sequential(input_layer, neural_net)
 
