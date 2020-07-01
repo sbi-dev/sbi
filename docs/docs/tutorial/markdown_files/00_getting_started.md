@@ -66,21 +66,23 @@ Regardless of the algorithm you need to provide a prior and a simulator for trai
 
 
 ### Prior
-A prior is a distribution objects that allows to sample parameter sets. Any class for the prior is allowed as long as it allows to call `prior.sample()` and `prior.log_prob()`.
+A prior is a distribution object that allows to sample parameter sets. Any class for the prior is allowed as long as it allows to call `prior.sample()` and `prior.log_prob()`.
 
 ### Simulator
 The simulator is a Python callable that takes in a parameter set and outputs data with some (even if very small) stochasticity.
 
 Allowed data types and shapes for input and output:
+
 - the input parameter set and the output have to be either a `np.ndarray` or a `torch.Tensor`. 
 - the input parameter set should have either shape `(1,N)` or `(N)`, and the output must have shape `(1,M)` or `(M)`.
 
 You can call simulators not written in Python as long as you wrap them in a Python function.
 
 ### Observation
-Once you have a trained posterior you will want to evaluate or sample the posterior $p(\theta|x_o)$ at certain observed values $x_o$.
+Once you have a trained posterior, you will want to evaluate or sample the posterior $p(\theta|x_o)$ at certain observed values $x_o$:
+
 - The allowable data types are either Numpy `np.ndarray` or a torch `torch.Tensor`.
-- The shape must be either `(1,N)` or just `(N)`.
+- The shape must be either `(1,M)` or just `(M)`.
 
 ## Running different algorithms
 
