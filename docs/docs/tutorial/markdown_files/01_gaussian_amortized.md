@@ -42,7 +42,7 @@ posterior = infer(linear_gaussian, prior, 'SNPE', num_simulations=1000)
 
 
 ## Amortized inference
-Note that we have not yet provided an observation to the inference procedure. In fact, we can evaluate the posterior for different observations without having to re-run inference. This is called amortization. An amortized posterior is one that is not focused on any particular observation. Naturally, if the diversity of observations is large, any of the inference methods will need to run many simulations for the resulting posterior to perform well across these diverse observations.
+Note that we have not yet provided an observation to the inference procedure. In fact, we can evaluate the posterior for different observations without having to re-run inference. This is called amortization. An amortized posterior is one that is not focused on any particular observation. Naturally, if the diversity of observations is large, any of the inference methods will need to run a sufficient number of simulations for the resulting posterior to perform well across these diverse observations.
 
 Let's say we have two observations `x_o_1 = [0,0,0]` and `x_o_2 = [2,2,2]`:
 
