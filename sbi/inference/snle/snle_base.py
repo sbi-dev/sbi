@@ -18,7 +18,7 @@ import sbi.utils as utils
 from sbi.inference import NeuralInference
 from sbi.inference.posterior import NeuralPosterior
 from sbi.types import OneOrMore, ScalarFloat
-from sbi.utils import handle_invalid_x, warn_on_invalid_x, x_shape_from_simulated_data
+from sbi.utils import handle_invalid_x, warn_on_invalid_x, x_shape_from_simulation
 
 
 class LikelihoodEstimator(NeuralInference, ABC):
@@ -129,7 +129,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
                 )
 
             x = self._batched_simulator(theta)
-            x_shape = x_shape_from_simulated_data(x)
+            x_shape = x_shape_from_simulation(x)
 
             # First round or if retraining from scratch:
             # Call the `self._build_neural_net` with the rounds' thetas and xs as
@@ -141,7 +141,6 @@ class LikelihoodEstimator(NeuralInference, ABC):
                     method_family="snle",
                     neural_net=self._build_neural_net(theta, x),
                     prior=self._prior,
-                    # XXX: Here we infer the shape of x from simulated data.
                     x_shape=x_shape,
                     sample_with_mcmc=self._sample_with_mcmc,
                     mcmc_method=self._mcmc_method,

@@ -20,7 +20,7 @@ import sbi.utils as utils
 from sbi.inference import NeuralInference
 from sbi.inference.posterior import NeuralPosterior
 from sbi.types import OneOrMore, ScalarFloat
-from sbi.utils import handle_invalid_x, warn_on_invalid_x, x_shape_from_simulated_data
+from sbi.utils import handle_invalid_x, warn_on_invalid_x, x_shape_from_simulation
 
 
 class PosteriorEstimator(NeuralInference, ABC):
@@ -159,7 +159,7 @@ class PosteriorEstimator(NeuralInference, ABC):
 
             # Run simulations for the round.
             theta, x, prior_mask = self._run_simulations(round_, num_sims)
-            x_shape = x_shape_from_simulated_data(x)
+            x_shape = x_shape_from_simulation(x)
 
             # First round or if retraining from scratch:
             # Call the `self._build_neural_net` with the rounds' thetas and xs as
