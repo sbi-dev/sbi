@@ -30,7 +30,7 @@
     rendering:
       show_root_heading: true
 
-::: sbi.inference.abc.smcabc.SABC
+::: sbi.inference.abc.smcabc.SMCABC
     rendering:
       show_root_heading: true
 
