@@ -14,7 +14,7 @@ def simple():
         loc=prior_mean, covariance_matrix=prior_cov
     )
     posterior = infer(
-        diagonal_linear_gaussian, prior, "snpe", num_simulations=500, num_workers=2
+        diagonal_linear_gaussian, prior, "snpe", num_simulations=500, num_workers=1
     )
     posterior.sample((100,), x=x_o)
 
@@ -40,7 +40,7 @@ def flexible():
 
 
 if __name__ == "__main__":
-    print("Simple interface with 2 workers:")
+    print("Simple interface:")
     print(simple())
     print("Flexible interface:")
     print(flexible())

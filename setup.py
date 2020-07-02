@@ -1,103 +1,148 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+#
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+#
+# Note: To use the 'upload' functionality of this file, you must:
+#   $ pipenv install twine --dev
+
+import io
 import os
+import sys
+from shutil import rmtree
 
-from setuptools import find_packages, setup
+from setuptools import find_packages, setup, Command
 
-desc = """`sbi` is a PyTorch package for simulation-based inference. Simulation-based
-inference is the process of finding the parameters of a simulator from observations.
-`sbi` takes a Bayesian approach and returns a full posterior distribution over the
-parameters, conditional on the observations.
+# Package meta-data.
+NAME = "sbi"
+DESCRIPTION = "Simulation-based inference."
+URL = "https://github.com/mackelab/sbi"
+EMAIL = "sbi@mackelab.org"
+AUTHOR = "Álvaro Tejero-Cantero, Jakob H. Macke, Jan-Matthis Lückmann, Conor M. Durkan, Michael Deistler, Jan Bölts"
+REQUIRES_PYTHON = ">=3.7.0"
 
-`sbi` offers a simple interface for one-line posterior inference
+REQUIRED = [
+    "joblib",
+    "matplotlib",
+    "numpy",
+    "pillow",
+    "pyro-ppl",
+    "pyknos==0.11",
+    "scipy",
+    "tensorboard",
+    "torch>=1.5.1",
+    "tqdm",
+]
 
-```python
-from sbi inference import infer
-# import your simulator, define your prior on the parameters
-parameter_posterior = infer(simulator, prior, method='SNPE')
-```
+EXTRAS = {
+    "dev": [
+        "autoflake",
+        "black",
+        "deepdiff",
+        "flake8",
+        "isort",
+        "mkdocs",
+        "mkdocs-material",
+        "markdown-include",
+        "mkdocs-redirects",
+        "mkdocstrings",
+        "nbconvert",
+        "nbstripout",
+        "pep517",
+        "pytest",
+        "pyyaml",
+        "scikit-learn",
+        "torchtestcase",
+        "twine",
+    ],
+    "examples": ["ipywidgets", "jupyter", "notebook",],
+}
 
-`sbi` is a community project. It is the PyTorch successor of
-[`delfi`](https://github.com/mackelab/delfi), and started life as a fork of Conor M. 
-Durkan's `lfi`. Development is currently coordinated at the [mackelab](https://uni-tuebingen.de/en/research/core-research/cluster-of-excellence-machine-learning/research/research/cluster-research-groups/professorships/machine-learning-in-science/).
+here = os.path.abspath(os.path.dirname(__file__))
 
-We would appreciate to hear how `sbi`is working for your simulation problems, and
-welcome also bug reports, pull requests and any other feedback at
-[github.com/mackelab/sbi](https://github.com/mackelab/sbi).
-"""
+# Import the README and use it as the long-description.
+try:
+    with io.open(os.path.join(here, "README.md"), encoding="utf-8") as f:
+        long_description = "\n" + f.read()
+except FileNotFoundError:
+    long_description = DESCRIPTION
+
+# Load the package's __version__.py module as a dictionary.
+about = {}
+project_slug = NAME.lower().replace("-", "_").replace(" ", "_")
+with open(os.path.join(here, project_slug, "__version__.py")) as f:
+    exec(f.read(), about)
 
 
-PROJECT_PATH = os.path.dirname(os.path.abspath(__file__))
+class UploadCommand(Command):
+    """Support setup.py upload."""
 
-version_namespace = {}
-for line in open(os.path.join(PROJECT_PATH, "sbi", "__version__.py")):
-    if line.startswith("__version__ = "):
-        exec(line, version_namespace)
+    description = "Build and publish the package."
+    user_options = []
+
+    @staticmethod
+    def status(s):
+        """Prints things in bold."""
+        print("\033[1m{0}\033[0m".format(s))
+
+    def initialize_options(self):
+        pass
+
+    def finalize_options(self):
+        pass
+
+    def run(self):
+        try:
+            self.status("Removing previous builds…")
+            rmtree(os.path.join(here, "dist"))
+        except OSError:
+            pass
+
+        self.status("Building Source and Wheel (universal) distribution…")
+        os.system("{0} setup.py sdist bdist_wheel --universal".format(sys.executable))
+
+        self.status("Uploading the package to PyPI via Twine…")
+        os.system("twine upload dist/*")
+
+        self.status("Pushing git tags…")
+        os.system("git tag v{0}".format(about["__version__"]))
+        os.system("git push --tags")
+
+        sys.exit()
+
 
 setup(
-    name="sbi",
-    version=version_namespace["__version__"],
-    description="Simulation-based inference.",
-    long_description=desc,
+    name=NAME,
+    version=about["__version__"],
+    description=DESCRIPTION,
+    long_description=long_description,
     long_description_content_type="text/markdown",
-    keywords="bayesian parameter inference system_identification simulator PyTorch",
-    url="http://mackelab.org/sbi",
-    author=(
-        "Álvaro Tejero-Cantero, Jakob H. Macke, Jan-Matthis Lückmann,"
-        " Conor M. Durkan, Michael Deistler, Jan Bölts."
-    ),
-    author_email="sbi@mackelab.org",
-    packages=find_packages(exclude=["tests"]),
+    author=AUTHOR,
+    author_email=EMAIL,
+    python_requires=REQUIRES_PYTHON,
+    url=URL,
+    packages=find_packages(exclude=["tests", "*.tests", "*.tests.*", "tests.*"]),
+    install_requires=REQUIRED,
+    extras_require=EXTRAS,
+    include_package_data=True,
     license="AGPLv3",
-    install_requires=[
-        "ipywidgets",
-        "joblib",
-        "jupyterlab",
-        "matplotlib",
-        "nbstripout",
-        "notebook",
-        "numpy",
-        "pillow",
-        "pyro-ppl",
-        "pyknos==0.11",
-        "scipy",
-        "tensorboard",
-        "torch>=1.4.0, !=1.5.0",  # See issue #37703 in PyTorch 1.5.0.
-        "tqdm",
-    ],
-    extras_require={
-        "dev": [
-            "autoflake",
-            "black",
-            "deepdiff",
-            "flake8",
-            "isort",
-            "mkdocs",
-            "mkdocs-material",
-            "markdown-include",
-            "mkdocs-redirects",
-            "mkdocstrings",
-            "nbconvert",
-            "pep517",
-            "pytest",
-            "pyyaml",
-            "scikit-learn",
-            "torchtestcase",
-            "twine",
-        ]
-    },
-    dependency_links=[],
     classifiers=[
+        # Full list: https://pypi.python.org/pypi?%3Aaction=list_classifiers
         "Development Status :: 3 - Alpha",
+        "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
         "Intended Audience :: Developers",
         "Intended Audience :: Education",
-        "Intended Audience :: Information Technology",
         "Intended Audience :: Science/Research",
         "Topic :: Adaptive Technologies",
         "Topic :: Scientific/Engineering",
         "Topic :: Scientific/Engineering :: Artificial Intelligence",
         "Topic :: Scientific/Engineering :: Mathematics",
-        "Topic :: Games/Entertainment :: Simulation",
-        "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
     ],
+    # $ setup.py publish support.
+    cmdclass={"upload": UploadCommand,},
 )

@@ -4,9 +4,10 @@
 from __future__ import annotations
 
 from pyknos.mdn.mdn import MultivariateGaussianMDN
+from pyknos.nflows import flows, transforms
 from torch import Tensor, nn
 
-from sbi.utils.sbiutils import standardizing_net
+from sbi.utils.sbiutils import standardizing_net, standardizing_transform
 
 
 def build_mdn(
@@ -35,7 +36,16 @@ def build_mdn(
     x_numel = batch_x[0].numel()
     y_numel = batch_y[0].numel()
 
-    neural_net = MultivariateGaussianMDN(
+    transform = transforms.IdentityTransform()
+
+    if z_score_x:
+        transform_zx = standardizing_transform(batch_x)
+        transform = transforms.CompositeTransform([transform_zx, transform])
+
+    if z_score_y:
+        embedding_net = nn.Sequential(standardizing_net(batch_y), embedding_net)
+
+    distribution = MultivariateGaussianMDN(
         features=x_numel,
         context_features=y_numel,
         hidden_features=hidden_features,
@@ -52,16 +62,6 @@ def build_mdn(
         custom_initialization=True,
     )
 
-    if z_score_x:
-        embedding_net_x = standardizing_net(batch_x)
-    else:
-        embedding_net_x = nn.Identity()
-
-    if z_score_y:
-        embedding_net_y = nn.Sequential(standardizing_net(batch_y), embedding_net)
-    else:
-        embedding_net_y = embedding_net
-
-    neural_net = nn.Sequential(embedding_net_y, neural_net, embedding_net_x)
+    neural_net = flows.Flow(transform, distribution, embedding_net)
 
     return neural_net

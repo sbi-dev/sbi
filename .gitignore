@@ -1,13 +1,12 @@
+# Project specific
+.sbi_env/
+*sbi-logs/
+/docs/docs/tutorial/*
+
 # Development files and python cache
 /*.pyc
 /*.egg
 /*.egg-info
-
-# log files 
-*sbi-logs/
-
-# SHA version
-sbi/_version.py
 
 # Notebook checkpoints
 .ipynb_checkpoints
@@ -40,9 +39,6 @@ var/
 *.egg-info/
 .installed.cfg
 *.egg
-
-# Virtual environment
-.sbi_env/
 
 # PyInstaller
 #  Usually these files are written by a python script from a template

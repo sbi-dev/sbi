@@ -1,1 +1,6 @@
-__version__ = "0.8.0"
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+
+VERSION = (0, 9, 0)
+
+__version__ = '.'.join(map(str, VERSION))
