@@ -19,13 +19,13 @@ posterior = infer(prior, simulator, num_simulations=1000, method='SNPE')
   neural dynamics](https://www.biorxiv.org/content/10.1101/838383v3).
 
 - If you want to get started using `sbi` on your own problem, jump to
-  [installation](install.md) and then check out the [tutorial](tutorial/markdown_files/00_getting_started.md).
+  [installation](install.md) and then check out the [tutorial](tutorial/00_getting_started.md).
 
 ## Motivation and approach
 
 Many areas of science and engineering make extensive use of complex, stochastic,
 numerical simulations to describe the structure and dynamics of the processes being
-investigated. 
+investigated.
 
 A key challenge in simulation-based science is constraining these simulation models'
 parameters, which are intepretable quantities, with observational data. Bayesian

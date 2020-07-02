@@ -46,6 +46,14 @@ def build_made(
         warn(f"In one-dimensional output space, this flow is limited to Gaussians")
 
     transform = transforms.IdentityTransform()
+
+    if z_score_x:
+        transform_zx = standardizing_transform(batch_x)
+        transform = transforms.CompositeTransform([transform_zx, transform])
+
+    if z_score_y:
+        embedding_net = nn.Sequential(standardizing_net(batch_y), embedding_net)
+
     distribution = distributions_.MADEMoG(
         features=x_numel,
         hidden_features=hidden_features,
@@ -60,14 +68,6 @@ def build_made(
         custom_initialization=True,
     )
 
-    if z_score_x:
-        transform_zx = standardizing_transform(batch_x)
-        transform = transforms.CompositeTransform([transform_zx, transform])
-
-    if z_score_y:
-        embedding_net = nn.Sequential(standardizing_net(batch_y), embedding_net)
-
-    distribution = distributions_.StandardNormal((x_numel,))
     neural_net = flows.Flow(transform, distribution, embedding_net)
 
     return neural_net
