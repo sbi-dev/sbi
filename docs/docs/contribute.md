@@ -1,9 +1,10 @@
 ## User experiences, bugs, and feature requests
 
-If you are using `sbi` to infer the parameters of a simulators, we would be delighted to
+If you are using `sbi` to infer the parameters of a simulator, we would be delighted to
 know how it worked for you. If it didn't work according to plan, please open up an issue
-and tell us more about your use case: the dimensionality of the input parameters, the
-type of simulator and the dimensionality of the output.
+and tell us more about your use case: the dimensionality of the input parameters and of 
+the output, as well as the setup you used to run inference (i.e. number of simulations,
+number of rounds,...).
 
 To report bugs and suggest features (including better documentation), please equally
 head over to [issues on GitHub](https://github.com/mackelab/sbi/issues). 
@@ -22,6 +23,18 @@ dependencies, just run `conda env update -f environment.yml --prune`.
 
 Alternatively, you can install via `setup.py` using `pip install -e ".[dev]"` (the dev
 flag installs development and testing dependencies).
+
+### Contributing inference algorithms
+
+`sbi` was developed to be extensible and we welcome implementations of additional 
+inference algorithms. Your new inference algorithm should be a class in 
+`sbi/inference/your_type_of_algorithm/your_algorithm.py`. The class should have a 
+`__call__()` function which runs inference and returns a posterior object. The posterior 
+object itself should have a `.sample()` function following the signature of 
+`sbi/inference/NeuralPosterior`, allowing to draw samples from the posterior. 
+Currently, `SNPE`, `SNLE`, and `SNRE` all share the `NeuralPosterior` class in 
+`sbi/inference/posterior.py`, but future versions of `sbi` will refactor them into 
+separate classes.
 
 
 ### Contributing to code: style conventions
