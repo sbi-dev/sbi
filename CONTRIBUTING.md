@@ -2,7 +2,7 @@
 
 If you are using `sbi` to infer the parameters of a simulator, we would be delighted to
 know how it worked for you. If it didn't work according to plan, please open up an issue
-and tell us more about your use case: the dimensionality of the input parameters and of 
+and tell us more about your use case: the dimensionality of the input parameters and of
 the output, as well as the setup you used to run inference (i.e. number of simulations,
 number of rounds,...).
 
@@ -27,14 +27,14 @@ flag installs development and testing dependencies).
 
 ### Contributing inference algorithms
 
-`sbi` was developed to be extensible and we welcome implementations of additional 
-inference algorithms. Your new inference algorithm should be a class in 
-`sbi/inference/your_type_of_algorithm/your_algorithm.py`. The class should have a 
-`__call__()` function which runs inference and returns a posterior object. The posterior 
-object itself should have a `.sample()` function following the signature of 
-`sbi/inference/NeuralPosterior`, allowing to draw samples from the posterior. 
-Currently, `SNPE`, `SNLE`, and `SNRE` all share the `NeuralPosterior` class in 
-`sbi/inference/posterior.py`, but future versions of `sbi` will refactor them into 
+`sbi` was developed to be extensible and we welcome implementations of additional
+inference algorithms. Your new inference algorithm should be a class in
+`sbi/inference/your_type_of_algorithm/your_algorithm.py`. The class should have a
+`__call__()` function which runs inference and returns a posterior object. The posterior
+object itself should have a `.sample()` function following the signature of
+`sbi/inference/NeuralPosterior`, allowing to draw samples from the posterior.
+Currently, `SNPE`, `SNLE`, and `SNRE` all share the `NeuralPosterior` class in
+`sbi/inference/posterior.py`, but future versions of `sbi` will refactor them into
 separate classes.
 
 ### Style conventions
@@ -59,6 +59,5 @@ Most of [the documentation](http://mackelab.org/sbi) is written in markdown ([ba
 markdown guide](https://guides.github.com/features/mastering-markdown/)).
 
 You can directly fix mistakes and suggest clearer formulations in markdown files simply
-by initiating a PR on the web. Click on [documentation
-file](https://github.com/mackelab/sbi/tree/master/docs/docs) and look for the little
-pencil at top left.
+by initiating a PR on through GitHub. Click on [documentation
+file](https://github.com/mackelab/sbi/tree/master/docs/docs) and look for the little pencil at top right.
