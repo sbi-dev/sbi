@@ -45,10 +45,9 @@ posterior = simple()
 print(posterior)
 ```
 
+## Inference Algorithms
 
-## Inference methods
-
-The following methods are currently available:
+The following algorithms are currently available:
 
 #### Sequential Neural Posterior Estimation (SNPE)
 
@@ -67,19 +66,18 @@ The following methods are currently available:
   Neural Likelihood_](https://arxiv.org/abs/1805.07226) (AISTATS 2019).
 >
 
+## Feedback and Contributions
+
+We would like to hear how it is working for your simulation as well as receive bug reports, pull requests and other feedback (see
+[contribute](http://www.mackelab.org/sbi/contribute/)).
+
 
 ## Acknowledgements
 
 `sbi` is the successor (using PyTorch) of the
 [`delfi`](https://github.com/mackelab/delfi) package. It was started as a fork of Conor
 M. Durkan's `lfi`. `sbi` runs as a community project; development is coordinated at the
-[mackelab](https://uni-tuebingen.de/en/research/core-research/cluster-of-excellence-machine-learning/research/research/cluster-research-groups/professorships/machine-learning-in-science/).
-
-We would like to hear how it is working for your simulation as well as receive bug
-reports, pull requests and other feedback (see
-[contribute](http://www.mackelab.org/sbi/contribute/)).
-
-See also [credits](https://github.com/mackelab/sbi/blob/master/docs/docs/credits.md).
+[mackelab](https://uni-tuebingen.de/en/research/core-research/cluster-of-excellence-machine-learning/research/research/cluster-research-groups/professorships/machine-learning-in-science/). See also [credits](https://github.com/mackelab/sbi/blob/master/docs/docs/credits.md).
 
 
 ## Support
