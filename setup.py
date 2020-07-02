@@ -42,6 +42,7 @@ EXTRAS = {
         "deepdiff",
         "flake8",
         "isort",
+        "jupyter",
         "mkdocs",
         "mkdocs-material",
         "markdown-include",
@@ -56,7 +57,6 @@ EXTRAS = {
         "torchtestcase",
         "twine",
     ],
-    "examples": ["ipywidgets", "jupyter", "notebook",],
 }
 
 here = os.path.abspath(os.path.dirname(__file__))
