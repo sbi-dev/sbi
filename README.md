@@ -68,7 +68,7 @@ The following algorithms are currently available:
 
 ## Feedback and Contributions
 
-We would like to hear how it is working for your simulation as well as receive bug reports, pull requests and other feedback (see
+We would like to hear how `sbi` is working for your inference problems as well as receive bug reports, pull requests and other feedback (see
 [contribute](http://www.mackelab.org/sbi/contribute/)).
 
 
