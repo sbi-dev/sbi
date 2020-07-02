@@ -2,6 +2,7 @@
 .sbi_env/
 *sbi-logs/
 /docs/docs/tutorial/*
+/docs/site/*
 
 # Development files and python cache
 /*.pyc
