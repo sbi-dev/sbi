@@ -681,7 +681,13 @@ class NeuralPosterior:
         Configures NeuralPosterior instance to use MCMC for sampling. See documentation of '.__init__()' for default
         MCMC method. Default MCMC method and respective settings can be set upon calling '.sample()'. For details, see
         documentation of '.sample()'.
+
+        Raises:
+        ValueError: on attempt to turn off MCMC sampling for family of methods that do not support rejection sampling.
         """
+        if not value:
+            if self._method_family not 'snpe':
+                raise ValueError(f'{self._method_family} cannot use MCMC for sampling.')
         self._sample_with_mcmc = value
         self._mcmc_init_params = None
 
