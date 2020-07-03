@@ -671,6 +671,7 @@ class NeuralPosterior:
 
     @property
     def sample_with_mcmc(self) -> bool:
+        """Return 'True' if NeuralPosterior instance is configured to use MCMC in '.sample()'."""
         return self._sample_with_mcmc
 
     def __repr__(self):
