@@ -669,6 +669,10 @@ class NeuralPosterior:
 
         return x_matched
 
+    @property
+    def sample_with_mcmc(self) -> bool:
+        return self._sample_with_mcmc
+
     def __repr__(self):
         desc = f"""NeuralPosterior(
                method_family={self._method_family},
