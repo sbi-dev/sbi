@@ -18,7 +18,12 @@ import sbi.utils as utils
 from sbi.inference import NeuralInference
 from sbi.inference.posterior import NeuralPosterior
 from sbi.types import OneOrMore, ScalarFloat
-from sbi.utils import handle_invalid_x, warn_on_invalid_x, x_shape_from_simulation
+from sbi.utils import (
+    check_estimator_arg,
+    handle_invalid_x,
+    warn_on_invalid_x,
+    x_shape_from_simulation,
+)
 
 
 class LikelihoodEstimator(NeuralInference, ABC):
@@ -70,6 +75,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         # `_build_neural_net`. It will be called in the first round and receive
         # thetas and xs as inputs, so that they can be used for shape inference and
         # potentially for z-scoring.
+        check_estimator_arg(density_estimator)
         if isinstance(density_estimator, str):
             self._build_neural_net = utils.likelihood_nn(model=density_estimator)
         else:

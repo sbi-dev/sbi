@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from copy import deepcopy
+from sbi.user_input.user_input_checks import check_estimator_arg
 from typing import Callable, Dict, Optional, Tuple, Union, cast
 from warnings import warn
 
@@ -20,7 +21,12 @@ import sbi.utils as utils
 from sbi.inference import NeuralInference
 from sbi.inference.posterior import NeuralPosterior
 from sbi.types import OneOrMore, ScalarFloat
-from sbi.utils import handle_invalid_x, warn_on_invalid_x, x_shape_from_simulation
+from sbi.utils import (
+    handle_invalid_x,
+    warn_on_invalid_x,
+    x_shape_from_simulation,
+    check_estimator_arg,
+)
 
 
 class PosteriorEstimator(NeuralInference, ABC):
@@ -75,6 +81,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         # `_build_neural_net`. It will be called in the first round and receive
         # thetas and xs as inputs, so that they can be used for shape inference and
         # potentially for z-scoring.
+        check_estimator_arg(density_estimator)
         if isinstance(density_estimator, str):
             self._build_neural_net = utils.posterior_nn(model=density_estimator)
         else:

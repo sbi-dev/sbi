@@ -2,6 +2,7 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 from __future__ import annotations
+from sbi.utils.get_nn_models import posterior_nn
 
 from typing import Callable
 
@@ -372,3 +373,60 @@ def test_invalid_inputs():
     # Test 3D value.
     with pytest.raises(AssertionError):
         joint.log_prob(ones(10, 4, 1))
+
+
+from torch import nn
+from pyknos.mdn.mdn import MultivariateGaussianMDN
+
+
+@pytest.mark.parametrize(
+    "arg",
+    [
+        ("maf"),
+        ("MAF"),
+        pytest.param(
+            "nn",
+            marks=pytest.mark.xfail(
+                AssertionError,
+                reason=(
+                    "custom density estimator must be a function return nn.Module, "
+                    "not the nn.Module."
+                ),
+            ),
+        ),
+        ("fun"),
+    ],
+)
+def test_passing_custom_density_estimator(arg):
+
+    x_numel = 2
+    y_numel = 2
+    hidden_features = 10
+    num_components = 1
+    mdn = MultivariateGaussianMDN(
+        features=x_numel,
+        context_features=y_numel,
+        hidden_features=hidden_features,
+        hidden_net=nn.Sequential(
+            nn.Linear(y_numel, hidden_features),
+            nn.ReLU(),
+            nn.Dropout(p=0.0),
+            nn.Linear(hidden_features, hidden_features),
+            nn.ReLU(),
+            nn.Linear(hidden_features, hidden_features),
+            nn.ReLU(),
+        ),
+        num_components=num_components,
+        custom_initialization=True,
+    )
+    if arg == "nn":
+        # Just the nn.Module.
+        density_estimator = mdn
+    elif arg == "fun":
+        # A function returning the nn.Module.
+        density_estimator = lambda batch_theta, batch_x: mdn
+    else:
+        density_estimator = arg
+    prior = MultivariateNormal(torch.zeros(2), torch.eye(2))
+    SNPE_C(diagonal_linear_gaussian, prior, density_estimator=density_estimator)
+

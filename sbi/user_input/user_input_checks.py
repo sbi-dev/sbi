@@ -3,14 +3,14 @@
 
 from __future__ import annotations
 
-from typing import cast, Callable, Optional, Sequence, Tuple
 import warnings
+from typing import Callable, Optional, Sequence, Tuple, Union, cast
 
+import torch
 from numpy import ndarray
 from scipy.stats._distn_infrastructure import rv_frozen
 from scipy.stats._multivariate import multi_rv_frozen
-import torch
-from torch import Tensor, float32
+from torch import Tensor, float32, nn
 from torch.distributions import Distribution
 
 from sbi.user_input.user_input_checks_utils import (
@@ -512,3 +512,13 @@ def check_sbi_inputs(simulator: Callable, prior: Distribution) -> None:
         sim_batch_shape == num_prior_samples
     ), f"""Simulation batch shape {sim_batch_shape} must match
         num_samples={num_prior_samples}."""
+
+
+def check_estimator_arg(estimator: Union[str, Callable]) -> None:
+    """Check (density or ratio) estimator argument passed by the user."""
+    assert isinstance(estimator, str) or (
+        isinstance(estimator, Callable) and not isinstance(estimator, nn.Module)
+    ), (
+        "The passed density estimator / classifier must be a string or a function "
+        f"returning a nn.Module, but is {type(estimator)}"
+    )
