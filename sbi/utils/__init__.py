@@ -41,3 +41,4 @@ from sbi.utils.typechecks import (
 )
 
 from sbi.user_input.user_input_checks_utils import MultipleIndependent
+from sbi.user_input.user_input_checks import check_estimator_arg

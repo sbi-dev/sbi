@@ -20,6 +20,7 @@ from sbi.utils import (
     handle_invalid_x,
     warn_on_invalid_x,
     x_shape_from_simulation,
+    check_estimator_arg,
 )
 from sbi.utils.torchutils import (
     ensure_theta_batched,
@@ -83,6 +84,7 @@ class RatioEstimator(NeuralInference, ABC):
         # `_build_neural_net`. It will be called in the first round and receive
         # thetas and xs as inputs, so that they can be used for shape inference and
         # potentially for z-scoring.
+        check_estimator_arg(classifier)
         if isinstance(classifier, str):
             self._build_neural_net = utils.classifier_nn(model=classifier)
         else:
