@@ -21,12 +21,7 @@ import sbi.utils as utils
 from sbi.inference import NeuralInference
 from sbi.inference.posterior import NeuralPosterior
 from sbi.types import OneOrMore, ScalarFloat
-from sbi.utils import (
-    handle_invalid_x,
-    warn_on_invalid_x,
-    x_shape_from_simulation,
-    check_estimator_arg,
-)
+from sbi.utils import check_estimator_arg, x_shape_from_simulation
 
 
 class PosteriorEstimator(NeuralInference, ABC):
@@ -164,19 +159,24 @@ class PosteriorEstimator(NeuralInference, ABC):
 
         for round_, num_sims in enumerate(num_sims_per_round):
 
-            # Run simulations for the round.
-            theta, x, prior_mask = self._run_simulations(round_, num_sims)
-            x_shape = x_shape_from_simulation(x)
+            # Run simulations for the round and prepend pre-simulated data.
+            theta, x = self._run_simulations(round_, num_sims)
+            theta, x = self._prepend_presimulated(theta, x)
+            self._append_to_round_bank(theta, x, round_, exclude_invalid_x)
+
+            x_shape = x_shape_from_simulation(self._x_bank[0])
 
             # First round or if retraining from scratch:
             # Call the `self._build_neural_net` with the rounds' thetas and xs as
-            # arguments, which will build the neural network
+            # arguments, which will build the neural network.
             # This is passed into NeuralPosterior, to create a neural posterior which
             # can `sample()` and `log_prob()`. The network is accessible via `.net`.
             if round_ == 0 or retrain_from_scratch_each_round:
                 self._posterior = NeuralPosterior(
                     method_family="snpe",
-                    neural_net=self._build_neural_net(theta, x),
+                    neural_net=self._build_neural_net(
+                        self._theta_bank[0], self._x_bank[0]
+                    ),
                     prior=self._prior,
                     x_shape=x_shape,
                     sample_with_mcmc=self._sample_with_mcmc,
@@ -184,15 +184,6 @@ class PosteriorEstimator(NeuralInference, ABC):
                     get_potential_function=PotentialFunctionProvider(),
                 )
             self._handle_x_o_wrt_amortization(x_o, x_shape, num_rounds)
-
-            # Check for NaNs in simulations.
-            is_valid_x, num_nans, num_infs = handle_invalid_x(x, exclude_invalid_x)
-            warn_on_invalid_x(num_nans, num_infs, exclude_invalid_x)
-
-            # XXX Rename bank -> rounds/roundwise.
-            self._theta_bank.append(theta[is_valid_x])
-            self._x_bank.append(x[is_valid_x])
-            self._prior_masks.append(prior_mask[is_valid_x])
 
             # Fit posterior using newly aggregated data set.
             self._train(
@@ -247,9 +238,7 @@ class PosteriorEstimator(NeuralInference, ABC):
     ) -> Tensor:
         raise NotImplementedError
 
-    def _run_simulations(
-        self, round_: int, num_sims: int,
-    ) -> Tuple[Tensor, Tensor, Tensor]:
+    def _run_simulations(self, round_: int, num_sims: int,) -> Tuple[Tensor, Tensor]:
         r"""
         Run the simulations for a given round.
 
@@ -276,7 +265,7 @@ class PosteriorEstimator(NeuralInference, ABC):
 
             x = self._batched_simulator(theta)
 
-        return theta, x, self._mask_sims_from_prior(round_, theta.size(0))
+        return theta, x
 
     def _mask_sims_from_prior(self, round_: int, num_simulations: int) -> Tensor:
         """Returns Tensor True where simulated from prior parameters.

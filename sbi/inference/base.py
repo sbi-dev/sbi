@@ -7,7 +7,7 @@ from abc import ABC
 from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Union, cast
+from typing import Callable, Dict, List, Optional, Tuple, Union, cast
 from warnings import warn
 
 import torch
@@ -18,7 +18,7 @@ import sbi.inference
 from sbi.inference.posterior import NeuralPosterior
 from sbi.simulators.simutils import simulate_in_batches
 from sbi.user_input.user_input_checks import prepare_for_sbi, process_x
-from sbi.utils import get_log_root
+from sbi.utils import get_log_root, handle_invalid_x, warn_on_invalid_x
 from sbi.utils.plot import pairplot
 from sbi.utils.torchutils import configure_default_device
 
@@ -137,6 +137,8 @@ class NeuralInference(ABC):
         # Initialize roundwise (theta, x) for storage of parameters and simulations.
         # XXX Rename self._roundwise_* or self._rounds_*
         self._theta_bank, self._x_bank = [], []
+        self._external_data = None
+        self._presimulated_current_round = False
 
         # XXX We could instantiate here the Posterior for all children. Two problems:
         #     1. We must dispatch to right PotentialProvider for mcmc based on name
@@ -151,6 +153,47 @@ class NeuralInference(ABC):
         self._summary = dict(
             median_observation_distances=[], epochs=[], best_validation_log_probs=[],
         )
+
+    def provide_presimulated(self, theta: Tensor, x: Tensor) -> None:
+        r"""
+        Provide external $\theta$ and $x$ to be used for training later on.
+
+        In this function, $\theta$ and $x$ are merely stored in an attribute. Later on,
+        they will be merged with simulated data, processed (e.g. to get rid of invalid
+        simulations), and eventually put into the banks to be used for training.
+
+        Args:
+            theta: Parameter sets used to generate presimulated data.
+            x: Simulation outputs of presimulated data.
+        """
+        self._external_data = (theta, x)
+        self._presimulated_current_round = True
+
+    def _prepend_presimulated(self, theta: Tensor, x: Tensor) -> Tuple[Tensor, Tensor]:
+        """
+        Return theta and x that are merged from presimulated data and simulations.
+        """
+        if self._presimulated_current_round:
+            theta = torch.cat((self._external_data[0], theta))
+            x = torch.cat((self._external_data[1], x))
+            # Resetting to `False` ensures that the external data is only appended in
+            # the first round after it was provided.
+            self._presimulated_current_round = False
+
+        return theta, x
+
+    def _append_to_round_bank(
+        self, theta: Tensor, x: Tensor, round: int, exclude_invalid_x: bool
+    ) -> None:
+
+        # Check for NaNs in simulations.
+        is_valid_x, num_nans, num_infs = handle_invalid_x(x, exclude_invalid_x)
+        warn_on_invalid_x(num_nans, num_infs, exclude_invalid_x)
+
+        # XXX Rename bank -> rounds/roundwise.
+        self._theta_bank.append(theta[is_valid_x])
+        self._x_bank.append(x[is_valid_x])
+        self._prior_masks.append(self._mask_sims_from_prior(round, theta.size(0)))
 
     def _converged(self, epoch: int, stop_after_epochs: int) -> bool:
         """Return whether the training converged yet and save best model state so far.
