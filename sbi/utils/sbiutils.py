@@ -61,6 +61,16 @@ def standardizing_transform(
     return transforms.AffineTransform(shift=-t_mean / t_std, scale=1 / t_std)
 
 
+class Standardize(nn.Module):
+    def __init__(self, mean, std):
+        super(Standardize, self).__init__()
+        self.mean = mean
+        self.std = std
+
+    def forward(self, tensor):
+        return (tensor - self.mean) / self.std
+
+
 def standardizing_net(batch_t: Tensor, min_std: float = 1e-7) -> nn.Module:
     """Builds standardizing network
 
@@ -73,15 +83,6 @@ def standardizing_net(batch_t: Tensor, min_std: float = 1e-7) -> nn.Module:
     Returns:
         Neural network module for z-scoring
     """
-
-    class Standardize(nn.Module):
-        def __init__(self, mean, std):
-            super(Standardize, self).__init__()
-            self.mean = mean
-            self.std = std
-
-        def forward(self, tensor):
-            return (tensor - self.mean) / self.std
 
     is_valid_t, *_ = handle_invalid_x(batch_t, True)
 
