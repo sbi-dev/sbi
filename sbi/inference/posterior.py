@@ -686,7 +686,7 @@ class NeuralPosterior:
         ValueError: on attempt to turn off MCMC sampling for family of methods that do not support rejection sampling.
         """
         if not value:
-            if self._method_family not 'snpe':
+            if self._method_family not in 'snpe':
                 raise ValueError(f'{self._method_family} cannot use MCMC for sampling.')
         self._sample_with_mcmc = value
         self._mcmc_init_params = None
