@@ -675,7 +675,7 @@ class NeuralPosterior:
         return self._sample_with_mcmc
 
     @sample_with_mcmc.setter
-    def sample_with_mcmc(self, value: bool):
+    def sample_with_mcmc(self, value: bool) -> None:
         """Set sampling method to use MCMC.
 
         Configures NeuralPosterior instance to use MCMC for sampling. See documentation of `.__init__()` for default
