@@ -55,16 +55,18 @@ The following algorithms are currently available:
   Posterior Transformation for likelihood-free
   inference_](https://arxiv.org/abs/1905.07488) (ICML 2019).
 
+
+#### Sequential Neural Likelihood Estimation (SNLE)
+* [`SNLE_A`](https://www.mackelab.org/sbi/reference/#sbi.inference.snle.snle_a.SNLE_A) or just `SNL` from Papamakarios G, Sterrat DC and Murray I [_Sequential
+  Neural Likelihood_](https://arxiv.org/abs/1805.07226) (AISTATS 2019).
+
+
 #### Sequential Neural Ratio Estimation (SNRE)
 
 * [`SNRE_A`](https://www.mackelab.org/sbi/reference/#sbi.inference.snre.snre_a.SNRE_A) or `AALR` from Hermans J, Begy V, and Louppe G. [_Likelihood-free Inference with Amortized Approximate Likelihood Ratios_](https://arxiv.org/abs/1903.04057) (ICML 2020).
 
 * [`SNRE_B`](https://www.mackelab.org/sbi/reference/#sbi.inference.snre.snre_b.SNRE_B) or `SRE` from Durkan C, Murray I, and Papamakarios G. [_On Contrastive Learning for Likelihood-free Inference_](https://arxiv.org/abs/2002.03712) (ICML 2020).
 
-#### Sequential Neural Likelihood Estimation (SNRE)
-* [`SNLE_A`](https://www.mackelab.org/sbi/reference/#sbi.inference.snle.snle_a.SNLE_A) or just `SNL` from Papamakarios G, Sterrat DC and Murray I [_Sequential
-  Neural Likelihood_](https://arxiv.org/abs/1805.07226) (AISTATS 2019).
->
 
 ## Feedback and Contributions
 
