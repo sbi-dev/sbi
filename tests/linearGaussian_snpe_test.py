@@ -175,7 +175,9 @@ def test_c2st_snpe_on_linearGaussian_different_dims(set_seed):
 @pytest.mark.parametrize(
     "num_dim, num_simulations", ((1, 0), (1, 1000), (2, 0), (2, 1000)),
 )
-def test_c2st_snpe_external_data_on_linearGaussian(num_dim: int, num_simulations: int):
+def test_c2st_snpe_external_data_on_linearGaussian(
+    num_dim: int, num_simulations: int, set_seed
+):
     """Test whether SNPE C infers well a simple example with available ground truth.
 
     Args:
