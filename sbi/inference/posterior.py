@@ -671,16 +671,16 @@ class NeuralPosterior:
 
     @property
     def sample_with_mcmc(self) -> bool:
-        """Return 'True' if NeuralPosterior instance is configured to use MCMC in '.sample()'."""
+        """Return `True` if NeuralPosterior instance is configured to use MCMC in `.sample()`."""
         return self._sample_with_mcmc
 
     @sample_with_mcmc.setter
     def sample_with_mcmc(self, value: bool):
         """Set sampling method to use MCMC.
 
-        Configures NeuralPosterior instance to use MCMC for sampling. See documentation of '.__init__()' for default
-        MCMC method. Default MCMC method and respective settings can be set upon calling '.sample()'. For details, see
-        documentation of '.sample()'.
+        Configures NeuralPosterior instance to use MCMC for sampling. See documentation of `.__init__()` for default
+        MCMC method. Default MCMC method and respective settings can be set upon calling `.sample()`. For details, see
+        documentation of `.sample()`.
 
         Raises:
         ValueError: on attempt to turn off MCMC sampling for family of methods that do not support rejection sampling.
