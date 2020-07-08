@@ -159,8 +159,8 @@ class LikelihoodEstimator(NeuralInference, ABC):
             warn_on_invalid_x(num_nans, num_infs, exclude_invalid_x)
 
             # Store (theta, x) pairs.
-            self._theta_bank.append(theta[is_valid_x])
-            self._x_bank.append(x[is_valid_x])
+            self._theta_roundwise.append(theta[is_valid_x])
+            self._x_roundwise.append(x[is_valid_x])
 
             # Fit neural likelihood to newly aggregated dataset.
             self._train(
@@ -182,8 +182,8 @@ class LikelihoodEstimator(NeuralInference, ABC):
             self._summarize(
                 round_=round_,
                 x_o=self._posterior.default_x,
-                theta_bank=self._theta_bank,
-                x_bank=self._x_bank,
+                theta_bank=self._theta_roundwise,
+                x_bank=self._x_roundwise,
             )
 
         self._posterior._num_trained_rounds = num_rounds
@@ -213,7 +213,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         # Starting index for the training set (1 = discard round-0 samples).
         start_idx = int(discard_prior_samples and round_ > 0)
         # Get total number of training examples.
-        num_examples = sum(len(theta) for theta in self._theta_bank)
+        num_examples = sum(len(theta) for theta in self._theta_roundwise)
 
         # Select random train and validation splits from (theta, x) pairs.
         permuted_indices = torch.randperm(num_examples)
@@ -226,7 +226,8 @@ class LikelihoodEstimator(NeuralInference, ABC):
 
         # Dataset is shared for training and validation loaders.
         dataset = data.TensorDataset(
-            torch.cat(self._x_bank[start_idx:]), torch.cat(self._theta_bank[start_idx:])
+            torch.cat(self._x_roundwise[start_idx:]),
+            torch.cat(self._theta_roundwise[start_idx:]),
         )
 
         # Create neural net and validation loaders using a subset sampler.

@@ -159,12 +159,12 @@ class PosteriorEstimator(NeuralInference, ABC):
 
         for round_, num_sims in enumerate(num_sims_per_round):
 
-            # Run simulations for the round and prepend pre-simulated data.
+            # Run simulations for the round.
             theta, x = self._run_simulations(round_, num_sims)
-            theta, x = self._prepend_presimulated(theta, x)
-            self._append_to_round_bank(theta, x, round_, exclude_invalid_x)
+            self._append_to_round_bank(theta, x, round_)
 
-            x_shape = x_shape_from_simulation(self._x_bank[0])
+            # Load data from most recent round.
+            theta, x, _ = self._get_from_round_bank(round_, exclude_invalid_x)
 
             # First round or if retraining from scratch:
             # Call the `self._build_neural_net` with the rounds' thetas and xs as
@@ -172,18 +172,17 @@ class PosteriorEstimator(NeuralInference, ABC):
             # This is passed into NeuralPosterior, to create a neural posterior which
             # can `sample()` and `log_prob()`. The network is accessible via `.net`.
             if round_ == 0 or retrain_from_scratch_each_round:
+                x_shape = x_shape_from_simulation(x)
                 self._posterior = NeuralPosterior(
                     method_family="snpe",
-                    neural_net=self._build_neural_net(
-                        self._theta_bank[0], self._x_bank[0]
-                    ),
+                    neural_net=self._build_neural_net(theta, x),
                     prior=self._prior,
                     x_shape=x_shape,
                     sample_with_mcmc=self._sample_with_mcmc,
                     mcmc_method=self._mcmc_method,
                     get_potential_function=PotentialFunctionProvider(),
                 )
-            self._handle_x_o_wrt_amortization(x_o, x_shape, num_rounds)
+                self._handle_x_o_wrt_amortization(x_o, x_shape, num_rounds)
 
             # Fit posterior using newly aggregated data set.
             self._train(
@@ -220,8 +219,8 @@ class PosteriorEstimator(NeuralInference, ABC):
             self._summarize(
                 round_=round_,
                 x_o=self._posterior.default_x,
-                theta_bank=self._theta_bank,
-                x_bank=self._x_bank,
+                theta_bank=theta,
+                x_bank=x,
                 posterior_samples_acceptance_rate=acceptance_rate,
             )
 
@@ -267,19 +266,6 @@ class PosteriorEstimator(NeuralInference, ABC):
 
         return theta, x
 
-    def _mask_sims_from_prior(self, round_: int, num_simulations: int) -> Tensor:
-        """Returns Tensor True where simulated from prior parameters.
-
-        Args:
-            round_: Current training round, starting at 0.
-            num_simulations: Actually performed simulations. This number can be below
-                the one fixed for the round if leakage correction through sampling is
-                active and `patience` is not enough to reach it.
-        """
-
-        prior_mask_values = ones if round_ == 0 else zeros
-        return prior_mask_values((num_simulations, 1), dtype=torch.bool)
-
     def _train(
         self,
         round_: int,
@@ -303,9 +289,11 @@ class PosteriorEstimator(NeuralInference, ABC):
 
         # Starting index for the training set (1 = discard round-0 samples).
         start_idx = int(discard_prior_samples and round_ > 0)
-        num_total_examples = sum(len(theta) for theta in self._theta_bank[start_idx:])
+
+        theta, x, prior_masks = self._get_from_round_bank(start_idx)
 
         # Select random neural net and validation splits from (theta, x) pairs.
+        num_total_examples = len(theta)
         permuted_indices = torch.randperm(num_total_examples)
         num_training_examples = int((1 - validation_fraction) * num_total_examples)
         num_validation_examples = num_total_examples - num_training_examples
@@ -315,11 +303,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         )
 
         # Dataset is shared for training and validation loaders.
-        dataset = data.TensorDataset(
-            torch.cat(self._theta_bank[start_idx:]),
-            torch.cat(self._x_bank[start_idx:]),
-            torch.cat(self._prior_masks[start_idx:]),
-        )
+        dataset = data.TensorDataset(theta, x, prior_masks)
 
         # Create neural net and validation loaders using a subset sampler.
         train_loader = data.DataLoader(

@@ -11,7 +11,7 @@ from typing import Callable, Dict, List, Optional, Tuple, Union, cast
 from warnings import warn
 
 import torch
-from torch import Tensor
+from torch import Tensor, ones, zeros
 from torch.utils.tensorboard import SummaryWriter
 
 import sbi.inference
@@ -134,11 +134,12 @@ class NeuralInference(ABC):
             self._show_progress_bars,
         )
 
-        # Initialize roundwise (theta, x) for storage of parameters and simulations.
-        # XXX Rename self._roundwise_* or self._rounds_*
-        self._theta_bank, self._x_bank = [], []
-        self._external_data = None
-        self._presimulated_current_round = False
+        # Initialize roundwise (theta, x, prior_masks) for storage of parameters,
+        # simulations and masks indicating if simulations came from prior.
+        self._theta_roundwise, self._x_roundwise, self._prior_masks = [], [], []
+
+        # Initialize list that indicates the round from which simulations were drawn.
+        self._data_round_index = []
 
         # XXX We could instantiate here the Posterior for all children. Two problems:
         #     1. We must dispatch to right PotentialProvider for mcmc based on name
@@ -154,46 +155,74 @@ class NeuralInference(ABC):
             median_observation_distances=[], epochs=[], best_validation_log_probs=[],
         )
 
-    def provide_presimulated(self, theta: Tensor, x: Tensor) -> None:
+    def provide_presimulated(
+        self, theta: Tensor, x: Tensor, from_round: int = 0
+    ) -> None:
         r"""
         Provide external $\theta$ and $x$ to be used for training later on.
-
-        In this function, $\theta$ and $x$ are merely stored in an attribute. Later on,
-        they will be merged with simulated data, processed (e.g. to get rid of invalid
-        simulations), and eventually put into the banks to be used for training.
 
         Args:
             theta: Parameter sets used to generate presimulated data.
             x: Simulation outputs of presimulated data.
+            from_round: Which round the data was simulated from. `from_round=0` means
+                that the data came from the first round.
         """
-        self._external_data = (theta, x)
-        self._presimulated_current_round = True
+        self._append_to_round_bank(theta, x, from_round)
 
-    def _prepend_presimulated(self, theta: Tensor, x: Tensor) -> Tuple[Tensor, Tensor]:
+    def _append_to_round_bank(self, theta: Tensor, x: Tensor, round_: int) -> None:
+        r"""
+        Store data in as entries in a list for each type of variable (parameter/data).
+
+        Stores $\theta$, $x$, prior_masks (indicating if simulations are coming from the
+        prior or not) and a index indicating which round the batch of simulations came
+        from.
+
+        Args:
+            theta: Parameter sets.
+            x: Simulation outputs.
+            round_: What round the $(\theta, x)$ pairs are coming from. We start
+                counting from round 0.
         """
-        Return theta and x that are merged from presimulated data and simulations.
+
+        self._theta_roundwise.append(theta)
+        self._x_roundwise.append(x)
+        self._prior_masks.append(self._mask_sims_from_prior(round_, theta.size(0)))
+        self._data_round_index.append(round_)
+
+    def _get_from_round_bank(
+        self, starting_round: int = 0, exclude_invalid_x: bool = True
+    ) -> Tuple[Tensor, Tensor, Tensor]:
+        r"""
+        Returns all $\theta$, $x$, and prior_masks from rounds >= `starting_round`.
+
+        If requested, do not return invalid data.
+
+        Args:
+            starting_round: The earliest round to return samples from (we start counting
+                from zero).
+            exclude_invalid_x: Whether to exclude simulation outputs `x=NaN` or `x=±∞`
+                during training.
+
+        Returns: Parameters, simulation outputs, prior masks.
         """
-        if self._presimulated_current_round:
-            theta = torch.cat((self._external_data[0], theta))
-            x = torch.cat((self._external_data[1], x))
-            # Resetting to `False` ensures that the external data is only appended in
-            # the first round after it was provided.
-            self._presimulated_current_round = False
 
-        return theta, x
-
-    def _append_to_round_bank(
-        self, theta: Tensor, x: Tensor, round: int, exclude_invalid_x: bool
-    ) -> None:
+        theta = self._get_data_after_round(self._theta_roundwise, starting_round)
+        x = self._get_data_after_round(self._x_roundwise, starting_round)
+        prior_masks = self._get_data_after_round(self._prior_masks, starting_round)
 
         # Check for NaNs in simulations.
         is_valid_x, num_nans, num_infs = handle_invalid_x(x, exclude_invalid_x)
         warn_on_invalid_x(num_nans, num_infs, exclude_invalid_x)
 
-        # XXX Rename bank -> rounds/roundwise.
-        self._theta_bank.append(theta[is_valid_x])
-        self._x_bank.append(x[is_valid_x])
-        self._prior_masks.append(self._mask_sims_from_prior(round, theta.size(0)))
+        return theta[is_valid_x], x[is_valid_x], prior_masks[is_valid_x]
+
+    def _get_data_after_round(self, data: List, starting_round: int) -> Tensor:
+        """
+        Returns tensor with all data coming from a round >= `starting_round`.
+        """
+        return torch.cat(
+            [t for t, r in zip(data, self._data_round_index) if r >= starting_round]
+        )
 
     def _converged(self, epoch: int, stop_after_epochs: int) -> bool:
         """Return whether the training converged yet and save best model state so far.
@@ -225,6 +254,19 @@ class NeuralInference(ABC):
             converged = True
 
         return converged
+
+    def _mask_sims_from_prior(self, round_: int, num_simulations: int) -> Tensor:
+        """Returns Tensor True where simulated from prior parameters.
+
+        Args:
+            round_: Current training round, starting at 0.
+            num_simulations: Actually performed simulations. This number can be below
+                the one fixed for the round if leakage correction through sampling is
+                active and `patience` is not enough to reach it.
+        """
+
+        prior_mask_values = ones if round_ == 0 else zeros
+        return prior_mask_values((num_simulations, 1), dtype=torch.bool)
 
     def _default_summary_writer(self) -> SummaryWriter:
         """Return summary writer logging to method- and simulator-specific directory."""
@@ -313,8 +355,8 @@ class NeuralInference(ABC):
         self,
         round_: int,
         x_o: Union[Tensor, None],
-        theta_bank: List[Tensor],
-        x_bank: List[Tensor],
+        theta_bank: Tensor,
+        x_bank: Tensor,
         posterior_samples_acceptance_rate: Optional[Tensor] = None,
     ) -> None:
         """Update the summary_writer with statistics for a given round.
@@ -330,7 +372,7 @@ class NeuralInference(ABC):
         # Median |x - x0| for most recent round.
         if x_o is not None:
             median_observation_distance = torch.median(
-                torch.sqrt(torch.sum((x_bank[-1] - x_o.reshape(1, -1)) ** 2, dim=-1,))
+                torch.sqrt(torch.sum((x_bank - x_o.reshape(1, -1)) ** 2, dim=-1,))
             )
             self._summary["median_observation_distances"].append(
                 median_observation_distance.item()
@@ -356,7 +398,7 @@ class NeuralInference(ABC):
 
         # Plot most recently sampled parameters.
         # XXX: need more plotting kwargs, e.g., prior limits.
-        parameters = theta_bank[-1]
+        parameters = theta_bank
 
         figure, axes = pairplot(parameters.to("cpu").numpy())
 
