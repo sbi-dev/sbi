@@ -179,7 +179,7 @@ class NeuralInference(ABC):
 
         Args:
             theta: Parameter sets.
-            x: Simulation outputs.
+            x: Simulated data.
             round_: What round the $(\theta, x)$ pairs are coming from. We start
                 counting from round 0.
         """
@@ -190,7 +190,10 @@ class NeuralInference(ABC):
         self._data_round_index.append(round_)
 
     def _get_from_round_bank(
-        self, starting_round: int = 0, exclude_invalid_x: bool = True
+        self,
+        starting_round: int = 0,
+        exclude_invalid_x: bool = True,
+        warn_on_invalid: bool = True,
     ) -> Tuple[Tensor, Tensor, Tensor]:
         r"""
         Returns all $\theta$, $x$, and prior_masks from rounds >= `starting_round`.
@@ -202,6 +205,8 @@ class NeuralInference(ABC):
                 from zero).
             exclude_invalid_x: Whether to exclude simulation outputs `x=NaN` or `x=±∞`
                 during training.
+            warn_on_invalid: Whether to give out a warning if invalid simulations were
+                found.
 
         Returns: Parameters, simulation outputs, prior masks.
         """
@@ -212,17 +217,53 @@ class NeuralInference(ABC):
 
         # Check for NaNs in simulations.
         is_valid_x, num_nans, num_infs = handle_invalid_x(x, exclude_invalid_x)
-        warn_on_invalid_x(num_nans, num_infs, exclude_invalid_x)
+        if warn_on_invalid:
+            warn_on_invalid_x(num_nans, num_infs, exclude_invalid_x)
 
         return theta[is_valid_x], x[is_valid_x], prior_masks[is_valid_x]
 
     def _get_data_after_round(self, data: List, starting_round: int) -> Tensor:
         """
         Returns tensor with all data coming from a round >= `starting_round`.
+
+        Args:
+            data: Each list entry contains a set of data (either parameters, simulation
+                outputs, or prior masks).
+            starting_round: From which round onwards to return the data. We start
+                counting from 0.
         """
         return torch.cat(
             [t for t, r in zip(data, self._data_round_index) if r >= starting_round]
         )
+
+    def _run_simulations(self, round_: int, num_sims: int,) -> Tuple[Tensor, Tensor]:
+        r"""
+        Run the simulations for a given round.
+
+        Args:
+            round_: Round number.
+            num_sims: Number of desired simulations for the round.
+
+        Returns:
+            theta: Parameters used for training.
+            x: Simulations used for training.
+            prior_mask: Whether each simulation came from a prior parameter sample.
+        """
+
+        if round_ == 0:
+            theta = self._prior.sample((num_sims,))
+
+            x = self._batched_simulator(theta)
+        else:
+            theta = self._posterior.sample(
+                (num_sims,),
+                x=self._posterior.default_x,
+                show_progress_bars=self._show_progress_bars,
+            )
+
+            x = self._batched_simulator(theta)
+
+        return theta, x
 
     def _converged(self, epoch: int, stop_after_epochs: int) -> bool:
         """Return whether the training converged yet and save best model state so far.
