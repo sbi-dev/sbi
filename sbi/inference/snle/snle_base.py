@@ -135,7 +135,11 @@ class LikelihoodEstimator(NeuralInference, ABC):
                 )
 
             x = self._batched_simulator(theta)
-            x_shape = x_shape_from_simulation(x)
+
+            self._append_to_round_bank(theta, x, round_)
+
+            # Load data from most recent round.
+            theta, x, _ = self._get_from_round_bank(round_, exclude_invalid_x)
 
             # First round or if retraining from scratch:
             # Call the `self._build_neural_net` with the rounds' thetas and xs as
@@ -143,6 +147,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
             # This is passed into NeuralPosterior, to create a neural posterior which
             # can `sample()` and `log_prob()`. The network is accessible via `.net`.
             if round_ == 0 or retrain_from_scratch_each_round:
+                x_shape = x_shape_from_simulation(x)
                 self._posterior = NeuralPosterior(
                     method_family="snle",
                     neural_net=self._build_neural_net(theta, x),
@@ -152,15 +157,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
                     mcmc_method=self._mcmc_method,
                     get_potential_function=PotentialFunctionProvider(),
                 )
-            self._handle_x_o_wrt_amortization(x_o, x_shape, num_rounds)
-
-            # Check for NaNs in simulations.
-            is_valid_x, num_nans, num_infs = handle_invalid_x(x, exclude_invalid_x)
-            warn_on_invalid_x(num_nans, num_infs, exclude_invalid_x)
-
-            # Store (theta, x) pairs.
-            self._theta_roundwise.append(theta[is_valid_x])
-            self._x_roundwise.append(x[is_valid_x])
+                self._handle_x_o_wrt_amortization(x_o, x_shape, num_rounds)
 
             # Fit neural likelihood to newly aggregated dataset.
             self._train(
@@ -182,8 +179,8 @@ class LikelihoodEstimator(NeuralInference, ABC):
             self._summarize(
                 round_=round_,
                 x_o=self._posterior.default_x,
-                theta_bank=self._theta_roundwise,
-                x_bank=self._x_roundwise,
+                theta_bank=theta,
+                x_bank=x,
             )
 
         self._posterior._num_trained_rounds = num_rounds
@@ -212,8 +209,11 @@ class LikelihoodEstimator(NeuralInference, ABC):
 
         # Starting index for the training set (1 = discard round-0 samples).
         start_idx = int(discard_prior_samples and round_ > 0)
+
+        theta, x, _ = self._get_from_round_bank(start_idx)
+
         # Get total number of training examples.
-        num_examples = sum(len(theta) for theta in self._theta_roundwise)
+        num_examples = len(theta)
 
         # Select random train and validation splits from (theta, x) pairs.
         permuted_indices = torch.randperm(num_examples)
