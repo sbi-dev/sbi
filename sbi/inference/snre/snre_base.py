@@ -15,17 +15,8 @@ import sbi.utils as utils
 from sbi.inference.base import NeuralInference
 from sbi.inference.posterior import NeuralPosterior
 from sbi.types import OneOrMore, ScalarFloat
-from sbi.utils import (
-    clamp_and_warn,
-    handle_invalid_x,
-    warn_on_invalid_x,
-    x_shape_from_simulation,
-    check_estimator_arg,
-)
-from sbi.utils.torchutils import (
-    ensure_theta_batched,
-    ensure_x_batched,
-)
+from sbi.utils import check_estimator_arg, clamp_and_warn, x_shape_from_simulation
+from sbi.utils.torchutils import ensure_theta_batched, ensure_x_batched
 
 
 class RatioEstimator(NeuralInference, ABC):
@@ -136,21 +127,13 @@ class RatioEstimator(NeuralInference, ABC):
 
         for round_, num_sims in enumerate(num_sims_per_round):
 
-            # Generate theta from prior in first round, and from most recent posterior
-            # estimate in subsequent rounds.
-            if round_ == 0:
-                theta = self._prior.sample((num_sims,))
-            else:
-                theta = self._posterior.sample(
-                    (num_sims,), show_progress_bars=self._show_progress_bars
-                )
-
-            x = self._batched_simulator(theta)
+            # Run simulations for the round.
+            theta, x = self._run_simulations(round_, num_sims)
 
             self._append_to_round_bank(theta, x, round_)
 
             # Load data from most recent round.
-            theta, x, _ = self._get_from_round_bank(round_, exclude_invalid_x)
+            theta, x, _ = self._get_from_round_bank(round_, exclude_invalid_x, False)
 
             # First round or if retraining from scratch:
             # Call the `self._build_neural_net` with the rounds' thetas and xs as
@@ -180,6 +163,7 @@ class RatioEstimator(NeuralInference, ABC):
                 stop_after_epochs=stop_after_epochs,
                 max_num_epochs=max_num_epochs,
                 clip_max_norm=clip_max_norm,
+                exclude_invalid_x=exclude_invalid_x,
                 discard_prior_samples=discard_prior_samples,
             )
 
@@ -209,6 +193,7 @@ class RatioEstimator(NeuralInference, ABC):
         stop_after_epochs: int,
         max_num_epochs: int,
         clip_max_norm: Optional[float],
+        exclude_invalid_x: bool,
         discard_prior_samples: bool,
     ) -> None:
         r"""
@@ -224,8 +209,7 @@ class RatioEstimator(NeuralInference, ABC):
 
         # Starting index for the training set (1 = discard round-0 samples).
         start_idx = int(discard_prior_samples and round_ > 0)
-
-        theta, x, _ = self._get_from_round_bank(start_idx)
+        theta, x, _ = self._get_from_round_bank(start_idx, exclude_invalid_x)
 
         # Get total number of training examples.
         num_examples = len(theta)
@@ -245,10 +229,7 @@ class RatioEstimator(NeuralInference, ABC):
         clamp_and_warn("num_atoms", num_atoms, min_val=2, max_val=clipped_batch_size)
 
         # Dataset is shared for training and validation loaders.
-        dataset = data.TensorDataset(
-            torch.cat(self._theta_roundwise[start_idx:]),
-            torch.cat(self._x_roundwise[start_idx:]),
-        )
+        dataset = data.TensorDataset(theta, x)
 
         # Create neural net and validation loaders using a subset sampler.
         train_loader = data.DataLoader(

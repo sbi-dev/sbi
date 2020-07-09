@@ -105,6 +105,62 @@ def test_c2st_snl_on_linearGaussian_different_dims(set_seed):
 
 
 @pytest.mark.slow
+@pytest.mark.parametrize(
+    "num_dim, num_simulations", ((1, 0), (1, 1000), (2, 0), (2, 1000)),
+)
+def test_c2st_snle_external_data_on_linearGaussian(
+    num_dim: int, num_simulations: int, set_seed
+):
+    """Test whether SNPE C infers well a simple example with available ground truth.
+
+    Args:
+        set_seed: fixture for manual seeding
+    """
+
+    device = "cpu"
+    configure_default_device(device)
+    x_o = zeros(1, num_dim)
+    num_samples = 1000
+
+    # likelihood_mean will be likelihood_shift+theta
+    likelihood_shift = -1.0 * ones(num_dim)
+    likelihood_cov = 0.3 * eye(num_dim)
+
+    prior_mean = zeros(num_dim)
+    prior_cov = eye(num_dim)
+    prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
+    gt_posterior = true_posterior_linear_gaussian_mvn_prior(
+        x_o[0], likelihood_shift, likelihood_cov, prior_mean, prior_cov
+    )
+    target_samples = gt_posterior.sample((num_samples,))
+
+    def simulator(theta):
+        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
+
+    infer = SNL(
+        *prepare_for_sbi(simulator, prior),
+        simulation_batch_size=1000,
+        show_progress_bars=False,
+        device=device,
+    )
+
+    external_theta = prior.sample((1000,))
+    external_x = simulator(external_theta)
+
+    infer.provide_presimulated(external_theta, external_x)
+
+    posterior = infer(
+        num_rounds=1,
+        num_simulations_per_round=num_simulations,
+        training_batch_size=100,
+    ).set_default_x(x_o)
+    samples = posterior.sample((num_samples,))
+
+    # Compute the c2st and assert it is near chance level of 0.5.
+    check_c2st(samples, target_samples, alg="snpe_c")
+
+
+@pytest.mark.slow
 @pytest.mark.parametrize("num_dim", (1, 2))
 @pytest.mark.parametrize("prior_str", ("uniform", "gaussian"))
 def test_c2st_snl_on_linearGaussian(num_dim: int, prior_str: str, set_seed):

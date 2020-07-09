@@ -11,7 +11,7 @@ from warnings import warn
 
 import numpy as np
 import torch
-from torch import Tensor, nn, ones, optim, zeros
+from torch import Tensor, nn, ones, optim
 from torch.nn.utils import clip_grad_norm_
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
@@ -85,7 +85,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         self._sample_with_mcmc = sample_with_mcmc
         self._mcmc_method = mcmc_method
 
-        self._prior_masks, self._model_bank = [], []
+        self._model_bank = []
 
         # Extra SNPE-specific fields summary_writer.
         self._summary.update({"rejection_sampling_acceptance_rates": []})  # type:ignore
@@ -164,7 +164,7 @@ class PosteriorEstimator(NeuralInference, ABC):
             self._append_to_round_bank(theta, x, round_)
 
             # Load data from most recent round.
-            theta, x, _ = self._get_from_round_bank(round_, exclude_invalid_x)
+            theta, x, _ = self._get_from_round_bank(round_, exclude_invalid_x, False)
 
             # First round or if retraining from scratch:
             # Call the `self._build_neural_net` with the rounds' thetas and xs as
@@ -194,6 +194,7 @@ class PosteriorEstimator(NeuralInference, ABC):
                 max_num_epochs=cast(int, max_num_epochs),
                 clip_max_norm=clip_max_norm,
                 calibration_kernel=calibration_kernel,
+                exclude_invalid_x=exclude_invalid_x,
                 discard_prior_samples=discard_prior_samples,
             )
 
@@ -237,35 +238,6 @@ class PosteriorEstimator(NeuralInference, ABC):
     ) -> Tensor:
         raise NotImplementedError
 
-    def _run_simulations(self, round_: int, num_sims: int,) -> Tuple[Tensor, Tensor]:
-        r"""
-        Run the simulations for a given round.
-
-        Args:
-            round_: Round number.
-            num_sims: Number of desired simulations for the round.
-
-        Returns:
-            theta: Parameters used for training.
-            x: Simulations used for training.
-            prior_mask: Whether each simulation came from a prior parameter sample.
-        """
-
-        if round_ == 0:
-            theta = self._prior.sample((num_sims,))
-
-            x = self._batched_simulator(theta)
-        else:
-            theta = self._posterior.sample(
-                (num_sims,),
-                x=self._posterior.default_x,
-                show_progress_bars=self._show_progress_bars,
-            )
-
-            x = self._batched_simulator(theta)
-
-        return theta, x
-
     def _train(
         self,
         round_: int,
@@ -276,6 +248,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         max_num_epochs: int,
         clip_max_norm: Optional[float],
         calibration_kernel: Callable,
+        exclude_invalid_x: bool,
         discard_prior_samples: bool,
     ) -> None:
         r"""Train the conditional density estimator for the posterior $p(\theta|x)$.
@@ -289,8 +262,7 @@ class PosteriorEstimator(NeuralInference, ABC):
 
         # Starting index for the training set (1 = discard round-0 samples).
         start_idx = int(discard_prior_samples and round_ > 0)
-
-        theta, x, prior_masks = self._get_from_round_bank(start_idx)
+        theta, x, prior_masks = self._get_from_round_bank(start_idx, exclude_invalid_x)
 
         # Select random neural net and validation splits from (theta, x) pairs.
         num_total_examples = len(theta)

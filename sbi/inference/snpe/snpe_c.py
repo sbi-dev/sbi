@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Callable, Optional, Union, Tuple
+from typing import Callable, Optional, Union
 
 import torch
 from torch import Tensor, eye, nn, ones
