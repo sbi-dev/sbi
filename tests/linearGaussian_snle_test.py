@@ -46,7 +46,7 @@ def test_api_snl_on_linearGaussian(num_dim: int, set_seed):
 
     posterior = infer(num_rounds=1, num_simulations_per_round=1000, max_num_epochs=5)
 
-    posterior.sample(sample_shape=(num_samples,), x=x_o, thin=3)
+    posterior.sample(sample_shape=(num_samples,), x=x_o, mcmc_parameters = {"thin": 3})
 
 
 def test_c2st_snl_on_linearGaussian_different_dims(set_seed):
@@ -98,7 +98,7 @@ def test_c2st_snl_on_linearGaussian_different_dims(set_seed):
     )
 
     posterior = infer(num_rounds=1, num_simulations_per_round=5000)  # type: ignore
-    samples = posterior.sample((num_samples,), x=x_o, thin=3)
+    samples = posterior.sample((num_samples,), x=x_o, mcmc_parameters = {"thin": 3})
 
     # Compute the c2st and assert it is near chance level of 0.5.
     check_c2st(samples, target_samples, alg="snle_a")
@@ -198,7 +198,7 @@ def test_c2st_snl_on_linearGaussian(num_dim: int, prior_str: str, set_seed):
 
     posterior = infer(num_rounds=1, num_simulations_per_round=1000).set_default_x(x_o)
 
-    samples = posterior.sample(sample_shape=(num_samples,), thin=3)
+    samples = posterior.sample(sample_shape=(num_samples,), mcmc_parameters = {"thin": 3})
 
     # Check performance based on c2st accuracy.
     check_c2st(samples, target_samples, alg=f"snle_a-{prior_str}-prior")
@@ -248,7 +248,7 @@ def test_c2st_multi_round_snl_on_linearGaussian(set_seed):
 
     posterior = infer(num_rounds=2, x_o=x_o, num_simulations_per_round=500)
 
-    samples = posterior.sample(sample_shape=(num_samples,), thin=3)
+    samples = posterior.sample(sample_shape=(num_samples,), mcmc_parameters = {"thin": 3})
 
     # Check performance based on c2st accuracy.
     check_c2st(samples, target_samples, alg="multi-round-snl")
@@ -285,4 +285,4 @@ def test_api_snl_sampling_methods(mcmc_method: str, prior_str: str, set_seed):
 
     posterior = infer(num_rounds=1, num_simulations_per_round=200, max_num_epochs=5)
 
-    posterior.sample(sample_shape=(num_samples,), x=x_o, thin=3)
+    posterior.sample(sample_shape=(num_samples,), x=x_o, mcmc_parameters = {"thin": 3})

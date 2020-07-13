@@ -7,22 +7,22 @@ from typing import Callable, Optional
 from warnings import warn
 
 import numpy as np
+import torch
 from pyro.infer.mcmc import HMC, NUTS
 from pyro.infer.mcmc.api import MCMC
-import torch
-from torch import Tensor, log, nn
+from torch import Tensor, log
 from torch import multiprocessing as mp
-from sbi.types import Shape
+from torch import nn
 
-from sbi.mcmc import Slice, SliceSampler
-from sbi.types import Array
 import sbi.utils as utils
+from sbi.mcmc import Slice, SliceSampler
+from sbi.types import Array, Shape
+from sbi.user_input.user_input_checks import process_x
 from sbi.utils.torchutils import (
-    ensure_theta_batched,
     atleast_2d_float32_tensor,
     batched_first_of_batch,
+    ensure_theta_batched,
 )
-from sbi.user_input.user_input_checks import process_x
 
 
 class NeuralPosterior:
@@ -53,6 +53,7 @@ class NeuralPosterior:
         x_shape: torch.Size,
         sample_with_mcmc: bool = True,
         mcmc_method: str = "slice_np",
+        mcmc_parameters: Optional[Dict[str, Any]] = None,
         get_potential_function: Optional[Callable] = None,
     ):
         """
@@ -64,34 +65,39 @@ class NeuralPosterior:
             sample_with_mcmc: Whether to sample with MCMC. Will always be `True` for SRE
                 and SNL, but can also be set to `True` for SNPE if MCMC is preferred to
                 deal with leakage over rejection sampling.
-            mcmc_method: If MCMC sampling is used, specify the method here: either of
-                slice_np, slice, hmc, nuts.
+            mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`, `hmc`, `nuts`.
+                Currently defaults to `slice_np` for a custom numpy implementation of
+                slice sampling; select `hmc`, `nuts` or `slice` for Pyro-based sampling.
+            mcmc_parameters: Dictionary overriding the default parameters for MCMC.
+                The following parameters are supported: `thin` to set the thinning
+                factor for the chain, `warmup_steps` to set the initial number of
+                samples to discard, `num_chains` for the number of chains, `init_strategy`
+                for the initialisation strategy for chains; `prior` will draw init
+                locations from prior, whereas `sir` will use Sequential-Importance-
+                Resampling using `init_strategy_num_candidates` to find init
+                locations.
             get_potential_function: Callable that returns the potential function used
                 for MCMC sampling.
         """
-
-        self.net = neural_net
-        self._prior = prior
-        # This can be changed via `.set_default_x() below.`
-        # TODO: set via default_x directly here? would require process_x to accept None.
-        self._x = None
-        self._x_o_training_focused_on = None
-
-        self._sample_with_mcmc = sample_with_mcmc
-        self._mcmc_method = mcmc_method
-        self._mcmc_init_params = None
-        self._get_potential_function = get_potential_function
-        self._x_shape = x_shape
-
         if method_family in ("snpe", "snle", "snre_a", "snre_b"):
             self._method_family = method_family
         else:
             raise ValueError("Method family unsupported.")
 
-        self._num_trained_rounds = 0
+        self.net = neural_net
 
-        # Correction factor for leakage, only applicable to SNPE-family methods.
-        self._leakage_density_correction_factor = None
+        self.set_mcmc_method(mcmc_method)
+        self.set_mcmc_parameters(mcmc_parameters)
+        self.set_sample_with_mcmc(sample_with_mcmc)
+
+        self._get_potential_function = get_potential_function
+        self._leakage_density_correction_factor = None  # Correction factor for SNPE.
+        self._mcmc_init_params = None
+        self._num_trained_rounds = 0
+        self._prior = prior
+        self._x = None
+        self._x_o_training_focused_on = None
+        self._x_shape = x_shape
 
     @property
     def default_x(self) -> Optional[Tensor]:
@@ -100,17 +106,11 @@ class NeuralPosterior:
 
     @default_x.setter
     def default_x(self, x: Tensor) -> None:
-        """Set new default x for `.sample(), .log_prob` to use as conditioning context.
+        """See `set_default_x`."""
+        self.set_default_x(x)
 
-        See documentation of `.set_default_x()` for rationale and semantics."""
-        processed_x = process_x(x, self._x_shape)
-        self._warn_if_posterior_was_focused_on_different_x(processed_x)
-        self._x = processed_x
-
-    # When a type is not yet defined, one uses a string representation.
     def set_default_x(self, x: Tensor) -> "NeuralPosterior":
-        """
-        Return `NeuralPosterior` object with default conditioning context set to `x`.
+        """Set new default x for `.sample(), .log_prob` to use as conditioning context.
 
         This is a pure convenience to avoid having to repeatedly specify `x` in calls to
         `.sample()` and `.log_prob()` - only θ needs to be passed.
@@ -132,7 +132,90 @@ class NeuralPosterior:
         processed_x = process_x(x, self._x_shape)
         self._warn_if_posterior_was_focused_on_different_x(processed_x)
         self._x = processed_x
+        return self
 
+    @property
+    def mcmc_method(self) -> str:
+        """Returns MCMC method."""
+        return self._mcmc_method
+
+    @mcmc_method.setter
+    def mcmc_method(self, method: str) -> None:
+        """See `set_mcmc_method`."""
+        self.set_mcmc_method(method)
+
+    def set_mcmc_method(self, method: str) -> "NeuralPosterior":
+        """Sets sampling method to for MCMC and returns `NeuralPosterior`.
+
+        Args:
+            method: Method to use.
+
+        Returns:
+            `NeuralPosterior` for chainable calls.
+        """
+        self._mcmc_method = method
+        return self
+
+    @property
+    def mcmc_parameters(self) -> dict:
+        """Returns MCMC parameters."""
+        if self._mcmc_parameters is None:
+            return {}
+        else:
+            return self._mcmc_parameters
+
+    @mcmc_parameters.setter
+    def mcmc_parameters(self, parameters: Dict[str, Any]) -> None:
+        """See `set_mcmc_parameters`."""
+        self.set_mcmc_parameters(parameters)
+
+    def set_mcmc_parameters(self, parameters: Dict[str, Any]) -> "NeuralPosterior":
+        """Sets parameters for MCMC and returns `NeuralPosterior`.
+
+        Args:
+            parameters: Dictionary overriding the default parameters for MCMC.
+                The following parameters are supported: `thin` to set the thinning
+                factor for the chain, `warmup_steps` to set the initial number of
+                samples to discard, `num_chains` for the number of chains, `init_strategy`
+                for the initialisation strategy for chains; `prior` will draw init
+                locations from prior, whereas `sir` will use Sequential-Importance-
+                Resampling using `init_strategy_num_candidates` to find init
+                locations.
+
+
+        Returns:
+            `NeuralPosterior` for chainable calls.
+        """
+        self._mcmc_parameters = parameters
+        return self
+
+    @property
+    def sample_with_mcmc(self) -> bool:
+        """Return `True` if NeuralPosterior instance is configured to use MCMC in `.sample()`."""
+        return self._sample_with_mcmc
+
+    @sample_with_mcmc.setter
+    def sample_with_mcmc(self, value: bool) -> None:
+        """See `set_sample_with_mcmc`."""
+        self.set_sample_with_mcmc(value)
+
+    def set_sample_with_mcmc(self, use_mcmc: bool) -> "NeuralPosterior":
+        """Turns MCMC sampling on or off and returns `NeuralPosterior`.
+
+        Args:
+            use_mcmc: Flag to set whether or not MCMC sampling is used.
+
+        Returns:
+            `NeuralPosterior` for chainable calls.
+
+        Raises:
+            `ValueError` on attempt to turn off MCMC sampling for family of methods
+            that do not support rejection sampling.
+        """
+        if not use_mcmc:
+            if self._method_family not in ["snpe"]:
+                raise ValueError(f"{self._method_family} cannot use MCMC for sampling.")
+        self._sample_with_mcmc = use_mcmc
         return self
 
     def log_prob(
@@ -303,7 +386,9 @@ class NeuralPosterior:
         sample_shape: Shape = torch.Size(),
         x: Optional[Tensor] = None,
         show_progress_bars: bool = True,
-        **kwargs,
+        sample_with_mcmc: Optional[bool] = None,
+        mcmc_method: Optional[str] = None,
+        mcmc_parameters: Optional[Dict[str, Any]] = None,
     ) -> Tensor:
         r"""
         Return samples from posterior distribution $p(\theta|x)$.
@@ -320,10 +405,19 @@ class NeuralPosterior:
                 fall back onto `x_o` if previously provided for multiround training, or
                 to a set default (see `set_default_x()` method).
             show_progress_bars: Whether to show sampling progress monitor.
-            **kwargs: Additional parameters to be passed to the MCMC sampler, such as
-                `thin` and `warmup_steps`.
+            sample_with_mcmc: Optional parameter to override `self.sample_with_mcmc`.
+            mcmc_method: Optional parameter to override `self.mcmc_method`.
+            mcmc_parameters: Dictionary overriding the default parameters for MCMC.
+                The following parameters are supported: `thin` to set the thinning
+                factor for the chain, `warmup_steps` to set the initial number of
+                samples to discard, `num_chains` for the number of chains, `init_strategy`
+                for the initialisation strategy for chains; `prior` will draw init
+                locations from prior, whereas `sir` will use Sequential-Importance-
+                Resampling using `init_strategy_num_candidates` to find init
+                locations.
 
-        Returns: Samples from posterior.
+        Returns:
+            Samples from posterior.
         """
 
         x = atleast_2d_float32_tensor(self._x_else_default_x(x))
@@ -332,13 +426,21 @@ class NeuralPosterior:
         self._warn_if_posterior_was_focused_on_different_x(x)
         num_samples = torch.Size(sample_shape).numel()
 
-        if self._sample_with_mcmc:
+        sample_with_mcmc = (
+            sample_with_mcmc if sample_with_mcmc is not None else self.sample_with_mcmc
+        )
+        mcmc_method = mcmc_method if mcmc_method is not None else self.mcmc_method
+        mcmc_parameters = (
+            mcmc_parameters if mcmc_parameters is not None else self.mcmc_parameters
+        )
+
+        if sample_with_mcmc:
             samples = self._sample_posterior_mcmc(
                 x=x,
                 num_samples=num_samples,
-                mcmc_method=self._mcmc_method,
                 show_progress_bars=show_progress_bars,
-                **kwargs,
+                mcmc_method=mcmc_method,
+                **mcmc_parameters,
             )
         elif self._method_family == "snpe":
             # Rejection sampling.
@@ -558,23 +660,6 @@ class NeuralPosterior:
         self.net.train(True)
 
         return samples
-
-    # NOTE: this is done here because NeuralPosterior is created in inference methods
-    # at instantiation, while it could and should be created at training time.
-    def set_embedding_net(self, embedding_net: nn.Module) -> None:
-        """
-        Set the `embedding_net` as an attribute of the `neural_net`.
-
-        Args:
-            embedding_net: Neural net to encode `x`.
-        """
-        assert isinstance(embedding_net, nn.Module), (
-            "`embedding_net`is not a `nn.Module`. "
-            "If you want to use hard-coded summary features, "
-            "please simply pass the already encoded summary features as input and pass "
-            "`embedding_net=None`."
-        )
-        self.net._embedding_net = embedding_net
 
     def _x_else_default_x(self, x: Optional[Array]) -> Array:
         if x is not None:
