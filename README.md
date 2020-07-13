@@ -1,6 +1,7 @@
 [![PyPI version](https://badge.fury.io/py/sbi.svg)](https://badge.fury.io/py/sbi)
 [![Contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](https://github.com/mackelab/sbi/blob/master/CONTRIBUTING.md)
 [![GitHub license](https://img.shields.io/github/license/mackelab/sbi)](https://github.com/mackelab/sbi/blob/master/LICENSE.txt)
+[![codecov](https://codecov.io/gh/mackelab/sbi/branch/main/graph/badge.svg)](https://codecov.io/gh/mackelab/sbi)
 ![Tests](https://github.com/mackelab/sbi/workflows/Tests/badge.svg?branch=main)
 
 ## sbi: simulation-based inference
