@@ -517,7 +517,7 @@ class NeuralPosterior:
                         for i in range(init_strategy_num_candidates)
                     ]
                 )
-                probs = np.exp(log_weights.view(-1).numpy().astype(np.float64))
+                probs = np.exp(log_weights.view(-1).detach().numpy().astype(np.float64))
                 probs[np.isnan(probs)] = 0.0
                 probs[np.isinf(probs)] = 0.0
                 probs /= probs.sum()
