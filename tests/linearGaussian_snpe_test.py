@@ -172,17 +172,14 @@ def test_c2st_snpe_on_linearGaussian_different_dims(set_seed):
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize(
-    "num_dim, num_simulations", ((1, 0), (1, 1000), (2, 0), (2, 1000)),
-)
-def test_c2st_snpe_external_data_on_linearGaussian(
-    num_dim: int, num_simulations: int, set_seed
-):
+def test_c2st_snpe_external_data_on_linearGaussian(set_seed):
     """Test whether SNPE C infers well a simple example with available ground truth.
 
     Args:
         set_seed: fixture for manual seeding
     """
+
+    num_dim = 2
 
     device = "cpu"
     configure_default_device(device)
@@ -218,9 +215,7 @@ def test_c2st_snpe_external_data_on_linearGaussian(
     infer.provide_presimulated(external_theta, external_x)
 
     posterior = infer(
-        num_rounds=1,
-        num_simulations_per_round=num_simulations,
-        training_batch_size=100,
+        num_rounds=1, num_simulations_per_round=1000, training_batch_size=100,
     ).set_default_x(x_o)
     samples = posterior.sample((num_samples,))
 
