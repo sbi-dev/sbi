@@ -30,6 +30,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         simulation_batch_size: int = 1,
         density_estimator: Union[str, Callable] = "maf",
         mcmc_method: str = "slice_np",
+        mcmc_parameters: Optional[Dict[str, Any]] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
@@ -47,8 +48,17 @@ class LikelihoodEstimator(NeuralInference, ABC):
                 needs to return a PyTorch `nn.Module` implementing the density
                 estimator. The density estimator needs to provide the methods
                 `.log_prob` and `.sample()`.
-            mcmc_method: Specify the method for MCMC sampling, either of:
-                slice_np, slice, hmc, nuts.
+            mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`, `hmc`, `nuts`.
+                Currently defaults to `slice_np` for a custom numpy implementation of
+                slice sampling; select `hmc`, `nuts` or `slice` for Pyro-based sampling.
+            mcmc_parameters: Dictionary overriding the default parameters for MCMC.
+                The following parameters are supported: `thin` to set the thinning
+                factor for the chain, `warmup_steps` to set the initial number of
+                samples to discard, `num_chains` for the number of chains, `init_strategy`
+                for the initialisation strategy for chains; `prior` will draw init
+                locations from prior, whereas `sir` will use Sequential-Importance-
+                Resampling using `init_strategy_num_candidates` to find init
+                locations.
 
         See docstring of `NeuralInference` class for all other arguments.
         """
@@ -78,6 +88,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         self._posterior = None
         self._sample_with_mcmc = True
         self._mcmc_method = mcmc_method
+        self._mcmc_parameters = mcmc_parameters
 
         # SNLE-specific summary_writer fields.
         self._summary.update({"mcmc_times": []})  # type: ignore
@@ -142,6 +153,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
                     x_shape=x_shape,
                     sample_with_mcmc=self._sample_with_mcmc,
                     mcmc_method=self._mcmc_method,
+                    mcmc_parameters=self._mcmc_parameters,
                     get_potential_function=PotentialFunctionProvider(),
                 )
                 self._handle_x_o_wrt_amortization(x_o, x_shape, num_rounds)

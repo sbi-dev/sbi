@@ -25,6 +25,7 @@ class SNPE_C(PosteriorEstimator):
         density_estimator: Union[str, nn.Module] = "maf",
         sample_with_mcmc: bool = False,
         mcmc_method: str = "slice_np",
+        mcmc_parameters: Optional[Dict[str, Any]] = None,
         use_combined_loss: bool = False,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
@@ -61,8 +62,17 @@ class SNPE_C(PosteriorEstimator):
                 `.log_prob` and `.sample()`.
             sample_with_mcmc: Whether to sample with MCMC. MCMC can be used to deal
                 with high leakage.
-            mcmc_method: If MCMC sampling is used, specify the method here: either of
-                slice_np, slice, hmc, nuts.
+            mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`, `hmc`, `nuts`.
+                Currently defaults to `slice_np` for a custom numpy implementation of
+                slice sampling; select `hmc`, `nuts` or `slice` for Pyro-based sampling.
+            mcmc_parameters: Dictionary overriding the default parameters for MCMC.
+                The following parameters are supported: `thin` to set the thinning
+                factor for the chain, `warmup_steps` to set the initial number of
+                samples to discard, `num_chains` for the number of chains, `init_strategy`
+                for the initialisation strategy for chains; `prior` will draw init
+                locations from prior, whereas `sir` will use Sequential-Importance-
+                Resampling using `init_strategy_num_candidates` to find init
+                locations.
             use_combined_loss: Whether to train the neural net also on prior samples
                 using maximum likelihood in addition to training it on all samples using
                 atomic loss. The extra MLE loss helps prevent density leaking with
