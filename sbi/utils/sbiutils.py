@@ -2,12 +2,12 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 import logging
-from typing import Tuple, Dict, Sequence, Any
+from typing import Any, Dict, List, Sequence, Tuple
 
-from pyknos.nflows import transforms
 import torch
-from torch import Tensor, as_tensor, ones
 import torch.nn as nn
+from pyknos.nflows import transforms
+from torch import Tensor, as_tensor, ones
 from tqdm.auto import tqdm
 
 
@@ -216,3 +216,20 @@ def warn_on_invalid_x(num_nans: int, num_infs: int, exclude_invalid_x: bool) -> 
                 f"Found {num_nans} NaN simulations and {num_infs} Inf simulations. "
                 "Training might fail. Consider setting `exclude_invalid_x=True`."
             )
+
+
+def get_data_after_round(
+    data: List, data_round_index: List, starting_round: int
+) -> Tensor:
+    """
+    Returns tensor with all data coming from a round >= `starting_round`.
+
+    Args:
+        data: Each list entry contains a set of data (either parameters, simulation
+            outputs, or prior masks).
+        data_round_index: List with same length as data, each entry is an integer that
+            indicates which round the data is from.
+        starting_round: From which round onwards to return the data. We start
+            counting from 0.
+    """
+    return torch.cat([t for t, r in zip(data, data_round_index) if r >= starting_round])
