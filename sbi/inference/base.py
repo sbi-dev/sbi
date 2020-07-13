@@ -21,7 +21,7 @@ from sbi.user_input.user_input_checks import prepare_for_sbi, process_x
 from sbi.utils import get_log_root, handle_invalid_x, warn_on_invalid_x
 from sbi.utils.plot import pairplot
 from sbi.utils.torchutils import configure_default_device
-from sbi.utils.sbiutils import get_data_after_round, mask_sims_from_prior
+from sbi.utils.sbiutils import get_data_since_round, mask_sims_from_prior
 
 
 def infer(
@@ -168,9 +168,9 @@ class NeuralInference(ABC):
             from_round: Which round the data was simulated from. `from_round=0` means
                 that the data came from the first round.
         """
-        self._append_to_round_bank(theta, x, from_round)
+        self._append_to_data_bank(theta, x, from_round)
 
-    def _append_to_round_bank(self, theta: Tensor, x: Tensor, round_: int) -> None:
+    def _append_to_data_bank(self, theta: Tensor, x: Tensor, from_round: int) -> None:
         r"""
         Store data in as entries in a list for each type of variable (parameter/data).
 
@@ -181,16 +181,16 @@ class NeuralInference(ABC):
         Args:
             theta: Parameter sets.
             x: Simulated data.
-            round_: What round the $(\theta, x)$ pairs are coming from. We start
+            from_round: What round the $(\theta, x)$ pairs are coming from. We start
                 counting from round 0.
         """
 
         self._theta_roundwise.append(theta)
         self._x_roundwise.append(x)
-        self._prior_masks.append(mask_sims_from_prior(round_, theta.size(0)))
-        self._data_round_index.append(round_)
+        self._prior_masks.append(mask_sims_from_prior(from_round, theta.size(0)))
+        self._data_round_index.append(from_round)
 
-    def _get_from_round_bank(
+    def _get_from_data_bank(
         self,
         starting_round: int = 0,
         exclude_invalid_x: bool = True,
@@ -212,13 +212,13 @@ class NeuralInference(ABC):
         Returns: Parameters, simulation outputs, prior masks.
         """
 
-        theta = get_data_after_round(
+        theta = get_data_since_round(
             self._theta_roundwise, self._data_round_index, starting_round
         )
-        x = get_data_after_round(
+        x = get_data_since_round(
             self._x_roundwise, self._data_round_index, starting_round
         )
-        prior_masks = get_data_after_round(
+        prior_masks = get_data_since_round(
             self._prior_masks, self._data_round_index, starting_round
         )
 
@@ -245,8 +245,6 @@ class NeuralInference(ABC):
 
         if round_ == 0:
             theta = self._prior.sample((num_sims,))
-
-            x = self._batched_simulator(theta)
         else:
             theta = self._posterior.sample(
                 (num_sims,),
@@ -254,7 +252,7 @@ class NeuralInference(ABC):
                 show_progress_bars=self._show_progress_bars,
             )
 
-            x = self._batched_simulator(theta)
+        x = self._batched_simulator(theta)
 
         return theta, x
 
