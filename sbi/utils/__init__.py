@@ -12,6 +12,7 @@ from sbi.utils.sbiutils import (
     handle_invalid_x,
     warn_on_invalid_x,
     x_shape_from_simulation,
+    get_data_after_round,
 )
 from sbi.utils.torchutils import (
     BoxUniform,

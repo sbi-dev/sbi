@@ -21,6 +21,7 @@ from sbi.user_input.user_input_checks import prepare_for_sbi, process_x
 from sbi.utils import get_log_root, handle_invalid_x, warn_on_invalid_x
 from sbi.utils.plot import pairplot
 from sbi.utils.torchutils import configure_default_device
+from sbi.utils.sbiutils import get_data_after_round
 
 
 def infer(
@@ -211,9 +212,15 @@ class NeuralInference(ABC):
         Returns: Parameters, simulation outputs, prior masks.
         """
 
-        theta = self._get_data_after_round(self._theta_roundwise, starting_round)
-        x = self._get_data_after_round(self._x_roundwise, starting_round)
-        prior_masks = self._get_data_after_round(self._prior_masks, starting_round)
+        theta = get_data_after_round(
+            self._theta_roundwise, self._data_round_index, starting_round
+        )
+        x = get_data_after_round(
+            self._x_roundwise, self._data_round_index, starting_round
+        )
+        prior_masks = get_data_after_round(
+            self._prior_masks, self._data_round_index, starting_round
+        )
 
         # Check for NaNs in simulations.
         is_valid_x, num_nans, num_infs = handle_invalid_x(x, exclude_invalid_x)
@@ -221,20 +228,6 @@ class NeuralInference(ABC):
             warn_on_invalid_x(num_nans, num_infs, exclude_invalid_x)
 
         return theta[is_valid_x], x[is_valid_x], prior_masks[is_valid_x]
-
-    def _get_data_after_round(self, data: List, starting_round: int) -> Tensor:
-        """
-        Returns tensor with all data coming from a round >= `starting_round`.
-
-        Args:
-            data: Each list entry contains a set of data (either parameters, simulation
-                outputs, or prior masks).
-            starting_round: From which round onwards to return the data. We start
-                counting from 0.
-        """
-        return torch.cat(
-            [t for t, r in zip(data, self._data_round_index) if r >= starting_round]
-        )
 
     def _run_simulations(self, round_: int, num_sims: int,) -> Tuple[Tensor, Tensor]:
         r"""
