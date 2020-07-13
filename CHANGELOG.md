@@ -1,3 +1,12 @@
+# v0.10.0
+
+- Added option to pass external data (#264)
+- Added setters for MCMC parameters (#267)
+- Added check for `density_estimator` argument (#263)
+- Fixed `NeuralPosterior` pickling error (#265)
+- Added code coverage reporting (#269)
+
+
 # v0.9.0
 
 - Added ABC methods (#250)
