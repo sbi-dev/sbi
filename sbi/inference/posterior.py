@@ -66,9 +66,16 @@ class NeuralPosterior:
                 and SNL, but can also be set to `True` for SNPE if MCMC is preferred to
                 deal with leakage over rejection sampling.
             mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`, `hmc`, `nuts`.
-            mcmc_parameters: Dictionary overriding the default parameters for MCMC,
-                such as `thin` or `warumup_steps`. See signature of `_sample_posterior_mcmc`
-                for default values.
+                Currently defaults to `slice_np` for a custom numpy implementation of
+                slice sampling; select `hmc`, `nuts` or `slice` for Pyro-based sampling.
+            mcmc_parameters: Dictionary overriding the default parameters for MCMC.
+                The following parameters are supported: `thin` to set the thinning
+                factor for the chain, `warmup_steps` to set the initial number of
+                samples to discard, `num_chains` for the number of chains, `init_strategy`
+                for the initialisation strategy for chains; `prior` will draw init
+                locations from prior, whereas `sir` will use Sequential-Importance-
+                Resampling using `init_strategy_num_candidates` to find init
+                locations.
             get_potential_function: Callable that returns the potential function used
                 for MCMC sampling.
         """
@@ -138,7 +145,7 @@ class NeuralPosterior:
         self.set_mcmc_method(method)
 
     def set_mcmc_method(self, method: str) -> "NeuralPosterior":
-        """Set sampling method to for MCMC.
+        """Sets sampling method to for MCMC and returns `NeuralPosterior`.
 
         Args:
             method: Method to use.
@@ -163,10 +170,18 @@ class NeuralPosterior:
         self.set_mcmc_parameters(parameters)
 
     def set_mcmc_parameters(self, parameters: Dict[str, Any]) -> "NeuralPosterior":
-        """Set parameters for MCMC.
+        """Sets parameters for MCMC and returns `NeuralPosterior`.
 
         Args:
-            parameters: MCMC parameters to use.
+            parameters: Dictionary overriding the default parameters for MCMC.
+                The following parameters are supported: `thin` to set the thinning
+                factor for the chain, `warmup_steps` to set the initial number of
+                samples to discard, `num_chains` for the number of chains, `init_strategy`
+                for the initialisation strategy for chains; `prior` will draw init
+                locations from prior, whereas `sir` will use Sequential-Importance-
+                Resampling using `init_strategy_num_candidates` to find init
+                locations.
+
 
         Returns:
             `NeuralPosterior` for chainable calls.
@@ -184,15 +199,11 @@ class NeuralPosterior:
         """See `set_sample_with_mcmc`."""
         self.set_sample_with_mcmc(value)
 
-    def set_sample_with_mcmc(self, value: bool) -> "NeuralPosterior":
-        """Turns MCMC sampling on or off.
-
-        Configures `NeuralPosterior` instance to use/not use MCMC for sampling.
-        MCMC method and respective settings can be set upon calling `.__init__()`
-        or `.sample()`.
+    def set_sample_with_mcmc(self, use_mcmc: bool) -> "NeuralPosterior":
+        """Turns MCMC sampling on or off and returns `NeuralPosterior`.
 
         Args:
-            value: Flag to set whether or not MCMC sampling is used.
+            use_mcmc: Flag to set whether or not MCMC sampling is used.
 
         Returns:
             `NeuralPosterior` for chainable calls.
@@ -201,10 +212,10 @@ class NeuralPosterior:
             `ValueError` on attempt to turn off MCMC sampling for family of methods
             that do not support rejection sampling.
         """
-        if not value:
-            if self._method_family not in "snpe":
+        if not use_mcmc:
+            if self._method_family not in ["snpe"]:
                 raise ValueError(f"{self._method_family} cannot use MCMC for sampling.")
-        self._sample_with_mcmc = value
+        self._sample_with_mcmc = use_mcmc
         return self
 
     def log_prob(
@@ -396,9 +407,14 @@ class NeuralPosterior:
             show_progress_bars: Whether to show sampling progress monitor.
             sample_with_mcmc: Optional parameter to override `self.sample_with_mcmc`.
             mcmc_method: Optional parameter to override `self.mcmc_method`.
-            mcmc_parameters: Dictionary overriding the default parameters for MCMC,
-                such as `thin` or `warumup_steps`. See signature of `_sample_posterior_mcmc`
-                for default values.
+            mcmc_parameters: Dictionary overriding the default parameters for MCMC.
+                The following parameters are supported: `thin` to set the thinning
+                factor for the chain, `warmup_steps` to set the initial number of
+                samples to discard, `num_chains` for the number of chains, `init_strategy`
+                for the initialisation strategy for chains; `prior` will draw init
+                locations from prior, whereas `sir` will use Sequential-Importance-
+                Resampling using `init_strategy_num_candidates` to find init
+                locations.
 
         Returns:
             Samples from posterior.
