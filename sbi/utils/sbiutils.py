@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Sequence, Tuple
 import torch
 import torch.nn as nn
 from pyknos.nflows import transforms
-from torch import Tensor, as_tensor, ones
+from torch import Tensor, as_tensor, ones, zeros
 from tqdm.auto import tqdm
 
 
@@ -233,3 +233,17 @@ def get_data_after_round(
             counting from 0.
     """
     return torch.cat([t for t, r in zip(data, data_round_index) if r >= starting_round])
+
+
+def mask_sims_from_prior(round_: int, num_simulations: int) -> Tensor:
+    """Returns Tensor True where simulated from prior parameters.
+
+    Args:
+        round_: Current training round, starting at 0.
+        num_simulations: Actually performed simulations. This number can be below
+            the one fixed for the round if leakage correction through sampling is
+            active and `patience` is not enough to reach it.
+    """
+
+    prior_mask_values = ones if round_ == 0 else zeros
+    return prior_mask_values((num_simulations, 1), dtype=torch.bool)
