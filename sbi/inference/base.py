@@ -21,7 +21,7 @@ from sbi.user_input.user_input_checks import prepare_for_sbi, process_x
 from sbi.utils import get_log_root, handle_invalid_x, warn_on_invalid_x
 from sbi.utils.plot import pairplot
 from sbi.utils.torchutils import configure_default_device
-from sbi.utils.sbiutils import get_data_after_round
+from sbi.utils.sbiutils import get_data_after_round, mask_sims_from_prior
 
 
 def infer(
@@ -187,7 +187,7 @@ class NeuralInference(ABC):
 
         self._theta_roundwise.append(theta)
         self._x_roundwise.append(x)
-        self._prior_masks.append(self._mask_sims_from_prior(round_, theta.size(0)))
+        self._prior_masks.append(mask_sims_from_prior(round_, theta.size(0)))
         self._data_round_index.append(round_)
 
     def _get_from_round_bank(
@@ -288,19 +288,6 @@ class NeuralInference(ABC):
             converged = True
 
         return converged
-
-    def _mask_sims_from_prior(self, round_: int, num_simulations: int) -> Tensor:
-        """Returns Tensor True where simulated from prior parameters.
-
-        Args:
-            round_: Current training round, starting at 0.
-            num_simulations: Actually performed simulations. This number can be below
-                the one fixed for the round if leakage correction through sampling is
-                active and `patience` is not enough to reach it.
-        """
-
-        prior_mask_values = ones if round_ == 0 else zeros
-        return prior_mask_values((num_simulations, 1), dtype=torch.bool)
 
     def _default_summary_writer(self) -> SummaryWriter:
         """Return summary writer logging to method- and simulator-specific directory."""

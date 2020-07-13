@@ -13,6 +13,7 @@ from sbi.utils.sbiutils import (
     warn_on_invalid_x,
     x_shape_from_simulation,
     get_data_after_round,
+    mask_sims_from_prior,
 )
 from sbi.utils.torchutils import (
     BoxUniform,
