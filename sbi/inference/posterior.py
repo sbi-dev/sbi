@@ -122,7 +122,9 @@ class NeuralPosterior:
         Returns:
             `NeuralPosterior` that will use a default `x` when not explicitly passed.
         """
-
+        processed_x = process_x(x, self._x_shape)
+        self._warn_if_posterior_was_focused_on_different_x(processed_x)
+        self._x = processed_x
         return self
 
     @property
