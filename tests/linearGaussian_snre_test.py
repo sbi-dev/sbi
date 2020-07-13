@@ -47,7 +47,7 @@ def test_api_sre_on_linearGaussian(num_dim: int):
 
     posterior = infer(num_rounds=1, num_simulations_per_round=1000, max_num_epochs=5)
 
-    posterior.sample(sample_shape=(10,), x=x_o, num_chains=2)
+    posterior.sample(sample_shape=(10,), x=x_o, mcmc_parameters={"num_chains": 2})
 
 
 def test_c2st_sre_on_linearGaussian_different_dims(set_seed):
