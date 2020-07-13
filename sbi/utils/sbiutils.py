@@ -218,8 +218,8 @@ def warn_on_invalid_x(num_nans: int, num_infs: int, exclude_invalid_x: bool) -> 
             )
 
 
-def get_data_after_round(
-    data: List, data_round_index: List, starting_round: int
+def get_data_since_round(
+    data: List, data_round_indices: List, starting_round_index: int
 ) -> Tensor:
     """
     Returns tensor with all data coming from a round >= `starting_round`.
@@ -227,12 +227,14 @@ def get_data_after_round(
     Args:
         data: Each list entry contains a set of data (either parameters, simulation
             outputs, or prior masks).
-        data_round_index: List with same length as data, each entry is an integer that
+        data_round_indices: List with same length as data, each entry is an integer that
             indicates which round the data is from.
-        starting_round: From which round onwards to return the data. We start
+        starting_round_index: From which round onwards to return the data. We start
             counting from 0.
     """
-    return torch.cat([t for t, r in zip(data, data_round_index) if r >= starting_round])
+    return torch.cat(
+        [t for t, r in zip(data, data_round_indices) if r >= starting_round_index]
+    )
 
 
 def mask_sims_from_prior(round_: int, num_simulations: int) -> Tensor:

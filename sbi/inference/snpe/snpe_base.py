@@ -161,10 +161,10 @@ class PosteriorEstimator(NeuralInference, ABC):
 
             # Run simulations for the round.
             theta, x = self._run_simulations(round_, num_sims)
-            self._append_to_round_bank(theta, x, round_)
+            self._append_to_data_bank(theta, x, round_)
 
             # Load data from most recent round.
-            theta, x, _ = self._get_from_round_bank(round_, exclude_invalid_x, False)
+            theta, x, _ = self._get_from_data_bank(round_, exclude_invalid_x, False)
 
             # First round or if retraining from scratch:
             # Call the `self._build_neural_net` with the rounds' thetas and xs as
@@ -262,7 +262,7 @@ class PosteriorEstimator(NeuralInference, ABC):
 
         # Starting index for the training set (1 = discard round-0 samples).
         start_idx = int(discard_prior_samples and round_ > 0)
-        theta, x, prior_masks = self._get_from_round_bank(start_idx, exclude_invalid_x)
+        theta, x, prior_masks = self._get_from_data_bank(start_idx, exclude_invalid_x)
 
         # Select random neural net and validation splits from (theta, x) pairs.
         num_total_examples = len(theta)
