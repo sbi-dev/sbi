@@ -4,6 +4,7 @@
 - Added setters for MCMC parameters (#267)
 - Added check for `density_estimator` argument (#263)
 - Fixed `NeuralPosterior` pickling error (#265)
+- Added code coverage reporting (#269)
 
 
 # v0.9.0
