@@ -504,8 +504,7 @@ runtime, but a better posterior estimate.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>26
-27
+<pre><span></span>27
 28
 29
 30
@@ -548,7 +547,8 @@ runtime, but a better posterior estimate.</p>
 67
 68
 69
-70</pre>
+70
+71</pre>
 </div>
 </td>
 <td class="code">
@@ -929,17 +929,7 @@ estimator for the posterior from scratch each round.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span> 88
- 89
- 90
- 91
- 92
- 93
- 94
- 95
- 96
- 97
- 98
+<pre><span></span> 98
  99
 100
 101
@@ -996,7 +986,17 @@ estimator for the posterior from scratch each round.</p>
 152
 153
 154
-155</pre>
+155
+156
+157
+158
+159
+160
+161
+162
+163
+164
+165</pre>
 </div>
 </td>
 <td class="code">
@@ -1080,7 +1080,7 @@ estimator for the posterior from scratch each round.</p>
 <div class="doc doc-object doc-method">
 <h4 class="doc doc-heading" data-toc-label="__init__()" id="sbi.inference.snpe.snpe_c.SNPE_C.__init__">
 <code class="highlight language-python">
-__init__<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">simulation_batch_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="s1">'maf'</span><span class="p">,</span> <span class="n">sample_with_mcmc</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">mcmc_method</span><span class="o">=</span><span class="s1">'slice_np'</span><span class="p">,</span> <span class="n">use_combined_loss</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s1">'cpu'</span><span class="p">,</span> <span class="n">logging_level</span><span class="o">=</span><span class="s1">'WARNING'</span><span class="p">,</span> <span class="n">summary_writer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">show_round_summary</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> </code>
+__init__<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">simulation_batch_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="s1">'maf'</span><span class="p">,</span> <span class="n">sample_with_mcmc</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">mcmc_method</span><span class="o">=</span><span class="s1">'slice_np'</span><span class="p">,</span> <span class="n">mcmc_parameters</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">use_combined_loss</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s1">'cpu'</span><span class="p">,</span> <span class="n">logging_level</span><span class="o">=</span><span class="s1">'WARNING'</span><span class="p">,</span> <span class="n">summary_writer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">show_round_summary</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> </code>
 <span class="doc doc-properties">
 <small class="doc doc-property doc-property-special"><code>special</code></small>
 </span>
@@ -1143,7 +1143,7 @@ same time. If &gt;= 1, the simulator has to process data of shape
 </tr>
 <tr>
 <td><code>density_estimator</code></td>
-<td><code>Union[str, nn.Module]</code></td>
+<td><code>Union[str, Callable]</code></td>
 <td>
 <p>If it is a string, use a pre-configured network of the
 provided type (one of nsf, maf, mdn, made). Alternatively, a function
@@ -1169,10 +1169,26 @@ with high leakage.</p>
 <td><code>mcmc_method</code></td>
 <td><code>str</code></td>
 <td>
-<p>If MCMC sampling is used, specify the method here: either of
-slice_np, slice, hmc, nuts.</p>
+<p>Method used for MCMC sampling, one of <code>slice_np</code>, <code>slice</code>, <code>hmc</code>, <code>nuts</code>.
+Currently defaults to <code>slice_np</code> for a custom numpy implementation of
+slice sampling; select <code>hmc</code>, <code>nuts</code> or <code>slice</code> for Pyro-based sampling.</p>
 </td>
 <td><code>'slice_np'</code></td>
+</tr>
+<tr>
+<td><code>mcmc_parameters</code></td>
+<td><code>Optional[Dict[str, Any]]</code></td>
+<td>
+<p>Dictionary overriding the default parameters for MCMC.
+The following parameters are supported: <code>thin</code> to set the thinning
+factor for the chain, <code>warmup_steps</code> to set the initial number of
+samples to discard, <code>num_chains</code> for the number of chains, <code>init_strategy</code>
+for the initialisation strategy for chains; <code>prior</code> will draw init
+locations from prior, whereas <code>sir</code> will use Sequential-Importance-
+Resampling using <code>init_strategy_num_candidates</code> to find init
+locations.</p>
+</td>
+<td><code>None</code></td>
 </tr>
 <tr>
 <td><code>use_combined_loss</code></td>
@@ -1304,7 +1320,17 @@ each round.</p>
 83
 84
 85
-86</pre>
+86
+87
+88
+89
+90
+91
+92
+93
+94
+95
+96</pre>
 </div>
 </td>
 <td class="code">
@@ -1315,9 +1341,10 @@ each round.</p>
     <span class="n">prior</span><span class="p">,</span>
     <span class="n">num_workers</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
     <span class="n">simulation_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
-    <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"maf"</span><span class="p">,</span>
+    <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"maf"</span><span class="p">,</span>
     <span class="n">sample_with_mcmc</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">mcmc_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"slice_np"</span><span class="p">,</span>
+    <span class="n">mcmc_parameters</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">use_combined_loss</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"cpu"</span><span class="p">,</span>
     <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"WARNING"</span><span class="p">,</span>
@@ -1354,8 +1381,17 @@ each round.</p>
 <span class="sd">            `.log_prob` and `.sample()`.</span>
 <span class="sd">        sample_with_mcmc: Whether to sample with MCMC. MCMC can be used to deal</span>
 <span class="sd">            with high leakage.</span>
-<span class="sd">        mcmc_method: If MCMC sampling is used, specify the method here: either of</span>
-<span class="sd">            slice_np, slice, hmc, nuts.</span>
+<span class="sd">        mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`, `hmc`, `nuts`.</span>
+<span class="sd">            Currently defaults to `slice_np` for a custom numpy implementation of</span>
+<span class="sd">            slice sampling; select `hmc`, `nuts` or `slice` for Pyro-based sampling.</span>
+<span class="sd">        mcmc_parameters: Dictionary overriding the default parameters for MCMC.</span>
+<span class="sd">            The following parameters are supported: `thin` to set the thinning</span>
+<span class="sd">            factor for the chain, `warmup_steps` to set the initial number of</span>
+<span class="sd">            samples to discard, `num_chains` for the number of chains, `init_strategy`</span>
+<span class="sd">            for the initialisation strategy for chains; `prior` will draw init</span>
+<span class="sd">            locations from prior, whereas `sir` will use Sequential-Importance-</span>
+<span class="sd">            Resampling using `init_strategy_num_candidates` to find init</span>
+<span class="sd">            locations.</span>
 <span class="sd">        use_combined_loss: Whether to train the neural net also on prior samples</span>
 <span class="sd">            using maximum likelihood in addition to training it on all samples using</span>
 <span class="sd">            atomic loss. The extra MLE loss helps prevent density leaking with</span>
@@ -1554,17 +1590,7 @@ estimator for the posterior from scratch each round.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span> 77
- 78
- 79
- 80
- 81
- 82
- 83
- 84
- 85
- 86
- 87
+<pre><span></span> 87
  88
  89
  90
@@ -1608,7 +1634,17 @@ estimator for the posterior from scratch each round.</p>
 128
 129
 130
-131</pre>
+131
+132
+133
+134
+135
+136
+137
+138
+139
+140
+141</pre>
 </div>
 </td>
 <td class="code">
@@ -1679,7 +1715,7 @@ estimator for the posterior from scratch each round.</p>
 <div class="doc doc-object doc-method">
 <h4 class="doc doc-heading" data-toc-label="__init__()" id="sbi.inference.snle.snle_a.SNLE_A.__init__">
 <code class="highlight language-python">
-__init__<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">simulation_batch_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="s1">'maf'</span><span class="p">,</span> <span class="n">mcmc_method</span><span class="o">=</span><span class="s1">'slice_np'</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s1">'cpu'</span><span class="p">,</span> <span class="n">logging_level</span><span class="o">=</span><span class="s1">'WARNING'</span><span class="p">,</span> <span class="n">summary_writer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">show_round_summary</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> </code>
+__init__<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">simulation_batch_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="s1">'maf'</span><span class="p">,</span> <span class="n">mcmc_method</span><span class="o">=</span><span class="s1">'slice_np'</span><span class="p">,</span> <span class="n">mcmc_parameters</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s1">'cpu'</span><span class="p">,</span> <span class="n">logging_level</span><span class="o">=</span><span class="s1">'WARNING'</span><span class="p">,</span> <span class="n">summary_writer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">show_round_summary</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> </code>
 <span class="doc doc-properties">
 <small class="doc doc-property doc-property-special"><code>special</code></small>
 </span>
@@ -1760,10 +1796,26 @@ estimator. The density estimator needs to provide the methods
 <td><code>mcmc_method</code></td>
 <td><code>str</code></td>
 <td>
-<p>Specify the method for MCMC sampling, either of:
-slice_np, slice, hmc, nuts.</p>
+<p>Method used for MCMC sampling, one of <code>slice_np</code>, <code>slice</code>, <code>hmc</code>, <code>nuts</code>.
+Currently defaults to <code>slice_np</code> for a custom numpy implementation of
+slice sampling; select <code>hmc</code>, <code>nuts</code> or <code>slice</code> for Pyro-based sampling.</p>
 </td>
 <td><code>'slice_np'</code></td>
+</tr>
+<tr>
+<td><code>mcmc_parameters</code></td>
+<td><code>Optional[Dict[str, Any]]</code></td>
+<td>
+<p>Dictionary overriding the default parameters for MCMC.
+The following parameters are supported: <code>thin</code> to set the thinning
+factor for the chain, <code>warmup_steps</code> to set the initial number of
+samples to discard, <code>num_chains</code> for the number of chains, <code>init_strategy</code>
+for the initialisation strategy for chains; <code>prior</code> will draw init
+locations from prior, whereas <code>sir</code> will use Sequential-Importance-
+Resampling using <code>init_strategy_num_candidates</code> to find init
+locations.</p>
+</td>
+<td><code>None</code></td>
 </tr>
 <tr>
 <td><code>device</code></td>
@@ -1873,7 +1925,17 @@ each round.</p>
 72
 73
 74
-75</pre>
+75
+76
+77
+78
+79
+80
+81
+82
+83
+84
+85</pre>
 </div>
 </td>
 <td class="code">
@@ -1886,6 +1948,7 @@ each round.</p>
     <span class="n">simulation_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
     <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"maf"</span><span class="p">,</span>
     <span class="n">mcmc_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"slice_np"</span><span class="p">,</span>
+    <span class="n">mcmc_parameters</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"cpu"</span><span class="p">,</span>
     <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"WARNING"</span><span class="p">,</span>
     <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">SummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -1920,8 +1983,17 @@ each round.</p>
 <span class="sd">            needs to return a PyTorch `nn.Module` implementing the density</span>
 <span class="sd">            estimator. The density estimator needs to provide the methods</span>
 <span class="sd">            `.log_prob` and `.sample()`.</span>
-<span class="sd">        mcmc_method: Specify the method for MCMC sampling, either of:</span>
-<span class="sd">            slice_np, slice, hmc, nuts.</span>
+<span class="sd">        mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`, `hmc`, `nuts`.</span>
+<span class="sd">            Currently defaults to `slice_np` for a custom numpy implementation of</span>
+<span class="sd">            slice sampling; select `hmc`, `nuts` or `slice` for Pyro-based sampling.</span>
+<span class="sd">        mcmc_parameters: Dictionary overriding the default parameters for MCMC.</span>
+<span class="sd">            The following parameters are supported: `thin` to set the thinning</span>
+<span class="sd">            factor for the chain, `warmup_steps` to set the initial number of</span>
+<span class="sd">            samples to discard, `num_chains` for the number of chains, `init_strategy`</span>
+<span class="sd">            for the initialisation strategy for chains; `prior` will draw init</span>
+<span class="sd">            locations from prior, whereas `sir` will use Sequential-Importance-</span>
+<span class="sd">            Resampling using `init_strategy_num_candidates` to find init</span>
+<span class="sd">            locations.</span>
 <span class="sd">        device: torch device on which to compute, e.g. gpu, cpu.</span>
 <span class="sd">        logging_level: Minimum severity of messages to log. One of the strings</span>
 <span class="sd">            INFO, WARNING, DEBUG, ERROR and CRITICAL.</span>
@@ -2112,17 +2184,7 @@ estimator for the posterior from scratch each round.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span> 72
- 73
- 74
- 75
- 76
- 77
- 78
- 79
- 80
- 81
- 82
+<pre><span></span> 82
  83
  84
  85
@@ -2169,7 +2231,17 @@ estimator for the posterior from scratch each round.</p>
 126
 127
 128
-129</pre>
+129
+130
+131
+132
+133
+134
+135
+136
+137
+138
+139</pre>
 </div>
 </td>
 <td class="code">
@@ -2243,7 +2315,7 @@ estimator for the posterior from scratch each round.</p>
 <div class="doc doc-object doc-method">
 <h4 class="doc doc-heading" data-toc-label="__init__()" id="sbi.inference.snre.snre_a.SNRE_A.__init__">
 <code class="highlight language-python">
-__init__<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">simulation_batch_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">classifier</span><span class="o">=</span><span class="s1">'resnet'</span><span class="p">,</span> <span class="n">mcmc_method</span><span class="o">=</span><span class="s1">'slice_np'</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s1">'cpu'</span><span class="p">,</span> <span class="n">logging_level</span><span class="o">=</span><span class="s1">'warning'</span><span class="p">,</span> <span class="n">summary_writer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">show_round_summary</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> </code>
+__init__<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">simulation_batch_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">classifier</span><span class="o">=</span><span class="s1">'resnet'</span><span class="p">,</span> <span class="n">mcmc_method</span><span class="o">=</span><span class="s1">'slice_np'</span><span class="p">,</span> <span class="n">mcmc_parameters</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s1">'cpu'</span><span class="p">,</span> <span class="n">logging_level</span><span class="o">=</span><span class="s1">'warning'</span><span class="p">,</span> <span class="n">summary_writer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">show_round_summary</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> </code>
 <span class="doc doc-properties">
 <small class="doc doc-property doc-property-special"><code>special</code></small>
 </span>
@@ -2322,10 +2394,26 @@ inference and potentially for z-scoring. It needs to return a PyTorch
 <td><code>mcmc_method</code></td>
 <td><code>str</code></td>
 <td>
-<p>Specify the method for MCMC sampling, either of:
-slice_np, slice, hmc, nuts.</p>
+<p>Method used for MCMC sampling, one of <code>slice_np</code>, <code>slice</code>, <code>hmc</code>, <code>nuts</code>.
+Currently defaults to <code>slice_np</code> for a custom numpy implementation of
+slice sampling; select <code>hmc</code>, <code>nuts</code> or <code>slice</code> for Pyro-based sampling.</p>
 </td>
 <td><code>'slice_np'</code></td>
+</tr>
+<tr>
+<td><code>mcmc_parameters</code></td>
+<td><code>Optional[Dict[str, Any]]</code></td>
+<td>
+<p>Dictionary overriding the default parameters for MCMC.
+The following parameters are supported: <code>thin</code> to set the thinning
+factor for the chain, <code>warmup_steps</code> to set the initial number of
+samples to discard, <code>num_chains</code> for the number of chains, <code>init_strategy</code>
+for the initialisation strategy for chains; <code>prior</code> will draw init
+locations from prior, whereas <code>sir</code> will use Sequential-Importance-
+Resampling using <code>init_strategy_num_candidates</code> to find init
+locations.</p>
+</td>
+<td><code>None</code></td>
 </tr>
 <tr>
 <td><code>device</code></td>
@@ -2433,7 +2521,17 @@ each round.</p>
 67
 68
 69
-70</pre>
+70
+71
+72
+73
+74
+75
+76
+77
+78
+79
+80</pre>
 </div>
 </td>
 <td class="code">
@@ -2446,6 +2544,7 @@ each round.</p>
     <span class="n">simulation_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
     <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"resnet"</span><span class="p">,</span>
     <span class="n">mcmc_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"slice_np"</span><span class="p">,</span>
+    <span class="n">mcmc_parameters</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"cpu"</span><span class="p">,</span>
     <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"warning"</span><span class="p">,</span>
     <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">SummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -2478,8 +2577,17 @@ each round.</p>
 <span class="sd">            first batch of simulations (theta, x), which can thus be used for shape</span>
 <span class="sd">            inference and potentially for z-scoring. It needs to return a PyTorch</span>
 <span class="sd">            `nn.Module` implementing the classifier.</span>
-<span class="sd">        mcmc_method: Specify the method for MCMC sampling, either of:</span>
-<span class="sd">            slice_np, slice, hmc, nuts.</span>
+<span class="sd">        mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`, `hmc`, `nuts`.</span>
+<span class="sd">            Currently defaults to `slice_np` for a custom numpy implementation of</span>
+<span class="sd">            slice sampling; select `hmc`, `nuts` or `slice` for Pyro-based sampling.</span>
+<span class="sd">        mcmc_parameters: Dictionary overriding the default parameters for MCMC.</span>
+<span class="sd">            The following parameters are supported: `thin` to set the thinning</span>
+<span class="sd">            factor for the chain, `warmup_steps` to set the initial number of</span>
+<span class="sd">            samples to discard, `num_chains` for the number of chains, `init_strategy`</span>
+<span class="sd">            for the initialisation strategy for chains; `prior` will draw init</span>
+<span class="sd">            locations from prior, whereas `sir` will use Sequential-Importance-</span>
+<span class="sd">            Resampling using `init_strategy_num_candidates` to find init</span>
+<span class="sd">            locations.</span>
 <span class="sd">        device: torch device on which to compute, e.g. gpu, cpu.</span>
 <span class="sd">        logging_level: Minimum severity of messages to log. One of the strings</span>
 <span class="sd">            INFO, WARNING, DEBUG, ERROR and CRITICAL.</span>
@@ -2670,17 +2778,7 @@ estimator for the posterior from scratch each round.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span> 72
- 73
- 74
- 75
- 76
- 77
- 78
- 79
- 80
- 81
- 82
+<pre><span></span> 82
  83
  84
  85
@@ -2725,7 +2823,17 @@ estimator for the posterior from scratch each round.</p>
 124
 125
 126
-127</pre>
+127
+128
+129
+130
+131
+132
+133
+134
+135
+136
+137</pre>
 </div>
 </td>
 <td class="code">
@@ -2797,7 +2905,7 @@ estimator for the posterior from scratch each round.</p>
 <div class="doc doc-object doc-method">
 <h4 class="doc doc-heading" data-toc-label="__init__()" id="sbi.inference.snre.snre_b.SNRE_B.__init__">
 <code class="highlight language-python">
-__init__<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">simulation_batch_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">classifier</span><span class="o">=</span><span class="s1">'resnet'</span><span class="p">,</span> <span class="n">mcmc_method</span><span class="o">=</span><span class="s1">'slice_np'</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s1">'cpu'</span><span class="p">,</span> <span class="n">logging_level</span><span class="o">=</span><span class="s1">'warning'</span><span class="p">,</span> <span class="n">summary_writer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">show_round_summary</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> </code>
+__init__<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">simulation_batch_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">classifier</span><span class="o">=</span><span class="s1">'resnet'</span><span class="p">,</span> <span class="n">mcmc_method</span><span class="o">=</span><span class="s1">'slice_np'</span><span class="p">,</span> <span class="n">mcmc_parameters</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s1">'cpu'</span><span class="p">,</span> <span class="n">logging_level</span><span class="o">=</span><span class="s1">'warning'</span><span class="p">,</span> <span class="n">summary_writer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">show_round_summary</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> </code>
 <span class="doc doc-properties">
 <small class="doc doc-property doc-property-special"><code>special</code></small>
 </span>
@@ -2876,10 +2984,26 @@ inference and potentially for z-scoring. It needs to return a PyTorch
 <td><code>mcmc_method</code></td>
 <td><code>str</code></td>
 <td>
-<p>Specify the method for MCMC sampling, either of:
-slice_np, slice, hmc, nuts.</p>
+<p>Method used for MCMC sampling, one of <code>slice_np</code>, <code>slice</code>, <code>hmc</code>, <code>nuts</code>.
+Currently defaults to <code>slice_np</code> for a custom numpy implementation of
+slice sampling; select <code>hmc</code>, <code>nuts</code> or <code>slice</code> for Pyro-based sampling.</p>
 </td>
 <td><code>'slice_np'</code></td>
+</tr>
+<tr>
+<td><code>mcmc_parameters</code></td>
+<td><code>Optional[Dict[str, Any]]</code></td>
+<td>
+<p>Dictionary overriding the default parameters for MCMC.
+The following parameters are supported: <code>thin</code> to set the thinning
+factor for the chain, <code>warmup_steps</code> to set the initial number of
+samples to discard, <code>num_chains</code> for the number of chains, <code>init_strategy</code>
+for the initialisation strategy for chains; <code>prior</code> will draw init
+locations from prior, whereas <code>sir</code> will use Sequential-Importance-
+Resampling using <code>init_strategy_num_candidates</code> to find init
+locations.</p>
+</td>
+<td><code>None</code></td>
 </tr>
 <tr>
 <td><code>device</code></td>
@@ -2987,7 +3111,17 @@ each round.</p>
 67
 68
 69
-70</pre>
+70
+71
+72
+73
+74
+75
+76
+77
+78
+79
+80</pre>
 </div>
 </td>
 <td class="code">
@@ -3000,6 +3134,7 @@ each round.</p>
     <span class="n">simulation_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
     <span class="n">classifier</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"resnet"</span><span class="p">,</span>
     <span class="n">mcmc_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"slice_np"</span><span class="p">,</span>
+    <span class="n">mcmc_parameters</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"cpu"</span><span class="p">,</span>
     <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"warning"</span><span class="p">,</span>
     <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">SummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -3032,8 +3167,17 @@ each round.</p>
 <span class="sd">            first batch of simulations (theta, x), which can thus be used for shape</span>
 <span class="sd">            inference and potentially for z-scoring. It needs to return a PyTorch</span>
 <span class="sd">            `nn.Module` implementing the classifier.</span>
-<span class="sd">        mcmc_method: Specify the method for MCMC sampling, either of:</span>
-<span class="sd">            slice_np, slice, hmc, nuts.</span>
+<span class="sd">        mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`, `hmc`, `nuts`.</span>
+<span class="sd">            Currently defaults to `slice_np` for a custom numpy implementation of</span>
+<span class="sd">            slice sampling; select `hmc`, `nuts` or `slice` for Pyro-based sampling.</span>
+<span class="sd">        mcmc_parameters: Dictionary overriding the default parameters for MCMC.</span>
+<span class="sd">            The following parameters are supported: `thin` to set the thinning</span>
+<span class="sd">            factor for the chain, `warmup_steps` to set the initial number of</span>
+<span class="sd">            samples to discard, `num_chains` for the number of chains, `init_strategy`</span>
+<span class="sd">            for the initialisation strategy for chains; `prior` will draw init</span>
+<span class="sd">            locations from prior, whereas `sir` will use Sequential-Importance-</span>
+<span class="sd">            Resampling using `init_strategy_num_candidates` to find init</span>
+<span class="sd">            locations.</span>
 <span class="sd">        device: torch device on which to compute, e.g. gpu, cpu.</span>
 <span class="sd">        logging_level: Minimum severity of messages to log. One of the strings</span>
 <span class="sd">            INFO, WARNING, DEBUG, ERROR and CRITICAL.</span>
@@ -3805,7 +3949,7 @@ summary (optional): A dictionary containing particles, weights, epsilons
     <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
         <span class="p">(</span>
             <span class="sa">f</span><span class="s2">"population=</span><span class="si">{</span><span class="n">pop_idx</span><span class="si">}</span><span class="s2">, eps=</span><span class="si">{</span><span class="n">epsilon</span><span class="si">}</span><span class="s2">, ess=</span><span class="si">{</span><span class="mf">1.0</span><span class="si">}</span><span class="s2">, "</span>
-            <span class="s2">"num_sims=</span><span class="si">{num_initial_pop}</span><span class="s2">"</span>
+            <span class="sa">f</span><span class="s2">"num_sims=</span><span class="si">{</span><span class="n">num_initial_pop</span><span class="si">}</span><span class="s2">"</span>
         <span class="p">)</span>
     <span class="p">)</span>
 
@@ -3850,7 +3994,7 @@ summary (optional): A dictionary containing particles, weights, epsilons
         <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
             <span class="p">(</span>
                 <span class="sa">f</span><span class="s2">"population=</span><span class="si">{</span><span class="n">pop_idx</span><span class="si">}</span><span class="s2"> done: eps=</span><span class="si">{</span><span class="n">epsilon</span><span class="si">:</span><span class="s2">.6f</span><span class="si">}</span><span class="s2">,"</span>
-                <span class="s2">" num_sims=</span><span class="si">{self.simulation_counter}</span><span class="s2">, acc=</span><span class="si">{acc:.4f}</span><span class="s2">."</span>
+                <span class="sa">f</span><span class="s2">" num_sims=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">simulation_counter</span><span class="si">}</span><span class="s2">."</span>
             <span class="p">)</span>
         <span class="p">)</span>
 
@@ -4402,10 +4546,49 @@ default_x: <span class="n">Optional</span><span class="p">[</span><span class="n
 <p>Return default x used by <code>.sample(), .log_prob</code> as conditioning context.</p>
 </div>
 </div>
+<div class="doc doc-object doc-attribute">
+<h4 class="doc doc-heading" data-toc-label="mcmc_method" id="sbi.inference.posterior.NeuralPosterior.mcmc_method">
+<code class="highlight">
+mcmc_method: <span class="nb">str</span> </code>
+<span class="doc doc-properties">
+<small class="doc doc-property doc-property-property"><code>property</code></small>
+<small class="doc doc-property doc-property-writable"><code>writable</code></small>
+</span>
+</h4>
+<div class="doc doc-contents">
+<p>Returns MCMC method.</p>
+</div>
+</div>
+<div class="doc doc-object doc-attribute">
+<h4 class="doc doc-heading" data-toc-label="mcmc_parameters" id="sbi.inference.posterior.NeuralPosterior.mcmc_parameters">
+<code class="highlight">
+mcmc_parameters: <span class="nb">dict</span> </code>
+<span class="doc doc-properties">
+<small class="doc doc-property doc-property-property"><code>property</code></small>
+<small class="doc doc-property doc-property-writable"><code>writable</code></small>
+</span>
+</h4>
+<div class="doc doc-contents">
+<p>Returns MCMC parameters.</p>
+</div>
+</div>
+<div class="doc doc-object doc-attribute">
+<h4 class="doc doc-heading" data-toc-label="sample_with_mcmc" id="sbi.inference.posterior.NeuralPosterior.sample_with_mcmc">
+<code class="highlight">
+sample_with_mcmc: <span class="nb">bool</span> </code>
+<span class="doc doc-properties">
+<small class="doc doc-property doc-property-property"><code>property</code></small>
+<small class="doc doc-property doc-property-writable"><code>writable</code></small>
+</span>
+</h4>
+<div class="doc doc-contents">
+<p>Return <code>True</code> if NeuralPosterior instance is configured to use MCMC in <code>.sample()</code>.</p>
+</div>
+</div>
 <div class="doc doc-object doc-method">
 <h4 class="doc doc-heading" data-toc-label="__init__()" id="sbi.inference.posterior.NeuralPosterior.__init__">
 <code class="highlight language-python">
-__init__<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">method_family</span><span class="p">,</span> <span class="n">neural_net</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">x_shape</span><span class="p">,</span> <span class="n">sample_with_mcmc</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">mcmc_method</span><span class="o">=</span><span class="s1">'slice_np'</span><span class="p">,</span> <span class="n">get_potential_function</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> </code>
+__init__<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">method_family</span><span class="p">,</span> <span class="n">neural_net</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">x_shape</span><span class="p">,</span> <span class="n">sample_with_mcmc</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">mcmc_method</span><span class="o">=</span><span class="s1">'slice_np'</span><span class="p">,</span> <span class="n">mcmc_parameters</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">get_potential_function</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> </code>
 <span class="doc doc-properties">
 <small class="doc doc-property doc-property-special"><code>special</code></small>
 </span>
@@ -4468,10 +4651,26 @@ deal with leakage over rejection sampling.</p>
 <td><code>mcmc_method</code></td>
 <td><code>str</code></td>
 <td>
-<p>If MCMC sampling is used, specify the method here: either of
-slice_np, slice, hmc, nuts.</p>
+<p>Method used for MCMC sampling, one of <code>slice_np</code>, <code>slice</code>, <code>hmc</code>, <code>nuts</code>.
+Currently defaults to <code>slice_np</code> for a custom numpy implementation of
+slice sampling; select <code>hmc</code>, <code>nuts</code> or <code>slice</code> for Pyro-based sampling.</p>
 </td>
 <td><code>'slice_np'</code></td>
+</tr>
+<tr>
+<td><code>mcmc_parameters</code></td>
+<td><code>Optional[Dict[str, Any]]</code></td>
+<td>
+<p>Dictionary overriding the default parameters for MCMC.
+The following parameters are supported: <code>thin</code> to set the thinning
+factor for the chain, <code>warmup_steps</code> to set the initial number of
+samples to discard, <code>num_chains</code> for the number of chains, <code>init_strategy</code>
+for the initialisation strategy for chains; <code>prior</code> will draw init
+locations from prior, whereas <code>sir</code> will use Sequential-Importance-
+Resampling using <code>init_strategy_num_candidates</code> to find init
+locations.</p>
+</td>
+<td><code>None</code></td>
 </tr>
 <tr>
 <td><code>get_potential_function</code></td>
@@ -4490,53 +4689,59 @@ for MCMC sampling.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>48
-49
-50
-51
-52
-53
-54
-55
-56
-57
-58
-59
-60
-61
-62
-63
-64
-65
-66
-67
-68
-69
-70
-71
-72
-73
-74
-75
-76
-77
-78
-79
-80
-81
-82
-83
-84
-85
-86
-87
-88
-89
-90
-91
-92
-93
-94</pre>
+<pre><span></span> 48
+ 49
+ 50
+ 51
+ 52
+ 53
+ 54
+ 55
+ 56
+ 57
+ 58
+ 59
+ 60
+ 61
+ 62
+ 63
+ 64
+ 65
+ 66
+ 67
+ 68
+ 69
+ 70
+ 71
+ 72
+ 73
+ 74
+ 75
+ 76
+ 77
+ 78
+ 79
+ 80
+ 81
+ 82
+ 83
+ 84
+ 85
+ 86
+ 87
+ 88
+ 89
+ 90
+ 91
+ 92
+ 93
+ 94
+ 95
+ 96
+ 97
+ 98
+ 99
+100</pre>
 </div>
 </td>
 <td class="code">
@@ -4549,6 +4754,7 @@ for MCMC sampling.</p>
     <span class="n">x_shape</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">,</span>
     <span class="n">sample_with_mcmc</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="n">mcmc_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"slice_np"</span><span class="p">,</span>
+    <span class="n">mcmc_parameters</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">get_potential_function</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">):</span>
     <span class="sd">"""</span>
@@ -4560,34 +4766,39 @@ for MCMC sampling.</p>
 <span class="sd">        sample_with_mcmc: Whether to sample with MCMC. Will always be `True` for SRE</span>
 <span class="sd">            and SNL, but can also be set to `True` for SNPE if MCMC is preferred to</span>
 <span class="sd">            deal with leakage over rejection sampling.</span>
-<span class="sd">        mcmc_method: If MCMC sampling is used, specify the method here: either of</span>
-<span class="sd">            slice_np, slice, hmc, nuts.</span>
+<span class="sd">        mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`, `hmc`, `nuts`.</span>
+<span class="sd">            Currently defaults to `slice_np` for a custom numpy implementation of</span>
+<span class="sd">            slice sampling; select `hmc`, `nuts` or `slice` for Pyro-based sampling.</span>
+<span class="sd">        mcmc_parameters: Dictionary overriding the default parameters for MCMC.</span>
+<span class="sd">            The following parameters are supported: `thin` to set the thinning</span>
+<span class="sd">            factor for the chain, `warmup_steps` to set the initial number of</span>
+<span class="sd">            samples to discard, `num_chains` for the number of chains, `init_strategy`</span>
+<span class="sd">            for the initialisation strategy for chains; `prior` will draw init</span>
+<span class="sd">            locations from prior, whereas `sir` will use Sequential-Importance-</span>
+<span class="sd">            Resampling using `init_strategy_num_candidates` to find init</span>
+<span class="sd">            locations.</span>
 <span class="sd">        get_potential_function: Callable that returns the potential function used</span>
 <span class="sd">            for MCMC sampling.</span>
 <span class="sd">    """</span>
-
-    <span class="bp">self</span><span class="o">.</span><span class="n">net</span> <span class="o">=</span> <span class="n">neural_net</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">_prior</span> <span class="o">=</span> <span class="n">prior</span>
-    <span class="c1"># This can be changed via `.set_default_x() below.`</span>
-    <span class="c1"># TODO: set via default_x directly here? would require process_x to accept None.</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">_x</span> <span class="o">=</span> <span class="kc">None</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">_x_o_training_focused_on</span> <span class="o">=</span> <span class="kc">None</span>
-
-    <span class="bp">self</span><span class="o">.</span><span class="n">_sample_with_mcmc</span> <span class="o">=</span> <span class="n">sample_with_mcmc</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">_mcmc_method</span> <span class="o">=</span> <span class="n">mcmc_method</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">_mcmc_init_params</span> <span class="o">=</span> <span class="kc">None</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">_get_potential_function</span> <span class="o">=</span> <span class="n">get_potential_function</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">_x_shape</span> <span class="o">=</span> <span class="n">x_shape</span>
-
     <span class="k">if</span> <span class="n">method_family</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"snpe"</span><span class="p">,</span> <span class="s2">"snle"</span><span class="p">,</span> <span class="s2">"snre_a"</span><span class="p">,</span> <span class="s2">"snre_b"</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_method_family</span> <span class="o">=</span> <span class="n">method_family</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Method family unsupported."</span><span class="p">)</span>
 
-    <span class="bp">self</span><span class="o">.</span><span class="n">_num_trained_rounds</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">net</span> <span class="o">=</span> <span class="n">neural_net</span>
 
-    <span class="c1"># Correction factor for leakage, only applicable to SNPE-family methods.</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">_leakage_density_correction_factor</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">set_mcmc_method</span><span class="p">(</span><span class="n">mcmc_method</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">set_mcmc_parameters</span><span class="p">(</span><span class="n">mcmc_parameters</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">set_sample_with_mcmc</span><span class="p">(</span><span class="n">sample_with_mcmc</span><span class="p">)</span>
+
+    <span class="bp">self</span><span class="o">.</span><span class="n">_get_potential_function</span> <span class="o">=</span> <span class="n">get_potential_function</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_leakage_density_correction_factor</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># Correction factor for SNPE.</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_mcmc_init_params</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_num_trained_rounds</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_prior</span> <span class="o">=</span> <span class="n">prior</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_x</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_x_o_training_focused_on</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_x_shape</span> <span class="o">=</span> <span class="n">x_shape</span>
 </code></pre>
 </div>
 </td>
@@ -4681,54 +4892,54 @@ enforce a new leakage estimate for rounds after the first (2, 3,..).</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>252
-253
-254
-255
-256
-257
-258
-259
-260
-261
-262
-263
-264
-265
-266
-267
-268
-269
-270
-271
-272
-273
-274
-275
-276
-277
-278
-279
-280
-281
-282
-283
-284
-285
-286
-287
-288
-289
-290
-291
-292
-293
-294
-295
-296
-297
-298
-299</pre>
+<pre><span></span>335
+336
+337
+338
+339
+340
+341
+342
+343
+344
+345
+346
+347
+348
+349
+350
+351
+352
+353
+354
+355
+356
+357
+358
+359
+360
+361
+362
+363
+364
+365
+366
+367
+368
+369
+370
+371
+372
+373
+374
+375
+376
+377
+378
+379
+380
+381
+382</pre>
 </div>
 </td>
 <td class="code">
@@ -4875,62 +5086,62 @@ support of the prior, -∞ (corresponding to 0 probability) outside.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>138
-139
-140
-141
-142
-143
-144
-145
-146
-147
-148
-149
-150
-151
-152
-153
-154
-155
-156
-157
-158
-159
-160
-161
-162
-163
-164
-165
-166
-167
-168
-169
-170
-171
-172
-173
-174
-175
-176
-177
-178
-179
-180
-181
-182
-183
-184
-185
-186
-187
-188
-189
-190
-191
-192
-193</pre>
+<pre><span></span>221
+222
+223
+224
+225
+226
+227
+228
+229
+230
+231
+232
+233
+234
+235
+236
+237
+238
+239
+240
+241
+242
+243
+244
+245
+246
+247
+248
+249
+250
+251
+252
+253
+254
+255
+256
+257
+258
+259
+260
+261
+262
+263
+264
+265
+266
+267
+268
+269
+270
+271
+272
+273
+274
+275
+276</pre>
 </div>
 </td>
 <td class="code">
@@ -5002,7 +5213,7 @@ support of the prior, -∞ (corresponding to 0 probability) outside.</p>
 <div class="doc doc-object doc-method">
 <h4 class="doc doc-heading" data-toc-label="sample()" id="sbi.inference.posterior.NeuralPosterior.sample">
 <code class="highlight language-python">
-sample<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sample_shape</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">([]),</span> <span class="n">x</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> </code>
+sample<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sample_shape</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">([]),</span> <span class="n">x</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">sample_with_mcmc</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">mcmc_method</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">mcmc_parameters</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> </code>
 </h4>
 <div class="doc doc-contents">
 <p>Return samples from posterior distribution <span><span class="MathJax_Preview">p(\theta|x)</span><script type="math/tex">p(\theta|x)</script></span>.</p>
@@ -5049,81 +5260,138 @@ to a set default (see <code>set_default_x()</code> method).</p>
 <td><code>True</code></td>
 </tr>
 <tr>
-<td><code>**kwargs</code></td>
-<td><code></code></td>
+<td><code>sample_with_mcmc</code></td>
+<td><code>Optional[bool]</code></td>
 <td>
-<p>Additional parameters to be passed to the MCMC sampler, such as
-<code>thin</code> and <code>warmup_steps</code>.</p>
+<p>Optional parameter to override <code>self.sample_with_mcmc</code>.</p>
 </td>
-<td><code>{}</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>mcmc_method</code></td>
+<td><code>Optional[str]</code></td>
+<td>
+<p>Optional parameter to override <code>self.mcmc_method</code>.</p>
+</td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>mcmc_parameters</code></td>
+<td><code>Optional[Dict[str, Any]]</code></td>
+<td>
+<p>Dictionary overriding the default parameters for MCMC.
+The following parameters are supported: <code>thin</code> to set the thinning
+factor for the chain, <code>warmup_steps</code> to set the initial number of
+samples to discard, <code>num_chains</code> for the number of chains, <code>init_strategy</code>
+for the initialisation strategy for chains; <code>prior</code> will draw init
+locations from prior, whereas <code>sir</code> will use Sequential-Importance-
+Resampling using <code>init_strategy_num_candidates</code> to find init
+locations.</p>
+</td>
+<td><code>None</code></td>
 </tr>
 </tbody>
 </table>
-<p>Returns: Samples from posterior.</p>
+<p><strong>Returns:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Tensor</code></td>
+<td>
+<p>Samples from posterior.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <details class="quote">
 <summary>Source code in <code>sbi/inference/posterior.py</code></summary>
 <table class="highlighttable">
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>301
-302
-303
-304
-305
-306
-307
-308
-309
-310
-311
-312
-313
-314
-315
-316
-317
-318
-319
-320
-321
-322
-323
-324
-325
-326
-327
-328
-329
-330
-331
-332
-333
-334
-335
-336
-337
-338
-339
-340
-341
-342
-343
-344
-345
-346
-347
-348
-349
-350
-351
-352
-353
-354
-355
-356
-357
-358</pre>
+<pre><span></span>384
+385
+386
+387
+388
+389
+390
+391
+392
+393
+394
+395
+396
+397
+398
+399
+400
+401
+402
+403
+404
+405
+406
+407
+408
+409
+410
+411
+412
+413
+414
+415
+416
+417
+418
+419
+420
+421
+422
+423
+424
+425
+426
+427
+428
+429
+430
+431
+432
+433
+434
+435
+436
+437
+438
+439
+440
+441
+442
+443
+444
+445
+446
+447
+448
+449
+450
+451
+452
+453
+454
+455
+456
+457
+458
+459
+460</pre>
 </div>
 </td>
 <td class="code">
@@ -5133,7 +5401,9 @@ to a set default (see <code>set_default_x()</code> method).</p>
     <span class="n">sample_shape</span><span class="p">:</span> <span class="n">Shape</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(),</span>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
-    <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+    <span class="n">sample_with_mcmc</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">mcmc_method</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">mcmc_parameters</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
     <span class="sa">r</span><span class="sd">"""</span>
 <span class="sd">    Return samples from posterior distribution $p(\theta|x)$.</span>
@@ -5150,10 +5420,19 @@ to a set default (see <code>set_default_x()</code> method).</p>
 <span class="sd">            fall back onto `x_o` if previously provided for multiround training, or</span>
 <span class="sd">            to a set default (see `set_default_x()` method).</span>
 <span class="sd">        show_progress_bars: Whether to show sampling progress monitor.</span>
-<span class="sd">        **kwargs: Additional parameters to be passed to the MCMC sampler, such as</span>
-<span class="sd">            `thin` and `warmup_steps`.</span>
+<span class="sd">        sample_with_mcmc: Optional parameter to override `self.sample_with_mcmc`.</span>
+<span class="sd">        mcmc_method: Optional parameter to override `self.mcmc_method`.</span>
+<span class="sd">        mcmc_parameters: Dictionary overriding the default parameters for MCMC.</span>
+<span class="sd">            The following parameters are supported: `thin` to set the thinning</span>
+<span class="sd">            factor for the chain, `warmup_steps` to set the initial number of</span>
+<span class="sd">            samples to discard, `num_chains` for the number of chains, `init_strategy`</span>
+<span class="sd">            for the initialisation strategy for chains; `prior` will draw init</span>
+<span class="sd">            locations from prior, whereas `sir` will use Sequential-Importance-</span>
+<span class="sd">            Resampling using `init_strategy_num_candidates` to find init</span>
+<span class="sd">            locations.</span>
 
-<span class="sd">    Returns: Samples from posterior.</span>
+<span class="sd">    Returns:</span>
+<span class="sd">        Samples from posterior.</span>
 <span class="sd">    """</span>
 
     <span class="n">x</span> <span class="o">=</span> <span class="n">atleast_2d_float32_tensor</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_x_else_default_x</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
@@ -5162,13 +5441,21 @@ to a set default (see <code>set_default_x()</code> method).</p>
     <span class="bp">self</span><span class="o">.</span><span class="n">_warn_if_posterior_was_focused_on_different_x</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
     <span class="n">num_samples</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">(</span><span class="n">sample_shape</span><span class="p">)</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span>
 
-    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sample_with_mcmc</span><span class="p">:</span>
+    <span class="n">sample_with_mcmc</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">sample_with_mcmc</span> <span class="k">if</span> <span class="n">sample_with_mcmc</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_with_mcmc</span>
+    <span class="p">)</span>
+    <span class="n">mcmc_method</span> <span class="o">=</span> <span class="n">mcmc_method</span> <span class="k">if</span> <span class="n">mcmc_method</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">mcmc_method</span>
+    <span class="n">mcmc_parameters</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">mcmc_parameters</span> <span class="k">if</span> <span class="n">mcmc_parameters</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">mcmc_parameters</span>
+    <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">sample_with_mcmc</span><span class="p">:</span>
         <span class="n">samples</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sample_posterior_mcmc</span><span class="p">(</span>
             <span class="n">x</span><span class="o">=</span><span class="n">x</span><span class="p">,</span>
             <span class="n">num_samples</span><span class="o">=</span><span class="n">num_samples</span><span class="p">,</span>
-            <span class="n">mcmc_method</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_mcmc_method</span><span class="p">,</span>
             <span class="n">show_progress_bars</span><span class="o">=</span><span class="n">show_progress_bars</span><span class="p">,</span>
-            <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+            <span class="n">mcmc_method</span><span class="o">=</span><span class="n">mcmc_method</span><span class="p">,</span>
+            <span class="o">**</span><span class="n">mcmc_parameters</span><span class="p">,</span>
         <span class="p">)</span>
     <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">_method_family</span> <span class="o">==</span> <span class="s2">"snpe"</span><span class="p">:</span>
         <span class="c1"># Rejection sampling.</span>
@@ -5200,7 +5487,7 @@ to a set default (see <code>set_default_x()</code> method).</p>
 set_default_x<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span> </code>
 </h4>
 <div class="doc doc-contents">
-<p>Return <code>NeuralPosterior</code> object with default conditioning context set to <code>x</code>.</p>
+<p>Set new default x for <code>.sample(), .log_prob</code> to use as conditioning context.</p>
 <p>This is a pure convenience to avoid having to repeatedly specify <code>x</code> in calls to
 <code>.sample()</code> and <code>.log_prob()</code> - only θ needs to be passed.</p>
 <p>This convenience is particularly useful when the posterior is focused, i.e.
@@ -5253,8 +5540,7 @@ that calls like <code>posterior.set_default_x(my_x).sample(mytheta)</code> are p
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>111
-112
+<pre><span></span>112
 113
 114
 115
@@ -5277,15 +5563,13 @@ that calls like <code>posterior.set_default_x(my_x).sample(mytheta)</code> are p
 132
 133
 134
-135
-136</pre>
+135</pre>
 </div>
 </td>
 <td class="code">
 <div class="highlight">
 <pre><span></span><code><span class="k">def</span> <span class="nf">set_default_x</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"NeuralPosterior"</span><span class="p">:</span>
-    <span class="sd">"""</span>
-<span class="sd">    Return `NeuralPosterior` object with default conditioning context set to `x`.</span>
+    <span class="sd">"""Set new default x for `.sample(), .log_prob` to use as conditioning context.</span>
 
 <span class="sd">    This is a pure convenience to avoid having to repeatedly specify `x` in calls to</span>
 <span class="sd">    `.sample()` and `.log_prob()` - only θ needs to be passed.</span>
@@ -5307,7 +5591,6 @@ that calls like <code>posterior.set_default_x(my_x).sample(mytheta)</code> are p
     <span class="n">processed_x</span> <span class="o">=</span> <span class="n">process_x</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_x_shape</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_warn_if_posterior_was_focused_on_different_x</span><span class="p">(</span><span class="n">processed_x</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_x</span> <span class="o">=</span> <span class="n">processed_x</span>
-
     <span class="k">return</span> <span class="bp">self</span>
 </code></pre>
 </div>
@@ -5318,12 +5601,12 @@ that calls like <code>posterior.set_default_x(my_x).sample(mytheta)</code> are p
 </div>
 </div>
 <div class="doc doc-object doc-method">
-<h4 class="doc doc-heading" data-toc-label="set_embedding_net()" id="sbi.inference.posterior.NeuralPosterior.set_embedding_net">
+<h4 class="doc doc-heading" data-toc-label="set_mcmc_method()" id="sbi.inference.posterior.NeuralPosterior.set_mcmc_method">
 <code class="highlight language-python">
-set_embedding_net<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">embedding_net</span><span class="p">)</span> </code>
+set_mcmc_method<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">method</span><span class="p">)</span> </code>
 </h4>
 <div class="doc doc-contents">
-<p>Set the <code>embedding_net</code> as an attribute of the <code>neural_net</code>.</p>
+<p>Sets sampling method to for MCMC and returns <code>NeuralPosterior</code>.</p>
 <p><strong>Parameters:</strong></p>
 <table>
 <thead>
@@ -5336,12 +5619,29 @@ set_embedding_net<span class="p">(</span><span class="bp">self</span><span class
 </thead>
 <tbody>
 <tr>
-<td><code>embedding_net</code></td>
-<td><code>nn.Module</code></td>
+<td><code>method</code></td>
+<td><code>str</code></td>
 <td>
-<p>Neural net to encode <code>x</code>.</p>
+<p>Method to use.</p>
 </td>
 <td><em>required</em></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>'NeuralPosterior'</code></td>
+<td>
+<p><code>NeuralPosterior</code> for chainable calls.</p>
+</td>
 </tr>
 </tbody>
 </table>
@@ -5351,38 +5651,239 @@ set_embedding_net<span class="p">(</span><span class="bp">self</span><span class
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>564
-565
-566
-567
-568
-569
-570
-571
-572
-573
-574
-575
-576
-577</pre>
+<pre><span></span>147
+148
+149
+150
+151
+152
+153
+154
+155
+156
+157</pre>
 </div>
 </td>
 <td class="code">
 <div class="highlight">
-<pre><span></span><code><span class="k">def</span> <span class="nf">set_embedding_net</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">embedding_net</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-    <span class="sd">"""</span>
-<span class="sd">    Set the `embedding_net` as an attribute of the `neural_net`.</span>
+<pre><span></span><code><span class="k">def</span> <span class="nf">set_mcmc_method</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">method</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"NeuralPosterior"</span><span class="p">:</span>
+    <span class="sd">"""Sets sampling method to for MCMC and returns `NeuralPosterior`.</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        embedding_net: Neural net to encode `x`.</span>
+<span class="sd">        method: Method to use.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        `NeuralPosterior` for chainable calls.</span>
 <span class="sd">    """</span>
-    <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">embedding_net</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">),</span> <span class="p">(</span>
-        <span class="s2">"`embedding_net`is not a `nn.Module`. "</span>
-        <span class="s2">"If you want to use hard-coded summary features, "</span>
-        <span class="s2">"please simply pass the already encoded summary features as input and pass "</span>
-        <span class="s2">"`embedding_net=None`."</span>
-    <span class="p">)</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">net</span><span class="o">.</span><span class="n">_embedding_net</span> <span class="o">=</span> <span class="n">embedding_net</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_mcmc_method</span> <span class="o">=</span> <span class="n">method</span>
+    <span class="k">return</span> <span class="bp">self</span>
+</code></pre>
+</div>
+</td>
+</tr>
+</table>
+</details>
+</div>
+</div>
+<div class="doc doc-object doc-method">
+<h4 class="doc doc-heading" data-toc-label="set_mcmc_parameters()" id="sbi.inference.posterior.NeuralPosterior.set_mcmc_parameters">
+<code class="highlight language-python">
+set_mcmc_parameters<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parameters</span><span class="p">)</span> </code>
+</h4>
+<div class="doc doc-contents">
+<p>Sets parameters for MCMC and returns <code>NeuralPosterior</code>.</p>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>parameters</code></td>
+<td><code>Dict[str, Any]</code></td>
+<td>
+<p>Dictionary overriding the default parameters for MCMC.
+The following parameters are supported: <code>thin</code> to set the thinning
+factor for the chain, <code>warmup_steps</code> to set the initial number of
+samples to discard, <code>num_chains</code> for the number of chains, <code>init_strategy</code>
+for the initialisation strategy for chains; <code>prior</code> will draw init
+locations from prior, whereas <code>sir</code> will use Sequential-Importance-
+Resampling using <code>init_strategy_num_candidates</code> to find init
+locations.</p>
+</td>
+<td><em>required</em></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>'NeuralPosterior'</code></td>
+<td>
+<p><code>NeuralPosterior</code> for chainable calls.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<details class="quote">
+<summary>Source code in <code>sbi/inference/posterior.py</code></summary>
+<table class="highlighttable">
+<tr>
+<td class="linenos">
+<div class="linenodiv">
+<pre><span></span>172
+173
+174
+175
+176
+177
+178
+179
+180
+181
+182
+183
+184
+185
+186
+187
+188
+189
+190</pre>
+</div>
+</td>
+<td class="code">
+<div class="highlight">
+<pre><span></span><code><span class="k">def</span> <span class="nf">set_mcmc_parameters</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parameters</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="s2">"NeuralPosterior"</span><span class="p">:</span>
+    <span class="sd">"""Sets parameters for MCMC and returns `NeuralPosterior`.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        parameters: Dictionary overriding the default parameters for MCMC.</span>
+<span class="sd">            The following parameters are supported: `thin` to set the thinning</span>
+<span class="sd">            factor for the chain, `warmup_steps` to set the initial number of</span>
+<span class="sd">            samples to discard, `num_chains` for the number of chains, `init_strategy`</span>
+<span class="sd">            for the initialisation strategy for chains; `prior` will draw init</span>
+<span class="sd">            locations from prior, whereas `sir` will use Sequential-Importance-</span>
+<span class="sd">            Resampling using `init_strategy_num_candidates` to find init</span>
+<span class="sd">            locations.</span>
+
+
+<span class="sd">    Returns:</span>
+<span class="sd">        `NeuralPosterior` for chainable calls.</span>
+<span class="sd">    """</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_mcmc_parameters</span> <span class="o">=</span> <span class="n">parameters</span>
+    <span class="k">return</span> <span class="bp">self</span>
+</code></pre>
+</div>
+</td>
+</tr>
+</table>
+</details>
+</div>
+</div>
+<div class="doc doc-object doc-method">
+<h4 class="doc doc-heading" data-toc-label="set_sample_with_mcmc()" id="sbi.inference.posterior.NeuralPosterior.set_sample_with_mcmc">
+<code class="highlight language-python">
+set_sample_with_mcmc<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">use_mcmc</span><span class="p">)</span> </code>
+</h4>
+<div class="doc doc-contents">
+<p>Turns MCMC sampling on or off and returns <code>NeuralPosterior</code>.</p>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>use_mcmc</code></td>
+<td><code>bool</code></td>
+<td>
+<p>Flag to set whether or not MCMC sampling is used.</p>
+</td>
+<td><em>required</em></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>'NeuralPosterior'</code></td>
+<td>
+<p><code>NeuralPosterior</code> for chainable calls.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<details class="quote">
+<summary>Source code in <code>sbi/inference/posterior.py</code></summary>
+<table class="highlighttable">
+<tr>
+<td class="linenos">
+<div class="linenodiv">
+<pre><span></span>202
+203
+204
+205
+206
+207
+208
+209
+210
+211
+212
+213
+214
+215
+216
+217
+218
+219</pre>
+</div>
+</td>
+<td class="code">
+<div class="highlight">
+<pre><span></span><code><span class="k">def</span> <span class="nf">set_sample_with_mcmc</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">use_mcmc</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"NeuralPosterior"</span><span class="p">:</span>
+    <span class="sd">"""Turns MCMC sampling on or off and returns `NeuralPosterior`.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        use_mcmc: Flag to set whether or not MCMC sampling is used.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        `NeuralPosterior` for chainable calls.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        `ValueError` on attempt to turn off MCMC sampling for family of methods</span>
+<span class="sd">        that do not support rejection sampling.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">use_mcmc</span><span class="p">:</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_method_family</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">"snpe"</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_method_family</span><span class="si">}</span><span class="s2"> cannot use MCMC for sampling."</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_sample_with_mcmc</span> <span class="o">=</span> <span class="n">use_mcmc</span>
+    <span class="k">return</span> <span class="bp">self</span>
 </code></pre>
 </div>
 </td>
@@ -5557,7 +6058,7 @@ sbi.utils.get_nn_models.classifier_nn<span class="p">(</span><span class="n">mod
 <div class="doc doc-object doc-function">
 <h3 class="doc doc-heading" id="sbi.utils.plot.pairplot">
 <code class="highlight language-python">
-sbi.utils.plot.pairplot<span class="p">(</span><span class="n">samples</span><span class="p">,</span> <span class="n">points</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">upper</span><span class="o">=</span><span class="s1">'hist'</span><span class="p">,</span> <span class="n">diag</span><span class="o">=</span><span class="s1">'hist'</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">legend</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">labels_points</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">labels_samples</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">samples_colors</span><span class="o">=</span><span class="p">[</span><span class="s1">'#1f77b4'</span><span class="p">,</span> <span class="s1">'#ff7f0e'</span><span class="p">,</span> <span class="s1">'#2ca02c'</span><span class="p">,</span> <span class="s1">'#d62728'</span><span class="p">,</span> <span class="s1">'#9467bd'</span><span class="p">,</span> <span class="s1">'#8c564b'</span><span class="p">,</span> <span class="s1">'#e377c2'</span><span class="p">,</span> <span class="s1">'#7f7f7f'</span><span class="p">,</span> <span class="s1">'#bcbd22'</span><span class="p">,</span> <span class="s1">'#17becf'</span><span class="p">],</span> <span class="n">points_colors</span><span class="o">=</span><span class="p">[</span><span class="s1">'#1f77b4'</span><span class="p">,</span> <span class="s1">'#ff7f0e'</span><span class="p">,</span> <span class="s1">'#2ca02c'</span><span class="p">,</span> <span class="s1">'#d62728'</span><span class="p">,</span> <span class="s1">'#9467bd'</span><span class="p">,</span> <span class="s1">'#8c564b'</span><span class="p">,</span> <span class="s1">'#e377c2'</span><span class="p">,</span> <span class="s1">'#7f7f7f'</span><span class="p">,</span> <span class="s1">'#bcbd22'</span><span class="p">,</span> <span class="s1">'#17becf'</span><span class="p">],</span> <span class="n">subset</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">ticks</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">tickformatter</span><span class="o">=&lt;</span><span class="n">matplotlib</span><span class="o">.</span><span class="n">ticker</span><span class="o">.</span><span class="n">FormatStrFormatter</span> <span class="nb">object</span> <span class="n">at</span> <span class="mh">0x7fbd30bc0a90</span><span class="o">&gt;</span><span class="p">,</span> <span class="n">tick_labels</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">hist_diag</span><span class="o">=</span><span class="p">{</span><span class="s1">'alpha'</span><span class="p">:</span> <span class="mf">1.0</span><span class="p">,</span> <span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span> <span class="s1">'density'</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s1">'histtype'</span><span class="p">:</span> <span class="s1">'step'</span><span class="p">},</span> <span class="n">hist_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">},</span> <span class="n">kde_diag</span><span class="o">=</span><span class="p">{</span><span class="s1">'bw_method'</span><span class="p">:</span> <span class="s1">'scott'</span><span class="p">,</span> <span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span> <span class="s1">'color'</span><span class="p">:</span> <span class="s1">'black'</span><span class="p">},</span> <span class="n">kde_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'bw_method'</span><span class="p">:</span> <span class="s1">'scott'</span><span class="p">,</span> <span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">},</span> <span class="n">contour_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'levels'</span><span class="p">:</span> <span class="p">[</span><span class="mf">0.68</span><span class="p">],</span> <span class="s1">'percentile'</span><span class="p">:</span> <span class="kc">True</span><span class="p">},</span> <span class="n">scatter_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'alpha'</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">,</span> <span class="s1">'edgecolor'</span><span class="p">:</span> <span class="s1">'none'</span><span class="p">,</span> <span class="s1">'rasterized'</span><span class="p">:</span> <span class="kc">False</span><span class="p">},</span> <span class="n">plot_offdiag</span><span class="o">=</span><span class="p">{},</span> <span class="n">points_diag</span><span class="o">=</span><span class="p">{},</span> <span class="n">points_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'marker'</span><span class="p">:</span> <span class="s1">'.'</span><span class="p">,</span> <span class="s1">'markersize'</span><span class="p">:</span> <span class="mi">20</span><span class="p">},</span> <span class="n">fig_size</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">10</span><span class="p">),</span> <span class="n">fig_bg_colors</span><span class="o">=</span><span class="p">{</span><span class="s1">'upper'</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span> <span class="s1">'diag'</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span> <span class="s1">'lower'</span><span class="p">:</span> <span class="kc">None</span><span class="p">},</span> <span class="n">fig_subplots_adjust</span><span class="o">=</span><span class="p">{</span><span class="s1">'top'</span><span class="p">:</span> <span class="mf">0.9</span><span class="p">},</span> <span class="n">subplots</span><span class="o">=</span><span class="p">{},</span> <span class="n">despine</span><span class="o">=</span><span class="p">{</span><span class="s1">'offset'</span><span class="p">:</span> <span class="mi">5</span><span class="p">},</span> <span class="n">title_format</span><span class="o">=</span><span class="p">{</span><span class="s1">'fontsize'</span><span class="p">:</span> <span class="mi">16</span><span class="p">})</span> </code>
+sbi.utils.plot.pairplot<span class="p">(</span><span class="n">samples</span><span class="p">,</span> <span class="n">points</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">upper</span><span class="o">=</span><span class="s1">'hist'</span><span class="p">,</span> <span class="n">diag</span><span class="o">=</span><span class="s1">'hist'</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">legend</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">labels_points</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">labels_samples</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">samples_colors</span><span class="o">=</span><span class="p">[</span><span class="s1">'#1f77b4'</span><span class="p">,</span> <span class="s1">'#ff7f0e'</span><span class="p">,</span> <span class="s1">'#2ca02c'</span><span class="p">,</span> <span class="s1">'#d62728'</span><span class="p">,</span> <span class="s1">'#9467bd'</span><span class="p">,</span> <span class="s1">'#8c564b'</span><span class="p">,</span> <span class="s1">'#e377c2'</span><span class="p">,</span> <span class="s1">'#7f7f7f'</span><span class="p">,</span> <span class="s1">'#bcbd22'</span><span class="p">,</span> <span class="s1">'#17becf'</span><span class="p">],</span> <span class="n">points_colors</span><span class="o">=</span><span class="p">[</span><span class="s1">'#1f77b4'</span><span class="p">,</span> <span class="s1">'#ff7f0e'</span><span class="p">,</span> <span class="s1">'#2ca02c'</span><span class="p">,</span> <span class="s1">'#d62728'</span><span class="p">,</span> <span class="s1">'#9467bd'</span><span class="p">,</span> <span class="s1">'#8c564b'</span><span class="p">,</span> <span class="s1">'#e377c2'</span><span class="p">,</span> <span class="s1">'#7f7f7f'</span><span class="p">,</span> <span class="s1">'#bcbd22'</span><span class="p">,</span> <span class="s1">'#17becf'</span><span class="p">],</span> <span class="n">subset</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">ticks</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">tickformatter</span><span class="o">=&lt;</span><span class="n">matplotlib</span><span class="o">.</span><span class="n">ticker</span><span class="o">.</span><span class="n">FormatStrFormatter</span> <span class="nb">object</span> <span class="n">at</span> <span class="mh">0x7f887d2f8b50</span><span class="o">&gt;</span><span class="p">,</span> <span class="n">tick_labels</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">hist_diag</span><span class="o">=</span><span class="p">{</span><span class="s1">'alpha'</span><span class="p">:</span> <span class="mf">1.0</span><span class="p">,</span> <span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span> <span class="s1">'density'</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s1">'histtype'</span><span class="p">:</span> <span class="s1">'step'</span><span class="p">},</span> <span class="n">hist_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">},</span> <span class="n">kde_diag</span><span class="o">=</span><span class="p">{</span><span class="s1">'bw_method'</span><span class="p">:</span> <span class="s1">'scott'</span><span class="p">,</span> <span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span> <span class="s1">'color'</span><span class="p">:</span> <span class="s1">'black'</span><span class="p">},</span> <span class="n">kde_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'bw_method'</span><span class="p">:</span> <span class="s1">'scott'</span><span class="p">,</span> <span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">},</span> <span class="n">contour_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'levels'</span><span class="p">:</span> <span class="p">[</span><span class="mf">0.68</span><span class="p">],</span> <span class="s1">'percentile'</span><span class="p">:</span> <span class="kc">True</span><span class="p">},</span> <span class="n">scatter_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'alpha'</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">,</span> <span class="s1">'edgecolor'</span><span class="p">:</span> <span class="s1">'none'</span><span class="p">,</span> <span class="s1">'rasterized'</span><span class="p">:</span> <span class="kc">False</span><span class="p">},</span> <span class="n">plot_offdiag</span><span class="o">=</span><span class="p">{},</span> <span class="n">points_diag</span><span class="o">=</span><span class="p">{},</span> <span class="n">points_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'marker'</span><span class="p">:</span> <span class="s1">'.'</span><span class="p">,</span> <span class="s1">'markersize'</span><span class="p">:</span> <span class="mi">20</span><span class="p">},</span> <span class="n">fig_size</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">10</span><span class="p">),</span> <span class="n">fig_bg_colors</span><span class="o">=</span><span class="p">{</span><span class="s1">'upper'</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span> <span class="s1">'diag'</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span> <span class="s1">'lower'</span><span class="p">:</span> <span class="kc">None</span><span class="p">},</span> <span class="n">fig_subplots_adjust</span><span class="o">=</span><span class="p">{</span><span class="s1">'top'</span><span class="p">:</span> <span class="mf">0.9</span><span class="p">},</span> <span class="n">subplots</span><span class="o">=</span><span class="p">{},</span> <span class="n">despine</span><span class="o">=</span><span class="p">{</span><span class="s1">'offset'</span><span class="p">:</span> <span class="mi">5</span><span class="p">},</span> <span class="n">title_format</span><span class="o">=</span><span class="p">{</span><span class="s1">'fontsize'</span><span class="p">:</span> <span class="mi">16</span><span class="p">})</span> </code>
 <a class="headerlink" href="#sbi.utils.plot.pairplot" title="Permanent link">¶</a></h3>
 <div class="doc doc-contents first">
 <p>Plot samples and points.</p>
@@ -5697,7 +6198,7 @@ max along each parameter dimension</p>
 <td>
 <p>passed to _format_axis()</p>
 </td>
-<td><code>&lt;matplotlib.ticker.FormatStrFormatter object at 0x7fbd30bc0a90&gt;</code></td>
+<td><code>&lt;matplotlib.ticker.FormatStrFormatter object at 0x7f887d2f8b50&gt;</code></td>
 </tr>
 <tr>
 <td><code>tick_labels</code></td>

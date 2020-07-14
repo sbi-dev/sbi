@@ -291,7 +291,7 @@
 <h2 id="user-experiences-bugs-and-feature-requests">User experiences, bugs, and feature requests<a class="headerlink" href="#user-experiences-bugs-and-feature-requests" title="Permanent link">¶</a></h2>
 <p>If you are using <code>sbi</code> to infer the parameters of a simulator, we would be delighted to
 know how it worked for you. If it didn’t work according to plan, please open up an issue
-and tell us more about your use case: the dimensionality of the input parameters and of 
+and tell us more about your use case: the dimensionality of the input parameters and of
 the output, as well as the setup you used to run inference (i.e. number of simulations,
 number of rounds,…).</p>
 <p>To report bugs and suggest features (including better documentation), please equally
@@ -306,14 +306,14 @@ dependencies, just run <code>conda env update -f environment.yml --prune</code>.
 <p>Alternatively, you can install via <code>setup.py</code> using <code>pip install -e ".[dev]"</code> (the dev
 flag installs development and testing dependencies).</p>
 <h3 id="contributing-inference-algorithms">Contributing inference algorithms<a class="headerlink" href="#contributing-inference-algorithms" title="Permanent link">¶</a></h3>
-<p><code>sbi</code> was developed to be extensible and we welcome implementations of additional 
-inference algorithms. Your new inference algorithm should be a class in 
-<code>sbi/inference/your_type_of_algorithm/your_algorithm.py</code>. The class should have a 
-<code>__call__()</code> function which runs inference and returns a posterior object. The posterior 
-object itself should have a <code>.sample()</code> function following the signature of 
-<code>sbi/inference/NeuralPosterior</code>, allowing to draw samples from the posterior. 
-Currently, <code>SNPE</code>, <code>SNLE</code>, and <code>SNRE</code> all share the <code>NeuralPosterior</code> class in 
-<code>sbi/inference/posterior.py</code>, but future versions of <code>sbi</code> will refactor them into 
+<p><code>sbi</code> was developed to be extensible and we welcome implementations of additional
+inference algorithms. Your new inference algorithm should be a class in
+<code>sbi/inference/your_type_of_algorithm/your_algorithm.py</code>. The class should have a
+<code>__call__()</code> function which runs inference and returns a posterior object. The posterior
+object itself should have a <code>.sample()</code> function following the signature of
+<code>sbi/inference/NeuralPosterior</code>, allowing to draw samples from the posterior.
+Currently, <code>SNPE</code>, <code>SNLE</code>, and <code>SNRE</code> all share the <code>NeuralPosterior</code> class in
+<code>sbi/inference/posterior.py</code>, but future versions of <code>sbi</code> will refactor them into
 separate classes.</p>
 <h3 id="style-conventions">Style conventions<a class="headerlink" href="#style-conventions" title="Permanent link">¶</a></h3>
 <p>For docstrings and comments, we use <a href="http://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings">Google
@@ -329,9 +329,8 @@ directory.</p>
 <p>Most of <a href="http://mackelab.org/sbi">the documentation</a> is written in markdown (<a href="https://guides.github.com/features/mastering-markdown/">basic
 markdown guide</a>).</p>
 <p>You can directly fix mistakes and suggest clearer formulations in markdown files simply
-by initiating a PR on the web. Click on <a href="https://github.com/mackelab/sbi/tree/master/docs/docs">documentation
-file</a> and look for the little
-pencil at top left.</p>
+by initiating a PR on through GitHub. Click on <a href="https://github.com/mackelab/sbi/tree/master/docs/docs">documentation
+file</a> and look for the little pencil at top right.</p>
 </article>
 </div>
 </div>
