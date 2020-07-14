@@ -1,3 +1,10 @@
+# v0.10.1
+
+- Added `mcmc_parameters` to init methods of inference methods (#270)
+- Fixed detaching of `log_weights` when using `sir` MCMC init (#270)
+- Fixed logging for SMC-ABC
+
+
 # v0.10.0
 
 - Added option to pass external data (#264)
