@@ -24,6 +24,7 @@ class SNLE_A(LikelihoodEstimator):
         simulation_batch_size: int = 1,
         density_estimator: Union[str, Callable] = "maf",
         mcmc_method: str = "slice_np",
+        mcmc_parameters: Optional[Dict[str, Any]] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
@@ -58,8 +59,17 @@ class SNLE_A(LikelihoodEstimator):
                 needs to return a PyTorch `nn.Module` implementing the density
                 estimator. The density estimator needs to provide the methods
                 `.log_prob` and `.sample()`.
-            mcmc_method: Specify the method for MCMC sampling, either of:
-                slice_np, slice, hmc, nuts.
+            mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`, `hmc`, `nuts`.
+                Currently defaults to `slice_np` for a custom numpy implementation of
+                slice sampling; select `hmc`, `nuts` or `slice` for Pyro-based sampling.
+            mcmc_parameters: Dictionary overriding the default parameters for MCMC.
+                The following parameters are supported: `thin` to set the thinning
+                factor for the chain, `warmup_steps` to set the initial number of
+                samples to discard, `num_chains` for the number of chains, `init_strategy`
+                for the initialisation strategy for chains; `prior` will draw init
+                locations from prior, whereas `sir` will use Sequential-Importance-
+                Resampling using `init_strategy_num_candidates` to find init
+                locations.
             device: torch device on which to compute, e.g. gpu, cpu.
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.

@@ -34,6 +34,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         density_estimator: Union[str, Callable] = "maf",
         sample_with_mcmc: bool = False,
         mcmc_method: str = "slice_np",
+        mcmc_parameters: Optional[Dict[str, Any]] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
@@ -53,8 +54,17 @@ class PosteriorEstimator(NeuralInference, ABC):
                 `.log_prob` and `.sample()`.
             sample_with_mcmc: Whether to sample with MCMC. MCMC can be used to deal
                 with high leakage.
-            mcmc_method: If MCMC sampling is used, specify the method here: either of
-                slice_np, slice, hmc, nuts.
+            mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`, `hmc`, `nuts`.
+                Currently defaults to `slice_np` for a custom numpy implementation of
+                slice sampling; select `hmc`, `nuts` or `slice` for Pyro-based sampling.
+            mcmc_parameters: Dictionary overriding the default parameters for MCMC.
+                The following parameters are supported: `thin` to set the thinning
+                factor for the chain, `warmup_steps` to set the initial number of
+                samples to discard, `num_chains` for the number of chains, `init_strategy`
+                for the initialisation strategy for chains; `prior` will draw init
+                locations from prior, whereas `sir` will use Sequential-Importance-
+                Resampling using `init_strategy_num_candidates` to find init
+                locations.
 
         See docstring of `NeuralInference` class for all other arguments.
         """
@@ -84,6 +94,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         self._posterior = None
         self._sample_with_mcmc = sample_with_mcmc
         self._mcmc_method = mcmc_method
+        self._mcmc_parameters = mcmc_parameters
 
         self._model_bank = []
 
@@ -180,6 +191,7 @@ class PosteriorEstimator(NeuralInference, ABC):
                     x_shape=x_shape,
                     sample_with_mcmc=self._sample_with_mcmc,
                     mcmc_method=self._mcmc_method,
+                    mcmc_parameters=self._mcmc_parameters,
                     get_potential_function=PotentialFunctionProvider(),
                 )
                 self._handle_x_o_wrt_amortization(x_o, x_shape, num_rounds)

@@ -502,12 +502,12 @@ class NeuralPosterior:
         # Find init points depending on `init_strategy` if no init is set
         if self._mcmc_init_params is None:
             if init_strategy == "prior":
-                self._mcmc_init_params = self._prior.sample((num_chains,))
+                self._mcmc_init_params = self._prior.sample((num_chains,)).detach()
             elif init_strategy == "sir":
                 self.net.eval()
                 init_param_candidates = self._prior.sample(
                     (init_strategy_num_candidates,)
-                )
+                ).detach()
                 potential_function = self._get_potential_function(
                     self._prior, self.net, x, "slice_np"
                 )
@@ -517,7 +517,7 @@ class NeuralPosterior:
                         for i in range(init_strategy_num_candidates)
                     ]
                 )
-                probs = np.exp(log_weights.view(-1).numpy().astype(np.float64))
+                probs = np.exp(log_weights.view(-1).detach().numpy().astype(np.float64))
                 probs[np.isnan(probs)] = 0.0
                 probs[np.isinf(probs)] = 0.0
                 probs /= probs.sum()
