@@ -149,7 +149,7 @@ class SMCABC(ABCBASE):
         self.logger.info(
             (
                 f"population={pop_idx}, eps={epsilon}, ess={1.0}, "
-                "num_sims={num_initial_pop}"
+                f"num_sims={num_initial_pop}"
             )
         )
 
@@ -194,7 +194,7 @@ class SMCABC(ABCBASE):
             self.logger.info(
                 (
                     f"population={pop_idx} done: eps={epsilon:.6f},"
-                    " num_sims={self.simulation_counter}, acc={acc:.4f}."
+                    f" num_sims={self.simulation_counter}."
                 )
             )
 
@@ -357,7 +357,7 @@ class SMCABC(ABCBASE):
             self.logger.warning(
                 (
                     f"Accepted unique distances={distances} don't match "
-                    "quantile={quantile:.2f}. Selecting last distance."
+                    f"quantile={quantile:.2f}. Selecting last distance."
                 )
             )
             qidx = -1
