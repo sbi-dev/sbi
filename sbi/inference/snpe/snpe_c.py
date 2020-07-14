@@ -22,7 +22,7 @@ class SNPE_C(PosteriorEstimator):
         prior,
         num_workers: int = 1,
         simulation_batch_size: int = 1,
-        density_estimator: Union[str, nn.Module] = "maf",
+        density_estimator: Union[str, Callable] = "maf",
         sample_with_mcmc: bool = False,
         mcmc_method: str = "slice_np",
         mcmc_parameters: Optional[Dict[str, Any]] = None,
