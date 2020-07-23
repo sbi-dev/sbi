@@ -5,7 +5,19 @@
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from sbi.user_input.user_input_checks import check_estimator_arg
-from typing import Callable, Optional, Union, Dict, Any, Tuple, Union, cast, List, Sequence, TypeVar
+from typing import (
+    Callable,
+    Optional,
+    Union,
+    Dict,
+    Any,
+    Tuple,
+    Union,
+    cast,
+    List,
+    Sequence,
+    TypeVar,
+)
 from warnings import warn
 
 import numpy as np
@@ -157,6 +169,8 @@ class PosteriorEstimator(NeuralInference, ABC):
             Posterior $p(\theta|x)$ that can be sampled and evaluated.
         """
 
+        # TODO: check the proposal. E.g. if it's a neuralPosterior, see if it has a default x.
+
         self._warn_if_retrain_from_scratch_snpe(retrain_from_scratch_each_round)
 
         # Calibration kernels proposed in Lueckmann, Gonçalves et al., 2017.
@@ -165,82 +179,78 @@ class PosteriorEstimator(NeuralInference, ABC):
 
         max_num_epochs = 2 ** 31 - 1 if max_num_epochs is None else max_num_epochs
 
-        num_sims_per_round = self._ensure_list(num_simulations_per_round, num_rounds)
+        self._maybe_update_round(proposal)
 
-        for round_, num_sims in enumerate(num_sims_per_round):
+        # Run simulations for the round.
+        theta, x = self._run_simulations(proposal, num_simulations)
+        self._append_to_data_bank(theta, x, self._round)
 
-            # Run simulations for the round.
-            theta, x = self._run_simulations(round_, num_sims)
-            self._append_to_data_bank(theta, x, round_)
+        # Load data from most recent round.
+        theta, x, _ = self._get_from_data_bank(self._round, exclude_invalid_x, False)
 
-            # Load data from most recent round.
-            theta, x, _ = self._get_from_data_bank(round_, exclude_invalid_x, False)
-
-            # First round or if retraining from scratch:
-            # Call the `self._build_neural_net` with the rounds' thetas and xs as
-            # arguments, which will build the neural network.
-            # This is passed into NeuralPosterior, to create a neural posterior which
-            # can `sample()` and `log_prob()`. The network is accessible via `.net`.
-            if round_ == 0 or retrain_from_scratch_each_round:
-                x_shape = x_shape_from_simulation(x)
-                self._posterior = NeuralPosterior(
-                    method_family="snpe",
-                    neural_net=self._build_neural_net(theta, x),
-                    prior=self._prior,
-                    x_shape=x_shape,
-                    sample_with_mcmc=self._sample_with_mcmc,
-                    mcmc_method=self._mcmc_method,
-                    mcmc_parameters=self._mcmc_parameters,
-                    get_potential_function=PotentialFunctionProvider(),
-                )
-                self._handle_x_o_wrt_amortization(x_o, x_shape, num_rounds)
-
-            # Fit posterior using newly aggregated data set.
-            self._train(
-                round_=round_,
-                training_batch_size=training_batch_size,
-                learning_rate=learning_rate,
-                validation_fraction=validation_fraction,
-                stop_after_epochs=stop_after_epochs,
-                max_num_epochs=cast(int, max_num_epochs),
-                clip_max_norm=clip_max_norm,
-                calibration_kernel=calibration_kernel,
-                exclude_invalid_x=exclude_invalid_x,
-                discard_prior_samples=discard_prior_samples,
+        # First round or if retraining from scratch:
+        # Call the `self._build_neural_net` with the rounds' thetas and xs as
+        # arguments, which will build the neural network.
+        # This is passed into NeuralPosterior, to create a neural posterior which
+        # can `sample()` and `log_prob()`. The network is accessible via `.net`.
+        if self._posterior is None or retrain_from_scratch_each_round:
+            x_shape = x_shape_from_simulation(x)
+            self._posterior = NeuralPosterior(
+                method_family="snpe",
+                neural_net=self._build_neural_net(theta, x),
+                prior=self._prior,
+                x_shape=x_shape,
+                sample_with_mcmc=self._sample_with_mcmc,
+                mcmc_method=self._mcmc_method,
+                mcmc_parameters=self._mcmc_parameters,
+                get_potential_function=PotentialFunctionProvider(),
             )
 
-            # Store models at end of each round.
-            self._model_bank.append(deepcopy(self._posterior))
-            self._model_bank[-1].net.eval()
+        # Fit posterior using newly aggregated data set.
+        self._train(
+            training_batch_size=training_batch_size,
+            learning_rate=learning_rate,
+            validation_fraction=validation_fraction,
+            stop_after_epochs=stop_after_epochs,
+            max_num_epochs=cast(int, max_num_epochs),
+            clip_max_norm=clip_max_norm,
+            calibration_kernel=calibration_kernel,
+            exclude_invalid_x=exclude_invalid_x,
+            discard_prior_samples=discard_prior_samples,
+        )
 
-            # Making the call to `leakage_correction()` and the update of
-            # self._leakage_density_correction_factor explicit here. This is just
-            # to make sure this update never gets lost when we e.g. do not log our
-            # things to tensorboard anymore. Calling `leakage_correction()` is needed
-            # to update the leakage after each round.
-            if self._posterior.default_x is None:
-                acceptance_rate = torch.tensor(float("nan"))
-            else:
-                acceptance_rate = self._posterior.leakage_correction(
-                    x=self._posterior.default_x,
-                    force_update=True,
-                    show_progress_bars=self._show_progress_bars,
-                )
+        # Store models at end of each round.
+        self._model_bank.append(deepcopy(self._posterior))
+        self._model_bank[-1].net.eval()
 
-            # Update tensorboard and summary dict.
-            self._summarize(
-                round_=round_,
-                x_o=self._posterior.default_x,
-                theta_bank=theta,
-                x_bank=x,
-                posterior_samples_acceptance_rate=acceptance_rate,
+        # Making the call to `leakage_correction()` and the update of
+        # self._leakage_density_correction_factor explicit here. This is just
+        # to make sure this update never gets lost when we e.g. do not log our
+        # things to tensorboard anymore. Calling `leakage_correction()` is needed
+        # to update the leakage after each round.
+        if self._posterior.default_x is None:
+            acceptance_rate = torch.tensor(float("nan"))
+        else:
+            acceptance_rate = self._posterior.leakage_correction(
+                x=self._posterior.default_x,
+                force_update=True,
+                show_progress_bars=self._show_progress_bars,
             )
 
-            # Update description for progress bar.
-            if self._show_round_summary:
-                print(self._describe_round(round_, self._summary))
+        # Update tensorboard and summary dict.
+        self._summarize(
+            round_=self._round,
+            x_o=self._posterior.default_x,
+            theta_bank=theta,
+            x_bank=x,
+            posterior_samples_acceptance_rate=acceptance_rate,
+        )
 
-        self._posterior._num_trained_rounds = num_rounds
+        # Update description for progress bar.
+        if self._show_round_summary:
+            print(self._describe_round(self._round, self._summary))
+
+        self._posterior._num_trained_rounds = self._round + 1
         return self._posterior
 
     @abstractmethod
@@ -251,7 +261,6 @@ class PosteriorEstimator(NeuralInference, ABC):
 
     def _train(
         self,
-        round_: int,
         training_batch_size: int,
         learning_rate: float,
         validation_fraction: float,
@@ -272,7 +281,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         """
 
         # Starting index for the training set (1 = discard round-0 samples).
-        start_idx = int(discard_prior_samples and round_ > 0)
+        start_idx = int(discard_prior_samples and self._round > 0)
         theta, x, prior_masks = self._get_from_data_bank(start_idx, exclude_invalid_x)
 
         # Select random neural net and validation splits from (theta, x) pairs.
@@ -321,9 +330,7 @@ class PosteriorEstimator(NeuralInference, ABC):
                 )
 
                 batch_loss = torch.mean(
-                    self._loss(
-                        round_, theta_batch, x_batch, masks_batch, calibration_kernel
-                    )
+                    self._loss(theta_batch, x_batch, masks_batch, calibration_kernel)
                 )
                 batch_loss.backward()
                 if clip_max_norm is not None:
@@ -346,7 +353,7 @@ class PosteriorEstimator(NeuralInference, ABC):
                     )
                     # Take negative loss here to get validation log_prob.
                     batch_log_prob = -self._loss(
-                        round_, theta_batch, x_batch, masks_batch, calibration_kernel
+                        theta_batch, x_batch, masks_batch, calibration_kernel
                     )
                     log_prob_sum += batch_log_prob.sum().item()
 
@@ -361,12 +368,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         self._summary["best_validation_log_probs"].append(self._best_val_log_prob)
 
     def _loss(
-        self,
-        round_: int,
-        theta: Tensor,
-        x: Tensor,
-        masks: Tensor,
-        calibration_kernel: Callable,
+        self, theta: Tensor, x: Tensor, masks: Tensor, calibration_kernel: Callable,
     ) -> Tensor:
         """Return loss with proposal correction (`round_>0`) or without it (`round_=0`).
 
@@ -377,7 +379,7 @@ class PosteriorEstimator(NeuralInference, ABC):
             Calibration kernel-weighted negative log prob.
         """
 
-        if round_ == 0:
+        if self._round == 0:
             # Use posterior log prob (without proposal correction) for first round.
             log_prob = self._posterior.net.log_prob(theta, x)
         else:

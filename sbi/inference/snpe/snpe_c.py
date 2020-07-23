@@ -2,7 +2,19 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 
-from typing import Callable, Optional, Union, Dict, Any, Tuple, Union, cast, List, Sequence, TypeVar
+from typing import (
+    Callable,
+    Optional,
+    Union,
+    Dict,
+    Any,
+    Tuple,
+    Union,
+    cast,
+    List,
+    Sequence,
+    TypeVar,
+)
 
 import torch
 from torch import Tensor, eye, nn, ones
@@ -96,9 +108,8 @@ class SNPE_C(PosteriorEstimator):
 
     def __call__(
         self,
-        num_rounds: int,
-        num_simulations_per_round: OneOrMore[int],
-        x_o: Optional[Tensor] = None,
+        num_simulations: OneOrMore[int],
+        proposal: Union[str, Any],
         num_atoms: int = 10,
         training_batch_size: int = 50,
         learning_rate: float = 5e-4,
@@ -116,18 +127,7 @@ class SNPE_C(PosteriorEstimator):
         Return posterior $p(\theta|x)$ after inference (possibly over several rounds).
 
         Args:
-            num_rounds: Number of rounds to run. Each round consists of a simulation and
-                training phase. `num_rounds=1` leads to a posterior $p(\theta|x)$ valid
-                for _any_ $x$ (amortized), but requires many simulations.
-                Alternatively, with `num_rounds>1` the inference returns a posterior
-                $p(\theta|x_o)$ focused on a specific observation `x_o`, potentially
-                requiring less simulations.
-            num_simulations_per_round: Number of simulator calls per round.
-            x_o: An observation that is only required when doing inference
-                over multiple rounds. After the first round, `x_o` is used to guide the
-                sampling so that the simulator is run with parameters that are likely
-                for that `x_o`, i.e. they are sampled from the posterior obtained in the
-                previous round $p(\theta|x_o)$.
+            num_simulations: Number of simulator calls per round.
             num_atoms: Number of atoms to use for classification.
             training_batch_size: Training batch size.
             learning_rate: Learning rate for Adam optimizer.

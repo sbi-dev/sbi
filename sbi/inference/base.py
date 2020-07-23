@@ -5,7 +5,19 @@ from abc import ABC
 from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, Optional, Union, Dict, Any, Tuple, Union, cast, List, Sequence, TypeVar
+from typing import (
+    Callable,
+    Optional,
+    Union,
+    Dict,
+    Any,
+    Tuple,
+    Union,
+    cast,
+    List,
+    Sequence,
+    TypeVar,
+)
 from warnings import warn
 
 import torch
@@ -140,6 +152,8 @@ class NeuralInference(ABC):
         # Initialize list that indicates the round from which simulations were drawn.
         self._data_round_index = []
 
+        self._round = 0
+
         # XXX We could instantiate here the Posterior for all children. Two problems:
         #     1. We must dispatch to right PotentialProvider for mcmc based on name
         #     2. `method_family` cannot be resolved only from `self.__class__.__name__`,
@@ -227,7 +241,7 @@ class NeuralInference(ABC):
 
         return theta[is_valid_x], x[is_valid_x], prior_masks[is_valid_x]
 
-    def _run_simulations(self, round_: int, num_sims: int,) -> Tuple[Tensor, Tensor]:
+    def _run_simulations(self, proposal: Any, num_sims: int,) -> Tuple[Tensor, Tensor]:
         r"""
         Run the simulations for a given round.
 
@@ -241,14 +255,10 @@ class NeuralInference(ABC):
             prior_mask: Whether each simulation came from a prior parameter sample.
         """
 
-        if round_ == 0:
+        if proposal is None:
             theta = self._prior.sample((num_sims,))
         else:
-            theta = self._posterior.sample(
-                (num_sims,),
-                x=self._posterior.default_x,
-                show_progress_bars=self._show_progress_bars,
-            )
+            theta = proposal.sample((num_sims,))
 
         x = self._batched_simulator(theta)
 
@@ -442,30 +452,11 @@ class NeuralInference(ABC):
     def summary(self):
         return self._summary
 
-    def _handle_x_o_wrt_amortization(
-        self, x_o: Optional[Tensor], x_shape: torch.Size, num_rounds: int
-    ) -> None:
+    def _maybe_update_round(self, proposal: Optional[Any]) -> None:
         """
-        Check whether provided `x_o` is consistent with `num_rounds`. For multi-round
-        inference, set `x_o` as the default observation in the posterior.
-
-        Warns:
-            When `x_o` is provided, yet `num_rounds=1`, i.e. inference is amortized.
-
-        Raises:
-            When `x_o` is absent, yet `num_rounds>1`, i.e. inference is focused.
+        Increase the round counter if a proposal is passed (i.e. if proposal != prior).
         """
-
-        if num_rounds == 1 and x_o is not None:
-            warn("Providing `x_o` in a single-round scenario has no effect.")
-        elif num_rounds > 1 and x_o is None:
-            raise ValueError(
-                "Observed data `x_o` is required if `num_rounds>1` since "
-                "samples in all rounds after the first one are drawn from "
-                "the posterior `p(theta|x_o)`."
-            )
-
-        if num_rounds > 1:
-            processed_x = process_x(x_o, x_shape)
-            self._posterior._x_o_training_focused_on = processed_x
-            self._posterior.default_x = processed_x
+        if proposal is None:
+            self._round = 0
+        else:
+            self._round += 1
