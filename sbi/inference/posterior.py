@@ -4,6 +4,7 @@
 
 from typing import Callable, Optional, Union, Dict, Any, Tuple, Union, cast, List, Sequence, TypeVar
 from warnings import warn
+from copy import deepcopy
 
 import numpy as np
 import torch
@@ -97,6 +98,17 @@ class NeuralPosterior:
         self._x = None
         self._x_o_training_focused_on = None
         self._x_shape = x_shape
+
+    def focus_training_on(self, x) -> "NeuralPosterior":
+        """
+        Return `NeuralPosterior` with default context and x_o for focused training.
+        """
+        processed_x = process_x(x, self._x_shape)
+        self._warn_if_posterior_was_focused_on_different_x(processed_x)
+        self._x_o_training_focused_on = processed_x
+        self._x = processed_x
+
+        return deepcopy(self)
 
     @property
     def default_x(self) -> Optional[Tensor]:
@@ -724,8 +736,8 @@ class NeuralPosterior:
                 f" observation x_o={self._x_o_training_focused_on.tolist()}. The"
                 f" observation you provided x={x.tolist()} is not identical to x_o,"
                 f" which can lead to poor performance of the inference method."
-                f" Consider running inference with `num_rounds==1`, which allows to"
-                f" pass any x (i.e. 'amortized' inference)."
+                f" Consider running inference with for just a single round, which"
+                f" allows to pass any x (i.e. 'amortized' inference)."
             )
 
     @staticmethod
