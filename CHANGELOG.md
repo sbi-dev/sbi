@@ -1,3 +1,9 @@
+# v0.11.0
+
+- Changed the API to do multi-round inference (#273)
+- Allow to continue inference (#273)
+
+
 # v0.10.2
 
 - Added missing type imports (#275)
