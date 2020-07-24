@@ -1,5 +1,6 @@
 import torch
-from sbi.inference import infer, prepare_for_sbi, SNPE
+
+from sbi.inference import SNPE, infer, prepare_for_sbi
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
 
 
@@ -33,7 +34,7 @@ def flexible():
     )
     simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior)
     inference = SNPE(simulator, prior)
-    posterior = inference(num_rounds=1, num_simulations_per_round=500)
+    posterior = inference(num_simulations=500)
     posterior.sample((100,), x=x_o)
 
     return posterior
