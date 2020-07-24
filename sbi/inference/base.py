@@ -460,3 +460,43 @@ class NeuralInference(ABC):
             self._round = 0
         else:
             self._round += 1
+
+    @staticmethod
+    def _check_proposal(proposal):
+        """
+        Check for validity of the provided proposal distribution.
+
+        If the proposal is a `NeuralPosterior`, we check if the default_x is set and
+        if it matches the `_x_o_training_focused_on`.
+
+        If the proposal is **not** a `NeuralPosterior`, we warn. This is especially
+        important if the user passed the prior as proposal, since this triggers atomic
+        loss despite not being necessary.
+        """
+        if proposal is not None:
+            if isinstance(proposal, NeuralPosterior):
+                if proposal._x_o_training_focused_on is None:
+                    raise ValueError(
+                        "`proposal._x_o_training_focused_on` is None, i.e. there is no "
+                        "x_o for training. Set it with "
+                        "`posterior.focus_training_on(x_o)`."
+                    )
+                if (proposal._x_o_training_focused_on != proposal.default_x).any():
+                    raise ValueError(
+                        f"`proposal._x_o_training_focused_on`"
+                        f" ({proposal._x_o_training_focused_on}) and"
+                        f" `proposal.default_x` ({proposal.default_x})"
+                        f" do not match. You set an x_o for training with "
+                        f"`posterior.focus_training_on(x_o)`,"
+                        f"but it seems changed the default x afterwards (e.g. with"
+                        f" posterior.set_default_x. Please call"
+                        f" `posterior.focus_training_on(x_o)` again."
+                    )
+            else:
+                warn(
+                    "The proposal you passed is not a `NeuralPosterior` object. If you "
+                    "are an expert user and did so for research purposes, this is fine."
+                    " If not, and you only wanted to do single round inference with"
+                    " `proposal=prior`, please instead set `proposal=None`, which"
+                    " automatically uses the prior as proposal."
+                )
