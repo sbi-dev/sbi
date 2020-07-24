@@ -16,8 +16,8 @@ from sbi.simulators.linear_gaussian import (
     samples_true_posterior_linear_gaussian_uniform_prior,
     true_posterior_linear_gaussian_mvn_prior,
 )
-from tests.test_utils import check_c2st, get_prob_outside_uniform_prior
 from sbi.utils.torchutils import configure_default_device
+from tests.test_utils import check_c2st, get_prob_outside_uniform_prior
 
 
 @pytest.mark.parametrize("num_dim", (1, 3))
@@ -44,9 +44,9 @@ def test_api_snl_on_linearGaussian(num_dim: int, set_seed):
         show_progress_bars=False,
     )
 
-    posterior = infer(num_rounds=1, num_simulations_per_round=1000, max_num_epochs=5)
+    posterior = infer(num_simulations=1000, max_num_epochs=5)
 
-    posterior.sample(sample_shape=(num_samples,), x=x_o, mcmc_parameters = {"thin": 3})
+    posterior.sample(sample_shape=(num_samples,), x=x_o, mcmc_parameters={"thin": 3})
 
 
 def test_c2st_snl_on_linearGaussian_different_dims(set_seed):
@@ -97,8 +97,8 @@ def test_c2st_snl_on_linearGaussian_different_dims(set_seed):
         device=device,
     )
 
-    posterior = infer(num_rounds=1, num_simulations_per_round=5000)  # type: ignore
-    samples = posterior.sample((num_samples,), x=x_o, mcmc_parameters = {"thin": 3})
+    posterior = infer(num_simulations=5000)  # type: ignore
+    samples = posterior.sample((num_samples,), x=x_o, mcmc_parameters={"thin": 3})
 
     # Compute the c2st and assert it is near chance level of 0.5.
     check_c2st(samples, target_samples, alg="snle_a")
@@ -146,9 +146,7 @@ def test_c2st_snle_external_data_on_linearGaussian(set_seed):
 
     infer.provide_presimulated(external_theta, external_x)
 
-    posterior = infer(
-        num_rounds=1, num_simulations_per_round=1000, training_batch_size=100,
-    ).set_default_x(x_o)
+    posterior = infer(num_simulations=1000, training_batch_size=100).set_default_x(x_o)
     samples = posterior.sample((num_samples,))
 
     # Compute the c2st and assert it is near chance level of 0.5.
@@ -196,9 +194,9 @@ def test_c2st_snl_on_linearGaussian(num_dim: int, prior_str: str, set_seed):
         show_progress_bars=False,
     )
 
-    posterior = infer(num_rounds=1, num_simulations_per_round=1000).set_default_x(x_o)
+    posterior = infer(num_simulations=1000).set_default_x(x_o)
 
-    samples = posterior.sample(sample_shape=(num_samples,), mcmc_parameters = {"thin": 3})
+    samples = posterior.sample(sample_shape=(num_samples,), mcmc_parameters={"thin": 3})
 
     # Check performance based on c2st accuracy.
     check_c2st(samples, target_samples, alg=f"snle_a-{prior_str}-prior")
@@ -246,9 +244,10 @@ def test_c2st_multi_round_snl_on_linearGaussian(set_seed):
         show_progress_bars=False,
     )
 
-    posterior = infer(num_rounds=2, x_o=x_o, num_simulations_per_round=500)
+    posterior1 = infer(num_simulations=500).focus_training_on(x_o)
+    posterior = infer(num_simulations=500, proposal=posterior1)
 
-    samples = posterior.sample(sample_shape=(num_samples,), mcmc_parameters = {"thin": 3})
+    samples = posterior.sample(sample_shape=(num_samples,), mcmc_parameters={"thin": 3})
 
     # Check performance based on c2st accuracy.
     check_c2st(samples, target_samples, alg="multi-round-snl")
@@ -283,6 +282,6 @@ def test_api_snl_sampling_methods(mcmc_method: str, prior_str: str, set_seed):
         show_progress_bars=False,
     )
 
-    posterior = infer(num_rounds=1, num_simulations_per_round=200, max_num_epochs=5)
+    posterior = infer(num_simulations=200, max_num_epochs=5)
 
-    posterior.sample(sample_shape=(num_samples,), x=x_o, mcmc_parameters = {"thin": 3})
+    posterior.sample(sample_shape=(num_samples,), x=x_o, mcmc_parameters={"thin": 3})

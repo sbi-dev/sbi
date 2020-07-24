@@ -1,20 +1,18 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
-from sbi.utils.sbiutils import handle_invalid_x
 import pytest
 import torch
-
-from sbi.inference import SNPE_C, SRE, SNL, prepare_for_sbi
-from torch import zeros, ones, eye
+from torch import eye, ones, zeros
 
 from sbi import utils as utils
 
+from sbi.inference import SNL, SNPE_C, SRE, prepare_for_sbi
 from sbi.simulators.linear_gaussian import (
-    samples_true_posterior_linear_gaussian_uniform_prior,
     linear_gaussian,
+    samples_true_posterior_linear_gaussian_uniform_prior,
 )
-
+from sbi.utils.sbiutils import handle_invalid_x
 from tests.test_utils import check_c2st
 
 
@@ -76,9 +74,7 @@ def test_inference_with_nan_simulator(
     infer = method(*prepare_for_sbi(linear_gaussian_nan, prior))
 
     posterior = infer(
-        num_rounds=1,
-        num_simulations_per_round=num_simulations,
-        exclude_invalid_x=exclude_invalid_x,
+        num_simulations=num_simulations, exclude_invalid_x=exclude_invalid_x,
     ).set_default_x(x_o)
 
     samples = posterior.sample((num_samples,))

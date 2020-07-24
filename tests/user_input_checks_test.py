@@ -2,14 +2,14 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 from __future__ import annotations
-from sbi.utils.get_nn_models import posterior_nn
 
 from typing import Callable, Optional, Union, Dict, Any, Tuple, Union, cast, List, Sequence, TypeVar
 
 import pytest
 import torch
+from pyknos.mdn.mdn import MultivariateGaussianMDN
 from scipy.stats import beta, multivariate_normal, uniform
-from torch import Tensor, eye, ones, zeros
+from torch import Tensor, eye, nn, ones, zeros
 from torch.distributions import Beta, Distribution, Gamma, MultivariateNormal, Uniform
 
 from sbi.inference import SNPE_C
@@ -26,6 +26,7 @@ from sbi.user_input.user_input_checks_utils import (
     PytorchReturnTypeWrapper,
     ScipyPytorchWrapper,
 )
+from sbi.utils.get_nn_models import posterior_nn
 from sbi.utils.torchutils import BoxUniform
 
 
@@ -273,7 +274,7 @@ def test_inference_with_user_sbi_problems(user_simulator: Callable, user_prior):
     )
 
     # Run inference.
-    _ = infer(num_rounds=1, num_simulations_per_round=100, max_num_epochs=2)
+    _ = infer(num_simulations=100, max_num_epochs=2)
 
 
 @pytest.mark.parametrize(
@@ -375,8 +376,6 @@ def test_invalid_inputs():
         joint.log_prob(ones(10, 4, 1))
 
 
-from torch import nn
-from pyknos.mdn.mdn import MultivariateGaussianMDN
 
 
 @pytest.mark.parametrize(
@@ -429,4 +428,3 @@ def test_passing_custom_density_estimator(arg):
         density_estimator = arg
     prior = MultivariateNormal(torch.zeros(2), torch.eye(2))
     SNPE_C(diagonal_linear_gaussian, prior, density_estimator=density_estimator)
-

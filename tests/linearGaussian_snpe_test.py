@@ -2,7 +2,6 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 from __future__ import annotations
-from sbi.utils.torchutils import configure_default_device
 
 import pytest
 from torch import eye, ones, zeros
@@ -16,6 +15,7 @@ from sbi.simulators.linear_gaussian import (
     samples_true_posterior_linear_gaussian_uniform_prior,
     true_posterior_linear_gaussian_mvn_prior,
 )
+from sbi.utils.torchutils import configure_default_device
 from tests.test_utils import (
     check_c2st,
     get_dkl_gaussian_prior,
@@ -70,9 +70,7 @@ def test_c2st_snpe_on_linearGaussian(
         device=device,
     )
 
-    posterior = infer(
-        num_rounds=1, num_simulations_per_round=2000, training_batch_size=100
-    ).set_default_x(x_o)
+    posterior = infer(num_simulations=2000, training_batch_size=100).set_default_x(x_o)
     samples = posterior.sample((num_samples,))
 
     # Compute the c2st and assert it is near chance level of 0.5.
@@ -164,7 +162,7 @@ def test_c2st_snpe_on_linearGaussian_different_dims(set_seed):
         sample_with_mcmc=False,
     )
 
-    posterior = infer(num_rounds=1, num_simulations_per_round=2000)  # type: ignore
+    posterior = infer(num_simulations=2000)  # type: ignore
     samples = posterior.sample((num_samples,), x=x_o)
 
     # Compute the c2st and assert it is near chance level of 0.5.
@@ -214,9 +212,7 @@ def test_c2st_snpe_external_data_on_linearGaussian(set_seed):
 
     infer.provide_presimulated(external_theta, external_x)
 
-    posterior = infer(
-        num_rounds=1, num_simulations_per_round=1000, training_batch_size=100,
-    ).set_default_x(x_o)
+    posterior = infer(num_simulations=1000, training_batch_size=100).set_default_x(x_o)
     samples = posterior.sample((num_samples,))
 
     # Compute the c2st and assert it is near chance level of 0.5.
@@ -270,16 +266,19 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str, set_seed):
         density_estimator="maf",
         show_progress_bars=False,
     )
-    call_args = dict(num_rounds=2, x_o=x_o, num_simulations_per_round=1000)
 
     if method_str == "snpe_b":
         infer = SNPE_B(simulation_batch_size=10, **creation_args)
-        posterior = infer(**call_args)
+        posterior1 = infer(num_simulations=1000)
+        posterior1.focus_training_on(x_o)
+        posterior = infer(num_simulations=1000, proposal=posterior1)
     elif method_str == "snpe_c":
         infer = SNPE_C(
             simulation_batch_size=50, sample_with_mcmc=False, **creation_args
         )
-        posterior = infer(num_atoms=10, **call_args)
+        posterior1 = infer(num_simulations=500, num_atoms=10)
+        posterior1.focus_training_on(x_o)
+        posterior = infer(num_simulations=500, num_atoms=10, proposal=posterior1)
 
     samples = posterior.sample((num_samples,))
 
@@ -335,7 +334,7 @@ def test_api_snpe_c_posterior_correction(
         show_progress_bars=False,
     )
 
-    posterior = infer(num_rounds=1, num_simulations_per_round=1000, max_num_epochs=5)
+    posterior = infer(num_simulations=1000, max_num_epochs=5)
 
     # Posterior should be corrected for leakage even if num_rounds just 1.
     samples = posterior.sample((10,), x=x_o)
@@ -368,4 +367,4 @@ def example_posterior():
         sample_with_mcmc=False,
     )
 
-    return infer(num_rounds=1, num_simulations_per_round=1000).set_default_x(x_o)
+    return infer(num_simulations=1000).set_default_x(x_o)

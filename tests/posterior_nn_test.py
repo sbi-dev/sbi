@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import pytest
-from torch import zeros, ones, eye
+from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
 from sbi.inference import SNPE_C, prepare_for_sbi
@@ -17,7 +17,7 @@ def test_log_prob_with_different_x():
 
     prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
     posterior = SNPE_C(*prepare_for_sbi(diagonal_linear_gaussian, prior))(
-        num_rounds=1, num_simulations_per_round=1000
+        num_simulations=1000
     )
 
     _ = posterior.sample((10,), x=ones(1, num_dim))
