@@ -30,8 +30,8 @@ from sbi.simulators.simutils import simulate_in_batches
 from sbi.user_input.user_input_checks import prepare_for_sbi, process_x
 from sbi.utils import get_log_root, handle_invalid_x, warn_on_invalid_x
 from sbi.utils.plot import pairplot
-from sbi.utils.torchutils import configure_default_device
 from sbi.utils.sbiutils import get_data_since_round, mask_sims_from_prior
+from sbi.utils.torchutils import configure_default_device
 
 
 def infer(
@@ -152,8 +152,8 @@ class NeuralInference(ABC):
         # Initialize list that indicates the round from which simulations were drawn.
         self._data_round_index = []
 
-        # `self._round = -1` indicates that there has not been any training yet.
-        self._round = -1
+        # `self._round = None` indicates that there has not been any training yet.
+        self._round = None
 
         # XXX We could instantiate here the Posterior for all children. Two problems:
         #     1. We must dispatch to right PotentialProvider for mcmc based on name
@@ -247,7 +247,7 @@ class NeuralInference(ABC):
         Run the simulations for a given round.
 
         Args:
-            round_: Round number.
+            proposal: Distribution from which to draw $\theta$.
             num_sims: Number of desired simulations for the round.
 
         Returns:
@@ -453,15 +453,6 @@ class NeuralInference(ABC):
     def summary(self):
         return self._summary
 
-    def _maybe_update_round(self, proposal: Optional[Any]) -> None:
-        """
-        Increase the round counter if a proposal is passed (i.e. if proposal != prior).
-        """
-        if proposal is None:
-            self._round = 0
-        else:
-            self._round += 1
-
     @staticmethod
     def _check_proposal(proposal):
         """
@@ -471,8 +462,12 @@ class NeuralInference(ABC):
         if it matches the `_x_o_training_focused_on`.
 
         If the proposal is **not** a `NeuralPosterior`, we warn. This is especially
-        important if the user passed the prior as proposal, since this triggers atomic
-        loss despite not being necessary.
+        important if the user passed the prior as proposal. Consider e.g.:
+        ```
+        posterior1 = infer(num_simulations=200, proposal=prior)
+        posterior2 = infer(num_simulations=200, proposal=prior)
+        ```
+        This will trigger atomic loss in the second line, which is not wanted.
         """
         if proposal is not None:
             if isinstance(proposal, NeuralPosterior):
@@ -489,8 +484,8 @@ class NeuralInference(ABC):
                         f" `proposal.default_x` ({proposal.default_x})"
                         f" do not match. You set an x_o for training with "
                         f"`posterior.focus_training_on(x_o)`,"
-                        f"but it seems changed the default x afterwards (e.g. with"
-                        f" posterior.set_default_x. Please call"
+                        f" but it seems you changed the default x afterwards (e.g. with"
+                        f" `posterior.set_default_x()`. Please call"
                         f" `posterior.focus_training_on(x_o)` again."
                     )
             else:

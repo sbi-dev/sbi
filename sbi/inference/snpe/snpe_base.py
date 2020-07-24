@@ -32,6 +32,7 @@ from sbi import utils as utils
 from sbi.inference import NeuralInference
 from sbi.inference.posterior import NeuralPosterior
 from sbi.types import OneOrMore, ScalarFloat
+from sbi.user_input.user_input_checks import check_estimator_arg
 from sbi.utils import check_estimator_arg, x_shape_from_simulation
 
 
@@ -114,9 +115,8 @@ class PosteriorEstimator(NeuralInference, ABC):
 
     def __call__(
         self,
-        num_rounds: int,
-        num_simulations_per_round: OneOrMore[int],
-        x_o: Optional[Tensor] = None,
+        num_simulations: int,
+        proposal: Optional[Any] = None,
         training_batch_size: int = 50,
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
@@ -130,21 +130,14 @@ class PosteriorEstimator(NeuralInference, ABC):
     ) -> NeuralPosterior:
         r"""Run SNPE.
 
-        Return posterior $p(\theta|x)$ after inference (possibly over several rounds).
+        Return posterior $p(\theta|x)$ after inference.
 
         Args:
-            num_rounds: Number of rounds to run. Each round consists of a simulation and
-                training phase. `num_rounds=1` leads to a posterior $p(\theta|x)$ valid
-                for _any_ $x$ ("amortized"), but requires many simulations.
-                Alternatively, with `num_rounds>1` the inference returns a posterior
-                $p(\theta|x_o)$ focused on a specific observation `x_o`, potentially
-                requiring less simulations.
-            num_simulations_per_round: Number of simulator calls per round.
-            x_o: An observation that is only required when doing inference
-                over multiple rounds. After the first round, `x_o` is used to guide the
-                sampling so that the simulator is run with parameters that are likely
-                for that `x_o`, i.e. they are sampled from the posterior obtained in the
-                previous round $p(\theta|x_o)$.
+            num_simulations: Number of simulator calls.
+            proposal: Distribution that the parameters $\theta$ are drawn from.
+                `proposal=None` uses the prior (i.e. single-round inference). Setting
+                the proposal to e.g. the posterior of the previous round leads to
+                multi-round inference.
             training_batch_size: Training batch size.
             learning_rate: Learning rate for Adam optimizer.
             validation_fraction: The fraction of data to use for validation.
@@ -169,8 +162,6 @@ class PosteriorEstimator(NeuralInference, ABC):
             Posterior $p(\theta|x)$ that can be sampled and evaluated.
         """
 
-        # TODO: check the proposal. E.g. if it's a neuralPosterior, see if it has a default x.
-
         self._warn_if_retrain_from_scratch_snpe(retrain_from_scratch_each_round)
 
         # Calibration kernels proposed in Lueckmann, Gonçalves et al., 2017.
@@ -180,7 +171,9 @@ class PosteriorEstimator(NeuralInference, ABC):
         max_num_epochs = 2 ** 31 - 1 if max_num_epochs is None else max_num_epochs
 
         self._check_proposal(proposal)
-        self._maybe_update_round(proposal)
+        self._round = (
+            self._round + 1 if (proposal is not None and self._round is not None) else 0
+        )
 
         # Run simulations for the round.
         theta, x = self._run_simulations(proposal, num_simulations)
