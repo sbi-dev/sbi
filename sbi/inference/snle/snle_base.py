@@ -16,7 +16,7 @@ from torch.utils.tensorboard import SummaryWriter
 from sbi import utils as utils
 from sbi.inference import NeuralInference
 from sbi.inference.posterior import NeuralPosterior
-from sbi.types import OneOrMore, ScalarFloat
+from sbi.types import ScalarFloat
 from sbi.utils import check_estimator_arg, x_shape_from_simulation
 
 
@@ -94,8 +94,8 @@ class LikelihoodEstimator(NeuralInference, ABC):
 
     def __call__(
         self,
-        num_rounds: int,
-        num_simulations_per_round: OneOrMore[int],
+        num_simulations: int,
+        proposal: Optional[Any] = None,
         x_o: Optional[Tensor] = None,
         training_batch_size: int = 50,
         learning_rate: float = 5e-4,
@@ -109,7 +109,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
     ) -> NeuralPosterior:
         r"""Run SNLE.
 
-        Return posterior $p(\theta|x)$ after inference (possibly over several rounds).
+        Return posterior $p(\theta|x)$ after inference.
 
         Args:
             exclude_invalid_x: Whether to exclude simulation outputs `x=NaN` or `x=±∞`
@@ -126,68 +126,63 @@ class LikelihoodEstimator(NeuralInference, ABC):
 
         max_num_epochs = 2 ** 31 - 1 if max_num_epochs is None else max_num_epochs
 
-        num_sims_per_round = self._ensure_list(num_simulations_per_round, num_rounds)
+        self._check_proposal(proposal)
+        self._round = self._round + 1 if (proposal is not None) else 0
 
-        for round_, num_sims in enumerate(num_sims_per_round):
+        # Run simulations for the round.
+        theta, x = self._run_simulations(proposal, num_simulations)
+        self._append_to_data_bank(theta, x, self._round)
 
-            # Run simulations for the round.
-            theta, x = self._run_simulations(round_, num_sims)
+        # Load data from most recent round.
+        theta, x, _ = self._get_from_data_bank(self._round, exclude_invalid_x, False)
 
-            self._append_to_data_bank(theta, x, round_)
-
-            # Load data from most recent round.
-            theta, x, _ = self._get_from_data_bank(round_, exclude_invalid_x, False)
-
-            # First round or if retraining from scratch:
-            # Call the `self._build_neural_net` with the rounds' thetas and xs as
-            # arguments, which will build the neural network
-            # This is passed into NeuralPosterior, to create a neural posterior which
-            # can `sample()` and `log_prob()`. The network is accessible via `.net`.
-            if round_ == 0 or retrain_from_scratch_each_round:
-                x_shape = x_shape_from_simulation(x)
-                self._posterior = NeuralPosterior(
-                    method_family="snle",
-                    neural_net=self._build_neural_net(theta, x),
-                    prior=self._prior,
-                    x_shape=x_shape,
-                    sample_with_mcmc=self._sample_with_mcmc,
-                    mcmc_method=self._mcmc_method,
-                    mcmc_parameters=self._mcmc_parameters,
-                    get_potential_function=PotentialFunctionProvider(),
-                )
-                self._handle_x_o_wrt_amortization(x_o, x_shape, num_rounds)
-
-            # Fit neural likelihood to newly aggregated dataset.
-            self._train(
-                round_=round_,
-                training_batch_size=training_batch_size,
-                learning_rate=learning_rate,
-                validation_fraction=validation_fraction,
-                stop_after_epochs=stop_after_epochs,
-                max_num_epochs=max_num_epochs,
-                clip_max_norm=clip_max_norm,
-                exclude_invalid_x=exclude_invalid_x,
-                discard_prior_samples=discard_prior_samples,
+        # First round or if retraining from scratch:
+        # Call the `self._build_neural_net` with the rounds' thetas and xs as
+        # arguments, which will build the neural network
+        # This is passed into NeuralPosterior, to create a neural posterior which
+        # can `sample()` and `log_prob()`. The network is accessible via `.net`.
+        if self._posterior or None or retrain_from_scratch_each_round:
+            x_shape = x_shape_from_simulation(x)
+            self._posterior = NeuralPosterior(
+                method_family="snle",
+                neural_net=self._build_neural_net(theta, x),
+                prior=self._prior,
+                x_shape=x_shape,
+                sample_with_mcmc=self._sample_with_mcmc,
+                mcmc_method=self._mcmc_method,
+                mcmc_parameters=self._mcmc_parameters,
+                get_potential_function=PotentialFunctionProvider(),
             )
 
-            # Update description for progress bar.
-            if self._show_round_summary:
-                print(self._describe_round(round_, self._summary))
+        # Fit neural likelihood to newly aggregated dataset.
+        self._train(
+            training_batch_size=training_batch_size,
+            learning_rate=learning_rate,
+            validation_fraction=validation_fraction,
+            stop_after_epochs=stop_after_epochs,
+            max_num_epochs=max_num_epochs,
+            clip_max_norm=clip_max_norm,
+            exclude_invalid_x=exclude_invalid_x,
+            discard_prior_samples=discard_prior_samples,
+        )
 
-            # Update TensorBoard and summary dict.
-            self._summarize(
-                round_=round_,
-                x_o=self._posterior.default_x,
-                theta_bank=theta,
-                x_bank=x,
-            )
+        # Update description for progress bar.
+        if self._show_round_summary:
+            print(self._describe_round(self._round, self._summary))
 
-        self._posterior._num_trained_rounds = num_rounds
+        # Update TensorBoard and summary dict.
+        self._summarize(
+            round_=self._round,
+            x_o=self._posterior.default_x,
+            theta_bank=theta,
+            x_bank=x,
+        )
+
+        self._posterior._num_trained_rounds = self._round + 1
         return self._posterior
 
     def _train(
         self,
-        round_: int,
         training_batch_size: int,
         learning_rate: float,
         validation_fraction: float,
@@ -208,7 +203,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         """
 
         # Starting index for the training set (1 = discard round-0 samples).
-        start_idx = int(discard_prior_samples and round_ > 0)
+        start_idx = int(discard_prior_samples and self._round > 0)
         theta, x, _ = self._get_from_data_bank(start_idx, exclude_invalid_x)
 
         # Get total number of training examples.
