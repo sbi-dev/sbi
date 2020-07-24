@@ -28,7 +28,12 @@ import sbi.inference
 from sbi.inference.posterior import NeuralPosterior
 from sbi.simulators.simutils import simulate_in_batches
 from sbi.user_input.user_input_checks import prepare_for_sbi, process_x
-from sbi.utils import get_log_root, handle_invalid_x, warn_on_invalid_x
+from sbi.utils import (
+    get_log_root,
+    handle_invalid_x,
+    warn_on_invalid_x,
+    warn_on_invalid_x_for_snpec_leakage,
+)
 from sbi.utils.plot import pairplot
 from sbi.utils.sbiutils import get_data_since_round, mask_sims_from_prior
 from sbi.utils.torchutils import configure_default_device
@@ -239,6 +244,9 @@ class NeuralInference(ABC):
         is_valid_x, num_nans, num_infs = handle_invalid_x(x, exclude_invalid_x)
         if warn_on_invalid:
             warn_on_invalid_x(num_nans, num_infs, exclude_invalid_x)
+            warn_on_invalid_x_for_snpec_leakage(
+                num_nans, num_infs, exclude_invalid_x, type(self).__name__, self._round
+            )
 
         return theta[is_valid_x], x[is_valid_x], prior_masks[is_valid_x]
 

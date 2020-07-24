@@ -218,6 +218,36 @@ def warn_on_invalid_x(num_nans: int, num_infs: int, exclude_invalid_x: bool) -> 
             )
 
 
+def warn_on_invalid_x(num_nans: int, num_infs: int, exclude_invalid_x: bool) -> None:
+    """Warn if there are NaNs or Infs. Warning text depends on `exclude_invalid_x`."""
+
+    if num_nans + num_infs > 0:
+        if exclude_invalid_x:
+            logging.warning(
+                f"Found {num_nans} NaN simulations and {num_infs} Inf simulations. "
+                "They will be excluded from training."
+            )
+        else:
+            logging.warning(
+                f"Found {num_nans} NaN simulations and {num_infs} Inf simulations. "
+                "Training might fail. Consider setting `exclude_invalid_x=True`."
+            )
+
+
+def warn_on_invalid_x_for_snpec_leakage(
+    num_nans: int, num_infs: int, exclude_invalid_x: bool, algorithm: str, round_: int
+) -> None:
+    """Give a dedicated warning about invalid data for multi-round SNPE-C"""
+
+    if num_nans + num_infs > 0 and exclude_invalid_x:
+        if algorithm == "SNPE_C" and round_ > 0:
+            logging.warning(
+                f"When invalid simulations are excluded, multi-round SNPE-C"
+                f" can `leak` into the regions where parameters led to"
+                f" invalid simulations. This can lead to poor results."
+            )
+
+
 def get_data_since_round(
     data: List, data_round_indices: List, starting_round_index: int
 ) -> Tensor:
