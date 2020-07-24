@@ -16,12 +16,12 @@ from sbi.simulators.linear_gaussian import (
     samples_true_posterior_linear_gaussian_uniform_prior,
     true_posterior_linear_gaussian_mvn_prior,
 )
+from sbi.utils.torchutils import configure_default_device
 from tests.test_utils import (
     check_c2st,
     get_dkl_gaussian_prior,
     get_prob_outside_uniform_prior,
 )
-from sbi.utils.torchutils import configure_default_device
 
 
 @pytest.mark.parametrize("num_dim", (1, 3))
@@ -45,7 +45,7 @@ def test_api_sre_on_linearGaussian(num_dim: int):
         show_progress_bars=False,
     )
 
-    posterior = infer(num_rounds=1, num_simulations_per_round=1000, max_num_epochs=5)
+    posterior = infer(num_simulations=1000, max_num_epochs=5)
 
     posterior.sample(sample_shape=(10,), x=x_o, mcmc_parameters={"num_chains": 2})
 
@@ -100,8 +100,8 @@ def test_c2st_sre_on_linearGaussian_different_dims(set_seed):
         device=device,
     )
 
-    posterior = infer(num_rounds=1, num_simulations_per_round=5000)
-    samples = posterior.sample((num_samples,), x=x_o, mcmc_parameters = {"thin": 3})
+    posterior = infer(num_simulations=5000)
+    samples = posterior.sample((num_samples,), x=x_o, mcmc_parameters={"thin": 3})
 
     # Compute the c2st and assert it is near chance level of 0.5.
     check_c2st(samples, target_samples, alg="snpe_c")
@@ -148,9 +148,7 @@ def test_c2st_sre_external_data_on_linearGaussian(set_seed):
 
     infer.provide_presimulated(external_theta, external_x)
 
-    posterior = infer(
-        num_rounds=1, num_simulations_per_round=1000, training_batch_size=100,
-    ).set_default_x(x_o)
+    posterior = infer(num_simulations=1000, training_batch_size=100).set_default_x(x_o)
     samples = posterior.sample((num_samples,))
 
     # Compute the c2st and assert it is near chance level of 0.5.
@@ -215,9 +213,9 @@ def test_c2st_sre_on_linearGaussian(
     infer = SRE(**kwargs) if method_str == "sre" else AALR(**kwargs)
 
     # Should use default `num_atoms=10` for SRE; `num_atoms=2` for AALR
-    posterior = infer(num_rounds=1, num_simulations_per_round=1000).set_default_x(x_o)
+    posterior = infer(num_simulations=1000).set_default_x(x_o)
 
-    samples = posterior.sample(sample_shape=(num_samples,), mcmc_parameters = {"thin": 3})
+    samples = posterior.sample(sample_shape=(num_samples,), mcmc_parameters={"thin": 3})
 
     # Check performance based on c2st accuracy.
     check_c2st(samples, target_samples, alg=f"sre-{prior_str}-{method_str}")
@@ -280,6 +278,6 @@ def test_api_sre_sampling_methods(mcmc_method: str, prior_str: str, set_seed):
         show_progress_bars=False,
     )
 
-    posterior = infer(num_rounds=1, num_simulations_per_round=200, max_num_epochs=5)
+    posterior = infer(num_simulations=200, max_num_epochs=5)
 
     posterior.sample(sample_shape=(10,), x=x_o)
