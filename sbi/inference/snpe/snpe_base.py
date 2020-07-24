@@ -31,8 +31,7 @@ from torch.utils.tensorboard import SummaryWriter
 from sbi import utils as utils
 from sbi.inference import NeuralInference
 from sbi.inference.posterior import NeuralPosterior
-from sbi.types import OneOrMore, ScalarFloat
-from sbi.user_input.user_input_checks import check_estimator_arg
+from sbi.types import ScalarFloat
 from sbi.utils import check_estimator_arg, x_shape_from_simulation
 
 
@@ -173,8 +172,6 @@ class PosteriorEstimator(NeuralInference, ABC):
         self._check_proposal(proposal)
         self._round = self._round + 1 if (proposal is not None) else 0
 
-        print("self._round", self._round)
-
         # Run simulations for the round.
         theta, x = self._run_simulations(proposal, num_simulations)
         self._append_to_data_bank(theta, x, self._round)
@@ -245,7 +242,7 @@ class PosteriorEstimator(NeuralInference, ABC):
             print(self._describe_round(self._round, self._summary))
 
         self._posterior._num_trained_rounds = self._round + 1
-        return self._posterior
+        return deepcopy(self._posterior)
 
     @abstractmethod
     def _log_prob_proposal_posterior(

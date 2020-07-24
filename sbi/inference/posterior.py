@@ -96,18 +96,7 @@ class NeuralPosterior:
         self._num_trained_rounds = 0
         self._prior = prior
         self._x = None
-        self._x_o_training_focused_on = None
         self._x_shape = x_shape
-
-    def focus_training_on(self, x) -> "NeuralPosterior":
-        """
-        Return `NeuralPosterior` with default context and x_o for focused training.
-        """
-        processed_x = process_x(x, self._x_shape)
-        self._x_o_training_focused_on = processed_x
-        self._x = processed_x
-
-        return deepcopy(self)
 
     @property
     def default_x(self) -> Optional[Tensor]:
@@ -135,13 +124,14 @@ class NeuralPosterior:
 
         Args:
             x: The default observation to set for the posterior $p(theta|x)$.
+            deep_copy: Whether to return a deepcopy of the posterior.
 
         Returns:
             `NeuralPosterior` that will use a default `x` when not explicitly passed.
         """
         processed_x = process_x(x, self._x_shape)
-        self._warn_if_posterior_was_focused_on_different_x(processed_x)
         self._x = processed_x
+
         return self
 
     @property
@@ -267,7 +257,6 @@ class NeuralPosterior:
         x = atleast_2d_float32_tensor(self._x_else_default_x(x))
         self._ensure_single_x(x)
         self._ensure_x_consistent_with_default_x(x)
-        self._warn_if_posterior_was_focused_on_different_x(x)
 
         # Repeat `x` in case of evaluation on multiple `theta`. This is needed below in
         # when calling nflows in order to have matching shapes of theta and context x
@@ -433,7 +422,6 @@ class NeuralPosterior:
         x = atleast_2d_float32_tensor(self._x_else_default_x(x))
         self._ensure_single_x(x)
         self._ensure_x_consistent_with_default_x(x)
-        self._warn_if_posterior_was_focused_on_different_x(x)
         num_samples = torch.Size(sample_shape).numel()
 
         sample_with_mcmc = (
@@ -726,19 +714,6 @@ class NeuralPosterior:
                 """
             )
 
-    def _warn_if_posterior_was_focused_on_different_x(self, x: Tensor):
-        """Warn if user provides an x not equal to the x_o used during inference."""
-
-        if self._num_trained_rounds > 1 and (self._x_o_training_focused_on != x).any():
-            warn(
-                f"The posterior was trained over multiple rounds focused on a specific"
-                f" observation x_o={self._x_o_training_focused_on.tolist()}. The"
-                f" observation you provided x={x.tolist()} is not identical to x_o,"
-                f" which can lead to poor performance of the inference method."
-                f" Consider running inference with for just a single round, which"
-                f" allows to pass any x (i.e. 'amortized' inference)."
-            )
-
     @staticmethod
     def _match_x_with_theta_batch_shape(x: Tensor, theta: Tensor) -> Tensor:
         """Return `x` with batch shape matched to that of `theta`.
@@ -776,11 +751,7 @@ class NeuralPosterior:
     def __str__(self):
         msg = {0: "untrained", 1: "amortized"}
 
-        focused_msg = (
-            f"focused on x_o={self._x_o_training_focused_on.tolist()!r}"
-            if self._x_o_training_focused_on is not None
-            else ""
-        )
+        focused_msg = "multi-round"
 
         default_x_msg = (
             f" Evaluates and samples by default at x={self.default_x.tolist()!r}"
@@ -790,7 +761,7 @@ class NeuralPosterior:
 
         desc = (
             f"Posterior conditional density p(θ|x) "
-            f"({msg.get(self._num_trained_rounds, focused_msg)}.){default_x_msg}.\n\n"
+            f"({msg.get(self._num_trained_rounds, focused_msg)}).{default_x_msg}.\n\n"
             f"This neural posterior was obtained with a "
             f"{self._method_family.upper()}-class "
             f"method using a {self.net.__class__.__name__.lower()}."
