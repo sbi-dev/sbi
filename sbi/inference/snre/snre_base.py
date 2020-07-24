@@ -1,5 +1,6 @@
 
 from abc import ABC, abstractmethod
+from copy import deepcopy
 from typing import Callable, Optional, Union, Dict, Any, Tuple, Union, cast, List, Sequence, TypeVar
 
 import numpy as np
@@ -188,7 +189,7 @@ class RatioEstimator(NeuralInference, ABC):
 
         self._posterior._num_trained_rounds = self._round + 1
 
-        return self._posterior
+        return deepcopy(self._posterior)
 
     def _train(
         self,

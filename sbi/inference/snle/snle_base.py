@@ -3,6 +3,8 @@
 
 
 from abc import ABC
+from copy import deepcopy
+from typing import Any, Callable, Dict, Optional, Union
 from typing import Callable, Optional, Union, Dict, Any, Tuple, Union, cast, List, Sequence, TypeVar
 
 import numpy as np
@@ -179,7 +181,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         )
 
         self._posterior._num_trained_rounds = self._round + 1
-        return self._posterior
+        return deepcopy(self._posterior)
 
     def _train(
         self,

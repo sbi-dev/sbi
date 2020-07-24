@@ -21,13 +21,13 @@ from typing import (
 from warnings import warn
 
 import torch
-from torch import Tensor, ones, zeros
+from torch import Tensor
 from torch.utils.tensorboard import SummaryWriter
 
 import sbi.inference
 from sbi.inference.posterior import NeuralPosterior
 from sbi.simulators.simutils import simulate_in_batches
-from sbi.user_input.user_input_checks import prepare_for_sbi, process_x
+from sbi.user_input.user_input_checks import prepare_for_sbi
 from sbi.utils import (
     get_log_root,
     handle_invalid_x,
@@ -477,22 +477,11 @@ class NeuralInference(ABC):
         """
         if proposal is not None:
             if isinstance(proposal, NeuralPosterior):
-                if proposal._x_o_training_focused_on is None:
+                if proposal.default_x is None:
                     raise ValueError(
-                        "`proposal._x_o_training_focused_on` is None, i.e. there is no "
+                        "`proposal.default_x` is None, i.e. there is no "
                         "x_o for training. Set it with "
-                        "`posterior.focus_training_on(x_o)`."
-                    )
-                if (proposal._x_o_training_focused_on != proposal.default_x).any():
-                    raise ValueError(
-                        f"`proposal._x_o_training_focused_on`"
-                        f" ({proposal._x_o_training_focused_on}) and"
-                        f" `proposal.default_x` ({proposal.default_x})"
-                        f" do not match. You set an x_o for training with "
-                        f"`posterior.focus_training_on(x_o)`,"
-                        f" but it seems you changed the default x afterwards (e.g. with"
-                        f" `posterior.set_default_x()`. Please call"
-                        f" `posterior.focus_training_on(x_o)` again."
+                        "`posterior.set_default_x(x_o)`."
                     )
             else:
                 warn(
