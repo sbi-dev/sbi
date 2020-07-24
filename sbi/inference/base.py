@@ -76,7 +76,7 @@ def infer(
     simulator, prior = prepare_for_sbi(simulator, prior)
 
     infer_ = method_fun(simulator, prior, num_workers=num_workers)
-    posterior = infer_(num_rounds=1, num_simulations_per_round=num_simulations)
+    posterior = infer_(num_simulations=num_simulations)
 
     return posterior
 
