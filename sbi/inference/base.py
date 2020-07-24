@@ -157,8 +157,7 @@ class NeuralInference(ABC):
         # Initialize list that indicates the round from which simulations were drawn.
         self._data_round_index = []
 
-        # `self._round = None` indicates that there has not been any training yet.
-        self._round = None
+        self._round = 0
 
         # XXX We could instantiate here the Posterior for all children. Two problems:
         #     1. We must dispatch to right PotentialProvider for mcmc based on name
@@ -461,8 +460,7 @@ class NeuralInference(ABC):
     def summary(self):
         return self._summary
 
-    @staticmethod
-    def _check_proposal(proposal):
+    def _check_proposal(self, proposal):
         """
         Check for validity of the provided proposal distribution.
 
@@ -504,3 +502,9 @@ class NeuralInference(ABC):
                     " `proposal=prior`, please instead set `proposal=None`, which"
                     " automatically uses the prior as proposal."
                 )
+        elif self._round > 0:
+            raise ValueError(
+                "You did not specify a proposal (i.e. `proposal=None`). "
+                "However, previously, you had already specified a proposal. "
+                "This scenario is currently not allowed."
+            )

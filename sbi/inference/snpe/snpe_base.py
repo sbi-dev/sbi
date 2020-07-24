@@ -171,9 +171,9 @@ class PosteriorEstimator(NeuralInference, ABC):
         max_num_epochs = 2 ** 31 - 1 if max_num_epochs is None else max_num_epochs
 
         self._check_proposal(proposal)
-        self._round = (
-            self._round + 1 if (proposal is not None and self._round is not None) else 0
-        )
+        self._round = self._round + 1 if (proposal is not None) else 0
+
+        print("self._round", self._round)
 
         # Run simulations for the round.
         theta, x = self._run_simulations(proposal, num_simulations)
