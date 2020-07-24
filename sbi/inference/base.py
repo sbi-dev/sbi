@@ -152,7 +152,8 @@ class NeuralInference(ABC):
         # Initialize list that indicates the round from which simulations were drawn.
         self._data_round_index = []
 
-        self._round = 0
+        # `self._round = -1` indicates that there has not been any training yet.
+        self._round = -1
 
         # XXX We could instantiate here the Posterior for all children. Two problems:
         #     1. We must dispatch to right PotentialProvider for mcmc based on name

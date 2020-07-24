@@ -182,8 +182,6 @@ class PosteriorEstimator(NeuralInference, ABC):
         self._check_proposal(proposal)
         self._maybe_update_round(proposal)
 
-        print("self.round", self._round)
-
         # Run simulations for the round.
         theta, x = self._run_simulations(proposal, num_simulations)
         self._append_to_data_bank(theta, x, self._round)

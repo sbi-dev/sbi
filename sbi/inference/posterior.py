@@ -104,7 +104,6 @@ class NeuralPosterior:
         Return `NeuralPosterior` with default context and x_o for focused training.
         """
         processed_x = process_x(x, self._x_shape)
-        self._warn_if_posterior_was_focused_on_different_x(processed_x)
         self._x_o_training_focused_on = processed_x
         self._x = processed_x
 
