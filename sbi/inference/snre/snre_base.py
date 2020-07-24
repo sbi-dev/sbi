@@ -13,7 +13,7 @@ from torch.utils.tensorboard import SummaryWriter
 from sbi import utils as utils
 from sbi.inference.base import NeuralInference
 from sbi.inference.posterior import NeuralPosterior
-from sbi.types import OneOrMore, ScalarFloat
+from sbi.types import ScalarFloat
 from sbi.utils import check_estimator_arg, clamp_and_warn, x_shape_from_simulation
 from sbi.utils.torchutils import ensure_theta_batched, ensure_x_batched
 
@@ -99,8 +99,8 @@ class RatioEstimator(NeuralInference, ABC):
 
     def __call__(
         self,
-        num_rounds: int,
-        num_simulations_per_round: OneOrMore[int],
+        num_simulations: int,
+        proposal: Optional[Any] = None,
         x_o: Optional[Tensor] = None,
         num_atoms: int = 10,
         training_batch_size: int = 50,
@@ -115,7 +115,7 @@ class RatioEstimator(NeuralInference, ABC):
     ) -> NeuralPosterior:
         """Run SNRE.
 
-        Return posterior $p(\theta|x)$ after inference (possibly over several rounds).
+        Return posterior $p(\theta|x)$ after inference.
 
         Args:
             num_atoms: Number of atoms to use for classification.
@@ -133,70 +133,65 @@ class RatioEstimator(NeuralInference, ABC):
 
         max_num_epochs = 2 ** 31 - 1 if max_num_epochs is None else max_num_epochs
 
-        num_sims_per_round = self._ensure_list(num_simulations_per_round, num_rounds)
+        self._check_proposal(proposal)
+        self._round = self._round + 1 if (proposal is not None) else 0
 
-        for round_, num_sims in enumerate(num_sims_per_round):
+        # Run simulations for the round.
+        theta, x = self._run_simulations(proposal, num_simulations)
+        self._append_to_data_bank(theta, x, self._round)
 
-            # Run simulations for the round.
-            theta, x = self._run_simulations(round_, num_sims)
+        # Load data from most recent round.
+        theta, x, _ = self._get_from_data_bank(self._round, exclude_invalid_x, False)
 
-            self._append_to_data_bank(theta, x, round_)
-
-            # Load data from most recent round.
-            theta, x, _ = self._get_from_data_bank(round_, exclude_invalid_x, False)
-
-            # First round or if retraining from scratch:
-            # Call the `self._build_neural_net` with the rounds' thetas and xs as
-            # arguments, which will build the neural network
-            # This is passed into NeuralPosterior, to create a neural posterior which
-            # can `sample()` and `log_prob()`. The network is accessible via `.net`.
-            if round_ == 0 or retrain_from_scratch_each_round:
-                x_shape = x_shape_from_simulation(x)
-                self._posterior = NeuralPosterior(
-                    method_family=self.__class__.__name__.lower(),
-                    neural_net=self._build_neural_net(theta, x),
-                    prior=self._prior,
-                    x_shape=x_shape,
-                    sample_with_mcmc=self._sample_with_mcmc,
-                    mcmc_method=self._mcmc_method,
-                    mcmc_parameters=self._mcmc_parameters,
-                    get_potential_function=PotentialFunctionProvider(),
-                )
-                self._handle_x_o_wrt_amortization(x_o, x_shape, num_rounds)
-
-            # Fit posterior using newly aggregated data set.
-            self._train(
-                round_=round_,
-                num_atoms=num_atoms,
-                training_batch_size=training_batch_size,
-                learning_rate=learning_rate,
-                validation_fraction=validation_fraction,
-                stop_after_epochs=stop_after_epochs,
-                max_num_epochs=max_num_epochs,
-                clip_max_norm=clip_max_norm,
-                exclude_invalid_x=exclude_invalid_x,
-                discard_prior_samples=discard_prior_samples,
+        # First round or if retraining from scratch:
+        # Call the `self._build_neural_net` with the rounds' thetas and xs as
+        # arguments, which will build the neural network
+        # This is passed into NeuralPosterior, to create a neural posterior which
+        # can `sample()` and `log_prob()`. The network is accessible via `.net`.
+        if self._posterior is None or retrain_from_scratch_each_round:
+            x_shape = x_shape_from_simulation(x)
+            self._posterior = NeuralPosterior(
+                method_family=self.__class__.__name__.lower(),
+                neural_net=self._build_neural_net(theta, x),
+                prior=self._prior,
+                x_shape=x_shape,
+                sample_with_mcmc=self._sample_with_mcmc,
+                mcmc_method=self._mcmc_method,
+                mcmc_parameters=self._mcmc_parameters,
+                get_potential_function=PotentialFunctionProvider(),
             )
 
-            # Update description for progress bar.
-            if self._show_round_summary:
-                print(self._describe_round(round_, self._summary))
+        # Fit posterior using newly aggregated data set.
+        self._train(
+            num_atoms=num_atoms,
+            training_batch_size=training_batch_size,
+            learning_rate=learning_rate,
+            validation_fraction=validation_fraction,
+            stop_after_epochs=stop_after_epochs,
+            max_num_epochs=max_num_epochs,
+            clip_max_norm=clip_max_norm,
+            exclude_invalid_x=exclude_invalid_x,
+            discard_prior_samples=discard_prior_samples,
+        )
 
-            # Update tensorboard and summary dict.
-            self._summarize(
-                round_=round_,
-                x_o=self._posterior.default_x,
-                theta_bank=theta,
-                x_bank=x,
-            )
+        # Update description for progress bar.
+        if self._show_round_summary:
+            print(self._describe_round(self._round, self._summary))
 
-        self._posterior._num_trained_rounds = num_rounds
+        # Update tensorboard and summary dict.
+        self._summarize(
+            round_=self._round,
+            x_o=self._posterior.default_x,
+            theta_bank=theta,
+            x_bank=x,
+        )
+
+        self._posterior._num_trained_rounds = self._round + 1
 
         return self._posterior
 
     def _train(
         self,
-        round_: int,
         num_atoms: int,
         training_batch_size: int,
         learning_rate: float,
@@ -219,7 +214,7 @@ class RatioEstimator(NeuralInference, ABC):
         """
 
         # Starting index for the training set (1 = discard round-0 samples).
-        start_idx = int(discard_prior_samples and round_ > 0)
+        start_idx = int(discard_prior_samples and self._round > 0)
         theta, x, _ = self._get_from_data_bank(start_idx, exclude_invalid_x)
 
         # Get total number of training examples.

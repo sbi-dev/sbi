@@ -141,7 +141,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         # arguments, which will build the neural network
         # This is passed into NeuralPosterior, to create a neural posterior which
         # can `sample()` and `log_prob()`. The network is accessible via `.net`.
-        if self._posterior or None or retrain_from_scratch_each_round:
+        if self._posterior is None or retrain_from_scratch_each_round:
             x_shape = x_shape_from_simulation(x)
             self._posterior = NeuralPosterior(
                 method_family="snle",

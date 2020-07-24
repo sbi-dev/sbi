@@ -7,7 +7,6 @@ from torch.utils.tensorboard import SummaryWriter
 
 from sbi.inference.posterior import NeuralPosterior
 from sbi.inference.snre.snre_base import RatioEstimator
-from sbi.types import OneOrMore
 from sbi.utils import del_entries
 
 
@@ -80,8 +79,8 @@ class SNRE_A(RatioEstimator):
 
     def __call__(
         self,
-        num_rounds: int,
-        num_simulations_per_round: OneOrMore[int],
+        num_simulations: int,
+        proposal: Optional[Any] = None,
         x_o: Optional[Tensor] = None,
         training_batch_size: int = 50,
         learning_rate: float = 5e-4,
@@ -95,16 +94,14 @@ class SNRE_A(RatioEstimator):
     ) -> NeuralPosterior:
         r"""Run AALR / SNRE_A.
 
-        Return posterior $p(\theta|x)$ after inference (possibly over several rounds).
+        Return posterior $p(\theta|x)$ after inference.
 
         Args:
-            num_rounds: Number of rounds to run. Each round consists of a simulation and
-                training phase. `num_rounds=1` leads to a posterior $p(\theta|x)$ valid
-                for _any_ $x$ (amortized), but requires many simulations.
-                Alternatively, with `num_rounds>1` the inference returns a posterior
-                $p(\theta|x_o)$ focused on a specific observation `x_o`, potentially
-                requiring less simulations.
-            num_simulations_per_round: Number of simulator calls per round.
+            num_simulations: Number of simulator calls.
+            proposal: Distribution that the parameters $\theta$ are drawn from.
+                `proposal=None` uses the prior (i.e. single-round inference). Setting
+                the proposal to e.g. the posterior of the previous round leads to
+                multi-round inference.
             x_o: An observation that is only required when doing inference
                 over multiple rounds. After the first round, `x_o` is used to guide the
                 sampling so that the simulator is run with parameters that are likely
