@@ -20,7 +20,7 @@ DESCRIPTION = "Simulation-based inference."
 URL = "https://github.com/mackelab/sbi"
 EMAIL = "sbi@mackelab.org"
 AUTHOR = "Álvaro Tejero-Cantero, Jakob H. Macke, Jan-Matthis Lückmann, Conor M. Durkan, Michael Deistler, Jan Bölts"
-REQUIRES_PYTHON = ">=3.7.0"
+REQUIRES_PYTHON = ">=3.6.0"
 
 REQUIRED = [
     "joblib",
