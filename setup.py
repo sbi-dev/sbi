@@ -29,7 +29,7 @@ REQUIRED = [
     "pillow",
     "pyro-ppl",
     "pyknos==0.11",
-    "nflows @ git+https://github.com/bayesiains/nflows.git@84dc0298d99cc3bee9650a1501ef6aa578558080#egg=nflows",
+    "nflows==0.12", #Remove once pyknos is updated to 0.12
     "scipy",
     "tensorboard",
     "torch>=1.5.1",
