@@ -26,7 +26,7 @@ See below for the available methods of inference, `SNPE`, `SNRE` and `SNLE`.
 
 ## Installation
 
-`sbi` requires Python 3.7 or higher. It can be installed using `pip`:
+`sbi` requires Python 3.6 or higher. It can be installed using `pip`:
 ```commandline
 $ pip install sbi
 ```
@@ -35,8 +35,8 @@ We recommend to use a [`conda`](https://docs.conda.io/en/latest/miniconda.html) 
 environment ([Miniconda installation instructions](https://docs.conda.io/en/latest/miniconda.html])). If `conda` is installed on the system, an environment for
 installing `sbi` can be created as follows:
 ```commandline
-# Create an environment for sbi (indicate Python 3.7 or higher); activate it
-$ conda create -n sbi_env python=3.7 && conda activate sbi_env
+# Create an environment for sbi (indicate Python 3.6 or higher); activate it
+$ conda create -n sbi_env python=3.6 && conda activate sbi_env
 ```
 
 To test the installation, drop into a python prompt and run
