@@ -3,7 +3,7 @@
 
 import collections
 import inspect
-from typing import Optional, Tuple, Union, List
+from typing import Callable, Optional, Union, Dict, Any, Tuple, Union, cast, List
 
 import torch
 import matplotlib as mpl

@@ -4,7 +4,7 @@
 from __future__ import annotations
 from sbi.utils.get_nn_models import posterior_nn
 
-from typing import Callable
+from typing import Callable, Optional, Union, Dict, Any, Tuple, Union, cast, List
 
 import pytest
 import torch

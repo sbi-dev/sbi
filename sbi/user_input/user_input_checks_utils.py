@@ -3,7 +3,7 @@
 
 
 import warnings
-from typing import Optional, Sequence, Union
+from typing import Callable, Optional, Union, Dict, Any, Tuple, Union, cast, List
 
 import torch
 from scipy.stats._distn_infrastructure import rv_frozen

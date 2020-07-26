@@ -4,7 +4,7 @@
 import numpy as np
 import torch
 
-from typing import Optional
+from typing import Callable, Optional, Union, Dict, Any, Tuple, Union, cast, List
 from torch import Tensor
 
 from sklearn.model_selection import KFold, cross_val_score

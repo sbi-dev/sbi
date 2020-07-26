@@ -2,7 +2,7 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 import logging
-from typing import Any, Dict, List, Sequence, Tuple
+from typing import Callable, Optional, Union, Dict, Any, Tuple, Union, cast, List
 
 import torch
 from torch import nn as nn

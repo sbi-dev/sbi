@@ -3,7 +3,7 @@
 
 
 from abc import ABC
-from typing import Callable, Optional, Union, Dict, Any, Tuple, Union, cast
+from typing import Callable, Optional, Union, Dict, Any, Tuple, Union, cast, List
 
 import numpy as np
 import torch

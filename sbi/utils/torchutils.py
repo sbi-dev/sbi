@@ -7,7 +7,7 @@ import numpy as np
 import torch
 from torch import Tensor, float32, device
 from torch.distributions import Independent, Uniform
-from typing import Union
+from typing import Callable, Optional, Union, Dict, Any, Tuple, Union, cast, List
 import warnings
 
 from sbi import utils as utils

@@ -3,7 +3,7 @@
 
 
 import warnings
-from typing import Callable, Optional, Sequence, Tuple, Union, cast
+from typing import Callable, Optional, Union, Dict, Any, Tuple, Union, cast, List
 
 import torch
 from numpy import ndarray

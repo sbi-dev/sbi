@@ -1,5 +1,5 @@
 
-from typing import Callable, Optional, Union, Dict, Any, Tuple, Union
+from typing import Callable, Optional, Union, Dict, Any, Tuple, Union, cast, List
 
 import torch
 from torch import Tensor

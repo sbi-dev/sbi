@@ -2,7 +2,7 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 
-from typing import Callable, Optional, Union, Dict, Any, Tuple, Union, cast
+from typing import Callable, Optional, Union, Dict, Any, Tuple, Union, cast, List
 from warnings import warn
 
 import numpy as np
