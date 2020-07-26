@@ -5,7 +5,7 @@
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from sbi.user_input.user_input_checks import check_estimator_arg
-from typing import Callable, Optional, Union, Dict, Any, Tuple, Union, cast, List
+from typing import Callable, Optional, Union, Dict, Any, Tuple, Union, cast, List, Sequence, TypeVar
 from warnings import warn
 
 import numpy as np
