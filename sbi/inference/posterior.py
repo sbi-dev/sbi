@@ -13,7 +13,7 @@ from torch import Tensor, log
 from torch import multiprocessing as mp
 from torch import nn
 
-import sbi.utils as utils
+from sbi import utils as utils
 from sbi.mcmc import Slice, SliceSampler
 from sbi.types import Array, Shape
 from sbi.user_input.user_input_checks import process_x

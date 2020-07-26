@@ -8,7 +8,7 @@ import torch
 from sbi.inference import SNPE_C, SRE, SNL, prepare_for_sbi
 from torch import zeros, ones, eye
 
-import sbi.utils as utils
+from sbi import utils as utils
 
 from sbi.simulators.linear_gaussian import (
     samples_true_posterior_linear_gaussian_uniform_prior,

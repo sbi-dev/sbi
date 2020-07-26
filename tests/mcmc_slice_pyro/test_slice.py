@@ -6,9 +6,9 @@ import os
 from collections import namedtuple
 
 import pyro
-import pyro.distributions as dist
-import pyro.optim as optim
-import pyro.poutine as poutine
+from pyro import distributions as dist
+from pyro import optim as optim
+from pyro import poutine as poutine
 import pytest
 import torch
 from pyro.contrib.conjugate.infer import (

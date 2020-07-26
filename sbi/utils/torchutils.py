@@ -10,7 +10,7 @@ from torch.distributions import Independent, Uniform
 from typing import Union
 import warnings
 
-import sbi.utils as utils
+from sbi import utils as utils
 from sbi.types import Array, OneOrMore, ScalarFloat
 
 

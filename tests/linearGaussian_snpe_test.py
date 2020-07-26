@@ -8,7 +8,7 @@ import pytest
 from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
-import sbi.utils as utils
+from sbi import utils as utils
 from sbi.inference import SNPE_B, SNPE_C, prepare_for_sbi
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,

@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import numpy as np
 import torch
-import torch.distributions as distributions
+from torch import distributions as distributions
 import torchtestcase
 
 from sbi.utils import torchutils

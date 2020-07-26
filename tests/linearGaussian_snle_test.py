@@ -7,7 +7,7 @@ import pytest
 from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
-import sbi.utils as utils
+from sbi import utils as utils
 from sbi.inference import SNL, prepare_for_sbi
 from sbi.simulators.linear_gaussian import (
     diagonal_linear_gaussian,

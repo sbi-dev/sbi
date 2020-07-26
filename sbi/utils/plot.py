@@ -7,7 +7,7 @@ from typing import Optional, Tuple, Union, List
 
 import torch
 import matplotlib as mpl
-import matplotlib.pyplot as plt
+from matplotlib import pyplot as plt
 import numpy as np
 import six
 from scipy.stats import gaussian_kde

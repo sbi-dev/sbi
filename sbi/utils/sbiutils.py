@@ -5,7 +5,7 @@ import logging
 from typing import Any, Dict, List, Sequence, Tuple
 
 import torch
-import torch.nn as nn
+from torch import nn as nn
 from pyknos.nflows import transforms
 from torch import Tensor, as_tensor, ones, zeros
 from tqdm.auto import tqdm
