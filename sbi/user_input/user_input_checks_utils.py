@@ -170,7 +170,7 @@ class MultipleIndependent(Distribution):
 
     def __init__(
         self, dists: Sequence[Distribution], validate_args=None,
-    ) -> MultipleIndependent:
+    ):
         self._check_distributions(dists)
 
         self.dists = dists
