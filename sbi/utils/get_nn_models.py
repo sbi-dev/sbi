@@ -1,9 +1,8 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
-from __future__ import annotations
 
-from typing import Any, Callable
+from typing import Callable, Optional, Union, Dict, Any, Tuple, Union, cast, List, Sequence, TypeVar
 from sbi.neural_nets.flow import build_made, build_maf, build_nsf
 from sbi.neural_nets.mdn import build_mdn
 from sbi.neural_nets.classifier import (

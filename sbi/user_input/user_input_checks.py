@@ -1,10 +1,9 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
-from __future__ import annotations
 
 import warnings
-from typing import Callable, Optional, Sequence, Tuple, Union, cast
+from typing import Callable, Optional, Union, Dict, Any, Tuple, Union, cast, List, Sequence, TypeVar
 
 import torch
 from numpy import ndarray

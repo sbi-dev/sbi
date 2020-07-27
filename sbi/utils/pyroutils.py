@@ -1,7 +1,7 @@
-from typing import Callable, Any
+from typing import Callable, Optional, Union, Dict, Any, Tuple, Union, cast, List, Sequence, TypeVar
 
-import pyro.distributions as dist
-import pyro.poutine as poutine
+from pyro import distributions as dist
+from pyro import poutine as poutine
 from torch.distributions import biject_to
 
 

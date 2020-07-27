@@ -2,10 +2,10 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 import logging
-from typing import Any, Dict, List, Sequence, Tuple
+from typing import Callable, Optional, Union, Dict, Any, Tuple, Union, cast, List, Sequence, TypeVar
 
 import torch
-import torch.nn as nn
+from torch import nn as nn
 from pyknos.nflows import transforms
 from torch import Tensor, as_tensor, ones, zeros
 from tqdm.auto import tqdm

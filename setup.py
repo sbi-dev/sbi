@@ -20,7 +20,7 @@ DESCRIPTION = "Simulation-based inference."
 URL = "https://github.com/mackelab/sbi"
 EMAIL = "sbi@mackelab.org"
 AUTHOR = "Álvaro Tejero-Cantero, Jakob H. Macke, Jan-Matthis Lückmann, Conor M. Durkan, Michael Deistler, Jan Bölts"
-REQUIRES_PYTHON = ">=3.7.0"
+REQUIRES_PYTHON = ">=3.6.0"
 
 REQUIRED = [
     "joblib",
@@ -29,6 +29,7 @@ REQUIRED = [
     "pillow",
     "pyro-ppl",
     "pyknos==0.11",
+    "nflows==0.12", #Remove once pyknos is updated to 0.12
     "scipy",
     "tensorboard",
     "torch>=1.5.1",

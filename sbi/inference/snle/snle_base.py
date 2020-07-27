@@ -1,10 +1,9 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
-from __future__ import annotations
 
 from abc import ABC
-from typing import Callable, Dict, Optional, Union
+from typing import Callable, Optional, Union, Dict, Any, Tuple, Union, cast, List, Sequence, TypeVar
 
 import numpy as np
 import torch
@@ -14,7 +13,7 @@ from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 
-import sbi.utils as utils
+from sbi import utils as utils
 from sbi.inference import NeuralInference
 from sbi.inference.posterior import NeuralPosterior
 from sbi.types import OneOrMore, ScalarFloat

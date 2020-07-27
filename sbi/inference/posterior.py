@@ -1,9 +1,8 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
-from __future__ import annotations
 
-from typing import Callable, Optional
+from typing import Callable, Optional, Union, Dict, Any, Tuple, Union, cast, List, Sequence, TypeVar
 from warnings import warn
 
 import numpy as np
@@ -14,7 +13,7 @@ from torch import Tensor, log
 from torch import multiprocessing as mp
 from torch import nn
 
-import sbi.utils as utils
+from sbi import utils as utils
 from sbi.mcmc import Slice, SliceSampler
 from sbi.types import Array, Shape
 from sbi.user_input.user_input_checks import process_x

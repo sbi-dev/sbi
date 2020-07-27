@@ -1,4 +1,4 @@
-from typing import List, Type  # noqa: F401
+from typing import Callable, Optional, Union, Dict, Any, Tuple, Union, cast, List, Sequence, TypeVar
 from sbi.inference.base import NeuralInference, infer  # noqa: F401
 from sbi.user_input.user_input_checks import prepare_for_sbi
 
