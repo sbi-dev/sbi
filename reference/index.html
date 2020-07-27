@@ -139,22 +139,22 @@
       </label>
 <ul class="md-nav__list" data-md-scrollfix="">
 <li class="md-nav__item">
-<a class="md-nav__link" href="../tutorial/00_getting_started/" title="Getting started">
+<a class="md-nav__link" href="../tutorial/00_getting_started.md" title="Getting started">
       Getting started
     </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="../tutorial/01_gaussian_amortized/" title="Amortized inference">
+<a class="md-nav__link" href="../tutorial/01_gaussian_amortized.md" title="Amortized inference">
       Amortized inference
     </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="../tutorial/02_HH_simulator/" title="Hodgkin-Huxley example">
+<a class="md-nav__link" href="../tutorial/02_HH_simulator.md" title="Hodgkin-Huxley example">
       Hodgkin-Huxley example
     </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="../tutorial/03_flexible_interface/" title="Flexible interface">
+<a class="md-nav__link" href="../tutorial/03_flexible_interface.md" title="Flexible interface">
       Flexible interface
     </a>
 </li>
@@ -504,7 +504,9 @@ runtime, but a better posterior estimate.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>27
+<pre><span></span>25
+26
+27
 28
 29
 30
@@ -546,9 +548,7 @@ runtime, but a better posterior estimate.</p>
 66
 67
 68
-69
-70
-71</pre>
+69</pre>
 </div>
 </td>
 <td class="code">
@@ -659,7 +659,7 @@ sbi.user_input.user_input_checks.prepare_for_sbi<span class="p">(</span><span cl
 </thead>
 <tbody>
 <tr>
-<td><code>Tuple[Callable, Distribution]</code></td>
+<td><code>Tuple[Callable, torch.distributions.distribution.Distribution]</code></td>
 <td>
 <p>Tuple (simulator, prior, x_shape) checked and matching the requirements of sbi.</p>
 </td>
@@ -672,7 +672,8 @@ sbi.user_input.user_input_checks.prepare_for_sbi<span class="p">(</span><span cl
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>457
+<pre><span></span>456
+457
 458
 459
 460
@@ -701,8 +702,7 @@ sbi.user_input.user_input_checks.prepare_for_sbi<span class="p">(</span><span cl
 483
 484
 485
-486
-487</pre>
+486</pre>
 </div>
 </td>
 <td class="code">
@@ -789,7 +789,7 @@ requiring less simulations.</p>
 </tr>
 <tr>
 <td><code>num_simulations_per_round</code></td>
-<td><code>OneOrMore[int]</code></td>
+<td><code>Union[int, Sequence[int]]</code></td>
 <td>
 <p>Number of simulator calls per round.</p>
 </td>
@@ -797,7 +797,7 @@ requiring less simulations.</p>
 </tr>
 <tr>
 <td><code>x_o</code></td>
-<td><code>Optional[Tensor]</code></td>
+<td><code>Optional[torch.Tensor]</code></td>
 <td>
 <p>An observation that is only required when doing inference
 over multiple rounds. After the first round, <code>x_o</code> is used to guide the
@@ -929,7 +929,8 @@ estimator for the posterior from scratch each round.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span> 98
+<pre><span></span> 97
+ 98
  99
 100
 101
@@ -995,8 +996,7 @@ estimator for the posterior from scratch each round.</p>
 161
 162
 163
-164
-165</pre>
+164</pre>
 </div>
 </td>
 <td class="code">
@@ -1220,7 +1220,7 @@ INFO, WARNING, DEBUG, ERROR and CRITICAL.</p>
 </tr>
 <tr>
 <td><code>summary_writer</code></td>
-<td><code>Optional[SummaryWriter]</code></td>
+<td><code>Optional[torch.utils.tensorboard.writer.SummaryWriter]</code></td>
 <td>
 <p>A <code>SummaryWriter</code> to control, among others, log
 file location (default is <code>&lt;current working directory&gt;/logs</code>.)</p>
@@ -1253,7 +1253,8 @@ each round.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>19
+<pre><span></span>18
+19
 20
 21
 22
@@ -1329,8 +1330,7 @@ each round.</p>
 92
 93
 94
-95
-96</pre>
+95</pre>
 </div>
 </td>
 <td class="code">
@@ -1467,7 +1467,7 @@ requiring less simulations.</p>
 </tr>
 <tr>
 <td><code>num_simulations_per_round</code></td>
-<td><code>OneOrMore[int]</code></td>
+<td><code>Union[int, Sequence[int]]</code></td>
 <td>
 <p>Number of simulator calls per round.</p>
 </td>
@@ -1475,7 +1475,7 @@ requiring less simulations.</p>
 </tr>
 <tr>
 <td><code>x_o</code></td>
-<td><code>Optional[Tensor]</code></td>
+<td><code>Optional[torch.Tensor]</code></td>
 <td>
 <p>An observation that is only required when doing inference
 over multiple rounds. After the first round, <code>x_o</code> is used to guide the
@@ -1590,7 +1590,8 @@ estimator for the posterior from scratch each round.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span> 87
+<pre><span></span> 86
+ 87
  88
  89
  90
@@ -1643,8 +1644,7 @@ estimator for the posterior from scratch each round.</p>
 137
 138
 139
-140
-141</pre>
+140</pre>
 </div>
 </td>
 <td class="code">
@@ -1836,7 +1836,7 @@ INFO, WARNING, DEBUG, ERROR and CRITICAL.</p>
 </tr>
 <tr>
 <td><code>summary_writer</code></td>
-<td><code>Optional[SummaryWriter]</code></td>
+<td><code>Optional[torch.utils.tensorboard.writer.SummaryWriter]</code></td>
 <td>
 <p>A <code>SummaryWriter</code> to control, among others, log
 file location (default is <code>&lt;current working directory&gt;/logs</code>.)</p>
@@ -1869,7 +1869,8 @@ each round.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>19
+<pre><span></span>18
+19
 20
 21
 22
@@ -1934,8 +1935,7 @@ each round.</p>
 81
 82
 83
-84
-85</pre>
+84</pre>
 </div>
 </td>
 <td class="code">
@@ -2061,7 +2061,7 @@ requiring less simulations.</p>
 </tr>
 <tr>
 <td><code>num_simulations_per_round</code></td>
-<td><code>OneOrMore[int]</code></td>
+<td><code>Union[int, Sequence[int]]</code></td>
 <td>
 <p>Number of simulator calls per round.</p>
 </td>
@@ -2069,7 +2069,7 @@ requiring less simulations.</p>
 </tr>
 <tr>
 <td><code>x_o</code></td>
-<td><code>Optional[Tensor]</code></td>
+<td><code>Optional[torch.Tensor]</code></td>
 <td>
 <p>An observation that is only required when doing inference
 over multiple rounds. After the first round, <code>x_o</code> is used to guide the
@@ -2184,7 +2184,8 @@ estimator for the posterior from scratch each round.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span> 82
+<pre><span></span> 81
+ 82
  83
  84
  85
@@ -2240,8 +2241,7 @@ estimator for the posterior from scratch each round.</p>
 135
 136
 137
-138
-139</pre>
+138</pre>
 </div>
 </td>
 <td class="code">
@@ -2434,7 +2434,7 @@ INFO, WARNING, DEBUG, ERROR and CRITICAL.</p>
 </tr>
 <tr>
 <td><code>summary_writer</code></td>
-<td><code>Optional[SummaryWriter]</code></td>
+<td><code>Optional[torch.utils.tensorboard.writer.SummaryWriter]</code></td>
 <td>
 <p>A <code>SummaryWriter</code> to control, among others, log
 file location (default is <code>&lt;current working directory&gt;/logs</code>.)</p>
@@ -2467,7 +2467,8 @@ each round.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>16
+<pre><span></span>15
+16
 17
 18
 19
@@ -2530,8 +2531,7 @@ each round.</p>
 76
 77
 78
-79
-80</pre>
+79</pre>
 </div>
 </td>
 <td class="code">
@@ -2655,7 +2655,7 @@ requiring less simulations.</p>
 </tr>
 <tr>
 <td><code>num_simulations_per_round</code></td>
-<td><code>OneOrMore[int]</code></td>
+<td><code>Union[int, Sequence[int]]</code></td>
 <td>
 <p>Number of simulator calls per round.</p>
 </td>
@@ -2663,7 +2663,7 @@ requiring less simulations.</p>
 </tr>
 <tr>
 <td><code>x_o</code></td>
-<td><code>Optional[Tensor]</code></td>
+<td><code>Optional[torch.Tensor]</code></td>
 <td>
 <p>An observation that is only required when doing inference
 over multiple rounds. After the first round, <code>x_o</code> is used to guide the
@@ -2778,7 +2778,8 @@ estimator for the posterior from scratch each round.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span> 82
+<pre><span></span> 81
+ 82
  83
  84
  85
@@ -2832,8 +2833,7 @@ estimator for the posterior from scratch each round.</p>
 133
 134
 135
-136
-137</pre>
+136</pre>
 </div>
 </td>
 <td class="code">
@@ -3024,7 +3024,7 @@ INFO, WARNING, DEBUG, ERROR and CRITICAL.</p>
 </tr>
 <tr>
 <td><code>summary_writer</code></td>
-<td><code>Optional[SummaryWriter]</code></td>
+<td><code>Optional[torch.utils.tensorboard.writer.SummaryWriter]</code></td>
 <td>
 <p>A <code>SummaryWriter</code> to control, among others, log
 file location (default is <code>&lt;current working directory&gt;/logs</code>.)</p>
@@ -3057,7 +3057,8 @@ each round.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>16
+<pre><span></span>15
+16
 17
 18
 19
@@ -3120,8 +3121,7 @@ each round.</p>
 76
 77
 78
-79
-80</pre>
+79</pre>
 </div>
 </td>
 <td class="code">
@@ -3231,7 +3231,7 @@ __call__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <tbody>
 <tr>
 <td><code>x_o</code></td>
-<td><code>Union[Tensor, ndarray]</code></td>
+<td><code>Union[torch.Tensor, numpy.ndarray]</code></td>
 <td>
 <p>Observed data.</p>
 </td>
@@ -3285,7 +3285,7 @@ selected parameters.</p>
 </thead>
 <tbody>
 <tr>
-<td><code>Union[Distribution, Tuple[Distribution, Tensor]]</code></td>
+<td><code>Union[torch.distributions.distribution.Distribution, Tuple[torch.distributions.distribution.Distribution, torch.Tensor]]</code></td>
 <td>
 <p>posterior: Empirical distribution based on selected parameters.
 distances: Tensor of distances of the selected parameters.</p>
@@ -3299,7 +3299,8 @@ distances: Tensor of distances of the selected parameters.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span> 60
+<pre><span></span> 59
+ 60
  61
  62
  63
@@ -3361,8 +3362,7 @@ distances: Tensor of distances of the selected parameters.</p>
 119
 120
 121
-122
-123</pre>
+122</pre>
 </div>
 </td>
 <td class="code">
@@ -3530,7 +3530,8 @@ sampling.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>16
+<pre><span></span>15
+16
 17
 18
 19
@@ -3571,8 +3572,7 @@ sampling.</p>
 54
 55
 56
-57
-58</pre>
+57</pre>
 </div>
 </td>
 <td class="code">
@@ -3660,7 +3660,7 @@ __call__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <tbody>
 <tr>
 <td><code>x_o</code></td>
-<td><code>Union[Tensor, ndarray]</code></td>
+<td><code>Union[torch.Tensor, numpy.ndarray]</code></td>
 <td>
 <p>Observed data.</p>
 </td>
@@ -3756,7 +3756,7 @@ weights, etc. at the end.</p>
 </thead>
 <tbody>
 <tr>
-<td><code>Union[Distribution, Tuple[Distribution, dict]]</code></td>
+<td><code>Union[torch.distributions.distribution.Distribution, Tuple[torch.distributions.distribution.Distribution, dict]]</code></td>
 <td>
 <p>posterior: Empirical posterior distribution defined by the accepted
     particles and their weights.
@@ -3772,7 +3772,8 @@ summary (optional): A dictionary containing particles, weights, epsilons
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>100
+<pre><span></span> 99
+100
 101
 102
 103
@@ -3891,8 +3892,7 @@ summary (optional): A dictionary containing particles, weights, epsilons
 216
 217
 218
-219
-220</pre>
+219</pre>
 </div>
 </td>
 <td class="code">
@@ -4140,7 +4140,8 @@ sampling.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>18
+<pre><span></span>17
+18
 19
 20
 21
@@ -4219,8 +4220,7 @@ sampling.</p>
 94
 95
 96
-97
-98</pre>
+97</pre>
 </div>
 </td>
 <td class="code">
@@ -4327,7 +4327,8 @@ get_new_kernel<span class="p">(</span><span class="bp">self</span><span class="p
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>481
+<pre><span></span>480
+481
 482
 483
 484
@@ -4342,8 +4343,7 @@ get_new_kernel<span class="p">(</span><span class="bp">self</span><span class="p
 493
 494
 495
-496
-497</pre>
+496</pre>
 </div>
 </td>
 <td class="code">
@@ -4387,7 +4387,8 @@ too small.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>499
+<pre><span></span>498
+499
 500
 501
 502
@@ -4408,8 +4409,7 @@ too small.</p>
 517
 518
 519
-520
-521</pre>
+520</pre>
 </div>
 </td>
 <td class="code">
@@ -4461,7 +4461,8 @@ sample_from_population_with_weights<span class="p">(</span><span class="n">parti
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>393
+<pre><span></span>392
+393
 394
 395
 396
@@ -4473,8 +4474,7 @@ sample_from_population_with_weights<span class="p">(</span><span class="n">parti
 402
 403
 404
-405
-406</pre>
+405</pre>
 </div>
 </td>
 <td class="code">
@@ -4536,7 +4536,7 @@ sample_from_population_with_weights<span class="p">(</span><span class="n">parti
 <div class="doc doc-object doc-attribute">
 <h4 class="doc doc-heading" data-toc-label="default_x" id="sbi.inference.posterior.NeuralPosterior.default_x">
 <code class="highlight">
-default_x: <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> </code>
+default_x: <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> </code>
 <span class="doc doc-properties">
 <small class="doc doc-property doc-property-property"><code>property</code></small>
 <small class="doc doc-property doc-property-writable"><code>writable</code></small>
@@ -4615,7 +4615,7 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 </tr>
 <tr>
 <td><code>neural_net</code></td>
-<td><code>nn.Module</code></td>
+<td><code>Module</code></td>
 <td>
 <p>A classifier for SNRE, a density estimator for SNPE and SNL.</p>
 </td>
@@ -4631,7 +4631,7 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 </tr>
 <tr>
 <td><code>x_shape</code></td>
-<td><code>torch.Size</code></td>
+<td><code>Size</code></td>
 <td>
 <p>Shape of a single simulator output.</p>
 </td>
@@ -4689,59 +4689,59 @@ for MCMC sampling.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span> 48
- 49
- 50
- 51
- 52
- 53
- 54
- 55
- 56
- 57
- 58
- 59
- 60
- 61
- 62
- 63
- 64
- 65
- 66
- 67
- 68
- 69
- 70
- 71
- 72
- 73
- 74
- 75
- 76
- 77
- 78
- 79
- 80
- 81
- 82
- 83
- 84
- 85
- 86
- 87
- 88
- 89
- 90
- 91
- 92
- 93
- 94
- 95
- 96
- 97
- 98
- 99
-100</pre>
+<pre><span></span>47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68
+69
+70
+71
+72
+73
+74
+75
+76
+77
+78
+79
+80
+81
+82
+83
+84
+85
+86
+87
+88
+89
+90
+91
+92
+93
+94
+95
+96
+97
+98
+99</pre>
 </div>
 </td>
 <td class="code">
@@ -4892,7 +4892,8 @@ enforce a new leakage estimate for rounds after the first (2, 3,..).</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>335
+<pre><span></span>334
+335
 336
 337
 338
@@ -4938,8 +4939,7 @@ enforce a new leakage estimate for rounds after the first (2, 3,..).</p>
 378
 379
 380
-381
-382</pre>
+381</pre>
 </div>
 </td>
 <td class="code">
@@ -5028,7 +5028,7 @@ log_prob<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 </tr>
 <tr>
 <td><code>x</code></td>
-<td><code>Optional[Tensor]</code></td>
+<td><code>Optional[torch.Tensor]</code></td>
 <td>
 <p>Conditioning context for posterior <span><span class="MathJax_Preview">p(\theta|x)</span><script type="math/tex">p(\theta|x)</script></span>. If not provided, fall
 back onto an <code>x_o</code> if previously provided for multi-round training, or
@@ -5086,7 +5086,8 @@ support of the prior, -∞ (corresponding to 0 probability) outside.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>221
+<pre><span></span>220
+221
 222
 223
 224
@@ -5140,8 +5141,7 @@ support of the prior, -∞ (corresponding to 0 probability) outside.</p>
 272
 273
 274
-275
-276</pre>
+275</pre>
 </div>
 </td>
 <td class="code">
@@ -5233,7 +5233,7 @@ and SRE are restricted to sampling with MCMC.</p>
 <tbody>
 <tr>
 <td><code>sample_shape</code></td>
-<td><code>Shape</code></td>
+<td><code>Union[torch.Size, Tuple[int, ...]]</code></td>
 <td>
 <p>Desired shape of samples that are drawn from posterior. If
 sample_shape is multidimensional we simply draw <code>sample_shape.numel()</code>
@@ -5243,7 +5243,7 @@ samples and then reshape into the desired shape.</p>
 </tr>
 <tr>
 <td><code>x</code></td>
-<td><code>Optional[Tensor]</code></td>
+<td><code>Optional[torch.Tensor]</code></td>
 <td>
 <p>Conditioning context for posterior <span><span class="MathJax_Preview">p(\theta|x)</span><script type="math/tex">p(\theta|x)</script></span>. If not provided,
 fall back onto <code>x_o</code> if previously provided for multiround training, or
@@ -5315,7 +5315,8 @@ locations.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>384
+<pre><span></span>383
+384
 385
 386
 387
@@ -5390,8 +5391,7 @@ locations.</p>
 456
 457
 458
-459
-460</pre>
+459</pre>
 </div>
 </td>
 <td class="code">
@@ -5527,7 +5527,7 @@ that calls like <code>posterior.set_default_x(my_x).sample(mytheta)</code> are p
 </thead>
 <tbody>
 <tr>
-<td><code>'NeuralPosterior'</code></td>
+<td><code>NeuralPosterior</code></td>
 <td>
 <p><code>NeuralPosterior</code> that will use a default <code>x</code> when not explicitly passed.</p>
 </td>
@@ -5540,7 +5540,8 @@ that calls like <code>posterior.set_default_x(my_x).sample(mytheta)</code> are p
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>112
+<pre><span></span>111
+112
 113
 114
 115
@@ -5562,8 +5563,7 @@ that calls like <code>posterior.set_default_x(my_x).sample(mytheta)</code> are p
 131
 132
 133
-134
-135</pre>
+134</pre>
 </div>
 </td>
 <td class="code">
@@ -5638,7 +5638,7 @@ set_mcmc_method<span class="p">(</span><span class="bp">self</span><span class="
 </thead>
 <tbody>
 <tr>
-<td><code>'NeuralPosterior'</code></td>
+<td><code>NeuralPosterior</code></td>
 <td>
 <p><code>NeuralPosterior</code> for chainable calls.</p>
 </td>
@@ -5651,7 +5651,8 @@ set_mcmc_method<span class="p">(</span><span class="bp">self</span><span class="
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>147
+<pre><span></span>146
+147
 148
 149
 150
@@ -5660,8 +5661,7 @@ set_mcmc_method<span class="p">(</span><span class="bp">self</span><span class="
 153
 154
 155
-156
-157</pre>
+156</pre>
 </div>
 </td>
 <td class="code">
@@ -5730,7 +5730,7 @@ locations.</p>
 </thead>
 <tbody>
 <tr>
-<td><code>'NeuralPosterior'</code></td>
+<td><code>NeuralPosterior</code></td>
 <td>
 <p><code>NeuralPosterior</code> for chainable calls.</p>
 </td>
@@ -5743,7 +5743,8 @@ locations.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>172
+<pre><span></span>171
+172
 173
 174
 175
@@ -5760,8 +5761,7 @@ locations.</p>
 186
 187
 188
-189
-190</pre>
+189</pre>
 </div>
 </td>
 <td class="code">
@@ -5831,7 +5831,7 @@ set_sample_with_mcmc<span class="p">(</span><span class="bp">self</span><span cl
 </thead>
 <tbody>
 <tr>
-<td><code>'NeuralPosterior'</code></td>
+<td><code>NeuralPosterior</code></td>
 <td>
 <p><code>NeuralPosterior</code> for chainable calls.</p>
 </td>
@@ -5844,7 +5844,8 @@ set_sample_with_mcmc<span class="p">(</span><span class="bp">self</span><span cl
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>202
+<pre><span></span>201
+202
 203
 204
 205
@@ -5860,8 +5861,7 @@ set_sample_with_mcmc<span class="p">(</span><span class="bp">self</span><span cl
 215
 216
 217
-218
-219</pre>
+218</pre>
 </div>
 </td>
 <td class="code">
@@ -5908,7 +5908,8 @@ sbi.utils.get_nn_models.posterior_nn<span class="p">(</span><span class="n">mode
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>49
+<pre><span></span>48
+49
 50
 51
 52
@@ -5920,8 +5921,7 @@ sbi.utils.get_nn_models.posterior_nn<span class="p">(</span><span class="n">mode
 58
 59
 60
-61
-62</pre>
+61</pre>
 </div>
 </td>
 <td class="code">
@@ -5960,7 +5960,8 @@ sbi.utils.get_nn_models.likelihood_nn<span class="p">(</span><span class="n">mod
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>33
+<pre><span></span>32
+33
 34
 35
 36
@@ -5972,8 +5973,7 @@ sbi.utils.get_nn_models.likelihood_nn<span class="p">(</span><span class="n">mod
 42
 43
 44
-45
-46</pre>
+45</pre>
 </div>
 </td>
 <td class="code">
@@ -6012,7 +6012,8 @@ sbi.utils.get_nn_models.classifier_nn<span class="p">(</span><span class="n">mod
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>16
+<pre><span></span>15
+16
 17
 18
 19
@@ -6025,8 +6026,7 @@ sbi.utils.get_nn_models.classifier_nn<span class="p">(</span><span class="n">mod
 26
 27
 28
-29
-30</pre>
+29</pre>
 </div>
 </td>
 <td class="code">
@@ -6058,7 +6058,7 @@ sbi.utils.get_nn_models.classifier_nn<span class="p">(</span><span class="n">mod
 <div class="doc doc-object doc-function">
 <h3 class="doc doc-heading" id="sbi.utils.plot.pairplot">
 <code class="highlight language-python">
-sbi.utils.plot.pairplot<span class="p">(</span><span class="n">samples</span><span class="p">,</span> <span class="n">points</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">upper</span><span class="o">=</span><span class="s1">'hist'</span><span class="p">,</span> <span class="n">diag</span><span class="o">=</span><span class="s1">'hist'</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">legend</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">labels_points</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">labels_samples</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">samples_colors</span><span class="o">=</span><span class="p">[</span><span class="s1">'#1f77b4'</span><span class="p">,</span> <span class="s1">'#ff7f0e'</span><span class="p">,</span> <span class="s1">'#2ca02c'</span><span class="p">,</span> <span class="s1">'#d62728'</span><span class="p">,</span> <span class="s1">'#9467bd'</span><span class="p">,</span> <span class="s1">'#8c564b'</span><span class="p">,</span> <span class="s1">'#e377c2'</span><span class="p">,</span> <span class="s1">'#7f7f7f'</span><span class="p">,</span> <span class="s1">'#bcbd22'</span><span class="p">,</span> <span class="s1">'#17becf'</span><span class="p">],</span> <span class="n">points_colors</span><span class="o">=</span><span class="p">[</span><span class="s1">'#1f77b4'</span><span class="p">,</span> <span class="s1">'#ff7f0e'</span><span class="p">,</span> <span class="s1">'#2ca02c'</span><span class="p">,</span> <span class="s1">'#d62728'</span><span class="p">,</span> <span class="s1">'#9467bd'</span><span class="p">,</span> <span class="s1">'#8c564b'</span><span class="p">,</span> <span class="s1">'#e377c2'</span><span class="p">,</span> <span class="s1">'#7f7f7f'</span><span class="p">,</span> <span class="s1">'#bcbd22'</span><span class="p">,</span> <span class="s1">'#17becf'</span><span class="p">],</span> <span class="n">subset</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">ticks</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">tickformatter</span><span class="o">=&lt;</span><span class="n">matplotlib</span><span class="o">.</span><span class="n">ticker</span><span class="o">.</span><span class="n">FormatStrFormatter</span> <span class="nb">object</span> <span class="n">at</span> <span class="mh">0x7f887d2f8b50</span><span class="o">&gt;</span><span class="p">,</span> <span class="n">tick_labels</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">hist_diag</span><span class="o">=</span><span class="p">{</span><span class="s1">'alpha'</span><span class="p">:</span> <span class="mf">1.0</span><span class="p">,</span> <span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span> <span class="s1">'density'</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s1">'histtype'</span><span class="p">:</span> <span class="s1">'step'</span><span class="p">},</span> <span class="n">hist_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">},</span> <span class="n">kde_diag</span><span class="o">=</span><span class="p">{</span><span class="s1">'bw_method'</span><span class="p">:</span> <span class="s1">'scott'</span><span class="p">,</span> <span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span> <span class="s1">'color'</span><span class="p">:</span> <span class="s1">'black'</span><span class="p">},</span> <span class="n">kde_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'bw_method'</span><span class="p">:</span> <span class="s1">'scott'</span><span class="p">,</span> <span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">},</span> <span class="n">contour_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'levels'</span><span class="p">:</span> <span class="p">[</span><span class="mf">0.68</span><span class="p">],</span> <span class="s1">'percentile'</span><span class="p">:</span> <span class="kc">True</span><span class="p">},</span> <span class="n">scatter_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'alpha'</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">,</span> <span class="s1">'edgecolor'</span><span class="p">:</span> <span class="s1">'none'</span><span class="p">,</span> <span class="s1">'rasterized'</span><span class="p">:</span> <span class="kc">False</span><span class="p">},</span> <span class="n">plot_offdiag</span><span class="o">=</span><span class="p">{},</span> <span class="n">points_diag</span><span class="o">=</span><span class="p">{},</span> <span class="n">points_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'marker'</span><span class="p">:</span> <span class="s1">'.'</span><span class="p">,</span> <span class="s1">'markersize'</span><span class="p">:</span> <span class="mi">20</span><span class="p">},</span> <span class="n">fig_size</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">10</span><span class="p">),</span> <span class="n">fig_bg_colors</span><span class="o">=</span><span class="p">{</span><span class="s1">'upper'</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span> <span class="s1">'diag'</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span> <span class="s1">'lower'</span><span class="p">:</span> <span class="kc">None</span><span class="p">},</span> <span class="n">fig_subplots_adjust</span><span class="o">=</span><span class="p">{</span><span class="s1">'top'</span><span class="p">:</span> <span class="mf">0.9</span><span class="p">},</span> <span class="n">subplots</span><span class="o">=</span><span class="p">{},</span> <span class="n">despine</span><span class="o">=</span><span class="p">{</span><span class="s1">'offset'</span><span class="p">:</span> <span class="mi">5</span><span class="p">},</span> <span class="n">title_format</span><span class="o">=</span><span class="p">{</span><span class="s1">'fontsize'</span><span class="p">:</span> <span class="mi">16</span><span class="p">})</span> </code>
+sbi.utils.plot.pairplot<span class="p">(</span><span class="n">samples</span><span class="p">,</span> <span class="n">points</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">upper</span><span class="o">=</span><span class="s1">'hist'</span><span class="p">,</span> <span class="n">diag</span><span class="o">=</span><span class="s1">'hist'</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">legend</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">labels_points</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">labels_samples</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">samples_colors</span><span class="o">=</span><span class="p">[</span><span class="s1">'#1f77b4'</span><span class="p">,</span> <span class="s1">'#ff7f0e'</span><span class="p">,</span> <span class="s1">'#2ca02c'</span><span class="p">,</span> <span class="s1">'#d62728'</span><span class="p">,</span> <span class="s1">'#9467bd'</span><span class="p">,</span> <span class="s1">'#8c564b'</span><span class="p">,</span> <span class="s1">'#e377c2'</span><span class="p">,</span> <span class="s1">'#7f7f7f'</span><span class="p">,</span> <span class="s1">'#bcbd22'</span><span class="p">,</span> <span class="s1">'#17becf'</span><span class="p">],</span> <span class="n">points_colors</span><span class="o">=</span><span class="p">[</span><span class="s1">'#1f77b4'</span><span class="p">,</span> <span class="s1">'#ff7f0e'</span><span class="p">,</span> <span class="s1">'#2ca02c'</span><span class="p">,</span> <span class="s1">'#d62728'</span><span class="p">,</span> <span class="s1">'#9467bd'</span><span class="p">,</span> <span class="s1">'#8c564b'</span><span class="p">,</span> <span class="s1">'#e377c2'</span><span class="p">,</span> <span class="s1">'#7f7f7f'</span><span class="p">,</span> <span class="s1">'#bcbd22'</span><span class="p">,</span> <span class="s1">'#17becf'</span><span class="p">],</span> <span class="n">subset</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">ticks</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">tickformatter</span><span class="o">=&lt;</span><span class="n">matplotlib</span><span class="o">.</span><span class="n">ticker</span><span class="o">.</span><span class="n">FormatStrFormatter</span> <span class="nb">object</span> <span class="n">at</span> <span class="mh">0x7fdc39df4a50</span><span class="o">&gt;</span><span class="p">,</span> <span class="n">tick_labels</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">hist_diag</span><span class="o">=</span><span class="p">{</span><span class="s1">'alpha'</span><span class="p">:</span> <span class="mf">1.0</span><span class="p">,</span> <span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span> <span class="s1">'density'</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s1">'histtype'</span><span class="p">:</span> <span class="s1">'step'</span><span class="p">},</span> <span class="n">hist_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">},</span> <span class="n">kde_diag</span><span class="o">=</span><span class="p">{</span><span class="s1">'bw_method'</span><span class="p">:</span> <span class="s1">'scott'</span><span class="p">,</span> <span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span> <span class="s1">'color'</span><span class="p">:</span> <span class="s1">'black'</span><span class="p">},</span> <span class="n">kde_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'bw_method'</span><span class="p">:</span> <span class="s1">'scott'</span><span class="p">,</span> <span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">},</span> <span class="n">contour_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'levels'</span><span class="p">:</span> <span class="p">[</span><span class="mf">0.68</span><span class="p">],</span> <span class="s1">'percentile'</span><span class="p">:</span> <span class="kc">True</span><span class="p">},</span> <span class="n">scatter_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'alpha'</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">,</span> <span class="s1">'edgecolor'</span><span class="p">:</span> <span class="s1">'none'</span><span class="p">,</span> <span class="s1">'rasterized'</span><span class="p">:</span> <span class="kc">False</span><span class="p">},</span> <span class="n">plot_offdiag</span><span class="o">=</span><span class="p">{},</span> <span class="n">points_diag</span><span class="o">=</span><span class="p">{},</span> <span class="n">points_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'marker'</span><span class="p">:</span> <span class="s1">'.'</span><span class="p">,</span> <span class="s1">'markersize'</span><span class="p">:</span> <span class="mi">20</span><span class="p">},</span> <span class="n">fig_size</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">10</span><span class="p">),</span> <span class="n">fig_bg_colors</span><span class="o">=</span><span class="p">{</span><span class="s1">'upper'</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span> <span class="s1">'diag'</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span> <span class="s1">'lower'</span><span class="p">:</span> <span class="kc">None</span><span class="p">},</span> <span class="n">fig_subplots_adjust</span><span class="o">=</span><span class="p">{</span><span class="s1">'top'</span><span class="p">:</span> <span class="mf">0.9</span><span class="p">},</span> <span class="n">subplots</span><span class="o">=</span><span class="p">{},</span> <span class="n">despine</span><span class="o">=</span><span class="p">{</span><span class="s1">'offset'</span><span class="p">:</span> <span class="mi">5</span><span class="p">},</span> <span class="n">title_format</span><span class="o">=</span><span class="p">{</span><span class="s1">'fontsize'</span><span class="p">:</span> <span class="mi">16</span><span class="p">})</span> </code>
 <a class="headerlink" href="#sbi.utils.plot.pairplot" title="Permanent link">¶</a></h3>
 <div class="doc doc-contents first">
 <p>Plot samples and points.</p>
@@ -6198,7 +6198,7 @@ max along each parameter dimension</p>
 <td>
 <p>passed to _format_axis()</p>
 </td>
-<td><code>&lt;matplotlib.ticker.FormatStrFormatter object at 0x7f887d2f8b50&gt;</code></td>
+<td><code>&lt;matplotlib.ticker.FormatStrFormatter object at 0x7fdc39df4a50&gt;</code></td>
 </tr>
 <tr>
 <td><code>tick_labels</code></td>
