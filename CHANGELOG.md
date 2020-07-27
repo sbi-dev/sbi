@@ -1,3 +1,9 @@
+# v0.10.2
+
+- Added missing type imports (#275)
+- Made compatible for Python 3.6 (#275)
+
+
 # v0.10.1
 
 - Added `mcmc_parameters` to init methods of inference methods (#270)
