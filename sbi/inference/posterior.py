@@ -1,10 +1,20 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
-
-from typing import Callable, Optional, Union, Dict, Any, Tuple, Union, cast, List, Sequence, TypeVar
-from warnings import warn
 from copy import deepcopy
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    TypeVar,
+    Union,
+    cast,
+)
+from warnings import warn
 
 import numpy as np
 import torch
@@ -124,7 +134,6 @@ class NeuralPosterior:
 
         Args:
             x: The default observation to set for the posterior $p(theta|x)$.
-            deep_copy: Whether to return a deepcopy of the posterior.
 
         Returns:
             `NeuralPosterior` that will use a default `x` when not explicitly passed.

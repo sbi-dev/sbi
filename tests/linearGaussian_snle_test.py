@@ -244,8 +244,8 @@ def test_c2st_multi_round_snl_on_linearGaussian(set_seed):
         show_progress_bars=False,
     )
 
-    posterior1 = infer(num_simulations=500).focus_training_on(x_o)
-    posterior = infer(num_simulations=500, proposal=posterior1)
+    posterior1 = infer(num_simulations=500).set_default_x(x_o)
+    posterior = infer(num_simulations=500, proposal=posterior1).set_default_x(x_o)
 
     samples = posterior.sample(sample_shape=(num_samples,), mcmc_parameters={"thin": 3})
 

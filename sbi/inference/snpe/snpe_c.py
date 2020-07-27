@@ -3,17 +3,16 @@
 
 
 from typing import (
-    Callable,
-    Optional,
-    Union,
-    Dict,
     Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Sequence,
     Tuple,
+    TypeVar,
     Union,
     cast,
-    List,
-    Sequence,
-    TypeVar,
 )
 
 import torch
@@ -129,9 +128,9 @@ class SNPE_C(PosteriorEstimator):
         Args:
             num_simulations: Number of simulator calls.
             proposal: Distribution that the parameters $\theta$ are drawn from.
-                `proposal=None` uses the prior (i.e. single-round inference). Setting
-                the proposal to e.g. the posterior of the previous round leads to
-                multi-round inference.
+                `proposal=None` uses the prior. Setting the proposal to a distribution
+                targeted on a specific observation, e.g. a posterior $p(\theta|x_o)$
+                obtained previously, can lead to less required simulations.
             num_atoms: Number of atoms to use for classification.
             training_batch_size: Training batch size.
             learning_rate: Learning rate for Adam optimizer.

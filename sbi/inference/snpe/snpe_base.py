@@ -4,19 +4,17 @@
 
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from sbi.user_input.user_input_checks import check_estimator_arg
 from typing import (
-    Callable,
-    Optional,
-    Union,
-    Dict,
     Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Sequence,
     Tuple,
+    TypeVar,
     Union,
     cast,
-    List,
-    Sequence,
-    TypeVar,
 )
 from warnings import warn
 
@@ -32,6 +30,7 @@ from sbi import utils as utils
 from sbi.inference import NeuralInference
 from sbi.inference.posterior import NeuralPosterior
 from sbi.types import ScalarFloat
+from sbi.user_input.user_input_checks import check_estimator_arg
 from sbi.utils import check_estimator_arg, x_shape_from_simulation
 
 
@@ -134,9 +133,9 @@ class PosteriorEstimator(NeuralInference, ABC):
         Args:
             num_simulations: Number of simulator calls.
             proposal: Distribution that the parameters $\theta$ are drawn from.
-                `proposal=None` uses the prior (i.e. single-round inference). Setting
-                the proposal to e.g. the posterior of the previous round leads to
-                multi-round inference.
+                `proposal=None` uses the prior. Setting the proposal to a distribution
+                targeted on a specific observation, e.g. a posterior $p(\theta|x_o)$
+                obtained previously, can lead to less required simulations.
             training_batch_size: Training batch size.
             learning_rate: Learning rate for Adam optimizer.
             validation_fraction: The fraction of data to use for validation.

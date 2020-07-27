@@ -1,5 +1,15 @@
-
-from typing import Callable, Optional, Union, Dict, Any, Tuple, Union, cast, List, Sequence, TypeVar
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    TypeVar,
+    Union,
+    cast,
+)
 
 import torch
 from torch import Tensor, nn, ones
@@ -81,7 +91,6 @@ class SNRE_A(RatioEstimator):
         self,
         num_simulations: int,
         proposal: Optional[Any] = None,
-        x_o: Optional[Tensor] = None,
         training_batch_size: int = 50,
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
@@ -99,14 +108,9 @@ class SNRE_A(RatioEstimator):
         Args:
             num_simulations: Number of simulator calls.
             proposal: Distribution that the parameters $\theta$ are drawn from.
-                `proposal=None` uses the prior (i.e. single-round inference). Setting
-                the proposal to e.g. the posterior of the previous round leads to
-                multi-round inference.
-            x_o: An observation that is only required when doing inference
-                over multiple rounds. After the first round, `x_o` is used to guide the
-                sampling so that the simulator is run with parameters that are likely
-                for that `x_o`, i.e. they are sampled from the posterior obtained in the
-                previous round $p(\theta|x_o)$.
+                `proposal=None` uses the prior. Setting the proposal to a distribution
+                targeted on a specific observation, e.g. a posterior $p(\theta|x_o)$
+                obtained previously, can lead to less required simulations.
             training_batch_size: Training batch size.
             learning_rate: Learning rate for Adam optimizer.
             validation_fraction: The fraction of data to use for validation.

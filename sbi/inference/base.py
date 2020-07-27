@@ -6,17 +6,16 @@ from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 from typing import (
-    Callable,
-    Optional,
-    Union,
-    Dict,
     Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Sequence,
     Tuple,
+    TypeVar,
     Union,
     cast,
-    List,
-    Sequence,
-    TypeVar,
 )
 from warnings import warn
 
@@ -249,7 +248,9 @@ class NeuralInference(ABC):
 
         return theta[is_valid_x], x[is_valid_x], prior_masks[is_valid_x]
 
-    def _run_simulations(self, proposal: Any, num_sims: int,) -> Tuple[Tensor, Tensor]:
+    def _run_simulations(
+        self, proposal: Optional[Any], num_sims: int,
+    ) -> Tuple[Tensor, Tensor]:
         r"""
         Run the simulations for a given round.
 
