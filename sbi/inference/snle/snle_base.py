@@ -4,8 +4,18 @@
 
 from abc import ABC
 from copy import deepcopy
-from typing import Any, Callable, Dict, Optional, Union
-from typing import Callable, Optional, Union, Dict, Any, Tuple, Union, cast, List, Sequence, TypeVar
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    TypeVar,
+    Union,
+    cast,
+)
 
 import numpy as np
 import torch
@@ -98,7 +108,6 @@ class LikelihoodEstimator(NeuralInference, ABC):
         self,
         num_simulations: int,
         proposal: Optional[Any] = None,
-        x_o: Optional[Tensor] = None,
         training_batch_size: int = 50,
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,

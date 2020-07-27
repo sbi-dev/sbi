@@ -1,7 +1,17 @@
-
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Callable, Optional, Union, Dict, Any, Tuple, Union, cast, List, Sequence, TypeVar
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    TypeVar,
+    Union,
+    cast,
+)
 
 import numpy as np
 import torch
@@ -102,7 +112,6 @@ class RatioEstimator(NeuralInference, ABC):
         self,
         num_simulations: int,
         proposal: Optional[Any] = None,
-        x_o: Optional[Tensor] = None,
         num_atoms: int = 10,
         training_batch_size: int = 50,
         learning_rate: float = 5e-4,

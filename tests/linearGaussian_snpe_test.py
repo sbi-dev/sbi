@@ -270,15 +270,16 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str, set_seed):
     if method_str == "snpe_b":
         infer = SNPE_B(simulation_batch_size=10, **creation_args)
         posterior1 = infer(num_simulations=1000)
-        posterior1.focus_training_on(x_o)
+        posterior1.set_default_x(x_o)
         posterior = infer(num_simulations=1000, proposal=posterior1)
     elif method_str == "snpe_c":
         infer = SNPE_C(
             simulation_batch_size=50, sample_with_mcmc=False, **creation_args
         )
-        posterior1 = infer(num_simulations=500, num_atoms=10)
-        posterior1.focus_training_on(x_o)
-        posterior = infer(num_simulations=500, num_atoms=10, proposal=posterior1)
+        posterior1 = infer(num_simulations=500, num_atoms=10).set_default_x(x_o)
+        posterior = infer(
+            num_simulations=500, num_atoms=10, proposal=posterior1
+        ).set_default_x(x_o)
 
     samples = posterior.sample((num_samples,))
 
