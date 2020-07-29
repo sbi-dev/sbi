@@ -307,10 +307,11 @@
 <p><code>sbi</code> can then run inference:</p>
 <div class="highlight"><pre><span></span><code><span class="n">posterior</span> <span class="o">=</span> <span class="n">infer</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">'SNPE'</span><span class="p">,</span> <span class="n">num_simulations</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>Running 1000 simulations.: 100%|██████████| 1000/1000 [00:00&lt;00:00, 32566.24it/s]
+<div class="codehilite"><pre><span></span><code>HBox(children=(FloatProgress(value=0.0, description='Running 1000 simulations.', max=1000.0, style=ProgressSty…
 
 
-Neural network successfully converged after 117 epochs.
+
+Neural network successfully converged after 73 epochs.
 </code></pre></div>
 <p>Let’s say we have made some observation <span class="arithmatex">\(x\)</span>:</p>
 <div class="highlight"><pre><span></span><code><span class="n">observation</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
@@ -320,7 +321,9 @@ Neural network successfully converged after 117 epochs.
 <span class="n">log_probability</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">log_prob</span><span class="p">(</span><span class="n">samples</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="n">observation</span><span class="p">)</span>
 <span class="n">_</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">pairplot</span><span class="p">(</span><span class="n">samples</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">],[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">],[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">]],</span> <span class="n">fig_size</span><span class="o">=</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span><span class="mi">6</span><span class="p">))</span>
 </code></pre></div>
-<p><img alt="png" src="../00_getting_started_files/00_getting_started_10_0.png"/></p>
+<div class="codehilite"><pre><span></span><code>HBox(children=(FloatProgress(value=0.0, description='Drawing 10000 posterior samples', max=10000.0, style=Prog…
+</code></pre></div>
+<p><img alt="png" src="../00_getting_started_files/00_getting_started_10_2.png"/></p>
 <h2 id="requirements-for-the-simulator-prior-and-observation">Requirements for the simulator, prior, and observation<a class="headerlink" href="#requirements-for-the-simulator-prior-and-observation" title="Permanent link">¶</a></h2>
 <p>Regardless of the algorithm you need to provide a prior and a simulator for training. Let’s talk about what requirements they need to satisfy.</p>
 <h3 id="prior">Prior<a class="headerlink" href="#prior" title="Permanent link">¶</a></h3>
@@ -344,6 +347,28 @@ Neural network successfully converged after 117 epochs.
 <div class="highlight"><pre><span></span><code><span class="n">posterior</span> <span class="o">=</span> <span class="n">infer</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">'SNPE'</span><span class="p">,</span> <span class="n">num_simulations</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">infer</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">'SNLE'</span><span class="p">,</span> <span class="n">num_simulations</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">infer</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">'SNRE'</span><span class="p">,</span> <span class="n">num_simulations</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>HBox(children=(FloatProgress(value=0.0, description='Running 1000 simulations.', max=1000.0, style=ProgressSty…
+
+
+
+Neural network successfully converged after 99 epochs.
+
+
+
+HBox(children=(FloatProgress(value=0.0, description='Running 1000 simulations.', max=1000.0, style=ProgressSty…
+
+
+
+Neural network successfully converged after 104 epochs.
+
+
+
+HBox(children=(FloatProgress(value=0.0, description='Running 1000 simulations.', max=1000.0, style=ProgressSty…
+
+
+
+Neural network successfully converged after 66 epochs.
 </code></pre></div>
 <p>You can then infer, sample, evaluate, and plot the posterior as described above.</p>
 </article>

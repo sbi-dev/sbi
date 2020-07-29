@@ -259,10 +259,11 @@
 <p>We can then run inference:</p>
 <div class="highlight"><pre><span></span><code><span class="n">posterior</span> <span class="o">=</span> <span class="n">infer</span><span class="p">(</span><span class="n">linear_gaussian</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="s1">'SNPE'</span><span class="p">,</span> <span class="n">num_simulations</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>Running 1000 simulations.: 100%|██████████| 1000/1000 [00:00&lt;00:00, 44788.93it/s]
+<div class="codehilite"><pre><span></span><code>HBox(children=(FloatProgress(value=0.0, description='Running 1000 simulations.', max=1000.0, style=ProgressSty…
 
 
-Neural network successfully converged after 70 epochs.
+
+Neural network successfully converged after 187 epochs.
 </code></pre></div>
 <h2 id="amortized-inference">Amortized inference<a class="headerlink" href="#amortized-inference" title="Permanent link">¶</a></h2>
 <p>Note that we have not yet provided an observation to the inference procedure. In fact, we can evaluate the posterior for different observations without having to re-run inference. This is called amortization. An amortized posterior is one that is not focused on any particular observation. Naturally, if the diversity of observations is large, any of the inference methods will need to run a sufficient number of simulations for the resulting posterior to perform well across these diverse observations.</p>
@@ -276,7 +277,9 @@ Neural network successfully converged after 70 epochs.
 <span class="c1"># plot posterior samples</span>
 <span class="n">_</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">pairplot</span><span class="p">(</span><span class="n">posterior_samples_1</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">],[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">],[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">]],</span> <span class="n">fig_size</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span><span class="mi">5</span><span class="p">))</span>
 </code></pre></div>
-<p><img alt="png" src="../01_gaussian_amortized_files/01_gaussian_amortized_13_0.png"/></p>
+<div class="codehilite"><pre><span></span><code>HBox(children=(FloatProgress(value=0.0, description='Drawing 10000 posterior samples', max=10000.0, style=Prog…
+</code></pre></div>
+<p><img alt="png" src="../01_gaussian_amortized_files/01_gaussian_amortized_13_2.png"/></p>
 <p>As it can be seen, the posterior samples are centered around <code>[-1,-1,-1]</code> in each dimension. 
 This makes sense because the simulator always adds <code>1.0</code> in each dimension and we have observed <code>x_o_1 = [0,0,0]</code>.</p>
 <p>Since the learned posterior is amortized, we can also draw samples from the posterior given the second observation without having to re-run inference:</p>
@@ -285,7 +288,9 @@ This makes sense because the simulator always adds <code>1.0</code> in each dime
 <span class="c1"># plot posterior samples</span>
 <span class="n">_</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">pairplot</span><span class="p">(</span><span class="n">posterior_samples_2</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">],[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">],[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">]],</span> <span class="n">fig_size</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span><span class="mi">5</span><span class="p">))</span>
 </code></pre></div>
-<p><img alt="png" src="../01_gaussian_amortized_files/01_gaussian_amortized_16_0.png"/></p>
+<div class="codehilite"><pre><span></span><code>HBox(children=(FloatProgress(value=0.0, description='Drawing 10000 posterior samples', max=10000.0, style=Prog…
+</code></pre></div>
+<p><img alt="png" src="../01_gaussian_amortized_files/01_gaussian_amortized_16_2.png"/></p>
 <p>So, if we have observed <code>x_o_2 = [2,2,2]</code>, the posterior is centered around <code>[1,1,1]</code> – again, this makes sense because the simulator adds <code>1.0</code> in each dimension.</p>
 </article>
 </div>

@@ -245,7 +245,7 @@
 <h2 id="features">Features<a class="headerlink" href="#features" title="Permanent link">¶</a></h2>
 <p>The flexible interface allows you to customize the following:</p>
 <ul>
-<li>performing sequential posterior estimation by using <code>num_rounds&gt;1</code>. This can decrease the number of simulations one has to run, but the inference procedure is no longer amortized.  </li>
+<li>performing sequential posterior estimation by using multiple rounds. This can decrease the number of simulations one has to run, but the inference procedure is no longer amortized.  </li>
 <li>specify your own density estimator, or change hyperparameters of existing ones (e.g. number of hidden units for <a href="https://arxiv.org/abs/1906.04032">NSF</a>).</li>
 <li>run simulations in batches, which can speed up simulations.</li>
 <li>when it makes sense, choose between different methods to sample from the posterior.</li>
@@ -279,11 +279,26 @@
                  <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 </code></pre></div>
 <p>And we can run inference. In this example, we will run inference over <code>2</code> rounds, potentially leading to a more focused posterior around the observation <code>x_o</code>.</p>
-<div class="highlight"><pre><span></span><code><span class="n">x_o</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="p">,)</span>
-<span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="p">(</span><span class="n">num_rounds</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">x_o</span><span class="o">=</span><span class="n">x_o</span><span class="p">,</span> <span class="n">num_simulations_per_round</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><span class="n">num_rounds</span> <span class="o">=</span> <span class="mi">2</span>
+<span class="n">x_o</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="p">,)</span>
+
+<span class="n">posteriors</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="n">proposal</span> <span class="o">=</span> <span class="kc">None</span>
+
+<span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_rounds</span><span class="p">):</span>
+    <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="p">(</span><span class="n">num_simulations</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">proposal</span><span class="o">=</span><span class="n">proposal</span><span class="p">)</span>
+    <span class="n">posteriors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">posterior</span><span class="p">)</span>
+    <span class="n">proposal</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">x_o</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>Neural network successfully converged after 94 epochs.
-Neural network successfully converged after 32 epochs.
+<div class="codehilite"><pre><span></span><code>Neural network successfully converged after 85 epochs.
+
+
+
+HBox(children=(FloatProgress(value=0.0, description='Drawing 500 posterior samples', max=500.0, style=Progress…
+
+
+
+Neural network successfully converged after 22 epochs.
 </code></pre></div>
 <p>Note that, for <code>num_rounds&gt;1</code>, the posterior is no longer amortized: it will give good results when sampled around <code>x=observation</code>, but possibly bad results for other <code>x</code>.</p>
 <p>Once we have obtained the posterior, we can <code>.sample()</code>, <code>.log_prob()</code>, or <code>.pairplot()</code> in the same way as for the easy interface.</p>
@@ -293,11 +308,13 @@ Neural network successfully converged after 32 epochs.
 <span class="n">_</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">pairplot</span><span class="p">(</span><span class="n">posterior_samples</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">],[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">],[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">]],</span> 
                    <span class="n">fig_size</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span><span class="mi">5</span><span class="p">))</span>
 </code></pre></div>
-<p><img alt="png" src="../03_flexible_interface_files/03_flexible_interface_17_0.png"/></p>
+<div class="codehilite"><pre><span></span><code>HBox(children=(FloatProgress(value=0.0, description='Drawing 10000 posterior samples', max=10000.0, style=Prog…
+</code></pre></div>
+<p><img alt="png" src="../03_flexible_interface_files/03_flexible_interface_17_2.png"/></p>
 <p>We can always print the posterior to know how it was trained:</p>
 <div class="highlight"><pre><span></span><code><span class="nb">print</span><span class="p">(</span><span class="n">posterior</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>Posterior conditional density p(θ|x) focused at x_o=[[0.0, 0.0, 0.0]]  with default evaluation at x=[[0.0, 0.0, 0.0]].
+<div class="codehilite"><pre><span></span><code>Posterior conditional density p(θ|x) (multi-round). Evaluates and samples by default at x=[[0.0, 0.0, 0.0]].
 
 This neural posterior was obtained with a SNPE-class method using a flow.
 </code></pre></div>
