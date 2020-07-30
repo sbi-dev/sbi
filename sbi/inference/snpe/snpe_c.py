@@ -2,26 +2,14 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    List,
-    Optional,
-    Sequence,
-    Tuple,
-    TypeVar,
-    Union,
-    cast,
-)
+from typing import Any, Callable, Dict, Optional, Union
 
 import torch
-from torch import Tensor, eye, nn, ones
+from torch import Tensor, eye, ones
 from torch.utils.tensorboard import SummaryWriter
 
-from sbi.inference.posterior import NeuralPosterior
+from sbi.inference.posteriors.posterior import NeuralPosterior
 from sbi.inference.snpe.snpe_base import PosteriorEstimator
-from sbi.types import OneOrMore
 from sbi.utils import clamp_and_warn, del_entries, repeat_rows
 
 

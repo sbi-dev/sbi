@@ -3,17 +3,15 @@
 
 from __future__ import annotations
 
-from typing import Callable, Optional, Union, Dict, Any, Tuple, Union, cast, List, Sequence, TypeVar
+from typing import Tuple, Union
 
 import torch
 from torch import Tensor
 from torch.distributions import Distribution
 
-from sbi.inference.posterior import NeuralPosterior
-
-from sbi.utils.metrics import c2st
-
+from sbi.inference.posteriors.posterior import NeuralPosterior
 from sbi.simulators.linear_gaussian import true_posterior_linear_gaussian_mvn_prior
+from sbi.utils.metrics import c2st
 
 
 def kl_d_via_monte_carlo(

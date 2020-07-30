@@ -4,18 +4,7 @@
 
 from abc import ABC
 from copy import deepcopy
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    List,
-    Optional,
-    Sequence,
-    Tuple,
-    TypeVar,
-    Union,
-    cast,
-)
+from typing import Any, Callable, Dict, Optional, Union
 
 import numpy as np
 import torch
@@ -27,7 +16,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from sbi import utils as utils
 from sbi.inference import NeuralInference
-from sbi.inference.posterior import NeuralPosterior
+from sbi.inference.posteriors.snle_posterior import SnlePosterior
 from sbi.types import ScalarFloat
 from sbi.utils import check_estimator_arg, x_shape_from_simulation
 
@@ -97,7 +86,6 @@ class LikelihoodEstimator(NeuralInference, ABC):
         else:
             self._build_neural_net = density_estimator
         self._posterior = None
-        self._sample_with_mcmc = True
         self._mcmc_method = mcmc_method
         self._mcmc_parameters = mcmc_parameters
 
@@ -117,7 +105,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         exclude_invalid_x: bool = True,
         discard_prior_samples: bool = False,
         retrain_from_scratch_each_round: bool = False,
-    ) -> NeuralPosterior:
+    ) -> SnlePosterior:
         r"""Run SNLE.
 
         Return posterior $p(\theta|x)$ after inference.
@@ -154,12 +142,11 @@ class LikelihoodEstimator(NeuralInference, ABC):
         # can `sample()` and `log_prob()`. The network is accessible via `.net`.
         if self._posterior is None or retrain_from_scratch_each_round:
             x_shape = x_shape_from_simulation(x)
-            self._posterior = NeuralPosterior(
+            self._posterior = SnlePosterior(
                 method_family="snle",
                 neural_net=self._build_neural_net(theta, x),
                 prior=self._prior,
                 x_shape=x_shape,
-                sample_with_mcmc=self._sample_with_mcmc,
                 mcmc_method=self._mcmc_method,
                 mcmc_parameters=self._mcmc_parameters,
                 get_potential_function=PotentialFunctionProvider(),
