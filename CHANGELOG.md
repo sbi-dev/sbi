@@ -1,3 +1,7 @@
+# v0.11.1
+- Bug fix for log_prob() in SNRE (#275)
+
+
 # v0.11.0
 
 - Changed the API to do multi-round inference (#273)
