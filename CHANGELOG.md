@@ -1,5 +1,5 @@
 # v0.11.1
-- Bug fix for log_prob() in SNRE (#275)
+- Bug fix for log_prob() in SNRE (#280)
 
 
 # v0.11.0
