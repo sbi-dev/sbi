@@ -1,17 +1,6 @@
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    List,
-    Optional,
-    Sequence,
-    Tuple,
-    TypeVar,
-    Union,
-    cast,
-)
+from typing import Any, Callable, Dict, Optional, Union
 
 import numpy as np
 import torch
@@ -23,7 +12,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from sbi import utils as utils
 from sbi.inference.base import NeuralInference
-from sbi.inference.posterior import NeuralPosterior
+from sbi.inference.posteriors.snre_posterior import SnrePosterior
 from sbi.types import ScalarFloat
 from sbi.utils import check_estimator_arg, clamp_and_warn, x_shape_from_simulation
 from sbi.utils.torchutils import ensure_theta_batched, ensure_x_batched
@@ -101,7 +90,6 @@ class RatioEstimator(NeuralInference, ABC):
         else:
             self._build_neural_net = classifier
         self._posterior = None
-        self._sample_with_mcmc = True
         self._mcmc_method = mcmc_method
         self._mcmc_parameters = mcmc_parameters
 
@@ -122,7 +110,7 @@ class RatioEstimator(NeuralInference, ABC):
         exclude_invalid_x: bool = True,
         discard_prior_samples: bool = False,
         retrain_from_scratch_each_round: bool = False,
-    ) -> NeuralPosterior:
+    ) -> SnrePosterior:
         """Run SNRE.
 
         Return posterior $p(\theta|x)$ after inference.
@@ -160,12 +148,11 @@ class RatioEstimator(NeuralInference, ABC):
         # can `sample()` and `log_prob()`. The network is accessible via `.net`.
         if self._posterior is None or retrain_from_scratch_each_round:
             x_shape = x_shape_from_simulation(x)
-            self._posterior = NeuralPosterior(
+            self._posterior = SnrePosterior(
                 method_family=self.__class__.__name__.lower(),
                 neural_net=self._build_neural_net(theta, x),
                 prior=self._prior,
                 x_shape=x_shape,
-                sample_with_mcmc=self._sample_with_mcmc,
                 mcmc_method=self._mcmc_method,
                 mcmc_parameters=self._mcmc_parameters,
                 get_potential_function=PotentialFunctionProvider(),

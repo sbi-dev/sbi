@@ -1,21 +1,10 @@
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    List,
-    Optional,
-    Sequence,
-    Tuple,
-    TypeVar,
-    Union,
-    cast,
-)
+from typing import Any, Callable, Dict, Optional, Union
 
 import torch
 from torch import Tensor
 from torch.utils.tensorboard import SummaryWriter
 
-from sbi.inference.posterior import NeuralPosterior
+from sbi.inference.posteriors.posterior import NeuralPosterior
 from sbi.inference.snre.snre_base import RatioEstimator
 from sbi.utils import del_entries
 

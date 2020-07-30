@@ -61,7 +61,6 @@ class NeuralPosterior:
         neural_net: nn.Module,
         prior,
         x_shape: torch.Size,
-        sample_with_mcmc: bool = True,
         mcmc_method: str = "slice_np",
         mcmc_parameters: Optional[Dict[str, Any]] = None,
         get_potential_function: Optional[Callable] = None,
@@ -72,9 +71,6 @@ class NeuralPosterior:
             neural_net: A classifier for SNRE, a density estimator for SNPE and SNL.
             prior: Prior distribution with `.log_prob()` and `.sample()`.
             x_shape: Shape of a single simulator output.
-            sample_with_mcmc: Whether to sample with MCMC. Will always be `True` for SRE
-                and SNL, but can also be set to `True` for SNPE if MCMC is preferred to
-                deal with leakage over rejection sampling.
             mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`, `hmc`, `nuts`.
                 Currently defaults to `slice_np` for a custom numpy implementation of
                 slice sampling; select `hmc`, `nuts` or `slice` for Pyro-based sampling.
@@ -98,7 +94,6 @@ class NeuralPosterior:
 
         self.set_mcmc_method(mcmc_method)
         self.set_mcmc_parameters(mcmc_parameters)
-        self.set_sample_with_mcmc(sample_with_mcmc)
 
         self._get_potential_function = get_potential_function
         self._leakage_density_correction_factor = None  # Correction factor for SNPE.
@@ -198,35 +193,6 @@ class NeuralPosterior:
         self._mcmc_parameters = parameters
         return self
 
-    @property
-    def sample_with_mcmc(self) -> bool:
-        """Return `True` if NeuralPosterior instance is configured to use MCMC in `.sample()`."""
-        return self._sample_with_mcmc
-
-    @sample_with_mcmc.setter
-    def sample_with_mcmc(self, value: bool) -> None:
-        """See `set_sample_with_mcmc`."""
-        self.set_sample_with_mcmc(value)
-
-    def set_sample_with_mcmc(self, use_mcmc: bool) -> "NeuralPosterior":
-        """Turns MCMC sampling on or off and returns `NeuralPosterior`.
-
-        Args:
-            use_mcmc: Flag to set whether or not MCMC sampling is used.
-
-        Returns:
-            `NeuralPosterior` for chainable calls.
-
-        Raises:
-            `ValueError` on attempt to turn off MCMC sampling for family of methods
-            that do not support rejection sampling.
-        """
-        if not use_mcmc:
-            if self._method_family not in ["snpe"]:
-                raise ValueError(f"{self._method_family} cannot use MCMC for sampling.")
-        self._sample_with_mcmc = use_mcmc
-        return self
-
     def log_prob(
         self,
         theta: Tensor,
@@ -288,34 +254,6 @@ class NeuralPosterior:
     # will need to also add a `_log_prob_X` here, and that is not nice.
     # PLAN: pass an instance of the inference object at Posterior creation,
 
-    def _log_prob_snpe(self, theta: Tensor, x: Tensor, norm_posterior: bool) -> Tensor:
-        r"""
-        Return posterior log probability $p(\theta|x)$.
-
-        The posterior probability will be only normalized if explicitly requested,
-        but it will be always zeroed out (i.e. given -∞ log-prob) outside the prior
-        support.
-        """
-
-        unnorm_log_prob = self.net.log_prob(theta, x)
-
-        # Force probability to be zero outside prior support.
-        is_prior_finite = torch.isfinite(self._prior.log_prob(theta))
-
-        masked_log_prob = torch.where(
-            is_prior_finite,
-            unnorm_log_prob,
-            torch.tensor(float("-inf"), dtype=torch.float32),
-        )
-
-        log_factor = (
-            log(self.leakage_correction(x=batched_first_of_batch(x)))
-            if norm_posterior
-            else 0
-        )
-
-        return masked_log_prob - log_factor
-
     def _log_prob_ratio_estimator(self, theta: Tensor, x: Tensor) -> Tensor:
         log_ratio = self.net(torch.cat((theta, x), dim=1)).reshape(-1)
         return log_ratio + self._prior.log_prob(theta)
@@ -340,55 +278,6 @@ class NeuralPosterior:
             "The log probability from SNL is only correct up to a normalizing constant."
         )
         return self.net.log_prob(x, theta) + self._prior.log_prob(theta)
-
-    @torch.no_grad()
-    def leakage_correction(
-        self,
-        x: Tensor,
-        num_rejection_samples: int = 10_000,
-        force_update: bool = False,
-        show_progress_bars: bool = False,
-    ) -> Tensor:
-        r"""Return leakage correction factor for a leaky posterior density estimate.
-
-        The factor is estimated from the acceptance probability during rejection
-        sampling from the posterior.
-
-        NOTE: This is to avoid re-estimating the acceptance probability from scratch
-              whenever `log_prob` is called and `norm_posterior_snpe=True`. Here, it
-              is estimated only once for `self.default_x` and saved for later. We
-              re-evaluate only whenever a new `x` is passed.
-
-        Arguments:
-            x: Conditioning context for posterior $p(\theta|x)$.
-            num_rejection_samples: Number of samples used to estimate correction factor.
-            force_update: Whether to force a reevaluation of the leakage correction even
-                if the context `x` is the same as `self.default_x`. This is useful to
-                enforce a new leakage estimate for rounds after the first (2, 3,..).
-            show_progress_bars: Whether to show a progress bar during sampling.
-
-        Returns:
-            Saved or newly-estimated correction factor (as a scalar `Tensor`).
-        """
-
-        def acceptance_at(x: Tensor) -> Tensor:
-            return utils.sample_posterior_within_prior(
-                self.net, self._prior, x, num_rejection_samples, show_progress_bars
-            )[1]
-
-        # Check if the provided x matches the default x (short-circuit on identity).
-        is_new_x = self.default_x is None or (
-            x is not self.default_x and (x != self.default_x).any()
-        )
-
-        not_saved_at_default_x = self._leakage_density_correction_factor is None
-
-        if is_new_x:  # Calculate at x; don't save.
-            return acceptance_at(x)
-        elif not_saved_at_default_x or force_update:  # Calculate at default_x; save.
-            self._leakage_density_correction_factor = acceptance_at(self.default_x)
-
-        return self._leakage_density_correction_factor  # type:ignore
 
     def sample(
         self,

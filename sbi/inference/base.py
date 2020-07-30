@@ -5,18 +5,7 @@ from abc import ABC
 from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    List,
-    Optional,
-    Sequence,
-    Tuple,
-    TypeVar,
-    Union,
-    cast,
-)
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union, cast
 from warnings import warn
 
 import torch
@@ -24,7 +13,7 @@ from torch import Tensor
 from torch.utils.tensorboard import SummaryWriter
 
 import sbi.inference
-from sbi.inference.posterior import NeuralPosterior
+from sbi.inference.posteriors.posterior import NeuralPosterior
 from sbi.simulators.simutils import simulate_in_batches
 from sbi.user_input.user_input_checks import prepare_for_sbi
 from sbi.utils import (
