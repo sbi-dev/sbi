@@ -317,21 +317,22 @@ class NeuralPosterior:
         return masked_log_prob - log_factor
 
     def _log_prob_ratio_estimator(self, theta: Tensor, x: Tensor) -> Tensor:
-        log_ratio = self.net(torch.cat((theta, x)).reshape(1, -1))
+        log_ratio = self.net(torch.cat((theta, x), dim=1)).reshape(-1)
         return log_ratio + self._prior.log_prob(theta)
 
     def _log_prob_snre_a(self, theta: Tensor, x: Tensor) -> Tensor:
-        warn(
-            "The log probability from SRE is only correct up to a normalizing constant."
-        )
+        if self._num_trained_rounds > 1:
+            warn(
+                "The log-probability from AALR / SNRE-A beyond round 1 is only correct "
+                "up to a normalizing constant."
+            )
         return self._log_prob_ratio_estimator(theta, x)
 
     def _log_prob_snre_b(self, theta: Tensor, x: Tensor) -> Tensor:
-        if self._num_trained_rounds > 1:
-            warn(
-                "The log-probability from AALR beyond round 1 is only correct "
-                "up to a normalizing constant."
-            )
+        warn(
+            "The log probability from SNRE_B is only correct up to a normalizing "
+            "constant."
+        )
         return self._log_prob_ratio_estimator(theta, x)
 
     def _log_prob_snle(self, theta: Tensor, x: Tensor) -> Tensor:

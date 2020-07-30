@@ -231,7 +231,7 @@ def test_c2st_sre_on_linearGaussian(
             posterior, x_o[0], likelihood_shift, likelihood_cov, prior_mean, prior_cov
         )
 
-        max_dkl = 0.1 if num_dim == 1 else 0.8
+        max_dkl = 0.1
 
         assert (
             dkl < max_dkl
