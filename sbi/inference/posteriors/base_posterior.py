@@ -213,9 +213,6 @@ class NeuralPosterior:
             often as there were batch elements in $\theta$ orginally.
         """
 
-        # TODO Train exited here, entered after sampling?
-        self.net.eval()
-
         theta = ensure_theta_batched(torch.as_tensor(theta))
 
         # Select and check x to condition on.

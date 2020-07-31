@@ -171,7 +171,7 @@ class NeuralInference(ABC):
             theta: Parameter sets used to generate presimulated data.
             x: Simulation outputs of presimulated data.
             from_round: Which round the data was simulated from. `from_round=0` means
-                that the data came from the first round.
+                that the data came from the first round, i.e. the prior.
         """
         self._append_to_data_bank(theta, x, from_round)
 
