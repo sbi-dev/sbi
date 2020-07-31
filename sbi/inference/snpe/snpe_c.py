@@ -6,10 +6,10 @@ from typing import Any, Callable, Dict, Optional, Union
 
 import torch
 from torch import Tensor, eye, ones
-from torch.utils.tensorboard import SummaryWriter
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.snpe.snpe_base import PosteriorEstimator
+from sbi.types import TensorboardSummaryWriter
 from sbi.utils import clamp_and_warn, del_entries, repeat_rows
 
 
@@ -27,7 +27,7 @@ class SNPE_C(PosteriorEstimator):
         use_combined_loss: bool = False,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
-        summary_writer: Optional[SummaryWriter] = None,
+        summary_writer: Optional[TensorboardSummaryWriter] = None,
         show_progress_bars: bool = True,
         show_round_summary: bool = False,
     ):
@@ -78,7 +78,7 @@ class SNPE_C(PosteriorEstimator):
             device: torch device on which to compute, e.g. gpu, cpu.
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
-            summary_writer: A `SummaryWriter` to control, among others, log
+            summary_writer: A tensorboard `SummaryWriter` to control, among others, log
                 file location (default is `<current working directory>/logs`.)
             show_progress_bars: Whether to show a progressbar during simulation and
                 sampling.
