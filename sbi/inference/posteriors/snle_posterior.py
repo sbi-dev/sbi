@@ -73,16 +73,17 @@ class SnlePosterior(NeuralPosterior):
             neural_net: A classifier for SNRE, a density estimator for SNPE and SNL.
             prior: Prior distribution with `.log_prob()` and `.sample()`.
             x_shape: Shape of a single simulator output.
-            mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`, `hmc`, `nuts`.
-                Currently defaults to `slice_np` for a custom numpy implementation of
-                slice sampling; select `hmc`, `nuts` or `slice` for Pyro-based sampling.
+            mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`,
+                `hmc`, `nuts`. Currently defaults to `slice_np` for a custom numpy
+                implementation of slice sampling; select `hmc`, `nuts` or `slice` for
+                Pyro-based sampling.
             mcmc_parameters: Dictionary overriding the default parameters for MCMC.
                 The following parameters are supported: `thin` to set the thinning
                 factor for the chain, `warmup_steps` to set the initial number of
-                samples to discard, `num_chains` for the number of chains, `init_strategy`
-                for the initialisation strategy for chains; `prior` will draw init
-                locations from prior, whereas `sir` will use Sequential-Importance-
-                Resampling using `init_strategy_num_candidates` to find init
+                samples to discard, `num_chains` for the number of chains,
+                `init_strategy` for the initialisation strategy for chains; `prior`
+                will draw init locations from prior, whereas `sir` will use Sequential-
+                Importance-Resampling using `init_strategy_num_candidates` to find init
                 locations.
             get_potential_function: Callable that returns the potential function used
                 for MCMC sampling.
@@ -90,11 +91,36 @@ class SnlePosterior(NeuralPosterior):
         kwargs = del_entries(locals(), entries=("self", "__class__"))
         super().__init__(**kwargs)
 
-    def _log_prob_snle(self, theta: Tensor, x: Tensor) -> Tensor:
+    def log_prob(
+        self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False,
+    ) -> Tensor:
+        r"""
+        Returns the log-probability of $p(x|\theta) \times p(\theta).$
+
+        This corresponds to an **unnormalized** posterior log-probability.
+
+        Args:
+            theta: Parameters $\theta$.
+            x: Conditioning context for posterior $p(\theta|x)$. If not provided, fall
+                back onto an `x_o` if previously provided for multi-round training, or
+                to another default if set later for convenience, see `.set_default_x()`.
+            track_gradients: Whether the returned tensor supports tracking gradients.
+                This can be helpful for e.g. sensitivity analysis, but increases memory
+                consumption.
+
+        Returns:
+            `(len(θ),)`-shaped log posterior probability $\log p(\theta|x)$ for θ in the
+            support of the prior, -∞ (corresponding to 0 probability) outside.
+
+        """
+        theta, x = self._build_theta_x_for_log_prob_(theta, x)
+
         warn(
             "The log probability from SNL is only correct up to a normalizing constant."
         )
-        return self.net.log_prob(x, theta) + self._prior.log_prob(theta)
+
+        with torch.set_grad_enabled(track_gradients):
+            return self.net.log_prob(x, theta) + self._prior.log_prob(theta)
 
     def sample(
         self,
@@ -125,10 +151,10 @@ class SnlePosterior(NeuralPosterior):
             mcmc_parameters: Dictionary overriding the default parameters for MCMC.
                 The following parameters are supported: `thin` to set the thinning
                 factor for the chain, `warmup_steps` to set the initial number of
-                samples to discard, `num_chains` for the number of chains, `init_strategy`
-                for the initialisation strategy for chains; `prior` will draw init
-                locations from prior, whereas `sir` will use Sequential-Importance-
-                Resampling using `init_strategy_num_candidates` to find init
+                samples to discard, `num_chains` for the number of chains,
+                `init_strategy` for the initialisation strategy for chains; `prior`
+                will draw init locations from prior, whereas `sir` will use Sequential-
+                Importance-Resampling using `init_strategy_num_candidates` to find init
                 locations.
 
         Returns:
