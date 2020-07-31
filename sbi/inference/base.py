@@ -13,7 +13,7 @@ from torch import Tensor
 from torch.utils.tensorboard import SummaryWriter
 
 import sbi.inference
-from sbi.inference.posteriors.posterior import NeuralPosterior
+from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.simulators.simutils import simulate_in_batches
 from sbi.user_input.user_input_checks import prepare_for_sbi
 from sbi.utils import (

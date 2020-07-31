@@ -1,7 +1,6 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
-from copy import deepcopy
 from typing import (
     Any,
     Callable,
@@ -16,45 +15,23 @@ from typing import (
 )
 from warnings import warn
 
-import numpy as np
 import torch
-from pyro.infer.mcmc import HMC, NUTS
-from pyro.infer.mcmc.api import MCMC
-from torch import Tensor, log
-from torch import multiprocessing as mp
-from torch import nn
+from torch import Tensor, nn
 
-from sbi import utils as utils
-from sbi.inference.posteriors.posterior import NeuralPosterior
-from sbi.mcmc import Slice, SliceSampler
-from sbi.types import Array, Shape
-from sbi.user_input.user_input_checks import process_x
+from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.types import Shape
 from sbi.utils import del_entries
-from sbi.utils.torchutils import (
-    atleast_2d_float32_tensor,
-    batched_first_of_batch,
-    ensure_theta_batched,
-)
+from sbi.utils.torchutils import atleast_2d_float32_tensor
 
 
-class SnlePosterior(NeuralPosterior):
-    r"""Posterior $p(\theta|x)$ with `log_prob()` and `sample()` methods.<br/><br/>
-    All inference methods in sbi train a neural network which is then used to obtain
-    the posterior distribution. The `NeuralPosterior` class wraps the trained network
-    such that one can directly evaluate the log probability and draw samples from the
-    posterior. The neural network itself can be accessed via the `.net` attribute.
-    <br/><br/>
-    Specifically, this class offers the following functionality:<br/>
-    - Correction of leakage (applicable only to SNPE): If the prior is bounded, the
-      posterior resulting from SNPE can generate samples that lie outside of the prior
-      support (i.e. the posterior leaks). This class rejects these samples or,
-      alternatively, allows to sample from the posterior with MCMC. It also corrects the
-      calculation of the log probability such that it compensates for the leakage.<br/>
-    - Posterior inference from likelihood (SNL) and likelihood ratio (SRE): SNL and SRE
-      learn to approximate the likelihood and likelihood ratio, which in turn can be
-      used to generate samples from the posterior. This class provides the needed MCMC
-      methods to sample from the posterior and to evaluate the log probability.
-
+class SNLE_Posterior(NeuralPosterior):
+    r"""Posterior $p(\theta|x)$ with `log_prob()` and `sample()` methods, obtained with
+    SNLE.<br/><br/>
+    SNLE trains a neural network to approximate the likelihood $p(x|\theta)$. The
+    `SNLE_Posterior` class wraps the trained network such that one can directly evaluate
+    the unnormalized posterior log probability $p(\theta|x) \propto p(x|\theta) \cdot
+    p(\theta)$ and draw samples from the posterior with MCMC.<br/><br/>
+    The neural network itself can be accessed via the `.net` attribute.
     """
 
     def __init__(
@@ -95,7 +72,7 @@ class SnlePosterior(NeuralPosterior):
         self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False,
     ) -> Tensor:
         r"""
-        Returns the log-probability of $p(x|\theta) \times p(\theta).$
+        Returns the log-probability of $p(x|\theta) \cdot p(\theta).$
 
         This corresponds to an **unnormalized** posterior log-probability.
 
@@ -109,11 +86,10 @@ class SnlePosterior(NeuralPosterior):
                 consumption.
 
         Returns:
-            `(len(θ),)`-shaped log posterior probability $\log p(\theta|x)$ for θ in the
-            support of the prior, -∞ (corresponding to 0 probability) outside.
+            `(len(θ),)`-shaped log-probability $\log(p(x|\theta) \cdot p(\theta))$.
 
         """
-        theta, x = self._build_theta_x_for_log_prob_(theta, x)
+        theta, x = self._prepare_theta_and_x_for_log_prob_(theta, x)
 
         warn(
             "The log probability from SNL is only correct up to a normalizing constant."
@@ -132,11 +108,7 @@ class SnlePosterior(NeuralPosterior):
         mcmc_parameters: Optional[Dict[str, Any]] = None,
     ) -> Tensor:
         r"""
-        Return samples from posterior distribution $p(\theta|x)$.
-
-        Samples are obtained either with rejection sampling or MCMC. SNPE can use
-        rejection sampling and MCMC (which can help to deal with strong leakage). SNL
-        and SRE are restricted to sampling with MCMC.
+        Return samples from posterior distribution $p(\theta|x)$ with MCMC.
 
         Args:
             sample_shape: Desired shape of samples that are drawn from posterior. If

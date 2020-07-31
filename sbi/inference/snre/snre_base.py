@@ -12,7 +12,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from sbi import utils as utils
 from sbi.inference.base import NeuralInference
-from sbi.inference.posteriors.snre_posterior import SnrePosterior
+from sbi.inference.posteriors.snre_posterior import SNRE_Posterior
 from sbi.types import ScalarFloat
 from sbi.utils import check_estimator_arg, clamp_and_warn, x_shape_from_simulation
 from sbi.utils.torchutils import ensure_theta_batched, ensure_x_batched
@@ -110,8 +110,8 @@ class RatioEstimator(NeuralInference, ABC):
         exclude_invalid_x: bool = True,
         discard_prior_samples: bool = False,
         retrain_from_scratch_each_round: bool = False,
-    ) -> SnrePosterior:
-        """Run SNRE.
+    ) -> SNRE_Posterior:
+        r"""Run SNRE.
 
         Return posterior $p(\theta|x)$ after inference.
 
@@ -148,7 +148,7 @@ class RatioEstimator(NeuralInference, ABC):
         # can `sample()` and `log_prob()`. The network is accessible via `.net`.
         if self._posterior is None or retrain_from_scratch_each_round:
             x_shape = x_shape_from_simulation(x)
-            self._posterior = SnrePosterior(
+            self._posterior = SNRE_Posterior(
                 method_family=self.__class__.__name__.lower(),
                 neural_net=self._build_neural_net(theta, x),
                 prior=self._prior,

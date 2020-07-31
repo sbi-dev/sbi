@@ -17,7 +17,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from sbi import utils as utils
 from sbi.inference import NeuralInference
-from sbi.inference.posteriors.snpe_posterior import SnpePosterior
+from sbi.inference.posteriors.snpe_posterior import SNPE_Posterior
 from sbi.types import ScalarFloat
 from sbi.utils import check_estimator_arg, x_shape_from_simulation
 
@@ -113,7 +113,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         exclude_invalid_x: bool = True,
         discard_prior_samples: bool = False,
         retrain_from_scratch_each_round: bool = False,
-    ) -> SnpePosterior:
+    ) -> SNPE_Posterior:
         r"""Run SNPE.
 
         Return posterior $p(\theta|x)$ after inference.
@@ -173,7 +173,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         # can `sample()` and `log_prob()`. The network is accessible via `.net`.
         if self._posterior is None or retrain_from_scratch_each_round:
             x_shape = x_shape_from_simulation(x)
-            self._posterior = SnpePosterior(
+            self._posterior = SNPE_Posterior(
                 method_family="snpe",
                 neural_net=self._build_neural_net(theta, x),
                 prior=self._prior,

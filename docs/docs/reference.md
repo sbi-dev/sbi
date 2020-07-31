@@ -34,9 +34,17 @@
     rendering:
       show_root_heading: true
 
-## Posterior
+## Posteriors
 
-::: sbi.inference.posterior.NeuralPosterior
+::: sbi.inference.posteriors.snpe_posterior.SNPE_Posterior
+    rendering:
+      show_root_heading: true
+      
+::: sbi.inference.posteriors.snle_posterior.SNLE_Posterior
+    rendering:
+      show_root_heading: true
+      
+::: sbi.inference.posteriors.snre_posterior.SNRE_Posterior
     rendering:
       show_root_heading: true
 
