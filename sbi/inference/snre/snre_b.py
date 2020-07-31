@@ -2,10 +2,10 @@ from typing import Any, Callable, Dict, Optional, Union
 
 import torch
 from torch import Tensor
-from torch.utils.tensorboard import SummaryWriter
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.snre.snre_base import RatioEstimator
+from sbi.types import TensorboardSummaryWriter
 from sbi.utils import del_entries
 
 
@@ -21,7 +21,7 @@ class SNRE_B(RatioEstimator):
         mcmc_parameters: Optional[Dict[str, Any]] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "warning",
-        summary_writer: Optional[SummaryWriter] = None,
+        summary_writer: Optional[TensorboardSummaryWriter] = None,
         show_progress_bars: bool = True,
         show_round_summary: bool = False,
     ):
@@ -65,7 +65,7 @@ class SNRE_B(RatioEstimator):
             device: torch device on which to compute, e.g. gpu, cpu.
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
-            summary_writer: A `SummaryWriter` to control, among others, log
+            summary_writer: A tensorboard `SummaryWriter` to control, among others, log
                 file location (default is `<current working directory>/logs`.)
             show_progress_bars: Whether to show a progressbar during simulation and
                 sampling.

@@ -4,10 +4,9 @@
 
 from typing import Any, Callable, Dict, Optional, Union
 
-from torch.utils.tensorboard import SummaryWriter
-
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.snle.snle_base import LikelihoodEstimator
+from sbi.types import TensorboardSummaryWriter
 from sbi.utils import del_entries
 
 
@@ -23,7 +22,7 @@ class SNLE_A(LikelihoodEstimator):
         mcmc_parameters: Optional[Dict[str, Any]] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
-        summary_writer: Optional[SummaryWriter] = None,
+        summary_writer: Optional[TensorboardSummaryWriter] = None,
         show_progress_bars: bool = True,
         show_round_summary: bool = False,
     ):
@@ -69,7 +68,7 @@ class SNLE_A(LikelihoodEstimator):
             device: torch device on which to compute, e.g. gpu, cpu.
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
-            summary_writer: A `SummaryWriter` to control, among others, log
+            summary_writer: A tensorboard `SummaryWriter` to control, among others, log
                 file location (default is `<current working directory>/logs`.)
             show_progress_bars: Whether to show a progressbar during simulation and
                 sampling.
