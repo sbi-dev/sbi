@@ -114,10 +114,14 @@ def get_normalization_uniform_prior(
     prior_sample = prior.sample()
 
     # Compute unnormalized density, i.e. just the output of the density estimator.
-    posterior_likelihood_unnorm = torch.exp(posterior.log_prob(prior_sample))
+    posterior_likelihood_unnorm = torch.exp(
+        posterior.log_prob(prior_sample, norm_posterior=False)
+    )
     # Compute the normalized density, scale up output of the density
     # estimator by the ratio of posterior samples within the prior bounds.
-    posterior_likelihood_norm = torch.exp(posterior.log_prob(prior_sample))
+    posterior_likelihood_norm = torch.exp(
+        posterior.log_prob(prior_sample, norm_posterior=True)
+    )
 
     # Estimate acceptance ratio through rejection sampling.
     acceptance_prob = posterior.leakage_correction(x=true_observation)

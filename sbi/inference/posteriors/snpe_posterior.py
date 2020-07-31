@@ -105,8 +105,8 @@ class SNPE_Posterior(NeuralPosterior):
             `NeuralPosterior` for chainable calls.
 
         Raises:
-            `ValueError` on attempt to turn off MCMC sampling for family of methods
-            that do not support rejection sampling.
+            ValueError: on attempt to turn off MCMC sampling for family of methods that
+                do not support rejection sampling.
         """
         if not use_mcmc:
             if self._method_family not in ["snpe"]:
@@ -145,6 +145,10 @@ class SNPE_Posterior(NeuralPosterior):
             support of the prior, -∞ (corresponding to 0 probability) outside.
 
         """
+
+        # TODO Train exited here, entered after sampling?
+        self.net.eval()
+
         theta, x = self._prepare_theta_and_x_for_log_prob_(theta, x)
 
         with torch.set_grad_enabled(track_gradients):

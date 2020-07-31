@@ -95,6 +95,10 @@ class SNRE_Posterior(NeuralPosterior):
             `(len(θ),)`-shaped log-probability $\log(p(x|\theta) \cdot p(\theta))$.
 
         """
+
+        # TODO Train exited here, entered after sampling?
+        self.net.eval()
+
         theta, x = self._prepare_theta_and_x_for_log_prob_(theta, x)
 
         self._warn_log_prob_snre()

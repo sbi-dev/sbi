@@ -1,3 +1,7 @@
+# v0.11.2
+- Subclassed Posterior (#282)
+
+
 # v0.11.1
 - Bug fix for log_prob() in SNRE (#280)
 

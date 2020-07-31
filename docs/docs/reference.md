@@ -13,40 +13,64 @@
 ::: sbi.inference.snpe.snpe_c.SNPE_C
     rendering:
       show_root_heading: true
+    selection:
+      filters: [ "!^_", "^__", "!^__class__" ]
+      inherited_members: true
 
 ::: sbi.inference.snle.snle_a.SNLE_A
     rendering:
       show_root_heading: true
+    selection:
+      filters: [ "!^_", "^__", "!^__class__" ]
+      inherited_members: true
 
 ::: sbi.inference.snre.snre_a.SNRE_A
     rendering:
       show_root_heading: true
+    selection:
+      filters: [ "!^_", "^__", "!^__class__" ]
+      inherited_members: true
 
 ::: sbi.inference.snre.snre_b.SNRE_B
     rendering:
       show_root_heading: true
+    selection:
+      filters: [ "!^_", "^__", "!^__class__" ]
+      inherited_members: true
 
 ::: sbi.inference.abc.mcabc.MCABC
     rendering:
       show_root_heading: true
+    selection:
+      filters: [ "!^_", "^__", "!^__class__" ]
+      inherited_members: true
 
 ::: sbi.inference.abc.smcabc.SMCABC
     rendering:
       show_root_heading: true
+    selection:
+      filters: [ "!^_", "^__", "!^__class__" ]
+      inherited_members: true
 
 ## Posteriors
 
 ::: sbi.inference.posteriors.snpe_posterior.SNPE_Posterior
     rendering:
       show_root_heading: true
+    selection:
+      inherited_members: true
       
 ::: sbi.inference.posteriors.snle_posterior.SNLE_Posterior
     rendering:
       show_root_heading: true
+    selection:
+      inherited_members: true
       
 ::: sbi.inference.posteriors.snre_posterior.SNRE_Posterior
     rendering:
       show_root_heading: true
+    selection:
+      inherited_members: true
 
 ## Models
 
