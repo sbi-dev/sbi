@@ -10,6 +10,7 @@ from torch import Tensor
 from torch.distributions import Distribution
 
 from sbi.inference.posteriors.posterior import NeuralPosterior
+from sbi.inference.posteriors.snpe_posterior import SnpePosterior
 from sbi.simulators.linear_gaussian import true_posterior_linear_gaussian_mvn_prior
 from sbi.utils.metrics import c2st
 
@@ -97,7 +98,7 @@ def get_prob_outside_uniform_prior(posterior: NeuralPosterior, num_dim: int) -> 
 
 
 def get_normalization_uniform_prior(
-    posterior: NeuralPosterior, prior: Distribution, true_observation: Tensor,
+    posterior: SnpePosterior, prior: Distribution, true_observation: Tensor,
 ) -> Tuple[Tensor, Tensor, Tensor]:
     """
     Return the unnormalized posterior likelihood, the normalized posterior likelihood,
@@ -113,14 +114,10 @@ def get_normalization_uniform_prior(
     prior_sample = prior.sample()
 
     # Compute unnormalized density, i.e. just the output of the density estimator.
-    posterior_likelihood_unnorm = torch.exp(
-        posterior.log_prob(prior_sample, norm_posterior_snpe=False)
-    )
+    posterior_likelihood_unnorm = torch.exp(posterior.log_prob(prior_sample))
     # Compute the normalized density, scale up output of the density
     # estimator by the ratio of posterior samples within the prior bounds.
-    posterior_likelihood_norm = torch.exp(
-        posterior.log_prob(prior_sample, norm_posterior_snpe=True)
-    )
+    posterior_likelihood_norm = torch.exp(posterior.log_prob(prior_sample))
 
     # Estimate acceptance ratio through rejection sampling.
     acceptance_prob = posterior.leakage_correction(x=true_observation)

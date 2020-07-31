@@ -71,10 +71,10 @@ class SnpePosterior(NeuralPosterior):
             mcmc_parameters: Dictionary overriding the default parameters for MCMC.
                 The following parameters are supported: `thin` to set the thinning
                 factor for the chain, `warmup_steps` to set the initial number of
-                samples to discard, `num_chains` for the number of chains, `init_strategy`
-                for the initialisation strategy for chains; `prior` will draw init
-                locations from prior, whereas `sir` will use Sequential-Importance-
-                Resampling using `init_strategy_num_candidates` to find init
+                samples to discard, `num_chains` for the number of chains,
+                `init_strategy` for the initialisation strategy for chains; `prior`
+                will draw init locations from prior, whereas `sir` will use Sequential-
+                Importance-Resampling using `init_strategy_num_candidates` to find init
                 locations.
             get_potential_function: Callable that returns the potential function used
                 for MCMC sampling.
@@ -118,33 +118,58 @@ class SnpePosterior(NeuralPosterior):
         self._sample_with_mcmc = use_mcmc
         return self
 
-    def _log_prob_snpe(self, theta: Tensor, x: Tensor, norm_posterior: bool) -> Tensor:
+    def log_prob(
+        self,
+        theta: Tensor,
+        x: Optional[Tensor] = None,
+        norm_posterior: bool = True,
+        track_gradients: bool = False,
+    ) -> Tensor:
         r"""
-        Return posterior log probability $p(\theta|x)$.
+        Returns the log-probability of the posterior $p(\theta|x).$
 
-        The posterior probability will be only normalized if explicitly requested,
-        but it will be always zeroed out (i.e. given -∞ log-prob) outside the prior
-        support.
+        Args:
+            theta: Parameters $\theta$.
+            x: Conditioning context for posterior $p(\theta|x)$. If not provided, fall
+                back onto an `x_o` if previously provided for multi-round training, or
+                to another default if set later for convenience, see `.set_default_x()`.
+            norm_posterior: Whether to enforce a normalized posterior density.
+                Renormalization of the posterior is useful when some
+                probability falls out or leaks out of the prescribed prior support.
+                The normalizing factor is calculated via rejection sampling, so if you
+                need speedier but unnormalized log posterior estimates set here
+                `norm_posterior_snpe=False`. The returned log posterior is set to
+                -∞ outside of the prior support regardless of this setting.
+            track_gradients: Whether the returned tensor supports tracking gradients.
+                This can be helpful for e.g. sensitivity analysis, but increases memory
+                consumption.
+
+        Returns:
+            `(len(θ),)`-shaped log posterior probability $\log p(\theta|x)$ for θ in the
+            support of the prior, -∞ (corresponding to 0 probability) outside.
+
         """
+        theta, x = self._build_theta_x_for_log_prob_(theta, x)
 
-        unnorm_log_prob = self.net.log_prob(theta, x)
+        with torch.set_grad_enabled(track_gradients):
+            unnorm_log_prob = self.net.log_prob(theta, x)
 
-        # Force probability to be zero outside prior support.
-        is_prior_finite = torch.isfinite(self._prior.log_prob(theta))
+            # Force probability to be zero outside prior support.
+            is_prior_finite = torch.isfinite(self._prior.log_prob(theta))
 
-        masked_log_prob = torch.where(
-            is_prior_finite,
-            unnorm_log_prob,
-            torch.tensor(float("-inf"), dtype=torch.float32),
-        )
+            masked_log_prob = torch.where(
+                is_prior_finite,
+                unnorm_log_prob,
+                torch.tensor(float("-inf"), dtype=torch.float32),
+            )
 
-        log_factor = (
-            log(self.leakage_correction(x=batched_first_of_batch(x)))
-            if norm_posterior
-            else 0
-        )
+            log_factor = (
+                log(self.leakage_correction(x=batched_first_of_batch(x)))
+                if norm_posterior
+                else 0
+            )
 
-        return masked_log_prob - log_factor
+            return masked_log_prob - log_factor
 
     @torch.no_grad()
     def leakage_correction(
@@ -224,10 +249,10 @@ class SnpePosterior(NeuralPosterior):
             mcmc_parameters: Dictionary overriding the default parameters for MCMC.
                 The following parameters are supported: `thin` to set the thinning
                 factor for the chain, `warmup_steps` to set the initial number of
-                samples to discard, `num_chains` for the number of chains, `init_strategy`
-                for the initialisation strategy for chains; `prior` will draw init
-                locations from prior, whereas `sir` will use Sequential-Importance-
-                Resampling using `init_strategy_num_candidates` to find init
+                samples to discard, `num_chains` for the number of chains,
+                `init_strategy` for the initialisation strategy for chains; `prior`
+                will draw init locations from prior, whereas `sir` will use Sequential-
+                Importance-Resampling using `init_strategy_num_candidates` to find init
                 locations.
 
         Returns:
@@ -239,12 +264,13 @@ class SnpePosterior(NeuralPosterior):
         self._ensure_x_consistent_with_default_x(x)
         num_samples = torch.Size(sample_shape).numel()
 
-        sample_with_mcmc = (
-            sample_with_mcmc if sample_with_mcmc is not None else self.sample_with_mcmc
-        )
         mcmc_method = mcmc_method if mcmc_method is not None else self.mcmc_method
         mcmc_parameters = (
             mcmc_parameters if mcmc_parameters is not None else self.mcmc_parameters
+        )
+
+        sample_with_mcmc = (
+            sample_with_mcmc if sample_with_mcmc is not None else self.sample_with_mcmc
         )
 
         if sample_with_mcmc:

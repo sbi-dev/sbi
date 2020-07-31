@@ -194,33 +194,36 @@ class NeuralPosterior:
         return self
 
     def log_prob(
-        self,
-        theta: Tensor,
-        x: Optional[Tensor] = None,
-        norm_posterior_snpe: bool = True,
-        track_gradients: bool = False,
+        self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False,
     ) -> Tensor:
-        r"""Return posterior log probability  $\log p(\theta|x)$.
+        """See child classes for docstring."""
+        pass
+
+    def sample(
+        self,
+        sample_shape: Shape = torch.Size(),
+        x: Optional[Tensor] = None,
+        show_progress_bars: bool = True,
+        mcmc_method: Optional[str] = None,
+        mcmc_parameters: Optional[Dict[str, Any]] = None,
+    ) -> Tensor:
+        """See child classes for docstring."""
+        pass
+
+    def _build_theta_x_for_log_prob_(
+        self, theta: Tensor, x: Optional[Tensor] = None,
+    ) -> Tuple[Tensor, Tensor]:
+        r"""Returns $\theta$ and $x$ in shape that can be used by posterior.log_prob().
 
         Args:
             theta: Parameters $\theta$.
             x: Conditioning context for posterior $p(\theta|x)$. If not provided, fall
                 back onto an `x_o` if previously provided for multi-round training, or
                 to another default if set later for convenience, see `.set_default_x()`.
-            norm_posterior_snpe: Whether to enforce a normalized posterior density when
-                using SNPE. Renormalization of the posterior is useful when some
-                probability falls out or leaks out of the prescribed prior support.
-                The normalizing factor is calculated via rejection sampling, so if you
-                need speedier but unnormalized log posterior estimates set here
-                `norm_posterior_snpe=False`. The returned log posterior is set to
-                -∞ outside of the prior support regardless of this setting.
-            track_gradients: Whether the returned tensor supports tracking gradients.
-                This can be helpful for e.g. sensitivity analysis, but increases memory
-                consumption.
 
         Returns:
-            `(len(θ),)`-shaped log posterior probability $\log p(\theta|x)$ for θ in the
-            support of the prior, -∞ (corresponding to 0 probability) outside.
+            ($\theta$, $x$) with the same batch dimension, where $x$ is repeated as
+            often as there were batch elements in $\theta$ orginally.
         """
 
         # TODO Train exited here, entered after sampling?
@@ -238,123 +241,7 @@ class NeuralPosterior:
         # at neural network evaluation time.
         x = self._match_x_with_theta_batch_shape(x, theta)
 
-        try:
-            log_prob_fn = getattr(self, f"_log_prob_{self._method_family}")
-        except AttributeError:
-            raise ValueError(f"{self._method_family} cannot evaluate probabilities.")
-
-        with torch.set_grad_enabled(track_gradients):
-            if self._method_family == "snpe":
-                return log_prob_fn(theta, x, norm_posterior=norm_posterior_snpe)
-            else:
-                return log_prob_fn(theta, x)
-
-    # TODO: Move _log_prob_X into the respective inference classes (X)?
-    # The problem is extensibility. Any third party contributing a method X
-    # will need to also add a `_log_prob_X` here, and that is not nice.
-    # PLAN: pass an instance of the inference object at Posterior creation,
-
-    def _log_prob_ratio_estimator(self, theta: Tensor, x: Tensor) -> Tensor:
-        log_ratio = self.net(torch.cat((theta, x), dim=1)).reshape(-1)
-        return log_ratio + self._prior.log_prob(theta)
-
-    def _log_prob_snre_a(self, theta: Tensor, x: Tensor) -> Tensor:
-        if self._num_trained_rounds > 1:
-            warn(
-                "The log-probability from AALR / SNRE-A beyond round 1 is only correct "
-                "up to a normalizing constant."
-            )
-        return self._log_prob_ratio_estimator(theta, x)
-
-    def _log_prob_snre_b(self, theta: Tensor, x: Tensor) -> Tensor:
-        warn(
-            "The log probability from SNRE_B is only correct up to a normalizing "
-            "constant."
-        )
-        return self._log_prob_ratio_estimator(theta, x)
-
-    def _log_prob_snle(self, theta: Tensor, x: Tensor) -> Tensor:
-        warn(
-            "The log probability from SNL is only correct up to a normalizing constant."
-        )
-        return self.net.log_prob(x, theta) + self._prior.log_prob(theta)
-
-    def sample(
-        self,
-        sample_shape: Shape = torch.Size(),
-        x: Optional[Tensor] = None,
-        show_progress_bars: bool = True,
-        sample_with_mcmc: Optional[bool] = None,
-        mcmc_method: Optional[str] = None,
-        mcmc_parameters: Optional[Dict[str, Any]] = None,
-    ) -> Tensor:
-        r"""
-        Return samples from posterior distribution $p(\theta|x)$.
-
-        Samples are obtained either with rejection sampling or MCMC. SNPE can use
-        rejection sampling and MCMC (which can help to deal with strong leakage). SNL
-        and SRE are restricted to sampling with MCMC.
-
-        Args:
-            sample_shape: Desired shape of samples that are drawn from posterior. If
-                sample_shape is multidimensional we simply draw `sample_shape.numel()`
-                samples and then reshape into the desired shape.
-            x: Conditioning context for posterior $p(\theta|x)$. If not provided,
-                fall back onto `x_o` if previously provided for multiround training, or
-                to a set default (see `set_default_x()` method).
-            show_progress_bars: Whether to show sampling progress monitor.
-            sample_with_mcmc: Optional parameter to override `self.sample_with_mcmc`.
-            mcmc_method: Optional parameter to override `self.mcmc_method`.
-            mcmc_parameters: Dictionary overriding the default parameters for MCMC.
-                The following parameters are supported: `thin` to set the thinning
-                factor for the chain, `warmup_steps` to set the initial number of
-                samples to discard, `num_chains` for the number of chains, `init_strategy`
-                for the initialisation strategy for chains; `prior` will draw init
-                locations from prior, whereas `sir` will use Sequential-Importance-
-                Resampling using `init_strategy_num_candidates` to find init
-                locations.
-
-        Returns:
-            Samples from posterior.
-        """
-
-        x = atleast_2d_float32_tensor(self._x_else_default_x(x))
-        self._ensure_single_x(x)
-        self._ensure_x_consistent_with_default_x(x)
-        num_samples = torch.Size(sample_shape).numel()
-
-        sample_with_mcmc = (
-            sample_with_mcmc if sample_with_mcmc is not None else self.sample_with_mcmc
-        )
-        mcmc_method = mcmc_method if mcmc_method is not None else self.mcmc_method
-        mcmc_parameters = (
-            mcmc_parameters if mcmc_parameters is not None else self.mcmc_parameters
-        )
-
-        if sample_with_mcmc:
-            samples = self._sample_posterior_mcmc(
-                x=x,
-                num_samples=num_samples,
-                show_progress_bars=show_progress_bars,
-                mcmc_method=mcmc_method,
-                **mcmc_parameters,
-            )
-        elif self._method_family == "snpe":
-            # Rejection sampling.
-            samples, _ = utils.sample_posterior_within_prior(
-                self.net,
-                self._prior,
-                x,
-                num_samples=num_samples,
-                show_progress_bars=show_progress_bars,
-            )
-        else:
-            raise ValueError(
-                "Only SNPE can use rejection sampling. All other"
-                "methods require MCMC."
-            )
-
-        return samples.reshape((*sample_shape, -1))
+        return theta, x
 
     def _sample_posterior_mcmc(
         self,

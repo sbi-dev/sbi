@@ -31,17 +31,12 @@ class SnrePosterior(NeuralPosterior):
     such that one can directly evaluate the log probability and draw samples from the
     posterior. The neural network itself can be accessed via the `.net` attribute.
     <br/><br/>
-    Specifically, this class offers the following functionality:<br/>
-    - Correction of leakage (applicable only to SNPE): If the prior is bounded, the
-      posterior resulting from SNPE can generate samples that lie outside of the prior
-      support (i.e. the posterior leaks). This class rejects these samples or,
-      alternatively, allows to sample from the posterior with MCMC. It also corrects the
-      calculation of the log probability such that it compensates for the leakage.<br/>
-    - Posterior inference from likelihood (SNL) and likelihood ratio (SRE): SNL and SRE
-      learn to approximate the likelihood and likelihood ratio, which in turn can be
-      used to generate samples from the posterior. This class provides the needed MCMC
-      methods to sample from the posterior and to evaluate the log probability.
-
+    Specifically, this class corrects for leakage:<br/>
+    Correction of leakage: If the prior is bounded, the
+    posterior resulting from SNPE can generate samples that lie outside of the prior
+    support (i.e. the posterior leaks). This class rejects these samples or,
+    alternatively, allows to sample from the posterior with MCMC. It also corrects the
+    calculation of the log probability such that it compensates for the leakage.<br/>
     """
 
     def __init__(
@@ -77,24 +72,50 @@ class SnrePosterior(NeuralPosterior):
         kwargs = del_entries(locals(), entries=("self", "__class__"))
         super().__init__(**kwargs)
 
-    def _log_prob_ratio_estimator(self, theta: Tensor, x: Tensor) -> Tensor:
-        log_ratio = self.net(torch.cat((theta, x), dim=1)).reshape(-1)
-        return log_ratio + self._prior.log_prob(theta)
+    def log_prob(
+        self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False,
+    ) -> Tensor:
+        r"""
+        Returns the log-probability of $p(x|\theta) \times p(\theta).$
 
-    def _log_prob_snre_a(self, theta: Tensor, x: Tensor) -> Tensor:
-        if self._num_trained_rounds > 1:
+        This corresponds to an **unnormalized** posterior log-probability. Only for
+        single-round SNRE_A / AALR, the returned log-probability will correspond to the
+        **normalized** log-probability.
+
+        Args:
+            theta: Parameters $\theta$.
+            x: Conditioning context for posterior $p(\theta|x)$. If not provided, fall
+                back onto an `x_o` if previously provided for multi-round training, or
+                to another default if set later for convenience, see `.set_default_x()`.
+            track_gradients: Whether the returned tensor supports tracking gradients.
+                This can be helpful for e.g. sensitivity analysis, but increases memory
+                consumption.
+
+        Returns:
+            `(len(θ),)`-shaped log posterior probability $\log p(\theta|x)$ for θ in the
+            support of the prior, -∞ (corresponding to 0 probability) outside.
+
+        """
+        theta, x = self._build_theta_x_for_log_prob_(theta, x)
+
+        self._warn_log_prob_snre()
+
+        with torch.set_grad_enabled(track_gradients):
+            log_ratio = self.net(torch.cat((theta, x), dim=1)).reshape(-1)
+            return log_ratio + self._prior.log_prob(theta)
+
+    def _warn_log_prob_snre(self) -> None:
+        if self._method_family == "snre_a":
+            if self._num_trained_rounds > 1:
+                warn(
+                    "The log-probability from AALR / SNRE-A beyond round 1 is only"
+                    " correct up to a normalizing constant."
+                )
+        elif self._method_family == "snre_b":
             warn(
-                "The log-probability from AALR / SNRE-A beyond round 1 is only correct "
-                "up to a normalizing constant."
+                "The log probability from SNRE_B is only correct up to a normalizing "
+                "constant."
             )
-        return self._log_prob_ratio_estimator(theta, x)
-
-    def _log_prob_snre_b(self, theta: Tensor, x: Tensor) -> Tensor:
-        warn(
-            "The log probability from SNRE_B is only correct up to a normalizing "
-            "constant."
-        )
-        return self._log_prob_ratio_estimator(theta, x)
 
     def sample(
         self,
@@ -125,10 +146,10 @@ class SnrePosterior(NeuralPosterior):
             mcmc_parameters: Dictionary overriding the default parameters for MCMC.
                 The following parameters are supported: `thin` to set the thinning
                 factor for the chain, `warmup_steps` to set the initial number of
-                samples to discard, `num_chains` for the number of chains, `init_strategy`
-                for the initialisation strategy for chains; `prior` will draw init
-                locations from prior, whereas `sir` will use Sequential-Importance-
-                Resampling using `init_strategy_num_candidates` to find init
+                samples to discard, `num_chains` for the number of chains,
+                `init_strategy` for the initialisation strategy for chains; `prior`
+                will draw init locations from prior, whereas `sir` will use Sequential-
+                Importance-Resampling using `init_strategy_num_candidates` to find init
                 locations.
 
         Returns:
