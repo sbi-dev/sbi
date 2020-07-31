@@ -6,7 +6,7 @@ from typing import Any, Callable, Dict, Optional, Union
 
 from torch.utils.tensorboard import SummaryWriter
 
-from sbi.inference.posteriors.posterior import NeuralPosterior
+from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.snle.snle_base import LikelihoodEstimator
 from sbi.utils import del_entries
 

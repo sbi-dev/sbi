@@ -4,7 +4,7 @@ import torch
 from torch import Tensor
 from torch.utils.tensorboard import SummaryWriter
 
-from sbi.inference.posteriors.posterior import NeuralPosterior
+from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.snre.snre_base import RatioEstimator
 from sbi.utils import del_entries
 
@@ -25,7 +25,7 @@ class SNRE_B(RatioEstimator):
         show_progress_bars: bool = True,
         show_round_summary: bool = False,
     ):
-        """SRE[1], here known as SNRE_B.
+        r"""SRE[1], here known as SNRE_B.
 
         [1] _On Contrastive Learning for Likelihood-free Inference_, Durkan et al.,
             ICML 2020, https://arxiv.org/pdf/2002.03712

@@ -4,7 +4,7 @@ import torch
 from torch import Tensor, nn, ones
 from torch.utils.tensorboard import SummaryWriter
 
-from sbi.inference.posteriors.posterior import NeuralPosterior
+from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.snre.snre_base import RatioEstimator
 from sbi.utils import del_entries
 
@@ -25,7 +25,7 @@ class SNRE_A(RatioEstimator):
         show_progress_bars: bool = True,
         show_round_summary: bool = False,
     ):
-        """AALR[1], here known as SNRE_A.
+        r"""AALR[1], here known as SNRE_A.
 
         [1] _Likelihood-free MCMC with Amortized Approximate Likelihood Ratios_, Hermans
             et al., ICML 2020, https://arxiv.org/abs/1903.04057

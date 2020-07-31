@@ -18,25 +18,24 @@ from warnings import warn
 import torch
 from torch import Tensor, nn
 
-from sbi.inference.posteriors.posterior import NeuralPosterior
+from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.types import Shape
 from sbi.utils import del_entries
 from sbi.utils.torchutils import atleast_2d_float32_tensor
 
 
-class SnrePosterior(NeuralPosterior):
-    r"""Posterior $p(\theta|x)$ with `log_prob()` and `sample()` methods.<br/><br/>
-    All inference methods in sbi train a neural network which is then used to obtain
-    the posterior distribution. The `NeuralPosterior` class wraps the trained network
-    such that one can directly evaluate the log probability and draw samples from the
-    posterior. The neural network itself can be accessed via the `.net` attribute.
-    <br/><br/>
-    Specifically, this class corrects for leakage:<br/>
-    Correction of leakage: If the prior is bounded, the
-    posterior resulting from SNPE can generate samples that lie outside of the prior
-    support (i.e. the posterior leaks). This class rejects these samples or,
-    alternatively, allows to sample from the posterior with MCMC. It also corrects the
-    calculation of the log probability such that it compensates for the leakage.<br/>
+class SNRE_Posterior(NeuralPosterior):
+    r"""Posterior $p(\theta|x)$ with `log_prob()` and `sample()` methods, obtained with
+    SNRE.<br/><br/>
+    SNRE trains a neural network to approximate likelihood ratios, which in turn can be
+    used obtain an unnormalized posterior $p(\theta|x) \propto p(x|\theta) \cdot
+    p(\theta)$. The `SNRE_Posterior` class wraps the trained network such that one can
+    directly evaluate the unnormalized posterior log-probability $p(\theta|x) \propto
+    p(x|\theta) \cdot p(\theta)$ and draw samples from the posterior with
+    MCMC. Note that, in the case of single-round SNRE_A / AALR, it is possible to
+    evaluate the log-probability of the **normalized** posterior, but sampling still
+    requires MCMC.<br/><br/>
+    The neural network itself can be accessed via the `.net` attribute.
     """
 
     def __init__(
@@ -55,16 +54,17 @@ class SnrePosterior(NeuralPosterior):
             neural_net: A classifier for SNRE, a density estimator for SNPE and SNL.
             prior: Prior distribution with `.log_prob()` and `.sample()`.
             x_shape: Shape of a single simulator output.
-            mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`, `hmc`, `nuts`.
-                Currently defaults to `slice_np` for a custom numpy implementation of
-                slice sampling; select `hmc`, `nuts` or `slice` for Pyro-based sampling.
+            mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`,
+                `hmc`, `nuts`. Currently defaults to `slice_np` for a custom numpy
+                implementation of slice sampling; select `hmc`, `nuts` or `slice` for
+                Pyro-based sampling.
             mcmc_parameters: Dictionary overriding the default parameters for MCMC.
                 The following parameters are supported: `thin` to set the thinning
                 factor for the chain, `warmup_steps` to set the initial number of
-                samples to discard, `num_chains` for the number of chains, `init_strategy`
-                for the initialisation strategy for chains; `prior` will draw init
-                locations from prior, whereas `sir` will use Sequential-Importance-
-                Resampling using `init_strategy_num_candidates` to find init
+                samples to discard, `num_chains` for the number of chains,
+                `init_strategy` for the initialisation strategy for chains; `prior`
+                will draw init locations from prior, whereas `sir` will use Sequential-
+                Importance-Resampling using `init_strategy_num_candidates` to find init
                 locations.
             get_potential_function: Callable that returns the potential function used
                 for MCMC sampling.
@@ -76,7 +76,7 @@ class SnrePosterior(NeuralPosterior):
         self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False,
     ) -> Tensor:
         r"""
-        Returns the log-probability of $p(x|\theta) \times p(\theta).$
+        Returns the log-probability of $p(x|\theta) \cdot p(\theta).$
 
         This corresponds to an **unnormalized** posterior log-probability. Only for
         single-round SNRE_A / AALR, the returned log-probability will correspond to the
@@ -92,11 +92,10 @@ class SnrePosterior(NeuralPosterior):
                 consumption.
 
         Returns:
-            `(len(θ),)`-shaped log posterior probability $\log p(\theta|x)$ for θ in the
-            support of the prior, -∞ (corresponding to 0 probability) outside.
+            `(len(θ),)`-shaped log-probability $\log(p(x|\theta) \cdot p(\theta))$.
 
         """
-        theta, x = self._build_theta_x_for_log_prob_(theta, x)
+        theta, x = self._prepare_theta_and_x_for_log_prob_(theta, x)
 
         self._warn_log_prob_snre()
 
@@ -127,11 +126,7 @@ class SnrePosterior(NeuralPosterior):
         mcmc_parameters: Optional[Dict[str, Any]] = None,
     ) -> Tensor:
         r"""
-        Return samples from posterior distribution $p(\theta|x)$.
-
-        Samples are obtained either with rejection sampling or MCMC. SNPE can use
-        rejection sampling and MCMC (which can help to deal with strong leakage). SNL
-        and SRE are restricted to sampling with MCMC.
+        Return samples from posterior distribution $p(\theta|x)$ with MCMC.
 
         Args:
             sample_shape: Desired shape of samples that are drawn from posterior. If

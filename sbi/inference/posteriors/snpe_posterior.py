@@ -18,30 +18,26 @@ import torch
 from torch import Tensor, log, nn
 
 from sbi import utils as utils
-from sbi.inference.posteriors.posterior import NeuralPosterior
+from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.types import Shape
 from sbi.utils import del_entries
 from sbi.utils.torchutils import atleast_2d_float32_tensor, batched_first_of_batch
 
 
-class SnpePosterior(NeuralPosterior):
-    r"""Posterior $p(\theta|x)$ with `log_prob()` and `sample()` methods.<br/><br/>
-    All inference methods in sbi train a neural network which is then used to obtain
-    the posterior distribution. The `NeuralPosterior` class wraps the trained network
-    such that one can directly evaluate the log probability and draw samples from the
-    posterior. The neural network itself can be accessed via the `.net` attribute.
-    <br/><br/>
+class SNPE_Posterior(NeuralPosterior):
+    r"""Posterior $p(\theta|x)$ with `log_prob()` and `sample()` methods, obtained with
+    SNPE.<br/><br/>
+    SNPE trains a neural network to directly approximate the posterior distribution.
+    However, for bounded priors, the neural network can have leakage: it puts non-zero
+    mass in regions where the prior is zero. The `SnpePosterior` class wraps the trained
+    network to deal with these cases.<br/><br/>
     Specifically, this class offers the following functionality:<br/>
-    - Correction of leakage (applicable only to SNPE): If the prior is bounded, the
-      posterior resulting from SNPE can generate samples that lie outside of the prior
-      support (i.e. the posterior leaks). This class rejects these samples or,
-      alternatively, allows to sample from the posterior with MCMC. It also corrects the
-      calculation of the log probability such that it compensates for the leakage.<br/>
-    - Posterior inference from likelihood (SNL) and likelihood ratio (SRE): SNL and SRE
-      learn to approximate the likelihood and likelihood ratio, which in turn can be
-      used to generate samples from the posterior. This class provides the needed MCMC
-      methods to sample from the posterior and to evaluate the log probability.
-
+    - correct the calculation of the log probability such that it compensates for the
+      leakage.<br/>
+    - reject samples that lie outside of the prior bounds.<br/>
+    - alternatively, if leakage is very high (which can happen for multi-round SNPE),
+      sample from the posterior with MCMC.<br/><br/>
+    The neural network itself can be accessed via the `.net` attribute.
     """
 
     def __init__(
@@ -149,7 +145,7 @@ class SnpePosterior(NeuralPosterior):
             support of the prior, -∞ (corresponding to 0 probability) outside.
 
         """
-        theta, x = self._build_theta_x_for_log_prob_(theta, x)
+        theta, x = self._prepare_theta_and_x_for_log_prob_(theta, x)
 
         with torch.set_grad_enabled(track_gradients):
             unnorm_log_prob = self.net.log_prob(theta, x)
@@ -184,10 +180,10 @@ class SnpePosterior(NeuralPosterior):
         The factor is estimated from the acceptance probability during rejection
         sampling from the posterior.
 
-        NOTE: This is to avoid re-estimating the acceptance probability from scratch
-              whenever `log_prob` is called and `norm_posterior_snpe=True`. Here, it
-              is estimated only once for `self.default_x` and saved for later. We
-              re-evaluate only whenever a new `x` is passed.
+        This is to avoid re-estimating the acceptance probability from scratch
+        whenever `log_prob` is called and `norm_posterior=True`. Here, it
+        is estimated only once for `self.default_x` and saved for later. We
+        re-evaluate only whenever a new `x` is passed.
 
         Arguments:
             x: Conditioning context for posterior $p(\theta|x)$.
@@ -232,9 +228,10 @@ class SnpePosterior(NeuralPosterior):
         r"""
         Return samples from posterior distribution $p(\theta|x)$.
 
-        Samples are obtained either with rejection sampling or MCMC. SNPE can use
-        rejection sampling and MCMC (which can help to deal with strong leakage). SNL
-        and SRE are restricted to sampling with MCMC.
+        Samples are obtained either with rejection sampling or MCMC. Rejection sampling
+        will be a lot faster if leakage is rather low. If leakage is high (e.g. above
+        99%, which can happen in multi-round SNPE), MCMC can be faster than rejection
+        sampling.
 
         Args:
             sample_shape: Desired shape of samples that are drawn from posterior. If

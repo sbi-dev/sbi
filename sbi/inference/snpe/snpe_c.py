@@ -8,7 +8,7 @@ import torch
 from torch import Tensor, eye, ones
 from torch.utils.tensorboard import SummaryWriter
 
-from sbi.inference.posteriors.posterior import NeuralPosterior
+from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.snpe.snpe_base import PosteriorEstimator
 from sbi.utils import clamp_and_warn, del_entries, repeat_rows
 
