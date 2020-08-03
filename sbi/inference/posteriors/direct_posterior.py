@@ -82,6 +82,10 @@ class DirectPosterior(NeuralPosterior):
         super().__init__(**kwargs)
 
         self.set_sample_with_mcmc(sample_with_mcmc)
+        self._purpose = (
+            "It allows to .sample() and .log_prob() the posterior and wraps the "
+            "output of the .net to avoid leakage into regions with 0 prior probability."
+        )
 
     @property
     def sample_with_mcmc(self) -> bool:

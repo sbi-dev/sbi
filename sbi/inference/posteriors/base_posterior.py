@@ -532,24 +532,6 @@ class NeuralPosterior(ABC):
             else ""
         )
 
-        purpose_leakage = (
-            "It allows to .sample() and .log_prob() the posterior"
-            " and wraps the output of the .net to avoid leakage into regions with 0"
-            " prior probability."
-        )
-
-        normalized_or_not = (
-            ""
-            if (self._method_family == "snre_a" and self._num_trained_rounds == 1)
-            else "_unnormalized_ "
-        )
-        purpose_mcmc = (
-            f"It provides MCMC to .sample() from the posterior and "
-            f"can evaluate the {normalized_or_not}posterior density with .log_prob()."
-        )
-
-        purpose = purpose_leakage if self._method_family == "snpe" else purpose_mcmc
-
         # The net might be sequential because it can have a standardization net. Hence,
         # we only access its last entry if it is a nn.Sequential.
         actual_net = self.net[-1] if isinstance(self.net, nn.Sequential) else self.net
@@ -559,7 +541,7 @@ class NeuralPosterior(ABC):
             f"This {self.__class__.__name__}-object was obtained with a "
             f"{self._method_family.upper()}-class "
             f"method using a {actual_net.__class__.__name__.lower()}.\n"
-            f"{purpose}"
+            f"{self._purpose}"
         )
 
         return desc
