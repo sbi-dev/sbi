@@ -1,5 +1,5 @@
 # v0.11.2
-- Subclassed Posterior (#282)
+- Subclassed Posterior (#282, #285)
 
 
 # v0.11.1

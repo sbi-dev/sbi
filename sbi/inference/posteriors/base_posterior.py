@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
+from abc import ABC, abstractmethod
 from typing import (
     Any,
     Callable,
@@ -29,7 +30,7 @@ from sbi.user_input.user_input_checks import process_x
 from sbi.utils.torchutils import atleast_2d_float32_tensor, ensure_theta_batched
 
 
-class NeuralPosterior:
+class NeuralPosterior(ABC):
     r"""Posterior $p(\theta|x)$ with `log_prob()` and `sample()` methods.<br/><br/>
     All inference methods in sbi train a neural network which is then used to obtain
     the posterior distribution. The `NeuralPosterior` class wraps the trained network
@@ -177,12 +178,14 @@ class NeuralPosterior:
         self._mcmc_parameters = parameters
         return self
 
+    @abstractmethod
     def log_prob(
         self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False,
     ) -> Tensor:
         """See child classes for docstring."""
         pass
 
+    @abstractmethod
     def sample(
         self,
         sample_shape: Shape = torch.Size(),

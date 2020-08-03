@@ -58,18 +58,21 @@
     rendering:
       show_root_heading: true
     selection:
+      filters: [ "!^_", "^__", "!^__class__" ]
       inherited_members: true
       
 ::: sbi.inference.posteriors.snle_posterior.SNLE_Posterior
     rendering:
       show_root_heading: true
     selection:
+      filters: [ "!^_", "^__", "!^__class__" ]
       inherited_members: true
       
 ::: sbi.inference.posteriors.snre_posterior.SNRE_Posterior
     rendering:
       show_root_heading: true
     selection:
+      filters: [ "!^_", "^__", "!^__class__" ]
       inherited_members: true
 
 ## Models
