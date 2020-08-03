@@ -174,3 +174,30 @@ class RatioBasedPosterior(NeuralPosterior):
         )
 
         return samples.reshape((*sample_shape, -1))
+
+    @property
+    def _num_trained_rounds(self):
+        return self._trained_rounds
+
+    @_num_trained_rounds.setter
+    def _num_trained_rounds(self, trained_rounds):
+        """
+        Sets the number of trained rounds and updates the purpose.
+
+        When the number of trained rounds is 1 and the algorithm is SNRE_A, then the
+        log_prob will be normalized, as specified in the purpose.
+
+        The reason we made this a property is that the purpose gets updated
+        automatically whenever the number of rounds is updated.
+        """
+        self._trained_rounds = trained_rounds
+
+        normalized_or_not = (
+            ""
+            if (self._method_family == "snre_a" and self._trained_rounds == 1)
+            else "_unnormalized_ "
+        )
+        self._purpose = (
+            f"It provides MCMC to .sample() from the posterior and "
+            f"can evaluate the {normalized_or_not}posterior density with .log_prob()."
+        )

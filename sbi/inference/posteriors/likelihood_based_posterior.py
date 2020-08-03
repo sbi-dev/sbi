@@ -65,8 +65,14 @@ class LikelihoodBasedPosterior(NeuralPosterior):
             get_potential_function: Callable that returns the potential function used
                 for MCMC sampling.
         """
+
         kwargs = del_entries(locals(), entries=("self", "__class__"))
         super().__init__(**kwargs)
+
+        self._purpose = (
+            f"It provides MCMC to .sample() from the posterior and "
+            f"can evaluate the _unnormalized_ posterior density with .log_prob()."
+        )
 
     def log_prob(
         self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False,
