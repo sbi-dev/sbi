@@ -16,7 +16,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from sbi import utils as utils
 from sbi.inference import NeuralInference
-from sbi.inference.posteriors.snle_posterior import SNLE_Posterior
+from sbi.inference.posteriors.likelihood_based_posterior import LikelihoodBasedPosterior
 from sbi.types import ScalarFloat
 from sbi.utils import check_estimator_arg, x_shape_from_simulation
 
@@ -105,7 +105,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         exclude_invalid_x: bool = True,
         discard_prior_samples: bool = False,
         retrain_from_scratch_each_round: bool = False,
-    ) -> SNLE_Posterior:
+    ) -> LikelihoodBasedPosterior:
         r"""Run SNLE.
 
         Return posterior $p(\theta|x)$ after inference.
@@ -142,7 +142,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         # can `sample()` and `log_prob()`. The network is accessible via `.net`.
         if self._posterior is None or retrain_from_scratch_each_round:
             x_shape = x_shape_from_simulation(x)
-            self._posterior = SNLE_Posterior(
+            self._posterior = LikelihoodBasedPosterior(
                 method_family="snle",
                 neural_net=self._build_neural_net(theta, x),
                 prior=self._prior,

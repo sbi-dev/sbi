@@ -10,7 +10,7 @@ from torch import Tensor
 from torch.distributions import Distribution
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
-from sbi.inference.posteriors.snpe_posterior import SNPE_Posterior
+from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.simulators.linear_gaussian import true_posterior_linear_gaussian_mvn_prior
 from sbi.utils.metrics import c2st
 
@@ -98,7 +98,7 @@ def get_prob_outside_uniform_prior(posterior: NeuralPosterior, num_dim: int) -> 
 
 
 def get_normalization_uniform_prior(
-    posterior: SNPE_Posterior, prior: Distribution, true_observation: Tensor,
+    posterior: DirectPosterior, prior: Distribution, true_observation: Tensor,
 ) -> Tuple[Tensor, Tensor, Tensor]:
     """
     Return the unnormalized posterior likelihood, the normalized posterior likelihood,
