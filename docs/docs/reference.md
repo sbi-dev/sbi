@@ -54,21 +54,21 @@
 
 ## Posteriors
 
-::: sbi.inference.posteriors.snpe_posterior.SNPE_Posterior
+::: sbi.inference.posteriors.direct_posterior.DirectPosterior
     rendering:
       show_root_heading: true
     selection:
       filters: [ "!^_", "^__", "!^__class__" ]
       inherited_members: true
       
-::: sbi.inference.posteriors.snle_posterior.SNLE_Posterior
+::: sbi.inference.posteriors.likelihood_based_posterior.LikelihoodBasedPosterior
     rendering:
       show_root_heading: true
     selection:
       filters: [ "!^_", "^__", "!^__class__" ]
       inherited_members: true
       
-::: sbi.inference.posteriors.snre_posterior.SNRE_Posterior
+::: sbi.inference.posteriors.ratio_based_posterior.RatioBasedPosterior
     rendering:
       show_root_heading: true
     selection:

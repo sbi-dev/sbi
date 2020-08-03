@@ -24,7 +24,7 @@ from sbi.utils import del_entries
 from sbi.utils.torchutils import atleast_2d_float32_tensor, batched_first_of_batch
 
 
-class SNPE_Posterior(NeuralPosterior):
+class DirectPosterior(NeuralPosterior):
     r"""Posterior $p(\theta|x)$ with `log_prob()` and `sample()` methods, obtained with
     SNPE.<br/><br/>
     SNPE trains a neural network to directly approximate the posterior distribution.

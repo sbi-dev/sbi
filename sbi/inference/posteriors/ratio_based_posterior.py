@@ -24,13 +24,17 @@ from sbi.utils import del_entries
 from sbi.utils.torchutils import atleast_2d_float32_tensor
 
 
-class SNLE_Posterior(NeuralPosterior):
+class RatioBasedPosterior(NeuralPosterior):
     r"""Posterior $p(\theta|x)$ with `log_prob()` and `sample()` methods, obtained with
-    SNLE.<br/><br/>
-    SNLE trains a neural network to approximate the likelihood $p(x|\theta)$. The
-    `SNLE_Posterior` class wraps the trained network such that one can directly evaluate
-    the unnormalized posterior log probability $p(\theta|x) \propto p(x|\theta) \cdot
-    p(\theta)$ and draw samples from the posterior with MCMC.<br/><br/>
+    SNRE.<br/><br/>
+    SNRE trains a neural network to approximate likelihood ratios, which in turn can be
+    used obtain an unnormalized posterior $p(\theta|x) \propto p(x|\theta) \cdot
+    p(\theta)$. The `SNRE_Posterior` class wraps the trained network such that one can
+    directly evaluate the unnormalized posterior log-probability $p(\theta|x) \propto
+    p(x|\theta) \cdot p(\theta)$ and draw samples from the posterior with
+    MCMC. Note that, in the case of single-round SNRE_A / AALR, it is possible to
+    evaluate the log-probability of the **normalized** posterior, but sampling still
+    requires MCMC.<br/><br/>
     The neural network itself can be accessed via the `.net` attribute.
     """
 
@@ -74,7 +78,9 @@ class SNLE_Posterior(NeuralPosterior):
         r"""
         Returns the log-probability of $p(x|\theta) \cdot p(\theta).$
 
-        This corresponds to an **unnormalized** posterior log-probability.
+        This corresponds to an **unnormalized** posterior log-probability. Only for
+        single-round SNRE_A / AALR, the returned log-probability will correspond to the
+        **normalized** log-probability.
 
         Args:
             theta: Parameters $\theta$.
@@ -95,12 +101,24 @@ class SNLE_Posterior(NeuralPosterior):
 
         theta, x = self._prepare_theta_and_x_for_log_prob_(theta, x)
 
-        warn(
-            "The log probability from SNL is only correct up to a normalizing constant."
-        )
+        self._warn_log_prob_snre()
 
         with torch.set_grad_enabled(track_gradients):
-            return self.net.log_prob(x, theta) + self._prior.log_prob(theta)
+            log_ratio = self.net(torch.cat((theta, x), dim=1)).reshape(-1)
+            return log_ratio + self._prior.log_prob(theta)
+
+    def _warn_log_prob_snre(self) -> None:
+        if self._method_family == "snre_a":
+            if self._num_trained_rounds > 1:
+                warn(
+                    "The log-probability from AALR / SNRE-A beyond round 1 is only"
+                    " correct up to a normalizing constant."
+                )
+        elif self._method_family == "snre_b":
+            warn(
+                "The log probability from SNRE_B is only correct up to a normalizing "
+                "constant."
+            )
 
     def sample(
         self,
