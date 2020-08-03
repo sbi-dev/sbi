@@ -230,6 +230,49 @@ class NeuralPosterior(ABC):
 
         return theta, x
 
+    def _prepare_for_sample(
+        self,
+        x: Tensor,
+        sample_shape: Optional[Tensor],
+        mcmc_method: Optional[str],
+        mcmc_parameters: Optional[Dict[str, Any]],
+    ) -> Tuple[Tensor, int, str, Dict[str, Any]]:
+        r"""
+        Return checked and (potentially default) values to sample from the posterior.
+
+        Args:
+            sample_shape: Desired shape of samples that are drawn from posterior. If
+                sample_shape is multidimensional we simply draw `sample_shape.numel()`
+                samples and then reshape into the desired shape.
+            x: Conditioning context for posterior $p(\theta|x)$. If not provided,
+                fall back onto `x_o` if previously provided for multiround training, or
+                to a set default (see `set_default_x()` method).
+            mcmc_method: Optional parameter to override `self.mcmc_method`.
+            mcmc_parameters: Dictionary overriding the default parameters for MCMC.
+                The following parameters are supported: `thin` to set the thinning
+                factor for the chain, `warmup_steps` to set the initial number of
+                samples to discard, `num_chains` for the number of chains,
+                `init_strategy` for the initialisation strategy for chains; `prior`
+                will draw init locations from prior, whereas `sir` will use Sequential-
+                Importance-Resampling using `init_strategy_num_candidates` to find init
+                locations.
+
+        Returns: Single (potentially default) $x$ with batch dimension; an integer
+            number of samples; a (potentially default) mcmc method; and (potentially
+            default) mcmc parameters.
+        """
+
+        x = atleast_2d_float32_tensor(self._x_else_default_x(x))
+        self._ensure_single_x(x)
+        self._ensure_x_consistent_with_default_x(x)
+        num_samples = torch.Size(sample_shape).numel()
+
+        mcmc_method = mcmc_method if mcmc_method is not None else self.mcmc_method
+        mcmc_parameters = (
+            mcmc_parameters if mcmc_parameters is not None else self.mcmc_parameters
+        )
+        return x, num_samples, mcmc_method, mcmc_parameters
+
     def _sample_posterior_mcmc(
         self,
         num_samples: int,

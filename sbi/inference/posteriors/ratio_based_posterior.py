@@ -155,14 +155,8 @@ class RatioBasedPosterior(NeuralPosterior):
             Samples from posterior.
         """
 
-        x = atleast_2d_float32_tensor(self._x_else_default_x(x))
-        self._ensure_single_x(x)
-        self._ensure_x_consistent_with_default_x(x)
-        num_samples = torch.Size(sample_shape).numel()
-
-        mcmc_method = mcmc_method if mcmc_method is not None else self.mcmc_method
-        mcmc_parameters = (
-            mcmc_parameters if mcmc_parameters is not None else self.mcmc_parameters
+        x, num_samples, mcmc_method, mcmc_parameters = self._prepare_for_sample(
+            x, sample_shape, mcmc_method, mcmc_parameters
         )
 
         samples = self._sample_posterior_mcmc(
@@ -176,11 +170,11 @@ class RatioBasedPosterior(NeuralPosterior):
         return samples.reshape((*sample_shape, -1))
 
     @property
-    def _num_trained_rounds(self):
+    def _num_trained_rounds(self) -> int:
         return self._trained_rounds
 
     @_num_trained_rounds.setter
-    def _num_trained_rounds(self, trained_rounds):
+    def _num_trained_rounds(self, trained_rounds: int) -> None:
         """
         Sets the number of trained rounds and updates the purpose.
 
