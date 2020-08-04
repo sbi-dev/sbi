@@ -171,7 +171,6 @@ class NeuralPosterior(ABC):
                 Importance-Resampling using `init_strategy_num_candidates` to find init
                 locations.
 
-
         Returns:
             `NeuralPosterior` for chainable calls.
         """

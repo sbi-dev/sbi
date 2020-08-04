@@ -1,5 +1,6 @@
 # v0.11.2
 - Subclassed Posterior (#282, #285)
+- Ensure correct round number when presimulated data was provided.
 
 
 # v0.11.1

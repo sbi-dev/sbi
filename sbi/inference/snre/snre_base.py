@@ -134,6 +134,13 @@ class RatioEstimator(NeuralInference, ABC):
         self._check_proposal(proposal)
         self._round = self._round + 1 if (proposal is not None) else 0
 
+        # If presimulated data was provided from a later round, set the self._round to
+        # this value. Otherwise, we would rely on the user to _additionally_ provide the
+        # proposal that the presimulated data was sampled from in order for self._round
+        # to become larger than 0.
+        if self._data_round_index:
+            self._round = max(self._round, max(self._data_round_index))
+
         # Run simulations for the round.
         theta, x = self._run_simulations(proposal, num_simulations)
         self._append_to_data_bank(theta, x, self._round)
