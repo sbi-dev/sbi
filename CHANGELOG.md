@@ -1,6 +1,7 @@
 # v0.11.2
 - Subclassed Posterior (#282, #285)
-- Ensure correct round number when presimulated data was provided.
+- Ensure correct round number when presimulated data was provided
+- Pin pyro to v1.3.1 as a temporary workaround 
 
 
 # v0.11.1
