@@ -27,9 +27,9 @@ REQUIRED = [
     "matplotlib",
     "numpy",
     "pillow",
-    "pyro-ppl",
+    "pyro-ppl==1.3.1",  # TODO: Remove once #286 is addressed
     "pyknos==0.11",
-    "nflows==0.12", #Remove once pyknos is updated to 0.12
+    "nflows==0.12",  # TODO: Remove once pyknos is updated to 0.12
     "scipy",
     "tensorboard",
     "torch>=1.5.1",
