@@ -555,6 +555,29 @@ class NeuralPosterior(ABC):
 
         return x_matched
 
+    def _get_net_name(self) -> str:
+        """
+        Return the name of the neural network used for inference.
+
+        For SNRE the net is sequential because it has a standardization net. Hence,
+        we only access its last entry.
+        """
+
+        try:
+            # Why not `isinstance(self.net[0], StandardizeInputs)`? Because
+            # `StandardizeInputs` is defined within a function in
+            # neural_nets/classifier.py and can not be imported here.
+            # TODO: Refactor this into the net's __str__  method.
+            if self.net[0].__class__.__name__ == "StandardizeInputs":
+                actual_net = self.net[-1]
+            else:
+                actual_net = self.net
+        except TypeError:
+            # If self.net is not a sequential, self.net[0] will throw an error.
+            actual_net = self.net
+
+        return actual_net.__class__.__name__.lower()
+
     def __repr__(self):
         desc = f"""{self.__class__.__name__}(
                method_family={self._method_family},
@@ -575,15 +598,12 @@ class NeuralPosterior(ABC):
             else ""
         )
 
-        # The net might be sequential because it can have a standardization net. Hence,
-        # we only access its last entry if it is a nn.Sequential.
-        actual_net = self.net[-1] if isinstance(self.net, nn.Sequential) else self.net
         desc = (
             f"Posterior conditional density p(θ|x) "
             f"({msg.get(self._num_trained_rounds, focused_msg)}).{default_x_msg}\n\n"
             f"This {self.__class__.__name__}-object was obtained with a "
             f"{self._method_family.upper()}-class "
-            f"method using a {actual_net.__class__.__name__.lower()}.\n"
+            f"method using a {self._get_net_name()}.\n"
             f"{self._purpose}"
         )
 
