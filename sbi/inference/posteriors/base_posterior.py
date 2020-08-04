@@ -459,6 +459,7 @@ class NeuralPosterior(ABC):
             initial_params={"": self._mcmc_init_params},
             num_chains=num_chains,
             mp_context="fork",
+            transforms={},
             disable_progbar=not show_progress_bars,
         )
         sampler.run()
