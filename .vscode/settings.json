@@ -1,8 +1,4 @@
 {
-    "python.pythonPath": ".sbi_env/bin/python",
-    //
-    // Testing: enable only one at a time (pytest, generally)
-    //
     "python.testing.unittestEnabled": false,
     "python.testing.nosetestsEnabled": false,
     "python.testing.pytestEnabled": true,

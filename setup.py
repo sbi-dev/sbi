@@ -17,6 +17,7 @@ from setuptools import find_packages, setup, Command
 # Package meta-data.
 NAME = "sbi"
 DESCRIPTION = "Simulation-based inference."
+KEYWORDS = "bayesian parameter inference system_identification simulator PyTorch"
 URL = "https://github.com/mackelab/sbi"
 EMAIL = "sbi@mackelab.org"
 AUTHOR = "Álvaro Tejero-Cantero, Jakob H. Macke, Jan-Matthis Lückmann, Conor M. Durkan, Michael Deistler, Jan Bölts"
@@ -27,9 +28,8 @@ REQUIRED = [
     "matplotlib",
     "numpy",
     "pillow",
+    "pyknos==0.12",
     "pyro-ppl==1.3.1",  # TODO: Remove once #286 is addressed
-    "pyknos==0.11",
-    "nflows==0.12",  # TODO: Remove once pyknos is updated to 0.12
     "scipy",
     "tensorboard",
     "torch>=1.5.1",
@@ -117,6 +117,7 @@ setup(
     name=NAME,
     version=about["__version__"],
     description=DESCRIPTION,
+    keywords=KEYWORDS,
     long_description=long_description,
     long_description_content_type="text/markdown",
     author=AUTHOR,
@@ -141,9 +142,10 @@ setup(
         "Topic :: Scientific/Engineering :: Mathematics",
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
     ],
     # $ setup.py publish support.
-    cmdclass={"upload": UploadCommand,},
+    cmdclass=dict(upload=UploadCommand),
 )
