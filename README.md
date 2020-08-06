@@ -93,4 +93,4 @@ Tübingen and Research Center caesar of the Max Planck Gesellschaft.
 
 ## License
 
-AGPLv3
+[Affero General Public License v3 (AGPLv3)](https://www.gnu.org/licenses/)
