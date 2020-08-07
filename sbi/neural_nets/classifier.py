@@ -9,6 +9,25 @@ from torch import Tensor, nn, relu
 from sbi.utils.sbiutils import standardizing_net
 
 
+class StandardizeInputs(nn.Module):
+    def __init__(self, embedding_net_x, embedding_net_y, dim_x, dim_y):
+        super().__init__()
+        self.embedding_net_x = embedding_net_x
+        self.embedding_net_y = embedding_net_y
+        self.dim_x = dim_x
+        self.dim_y = dim_y
+
+    def forward(self, t):
+        out = torch.cat(
+            [
+                self.embedding_net_x(t[:, : self.dim_x]),
+                self.embedding_net_y(t[:, self.dim_x : self.dim_x + self.dim_y]),
+            ],
+            dim=1,
+        )
+        return out
+
+
 def build_input_layer(
     batch_x: Tensor = None,
     batch_y: Tensor = None,
@@ -38,24 +57,6 @@ def build_input_layer(
 
     if z_score_y:
         embedding_net_y = nn.Sequential(standardizing_net(batch_y), embedding_net_y)
-
-    class StandardizeInputs(nn.Module):
-        def __init__(self, embedding_net_x, embedding_net_y, dim_x, dim_y):
-            super().__init__()
-            self.embedding_net_x = embedding_net_x
-            self.embedding_net_y = embedding_net_y
-            self.dim_x = dim_x
-            self.dim_y = dim_y
-
-        def forward(self, t):
-            out = torch.cat(
-                [
-                    self.embedding_net_x(t[:, : self.dim_x]),
-                    self.embedding_net_y(t[:, self.dim_x : self.dim_x + self.dim_y]),
-                ],
-                dim=1,
-            )
-            return out
 
     input_layer = StandardizeInputs(
         embedding_net_x, embedding_net_y, dim_x=batch_x.shape[1], dim_y=batch_y.shape[1]
