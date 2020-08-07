@@ -1,10 +1,14 @@
 # v0.11.2
-- Subclassed Posterior (#282, #285)
-- Ensure correct round number when presimulated data was provided
-- Pin pyro to v1.3.1 as a temporary workaround 
+
+- Fixed pickling of SNRE by moving StandardizeInputs (#291)
+- Added check to ensure correct round number when presimulated data is provided
+- Subclassed Posterior depending on inference algorithm (#282, #285)
+- Pinned pyro to v1.3.1 as a temporary workaround (see #288) 
+- Detaching weights for MCMC SIR init immediately to save memory (#292)
 
 
 # v0.11.1
+
 - Bug fix for log_prob() in SNRE (#280)
 
 
