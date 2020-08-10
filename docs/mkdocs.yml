@@ -11,6 +11,7 @@ nav:
       - Flexible interface: tutorial/03_flexible_interface.md
   - Contribute: contribute.md
   - API Reference: reference.md
+  - FAQ: faq.md
   - Credits: credits.md
 
 repo_name: 'mackelab/sbi'

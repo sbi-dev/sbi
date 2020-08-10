@@ -1,3 +1,8 @@
+# v0.11.3
+
+- Added an FAQ (#293)
+
+
 # v0.11.2
 
 - Fixed pickling of SNRE by moving StandardizeInputs (#291)
