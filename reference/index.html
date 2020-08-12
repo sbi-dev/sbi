@@ -7,10 +7,10 @@
 <meta content="width=device-width,initial-scale=1" name="viewport"/>
 <link href="https://mackelab.org/sbi/reference/" rel="canonical"/>
 <link href="../assets/images/favicon.png" rel="shortcut icon"/>
-<meta content="mkdocs-1.1.2, mkdocs-material-5.5.3" name="generator"/>
+<meta content="mkdocs-1.1.2, mkdocs-material-5.2.2" name="generator"/>
 <title>API Reference - sbi</title>
-<link href="../assets/stylesheets/main.947af8d5.min.css" rel="stylesheet"/>
-<link href="../assets/stylesheets/palette.7f672a1f.min.css" rel="stylesheet"/>
+<link href="../assets/stylesheets/main.a2408e81.min.css" rel="stylesheet"/>
+<link href="../assets/stylesheets/palette.a46bcfb3.min.css" rel="stylesheet"/>
 <meta content="#3f51b5" name="theme-color"/>
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
 <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,400i,700%7CRoboto+Mono&amp;display=fallback" rel="stylesheet"/>
@@ -298,6 +298,11 @@
 </li>
 </ul>
 </nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../faq/" title="FAQ">
+      FAQ
+    </a>
 </li>
 <li class="md-nav__item">
 <a class="md-nav__link" href="../credits/" title="Credits">
@@ -3678,7 +3683,7 @@ distances: Tensor of distances of the selected parameters.</p>
     <span class="k">if</span> <span class="n">eps</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">is_accepted</span> <span class="o">=</span> <span class="n">distances</span> <span class="o">&lt;</span> <span class="n">eps</span>
         <span class="n">num_accepted</span> <span class="o">=</span> <span class="n">is_accepted</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
-        <span class="k">assert</span> <span class="n">num_accepted</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"No parameters accepted, eps=</span><span class="si">{eps}</span><span class="s2"> too small"</span>
+        <span class="k">assert</span> <span class="n">num_accepted</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"No parameters accepted, eps=</span><span class="si">{</span><span class="n">eps</span><span class="si">}</span><span class="s2"> too small"</span>
 
         <span class="n">theta_accepted</span> <span class="o">=</span> <span class="n">theta</span><span class="p">[</span><span class="n">is_accepted</span><span class="p">]</span>
         <span class="n">distances_accepted</span> <span class="o">=</span> <span class="n">distances</span><span class="p">[</span><span class="n">is_accepted</span><span class="p">]</span>
@@ -4300,8 +4305,8 @@ summary (optional): A dictionary containing particles, weights, epsilons
 
     <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
         <span class="p">(</span>
-            <span class="sa">f</span><span class="s2">"population=</span><span class="si">{pop_idx}</span><span class="s2">, eps=</span><span class="si">{epsilon}</span><span class="s2">, ess=</span><span class="si">{1.0}</span><span class="s2">, "</span>
-            <span class="sa">f</span><span class="s2">"num_sims=</span><span class="si">{num_initial_pop}</span><span class="s2">"</span>
+            <span class="sa">f</span><span class="s2">"population=</span><span class="si">{</span><span class="n">pop_idx</span><span class="si">}</span><span class="s2">, eps=</span><span class="si">{</span><span class="n">epsilon</span><span class="si">}</span><span class="s2">, ess=</span><span class="si">{</span><span class="mf">1.0</span><span class="si">}</span><span class="s2">, "</span>
+            <span class="sa">f</span><span class="s2">"num_sims=</span><span class="si">{</span><span class="n">num_initial_pop</span><span class="si">}</span><span class="s2">"</span>
         <span class="p">)</span>
     <span class="p">)</span>
 
@@ -4345,8 +4350,8 @@ summary (optional): A dictionary containing particles, weights, epsilons
 
         <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
             <span class="p">(</span>
-                <span class="sa">f</span><span class="s2">"population=</span><span class="si">{pop_idx}</span><span class="s2"> done: eps=</span><span class="si">{epsilon:.6f}</span><span class="s2">,"</span>
-                <span class="sa">f</span><span class="s2">" num_sims=</span><span class="si">{self.simulation_counter}</span><span class="s2">."</span>
+                <span class="sa">f</span><span class="s2">"population=</span><span class="si">{</span><span class="n">pop_idx</span><span class="si">}</span><span class="s2"> done: eps=</span><span class="si">{</span><span class="n">epsilon</span><span class="si">:</span><span class="s2">.6f</span><span class="si">}</span><span class="s2">,"</span>
+                <span class="sa">f</span><span class="s2">" num_sims=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">simulation_counter</span><span class="si">}</span><span class="s2">."</span>
             <span class="p">)</span>
         <span class="p">)</span>
 
@@ -4637,12 +4642,12 @@ sampling.</p>
     <span class="n">kernels</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"gaussian"</span><span class="p">,</span> <span class="s2">"uniform"</span><span class="p">)</span>
     <span class="k">assert</span> <span class="p">(</span>
         <span class="n">kernel</span> <span class="ow">in</span> <span class="n">kernels</span>
-    <span class="p">),</span> <span class="sa">f</span><span class="s2">"Kernel '</span><span class="si">{kernel}</span><span class="s2">' not supported. Choose one from </span><span class="si">{kernels}</span><span class="s2">."</span>
+    <span class="p">),</span> <span class="sa">f</span><span class="s2">"Kernel '</span><span class="si">{</span><span class="n">kernel</span><span class="si">}</span><span class="s2">' not supported. Choose one from </span><span class="si">{</span><span class="n">kernels</span><span class="si">}</span><span class="s2">."</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">kernel</span> <span class="o">=</span> <span class="n">kernel</span>
 
     <span class="n">algorithm_variants</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"A"</span><span class="p">,</span> <span class="s2">"B"</span><span class="p">,</span> <span class="s2">"C"</span><span class="p">)</span>
     <span class="k">assert</span> <span class="n">algorithm_variant</span> <span class="ow">in</span> <span class="n">algorithm_variants</span><span class="p">,</span> <span class="p">(</span>
-        <span class="sa">f</span><span class="s2">"SMCABC variant '</span><span class="si">{algorithm_variant}</span><span class="s2">' not supported, choose one from"</span>
+        <span class="sa">f</span><span class="s2">"SMCABC variant '</span><span class="si">{</span><span class="n">algorithm_variant</span><span class="si">}</span><span class="s2">' not supported, choose one from"</span>
         <span class="s2">" </span><span class="si">{algorithm_variants}</span><span class="s2">."</span>
     <span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">algorithm_variant</span> <span class="o">=</span> <span class="n">algorithm_variant</span>
@@ -4800,7 +4805,7 @@ get_new_kernel<span class="p">(</span><span class="bp">self</span><span class="p
         <span class="c1"># parameter dimension.</span>
         <span class="k">return</span> <span class="n">Uniform</span><span class="p">(</span><span class="n">low</span><span class="o">=</span><span class="n">low</span><span class="p">,</span> <span class="n">high</span><span class="o">=</span><span class="n">high</span><span class="p">)</span><span class="o">.</span><span class="n">to_event</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Kernel, '</span><span class="si">{self.kernel}</span><span class="s2">' not supported."</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Kernel, '</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">kernel</span><span class="si">}</span><span class="s2">' not supported."</span><span class="p">)</span>
 </code></pre>
 </div>
 </td>
@@ -4865,7 +4870,7 @@ too small.</p>
     <span class="n">ess</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">/</span> <span class="n">torch</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="mf">2.0</span> <span class="o">*</span> <span class="n">log_weights</span><span class="p">),</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">))</span> <span class="o">/</span> <span class="n">num_particles</span>
     <span class="c1"># Resampling of weights for low ESS only for Sisson et al. 2007.</span>
     <span class="k">if</span> <span class="n">ess</span> <span class="o">&lt;</span> <span class="n">ess_min</span><span class="p">:</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">"ESS=</span><span class="si">{ess:.2f}</span><span class="s2"> too low, resampling pop </span><span class="si">{pop_idx}</span><span class="s2">..."</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">"ESS=</span><span class="si">{</span><span class="n">ess</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> too low, resampling pop </span><span class="si">{</span><span class="n">pop_idx</span><span class="si">}</span><span class="s2">..."</span><span class="p">)</span>
         <span class="c1"># First resample, then set to uniform weights in in Sisson et al. 2007.</span>
         <span class="n">particles</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_from_population_with_weights</span><span class="p">(</span>
             <span class="n">particles</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">log_weights</span><span class="p">),</span> <span class="n">num_samples</span><span class="o">=</span><span class="n">num_particles</span>
@@ -4947,27 +4952,27 @@ sample_from_population_with_weights<span class="p">(</span><span class="n">parti
 <a class="headerlink" href="#sbi.inference.posteriors.direct_posterior.DirectPosterior" title="Permanent link">¶</a></h3>
 <div class="doc doc-contents first">
 <p>Posterior <span><span class="MathJax_Preview">p(\theta|x)</span><script type="math/tex">p(\theta|x)</script></span> with <code>log_prob()</code> and <code>sample()</code> methods, obtained with
-SNPE.<br/>
+    SNPE.<br/>
 <br/>
 
-SNPE trains a neural network to directly approximate the posterior distribution.
-However, for bounded priors, the neural network can have leakage: it puts non-zero
-mass in regions where the prior is zero. The <code>SnpePosterior</code> class wraps the trained
-network to deal with these cases.<br/>
+    SNPE trains a neural network to directly approximate the posterior distribution.
+    However, for bounded priors, the neural network can have leakage: it puts non-zero
+    mass in regions where the prior is zero. The <code>SnpePosterior</code> class wraps the trained
+    network to deal with these cases.<br/>
 <br/>
 
-Specifically, this class offers the following functionality:<br/>
+    Specifically, this class offers the following functionality:<br/>
 
-- correct the calculation of the log probability such that it compensates for the
-  leakage.<br/>
+    - correct the calculation of the log probability such that it compensates for the
+      leakage.<br/>
 
-- reject samples that lie outside of the prior bounds.<br/>
+    - reject samples that lie outside of the prior bounds.<br/>
 
-- alternatively, if leakage is very high (which can happen for multi-round SNPE),
-  sample from the posterior with MCMC.<br/>
+    - alternatively, if leakage is very high (which can happen for multi-round SNPE),
+      sample from the posterior with MCMC.<br/>
 <br/>
 
-The neural network itself can be accessed via the <code>.net</code> attribute.</p>
+    The neural network itself can be accessed via the <code>.net</code> attribute.</p>
 <div class="doc doc-children">
 <div class="doc doc-object doc-attribute">
 <h4 class="doc doc-heading" data-toc-label="default_x" id="sbi.inference.posteriors.direct_posterior.DirectPosterior.default_x">
@@ -6325,17 +6330,17 @@ do not support rejection sampling.</p>
 <a class="headerlink" href="#sbi.inference.posteriors.likelihood_based_posterior.LikelihoodBasedPosterior" title="Permanent link">¶</a></h3>
 <div class="doc doc-contents first">
 <p>Posterior <span><span class="MathJax_Preview">p(\theta|x)</span><script type="math/tex">p(\theta|x)</script></span> with <code>log_prob()</code> and <code>sample()</code> methods, obtained with
-SNLE.<br/>
+    SNLE.<br/>
 <br/>
 
-SNLE trains a neural network to approximate the likelihood <span><span class="MathJax_Preview">p(x|\theta)</span><script type="math/tex">p(x|\theta)</script></span>. The
-<code>SNLE_Posterior</code> class wraps the trained network such that one can directly evaluate
-the unnormalized posterior log probability <span><span class="MathJax_Preview">p(\theta|x) \propto p(x|\theta) \cdot
-p(\theta)</span><script type="math/tex">p(\theta|x) \propto p(x|\theta) \cdot
-p(\theta)</script></span> and draw samples from the posterior with MCMC.<br/>
+    SNLE trains a neural network to approximate the likelihood <span><span class="MathJax_Preview">p(x|\theta)</span><script type="math/tex">p(x|\theta)</script></span>. The
+    <code>SNLE_Posterior</code> class wraps the trained network such that one can directly evaluate
+    the unnormalized posterior log probability <span><span class="MathJax_Preview">p(\theta|x) \propto p(x|\theta) \cdot
+    p(\theta)</span><script type="math/tex">p(\theta|x) \propto p(x|\theta) \cdot
+    p(\theta)</script></span> and draw samples from the posterior with MCMC.<br/>
 <br/>
 
-The neural network itself can be accessed via the <code>.net</code> attribute.</p>
+    The neural network itself can be accessed via the <code>.net</code> attribute.</p>
 <div class="doc doc-children">
 <div class="doc doc-object doc-attribute">
 <h4 class="doc doc-heading" data-toc-label="default_x" id="sbi.inference.posteriors.likelihood_based_posterior.LikelihoodBasedPosterior.default_x">
@@ -7067,22 +7072,22 @@ locations.</p>
 <a class="headerlink" href="#sbi.inference.posteriors.ratio_based_posterior.RatioBasedPosterior" title="Permanent link">¶</a></h3>
 <div class="doc doc-contents first">
 <p>Posterior <span><span class="MathJax_Preview">p(\theta|x)</span><script type="math/tex">p(\theta|x)</script></span> with <code>log_prob()</code> and <code>sample()</code> methods, obtained with
-SNRE.<br/>
+    SNRE.<br/>
 <br/>
 
-SNRE trains a neural network to approximate likelihood ratios, which in turn can be
-used obtain an unnormalized posterior <span><span class="MathJax_Preview">p(\theta|x) \propto p(x|\theta) \cdot
-p(\theta)</span><script type="math/tex">p(\theta|x) \propto p(x|\theta) \cdot
-p(\theta)</script></span>. The <code>SNRE_Posterior</code> class wraps the trained network such that one can
-directly evaluate the unnormalized posterior log-probability <span><span class="MathJax_Preview">p(\theta|x) \propto
-p(x|\theta) \cdot p(\theta)</span><script type="math/tex">p(\theta|x) \propto
-p(x|\theta) \cdot p(\theta)</script></span> and draw samples from the posterior with
-MCMC. Note that, in the case of single-round SNRE_A / AALR, it is possible to
-evaluate the log-probability of the <strong>normalized</strong> posterior, but sampling still
-requires MCMC.<br/>
+    SNRE trains a neural network to approximate likelihood ratios, which in turn can be
+    used obtain an unnormalized posterior <span><span class="MathJax_Preview">p(\theta|x) \propto p(x|\theta) \cdot
+    p(\theta)</span><script type="math/tex">p(\theta|x) \propto p(x|\theta) \cdot
+    p(\theta)</script></span>. The <code>SNRE_Posterior</code> class wraps the trained network such that one can
+    directly evaluate the unnormalized posterior log-probability <span><span class="MathJax_Preview">p(\theta|x) \propto
+    p(x|\theta) \cdot p(\theta)</span><script type="math/tex">p(\theta|x) \propto
+    p(x|\theta) \cdot p(\theta)</script></span> and draw samples from the posterior with
+    MCMC. Note that, in the case of single-round SNRE_A / AALR, it is possible to
+    evaluate the log-probability of the <strong>normalized</strong> posterior, but sampling still
+    requires MCMC.<br/>
 <br/>
 
-The neural network itself can be accessed via the <code>.net</code> attribute.</p>
+    The neural network itself can be accessed via the <code>.net</code> attribute.</p>
 <div class="doc doc-children">
 <div class="doc doc-object doc-attribute">
 <h4 class="doc doc-heading" data-toc-label="default_x" id="sbi.inference.posteriors.ratio_based_posterior.RatioBasedPosterior.default_x">
@@ -7975,7 +7980,7 @@ sbi.utils.get_nn_models.classifier_nn<span class="p">(</span><span class="n">mod
 <div class="doc doc-object doc-function">
 <h3 class="doc doc-heading" id="sbi.utils.plot.pairplot">
 <code class="highlight language-python">
-sbi.utils.plot.pairplot<span class="p">(</span><span class="n">samples</span><span class="p">,</span> <span class="n">points</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">upper</span><span class="o">=</span><span class="s1">'hist'</span><span class="p">,</span> <span class="n">diag</span><span class="o">=</span><span class="s1">'hist'</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">legend</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">labels_points</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">labels_samples</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">samples_colors</span><span class="o">=</span><span class="p">[</span><span class="s1">'#1f77b4'</span><span class="p">,</span> <span class="s1">'#ff7f0e'</span><span class="p">,</span> <span class="s1">'#2ca02c'</span><span class="p">,</span> <span class="s1">'#d62728'</span><span class="p">,</span> <span class="s1">'#9467bd'</span><span class="p">,</span> <span class="s1">'#8c564b'</span><span class="p">,</span> <span class="s1">'#e377c2'</span><span class="p">,</span> <span class="s1">'#7f7f7f'</span><span class="p">,</span> <span class="s1">'#bcbd22'</span><span class="p">,</span> <span class="s1">'#17becf'</span><span class="p">],</span> <span class="n">points_colors</span><span class="o">=</span><span class="p">[</span><span class="s1">'#1f77b4'</span><span class="p">,</span> <span class="s1">'#ff7f0e'</span><span class="p">,</span> <span class="s1">'#2ca02c'</span><span class="p">,</span> <span class="s1">'#d62728'</span><span class="p">,</span> <span class="s1">'#9467bd'</span><span class="p">,</span> <span class="s1">'#8c564b'</span><span class="p">,</span> <span class="s1">'#e377c2'</span><span class="p">,</span> <span class="s1">'#7f7f7f'</span><span class="p">,</span> <span class="s1">'#bcbd22'</span><span class="p">,</span> <span class="s1">'#17becf'</span><span class="p">],</span> <span class="n">subset</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">ticks</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">tickformatter</span><span class="o">=&lt;</span><span class="n">matplotlib</span><span class="o">.</span><span class="n">ticker</span><span class="o">.</span><span class="n">FormatStrFormatter</span> <span class="nb">object</span> <span class="n">at</span> <span class="mh">0x7fe482235e20</span><span class="o">&gt;</span><span class="p">,</span> <span class="n">tick_labels</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">hist_diag</span><span class="o">=</span><span class="p">{</span><span class="s1">'alpha'</span><span class="p">:</span> <span class="mf">1.0</span><span class="p">,</span> <span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span> <span class="s1">'density'</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s1">'histtype'</span><span class="p">:</span> <span class="s1">'step'</span><span class="p">},</span> <span class="n">hist_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">},</span> <span class="n">kde_diag</span><span class="o">=</span><span class="p">{</span><span class="s1">'bw_method'</span><span class="p">:</span> <span class="s1">'scott'</span><span class="p">,</span> <span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span> <span class="s1">'color'</span><span class="p">:</span> <span class="s1">'black'</span><span class="p">},</span> <span class="n">kde_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'bw_method'</span><span class="p">:</span> <span class="s1">'scott'</span><span class="p">,</span> <span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">},</span> <span class="n">contour_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'levels'</span><span class="p">:</span> <span class="p">[</span><span class="mf">0.68</span><span class="p">],</span> <span class="s1">'percentile'</span><span class="p">:</span> <span class="kc">True</span><span class="p">},</span> <span class="n">scatter_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'alpha'</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">,</span> <span class="s1">'edgecolor'</span><span class="p">:</span> <span class="s1">'none'</span><span class="p">,</span> <span class="s1">'rasterized'</span><span class="p">:</span> <span class="kc">False</span><span class="p">},</span> <span class="n">plot_offdiag</span><span class="o">=</span><span class="p">{},</span> <span class="n">points_diag</span><span class="o">=</span><span class="p">{},</span> <span class="n">points_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'marker'</span><span class="p">:</span> <span class="s1">'.'</span><span class="p">,</span> <span class="s1">'markersize'</span><span class="p">:</span> <span class="mi">20</span><span class="p">},</span> <span class="n">fig_size</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">10</span><span class="p">),</span> <span class="n">fig_bg_colors</span><span class="o">=</span><span class="p">{</span><span class="s1">'upper'</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span> <span class="s1">'diag'</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span> <span class="s1">'lower'</span><span class="p">:</span> <span class="kc">None</span><span class="p">},</span> <span class="n">fig_subplots_adjust</span><span class="o">=</span><span class="p">{</span><span class="s1">'top'</span><span class="p">:</span> <span class="mf">0.9</span><span class="p">},</span> <span class="n">subplots</span><span class="o">=</span><span class="p">{},</span> <span class="n">despine</span><span class="o">=</span><span class="p">{</span><span class="s1">'offset'</span><span class="p">:</span> <span class="mi">5</span><span class="p">},</span> <span class="n">title_format</span><span class="o">=</span><span class="p">{</span><span class="s1">'fontsize'</span><span class="p">:</span> <span class="mi">16</span><span class="p">})</span> </code>
+sbi.utils.plot.pairplot<span class="p">(</span><span class="n">samples</span><span class="p">,</span> <span class="n">points</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">upper</span><span class="o">=</span><span class="s1">'hist'</span><span class="p">,</span> <span class="n">diag</span><span class="o">=</span><span class="s1">'hist'</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">legend</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">labels_points</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">labels_samples</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">samples_colors</span><span class="o">=</span><span class="p">[</span><span class="s1">'#1f77b4'</span><span class="p">,</span> <span class="s1">'#ff7f0e'</span><span class="p">,</span> <span class="s1">'#2ca02c'</span><span class="p">,</span> <span class="s1">'#d62728'</span><span class="p">,</span> <span class="s1">'#9467bd'</span><span class="p">,</span> <span class="s1">'#8c564b'</span><span class="p">,</span> <span class="s1">'#e377c2'</span><span class="p">,</span> <span class="s1">'#7f7f7f'</span><span class="p">,</span> <span class="s1">'#bcbd22'</span><span class="p">,</span> <span class="s1">'#17becf'</span><span class="p">],</span> <span class="n">points_colors</span><span class="o">=</span><span class="p">[</span><span class="s1">'#1f77b4'</span><span class="p">,</span> <span class="s1">'#ff7f0e'</span><span class="p">,</span> <span class="s1">'#2ca02c'</span><span class="p">,</span> <span class="s1">'#d62728'</span><span class="p">,</span> <span class="s1">'#9467bd'</span><span class="p">,</span> <span class="s1">'#8c564b'</span><span class="p">,</span> <span class="s1">'#e377c2'</span><span class="p">,</span> <span class="s1">'#7f7f7f'</span><span class="p">,</span> <span class="s1">'#bcbd22'</span><span class="p">,</span> <span class="s1">'#17becf'</span><span class="p">],</span> <span class="n">subset</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">ticks</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">tickformatter</span><span class="o">=&lt;</span><span class="n">matplotlib</span><span class="o">.</span><span class="n">ticker</span><span class="o">.</span><span class="n">FormatStrFormatter</span> <span class="nb">object</span> <span class="n">at</span> <span class="mh">0x12225ee50</span><span class="o">&gt;</span><span class="p">,</span> <span class="n">tick_labels</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">hist_diag</span><span class="o">=</span><span class="p">{</span><span class="s1">'alpha'</span><span class="p">:</span> <span class="mf">1.0</span><span class="p">,</span> <span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span> <span class="s1">'density'</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s1">'histtype'</span><span class="p">:</span> <span class="s1">'step'</span><span class="p">},</span> <span class="n">hist_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">},</span> <span class="n">kde_diag</span><span class="o">=</span><span class="p">{</span><span class="s1">'bw_method'</span><span class="p">:</span> <span class="s1">'scott'</span><span class="p">,</span> <span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span> <span class="s1">'color'</span><span class="p">:</span> <span class="s1">'black'</span><span class="p">},</span> <span class="n">kde_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'bw_method'</span><span class="p">:</span> <span class="s1">'scott'</span><span class="p">,</span> <span class="s1">'bins'</span><span class="p">:</span> <span class="mi">50</span><span class="p">},</span> <span class="n">contour_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'levels'</span><span class="p">:</span> <span class="p">[</span><span class="mf">0.68</span><span class="p">],</span> <span class="s1">'percentile'</span><span class="p">:</span> <span class="kc">True</span><span class="p">},</span> <span class="n">scatter_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'alpha'</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">,</span> <span class="s1">'edgecolor'</span><span class="p">:</span> <span class="s1">'none'</span><span class="p">,</span> <span class="s1">'rasterized'</span><span class="p">:</span> <span class="kc">False</span><span class="p">},</span> <span class="n">plot_offdiag</span><span class="o">=</span><span class="p">{},</span> <span class="n">points_diag</span><span class="o">=</span><span class="p">{},</span> <span class="n">points_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'marker'</span><span class="p">:</span> <span class="s1">'.'</span><span class="p">,</span> <span class="s1">'markersize'</span><span class="p">:</span> <span class="mi">20</span><span class="p">},</span> <span class="n">fig_size</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">10</span><span class="p">),</span> <span class="n">fig_bg_colors</span><span class="o">=</span><span class="p">{</span><span class="s1">'upper'</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span> <span class="s1">'diag'</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span> <span class="s1">'lower'</span><span class="p">:</span> <span class="kc">None</span><span class="p">},</span> <span class="n">fig_subplots_adjust</span><span class="o">=</span><span class="p">{</span><span class="s1">'top'</span><span class="p">:</span> <span class="mf">0.9</span><span class="p">},</span> <span class="n">subplots</span><span class="o">=</span><span class="p">{},</span> <span class="n">despine</span><span class="o">=</span><span class="p">{</span><span class="s1">'offset'</span><span class="p">:</span> <span class="mi">5</span><span class="p">},</span> <span class="n">title_format</span><span class="o">=</span><span class="p">{</span><span class="s1">'fontsize'</span><span class="p">:</span> <span class="mi">16</span><span class="p">})</span> </code>
 <a class="headerlink" href="#sbi.utils.plot.pairplot" title="Permanent link">¶</a></h3>
 <div class="doc doc-contents first">
 <p>Plot samples and points.</p>
@@ -8115,7 +8120,7 @@ max along each parameter dimension</p>
 <td>
 <p>passed to _format_axis()</p>
 </td>
-<td><code>&lt;matplotlib.ticker.FormatStrFormatter object at 0x7fe482235e20&gt;</code></td>
+<td><code>&lt;matplotlib.ticker.FormatStrFormatter object at 0x12225ee50&gt;</code></td>
 </tr>
 <tr>
 <td><code>tick_labels</code></td>
@@ -9187,13 +9192,13 @@ the respective background colors. Passed to ax.set_facecolor()</p>
               </div>
 </div>
 </a>
-<a class="md-footer-nav__link md-footer-nav__link--next" href="../credits/" rel="next" title="Credits">
+<a class="md-footer-nav__link md-footer-nav__link--next" href="../faq/" rel="next" title="FAQ">
 <div class="md-footer-nav__title">
 <div class="md-ellipsis">
 <span class="md-footer-nav__direction">
                   Next
                 </span>
-                Credits
+                FAQ
               </div>
 </div>
 <div class="md-footer-nav__button md-icon">
@@ -9220,14 +9225,14 @@ the respective background colors. Passed to ax.set_facecolor()</p>
 </div>
 </footer>
 </div>
-<script src="../assets/javascripts/vendor.c3dc8c49.min.js"></script>
-<script src="../assets/javascripts/bundle.f9edbbd5.min.js"></script><script id="__lang" type="application/json">{"clipboard.copy": "Copy to clipboard", "clipboard.copied": "Copied to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.result.placeholder": "Type to start searching", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents"}</script>
+<script src="../assets/javascripts/vendor.d710d30a.min.js"></script>
+<script src="../assets/javascripts/bundle.5f27aba8.min.js"></script><script id="__lang" type="application/json">{"clipboard.copy": "Copy to clipboard", "clipboard.copied": "Copied to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.result.placeholder": "Type to start searching", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents"}</script>
 <script>
         app = initialize({
           base: "..",
           features: [],
           search: Object.assign({
-            worker: "../assets/javascripts/worker/search.8e2cddea.min.js"
+            worker: "../assets/javascripts/worker/search.27c6a5e6.min.js"
           }, typeof search !== "undefined" && search)
         })
       </script>
