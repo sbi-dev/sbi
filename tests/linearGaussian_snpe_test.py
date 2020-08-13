@@ -169,6 +169,82 @@ def test_c2st_snpe_on_linearGaussian_different_dims(set_seed):
     check_c2st(samples, target_samples, alg="snpe_c")
 
 
+# Test multi-round SNPE.
+@pytest.mark.slow
+@pytest.mark.parametrize(
+    "method_str",
+    (
+        pytest.param(
+            "snpe_b",
+            marks=pytest.mark.xfail(
+                raises=NotImplementedError, reason="""SNPE-B not implemented""",
+            ),
+        ),
+        "snpe_c",
+        "snpe_c_non_atomic",
+    ),
+)
+def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str, set_seed):
+    """Test whether SNPE B/C infer well a simple example with available ground truth.
+
+    Args:
+        set_seed: fixture for manual seeding.
+    """
+
+    num_dim = 2
+    x_o = zeros((1, num_dim))
+    num_samples = 1000
+
+    # likelihood_mean will be likelihood_shift+theta
+    likelihood_shift = -1.0 * ones(num_dim)
+    likelihood_cov = 0.3 * eye(num_dim)
+
+    prior_mean = zeros(num_dim)
+    prior_cov = eye(num_dim)
+    prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
+
+    gt_posterior = true_posterior_linear_gaussian_mvn_prior(
+        x_o[0], likelihood_shift, likelihood_cov, prior_mean, prior_cov
+    )
+    target_samples = gt_posterior.sample((num_samples,))
+
+    def simulator(theta):
+        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
+
+    if method_str == "snpe_c_non_atomic":
+        density_estimator = utils.posterior_nn("mdn", num_components=5)
+        method_str = "snpe_c"
+    else:
+        density_estimator = "maf"
+
+    simulator, prior = prepare_for_sbi(simulator, prior)
+    creation_args = dict(
+        simulator=simulator,
+        prior=prior,
+        density_estimator=density_estimator,
+        show_progress_bars=False,
+    )
+
+    if method_str == "snpe_b":
+        infer = SNPE_B(simulation_batch_size=10, **creation_args)
+        posterior1 = infer(num_simulations=1000)
+        posterior1.set_default_x(x_o)
+        posterior = infer(num_simulations=1000, proposal=posterior1)
+    elif method_str == "snpe_c":
+        infer = SNPE_C(
+            simulation_batch_size=50, sample_with_mcmc=False, **creation_args
+        )
+        posterior = infer(num_simulations=500, num_atoms=10).set_default_x(x_o)
+        posterior = infer(
+            num_simulations=1000, num_atoms=10, proposal=posterior
+        ).set_default_x(x_o)
+
+    samples = posterior.sample((num_samples,))
+
+    # Compute the c2st and assert it is near chance level of 0.5.
+    check_c2st(samples, target_samples, alg=method_str)
+
+
 @pytest.mark.slow
 def test_c2st_snpe_external_data_on_linearGaussian(set_seed):
     """Test whether SNPE C infers well a simple example with available ground truth.
@@ -217,74 +293,6 @@ def test_c2st_snpe_external_data_on_linearGaussian(set_seed):
 
     # Compute the c2st and assert it is near chance level of 0.5.
     check_c2st(samples, target_samples, alg="snpe_c")
-
-
-# Test multi-round SNPE.
-@pytest.mark.slow
-@pytest.mark.parametrize(
-    "method_str",
-    (
-        pytest.param(
-            "snpe_b",
-            marks=pytest.mark.xfail(
-                raises=NotImplementedError, reason="""SNPE-B not implemented""",
-            ),
-        ),
-        "snpe_c",
-    ),
-)
-def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str, set_seed):
-    """Test whether SNPE B/C infer well a simple example with available ground truth.
-
-    Args:
-        set_seed: fixture for manual seeding.
-    """
-
-    num_dim = 2
-    x_o = zeros((1, num_dim))
-    num_samples = 1000
-
-    # likelihood_mean will be likelihood_shift+theta
-    likelihood_shift = -1.0 * ones(num_dim)
-    likelihood_cov = 0.3 * eye(num_dim)
-
-    prior_mean = zeros(num_dim)
-    prior_cov = eye(num_dim)
-    prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
-    gt_posterior = true_posterior_linear_gaussian_mvn_prior(
-        x_o[0], likelihood_shift, likelihood_cov, prior_mean, prior_cov
-    )
-    target_samples = gt_posterior.sample((num_samples,))
-
-    def simulator(theta):
-        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
-
-    simulator, prior = prepare_for_sbi(simulator, prior)
-    creation_args = dict(
-        simulator=simulator,
-        prior=prior,
-        density_estimator="maf",
-        show_progress_bars=False,
-    )
-
-    if method_str == "snpe_b":
-        infer = SNPE_B(simulation_batch_size=10, **creation_args)
-        posterior1 = infer(num_simulations=1000)
-        posterior1.set_default_x(x_o)
-        posterior = infer(num_simulations=1000, proposal=posterior1)
-    elif method_str == "snpe_c":
-        infer = SNPE_C(
-            simulation_batch_size=50, sample_with_mcmc=False, **creation_args
-        )
-        posterior1 = infer(num_simulations=500, num_atoms=10).set_default_x(x_o)
-        posterior = infer(
-            num_simulations=500, num_atoms=10, proposal=posterior1
-        ).set_default_x(x_o)
-
-    samples = posterior.sample((num_samples,))
-
-    # Compute the c2st and assert it is near chance level of 0.5.
-    check_c2st(samples, target_samples, alg=method_str)
 
 
 # Testing rejection and mcmc sampling methods.

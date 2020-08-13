@@ -3,12 +3,24 @@
 
 """Various PyTorch utility functions."""
 
+import warnings
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    TypeVar,
+    Union,
+    cast,
+)
+
 import numpy as np
 import torch
-from torch import Tensor, float32, device
+from torch import Tensor, device, float32
 from torch.distributions import Independent, Uniform
-from typing import Callable, Optional, Union, Dict, Any, Tuple, Union, cast, List, Sequence, TypeVar
-import warnings
 
 from sbi import utils as utils
 from sbi.types import Array, OneOrMore, ScalarFloat

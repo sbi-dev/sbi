@@ -2,12 +2,24 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 import logging
-from typing import Callable, Optional, Union, Dict, Any, Tuple, Union, cast, List, Sequence, TypeVar
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    TypeVar,
+    Union,
+    cast,
+)
 
 import torch
-from torch import nn as nn
 from pyknos.nflows import transforms
-from torch import Tensor, as_tensor, ones, zeros
+from torch import Tensor, as_tensor
+from torch import nn as nn
+from torch import ones, zeros
 from tqdm.auto import tqdm
 
 
@@ -279,3 +291,41 @@ def mask_sims_from_prior(round_: int, num_simulations: int) -> Tensor:
 
     prior_mask_values = ones if round_ == 0 else zeros
     return prior_mask_values((num_simulations, 1), dtype=torch.bool)
+
+
+def batched_mixture_vmv(matrix: Tensor, vector: Tensor) -> Tensor:
+    """
+    Returns (vector.T * matrix * vector).
+
+    Doing this with einsum() allows for vector and matrix to be batched and have
+    several mixture components. In other words, we deal with cases where the matrix and
+    vector have two leading dimensions (batch_dim, num_components, **).
+
+    Args:
+        matrix: Matrix of shape
+            (batch_dim, num_components, parameter_dim, parameter_dim).
+        vector: Vector of shape (batch_dim, num_components, parameter_dim).
+
+    Returns:
+        Product (vector.T * matrix * vector) of shape (batch_dim, num_components).
+    """
+    return torch.einsum("bci, bci -> bc", vector, batched_mixture_mv(matrix, vector))
+
+
+def batched_mixture_mv(matrix: Tensor, vector: Tensor) -> Tensor:
+    """
+    Returns (matrix * vector).
+
+    Doing this with einsum() allows for vector and matrix to be batched and have
+    several mixture components. In other words, we deal with cases where the matrix and
+    vector have two leading dimensions (batch_dim, num_components, **).
+
+    Args:
+        matrix: Matrix of shape
+            (batch_dim, num_components, parameter_dim, parameter_dim).
+        vector: Vector of shape (batch_dim, num_components, parameter_dim).
+
+    Returns:
+        Product (matrix * vector) of shape (batch_dim, num_components, parameter_dim).
+    """
+    return torch.einsum("bcij,bcj -> bci", matrix, vector)

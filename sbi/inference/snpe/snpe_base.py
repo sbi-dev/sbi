@@ -52,17 +52,18 @@ class PosteriorEstimator(NeuralInference, ABC):
                 `.log_prob` and `.sample()`.
             sample_with_mcmc: Whether to sample with MCMC. MCMC can be used to deal
                 with high leakage.
-            mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`, `hmc`, `nuts`.
-                Currently defaults to `slice_np` for a custom numpy implementation of
-                slice sampling; select `hmc`, `nuts` or `slice` for Pyro-based sampling.
+            mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`,
+                `hmc`, `nuts`. Currently defaults to `slice_np` for a custom numpy
+                implementation of slice sampling; select `hmc`, `nuts` or `slice` for
+                Pyro-based sampling.
             mcmc_parameters: Dictionary overriding the default parameters for MCMC.
                 The following parameters are supported: `thin` to set the thinning
                 factor for the chain, `warmup_steps` to set the initial number of
-                samples to discard, `num_chains` for the number of chains, `init_strategy`
-                for the initialisation strategy for chains; `prior` will draw init
-                locations from prior, whereas `sir` will use Sequential-Importance-
-                Resampling using `init_strategy_num_candidates` to find init
-                locations.
+                samples to discard, `num_chains` for the number of chains,
+                `init_strategy` for the initialisation strategy for chains; `prior` will
+                draw init locations from prior, whereas `sir` will use
+                Sequential-Importance-Resampling using `init_strategy_num_candidates`
+                to find init locations.
 
         See docstring of `NeuralInference` class for all other arguments.
         """
@@ -95,6 +96,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         self._mcmc_parameters = mcmc_parameters
 
         self._model_bank = []
+        self.use_non_atomic_loss = False
 
         # Extra SNPE-specific fields summary_writer.
         self._summary.update({"rejection_sampling_acceptance_rates": []})  # type:ignore
@@ -193,6 +195,7 @@ class PosteriorEstimator(NeuralInference, ABC):
 
         # Fit posterior using newly aggregated data set.
         self._train(
+            proposal=proposal,
             training_batch_size=training_batch_size,
             learning_rate=learning_rate,
             validation_fraction=validation_fraction,
@@ -240,12 +243,13 @@ class PosteriorEstimator(NeuralInference, ABC):
 
     @abstractmethod
     def _log_prob_proposal_posterior(
-        self, theta: Tensor, x: Tensor, masks: Tensor, **kwargs
+        self, theta: Tensor, x: Tensor, masks: Tensor, proposal: Optional[Any]
     ) -> Tensor:
         raise NotImplementedError
 
     def _train(
         self,
+        proposal: Optional[Any],
         training_batch_size: int,
         learning_rate: float,
         validation_fraction: float,
@@ -263,10 +267,17 @@ class PosteriorEstimator(NeuralInference, ABC):
 
         Uses performance on a held-out validation set as a terminating condition (early
         stopping).
+
+        The proposal is only needed for non-atomic SNPE.
         """
 
         # Starting index for the training set (1 = discard round-0 samples).
         start_idx = int(discard_prior_samples and self._round > 0)
+
+        # For non-atomic loss, we can not reuse samples from previous rounds as of now.
+        if self.use_non_atomic_loss:
+            start_idx = self._round
+
         theta, x, prior_masks = self._get_from_data_bank(start_idx, exclude_invalid_x)
 
         # Select random neural net and validation splits from (theta, x) pairs.
@@ -315,7 +326,9 @@ class PosteriorEstimator(NeuralInference, ABC):
                 )
 
                 batch_loss = torch.mean(
-                    self._loss(theta_batch, x_batch, masks_batch, calibration_kernel)
+                    self._loss(
+                        theta_batch, x_batch, masks_batch, proposal, calibration_kernel
+                    )
                 )
                 batch_loss.backward()
                 if clip_max_norm is not None:
@@ -338,7 +351,7 @@ class PosteriorEstimator(NeuralInference, ABC):
                     )
                     # Take negative loss here to get validation log_prob.
                     batch_log_prob = -self._loss(
-                        theta_batch, x_batch, masks_batch, calibration_kernel
+                        theta_batch, x_batch, masks_batch, proposal, calibration_kernel
                     )
                     log_prob_sum += batch_log_prob.sum().item()
 
@@ -353,7 +366,12 @@ class PosteriorEstimator(NeuralInference, ABC):
         self._summary["best_validation_log_probs"].append(self._best_val_log_prob)
 
     def _loss(
-        self, theta: Tensor, x: Tensor, masks: Tensor, calibration_kernel: Callable,
+        self,
+        theta: Tensor,
+        x: Tensor,
+        masks: Tensor,
+        proposal: Optional[Any],
+        calibration_kernel: Callable,
     ) -> Tensor:
         """Return loss with proposal correction (`round_>0`) or without it (`round_=0`).
 
@@ -368,8 +386,7 @@ class PosteriorEstimator(NeuralInference, ABC):
             # Use posterior log prob (without proposal correction) for first round.
             log_prob = self._posterior.net.log_prob(theta, x)
         else:
-            # Use proposal posterior log prob tailored to snpe version (B, C).
-            log_prob = self._log_prob_proposal_posterior(theta, x, masks)
+            log_prob = self._log_prob_proposal_posterior(theta, x, masks, proposal)
 
         return -(calibration_kernel(x) * log_prob)
 

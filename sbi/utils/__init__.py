@@ -5,6 +5,8 @@ from sbi.utils.get_nn_models import classifier_nn, likelihood_nn, posterior_nn
 from sbi.utils.io import get_data_root, get_log_root, get_project_root
 from sbi.utils.plot import pairplot
 from sbi.utils.sbiutils import (
+    batched_mixture_mv,
+    batched_mixture_vmv,
     clamp_and_warn,
     del_entries,
     get_data_since_round,
