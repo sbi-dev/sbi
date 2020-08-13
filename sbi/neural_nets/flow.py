@@ -39,7 +39,8 @@ def build_made(
         Neural network.
     """
     x_numel = batch_x[0].numel()
-    y_numel = batch_y[0].numel()
+    # Infer the output dimensionality of the embedding_net by making a forward pass.
+    y_numel = embedding_net(batch_y[:1]).numel()
 
     if x_numel == 1:
         warn(f"In one-dimensional output space, this flow is limited to Gaussians")
@@ -96,7 +97,8 @@ def build_maf(
         Neural network.
     """
     x_numel = batch_x[0].numel()
-    y_numel = batch_y[0].numel()
+    # Infer the output dimensionality of the embedding_net by making a forward pass.
+    y_numel = embedding_net(batch_y[:1]).numel()
 
     if x_numel == 1:
         warn(f"In one-dimensional output space, this flow is limited to Gaussians")
@@ -160,7 +162,8 @@ def build_nsf(
         Neural network.
     """
     x_numel = batch_x[0].numel()
-    y_numel = batch_y[0].numel()
+    # Infer the output dimensionality of the embedding_net by making a forward pass.
+    y_numel = embedding_net(batch_y[:1]).numel()
 
     if x_numel == 1:
         raise NotImplementedError
