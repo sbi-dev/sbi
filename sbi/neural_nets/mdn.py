@@ -17,6 +17,7 @@ def build_mdn(
     hidden_features: int = 50,
     num_components: int = 10,
     embedding_net: nn.Module = nn.Identity(),
+    **kwargs
 ) -> nn.Module:
     """Builds MDN p(x|y).
 
@@ -28,6 +29,8 @@ def build_mdn(
         hidden_features: Number of hidden features.
         num_components: Number of components.
         embedding_net: Optional embedding network for y.
+        kwargs: Additional arguments that are passed by the build function but are not
+            relevant for MDNs and are therefore ignored.
 
     Returns:
         Neural network.

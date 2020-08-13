@@ -19,9 +19,9 @@ def build_made(
     z_score_x: bool = True,
     z_score_y: bool = True,
     hidden_features: int = 50,
-    num_blocks: int = 5,
     num_mixture_components: int = 10,
     embedding_net: nn.Module = nn.Identity(),
+    **kwargs,
 ) -> nn.Module:
     """Builds MADE p(x|y).
 
@@ -31,9 +31,10 @@ def build_made(
         z_score_x: Whether to z-score xs passing into the network.
         z_score_y: Whether to z-score ys passing into the network.
         hidden_features: Number of hidden features.
-        num_blocks: Number of MADE blocks.
         num_mixture_components: Number of mixture components.
         embedding_net: Optional embedding network for y.
+        kwargs: Additional arguments that are passed by the build function but are not
+            relevant for mades and are therefore ignored.
 
     Returns:
         Neural network.
@@ -58,7 +59,7 @@ def build_made(
         features=x_numel,
         hidden_features=hidden_features,
         context_features=y_numel,
-        num_blocks=num_blocks,
+        num_blocks=5,
         num_mixture_components=num_mixture_components,
         use_residual_blocks=True,
         random_mask=False,
@@ -181,7 +182,7 @@ def build_nsf(
                             out_features=out_features,
                             hidden_features=hidden_features,
                             context_features=y_numel,
-                            num_blocks=2,
+                            num_blocks=num_blocks,
                             activation=relu,
                             dropout_probability=0.0,
                             use_batch_norm=False,

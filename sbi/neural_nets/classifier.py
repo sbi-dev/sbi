@@ -72,6 +72,7 @@ def build_linear_classifier(
     z_score_y: bool = True,
     embedding_net_x: nn.Module = nn.Identity(),
     embedding_net_y: nn.Module = nn.Identity(),
+    **kwargs
 ) -> nn.Module:
     """Builds linear classifier.
 
@@ -84,6 +85,8 @@ def build_linear_classifier(
         z_score_y: Whether to z-score ys passing into the network.
         embedding_net_x: Optional embedding network for x.
         embedding_net_y: Optional embedding network for y.
+        kwargs: Additional arguments that are passed by the build function but are not
+            relevant for linear classifiers and are therefore ignored.
 
     Returns:
         Neural network.
