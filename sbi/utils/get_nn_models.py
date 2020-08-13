@@ -2,17 +2,52 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 
-from typing import Callable, Optional, Union, Dict, Any, Tuple, Union, cast, List, Sequence, TypeVar
-from sbi.neural_nets.flow import build_made, build_maf, build_nsf
-from sbi.neural_nets.mdn import build_mdn
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    TypeVar,
+    Union,
+    cast,
+)
+
+from torch import nn
+
 from sbi.neural_nets.classifier import (
     build_linear_classifier,
     build_mlp_classifier,
     build_resnet_classifier,
 )
+from sbi.neural_nets.flow import build_made, build_maf, build_nsf
+from sbi.neural_nets.mdn import build_mdn
 
 
-def classifier_nn(model: str, **kwargs: Any) -> Callable:
+def classifier_nn(
+    model: str,
+    z_score_x: bool = True,
+    z_score_y: bool = True,
+    hidden_features: int = 50,
+    embedding_net_x: nn.Module = nn.Identity(),
+    embedding_net_y: nn.Module = nn.Identity(),
+) -> Callable:
+
+    kwargs = dict(
+        zip(
+            (
+                "z_score_x",
+                "z_score_y",
+                "hidden_features",
+                "embedding_net_x",
+                "embedding_net_y",
+            ),
+            (z_score_x, z_score_y, hidden_features, embedding_net_x, embedding_net_y),
+        )
+    )
+
     def build_fn(batch_theta, batch_x):
         if model == "linear":
             return build_linear_classifier(
@@ -24,12 +59,34 @@ def classifier_nn(model: str, **kwargs: Any) -> Callable:
             return build_resnet_classifier(
                 batch_x=batch_x, batch_y=batch_theta, **kwargs
             )
+        else:
             raise NotImplementedError
 
     return build_fn
 
 
-def likelihood_nn(model: str, **kwargs: Any) -> Callable:
+def likelihood_nn(
+    model: str,
+    z_score_x: bool = True,
+    z_score_y: bool = True,
+    hidden_features: int = 50,
+    num_transforms: int = 5,
+    embedding_net: nn.Module = nn.Identity(),
+) -> Callable:
+
+    kwargs = dict(
+        zip(
+            (
+                "z_score_x",
+                "z_score_y",
+                "hidden_features",
+                "num_transforms",
+                "embedding_net",
+            ),
+            (z_score_x, z_score_y, hidden_features, num_transforms, embedding_net),
+        )
+    )
+
     def build_fn(batch_theta, batch_x):
         if model == "mdn":
             return build_mdn(batch_x=batch_x, batch_y=batch_theta, **kwargs)
@@ -45,7 +102,28 @@ def likelihood_nn(model: str, **kwargs: Any) -> Callable:
     return build_fn
 
 
-def posterior_nn(model: str, **kwargs: Any) -> Callable:
+def posterior_nn(
+    model: str,
+    z_score_theta: bool = True,
+    z_score_x: bool = True,
+    hidden_features: int = 50,
+    num_transforms: int = 5,
+    embedding_net: nn.Module = nn.Identity(),
+) -> Callable:
+
+    kwargs = dict(
+        zip(
+            (
+                "z_score_x",
+                "z_score_y",
+                "hidden_features",
+                "num_transforms",
+                "embedding_net",
+            ),
+            (z_score_theta, z_score_x, hidden_features, num_transforms, embedding_net),
+        )
+    )
+
     def build_fn(batch_theta, batch_x):
         if model == "mdn":
             return build_mdn(batch_x=batch_theta, batch_y=batch_x, **kwargs)
