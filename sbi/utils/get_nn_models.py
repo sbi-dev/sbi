@@ -28,12 +28,31 @@ from sbi.neural_nets.mdn import build_mdn
 
 def classifier_nn(
     model: str,
+    z_score_theta: bool = True,
     z_score_x: bool = True,
-    z_score_y: bool = True,
     hidden_features: int = 50,
+    embedding_net_theta: nn.Module = nn.Identity(),
     embedding_net_x: nn.Module = nn.Identity(),
-    embedding_net_y: nn.Module = nn.Identity(),
 ) -> Callable:
+    r"""
+    Returns a function that builds a classifier for learning density ratios.
+
+    This function will usually be used for SNRE. The returned function is to be passed
+    to the inference class when using the flexible interface.
+
+    Args:
+        model: The type of classifier that will be created. One of [`linear`, `mlp`,
+            `resnet`].
+        z_score_theta: Whether to z-score parameters $\theta$ before passing them into
+            the network.
+        z_score_x: Whether to z-score simulation outputs $x$ before passing them into
+            the network.
+        hidden_features: Number of hidden features.
+        embedding_net_theta:  Optional embedding network for parameters $\theta$.
+        embedding_net_x:  Optional embedding network for simulation outputs $x. This
+            embedding net allows to learn features from potentially high-dimensional
+            simulation outputs.
+    """
 
     kwargs = dict(
         zip(
@@ -44,7 +63,13 @@ def classifier_nn(
                 "embedding_net_x",
                 "embedding_net_y",
             ),
-            (z_score_x, z_score_y, hidden_features, embedding_net_x, embedding_net_y),
+            (
+                z_score_x,
+                z_score_theta,
+                hidden_features,
+                embedding_net_x,
+                embedding_net_theta,
+            ),
         )
     )
 
@@ -67,12 +92,29 @@ def classifier_nn(
 
 def likelihood_nn(
     model: str,
+    z_score_theta: bool = True,
     z_score_x: bool = True,
-    z_score_y: bool = True,
     hidden_features: int = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
 ) -> Callable:
+    r"""
+    Returns a function that builds a density estimator for learning the likelihood.
+
+    This function will usually be used for SNLE. The returned function is to be passed
+    to the inference class when using the flexible interface.
+
+    Args:
+        model: The type of density estimator that will be created. One of [`mdn`,
+            `made`, `maf`, `nsf`].
+        z_score_theta: Whether to z-score parameters $\theta$ before passing them into
+            the network.
+        z_score_x: Whether to z-score simulation outputs $x$ before passing them into
+            the network.
+        hidden_features: Number of hidden features.
+        num_transforms: Number of transforms when a flow is used.
+        embedding_net: Optional embedding network for parameters $\theta$.
+    """
 
     kwargs = dict(
         zip(
@@ -83,7 +125,7 @@ def likelihood_nn(
                 "num_transforms",
                 "embedding_net",
             ),
-            (z_score_x, z_score_y, hidden_features, num_transforms, embedding_net),
+            (z_score_x, z_score_theta, hidden_features, num_transforms, embedding_net),
         )
     )
 
@@ -110,6 +152,25 @@ def posterior_nn(
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
 ) -> Callable:
+    r"""
+    Returns a function that builds a density estimator for learning the posterior.
+
+    This function will usually be used for SNPE. The returned function is to be passed
+    to the inference class when using the flexible interface.
+
+    Args:
+        model: The type of density estimator that will be created. One of [`mdn`,
+            `made`, `maf`, `nsf`].
+        z_score_theta: Whether to z-score parameters $\theta$ before passing them into
+            the network.
+        z_score_x: Whether to z-score simulation outputs $x$ before passing them into
+            the network.
+        hidden_features: Number of hidden features.
+        num_transforms: Number of transforms when a flow is used.
+        embedding_net: Optional embedding network for simulation outputs $x$. This
+            embedding net allows to learn features from potentially high-dimensional
+            simulation outputs.
+    """
 
     kwargs = dict(
         zip(
