@@ -97,6 +97,7 @@ def likelihood_nn(
     hidden_features: int = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
+    num_components: int = 10,
 ) -> Callable:
     r"""
     Returns a function that builds a density estimator for learning the likelihood.
@@ -116,6 +117,8 @@ def likelihood_nn(
             density estimator is a normalizing flow (i.e. currently either a `maf` or a
             `nsf`). Ignored if density estimator is a `mdn` or `made`.
         embedding_net: Optional embedding network for parameters $\theta$.
+        num_components: Number of mixture components for a mixture of Gaussians.
+            Ignored if density estimator is not an mdn.
     """
 
     kwargs = dict(
@@ -126,8 +129,16 @@ def likelihood_nn(
                 "hidden_features",
                 "num_transforms",
                 "embedding_net",
+                "num_components",
             ),
-            (z_score_x, z_score_theta, hidden_features, num_transforms, embedding_net,),
+            (
+                z_score_x,
+                z_score_theta,
+                hidden_features,
+                num_transforms,
+                embedding_net,
+                num_components,
+            ),
         )
     )
 
@@ -153,6 +164,7 @@ def posterior_nn(
     hidden_features: int = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
+    num_components: int = 10,
 ) -> Callable:
     r"""
     Returns a function that builds a density estimator for learning the posterior.
@@ -174,6 +186,8 @@ def posterior_nn(
         embedding_net: Optional embedding network for simulation outputs $x$. This
             embedding net allows to learn features from potentially high-dimensional
             simulation outputs.
+        num_components: Number of mixture components for a mixture of Gaussians.
+            Ignored if density estimator is not an mdn.
     """
 
     kwargs = dict(
@@ -184,8 +198,16 @@ def posterior_nn(
                 "hidden_features",
                 "num_transforms",
                 "embedding_net",
+                "num_components",
             ),
-            (z_score_theta, z_score_x, hidden_features, num_transforms, embedding_net,),
+            (
+                z_score_theta,
+                z_score_x,
+                hidden_features,
+                num_transforms,
+                embedding_net,
+                num_components,
+            ),
         )
     )
 

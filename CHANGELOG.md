@@ -1,9 +1,11 @@
-# v0.11.3
+# v0.12.0
 
 - Added an FAQ (#293)
 - Fixed bug in embedding_net when output dimension does not equal input dimension (#299)
 - Exposed arguments of functions used to build custom networks (#299)
-
+- Implemented non-atomic APT (#301)
+- depend on pyknos and nflows 0.12
+- improve documentation (#302)
 
 # v0.11.2
 

@@ -82,6 +82,7 @@ def build_maf(
     hidden_features: int = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
+    **kwargs,
 ) -> nn.Module:
     """Builds MAF p(x|y).
 
@@ -93,6 +94,8 @@ def build_maf(
         hidden_features: Number of hidden features.
         num_transforms: Number of transforms.
         embedding_net: Optional embedding network for y.
+        kwargs: Additional arguments that are passed by the build function but are not
+            relevant for maf and are therefore ignored.
 
     Returns:
         Neural network.
@@ -147,6 +150,7 @@ def build_nsf(
     hidden_features: int = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
+    **kwargs,
 ) -> nn.Module:
     """Builds NSF p(x|y).
 
@@ -158,6 +162,8 @@ def build_nsf(
         hidden_features: Number of hidden features.
         num_transforms: Number of transforms.
         embedding_net: Optional embedding network for y.
+        kwargs: Additional arguments that are passed by the build function but are not
+            relevant for maf and are therefore ignored.
 
     Returns:
         Neural network.
