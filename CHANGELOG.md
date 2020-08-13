@@ -1,6 +1,8 @@
 # v0.11.3
 
 - Added an FAQ (#293)
+- Fixed bug in embedding_net when output dimension does not equal input dimension (#299)
+- Exposed arguments of functions used to build custom networks (#299)
 
 
 # v0.11.2
