@@ -88,7 +88,12 @@ def build_linear_classifier(
     Returns:
         Neural network.
     """
-    neural_net = nn.Linear(batch_x[0].numel() + batch_y[0].numel(), 1)
+
+    # Infer the output dimensionalities of the embedding_net by making a forward pass.
+    x_numel = embedding_net_x(batch_x[:1]).numel()
+    y_numel = embedding_net_y(batch_y[:1]).numel()
+
+    neural_net = nn.Linear(x_numel + y_numel, 1)
 
     input_layer = build_input_layer(
         batch_x, batch_y, z_score_x, z_score_y, embedding_net_x, embedding_net_y
@@ -124,8 +129,13 @@ def build_mlp_classifier(
     Returns:
         Neural network.
     """
+
+    # Infer the output dimensionalities of the embedding_net by making a forward pass.
+    x_numel = embedding_net_x(batch_x[:1]).numel()
+    y_numel = embedding_net_y(batch_y[:1]).numel()
+
     neural_net = nn.Sequential(
-        nn.Linear(batch_x[0].numel() + batch_y[0].numel(), hidden_features),
+        nn.Linear(x_numel + y_numel, hidden_features),
         nn.BatchNorm1d(hidden_features),
         nn.ReLU(),
         nn.Linear(hidden_features, hidden_features),
@@ -168,8 +178,13 @@ def build_resnet_classifier(
     Returns:
         Neural network.
     """
+
+    # Infer the output dimensionalities of the embedding_net by making a forward pass.
+    x_numel = embedding_net_x(batch_x[:1]).numel()
+    y_numel = embedding_net_y(batch_y[:1]).numel()
+
     neural_net = nets.ResidualNet(
-        in_features=batch_x[0].numel() + batch_y[0].numel(),
+        in_features=x_numel + y_numel,
         out_features=1,
         hidden_features=hidden_features,
         context_features=None,
