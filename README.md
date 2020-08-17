@@ -5,6 +5,7 @@
 ![Tests](https://github.com/mackelab/sbi/workflows/Tests/badge.svg?branch=main)
 
 ## sbi: simulation-based inference
+[Documentation](https://www.mackelab.org/sbi/)
 
 `sbi` is a PyTorch package for simulation-based inference. Simulation-based inference is
 the process of finding parameters of a simulator from observations.
