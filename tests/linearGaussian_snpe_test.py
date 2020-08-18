@@ -283,12 +283,12 @@ def test_c2st_snpe_external_data_on_linearGaussian(set_seed):
         device=device,
     )
 
-    external_theta = prior.sample((1000,))
+    external_theta = prior.sample((500,))
     external_x = simulator(external_theta)
 
     infer.provide_presimulated(external_theta, external_x)
 
-    posterior = infer(num_simulations=1000, training_batch_size=100).set_default_x(x_o)
+    posterior = infer(num_simulations=500, training_batch_size=50).set_default_x(x_o)
     samples = posterior.sample((num_samples,))
 
     # Compute the c2st and assert it is near chance level of 0.5.
