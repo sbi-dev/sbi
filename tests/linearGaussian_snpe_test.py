@@ -278,6 +278,7 @@ def test_c2st_snpe_external_data_on_linearGaussian(set_seed):
     infer = SNPE_C(
         *prepare_for_sbi(simulator, prior),
         simulation_batch_size=1000,
+        density_estimator="nsf",
         show_progress_bars=False,
         sample_with_mcmc=False,
         device=device,
