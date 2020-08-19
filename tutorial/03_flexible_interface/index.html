@@ -7,9 +7,9 @@
 <meta content="width=device-width,initial-scale=1" name="viewport"/>
 <link href="https://mackelab.org/sbi/tutorial/03_flexible_interface/" rel="canonical"/>
 <link href="../../assets/images/favicon.png" rel="shortcut icon"/>
-<meta content="mkdocs-1.1.2, mkdocs-material-5.2.2" name="generator"/>
+<meta content="mkdocs-1.1.2, mkdocs-material-5.4.0" name="generator"/>
 <title>Flexible interface - sbi</title>
-<link href="../../assets/stylesheets/main.a2408e81.min.css" rel="stylesheet"/>
+<link href="../../assets/stylesheets/main.fe0cca5b.min.css" rel="stylesheet"/>
 <link href="../../assets/stylesheets/palette.a46bcfb3.min.css" rel="stylesheet"/>
 <meta content="#3f51b5" name="theme-color"/>
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
@@ -247,6 +247,7 @@
 <h1 id="the-flexible-interface">The flexible interface<a class="headerlink" href="#the-flexible-interface" title="Permanent link">¶</a></h1>
 <p>In the previous tutorial, we have demonstrated how <code>sbi</code> can be used to run simulation-based inference with just a single line of code.</p>
 <p>In addition to this simple interface, <code>sbi</code> also provides a <strong>flexible interface</strong> which unlocks several additional features implemented in <code>sbi</code>.</p>
+<p>Note, you find the original version of this notebook at <a href="https://github.com/mackelab/sbi/blob/main/tutorial/03_flexible_interface.ipynb">https://github.com/mackelab/sbi/blob/main/tutorial/03_flexible_interface.ipynb</a> in the <code>sbi</code> repository.</p>
 <h2 id="features">Features<a class="headerlink" href="#features" title="Permanent link">¶</a></h2>
 <p>The flexible interface allows you to customize the following:</p>
 <ul>
@@ -315,7 +316,7 @@ Neural network successfully converged after 22 epochs.
 </code></pre></div>
 <div class="codehilite"><pre><span></span><code>HBox(children=(FloatProgress(value=0.0, description='Drawing 10000 posterior samples', max=10000.0, style=Prog…
 </code></pre></div>
-<p><img alt="png" src="../03_flexible_interface_files/03_flexible_interface_17_2.png"/></p>
+<p><img alt="png" src="../03_flexible_interface_files/03_flexible_interface_18_2.png"/></p>
 <p>We can always print the posterior to know how it was trained:</p>
 <div class="highlight"><pre><span></span><code><span class="nb">print</span><span class="p">(</span><span class="n">posterior</span><span class="p">)</span>
 </code></pre></div>
@@ -377,13 +378,13 @@ This neural posterior was obtained with a SNPE-class method using a flow.
 </footer>
 </div>
 <script src="../../assets/javascripts/vendor.d710d30a.min.js"></script>
-<script src="../../assets/javascripts/bundle.5f27aba8.min.js"></script><script id="__lang" type="application/json">{"clipboard.copy": "Copy to clipboard", "clipboard.copied": "Copied to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.result.placeholder": "Type to start searching", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents"}</script>
+<script src="../../assets/javascripts/bundle.b39636ac.min.js"></script><script id="__lang" type="application/json">{"clipboard.copy": "Copy to clipboard", "clipboard.copied": "Copied to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.result.placeholder": "Type to start searching", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents"}</script>
 <script>
         app = initialize({
           base: "../..",
           features: [],
           search: Object.assign({
-            worker: "../../assets/javascripts/worker/search.27c6a5e6.min.js"
+            worker: "../../assets/javascripts/worker/search.a68abb33.min.js"
           }, typeof search !== "undefined" && search)
         })
       </script>

@@ -7,9 +7,9 @@
 <meta content="width=device-width,initial-scale=1" name="viewport"/>
 <link href="https://mackelab.org/sbi/tutorial/02_HH_simulator/" rel="canonical"/>
 <link href="../../assets/images/favicon.png" rel="shortcut icon"/>
-<meta content="mkdocs-1.1.2, mkdocs-material-5.2.2" name="generator"/>
+<meta content="mkdocs-1.1.2, mkdocs-material-5.4.0" name="generator"/>
 <title>Hodgkin-Huxley example - sbi</title>
-<link href="../../assets/stylesheets/main.a2408e81.min.css" rel="stylesheet"/>
+<link href="../../assets/stylesheets/main.fe0cca5b.min.css" rel="stylesheet"/>
 <link href="../../assets/stylesheets/palette.a46bcfb3.min.css" rel="stylesheet"/>
 <meta content="#3f51b5" name="theme-color"/>
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
@@ -314,6 +314,7 @@
 </a>
 <h1 id="inference-on-hodgkin-huxley-model-tutorial">Inference on Hodgkin-Huxley model: tutorial<a class="headerlink" href="#inference-on-hodgkin-huxley-model-tutorial" title="Permanent link">¶</a></h1>
 <p>In this tutorial, we use <code>sbi</code> to do inference on a <a href="https://en.wikipedia.org/wiki/Hodgkin%E2%80%93Huxley_model">Hodgkin-Huxley model</a> from neuroscience (Hodgkin and Huxley, 1952). We will learn two parameters (<span class="arithmatex">\(\bar g_{Na}\)</span>,<span class="arithmatex">\(\bar g_K\)</span>) based on a current-clamp recording, that we generate synthetically (in practice, this would be an experimental observation).</p>
+<p>Note, you find the original version of this notebook at <a href="https://github.com/mackelab/sbi/blob/main/tutorial/02_HH_simulator.ipynb">https://github.com/mackelab/sbi/blob/main/tutorial/02_HH_simulator.ipynb</a> in the <code>sbi</code> repository.</p>
 <p>First we are going to import basic packages.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
 <span class="kn">import</span> <span class="nn">torch</span>
@@ -416,7 +417,7 @@ C_m\frac{dV}{dt}&amp;=g_1\left(E_1-V\right)+
 <span class="n">ax</span><span class="o">.</span><span class="n">yaxis</span><span class="o">.</span><span class="n">set_major_formatter</span><span class="p">(</span><span class="n">mpl</span><span class="o">.</span><span class="n">ticker</span><span class="o">.</span><span class="n">FormatStrFormatter</span><span class="p">(</span><span class="s1">'</span><span class="si">%.2f</span><span class="s1">'</span><span class="p">))</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 </code></pre></div>
-<p><img alt="png" src="../02_HH_simulator_files/02_HH_simulator_18_0.png"/></p>
+<p><img alt="png" src="../02_HH_simulator_files/02_HH_simulator_19_0.png"/></p>
 <p>As can be seen, the voltage traces can be quite diverse for different parameter values.</p>
 <p>Often, we are not interested in matching the exact trace, but only in matching certain features thereof. In this example of the Hodgkin-Huxley model, the summary features are the number of spikes, the mean resting potential, the standard deviation of the resting potential, and the first four voltage moments: mean, standard deviation, skewness and kurtosis. Using the function <code>calculate_summary_statistics()</code> imported below, we obtain these statistics from the output of the Hodgkin Huxley simulator. </p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">HH_helper_functions</span> <span class="kn">import</span> <span class="n">calculate_summary_statistics</span>
@@ -483,7 +484,7 @@ Neural network successfully converged after 202 epochs.
 <span class="n">ax</span><span class="o">.</span><span class="n">set_yticks</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mf">1.1</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">I</span><span class="o">*</span><span class="n">A_soma</span><span class="o">*</span><span class="mf">1e3</span><span class="p">)])</span>
 <span class="n">ax</span><span class="o">.</span><span class="n">yaxis</span><span class="o">.</span><span class="n">set_major_formatter</span><span class="p">(</span><span class="n">mpl</span><span class="o">.</span><span class="n">ticker</span><span class="o">.</span><span class="n">FormatStrFormatter</span><span class="p">(</span><span class="s1">'</span><span class="si">%.2f</span><span class="s1">'</span><span class="p">))</span>
 </code></pre></div>
-<p><img alt="png" src="../02_HH_simulator_files/02_HH_simulator_34_0.png"/></p>
+<p><img alt="png" src="../02_HH_simulator_files/02_HH_simulator_35_0.png"/></p>
 <h2 id="analysis-of-the-posterior-given-the-observed-data">Analysis of the posterior given the observed data<a class="headerlink" href="#analysis-of-the-posterior-given-the-observed-data" title="Permanent link">¶</a></h2>
 <p>After running the inference algorithm, let us inspect the inferred posterior distribution over the parameters (<span class="arithmatex">\(\bar g_{Na}\)</span>,<span class="arithmatex">\(\bar g_K\)</span>), given the observed trace. To do so, we first draw samples (i.e. consistent parameter sets) from the posterior:</p>
 <div class="highlight"><pre><span></span><code><span class="n">samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10000</span><span class="p">,),</span> 
@@ -499,7 +500,7 @@ Neural network successfully converged after 202 epochs.
                            <span class="n">points_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'markersize'</span><span class="p">:</span> <span class="mi">6</span><span class="p">},</span>
                            <span class="n">points_colors</span><span class="o">=</span><span class="s1">'r'</span><span class="p">);</span>
 </code></pre></div>
-<p><img alt="png" src="../02_HH_simulator_files/02_HH_simulator_37_0.png"/></p>
+<p><img alt="png" src="../02_HH_simulator_files/02_HH_simulator_38_0.png"/></p>
 <p>As can be seen, the inferred posterior contains the ground-truth parameters (red) in a high-probability region. Now, let us sample parameters from the posterior distribution, simulate the Hodgkin-Huxley model for this parameter set and compare the simulations with the observed data:</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># Draw a sample from the posterior and convert to numpy for plotting.</span>
 <span class="n">posterior_sample</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">1</span><span class="p">,),</span> 
@@ -529,7 +530,7 @@ Neural network successfully converged after 202 epochs.
 <span class="n">ax</span><span class="o">.</span><span class="n">set_xticks</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">60</span><span class="p">,</span> <span class="mi">120</span><span class="p">])</span>
 <span class="n">ax</span><span class="o">.</span><span class="n">set_yticks</span><span class="p">([</span><span class="o">-</span><span class="mi">80</span><span class="p">,</span> <span class="o">-</span><span class="mi">20</span><span class="p">,</span> <span class="mi">40</span><span class="p">]);</span>
 </code></pre></div>
-<p><img alt="png" src="../02_HH_simulator_files/02_HH_simulator_40_0.png"/></p>
+<p><img alt="png" src="../02_HH_simulator_files/02_HH_simulator_41_0.png"/></p>
 <p>As can be seen, the sample from the inferred posterior leads to simulations that closely resemble the observed data, confirming that <code>SNPE</code> did a good job at capturing the observed data in this simple case.</p>
 <h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">¶</a></h2>
 <p>A. L. Hodgkin and A. F. Huxley. A quantitative description of membrane current and its application to conduction and excitation in nerve. The Journal of Physiology, 117(4):500–544, 1952.</p>
@@ -588,13 +589,13 @@ Neural network successfully converged after 202 epochs.
 </footer>
 </div>
 <script src="../../assets/javascripts/vendor.d710d30a.min.js"></script>
-<script src="../../assets/javascripts/bundle.5f27aba8.min.js"></script><script id="__lang" type="application/json">{"clipboard.copy": "Copy to clipboard", "clipboard.copied": "Copied to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.result.placeholder": "Type to start searching", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents"}</script>
+<script src="../../assets/javascripts/bundle.b39636ac.min.js"></script><script id="__lang" type="application/json">{"clipboard.copy": "Copy to clipboard", "clipboard.copied": "Copied to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.result.placeholder": "Type to start searching", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents"}</script>
 <script>
         app = initialize({
           base: "../..",
           features: [],
           search: Object.assign({
-            worker: "../../assets/javascripts/worker/search.27c6a5e6.min.js"
+            worker: "../../assets/javascripts/worker/search.a68abb33.min.js"
           }, typeof search !== "undefined" && search)
         })
       </script>
