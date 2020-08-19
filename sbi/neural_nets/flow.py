@@ -188,7 +188,7 @@ def build_nsf(
                             out_features=out_features,
                             hidden_features=hidden_features,
                             context_features=y_numel,
-                            num_blocks=num_blocks,
+                            num_blocks=2,
                             activation=relu,
                             dropout_probability=0.0,
                             use_batch_norm=False,
