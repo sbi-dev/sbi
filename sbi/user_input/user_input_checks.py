@@ -3,14 +3,21 @@
 
 
 import warnings
-from typing import Callable, Optional, Union, Dict, Any, Tuple, Union, cast, List, Sequence, TypeVar
+from typing import (
+    Callable,
+    Optional,
+    Union,
+    Tuple,
+    cast,
+    Sequence,
+)
 
 import torch
 from numpy import ndarray
 from scipy.stats._distn_infrastructure import rv_frozen
 from scipy.stats._multivariate import multi_rv_frozen
 from torch import Tensor, float32, nn
-from torch.distributions import Distribution
+from torch.distributions import Distribution, Uniform
 
 from sbi.user_input.user_input_checks_utils import (
     CustomPytorchWrapper,
@@ -18,7 +25,7 @@ from sbi.user_input.user_input_checks_utils import (
     PytorchReturnTypeWrapper,
     ScipyPytorchWrapper,
 )
-from sbi.utils.torchutils import atleast_2d
+from sbi.utils.torchutils import BoxUniform, atleast_2d
 
 
 def process_prior(prior) -> Tuple[Distribution, int, bool]:
@@ -137,10 +144,17 @@ def process_pytorch_prior(prior: Distribution) -> Tuple[Distribution, int, bool]
     """
 
     # Reject unwrapped scalar priors.
+    # This will reject Uniform priors with dimension larger than 1.
     if prior.sample().ndim == 0:
         raise ValueError(
             "Detected scalar prior. Please make sure to pass a PyTorch prior with "
             "`batch_shape=torch.Size([1])` or `event_shape=torch.Size([1])`."
+        )
+    # Cast 1D Uniform to BoxUniform to avoid shape error in mdn log prob.
+    elif isinstance(prior, Uniform) and prior.batch_shape.numel() == 1:
+        prior = BoxUniform(low=prior.low, high=prior.high)
+        warnings.warn(
+            "Casting 1D Uniform prior to BoxUniform to match sbi batch requirements."
         )
 
     check_prior_batch_behavior(prior)
