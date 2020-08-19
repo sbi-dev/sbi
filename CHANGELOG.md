@@ -1,3 +1,7 @@
+# v0.12.1
+- Bug fix for broken NSF (#310, thanks @tvwenger).
+
+
 # v0.12.0
 
 - Add FAQ (#293)
