@@ -135,7 +135,7 @@ class DirectPosterior(NeuralPosterior):
                 probability falls out or leaks out of the prescribed prior support.
                 The normalizing factor is calculated via rejection sampling, so if you
                 need speedier but unnormalized log posterior estimates set here
-                `norm_posterior_snpe=False`. The returned log posterior is set to
+                `norm_posterior=False`. The returned log posterior is set to
                 -∞ outside of the prior support regardless of this setting.
             track_gradients: Whether the returned tensor supports tracking gradients.
                 This can be helpful for e.g. sensitivity analysis, but increases memory
@@ -204,7 +204,12 @@ class DirectPosterior(NeuralPosterior):
 
         def acceptance_at(x: Tensor) -> Tensor:
             return utils.sample_posterior_within_prior(
-                self.net, self._prior, x, num_rejection_samples, show_progress_bars
+                self.net,
+                self._prior,
+                x,
+                num_rejection_samples,
+                show_progress_bars,
+                sample_for_correction_factor=True,
             )[1]
 
         # Check if the provided x matches the default x (short-circuit on identity).

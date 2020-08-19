@@ -113,6 +113,7 @@ def sample_posterior_within_prior(
     num_samples: int = 1,
     show_progress_bars: bool = False,
     warn_acceptance: float = 0.01,
+    sample_for_correction_factor: bool = False,
 ) -> Tuple[Tensor, Tensor]:
     r"""Return samples from a posterior $p(\theta|x)$ only within the prior support.
 
@@ -131,6 +132,9 @@ def sample_posterior_within_prior(
         num_samples: Desired number of samples.
         show_progress_bars: Whether to show a progressbar during sampling.
         warn_acceptance: A minimum acceptance rate under which to warn about slowness.
+        sample_for_correction_factor: True if this function was called by
+            `leakage_correction()`. False otherwise. Will be used to adapt the leakage
+             warning.
 
     Returns:
         Accepted samples and acceptance rate as scalar Tensor.
@@ -175,12 +179,28 @@ def sample_posterior_within_prior(
             and acceptance_rate < warn_acceptance
             and not leakage_warning_raised
         ):
-            logging.warning(
-                f"""Only {acceptance_rate:.0%} posterior samples are within the
-                    prior support. It may take a long time to collect the remaining
-                    {num_remaining} samples. Consider interrupting (Ctrl-C)
-                    and switching to `sample_with_mcmc=True`."""
-            )
+            if sample_for_correction_factor:
+                logging.warning(
+                    f"""Drawing samples from posterior to estimate the normalizing
+                        constant for `log_prob()`. However, only {acceptance_rate:.0%}
+                        posterior samples are within the prior support. It may take a
+                        long time to collect the remaining {num_remaining} samples.
+                        Consider interrupting (Ctrl-C) and either basing the estimate
+                        of the normalizing constant on fewer samples (by calling
+                        `posterior.leakage_correction(x_o, num_rejection_samples=N)`,
+                        where `N` is the number of samples you want to base the
+                        estimate on (default N=10000), or not estimating the
+                        normalizing constant at all
+                        (`log_prob(..., norm_posterior=False)`. The latter will result
+                        in an unnormalized `log_prob()`."""
+                )
+            else:
+                logging.warning(
+                    f"""Only {acceptance_rate:.0%} posterior samples are within the
+                        prior support. It may take a long time to collect the remaining
+                        {num_remaining} samples. Consider interrupting (Ctrl-C)
+                        and switching to `sample_with_mcmc=True`."""
+                )
             leakage_warning_raised = True  # Ensure warning is raised just once.
 
     pbar.close()
