@@ -1,5 +1,5 @@
 ---
-title: 'sbi - a toolkit for simulation-based inference'
+title: 'sbi: A toolkit for simulation-based inference'
 tags:
   - simulation science
   - likelihood-free inference
