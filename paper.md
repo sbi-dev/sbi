@@ -62,7 +62,7 @@ To aid in effective application of these algorithms to a wide range of problems,
 
 ## Related software and use in research
 
-We are aware of several mature packages that implement SBI algorithms. `elfi` [@elfi2018] is a package offering BOLFI, a Gaussian process-based algorithm [@gutmann2015], and some classical ABC algorithms. The package `carl` [@louppe2016] implements the algorithm described in @cranmer2015carl. Two other SBI packages, currently under development, are `hypothesis` [@hypothesis-repo] and `pydelfi` [@pydelfi-repo]. `pyabc` [@Klinger2018] and `ABCpy` [@abcpy-repo] are two packages offering a diversity of ABC algorithms.
+We are aware of several mature packages that implement SBI algorithms. `elfi` [@elfi2018] is a package offering BOLFI, a Gaussian process-based algorithm [@gutmann2015], and some classical ABC algorithms. The package `carl` [@louppe2016] implements the algorithm described in @cranmer2015carl. Two other SBI packages, currently under development, are `hypothesis` [@hypothesis-repo] and `pydelfi` [@pydelfi-repo]. `pyabc` [@Klinger2018] and `ABCpy` [@dutta2017] are two packages offering a diversity of ABC algorithms.
 
 `sbi` is closely integrated with PyTorch [@paszke2019] and uses `nflows` [@nflows-repo] for flow-based density estimators. `sbi` builds on experience accumulated developing `delfi` [@delfi-repo], which it succeeds. `delfi` was based on `theano` [@theano] (development discontinued) and developed both for SBI research [@greenberg2019; @lueckmann2017] and for scientific applications [@goncalves2019]. The `sbi` codebase started as a fork of `lfi` [@lfi-repo], developed for @durkan2020.
 
