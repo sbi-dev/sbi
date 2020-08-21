@@ -4,11 +4,14 @@ site_url: "https://mackelab.org/sbi/"
 nav:
   - Home: index.md
   - Installation: install.md
-  - Tutorial:
-      - Getting started: tutorial/00_getting_started.md
-      - Amortized inference: tutorial/01_gaussian_amortized.md
-      - Hodgkin-Huxley example: tutorial/02_HH_simulator.md
-      - Flexible interface: tutorial/03_flexible_interface.md
+  - Tutorials and Examples:
+      - Introduction:
+        - Getting started: tutorial/00_getting_started.md
+        - Amortized inference: tutorial/01_gaussian_amortized.md
+      - Advanced:
+        - Flexible interface: tutorial/02_flexible_interface.md
+      - Examples:
+        - Hodgkin-Huxley example: examples/00_HH_simulator.md
   - Contribute: contribute.md
   - API Reference: reference.md
   - FAQ: faq.md
