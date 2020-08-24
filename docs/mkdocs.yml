@@ -10,6 +10,7 @@ nav:
         - Amortized inference: tutorial/01_gaussian_amortized.md
       - Advanced:
         - Flexible interface: tutorial/02_flexible_interface.md
+        - Learning summary statistics: tutorial/03_embedding_net.md
       - Examples:
         - Hodgkin-Huxley example: examples/00_HH_simulator.md
   - Contribute: contribute.md
