@@ -266,6 +266,9 @@ class DirectPosterior(NeuralPosterior):
             Samples from posterior.
         """
 
+        # TODO: do we need this?
+        self.net.eval()
+
         x, num_samples, mcmc_method, mcmc_parameters = self._prepare_for_sample(
             x, sample_shape, mcmc_method, mcmc_parameters
         )

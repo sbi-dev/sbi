@@ -21,6 +21,7 @@ from sbi.inference import NeuralInference
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.types import ScalarFloat
 from sbi.utils import check_estimator_arg, x_shape_from_simulation
+from sbi.inference.snpe.posterior_net import PosteriorNet
 
 
 class PosteriorEstimator(NeuralInference, ABC):
@@ -183,9 +184,11 @@ class PosteriorEstimator(NeuralInference, ABC):
         # can `sample()` and `log_prob()`. The network is accessible via `.net`.
         if self._posterior is None or retrain_from_scratch_each_round:
             x_shape = x_shape_from_simulation(x)
+            neural_net = self._build_neural_net(theta, x)
+            model = PosteriorNet(neural_net, prior=self._prior, proposal=proposal)
             self._posterior = DirectPosterior(
                 method_family="snpe",
-                neural_net=self._build_neural_net(theta, x),
+                neural_net=model,
                 prior=self._prior,
                 x_shape=x_shape,
                 sample_with_mcmc=self._sample_with_mcmc,
@@ -364,11 +367,13 @@ class PosteriorEstimator(NeuralInference, ABC):
         #
         #     self._maybe_show_progress(self._show_progress_bars, epoch)
 
-        self._report_convergence_at_end(epoch, stop_after_epochs, max_num_epochs)
+        # todo: back in
+        # self._report_convergence_at_end(epoch, stop_after_epochs, max_num_epochs)
 
         # Update summary.
-        self._summary["epochs"].append(epoch)
-        self._summary["best_validation_log_probs"].append(self._best_val_log_prob)
+        # TODO: EPOCH = 0, VAL_LOG_PROB = 0
+        self._summary["epochs"].append(0)
+        self._summary["best_validation_log_probs"].append(0)
 
     def _loss(
         self,
