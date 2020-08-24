@@ -35,7 +35,6 @@ class LikelihoodEstimator(NeuralInference, ABC):
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
         show_progress_bars: bool = True,
-        show_round_summary: bool = False,
     ):
         r"""Base class for Sequential Neural Likelihood Estimation methods.
 
@@ -72,7 +71,6 @@ class LikelihoodEstimator(NeuralInference, ABC):
             logging_level=logging_level,
             summary_writer=summary_writer,
             show_progress_bars=show_progress_bars,
-            show_round_summary=show_round_summary,
         )
 
         # As detailed in the docstring, `density_estimator` is either a string or
@@ -170,10 +168,6 @@ class LikelihoodEstimator(NeuralInference, ABC):
             exclude_invalid_x=exclude_invalid_x,
             discard_prior_samples=discard_prior_samples,
         )
-
-        # Update description for progress bar.
-        if self._show_round_summary:
-            print(self._describe_round(self._round, self._summary))
 
         # Update TensorBoard and summary dict.
         self._summarize(

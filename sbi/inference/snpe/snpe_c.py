@@ -41,7 +41,6 @@ class SNPE_C(PosteriorEstimator):
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[TensorboardSummaryWriter] = None,
         show_progress_bars: bool = True,
-        show_round_summary: bool = False,
     ):
         r"""SNPE-C / APT [1].
 
@@ -116,8 +115,6 @@ class SNPE_C(PosteriorEstimator):
                 file location (default is `<current working directory>/logs`.)
             show_progress_bars: Whether to show a progressbar during simulation and
                 sampling.
-            show_round_summary: Whether to show the validation loss and leakage after
-                each round.
         """
 
         self._use_combined_loss = use_combined_loss

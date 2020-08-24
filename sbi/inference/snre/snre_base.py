@@ -32,7 +32,6 @@ class RatioEstimator(NeuralInference, ABC):
         logging_level: Union[int, str] = "warning",
         summary_writer: Optional[SummaryWriter] = None,
         show_progress_bars: bool = True,
-        show_round_summary: bool = False,
     ):
         r"""Sequential Neural Ratio Estimation.
 
@@ -76,7 +75,6 @@ class RatioEstimator(NeuralInference, ABC):
             logging_level=logging_level,
             summary_writer=summary_writer,
             show_progress_bars=show_progress_bars,
-            show_round_summary=show_round_summary,
         )
 
         # As detailed in the docstring, `density_estimator` is either a string or
@@ -177,10 +175,6 @@ class RatioEstimator(NeuralInference, ABC):
             exclude_invalid_x=exclude_invalid_x,
             discard_prior_samples=discard_prior_samples,
         )
-
-        # Update description for progress bar.
-        if self._show_round_summary:
-            print(self._describe_round(self._round, self._summary))
 
         # Update tensorboard and summary dict.
         self._summarize(

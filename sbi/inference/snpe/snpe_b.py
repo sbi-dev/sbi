@@ -2,7 +2,18 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 
-from typing import Callable, Optional, Union, Dict, Any, Tuple, Union, cast, List, Sequence, TypeVar
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    TypeVar,
+    Union,
+    cast,
+)
 
 import torch
 from torch import Tensor, nn
@@ -27,7 +38,6 @@ class SNPE_B(PosteriorEstimator):
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
         show_progress_bars: bool = True,
-        show_round_summary: bool = False,
     ):
         r"""SNPE-B [1]. CURRENTLY NOT IMPLEMENTED.
 
@@ -54,7 +64,6 @@ class SNPE_B(PosteriorEstimator):
             device=device,
             logging_level=logging_level,
             show_progress_bars=show_progress_bars,
-            show_round_summary=show_round_summary,
         )
 
     def _log_prob_proposal_posterior(

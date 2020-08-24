@@ -23,7 +23,6 @@ class SNRE_A(RatioEstimator):
         logging_level: Union[int, str] = "warning",
         summary_writer: Optional[TensorboardSummaryWriter] = None,
         show_progress_bars: bool = True,
-        show_round_summary: bool = False,
     ):
         r"""AALR[1], here known as SNRE_A.
 
@@ -69,8 +68,6 @@ class SNRE_A(RatioEstimator):
                 file location (default is `<current working directory>/logs`.)
             show_progress_bars: Whether to show a progressbar during simulation and
                 sampling.
-            show_round_summary: Whether to show the validation loss and leakage after
-                each round.
         """
 
         kwargs = del_entries(locals(), entries=("self", "__class__"))

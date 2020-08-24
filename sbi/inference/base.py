@@ -9,9 +9,9 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union, cast
 from warnings import warn
 
 import torch
+from pytorch_lightning.loggers import TensorBoardLogger
 from torch import Tensor
 from torch.utils.tensorboard import SummaryWriter
-from pytorch_lightning.loggers import TensorBoardLogger
 
 import sbi.inference
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
@@ -88,7 +88,6 @@ class NeuralInference(ABC):
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
         show_progress_bars: bool = True,
-        show_round_summary: bool = False,
     ):
         r"""
         Base class for inference methods.
@@ -114,8 +113,6 @@ class NeuralInference(ABC):
                 file location (default is `<current working directory>/logs`.)
             show_progress_bars: Whether to show a progressbar during simulation and
                 sampling.
-            show_round_summary: Whether to show the validation loss and leakage after
-                each round.
         """
 
         # We set the device globally by setting the default tensor type for all tensors.
@@ -129,7 +126,6 @@ class NeuralInference(ABC):
         self._simulator, self._prior = simulator, prior
 
         self._show_progress_bars = show_progress_bars
-        self._show_round_summary = show_round_summary
 
         self._batched_simulator = lambda theta: simulate_in_batches(
             self._simulator,
@@ -326,31 +322,6 @@ class NeuralInference(ABC):
         return cast(list, num_simulations_per_round)
 
     @staticmethod
-    def _describe_round(round_: int, summary: Dict[str, list]) -> str:
-        epochs = summary["epochs"][-1]
-        best_validation_log_probs = summary["best_validation_log_probs"][-1]
-        if "rejection_sampling_acceptance_rates" in summary:
-            # If this key exists, we are using SNPE.
-            posterior_acceptance_prob = summary["rejection_sampling_acceptance_rates"][
-                -1
-            ]
-        else:
-            # For all other methods, `rejection_sampling_acceptance_rates` is not logged
-            # because the acceptance probability is by definition 1.0.
-            posterior_acceptance_prob = 1.0
-
-        # todo
-        description = f"""
-        -------------------------
-        ||||| ROUND {round_ + 1} STATS |||||:
-        -------------------------
-        Acceptance rate: {posterior_acceptance_prob:.4f}
-        -------------------------
-        """
-
-        return description
-
-    @staticmethod
     def _maybe_show_progress(show=bool, epoch=int) -> None:
         if show:
             # end="\r" deletes the print statement when a new one appears.
@@ -429,13 +400,6 @@ class NeuralInference(ABC):
         self._summary_writer.experiment.add_figure(
             tag="posterior_samples", figure=figure, global_step=round_ + 1
         )
-
-        # todo
-        # self._summary_writer.experiment.add_scalar(
-        #     tag="best_validation_log_prob",
-        #     scalar_value=self._summary["best_validation_log_probs"][-1],
-        #     global_step=round_ + 1,
-        # )
 
         self._summary_writer.experiment.flush()
 

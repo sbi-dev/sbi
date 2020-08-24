@@ -39,7 +39,6 @@ class PosteriorEstimator(NeuralInference, ABC):
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
         show_progress_bars: bool = True,
-        show_round_summary: bool = False,
     ):
         """Base class for Sequential Neural Posterior Estimation methods.
 
@@ -79,7 +78,6 @@ class PosteriorEstimator(NeuralInference, ABC):
             logging_level=logging_level,
             summary_writer=summary_writer,
             show_progress_bars=show_progress_bars,
-            show_round_summary=show_round_summary,
         )
 
         # As detailed in the docstring, `density_estimator` is either a string or
@@ -249,10 +247,6 @@ class PosteriorEstimator(NeuralInference, ABC):
             x_bank=x,
             posterior_samples_acceptance_rate=acceptance_rate,
         )
-
-        # Update description for progress bar.
-        if self._show_round_summary:
-            print(self._describe_round(self._round, self._summary))
 
         self._posterior._num_trained_rounds = self._round + 1
         return deepcopy(self._posterior)
