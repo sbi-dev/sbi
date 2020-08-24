@@ -116,7 +116,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         calibration_kernel: Optional[Callable] = None,
         exclude_invalid_x: bool = True,
         discard_prior_samples: bool = False,
-        retrain_from_scratch_each_round: bool = False,
+        retrain_from_scratch: bool = False,
     ) -> DirectPosterior:
         r"""Run SNPE.
 
@@ -145,14 +145,14 @@ class PosteriorEstimator(NeuralInference, ABC):
             discard_prior_samples: Whether to discard samples simulated in round 1, i.e.
                 from the prior. Training may be sped up by ignoring such less targeted
                 samples.
-            retrain_from_scratch_each_round: Whether to retrain the conditional density
+            retrain_from_scratch: Whether to retrain the conditional density
                 estimator for the posterior from scratch each round.
 
         Returns:
             Posterior $p(\theta|x)$ that can be sampled and evaluated.
         """
 
-        self._warn_if_retrain_from_scratch_snpe(retrain_from_scratch_each_round)
+        self._warn_if_retrain_from_scratch_snpe(retrain_from_scratch)
 
         # Calibration kernels proposed in Lueckmann, Gonçalves et al., 2017.
         if calibration_kernel is None:
@@ -182,7 +182,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         # arguments, which will build the neural network.
         # This is passed into NeuralPosterior, to create a neural posterior which
         # can `sample()` and `log_prob()`. The network is accessible via `.net`.
-        if self._model is None or retrain_from_scratch_each_round:
+        if self._model is None or retrain_from_scratch:
             neural_net = self._build_neural_net(theta, x)
         else:
             neural_net = self._model.net
