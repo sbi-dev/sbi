@@ -28,6 +28,7 @@ from sbi.mcmc import Slice, SliceSampler
 from sbi.types import Array, Shape
 from sbi.user_input.user_input_checks import process_x
 from sbi.utils.torchutils import atleast_2d_float32_tensor, ensure_theta_batched
+from sbi.inference.snpe.posterior_net import PosteriorNet
 
 
 class NeuralPosterior(ABC):
@@ -75,6 +76,7 @@ class NeuralPosterior(ABC):
         else:
             raise ValueError("Method family unsupported.")
 
+        self.net = PosteriorNet(neural_net, prior)
         self.net = neural_net
 
         self.set_mcmc_method(mcmc_method)

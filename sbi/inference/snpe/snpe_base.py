@@ -7,6 +7,7 @@ from copy import deepcopy
 from typing import Any, Callable, Dict, Optional, Union, cast
 from warnings import warn
 
+import pytorch_lightning as pl
 import numpy as np
 import torch
 from torch import Tensor, nn, ones, optim
@@ -308,56 +309,60 @@ class PosteriorEstimator(NeuralInference, ABC):
             sampler=SubsetRandomSampler(val_indices),
         )
 
-        optimizer = optim.Adam(
-            list(self._posterior.net.parameters()), lr=learning_rate,
-        )
+        trainer = pl.Trainer(early_stop_callback=True)
+        trainer.fit(self._posterior.net, train_loader, val_loader)
 
-        epoch, self._val_log_prob = 0, float("-Inf")
-        while epoch <= max_num_epochs and not self._converged(epoch, stop_after_epochs):
-
-            # Train for a single epoch.
-            self._posterior.net.train()
-            for batch in train_loader:
-                optimizer.zero_grad()
-                theta_batch, x_batch, masks_batch = (
-                    batch[0].to(self._device),
-                    batch[1].to(self._device),
-                    batch[2].to(self._device),
-                )
-
-                batch_loss = torch.mean(
-                    self._loss(
-                        theta_batch, x_batch, masks_batch, proposal, calibration_kernel
-                    )
-                )
-                batch_loss.backward()
-                if clip_max_norm is not None:
-                    clip_grad_norm_(
-                        self._posterior.net.parameters(), max_norm=clip_max_norm,
-                    )
-                optimizer.step()
-
-            epoch += 1
-
-            # Calculate validation performance.
-            self._posterior.net.eval()
-            log_prob_sum = 0
-            with torch.no_grad():
-                for batch in val_loader:
-                    theta_batch, x_batch, masks_batch = (
-                        batch[0].to(self._device),
-                        batch[1].to(self._device),
-                        batch[2].to(self._device),
-                    )
-                    # Take negative loss here to get validation log_prob.
-                    batch_log_prob = -self._loss(
-                        theta_batch, x_batch, masks_batch, proposal, calibration_kernel
-                    )
-                    log_prob_sum += batch_log_prob.sum().item()
-
-            self._val_log_prob = log_prob_sum / num_validation_examples
-
-            self._maybe_show_progress(self._show_progress_bars, epoch)
+        # TODO: throw out for pl
+        # optimizer = optim.Adam(
+        #     list(self._posterior.net.parameters()), lr=learning_rate,
+        # )
+        #
+        # epoch, self._val_log_prob = 0, float("-Inf")
+        # while epoch <= max_num_epochs and not self._converged(epoch, stop_after_epochs):
+        #
+        #     # Train for a single epoch.
+        #     self._posterior.net.train()
+        #     for batch in train_loader:
+        #         optimizer.zero_grad()
+        #         theta_batch, x_batch, masks_batch = (
+        #             batch[0].to(self._device),
+        #             batch[1].to(self._device),
+        #             batch[2].to(self._device),
+        #         )
+        #
+        #         batch_loss = torch.mean(
+        #             self._loss(
+        #                 theta_batch, x_batch, masks_batch, proposal, calibration_kernel
+        #             )
+        #         )
+        #         batch_loss.backward()
+        #         if clip_max_norm is not None:
+        #             clip_grad_norm_(
+        #                 self._posterior.net.parameters(), max_norm=clip_max_norm,
+        #             )
+        #         optimizer.step()
+        #
+        #     epoch += 1
+        #
+        #     # Calculate validation performance.
+        #     self._posterior.net.eval()
+        #     log_prob_sum = 0
+        #     with torch.no_grad():
+        #         for batch in val_loader:
+        #             theta_batch, x_batch, masks_batch = (
+        #                 batch[0].to(self._device),
+        #                 batch[1].to(self._device),
+        #                 batch[2].to(self._device),
+        #             )
+        #             # Take negative loss here to get validation log_prob.
+        #             batch_log_prob = -self._loss(
+        #                 theta_batch, x_batch, masks_batch, proposal, calibration_kernel
+        #             )
+        #             log_prob_sum += batch_log_prob.sum().item()
+        #
+        #     self._val_log_prob = log_prob_sum / num_validation_examples
+        #
+        #     self._maybe_show_progress(self._show_progress_bars, epoch)
 
         self._report_convergence_at_end(epoch, stop_after_epochs, max_num_epochs)
 
