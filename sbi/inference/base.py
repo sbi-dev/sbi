@@ -11,6 +11,7 @@ from warnings import warn
 import torch
 from torch import Tensor
 from torch.utils.tensorboard import SummaryWriter
+from pytorch_lightning.loggers import TensorBoardLogger
 
 import sbi.inference
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
@@ -157,9 +158,8 @@ class NeuralInference(ABC):
         )
 
         # Logging during training (by SummaryWriter).
-        self._summary = dict(
-            median_observation_distances=[], epochs=[], best_validation_log_probs=[],
-        )
+        # todo
+        self._summary = dict(median_observation_distances=[],)
 
     def provide_presimulated(
         self, theta: Tensor, x: Tensor, from_round: int = 0
@@ -293,7 +293,7 @@ class NeuralInference(ABC):
 
         return converged
 
-    def _default_summary_writer(self) -> SummaryWriter:
+    def _default_summary_writer(self) -> TensorBoardLogger:
         """Return summary writer logging to method- and simulator-specific directory."""
         try:
             simulator = self._simulator.__name__
@@ -307,7 +307,7 @@ class NeuralInference(ABC):
             method,
             datetime.now().isoformat().replace(":", "_"),
         )
-        return SummaryWriter(logdir)
+        return TensorBoardLogger(logdir)
 
     @staticmethod
     def _ensure_list(
@@ -339,12 +339,11 @@ class NeuralInference(ABC):
             # because the acceptance probability is by definition 1.0.
             posterior_acceptance_prob = 1.0
 
+        # todo
         description = f"""
         -------------------------
         ||||| ROUND {round_ + 1} STATS |||||:
         -------------------------
-        Epochs trained: {epochs}
-        Best validation performance: {best_validation_log_probs:.4f}
         Acceptance rate: {posterior_acceptance_prob:.4f}
         -------------------------
         """
@@ -403,7 +402,7 @@ class NeuralInference(ABC):
                 median_observation_distance.item()
             )
 
-            self._summary_writer.add_scalar(
+            self._summary_writer.experiment.add_scalar(
                 tag="median_observation_distance",
                 scalar_value=self._summary["median_observation_distances"][-1],
                 global_step=round_ + 1,
@@ -415,7 +414,7 @@ class NeuralInference(ABC):
                 posterior_samples_acceptance_rate.item()
             )
 
-            self._summary_writer.add_scalar(
+            self._summary_writer.experiment.add_scalar(
                 tag="rejection_sampling_acceptance_rate",
                 scalar_value=self._summary["rejection_sampling_acceptance_rates"][-1],
                 global_step=round_ + 1,
@@ -427,24 +426,18 @@ class NeuralInference(ABC):
 
         figure, axes = pairplot(parameters.to("cpu").numpy())
 
-        self._summary_writer.add_figure(
+        self._summary_writer.experiment.add_figure(
             tag="posterior_samples", figure=figure, global_step=round_ + 1
         )
 
-        # Add most recent training stats to summary writer.
-        self._summary_writer.add_scalar(
-            tag="epochs_trained",
-            scalar_value=self._summary["epochs"][-1],
-            global_step=round_ + 1,
-        )
+        # todo
+        # self._summary_writer.experiment.add_scalar(
+        #     tag="best_validation_log_prob",
+        #     scalar_value=self._summary["best_validation_log_probs"][-1],
+        #     global_step=round_ + 1,
+        # )
 
-        self._summary_writer.add_scalar(
-            tag="best_validation_log_prob",
-            scalar_value=self._summary["best_validation_log_probs"][-1],
-            global_step=round_ + 1,
-        )
-
-        self._summary_writer.flush()
+        self._summary_writer.experiment.flush()
 
     @property
     def summary(self):

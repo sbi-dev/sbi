@@ -7,9 +7,10 @@ from copy import deepcopy
 from typing import Any, Callable, Dict, Optional, Union, cast
 from warnings import warn
 
-import pytorch_lightning as pl
 import numpy as np
+import pytorch_lightning as pl
 import torch
+from pytorch_lightning.callbacks import EarlyStopping, progress
 from torch import Tensor, nn, ones, optim
 from torch.nn.utils import clip_grad_norm_
 from torch.utils import data
@@ -21,7 +22,6 @@ from sbi.inference import NeuralInference
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.types import ScalarFloat
 from sbi.utils import check_estimator_arg, x_shape_from_simulation
-from sbi.inference.snpe.posterior_net import PosteriorNet
 
 
 class PosteriorEstimator(NeuralInference, ABC):
@@ -92,7 +92,7 @@ class PosteriorEstimator(NeuralInference, ABC):
             self._build_neural_net = utils.posterior_nn(model=density_estimator)
         else:
             self._build_neural_net = density_estimator
-        self._posterior = None
+        self._model = None
         self._sample_with_mcmc = sample_with_mcmc
         self._mcmc_method = mcmc_method
         self._mcmc_parameters = mcmc_parameters
@@ -182,33 +182,45 @@ class PosteriorEstimator(NeuralInference, ABC):
         # arguments, which will build the neural network.
         # This is passed into NeuralPosterior, to create a neural posterior which
         # can `sample()` and `log_prob()`. The network is accessible via `.net`.
-        if self._posterior is None or retrain_from_scratch_each_round:
-            x_shape = x_shape_from_simulation(x)
+        if self._model is None or retrain_from_scratch_each_round:
             neural_net = self._build_neural_net(theta, x)
-            model = PosteriorNet(neural_net, prior=self._prior, proposal=proposal)
-            self._posterior = DirectPosterior(
-                method_family="snpe",
-                neural_net=model,
-                prior=self._prior,
-                x_shape=x_shape,
-                sample_with_mcmc=self._sample_with_mcmc,
-                mcmc_method=self._mcmc_method,
-                mcmc_parameters=self._mcmc_parameters,
-                get_potential_function=PotentialFunctionProvider(),
-            )
+        else:
+            neural_net = self._model.net
+
+        # Re-initializing the `PosteriorEstimationNet` ensures that the optimizers are
+        # reset every round. I think that this makes sense since the loss changes. Also,
+        # it is required to set the proposal.
+        self._model = PosteriorEstimationNet(
+            neural_net,
+            prior=self._prior,
+            proposal=proposal,
+            loss=self._loss,
+            lr=learning_rate,
+            calibration_kernel=calibration_kernel,
+        )
 
         # Fit posterior using newly aggregated data set.
         self._train(
-            proposal=proposal,
             training_batch_size=training_batch_size,
-            learning_rate=learning_rate,
             validation_fraction=validation_fraction,
             stop_after_epochs=stop_after_epochs,
             max_num_epochs=cast(int, max_num_epochs),
             clip_max_norm=clip_max_norm,
-            calibration_kernel=calibration_kernel,
             exclude_invalid_x=exclude_invalid_x,
             discard_prior_samples=discard_prior_samples,
+        )
+
+        x_shape = x_shape_from_simulation(x)
+
+        self._posterior = DirectPosterior(
+            method_family="snpe",
+            neural_net=self._model.net,
+            prior=self._prior,
+            x_shape=x_shape,
+            sample_with_mcmc=self._sample_with_mcmc,
+            mcmc_method=self._mcmc_method,
+            mcmc_parameters=self._mcmc_parameters,
+            get_potential_function=PotentialFunctionProvider(),
         )
 
         # Store models at end of each round.
@@ -253,14 +265,11 @@ class PosteriorEstimator(NeuralInference, ABC):
 
     def _train(
         self,
-        proposal: Optional[Any],
         training_batch_size: int,
-        learning_rate: float,
         validation_fraction: float,
         stop_after_epochs: int,
         max_num_epochs: int,
         clip_max_norm: Optional[float],
-        calibration_kernel: Callable,
         exclude_invalid_x: bool,
         discard_prior_samples: bool,
     ) -> None:
@@ -303,6 +312,7 @@ class PosteriorEstimator(NeuralInference, ABC):
             batch_size=min(training_batch_size, num_training_examples),
             drop_last=True,
             sampler=SubsetRandomSampler(train_indices),
+            num_workers=4,  # todo should not be set hard.
         )
         val_loader = data.DataLoader(
             dataset,
@@ -310,70 +320,17 @@ class PosteriorEstimator(NeuralInference, ABC):
             shuffle=False,
             drop_last=True,
             sampler=SubsetRandomSampler(val_indices),
+            num_workers=4,
         )
 
-        trainer = pl.Trainer(early_stop_callback=True)
-        trainer.fit(self._posterior.net, train_loader, val_loader)
-
-        # TODO: throw out for pl
-        # optimizer = optim.Adam(
-        #     list(self._posterior.net.parameters()), lr=learning_rate,
-        # )
-        #
-        # epoch, self._val_log_prob = 0, float("-Inf")
-        # while epoch <= max_num_epochs and not self._converged(epoch, stop_after_epochs):
-        #
-        #     # Train for a single epoch.
-        #     self._posterior.net.train()
-        #     for batch in train_loader:
-        #         optimizer.zero_grad()
-        #         theta_batch, x_batch, masks_batch = (
-        #             batch[0].to(self._device),
-        #             batch[1].to(self._device),
-        #             batch[2].to(self._device),
-        #         )
-        #
-        #         batch_loss = torch.mean(
-        #             self._loss(
-        #                 theta_batch, x_batch, masks_batch, proposal, calibration_kernel
-        #             )
-        #         )
-        #         batch_loss.backward()
-        #         if clip_max_norm is not None:
-        #             clip_grad_norm_(
-        #                 self._posterior.net.parameters(), max_norm=clip_max_norm,
-        #             )
-        #         optimizer.step()
-        #
-        #     epoch += 1
-        #
-        #     # Calculate validation performance.
-        #     self._posterior.net.eval()
-        #     log_prob_sum = 0
-        #     with torch.no_grad():
-        #         for batch in val_loader:
-        #             theta_batch, x_batch, masks_batch = (
-        #                 batch[0].to(self._device),
-        #                 batch[1].to(self._device),
-        #                 batch[2].to(self._device),
-        #             )
-        #             # Take negative loss here to get validation log_prob.
-        #             batch_log_prob = -self._loss(
-        #                 theta_batch, x_batch, masks_batch, proposal, calibration_kernel
-        #             )
-        #             log_prob_sum += batch_log_prob.sum().item()
-        #
-        #     self._val_log_prob = log_prob_sum / num_validation_examples
-        #
-        #     self._maybe_show_progress(self._show_progress_bars, epoch)
-
-        # todo: back in
-        # self._report_convergence_at_end(epoch, stop_after_epochs, max_num_epochs)
-
-        # Update summary.
-        # TODO: EPOCH = 0, VAL_LOG_PROB = 0
-        self._summary["epochs"].append(0)
-        self._summary["best_validation_log_probs"].append(0)
+        trainer = pl.Trainer(
+            logger=self._summary_writer,
+            early_stop_callback=EarlyStopping(patience=stop_after_epochs,),
+            gradient_clip_val=clip_max_norm,
+            max_epochs=max_num_epochs,
+            progress_bar_refresh_rate=self._show_progress_bars,
+        )
+        trainer.fit(self._model, train_loader, val_loader)
 
     def _loss(
         self,
@@ -394,7 +351,7 @@ class PosteriorEstimator(NeuralInference, ABC):
 
         if self._round == 0:
             # Use posterior log prob (without proposal correction) for first round.
-            log_prob = self._posterior.net.log_prob(theta, x)
+            log_prob = self._model.net.log_prob(theta, x)
         else:
             log_prob = self._log_prob_proposal_posterior(theta, x, masks, proposal)
 
@@ -409,6 +366,43 @@ class PosteriorEstimator(NeuralInference, ABC):
                 "scenario and we therefore strongly recommend "
                 "`retrain_from_scratch_each_round=False`, see GH #215."
             )
+
+
+class PosteriorEstimationNet(pl.LightningModule):
+    """
+    This is a wrapper class for the neural network defined by pyknos / nflows. It wraps
+    the neural network into a pytorch_lightning module.
+    """
+
+    def __init__(self, net, prior, proposal, loss, lr, calibration_kernel):
+        super().__init__()
+        self.net = net
+        self._prior = prior
+        self.proposal = proposal
+        self.loss = loss
+        self.lr = lr
+        self.calibration_kernel = calibration_kernel
+
+    def configure_optimizers(self):
+        optimizer = optim.Adam(list(self.net.parameters()), lr=self.lr)
+        return optimizer
+
+    def training_step(self, batch, batch_idx):
+        theta, x, masks = batch
+        loss = torch.mean(
+            self.loss(theta, x, masks, self.proposal, self.calibration_kernel)
+        )
+        result = pl.TrainResult(loss)
+        return result
+
+    def validation_step(self, batch, batch_idx):
+        theta, x, masks = batch
+        loss = torch.mean(
+            self.loss(theta, x, masks, self.proposal, self.calibration_kernel)
+        )
+        result = pl.EvalResult(checkpoint_on=loss, early_stop_on=loss)
+        result.log("val_loss", loss)
+        return result
 
 
 class PotentialFunctionProvider:

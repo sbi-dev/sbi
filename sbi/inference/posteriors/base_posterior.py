@@ -75,7 +75,6 @@ class NeuralPosterior(ABC):
         else:
             raise ValueError("Method family unsupported.")
 
-        # TODO: maybe we should rename neural_net into model because it is not a lm.
         self.net = neural_net
 
         self.set_mcmc_method(mcmc_method)

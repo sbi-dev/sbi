@@ -189,7 +189,7 @@ class SNPE_C(PosteriorEstimator):
         if proposal is not None:
             self.use_non_atomic_loss = (
                 isinstance(proposal.net._distribution, mdn)
-                and isinstance(self._posterior.net._distribution, mdn)
+                and isinstance(self._model.net._distribution, mdn)
                 and (
                     isinstance(self._prior, utils.BoxUniform)
                     or isinstance(self._prior, MultivariateNormal)
@@ -218,9 +218,7 @@ class SNPE_C(PosteriorEstimator):
             training step if the prior is Gaussian.
         """
 
-        self.z_score_theta = isinstance(
-            self._posterior.net._transform, CompositeTransform
-        )
+        self.z_score_theta = isinstance(self._model.net._transform, CompositeTransform)
 
         self._set_maybe_z_scored_prior()
 
@@ -251,8 +249,8 @@ class SNPE_C(PosteriorEstimator):
         """
 
         if self.z_score_theta:
-            scale = self._posterior.net._transform._transforms[0]._scale
-            shift = self._posterior.net._transform._transforms[0]._shift
+            scale = self._model.net._transform._transforms[0]._scale
+            shift = self._model.net._transform._transforms[0]._shift
 
             # Following the definintion of the linear transform in
             # `standardizing_transform` in `sbiutils.py`:
@@ -356,7 +354,7 @@ class SNPE_C(PosteriorEstimator):
         )
 
         # Evaluate large batch giving (batch_size * num_atoms) log prob posterior evals.
-        log_prob_posterior = self._posterior.net.log_prob(atomic_theta, repeated_x)
+        log_prob_posterior = self._model.net.log_prob(atomic_theta, repeated_x)
         self._assert_all_finite(log_prob_posterior, "posterior eval")
         log_prob_posterior = log_prob_posterior.reshape(batch_size, num_atoms)
 
@@ -376,7 +374,7 @@ class SNPE_C(PosteriorEstimator):
 
         # XXX This evaluates the posterior on _all_ prior samples
         if self._use_combined_loss:
-            log_prob_posterior_non_atomic = self._posterior.net.log_prob(theta, x)
+            log_prob_posterior_non_atomic = self._model.net.log_prob(theta, x)
             masks = masks.reshape(-1)
             log_prob_proposal_posterior = (
                 masks * log_prob_posterior_non_atomic + log_prob_proposal_posterior
@@ -423,8 +421,8 @@ class SNPE_C(PosteriorEstimator):
         norm_logits_p = logits_p - torch.logsumexp(logits_p, dim=-1, keepdim=True)
 
         # Evaluate the density estimator.
-        encoded_x = self._posterior.net._embedding_net(x)
-        dist = self._posterior.net._distribution  # defined to avoid black formatting.
+        encoded_x = self._model.net._embedding_net(x)
+        dist = self._model.net._distribution  # defined to avoid black formatting.
         logits_d, m_d, prec_d, _, _ = dist.get_mixture_components(encoded_x)
         norm_logits_d = logits_d - torch.logsumexp(logits_d, dim=-1, keepdim=True)
 
@@ -651,7 +649,7 @@ class SNPE_C(PosteriorEstimator):
         """Return potentially standardized theta if z-scoring was requested."""
 
         if self.z_score_theta:
-            theta, _ = self._posterior.net._transform(theta)
+            theta, _ = self._model.net._transform(theta)
 
         return theta
 
