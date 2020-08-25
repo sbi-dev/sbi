@@ -249,7 +249,7 @@ class SNPE_C(PosteriorEstimator):
             scale = self._model.net._transform._transforms[0]._scale
             shift = self._model.net._transform._transforms[0]._shift
 
-            # Following the definintion of the linear transform in
+            # Following the definition of the linear transform in
             # `standardizing_transform` in `sbiutils.py`:
             # shift=-mean / std
             # scale=1 / std

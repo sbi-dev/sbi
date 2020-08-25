@@ -285,7 +285,7 @@ class PosteriorEstimator(NeuralInference, ABC):
             batch_size=min(training_batch_size, num_training_examples),
             drop_last=True,
             sampler=SubsetRandomSampler(train_indices),
-            num_workers=4,  # todo should not be set hard.
+            num_workers=4,  # TODO: should not be set hard.
         )
         val_loader = data.DataLoader(
             dataset,
