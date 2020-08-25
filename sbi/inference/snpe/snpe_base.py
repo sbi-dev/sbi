@@ -110,7 +110,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         calibration_kernel: Optional[Callable] = None,
         exclude_invalid_x: bool = True,
         discard_prior_samples: bool = False,
-        retrain_from_scratch: bool = False,
+        train_from: str = "last",
     ) -> DirectPosterior:
         r"""Run SNPE.
 
@@ -139,14 +139,18 @@ class PosteriorEstimator(NeuralInference, ABC):
             discard_prior_samples: Whether to discard samples simulated in round 1, i.e.
                 from the prior. Training may be sped up by ignoring such less targeted
                 samples.
-            retrain_from_scratch: Whether to retrain the conditional density
-                estimator for the posterior from scratch each round.
+            train_from: Sets the initial state of the neural network. Must be either of
+                [`last`, `scratch`, `filename`]. If `last`, it continues training the
+                network from the parameters of the most recent round. If `scratch`,
+                it retrains the network from random initial parameters. A `filename`
+                sets the initial state to pytorch-lightning checkpoint stored in the
+                provided file.
 
         Returns:
             Posterior $p(\theta|x)$ that can be sampled and evaluated.
         """
 
-        self._warn_if_retrain_from_scratch_snpe(retrain_from_scratch)
+        self._warn_if_retrain_from_scratch_snpe(train_from)
 
         # Calibration kernels proposed in Lueckmann, Gonçalves et al., 2017.
         if calibration_kernel is None:
@@ -176,7 +180,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         # arguments, which will build the neural network.
         # This is passed into NeuralPosterior, to create a neural posterior which
         # can `sample()` and `log_prob()`. The network is accessible via `.net`.
-        if self._model is None or retrain_from_scratch:
+        if self._model is None or train_from:
             neural_net = self._build_neural_net(theta, x)
         else:
             neural_net = self._model.net

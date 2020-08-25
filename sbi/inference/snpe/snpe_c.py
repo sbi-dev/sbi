@@ -138,7 +138,7 @@ class SNPE_C(PosteriorEstimator):
         calibration_kernel: Optional[Callable] = None,
         exclude_invalid_x: bool = True,
         discard_prior_samples: bool = False,
-        retrain_from_scratch: bool = False,
+        train_from: bool = False,
     ) -> DirectPosterior:
         r"""Run SNPE.
 
@@ -168,7 +168,7 @@ class SNPE_C(PosteriorEstimator):
             discard_prior_samples: Whether to discard samples simulated in round 1, i.e.
                 from the prior. Training may be sped up by ignoring such less targeted
                 samples.
-            retrain_from_scratch: Whether to retrain the conditional density
+            train_from: Whether to retrain the conditional density
                 estimator for the posterior from scratch each round.
 
         Returns:

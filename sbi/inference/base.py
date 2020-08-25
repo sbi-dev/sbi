@@ -268,22 +268,6 @@ class NeuralInference(ABC):
         return TensorBoardLogger(logdir)
 
     @staticmethod
-    def _ensure_list(
-        num_simulations_per_round: Union[List[int], int], num_rounds: int
-    ) -> List[int]:
-        """Return `num_simulations_per_round` as a list of length `num_rounds`.
-        """
-        try:
-            assert len(num_simulations_per_round) == num_rounds, (
-                "Please provide a list with number of simulations per round for each "
-                "round, or a single integer to be used for all rounds."
-            )
-        except TypeError:
-            num_simulations_per_round: List = [num_simulations_per_round] * num_rounds
-
-        return cast(list, num_simulations_per_round)
-
-    @staticmethod
     def _assert_all_finite(quantity: Tensor, description: str = "tensor") -> None:
         """Raise if tensor quantity contains any NaN or Inf element."""
 
