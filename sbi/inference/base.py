@@ -346,14 +346,7 @@ class NeuralInference(ABC):
         msg = f"NaN/Inf present in {description}."
         assert torch.isfinite(quantity).all(), msg
 
-    def _summarize(
-        self,
-        round_: int,
-        x_o: Union[Tensor, None],
-        theta_bank: Tensor,
-        x_bank: Tensor,
-        posterior_samples_acceptance_rate: Optional[Tensor] = None,
-    ) -> None:
+    def _summarize(self, round_: int, theta_bank: Tensor,) -> None:
         """Update the summary_writer with statistics for a given round.
 
         Statistics are extracted from the arguments and from entries in self._summary
@@ -364,35 +357,8 @@ class NeuralInference(ABC):
         # part of the logging was removed because of API changes, e.g., logging
         # comparisons to ground-truth parameters and samples.
 
-        # Median |x - x0| for most recent round.
-        if x_o is not None:
-            median_observation_distance = torch.median(
-                torch.sqrt(torch.sum((x_bank - x_o.reshape(1, -1)) ** 2, dim=-1,))
-            )
-            self._summary["median_observation_distances"].append(
-                median_observation_distance.item()
-            )
-
-            self._summary_writer.experiment.add_scalar(
-                tag="median_observation_distance",
-                scalar_value=self._summary["median_observation_distances"][-1],
-                global_step=round_ + 1,
-            )
-
-        # Rejection sampling acceptance rate, only for SNPE.
-        if posterior_samples_acceptance_rate is not None:
-            self._summary["rejection_sampling_acceptance_rates"].append(
-                posterior_samples_acceptance_rate.item()
-            )
-
-            self._summary_writer.experiment.add_scalar(
-                tag="rejection_sampling_acceptance_rate",
-                scalar_value=self._summary["rejection_sampling_acceptance_rates"][-1],
-                global_step=round_ + 1,
-            )
-
         # Plot most recently sampled parameters.
-        # XXX: need more plotting kwargs, e.g., prior limits.
+        # TODO: need more plotting kwargs, e.g., prior limits.
         parameters = theta_bank
 
         figure, axes = pairplot(parameters.to("cpu").numpy())

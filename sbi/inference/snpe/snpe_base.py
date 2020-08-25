@@ -98,9 +98,6 @@ class PosteriorEstimator(NeuralInference, ABC):
         self._model_bank = []
         self.use_non_atomic_loss = False
 
-        # Extra SNPE-specific fields summary_writer.
-        self._summary.update({"rejection_sampling_acceptance_rates": []})  # type:ignore
-
     def __call__(
         self,
         num_simulations: int,
@@ -225,27 +222,9 @@ class PosteriorEstimator(NeuralInference, ABC):
         self._model_bank.append(deepcopy(self._posterior))
         self._model_bank[-1].net.eval()
 
-        # Making the call to `leakage_correction()` and the update of
-        # self._leakage_density_correction_factor explicit here. This is just
-        # to make sure this update never gets lost when we e.g. do not log our
-        # things to tensorboard anymore. Calling `leakage_correction()` is needed
-        # to update the leakage after each round.
-        if self._posterior.default_x is None:
-            acceptance_rate = torch.tensor(float("nan"))
-        else:
-            acceptance_rate = self._posterior.leakage_correction(
-                x=self._posterior.default_x,
-                force_update=True,
-                show_progress_bars=self._show_progress_bars,
-            )
-
         # Update tensorboard and summary dict.
         self._summarize(
-            round_=self._round,
-            x_o=self._posterior.default_x,
-            theta_bank=theta,
-            x_bank=x,
-            posterior_samples_acceptance_rate=acceptance_rate,
+            round_=self._round, theta_bank=theta,
         )
 
         self._posterior._num_trained_rounds = self._round + 1
