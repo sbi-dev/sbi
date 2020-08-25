@@ -138,7 +138,7 @@ class SNPE_C(PosteriorEstimator):
         calibration_kernel: Optional[Callable] = None,
         exclude_invalid_x: bool = True,
         discard_prior_samples: bool = False,
-        train_from: bool = False,
+        train_from: str = "last",
     ) -> DirectPosterior:
         r"""Run SNPE.
 
@@ -168,8 +168,12 @@ class SNPE_C(PosteriorEstimator):
             discard_prior_samples: Whether to discard samples simulated in round 1, i.e.
                 from the prior. Training may be sped up by ignoring such less targeted
                 samples.
-            train_from: Whether to retrain the conditional density
-                estimator for the posterior from scratch each round.
+            train_from: Sets the initial state of the neural network. Must be either of
+                [`last`, `scratch`, `filename`]. If `last`, it continues training the
+                network from the parameters of the most recent round. If `scratch`,
+                it retrains the network from random initial parameters. A `filename`
+                sets the initial state to pytorch-lightning checkpoint stored in the
+                provided file.
 
         Returns:
             Posterior $p(\theta|x)$ that can be sampled and evaluated.
@@ -183,22 +187,23 @@ class SNPE_C(PosteriorEstimator):
         self._num_atoms = num_atoms
         kwargs = del_entries(locals(), entries=("self", "__class__", "num_atoms"))
 
-        if proposal is not None:
-            self.use_non_atomic_loss = (
-                isinstance(proposal.net._distribution, mdn)
-                and isinstance(self._model.net._distribution, mdn)
-                and (
-                    isinstance(self._prior, utils.BoxUniform)
-                    or isinstance(self._prior, MultivariateNormal)
-                )
-            )
-
-            algorithm = "non-atomic" if self.use_non_atomic_loss else "atomic"
-            print(f"Using SNPE-C with {algorithm} loss")
-
-            if self.use_non_atomic_loss:
-                # Take care of z-scoring, pre-compute and store prior terms.
-                self._set_state_for_mog_proposal()
+        # todo
+        # if proposal is not None:
+        #     self.use_non_atomic_loss = (
+        #         isinstance(proposal.net._distribution, mdn)
+        #         and isinstance(self._model.net._distribution, mdn)
+        #         and (
+        #             isinstance(self._prior, utils.BoxUniform)
+        #             or isinstance(self._prior, MultivariateNormal)
+        #         )
+        #     )
+        #
+        #     algorithm = "non-atomic" if self.use_non_atomic_loss else "atomic"
+        #     print(f"Using SNPE-C with {algorithm} loss")
+        #
+        #     if self.use_non_atomic_loss:
+        #         # Take care of z-scoring, pre-compute and store prior terms.
+        #         self._set_state_for_mog_proposal()
 
         return super().__call__(**kwargs)
 

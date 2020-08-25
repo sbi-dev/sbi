@@ -136,6 +136,7 @@ class NeuralInference(ABC):
         )
 
         self._model = None
+        self.train_loader = None
 
         # Initialize roundwise (theta, x, prior_masks) for storage of parameters,
         # simulations and masks indicating if simulations came from prior.
@@ -242,12 +243,17 @@ class NeuralInference(ABC):
             prior_mask: Whether each simulation came from a prior parameter sample.
         """
 
-        if proposal is None:
-            theta = self._prior.sample((num_sims,))
-        else:
-            theta = proposal.sample((num_sims,))
+        # todo
+        if num_sims > 0:
+            if proposal is None:
+                theta = self._prior.sample((num_sims,))
+            else:
+                theta = proposal.sample((num_sims,))
 
-        x = self._batched_simulator(theta)
+            x = self._batched_simulator(theta)
+        else:
+            theta = torch.empty(0, 2)
+            x = torch.empty(0, 2)
 
         return theta, x
 

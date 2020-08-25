@@ -251,7 +251,7 @@ class RatioEstimator(NeuralInference, ABC):
             dataset,
             batch_size=clipped_batch_size,
             shuffle=False,
-            drop_last=False,
+            drop_last=True,
             sampler=SubsetRandomSampler(val_indices),
         )
 

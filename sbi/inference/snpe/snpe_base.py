@@ -10,7 +10,7 @@ from warnings import warn
 import numpy as np
 import pytorch_lightning as pl
 import torch
-from pytorch_lightning.callbacks import EarlyStopping, progress
+from pytorch_lightning.callbacks import EarlyStopping, progress, ModelCheckpoint
 from torch import Tensor, nn, ones, optim
 from torch.nn.utils import clip_grad_norm_
 from torch.utils import data
@@ -150,7 +150,8 @@ class PosteriorEstimator(NeuralInference, ABC):
             Posterior $p(\theta|x)$ that can be sampled and evaluated.
         """
 
-        self._warn_if_retrain_from_scratch_snpe(train_from)
+        # TODO: REMOVE
+        # self._warn_if_retrain_from_scratch_snpe(train_from)
 
         # Calibration kernels proposed in Lueckmann, Gonçalves et al., 2017.
         if calibration_kernel is None:
@@ -158,7 +159,7 @@ class PosteriorEstimator(NeuralInference, ABC):
 
         max_num_epochs = 2 ** 31 - 1 if max_num_epochs is None else max_num_epochs
 
-        self._check_proposal(proposal)
+        # self._check_proposal(proposal)
         self._round = self._round + 1 if (proposal is not None) else 0
 
         # If presimulated data was provided from a later round, set the self._round to
@@ -168,34 +169,35 @@ class PosteriorEstimator(NeuralInference, ABC):
         if self._data_round_index:
             self._round = max(self._round, max(self._data_round_index))
 
-        # Run simulations for the round.
-        theta, x = self._run_simulations(proposal, num_simulations)
-        self._append_to_data_bank(theta, x, self._round)
+        if self._model is None:
+            # Run simulations for the round.
+            theta, x = self._run_simulations(proposal, num_simulations)
+            self._append_to_data_bank(theta, x, self._round)
 
-        # Load data from most recent round.
-        theta, x, _ = self._get_from_data_bank(self._round, exclude_invalid_x, False)
+            # Load data from most recent round.
+            theta, x, _ = self._get_from_data_bank(
+                self._round, exclude_invalid_x, False
+            )
 
-        # First round or if retraining from scratch:
-        # Call the `self._build_neural_net` with the rounds' thetas and xs as
-        # arguments, which will build the neural network.
-        # This is passed into NeuralPosterior, to create a neural posterior which
-        # can `sample()` and `log_prob()`. The network is accessible via `.net`.
-        if self._model is None or train_from:
+            # First round or if retraining from scratch:
+            # Call the `self._build_neural_net` with the rounds' thetas and xs as
+            # arguments, which will build the neural network.
+            # This is passed into NeuralPosterior, to create a neural posterior which
+            # can `sample()` and `log_prob()`. The network is accessible via `.net`.
+            # todo
+            # if self._model is None or train_from == "scratch":
+            #     neural_net = self._build_neural_net(theta, x)
+            # else:
+            #     neural_net = self._model.net
+            #
             neural_net = self._build_neural_net(theta, x)
-        else:
-            neural_net = self._model.net
-
-        # Re-initializing the `PosteriorEstimationNet` ensures that the optimizers are
-        # reset every round. I think that this makes sense since the loss changes. Also,
-        # it is required to set the proposal.
-        self._model = PosteriorEstimationNet(
-            neural_net,
-            prior=self._prior,
-            proposal=proposal,
-            loss=self._loss,
-            lr=learning_rate,
-            calibration_kernel=calibration_kernel,
-        )
+            self._model = PosteriorEstimationNet(
+                net=neural_net,
+                proposal=proposal,
+                loss=self._loss,
+                lr=learning_rate,
+                calibration_kernel=calibration_kernel,
+            )
 
         # Fit posterior using newly aggregated data set.
         self._train(
@@ -206,32 +208,34 @@ class PosteriorEstimator(NeuralInference, ABC):
             clip_max_norm=clip_max_norm,
             exclude_invalid_x=exclude_invalid_x,
             discard_prior_samples=discard_prior_samples,
+            checkpoint_path=train_from,
         )
 
-        x_shape = x_shape_from_simulation(x)
+        # x_shape = x_shape_from_simulation(x)
+        # self._posterior = DirectPosterior(
+        #     method_family="snpe",
+        #     neural_net=self._model.net,
+        #     prior=self._prior,
+        #     x_shape=x_shape,
+        #     sample_with_mcmc=self._sample_with_mcmc,
+        #     mcmc_method=self._mcmc_method,
+        #     mcmc_parameters=self._mcmc_parameters,
+        #     get_potential_function=PotentialFunctionProvider(),
+        # )
 
-        self._posterior = DirectPosterior(
-            method_family="snpe",
-            neural_net=self._model.net,
-            prior=self._prior,
-            x_shape=x_shape,
-            sample_with_mcmc=self._sample_with_mcmc,
-            mcmc_method=self._mcmc_method,
-            mcmc_parameters=self._mcmc_parameters,
-            get_potential_function=PotentialFunctionProvider(),
-        )
+        # todo
+        # # Store models at end of each round.
+        # self._model_bank.append(deepcopy(self._posterior))
+        # self._model_bank[-1].net.eval()
+        #
+        # # Update tensorboard and summary dict.
+        # self._summarize(
+        #     round_=self._round, theta_bank=theta,
+        # )
 
-        # Store models at end of each round.
-        self._model_bank.append(deepcopy(self._posterior))
-        self._model_bank[-1].net.eval()
-
-        # Update tensorboard and summary dict.
-        self._summarize(
-            round_=self._round, theta_bank=theta,
-        )
-
-        self._posterior._num_trained_rounds = self._round + 1
-        return deepcopy(self._posterior)
+        # todo
+        # self._posterior._num_trained_rounds = self._round + 1
+        return None  # deepcopy(self._posterior)
 
     @abstractmethod
     def _log_prob_proposal_posterior(
@@ -248,6 +252,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         clip_max_norm: Optional[float],
         exclude_invalid_x: bool,
         discard_prior_samples: bool,
+        checkpoint_path: str,
     ) -> None:
         r"""Train the conditional density estimator for the posterior $p(\theta|x)$.
 
@@ -260,53 +265,104 @@ class PosteriorEstimator(NeuralInference, ABC):
         The proposal is only needed for non-atomic SNPE.
         """
 
-        # Starting index for the training set (1 = discard round-0 samples).
-        start_idx = int(discard_prior_samples and self._round > 0)
+        if self.train_loader is None:
+            # Starting index for the training set (1 = discard round-0 samples).
+            start_idx = int(discard_prior_samples and self._round > 0)
 
-        # For non-atomic loss, we can not reuse samples from previous rounds as of now.
-        if self.use_non_atomic_loss:
-            start_idx = self._round
+            # For non-atomic loss, we can not reuse samples from previous rounds as of now.
+            if self.use_non_atomic_loss:
+                start_idx = self._round
 
-        theta, x, prior_masks = self._get_from_data_bank(start_idx, exclude_invalid_x)
+            theta, x, prior_masks = self._get_from_data_bank(
+                start_idx, exclude_invalid_x
+            )
 
-        # Select random neural net and validation splits from (theta, x) pairs.
-        num_total_examples = len(theta)
-        permuted_indices = torch.randperm(num_total_examples)
-        num_training_examples = int((1 - validation_fraction) * num_total_examples)
-        num_validation_examples = num_total_examples - num_training_examples
-        train_indices, val_indices = (
-            permuted_indices[:num_training_examples],
-            permuted_indices[num_training_examples:],
-        )
+            # Select random neural net and validation splits from (theta, x) pairs.
+            num_total_examples = len(theta)
+            permuted_indices = torch.randperm(num_total_examples)
+            num_training_examples = int((1 - validation_fraction) * num_total_examples)
+            num_validation_examples = num_total_examples - num_training_examples
+            train_indices, val_indices = (
+                permuted_indices[:num_training_examples],
+                permuted_indices[num_training_examples:],
+            )
 
-        # Dataset is shared for training and validation loaders.
-        dataset = data.TensorDataset(theta, x, prior_masks)
+            # Dataset is shared for training and validation loaders.
+            dataset = data.TensorDataset(theta, x, prior_masks)
 
-        # Create neural net and validation loaders using a subset sampler.
-        train_loader = data.DataLoader(
-            dataset,
-            batch_size=min(training_batch_size, num_training_examples),
-            drop_last=True,
-            sampler=SubsetRandomSampler(train_indices),
-            num_workers=4,  # TODO: should not be set hard.
-        )
-        val_loader = data.DataLoader(
-            dataset,
-            batch_size=min(training_batch_size, num_validation_examples),
-            shuffle=False,
-            drop_last=True,
-            sampler=SubsetRandomSampler(val_indices),
-            num_workers=4,
-        )
+            # Create neural net and validation loaders using a subset sampler.
+            self.train_loader = data.DataLoader(
+                dataset,
+                batch_size=min(training_batch_size, num_training_examples),
+                drop_last=True,
+                sampler=SubsetRandomSampler(train_indices),
+                num_workers=4,  # TODO: should not be set hard.
+            )
+            self.val_loader = data.DataLoader(
+                dataset,
+                batch_size=min(training_batch_size, num_validation_examples),
+                shuffle=False,
+                drop_last=True,
+                sampler=SubsetRandomSampler(val_indices),
+                num_workers=4,
+            )
 
+        # print("checkpoint_path", checkpoint_path)
+
+        model_checkpoint = ModelCheckpoint(save_last=True)
+        early_stop = EarlyStopping(patience=stop_after_epochs,)
+
+        # # # TODO: does the trainer reset to the 'best' model, i.e. not the last?
         trainer = pl.Trainer(
             logger=self._summary_writer,
-            early_stop_callback=EarlyStopping(patience=stop_after_epochs,),
+            early_stop_callback=early_stop,
+            checkpoint_callback=model_checkpoint,
+            gradient_clip_val=clip_max_norm,
+            max_epochs=5,
+            progress_bar_refresh_rate=self._show_progress_bars,
+            resume_from_checkpoint=None,
+            deterministic=True,
+        )
+        trainer.fit(self._model, self.train_loader, self.val_loader)
+        checkpoint_path == "file"
+
+        if checkpoint_path == "last" or checkpoint_path == "scratch":
+            checkpoint_path = None
+        elif checkpoint_path == "file":
+            checkpoint_path = (
+                str(self._summary_writer.save_dir)
+                + "/default/version_0/checkpoints/last.ckpt"
+            )
+
+        print("checkpoint_path", checkpoint_path)
+
+        # TODO: does the trainer reset to the 'best' model, i.e. not the last?
+        # model_checkpoint = ModelCheckpoint(save_last=True)
+        trainer = pl.Trainer(
+            logger=self._summary_writer,
+            early_stop_callback=early_stop,
+            checkpoint_callback=model_checkpoint,
             gradient_clip_val=clip_max_norm,
             max_epochs=max_num_epochs,
             progress_bar_refresh_rate=self._show_progress_bars,
+            resume_from_checkpoint=checkpoint_path,
+            deterministic=True,
         )
-        trainer.fit(self._model, train_loader, val_loader)
+        trainer.fit(self._model, self.train_loader, self.val_loader)
+
+        # Load the model that had the highest validation log-probability.
+        # Sneaky trick ahead: We have to initialize a PosteriorEstimationNet before we
+        # load the weights with the checkpoint. In theory, this should be doable with
+        # pytorch lightnings self.save_hyperparameters(), but I got errors with it. So,
+        # instead, we simply initialize a PosteriorEstimationNet and then override its
+        # weights using the checkpoint.
+        # todo
+        # self._best_model = PosteriorEstimationNet.load_from_checkpoint(
+        #     checkpoint_path=model_checkpoint.best_model_path, net=self._model.net
+        # )
+
+        # TODO: log the best model score.
+        # print("best_model_score", model_checkpoint.best_model_score)
 
     def _loss(
         self,
@@ -350,14 +406,18 @@ class PosteriorEstimationNet(pl.LightningModule):
     the neural network into a pytorch_lightning module.
     """
 
-    def __init__(self, net, prior, proposal, loss, lr, calibration_kernel):
+    def __init__(
+        self, net, proposal=None, loss=None, lr=None, calibration_kernel=None,
+    ):
         super().__init__()
+
         self.net = net
-        self._prior = prior
         self.proposal = proposal
         self.loss = loss
         self.lr = lr
         self.calibration_kernel = calibration_kernel
+
+        self.save_hyperparameters()
 
     def configure_optimizers(self):
         optimizer = optim.Adam(list(self.net.parameters()), lr=self.lr)
