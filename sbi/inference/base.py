@@ -258,37 +258,6 @@ class NeuralInference(ABC):
 
         return theta, x
 
-    def _converged(self, epoch: int, stop_after_epochs: int) -> bool:
-        """Return whether the training converged yet and save best model state so far.
-
-        Checks for improvement in validation performance over previous epochs.
-
-        Args:
-            epoch: Current epoch in training.
-            stop_after_epochs: How many fruitless epochs to let pass before stopping.
-
-        Returns:
-            Whether the training has stopped improving, i.e. has converged.
-        """
-        converged = False
-
-        posterior_nn = self._posterior.net
-
-        # (Re)-start the epoch count with the first epoch or any improvement.
-        if epoch == 0 or self._val_log_prob > self._best_val_log_prob:
-            self._best_val_log_prob = self._val_log_prob
-            self._epochs_since_last_improvement = 0
-            self._best_model_state_dict = deepcopy(posterior_nn.state_dict())
-        else:
-            self._epochs_since_last_improvement += 1
-
-        # If no validation improvement over many epochs, stop training.
-        if self._epochs_since_last_improvement > stop_after_epochs - 1:
-            posterior_nn.load_state_dict(self._best_model_state_dict)
-            converged = True
-
-        return converged
-
     def _default_summary_writer(self) -> TensorBoardLogger:
         """Return summary writer logging to method- and simulator-specific directory."""
         try:
@@ -320,24 +289,6 @@ class NeuralInference(ABC):
             num_simulations_per_round: List = [num_simulations_per_round] * num_rounds
 
         return cast(list, num_simulations_per_round)
-
-    @staticmethod
-    def _maybe_show_progress(show=bool, epoch=int) -> None:
-        if show:
-            # end="\r" deletes the print statement when a new one appears.
-            # https://stackoverflow.com/questions/3419984/
-            print("Training neural network. Epochs trained: ", epoch, end="\r")
-
-    def _report_convergence_at_end(
-        self, epoch: int, stop_after_epochs: int, max_num_epochs: int
-    ) -> None:
-        if self._converged(epoch, stop_after_epochs):
-            print(f"Neural network successfully converged after {epoch} epochs.")
-        elif max_num_epochs == epoch:
-            warn(
-                "Maximum number of epochs `max_num_epochs={max_num_epochs}` reached,"
-                "but network has not yet fully converged. Consider increasing it."
-            )
 
     @staticmethod
     def _assert_all_finite(quantity: Tensor, description: str = "tensor") -> None:

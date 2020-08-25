@@ -147,7 +147,6 @@ class DirectPosterior(NeuralPosterior):
 
         """
 
-        # TODO Train exited here, entered after sampling?
         self.net.eval()
 
         theta, x = self._prepare_theta_and_x_for_log_prob_(theta, x)
