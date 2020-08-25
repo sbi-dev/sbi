@@ -31,5 +31,6 @@ dependencies:
     - -e ".[dev]"
   - "python >= 3.6.0"
   - "pytorch >= 1.5.1"
+  - pytorch-lightning
   - scikit-learn
   - scipy

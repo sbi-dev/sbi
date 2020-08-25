@@ -30,6 +30,7 @@ REQUIRED = [
     "pillow",
     "pyknos==0.12",
     "pyro-ppl==1.3.1",  # TODO: Remove once #286 is addressed
+    "pytorch-lightning",
     "scipy",
     "tensorboard",
     "torch>=1.5.1",
