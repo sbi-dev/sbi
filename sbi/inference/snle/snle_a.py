@@ -24,7 +24,6 @@ class SNLE_A(LikelihoodEstimator):
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[TensorboardSummaryWriter] = None,
         show_progress_bars: bool = True,
-        show_round_summary: bool = False,
     ):
         r"""Sequential Neural Likelihood [1].
 
@@ -72,8 +71,6 @@ class SNLE_A(LikelihoodEstimator):
                 file location (default is `<current working directory>/logs`.)
             show_progress_bars: Whether to show a progressbar during simulation and
                 sampling.
-            show_round_summary: Whether to show the validation loss and leakage after
-                each round.
         """
 
         kwargs = del_entries(locals(), entries=("self", "__class__"))
@@ -91,7 +88,7 @@ class SNLE_A(LikelihoodEstimator):
         clip_max_norm: Optional[float] = 5.0,
         exclude_invalid_x: bool = True,
         discard_prior_samples: bool = False,
-        retrain_from_scratch_each_round: bool = False,
+        retrain_from_scratch: bool = False,
     ) -> NeuralPosterior:
         r"""Run SNLE.
 
@@ -118,7 +115,7 @@ class SNLE_A(LikelihoodEstimator):
             discard_prior_samples: Whether to discard samples simulated in round 1, i.e.
                 from the prior. Training may be sped up by ignoring such less targeted
                 samples.
-            retrain_from_scratch_each_round: Whether to retrain the conditional density
+            retrain_from_scratch: Whether to retrain the conditional density
                 estimator for the posterior from scratch each round.
 
         Returns:

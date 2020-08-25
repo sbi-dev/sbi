@@ -90,7 +90,6 @@ class PosteriorEstimator(NeuralInference, ABC):
             self._build_neural_net = utils.posterior_nn(model=density_estimator)
         else:
             self._build_neural_net = density_estimator
-        self._model = None
         self._sample_with_mcmc = sample_with_mcmc
         self._mcmc_method = mcmc_method
         self._mcmc_parameters = mcmc_parameters

@@ -135,6 +135,8 @@ class NeuralInference(ABC):
             self._show_progress_bars,
         )
 
+        self._model = None
+
         # Initialize roundwise (theta, x, prior_masks) for storage of parameters,
         # simulations and masks indicating if simulations came from prior.
         self._theta_roundwise, self._x_roundwise, self._prior_masks = [], [], []

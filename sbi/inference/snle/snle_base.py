@@ -7,7 +7,9 @@ from copy import deepcopy
 from typing import Any, Callable, Dict, Optional, Union
 
 import numpy as np
+import pytorch_lightning as pl
 import torch
+from pytorch_lightning.callbacks import EarlyStopping
 from torch import Tensor, nn, optim
 from torch.nn.utils import clip_grad_norm_
 from torch.utils import data
@@ -87,8 +89,9 @@ class LikelihoodEstimator(NeuralInference, ABC):
         self._mcmc_method = mcmc_method
         self._mcmc_parameters = mcmc_parameters
 
-        # SNLE-specific summary_writer fields.
-        self._summary.update({"mcmc_times": []})  # type: ignore
+        # TODO: is this something we need?
+        # # SNLE-specific summary_writer fields.
+        # self._summary.update({"mcmc_times": []})  # type: ignore
 
     def __call__(
         self,
@@ -102,7 +105,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         clip_max_norm: Optional[float] = 5.0,
         exclude_invalid_x: bool = True,
         discard_prior_samples: bool = False,
-        retrain_from_scratch_each_round: bool = False,
+        retrain_from_scratch: bool = False,
     ) -> LikelihoodBasedPosterior:
         r"""Run SNLE.
 
@@ -114,7 +117,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
             discard_prior_samples: Whether to discard samples simulated in round 1, i.e.
                 from the prior. Training may be sped up by ignoring such less targeted
                 samples.
-            retrain_from_scratch_each_round: Whether to retrain the conditional density
+            retrain_from_scratch: Whether to retrain the conditional density
                 estimator for the posterior from scratch each round.
 
         Returns:
@@ -145,22 +148,19 @@ class LikelihoodEstimator(NeuralInference, ABC):
         # arguments, which will build the neural network
         # This is passed into NeuralPosterior, to create a neural posterior which
         # can `sample()` and `log_prob()`. The network is accessible via `.net`.
-        if self._posterior is None or retrain_from_scratch_each_round:
-            x_shape = x_shape_from_simulation(x)
-            self._posterior = LikelihoodBasedPosterior(
-                method_family="snle",
-                neural_net=self._build_neural_net(theta, x),
-                prior=self._prior,
-                x_shape=x_shape,
-                mcmc_method=self._mcmc_method,
-                mcmc_parameters=self._mcmc_parameters,
-                get_potential_function=PotentialFunctionProvider(),
-            )
+        if self._model is None or retrain_from_scratch:
+            neural_net = self._build_neural_net(theta, x)
+        else:
+            neural_net = self._model.net
+
+        # Re-initializing the `PosteriorEstimationNet` ensures that the optimizers are
+        # reset every round. I think that this makes sense since the loss changes. Also,
+        # it is required to set the proposal.
+        self._model = LikelihoodEstimationNet(neural_net, lr=learning_rate)
 
         # Fit neural likelihood to newly aggregated dataset.
         self._train(
             training_batch_size=training_batch_size,
-            learning_rate=learning_rate,
             validation_fraction=validation_fraction,
             stop_after_epochs=stop_after_epochs,
             max_num_epochs=max_num_epochs,
@@ -169,12 +169,20 @@ class LikelihoodEstimator(NeuralInference, ABC):
             discard_prior_samples=discard_prior_samples,
         )
 
+        x_shape = x_shape_from_simulation(x)
+        self._posterior = LikelihoodBasedPosterior(
+            method_family="snle",
+            neural_net=self._model.net,
+            prior=self._prior,
+            x_shape=x_shape,
+            mcmc_method=self._mcmc_method,
+            mcmc_parameters=self._mcmc_parameters,
+            get_potential_function=PotentialFunctionProvider(),
+        )
+
         # Update TensorBoard and summary dict.
         self._summarize(
-            round_=self._round,
-            x_o=self._posterior.default_x,
-            theta_bank=theta,
-            x_bank=x,
+            round_=self._round, theta_bank=theta,
         )
 
         self._posterior._num_trained_rounds = self._round + 1
@@ -183,7 +191,6 @@ class LikelihoodEstimator(NeuralInference, ABC):
     def _train(
         self,
         training_batch_size: int,
-        learning_rate: float,
         validation_fraction: float,
         stop_after_epochs: int,
         max_num_epochs: int,
@@ -226,63 +233,54 @@ class LikelihoodEstimator(NeuralInference, ABC):
             batch_size=min(training_batch_size, num_training_examples),
             drop_last=True,
             sampler=SubsetRandomSampler(train_indices),
+            num_workers=4,  # TODO: make configurable
         )
         val_loader = data.DataLoader(
             dataset,
             batch_size=min(training_batch_size, num_validation_examples),
             shuffle=False,
-            drop_last=False,
+            drop_last=True,
             sampler=SubsetRandomSampler(val_indices),
+            num_workers=4,
         )
 
-        optimizer = optim.Adam(
-            list(self._posterior.net.parameters()), lr=learning_rate,
+        trainer = pl.Trainer(
+            logger=self._summary_writer,
+            early_stop_callback=EarlyStopping(patience=stop_after_epochs,),
+            gradient_clip_val=clip_max_norm,
+            max_epochs=max_num_epochs,
+            progress_bar_refresh_rate=self._show_progress_bars,
         )
+        trainer.fit(self._model, train_loader, val_loader)
 
-        epoch, self._val_log_prob = 0, float("-Inf")
-        while epoch <= max_num_epochs and not self._converged(epoch, stop_after_epochs):
 
-            # Train for a single epoch.
-            self._posterior.net.train()
-            for batch in train_loader:
-                optimizer.zero_grad()
-                theta_batch, x_batch = (
-                    batch[0].to(self._device),
-                    batch[1].to(self._device),
-                )
-                log_prob = self._posterior.net.log_prob(theta_batch, context=x_batch)
-                loss = -torch.mean(log_prob)
-                loss.backward()
-                if clip_max_norm is not None:
-                    clip_grad_norm_(
-                        self._posterior.net.parameters(), max_norm=clip_max_norm,
-                    )
-                optimizer.step()
+class LikelihoodEstimationNet(pl.LightningModule):
+    """
+    This is a wrapper class for the neural network defined by pyknos / nflows. It wraps
+    the neural network into a pytorch_lightning module.
+    """
 
-            epoch += 1
+    def __init__(self, net, lr):
+        super().__init__()
+        self.net = net
+        self.lr = lr
 
-            # Calculate validation performance.
-            self._posterior.net.eval()
-            log_prob_sum = 0
-            with torch.no_grad():
-                for batch in val_loader:
-                    theta_batch, x_batch = (
-                        batch[0].to(self._device),
-                        batch[1].to(self._device),
-                    )
-                    log_prob = self._posterior.net.log_prob(
-                        theta_batch, context=x_batch
-                    )
-                    log_prob_sum += log_prob.sum().item()
-            self._val_log_prob = log_prob_sum / num_validation_examples
+    def configure_optimizers(self):
+        optimizer = optim.Adam(list(self.net.parameters()), lr=self.lr)
+        return optimizer
 
-            self._maybe_show_progress(self._show_progress_bars, epoch)
+    def training_step(self, batch, batch_idx):
+        x, theta = batch
+        loss = torch.mean(-self.net.log_prob(x, context=theta))
+        result = pl.TrainResult(loss)
+        return result
 
-        self._report_convergence_at_end(epoch, stop_after_epochs, max_num_epochs)
-
-        # Update summary.
-        self._summary["epochs"].append(epoch)
-        self._summary["best_validation_log_probs"].append(self._best_val_log_prob)
+    def validation_step(self, batch, batch_idx):
+        x, theta = batch
+        loss = torch.mean(-self.net.log_prob(x, context=theta))
+        result = pl.EvalResult(checkpoint_on=loss, early_stop_on=loss)
+        result.log("val_loss", loss)
+        return result
 
 
 class PotentialFunctionProvider:
