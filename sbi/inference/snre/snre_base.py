@@ -3,7 +3,9 @@ from copy import deepcopy
 from typing import Any, Callable, Dict, Optional, Union
 
 import numpy as np
+import pytorch_lightning as pl
 import torch
+from pytorch_lightning.callbacks import EarlyStopping, progress
 from torch import Tensor, eye, nn, ones, optim
 from torch.nn.utils import clip_grad_norm_
 from torch.utils import data
@@ -91,8 +93,9 @@ class RatioEstimator(NeuralInference, ABC):
         self._mcmc_method = mcmc_method
         self._mcmc_parameters = mcmc_parameters
 
-        # Ratio-based-specific summary_writer fields.
-        self._summary.update({"mcmc_times": []})  # type: ignore
+        # TODO: do we need this?
+        # # Ratio-based-specific summary_writer fields.
+        # self._summary.update({"mcmc_times": []})  # type: ignore
 
     def __call__(
         self,
@@ -107,7 +110,7 @@ class RatioEstimator(NeuralInference, ABC):
         clip_max_norm: Optional[float] = 5.0,
         exclude_invalid_x: bool = True,
         discard_prior_samples: bool = False,
-        retrain_from_scratch_each_round: bool = False,
+        retrain_from_scratch: bool = False,
     ) -> RatioBasedPosterior:
         r"""Run SNRE.
 
@@ -120,7 +123,7 @@ class RatioEstimator(NeuralInference, ABC):
             discard_prior_samples: Whether to discard samples simulated in round 1, i.e.
                 from the prior. Training may be sped up by ignoring such less targeted
                 samples.
-            retrain_from_scratch_each_round: Whether to retrain the conditional density
+            retrain_from_scratch: Whether to retrain the conditional density
                 estimator for the posterior from scratch each round.
 
         Returns:
@@ -151,23 +154,22 @@ class RatioEstimator(NeuralInference, ABC):
         # arguments, which will build the neural network
         # This is passed into NeuralPosterior, to create a neural posterior which
         # can `sample()` and `log_prob()`. The network is accessible via `.net`.
-        if self._posterior is None or retrain_from_scratch_each_round:
-            x_shape = x_shape_from_simulation(x)
-            self._posterior = RatioBasedPosterior(
-                method_family=self.__class__.__name__.lower(),
-                neural_net=self._build_neural_net(theta, x),
-                prior=self._prior,
-                x_shape=x_shape,
-                mcmc_method=self._mcmc_method,
-                mcmc_parameters=self._mcmc_parameters,
-                get_potential_function=PotentialFunctionProvider(),
-            )
+        if self._model is None or retrain_from_scratch:
+            neural_net = self._build_neural_net(theta, x)
+        else:
+            neural_net = self._model.net
+
+        # Re-initializing the `RatioEstimationNet` ensures that the optimizers are
+        # reset every round. I think that this makes sense since the loss changes. Also,
+        # it is required to set the proposal.
+        self._model = RatioEstimationNet(
+            neural_net, loss=self._loss, num_atoms=num_atoms, lr=learning_rate
+        )
 
         # Fit posterior using newly aggregated data set.
         self._train(
             num_atoms=num_atoms,
             training_batch_size=training_batch_size,
-            learning_rate=learning_rate,
             validation_fraction=validation_fraction,
             stop_after_epochs=stop_after_epochs,
             max_num_epochs=max_num_epochs,
@@ -176,12 +178,20 @@ class RatioEstimator(NeuralInference, ABC):
             discard_prior_samples=discard_prior_samples,
         )
 
+        x_shape = x_shape_from_simulation(x)
+        self._posterior = RatioBasedPosterior(
+            method_family=self.__class__.__name__.lower(),
+            neural_net=self._model.net,
+            prior=self._prior,
+            x_shape=x_shape,
+            mcmc_method=self._mcmc_method,
+            mcmc_parameters=self._mcmc_parameters,
+            get_potential_function=PotentialFunctionProvider(),
+        )
+
         # Update tensorboard and summary dict.
         self._summarize(
-            round_=self._round,
-            x_o=self._posterior.default_x,
-            theta_bank=theta,
-            x_bank=x,
+            round_=self._round, theta_bank=theta,
         )
 
         self._posterior._num_trained_rounds = self._round + 1
@@ -192,7 +202,6 @@ class RatioEstimator(NeuralInference, ABC):
         self,
         num_atoms: int,
         training_batch_size: int,
-        learning_rate: float,
         validation_fraction: float,
         stop_after_epochs: int,
         max_num_epochs: int,
@@ -250,52 +259,14 @@ class RatioEstimator(NeuralInference, ABC):
             sampler=SubsetRandomSampler(val_indices),
         )
 
-        optimizer = optim.Adam(
-            list(self._posterior.net.parameters()), lr=learning_rate,
+        trainer = pl.Trainer(
+            logger=self._summary_writer,
+            early_stop_callback=EarlyStopping(patience=stop_after_epochs,),
+            gradient_clip_val=clip_max_norm,
+            max_epochs=max_num_epochs,
+            progress_bar_refresh_rate=self._show_progress_bars,
         )
-
-        epoch, self._val_log_prob = 0, float("-Inf")
-
-        while epoch <= max_num_epochs and not self._converged(epoch, stop_after_epochs):
-
-            # Train for a single epoch.
-            self._posterior.net.train()
-            for batch in train_loader:
-                optimizer.zero_grad()
-                theta_batch, x_batch = (
-                    batch[0].to(self._device),
-                    batch[1].to(self._device),
-                )
-                loss = self._loss(theta_batch, x_batch, num_atoms)
-                loss.backward()
-                if clip_max_norm is not None:
-                    clip_grad_norm_(
-                        self._posterior.net.parameters(), max_norm=clip_max_norm,
-                    )
-                optimizer.step()
-
-            epoch += 1
-
-            # Calculate validation performance.
-            self._posterior.net.eval()
-            log_prob_sum = 0
-            with torch.no_grad():
-                for batch in val_loader:
-                    theta_batch, x_batch = (
-                        batch[0].to(self._device),
-                        batch[1].to(self._device),
-                    )
-                    log_prob = self._loss(theta_batch, x_batch, num_atoms)
-                    log_prob_sum -= log_prob.sum().item()
-                self._val_log_prob = log_prob_sum / num_validation_examples
-
-            self._maybe_show_progress(self._show_progress_bars, epoch)
-
-        self._report_convergence_at_end(epoch, stop_after_epochs, max_num_epochs)
-
-        # Update summary.
-        self._summary["epochs"].append(epoch)
-        self._summary["best_validation_log_probs"].append(self._best_val_log_prob)
+        trainer.fit(self._model, train_loader, val_loader)
 
     def _classifier_logits(self, theta: Tensor, x: Tensor, num_atoms: int) -> Tensor:
         """Return logits obtained through classifier forward pass.
@@ -318,11 +289,42 @@ class RatioEstimator(NeuralInference, ABC):
 
         theta_and_x = torch.cat((atomic_theta, repeated_x), dim=1)
 
-        return self._posterior.net(theta_and_x)
+        return self._model.net(theta_and_x)
 
     @abstractmethod
     def _loss(self, theta: Tensor, x: Tensor, num_atoms: int) -> Tensor:
         raise NotImplementedError
+
+
+class RatioEstimationNet(pl.LightningModule):
+    """
+    This is a wrapper class for the neural network defined by pyknos / nflows. It wraps
+    the neural network into a pytorch_lightning module.
+    """
+
+    def __init__(self, net, loss, num_atoms, lr):
+        super().__init__()
+        self.net = net
+        self.lr = lr
+        self.loss = loss
+        self.num_atoms = num_atoms
+
+    def configure_optimizers(self):
+        optimizer = optim.Adam(list(self.net.parameters()), lr=self.lr)
+        return optimizer
+
+    def training_step(self, batch, batch_idx):
+        theta, x = batch
+        loss = torch.mean(self.loss(theta, x, self.num_atoms))
+        result = pl.TrainResult(loss)
+        return result
+
+    def validation_step(self, batch, batch_idx):
+        theta, x = batch
+        loss = torch.mean(self.loss(theta, x, self.num_atoms))
+        result = pl.EvalResult(checkpoint_on=loss, early_stop_on=loss)
+        result.log("val_loss", loss)
+        return result
 
 
 class PotentialFunctionProvider:
