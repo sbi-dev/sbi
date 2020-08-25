@@ -89,10 +89,6 @@ class LikelihoodEstimator(NeuralInference, ABC):
         self._mcmc_method = mcmc_method
         self._mcmc_parameters = mcmc_parameters
 
-        # TODO: is this something we need?
-        # # SNLE-specific summary_writer fields.
-        # self._summary.update({"mcmc_times": []})  # type: ignore
-
     def __call__(
         self,
         num_simulations: int,

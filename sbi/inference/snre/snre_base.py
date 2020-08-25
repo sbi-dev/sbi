@@ -93,10 +93,6 @@ class RatioEstimator(NeuralInference, ABC):
         self._mcmc_method = mcmc_method
         self._mcmc_parameters = mcmc_parameters
 
-        # TODO: do we need this?
-        # # Ratio-based-specific summary_writer fields.
-        # self._summary.update({"mcmc_times": []})  # type: ignore
-
     def __call__(
         self,
         num_simulations: int,
