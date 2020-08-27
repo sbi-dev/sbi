@@ -1,3 +1,8 @@
+# v0.12.2
+- Bug fix for zero simulations in later rounds (#318)
+- Tutorials on embedding_net and presimulated data (thanks @plcrodrigues, #314, #318)
+
+
 # v0.12.1
 - Bug fix for broken NSF (#310, thanks @tvwenger).
 
