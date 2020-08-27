@@ -253,7 +253,10 @@ class NeuralInference(ABC):
             prior_mask: Whether each simulation came from a prior parameter sample.
         """
 
-        if proposal is None:
+        # Some proposals (e.g. flows) can not deal with `num_sims=0`. So we just draw
+        # 0 prior samples instead (does not matter because it is 0 samples anyway).
+        # `num_sims=0` happens often when presimulated data is provided.
+        if proposal is None or num_sims == 0:
             theta = self._prior.sample((num_sims,))
         else:
             theta = proposal.sample((num_sims,))
