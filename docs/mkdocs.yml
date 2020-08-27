@@ -10,8 +10,10 @@ nav:
         - Amortized inference: tutorial/01_gaussian_amortized.md
       - Advanced:
         - Flexible interface: tutorial/02_flexible_interface.md
-        - Learning summary statistics: tutorial/03_embedding_net.md
-        - Providing presimulated data: tutorial/04_provide_presimulated.md
+        - Multi-round inference: tutorial/03_multiround_inference.md
+        - Custom density estimators: tutorial/04_density_estimators.md
+        - Learning summary statistics: tutorial/05_embedding_net.md
+        - Providing presimulated data: tutorial/06_provide_presimulated.md
       - Examples:
         - Hodgkin-Huxley example: examples/00_HH_simulator.md
   - Contribute: contribute.md
