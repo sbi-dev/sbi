@@ -276,7 +276,7 @@ class RatioEstimator(NeuralInference, ABC):
             checkpoint_path=model_checkpoint.best_model_path
         )
 
-        self._best_val_log_prob = model_checkpoint.best_model_score
+        self._summary["best_validation_loss"].append(model_checkpoint.best_model_score)
 
     def _classifier_logits(self, theta: Tensor, x: Tensor, num_atoms: int) -> Tensor:
         """Return logits obtained through classifier forward pass.

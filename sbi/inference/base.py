@@ -150,6 +150,9 @@ class NeuralInference(ABC):
             self._default_summary_writer() if summary_writer is None else summary_writer
         )
 
+        # Logging during training (by SummaryWriter).
+        self._summary = dict(best_validation_log_probs=[])
+
     def provide_presimulated(
         self, theta: Tensor, x: Tensor, from_round: int = 0
     ) -> None:
@@ -293,6 +296,12 @@ class NeuralInference(ABC):
 
         self._summary_writer.experiment.add_figure(
             tag="posterior_samples", figure=figure, global_step=round_ + 1
+        )
+
+        self._summary_writer.add_scalar(
+            tag="best_validation_log_prob",
+            scalar_value=self._summary["best_validation_log_probs"][-1],
+            global_step=round_ + 1,
         )
 
         self._summary_writer.experiment.flush()
