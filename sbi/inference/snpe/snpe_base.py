@@ -10,9 +10,8 @@ from warnings import warn
 import numpy as np
 import pytorch_lightning as pl
 import torch
-from pytorch_lightning.callbacks import EarlyStopping, progress
+from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from torch import Tensor, nn, ones, optim
-from torch.nn.utils import clip_grad_norm_
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
@@ -185,12 +184,13 @@ class PosteriorEstimator(NeuralInference, ABC):
         # reset every round. I think that this makes sense since the loss changes. Also,
         # it is required to set the proposal.
         self._model = PosteriorEstimationNet(
-            neural_net,
-            prior=self._prior,
-            proposal=proposal,
-            loss=self._loss,
-            lr=learning_rate,
-            calibration_kernel=calibration_kernel,
+            args={
+                "net": neural_net,
+                "proposal": proposal,
+                "loss": self._loss,
+                "lr": learning_rate,
+                "calibration_kernel": calibration_kernel,
+            }
         )
 
         # Fit posterior using newly aggregated data set.
@@ -295,14 +295,24 @@ class PosteriorEstimator(NeuralInference, ABC):
             num_workers=4,
         )
 
+        model_checkpoint = ModelCheckpoint()
         trainer = pl.Trainer(
             logger=self._summary_writer,
             early_stop_callback=EarlyStopping(patience=stop_after_epochs,),
+            checkpoint_callback=model_checkpoint,
             gradient_clip_val=clip_max_norm,
             max_epochs=max_num_epochs,
             progress_bar_refresh_rate=self._show_progress_bars,
+            deterministic=True,
         )
         trainer.fit(self._model, train_loader, val_loader)
+
+        # Load the model that had the best validation log-probability.
+        self._best_model = PosteriorEstimationNet.load_from_checkpoint(
+            checkpoint_path=model_checkpoint.best_model_path
+        )
+
+        self._best_val_log_prob = model_checkpoint.best_model_score
 
     def _loss(
         self,
@@ -346,14 +356,33 @@ class PosteriorEstimationNet(pl.LightningModule):
     the neural network into a pytorch_lightning module.
     """
 
-    def __init__(self, net, prior, proposal, loss, lr, calibration_kernel):
+    def __init__(self, args: dict):
+        """
+        Initialize the posterior estimation net.
+
+        The reason that this is a dict: when listing all arguments separately, pytorch-
+        lightning breaks when one calls `load_from_checkpoint` if the arguments have
+        different types.
+
+        Args:
+            args: Dict containing `net`, `proposal`, `loss`, lr`, `calibration_kernel`.
+                See below for further explanation.
+            `net`: Neural density estimator.
+            `proposal`: Proposal distribution.
+            `loss`: Loss function.
+            `lr`: Learning rate.
+            `calibration_kernel`: Calibration kernel.
+        """
+
         super().__init__()
-        self.net = net
-        self._prior = prior
-        self.proposal = proposal
-        self.loss = loss
-        self.lr = lr
-        self.calibration_kernel = calibration_kernel
+
+        self.save_hyperparameters()
+
+        self.net = args["net"]
+        self.proposal = args["proposal"]
+        self.loss = args["loss"]
+        self.lr = args["lr"]
+        self.calibration_kernel = args["calibration_kernel"]
 
     def configure_optimizers(self):
         optimizer = optim.Adam(list(self.net.parameters()), lr=self.lr)

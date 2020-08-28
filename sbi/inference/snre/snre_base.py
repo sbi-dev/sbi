@@ -5,9 +5,8 @@ from typing import Any, Callable, Dict, Optional, Union
 import numpy as np
 import pytorch_lightning as pl
 import torch
-from pytorch_lightning.callbacks import EarlyStopping, progress
+from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from torch import Tensor, eye, nn, ones, optim
-from torch.nn.utils import clip_grad_norm_
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
@@ -159,7 +158,12 @@ class RatioEstimator(NeuralInference, ABC):
         # reset every round. I think that this makes sense since the loss changes. Also,
         # it is required to set the proposal.
         self._model = RatioEstimationNet(
-            neural_net, loss=self._loss, num_atoms=num_atoms, lr=learning_rate
+            args={
+                "net": neural_net,
+                "loss": self._loss,
+                "lr": learning_rate,
+                "num_atoms": num_atoms,
+            }
         )
 
         # Fit posterior using newly aggregated data set.
@@ -255,14 +259,24 @@ class RatioEstimator(NeuralInference, ABC):
             sampler=SubsetRandomSampler(val_indices),
         )
 
+        model_checkpoint = ModelCheckpoint()
         trainer = pl.Trainer(
             logger=self._summary_writer,
             early_stop_callback=EarlyStopping(patience=stop_after_epochs,),
+            checkpoint_callback=model_checkpoint,
             gradient_clip_val=clip_max_norm,
             max_epochs=max_num_epochs,
             progress_bar_refresh_rate=self._show_progress_bars,
+            deterministic=True,
         )
         trainer.fit(self._model, train_loader, val_loader)
+
+        # Load the model that had the best validation log-probability.
+        self._best_model = RatioEstimationNet.load_from_checkpoint(
+            checkpoint_path=model_checkpoint.best_model_path
+        )
+
+        self._best_val_log_prob = model_checkpoint.best_model_score
 
     def _classifier_logits(self, theta: Tensor, x: Tensor, num_atoms: int) -> Tensor:
         """Return logits obtained through classifier forward pass.
@@ -298,12 +312,30 @@ class RatioEstimationNet(pl.LightningModule):
     the neural network into a pytorch_lightning module.
     """
 
-    def __init__(self, net, loss, num_atoms, lr):
+    def __init__(self, args: Dict):
+        """
+        Initialize the posterior estimation net.
+
+        The reason that this is a dict: when listing all arguments separately, pytorch-
+        lightning breaks when one calls `load_from_checkpoint` if the arguments have
+        different types.
+
+        Args:
+            args: Dict containing `net`, `proposal`, `loss`, lr`, `calibration_kernel`.
+                See below for further explanation.
+            `net`: Neural density estimator.
+            `loss`: Loss function.
+            `lr`: Learning rate.
+            `num_atoms`: Number of atoms.
+        """
         super().__init__()
-        self.net = net
-        self.lr = lr
-        self.loss = loss
-        self.num_atoms = num_atoms
+
+        self.save_hyperparameters()
+
+        self.net = args["net"]
+        self.loss = args["loss"]
+        self.lr = args["lr"]
+        self.num_atoms = args["num_atoms"]
 
     def configure_optimizers(self):
         optimizer = optim.Adam(list(self.net.parameters()), lr=self.lr)
