@@ -3,14 +3,27 @@
 
 import collections
 import inspect
-from typing import Callable, Optional, Union, Dict, Any, Tuple, Union, cast, List, Sequence, TypeVar
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    TypeVar,
+    Union,
+    cast,
+)
 
-import torch
 import matplotlib as mpl
-from matplotlib import pyplot as plt
 import numpy as np
 import six
+import torch
+from matplotlib import pyplot as plt
 from scipy.stats import gaussian_kde
+
+from sbi.utils.conditional_density import eval_conditional_density
 
 try:
     collectionsAbc = collections.abc
@@ -126,122 +139,26 @@ def ensure_numpy(t: Union[np.ndarray, torch.Tensor]) -> np.ndarray:
         return t
 
 
-def pairplot(
-    samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
-    points: Optional[
-        Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor]
-    ] = None,
-    upper: Optional[str] = "hist",
-    diag: Optional[str] = "hist",
-    title: Optional[str] = None,
-    legend: Optional[bool] = False,
-    labels=None,
-    labels_points=None,
-    labels_samples=None,
-    samples_colors=plt.rcParams["axes.prop_cycle"].by_key()["color"],
-    points_colors=plt.rcParams["axes.prop_cycle"].by_key()["color"],
-    subset=None,
-    limits=None,
-    ticks=None,
-    tickformatter=mpl.ticker.FormatStrFormatter("%g"),
-    tick_labels=None,
-    hist_diag={"alpha": 1.0, "bins": 50, "density": False, "histtype": "step"},
-    hist_offdiag={"bins": 50,},
-    kde_diag={"bw_method": "scott", "bins": 50, "color": "black"},
-    kde_offdiag={"bw_method": "scott", "bins": 50},
-    contour_offdiag={"levels": [0.68], "percentile": True},
-    scatter_offdiag={"alpha": 0.5, "edgecolor": "none", "rasterized": False},
-    plot_offdiag={},
-    points_diag={},
-    points_offdiag={"marker": ".", "markersize": 20},
-    fig_size: Tuple = (10, 10),
-    fig_bg_colors={"upper": None, "diag": None, "lower": None},
-    fig_subplots_adjust={"top": 0.9},
-    subplots={},
-    despine={"offset": 5},
-    title_format={"fontsize": 16},
-):
+def _pairplot_scaffold(diag_func, upper_func, dim, limits, points, opts):
     """
-    Plot samples and points.
-
-    For developers: if you add arguments that expect dictionaries, make sure to access
-    them via the opts dictionary instantiated below. E.g. if you want to access the dict
-    stored in the input variable hist_diag, use opts[`hist_diag`].
+    Builds the scaffold for any function that plots parameters in a pairplot setting.
 
     Args:
-        samples: posterior samples used to build the histogram
-        points: list of additional points to scatter
-        upper: plotting style for upper diagonal, {hist, scatter, contour, None}
-        diag: plotting style for diagonal, {hist, None}
-        title: title string
-        legend: whether to plot a legend for the points
-        labels: np.ndarray of strings specifying the names of the parameters
-        labels_points: np.ndarray of strings specifying the names of the passed points
-        labels_samples: np.ndarray of strings specifying the names of the passed samples
-        samples_colors: colors of the samples
-        points_colors: colors of the points
-        subset: List containing the dimensions to plot. E.g. subset=[1,3] will plot
-            plot only the 1st and 3rd dimension but will discard the 0th and 2nd (and,
-            if they exist, the 4th, 5th and so on)
-        limits: array containing the plot xlim for each parameter dimension. If None,
-            just use the min and max of the passed samples
-        ticks: location of the ticks for each parameter. If None, just use the min and
-            max along each parameter dimension
-        tickformatter: passed to _format_axis()
-        tick_labels: np.ndarray containing the ticklabels.
-        hist_diag: dictionary passed to plt.hist() for diagonal plots
-        hist_offdiag: dictionary passed to np.histogram2d() for off diagonal plots
-        kde_diag: dictionary passed to gaussian_kde() for diagonal plots
-        kde_offdiag: dictionary passed to gaussian_kde() for off diagonal plots
-        contour_offdiag: dictionary that should contain `percentile` and `levels` keys.
-            `percentile`: bool.
-                If  `percentile`==True,
-                the levels are made with respect to the max probability of the posterior
-                If `percentile`==False,
-                the levels are drawn at absolute positions
-            `levels`: list or np.ndarray: specifies the location where the contours are
-                drawn.
-        scatter_offdiag: dictionary for plt.scatter() on off diagonal
-        plot_offdiag: dictionary for plt.plot() on off diagonal
-        points_diag: dictionary for plt.plot() used for plotting points on diagonal
-        points_offdiag: dictionary for plt.plot() used for plotting points on off
-            diagonal
-        fig_size: size of the entire figure
-        fig_bg_colors: Dictionary that contains `upper`, `diag`, `lower`, and specifies
-            the respective background colors. Passed to ax.set_facecolor()
-        fig_subplots_adjust: dictionary passed to fig.subplots_adjust()
-        subplots: dictionary passed to plt.subplots()
-        despine: dictionary passed to set_position() for axis position
-        title_format: dictionary passed to plt.title()
+        diag_func: Plotting function that will be executed for the diagonal elements of
+            the plot. It will be passed the current `row` (i.e. which parameter that is
+            to be plotted) and the `limits` for all dimensions.
+        upper_func: Plotting function that will be executed for the upper-diagonal
+            elements of the plot. It will be passed the current `row` and `col` (i.e.
+            which parameters are to be plotted and the `limits` for all dimensions.
+        dim: The dimensionality of the density.
+        limits: Limits for each parameter.
+        points: Additional points to be scatter-plotted.
+        opts: Dictionary built by the functions that call `pairplot_scaffold`. Must
+            contain at least `labels`, `ticks`, `subset`, `fig_size`, `subplots`,
+            `fig_subplots_adjust`, `title`, `title_format`, ..
 
-    Returns: figure and axis of posterior distribution plot
-
+    Returns: figure and axis
     """
-
-    # TODO: add color map support
-    # TODO: automatically determine good bin sizes for histograms
-    # TODO: add legend (if legend is True)
-
-    # get default values of function arguments
-    # https://stackoverflow.com/questions/12627118/get-a-function-arguments-default-value
-    spec = inspect.getfullargspec(pairplot)
-
-    # build a dict for the defaults
-    # https://stackoverflow.com/questions/12627118/get-a-function-arguments-default-value
-    # answer by gnr
-    default_val_dict = dict(zip(spec.args[::-1], (spec.defaults or ())[::-1]))
-
-    # update the defaults dictionary by the current values of the variables (passed by
-    # the user)
-    opts = _update(default_val_dict, locals())
-
-    # Prepare samples
-    if type(samples) != list:
-        samples = ensure_numpy(samples)
-        samples = [samples]
-    else:
-        for i, sample_pack in enumerate(samples):
-            samples[i] = ensure_numpy(samples[i])
 
     # Prepare points
     if points is None:
@@ -252,10 +169,6 @@ def pairplot(
     points = [np.atleast_2d(p) for p in points]
     points = [np.atleast_2d(ensure_numpy(p)) for p in points]
 
-    # Dimensions
-    dim = samples[0].shape[1]
-    num_samples = samples[0].shape[0]
-
     # TODO: add asserts checking compatibility of dimensions
 
     # Prepare labels
@@ -263,24 +176,6 @@ def pairplot(
         labels_dim = ["dim {}".format(i + 1) for i in range(dim)]
     else:
         labels_dim = opts["labels"]
-
-    # Prepare limits
-    if opts["limits"] == [] or opts["limits"] is None:
-        limits = []
-        for d in range(dim):
-            min = +np.inf
-            max = -np.inf
-            for sample in samples:
-                min_ = sample[:, d].min()
-                min = min_ if min_ < min else min
-                max_ = sample[:, d].max()
-                max = max_ if max_ > max else max
-            limits.append([min, max])
-    else:
-        if len(opts["limits"]) == 1:
-            limits = [opts["limits"][0] for _ in range(dim)]
-        else:
-            limits = opts["limits"]
 
     # Prepare ticks
     if opts["ticks"] == [] or opts["ticks"] is None:
@@ -290,15 +185,6 @@ def pairplot(
             ticks = [opts["ticks"][0] for _ in range(dim)]
         else:
             ticks = opts["ticks"]
-
-    # Prepare diag/upper/lower
-    if type(opts["diag"]) is not list:
-        opts["diag"] = [opts["diag"] for _ in range(len(samples))]
-    if type(opts["upper"]) is not list:
-        opts["upper"] = [opts["upper"] for _ in range(len(samples))]
-    # if type(opts['lower']) is not list:
-    #    opts['lower'] = [opts['lower'] for _ in range(len(samples))]
-    opts["lower"] = None
 
     # Figure out if we subset the plot
     subset = opts["subset"]
@@ -360,12 +246,9 @@ def pairplot(
                 continue
 
             # Limits
-            if limits is not None:
-                ax.set_xlim((limits[col][0], limits[col][1]))
-                if current != "diag":
-                    ax.set_ylim((limits[row][0], limits[row][1]))
-            xmin, xmax = ax.get_xlim()
-            ymin, ymax = ax.get_ylim()
+            ax.set_xlim((limits[col][0], limits[col][1]))
+            if current != "diag":
+                ax.set_ylim((limits[row][0], limits[row][1]))
 
             # Ticks
             if ticks is not None:
@@ -376,7 +259,7 @@ def pairplot(
             # Despine
             ax.spines["right"].set_visible(False)
             ax.spines["top"].set_visible(False)
-            ax.spines["bottom"].set_position(("outward", despine["offset"]))
+            ax.spines["bottom"].set_position(("outward", opts["despine"]["offset"]))
 
             # Formatting axes
             if current == "diag":  # off-diagnoals
@@ -411,23 +294,7 @@ def pairplot(
 
             # Diagonals
             if current == "diag":
-                if len(samples) > 0:
-                    for n, v in enumerate(samples):
-                        if opts["diag"][n] == "hist":
-                            h = plt.hist(
-                                v[:, row],
-                                color=opts["samples_colors"][n],
-                                **opts["hist_diag"]
-                            )
-                        elif opts["diag"][n] == "kde":
-                            density = gaussian_kde(
-                                v[:, row], bw_method=opts["kde_diag"]["bw_method"]
-                            )
-                            xs = np.linspace(xmin, xmax, opts["kde_diag"]["bins"])
-                            ys = density(xs)
-                            h = plt.plot(xs, ys, color=opts["samples_colors"][n],)
-                        else:
-                            pass
+                diag_func(row=row, limits=limits)
 
                 if len(points) > 0:
                     extent = ax.get_ylim()
@@ -441,109 +308,9 @@ def pairplot(
 
             # Off-diagonals
             else:
-
-                if len(samples) > 0:
-                    for n, v in enumerate(samples):
-                        if opts["upper"][n] == "hist" or opts["upper"][n] == "hist2d":
-                            # h = plt.hist2d(
-                            #     v[:, col], v[:, row],
-                            #     range=(
-                            #         [limits[col][0], limits[col][1]],
-                            #         [limits[row][0], limits[row][1]]),
-                            #     **opts['hist_offdiag']
-                            #     )
-                            hist, xedges, yedges = np.histogram2d(
-                                v[:, col],
-                                v[:, row],
-                                range=[
-                                    [limits[col][0], limits[col][1]],
-                                    [limits[row][0], limits[row][1]],
-                                ],
-                                **opts["hist_offdiag"]
-                            )
-                            h = plt.imshow(
-                                hist.T,
-                                origin="lower",
-                                extent=[xedges[0], xedges[-1], yedges[0], yedges[-1],],
-                                aspect="auto",
-                            )
-
-                        elif opts["upper"][n] in [
-                            "kde",
-                            "kde2d",
-                            "contour",
-                            "contourf",
-                        ]:
-                            density = gaussian_kde(
-                                v[:, [col, row]].T,
-                                bw_method=opts["kde_offdiag"]["bw_method"],
-                            )
-                            X, Y = np.meshgrid(
-                                np.linspace(
-                                    limits[col][0],
-                                    limits[col][1],
-                                    opts["kde_offdiag"]["bins"],
-                                ),
-                                np.linspace(
-                                    limits[row][0],
-                                    limits[row][1],
-                                    opts["kde_offdiag"]["bins"],
-                                ),
-                            )
-                            positions = np.vstack([X.ravel(), Y.ravel()])
-                            Z = np.reshape(density(positions).T, X.shape)
-
-                            if opts["upper"][n] == "kde" or opts["upper"][n] == "kde2d":
-                                h = plt.imshow(
-                                    Z,
-                                    extent=[
-                                        limits[col][0],
-                                        limits[col][1],
-                                        limits[row][0],
-                                        limits[row][1],
-                                    ],
-                                    origin="lower",
-                                    aspect="auto",
-                                )
-                            elif opts["upper"][n] == "contour":
-                                if opts["contour_offdiag"]["percentile"]:
-                                    Z = probs2contours(
-                                        Z, opts["contour_offdiag"]["levels"]
-                                    )
-                                else:
-                                    Z = (Z - Z.min()) / (Z.max() - Z.min())
-                                h = plt.contour(
-                                    X,
-                                    Y,
-                                    Z,
-                                    origin="lower",
-                                    extent=[
-                                        limits[col][0],
-                                        limits[col][1],
-                                        limits[row][0],
-                                        limits[row][1],
-                                    ],
-                                    colors=opts["samples_colors"][n],
-                                    levels=opts["contour_offdiag"]["levels"],
-                                )
-                            else:
-                                pass
-                        elif opts["upper"][n] == "scatter":
-                            h = plt.scatter(
-                                v[:, col],
-                                v[:, row],
-                                color=opts["samples_colors"][n],
-                                **opts["scatter_offdiag"]
-                            )
-                        elif opts["upper"][n] == "plot":
-                            h = plt.plot(
-                                v[:, col],
-                                v[:, row],
-                                color=opts["samples_colors"][n],
-                                **opts["plot_offdiag"]
-                            )
-                        else:
-                            pass
+                upper_func(
+                    row=row, col=col, limits=limits,
+                )
 
                 if len(points) > 0:
 
@@ -572,3 +339,419 @@ def pairplot(
                 )
 
     return fig, axes
+
+
+def conditional_pairplot(
+    density: Any,
+    condition: torch.Tensor,
+    limits: Union[List, torch.Tensor],
+    points: Optional[
+        Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor]
+    ] = None,
+    subset: List[int] = None,
+    resolution: int = 50,
+    title: Optional[str] = None,
+    legend: Optional[bool] = False,
+    labels=None,
+    labels_points=None,
+    labels_samples=None,
+    samples_colors=plt.rcParams["axes.prop_cycle"].by_key()["color"],
+    points_colors=plt.rcParams["axes.prop_cycle"].by_key()["color"],
+    ticks=None,
+    tickformatter=mpl.ticker.FormatStrFormatter("%g"),
+    tick_labels=None,
+    points_diag={},
+    points_offdiag={"marker": ".", "markersize": 20},
+    fig_size: Tuple = (10, 10),
+    fig_bg_colors={"upper": None, "diag": None, "lower": None},
+    fig_subplots_adjust={"top": 0.9},
+    subplots={},
+    despine={"offset": 5},
+    title_format={"fontsize": 16},
+):
+    r"""
+    Plot conditional distribution given all other parameters.
+
+    The conditionals can be interpreted as slices through the `density` at a location
+    given by `condition`.
+
+    Example:
+    Say we have a 3D density with parameters $\theta_0$, $\theta_1$, $\theta_2$ and
+    a condition $c$ passed by the user in the `condition` argument.
+    For the diagonal plot of parameter $\theta_1$, this will plot the conditional
+    $p(\theta_0 | \theta_1=c[1], \theta_2=c[2])$. For the upper
+    diagonal of $\theta_1$ and $\theta_2$, it will plot
+    $p(\theta_1, \theta_2 | \theta_0=c[0])$. All other diagonals and upper-diagonals
+    are built in the corresponding way.
+
+    For developers: if you add arguments that expect dictionaries, make sure to access
+    them via the opts dictionary instantiated below. E.g. if you want to access the dict
+    stored in the input variable hist_diag, use opts[`hist_diag`].
+
+    Args:
+        density: Probability density with a `log_prob()` method.
+        condition: Condition that all but the one/two regarded parameters are fixed to.
+            The condition should be of shape (1, dim_theta), i.e. it could e.g. be
+            a sample from the posterior distribution.
+        limits: Limits in between which each parameter will be evaluated.
+        points: Additional points to scatter.
+        subset: List containing the dimensions to plot. E.g. subset=[1,3] will plot
+            plot only the 1st and 3rd dimension but will discard the 0th and 2nd (and,
+            if they exist, the 4th, 5th and so on)
+        resolution: Resolution of the grid at which we evaluate the `pdf`.
+        title: title string
+        legend: whether to plot a legend for the points
+        labels: np.ndarray of strings specifying the names of the parameters
+        labels_points: np.ndarray of strings specifying the names of the passed points
+        samples_colors: colors of the samples
+        labels_samples: np.ndarray of strings specifying the names of the passed samples
+        points_colors: colors of the points
+        ticks: location of the ticks for each parameter. If None, just use the min and
+            max along each parameter dimension
+        tickformatter: passed to _format_axis()
+        tick_labels: np.ndarray containing the ticklabels.
+        points_diag: dictionary for plt.plot() used for plotting points on diagonal
+        points_offdiag: dictionary for plt.plot() used for plotting points on off
+            diagonal
+        fig_size: size of the entire figure
+        fig_bg_colors: Dictionary that contains `upper`, `diag`, `lower`, and specifies
+            the respective background colors. Passed to ax.set_facecolor()
+        fig_subplots_adjust: dictionary passed to fig.subplots_adjust()
+        subplots: dictionary passed to plt.subplots()
+        despine: dictionary passed to set_position() for axis position
+        title_format: dictionary passed to plt.title()
+
+    Returns: figure and axis of posterior distribution plot
+    """
+    # get default values of function arguments
+    # https://stackoverflow.com/questions/12627118/get-a-function-arguments-default-value
+    spec = inspect.getfullargspec(pairplot)
+
+    # build a dict for the defaults
+    # https://stackoverflow.com/questions/12627118/get-a-function-arguments-default-value
+    # answer by gnr
+    default_val_dict = dict(zip(spec.args[::-1], (spec.defaults or ())[::-1]))
+
+    # update the defaults dictionary by the current values of the variables (passed by
+    # the user)
+    opts = _update(default_val_dict, locals())
+
+    # Dimensions
+    dim = condition.shape[1]
+
+    # Prepare limits
+    if len(opts["limits"]) == 1:
+        limits = [opts["limits"][0] for _ in range(dim)]
+    else:
+        limits = opts["limits"]
+    limits = torch.as_tensor(limits)
+
+    opts["lower"] = None
+
+    # Infer the margin. This is to avoid that we evaluate the posterior **exactly**
+    # at the boundary.
+    limits_diffs = limits[:, 1] - limits[:, 0]
+    eps_margins = limits_diffs / 1e5
+
+    def diag_func(row, **kwargs):
+        p_vector = eval_conditional_density(
+            opts["density"],
+            opts["condition"],
+            limits,
+            row,
+            row,
+            resolution=resolution,
+            eps_margins1=eps_margins[row],
+            eps_margins2=eps_margins[row],
+        ).numpy()
+        h = plt.plot(
+            np.linspace(limits[row, 0], limits[row, 1], resolution,),
+            p_vector,
+            c=opts["samples_colors"][0],
+        )
+
+    def upper_func(row, col, **kwargs):
+        p_image = eval_conditional_density(
+            opts["density"],
+            opts["condition"],
+            limits,
+            row,
+            col,
+            resolution=resolution,
+            eps_margins1=eps_margins[row],
+            eps_margins2=eps_margins[col],
+        ).numpy()
+        h = plt.imshow(
+            p_image.T,
+            origin="lower",
+            extent=[limits[col, 0], limits[col, 1], limits[row, 0], limits[row, 1],],
+            aspect="auto",
+        )
+
+    return _pairplot_scaffold(diag_func, upper_func, dim, limits, points, opts)
+
+
+def pairplot(
+    samples: Union[
+        List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor
+    ] = None,
+    points: Optional[
+        Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor]
+    ] = None,
+    subset: List[int] = None,
+    upper: Optional[str] = "hist",
+    diag: Optional[str] = "hist",
+    title: Optional[str] = None,
+    legend: Optional[bool] = False,
+    labels=None,
+    labels_points=None,
+    labels_samples=None,
+    samples_colors=plt.rcParams["axes.prop_cycle"].by_key()["color"],
+    points_colors=plt.rcParams["axes.prop_cycle"].by_key()["color"],
+    limits=None,
+    ticks=None,
+    tickformatter=mpl.ticker.FormatStrFormatter("%g"),
+    tick_labels=None,
+    hist_diag={"alpha": 1.0, "bins": 50, "density": False, "histtype": "step"},
+    hist_offdiag={"bins": 50,},
+    kde_diag={"bw_method": "scott", "bins": 50, "color": "black"},
+    kde_offdiag={"bw_method": "scott", "bins": 50},
+    contour_offdiag={"levels": [0.68], "percentile": True},
+    scatter_offdiag={"alpha": 0.5, "edgecolor": "none", "rasterized": False},
+    plot_offdiag={},
+    points_diag={},
+    points_offdiag={"marker": ".", "markersize": 20},
+    fig_size: Tuple = (10, 10),
+    fig_bg_colors={"upper": None, "diag": None, "lower": None},
+    fig_subplots_adjust={"top": 0.9},
+    subplots={},
+    despine={"offset": 5},
+    title_format={"fontsize": 16},
+):
+    """
+    Plot samples and points.
+
+    For developers: if you add arguments that expect dictionaries, make sure to access
+    them via the opts dictionary instantiated below. E.g. if you want to access the dict
+    stored in the input variable hist_diag, use opts[`hist_diag`].
+
+    Args:
+        samples: posterior samples used to build the histogram
+        points: list of additional points to scatter
+        upper: plotting style for upper diagonal, {hist, scatter, contour, cond, None}
+        diag: plotting style for diagonal, {hist, cond, None}
+        title: title string
+        legend: whether to plot a legend for the points
+        labels: np.ndarray of strings specifying the names of the parameters
+        labels_points: np.ndarray of strings specifying the names of the passed points
+        labels_samples: np.ndarray of strings specifying the names of the passed samples
+        samples_colors: colors of the samples
+        points_colors: colors of the points
+        subset: List containing the dimensions to plot. E.g. subset=[1,3] will plot
+            plot only the 1st and 3rd dimension but will discard the 0th and 2nd (and,
+            if they exist, the 4th, 5th and so on)
+        limits: array containing the plot xlim for each parameter dimension. If None,
+            just use the min and max of the passed samples
+        ticks: location of the ticks for each parameter. If None, just use the min and
+            max along each parameter dimension
+        tickformatter: passed to _format_axis()
+        tick_labels: np.ndarray containing the ticklabels.
+        hist_diag: dictionary passed to plt.hist() for diagonal plots
+        hist_offdiag: dictionary passed to np.histogram2d() for off diagonal plots
+        kde_diag: dictionary passed to gaussian_kde() for diagonal plots
+        kde_offdiag: dictionary passed to gaussian_kde() for off diagonal plots
+        contour_offdiag: dictionary that should contain `percentile` and `levels` keys.
+            `percentile`: bool.
+                If  `percentile`==True,
+                the levels are made with respect to the max probability of the posterior
+                If `percentile`==False,
+                the levels are drawn at absolute positions
+            `levels`: list or np.ndarray: specifies the location where the contours are
+                drawn.
+        scatter_offdiag: dictionary for plt.scatter() on off diagonal
+        plot_offdiag: dictionary for plt.plot() on off diagonal
+        points_diag: dictionary for plt.plot() used for plotting points on diagonal
+        points_offdiag: dictionary for plt.plot() used for plotting points on off
+            diagonal
+        fig_size: size of the entire figure
+        fig_bg_colors: Dictionary that contains `upper`, `diag`, `lower`, and specifies
+            the respective background colors. Passed to ax.set_facecolor()
+        fig_subplots_adjust: dictionary passed to fig.subplots_adjust()
+        subplots: dictionary passed to plt.subplots()
+        despine: dictionary passed to set_position() for axis position
+        title_format: dictionary passed to plt.title()
+
+    Returns: figure and axis of posterior distribution plot
+    """
+
+    # TODO: add color map support
+    # TODO: automatically determine good bin sizes for histograms
+    # TODO: add legend (if legend is True)
+
+    # Why do we do the following three lines? We want dicionaries as defaults. When the
+    # user passes a new dictionary, we want to override only the keys that had been
+    # specified by the user, the others should be set to the default value. Hence, we
+    # would have to spell out every key of every dictionary as a separate argument,
+    # which becomes very messy.
+
+    # get default values of function arguments
+    # https://stackoverflow.com/questions/12627118/get-a-function-arguments-default-value
+    spec = inspect.getfullargspec(pairplot)
+
+    # build a dict for the defaults
+    # https://stackoverflow.com/questions/12627118/get-a-function-arguments-default-value
+    # answer by gnr
+    default_val_dict = dict(zip(spec.args[::-1], (spec.defaults or ())[::-1]))
+
+    # update the defaults dictionary by the current values of the variables (passed by
+    # the user)
+    opts = _update(default_val_dict, locals())
+
+    # Prepare samples
+    if type(samples) != list:
+        samples = ensure_numpy(samples)
+        samples = [samples]
+    else:
+        for i, sample_pack in enumerate(samples):
+            samples[i] = ensure_numpy(samples[i])
+
+    # Dimensionality of the problem.
+    dim = samples[0].shape[1]
+
+    # Prepare limits. Infer them from samples if they had not been passed.
+    if opts["limits"] == [] or opts["limits"] is None:
+        limits = []
+        for d in range(dim):
+            min = +np.inf
+            max = -np.inf
+            for sample in samples:
+                min_ = sample[:, d].min()
+                min = min_ if min_ < min else min
+                max_ = sample[:, d].max()
+                max = max_ if max_ > max else max
+            limits.append([min, max])
+    else:
+        if len(opts["limits"]) == 1:
+            limits = [opts["limits"][0] for _ in range(dim)]
+        else:
+            limits = opts["limits"]
+
+    # Prepare diag/upper/lower
+    if type(opts["diag"]) is not list:
+        opts["diag"] = [opts["diag"] for _ in range(len(samples))]
+    if type(opts["upper"]) is not list:
+        opts["upper"] = [opts["upper"] for _ in range(len(samples))]
+    # if type(opts['lower']) is not list:
+    #    opts['lower'] = [opts['lower'] for _ in range(len(samples))]
+    opts["lower"] = None
+
+    def diag_func(row, **kwargs):
+        if len(samples) > 0:
+            for n, v in enumerate(samples):
+                if opts["diag"][n] == "hist":
+                    h = plt.hist(
+                        v[:, row], color=opts["samples_colors"][n], **opts["hist_diag"]
+                    )
+                elif opts["diag"][n] == "kde":
+                    density = gaussian_kde(
+                        v[:, row], bw_method=opts["kde_diag"]["bw_method"]
+                    )
+                    xs = np.linspace(
+                        limits[row, 0], limits[row, 1], opts["kde_diag"]["bins"]
+                    )
+                    ys = density(xs)
+                    h = plt.plot(xs, ys, color=opts["samples_colors"][n],)
+                else:
+                    pass
+
+    def upper_func(row, col, limits, **kwargs):
+        if len(samples) > 0:
+            for n, v in enumerate(samples):
+                if opts["upper"][n] == "hist" or opts["upper"][n] == "hist2d":
+                    hist, xedges, yedges = np.histogram2d(
+                        v[:, col],
+                        v[:, row],
+                        range=[
+                            [limits[col][0], limits[col][1]],
+                            [limits[row][0], limits[row][1]],
+                        ],
+                        **opts["hist_offdiag"]
+                    )
+                    h = plt.imshow(
+                        hist.T,
+                        origin="lower",
+                        extent=[xedges[0], xedges[-1], yedges[0], yedges[-1],],
+                        aspect="auto",
+                    )
+
+                elif opts["upper"][n] in [
+                    "kde",
+                    "kde2d",
+                    "contour",
+                    "contourf",
+                ]:
+                    density = gaussian_kde(
+                        v[:, [col, row]].T, bw_method=opts["kde_offdiag"]["bw_method"],
+                    )
+                    X, Y = np.meshgrid(
+                        np.linspace(
+                            limits[col][0], limits[col][1], opts["kde_offdiag"]["bins"],
+                        ),
+                        np.linspace(
+                            limits[row][0], limits[row][1], opts["kde_offdiag"]["bins"],
+                        ),
+                    )
+                    positions = np.vstack([X.ravel(), Y.ravel()])
+                    Z = np.reshape(density(positions).T, X.shape)
+
+                    if opts["upper"][n] == "kde" or opts["upper"][n] == "kde2d":
+                        h = plt.imshow(
+                            Z,
+                            extent=[
+                                limits[col][0],
+                                limits[col][1],
+                                limits[row][0],
+                                limits[row][1],
+                            ],
+                            origin="lower",
+                            aspect="auto",
+                        )
+                    elif opts["upper"][n] == "contour":
+                        if opts["contour_offdiag"]["percentile"]:
+                            Z = probs2contours(Z, opts["contour_offdiag"]["levels"])
+                        else:
+                            Z = (Z - Z.min()) / (Z.max() - Z.min())
+                        h = plt.contour(
+                            X,
+                            Y,
+                            Z,
+                            origin="lower",
+                            extent=[
+                                limits[col][0],
+                                limits[col][1],
+                                limits[row][0],
+                                limits[row][1],
+                            ],
+                            colors=opts["samples_colors"][n],
+                            levels=opts["contour_offdiag"]["levels"],
+                        )
+                    else:
+                        pass
+                elif opts["upper"][n] == "scatter":
+                    h = plt.scatter(
+                        v[:, col],
+                        v[:, row],
+                        color=opts["samples_colors"][n],
+                        **opts["scatter_offdiag"]
+                    )
+                elif opts["upper"][n] == "plot":
+                    h = plt.plot(
+                        v[:, col],
+                        v[:, row],
+                        color=opts["samples_colors"][n],
+                        **opts["plot_offdiag"]
+                    )
+                else:
+                    pass
+
+    return _pairplot_scaffold(diag_func, upper_func, dim, limits, points, opts)
