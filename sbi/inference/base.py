@@ -82,6 +82,7 @@ class NeuralInference(ABC):
         simulator: Callable,
         prior,
         num_workers: int = 1,
+        mp_framework: str = "joblib",
         simulation_batch_size: int = 1,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
@@ -102,6 +103,8 @@ class NeuralInference(ABC):
                 object with `.log_prob()`and `.sample()` (for example, a PyTorch
                 distribution) can be used.
             num_workers: Number of parallel workers to use for simulations.
+            mp_framework: Which framework to use for multiprocessing. Can be either of
+                [`joblib` | `mp_pathos`]. Ignored if `num_workers==1`.
             simulation_batch_size: Number of parameter sets that the simulator
                 maps to data x at once. If None, we simulate all parameter sets at the
                 same time. If >= 1, the simulator has to process data of shape
@@ -135,6 +138,7 @@ class NeuralInference(ABC):
             theta,
             simulation_batch_size,
             num_workers,
+            mp_framework,
             self._show_progress_bars,
         )
 

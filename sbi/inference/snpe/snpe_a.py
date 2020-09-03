@@ -2,7 +2,19 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 
-from typing import Callable, Optional, Union, Dict, Any, Tuple, Union, cast, List, Sequence, TypeVar
+from typing import (
+    Callable,
+    Optional,
+    Union,
+    Dict,
+    Any,
+    Tuple,
+    Union,
+    cast,
+    List,
+    Sequence,
+    TypeVar,
+)
 
 import torch
 from torch import nn
@@ -17,6 +29,7 @@ class SNPE_A(PosteriorEstimator):
         simulator: Callable,
         prior,
         num_workers: int = 1,
+        mp_framework: str = "joblib",
         simulation_batch_size: int = 1,
         density_estimator: Union[str, Callable] = "mdn",
         calibration_kernel: Optional[Callable] = None,

@@ -16,6 +16,7 @@ class SNLE_A(LikelihoodEstimator):
         simulator: Callable,
         prior,
         num_workers: int = 1,
+        mp_framework: str = "joblib",
         simulation_batch_size: int = 1,
         density_estimator: Union[str, Callable] = "maf",
         mcmc_method: str = "slice_np",
@@ -42,6 +43,8 @@ class SNLE_A(LikelihoodEstimator):
                 object with `.log_prob()`and `.sample()` (for example, a PyTorch
                 distribution) can be used.
             num_workers: Number of parallel workers to use for simulations.
+            mp_framework: Which framework to use for multiprocessing. Can be either of
+                [`joblib` | `mp_pathos`]. Ignored if `num_workers==1`.
             simulation_batch_size: Number of parameter sets that the simulator
                 maps to data x at once. If None, we simulate all parameter sets at the
                 same time. If >= 1, the simulator has to process data of shape
