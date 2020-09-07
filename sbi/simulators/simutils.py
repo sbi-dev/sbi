@@ -77,7 +77,7 @@ def simulate_in_batches(
                     total=num_updates_pbar,
                 ):
                     proc_batches = torch.split(subset_of_batches, sim_batch_size, dim=0)
-                    pool = ProcessPool(processes=num_workers, maxtasksperchild=1)
+                    pool = ProcessPool(nodes=num_workers)
                     simulation_outputs.append(
                         torch.cat(pool.map(simulator, list(proc_batches)))
                     )

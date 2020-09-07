@@ -1,0 +1,47 @@
+ilow = 20   	// starting injection current (pA)
+istep = 10		// current step increment (pA)
+nsteps = 35		// number of steps to run
+
+
+begintemplate HH
+
+	public isoma
+	create isoma
+	objectvar stim
+
+	proc init() {
+		iamp = $1
+		isoma {
+				insert hh
+		}
+	}
+endtemplate HH
+
+objectvar HHcell[nsteps]
+objref data_vecs_HH[nsteps]
+
+proc initHH(){
+	for i=0, nsteps-1 {
+		HHcell[i] = new HH(ilow+(istep*i))
+		data_vecs_HH[i] = new Vector()
+	}
+}
+
+proc runHHsim() {
+	dt = 0.01
+	v_init = -60
+	tstop = 300
+	tctr = 0
+
+	finitialize(v_init)
+
+	while(t<tstop) {
+		if (tctr % 10 == 0) {
+			for i=0, nsteps-1 {
+				data_vecs_HH[i].append(HHcell[i].isoma.v(0.5))
+			}
+		}
+		tctr = tctr + 1
+		fadvance()
+	}
+}
