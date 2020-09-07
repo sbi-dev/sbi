@@ -150,8 +150,6 @@ class PosteriorEstimator(NeuralInference, ABC):
             Posterior $p(\theta|x)$ that can be sampled and evaluated.
         """
 
-        self._warn_if_retrain_from_scratch_snpe(retrain_from_scratch_each_round)
-
         # Calibration kernels proposed in Lueckmann, Gonçalves et al., 2017.
         if calibration_kernel is None:
             calibration_kernel = lambda x: ones([len(x)])
@@ -389,16 +387,6 @@ class PosteriorEstimator(NeuralInference, ABC):
             log_prob = self._log_prob_proposal_posterior(theta, x, masks, proposal)
 
         return -(calibration_kernel(x) * log_prob)
-
-    @staticmethod
-    def _warn_if_retrain_from_scratch_snpe(retrain_from_scratch_each_round):
-        if retrain_from_scratch_each_round:
-            warn(
-                "You specified `retrain_from_scratch_each_round=True`. For "
-                "SNPE, we have experienced very poor performance in this "
-                "scenario and we therefore strongly recommend "
-                "`retrain_from_scratch_each_round=False`, see GH #215."
-            )
 
 
 class PotentialFunctionProvider:
