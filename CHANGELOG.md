@@ -1,9 +1,13 @@
 # v0.12.2
+
 - Bug fix for zero simulations in later rounds (#318)
+- Bug fix for sbi.utils.sbiutils.Standardize; mean and std are now registered in state dict (thanks @plcrodrigues, #325)
 - Tutorials on embedding_net and presimulated data (thanks @plcrodrigues, #314, #318)
+- FAQ entry for pickling error
 
 
 # v0.12.1
+
 - Bug fix for broken NSF (#310, thanks @tvwenger).
 
 
