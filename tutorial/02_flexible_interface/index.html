@@ -323,12 +323,12 @@
 </a>
 <h1 id="the-flexible-interface">The flexible interface<a class="headerlink" href="#the-flexible-interface" title="Permanent link">¶</a></h1>
 <p>In the previous tutorial, we have demonstrated how <code>sbi</code> can be used to run simulation-based inference with just a single line of code.</p>
-<p>In addition to this simple interface, <code>sbi</code> also provides a <strong>flexible interface</strong> which unlocks several additional features implemented in <code>sbi</code>.</p>
+<p>In addition to this simple interface, <code>sbi</code> also provides a <strong>flexible interface</strong> which provides several additional features implemented in <code>sbi</code>.</p>
 <p>Note, you find the original version of this notebook at <a href="https://github.com/mackelab/sbi/blob/main/tutorial/02_flexible_interface.ipynb">https://github.com/mackelab/sbi/blob/main/tutorial/02_flexible_interface.ipynb</a> in the <code>sbi</code> repository.</p>
 <h2 id="features">Features<a class="headerlink" href="#features" title="Permanent link">¶</a></h2>
-<p>The flexible interface offers the following features:</p>
+<p>The flexible interface offers at least the following features:</p>
 <ul>
-<li>performing sequential posterior estimation by using multiple rounds. This can decrease the number of simulations one has to run, but the inference procedure is no longer amortized (<a href="https://www.mackelab.org/sbi/tutorial/03_multiround_inference/">tutorial</a>).    </li>
+<li>performing sequential posterior estimation by focusing on a particular observation over multiple rounds. This can decrease the number of simulations one has to run, but the inference procedure is no longer amortized (<a href="https://www.mackelab.org/sbi/tutorial/03_multiround_inference/">tutorial</a>).    </li>
 <li>specify your own density estimator, or change hyperparameters of existing ones (e.g. number of hidden units for <a href="https://arxiv.org/abs/1906.04032">NSF</a>) (<a href="https://www.mackelab.org/sbi/tutorial/04_density_estimators/">tutorial</a>).    </li>
 <li>use an <code>embedding_net</code> to learn summary features from high-dimensional simulation outputs (<a href="https://www.mackelab.org/sbi/tutorial/05_embedding_net/">tutorial</a>).  </li>
 <li>provide presimulated data (<a href="https://www.mackelab.org/sbi/tutorial/06_provide_presimulated/">tutorial</a>)  </li>

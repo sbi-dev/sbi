@@ -322,13 +322,15 @@
 <svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75L3 17.25z"></path></svg>
 </a>
 <h1 id="providing-presimulated-data">Providing presimulated data<a class="headerlink" href="#providing-presimulated-data" title="Permanent link">¶</a></h1>
-<p>In this tutorial, we will demonstrate how one can obtain the posterior with <code>sbi</code> from data that been simulated beforehand (for example data that had been simulated on a compute cluster).</p>
+<p>In this tutorial, we will demonstrate how one can obtain the posterior with <code>sbi</code> using data that was generated beforehand (for example on a compute cluster).</p>
 <p>Note, you can find the original version of this notebook at <a href="https://github.com/mackelab/sbi/blob/main/tutorial/06_presimulated.ipynb">https://github.com/mackelab/sbi/blob/main/tutorial/06_presimulated.ipynb</a> in the <code>sbi</code> repository.</p>
 <h2 id="main-syntax">Main syntax<a class="headerlink" href="#main-syntax" title="Permanent link">¶</a></h2>
-<p>After having instantiated the inference object (<code>SNPE</code>, <code>SNRE</code>, or <code>SNLE</code>), but before running the inference, we can provide the externally generated data:</p>
+<p>After having instantiated the inference object (<code>SNPE</code>, <code>SNRE</code>, or <code>SNLE</code>), but before running the inference, we can provide the externally generated data. </p>
+<p>See below for details on the <code>from_round</code> argument.</p>
 <div class="highlight"><pre><span></span><code><span class="n">inference</span> <span class="o">=</span> <span class="n">SNPE</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">)</span>
 <span class="n">inference</span><span class="o">.</span><span class="n">provide_presimulated</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">from_round</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
-<span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="p">(</span><span class="n">num_simulations</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>  <span class="c1"># num_simulations will be the number of simulations on top of the presimulated data.</span>
+<span class="c1"># num_simulations will be the number of simulations on top of the presimulated data.</span>
+<span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="p">(</span><span class="n">num_simulations</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
 </code></pre></div>
 <h2 id="linear-gaussian-example">Linear Gaussian example<a class="headerlink" href="#linear-gaussian-example" title="Permanent link">¶</a></h2>
 <p>We now give a full example for how to use presimulated data. We will do this on the previously introduced example of a Uniform prior and Gaussian simulator (see <a href="https://www.mackelab.org/sbi/tutorial/00_getting_started/">here</a>).</p>
