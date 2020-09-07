@@ -50,7 +50,6 @@ EXTRAS = {
         "mkdocs-redirects",
         "mkdocstrings",
         "nbconvert",
-        "nbstripout",
         "pep517",
         "pytest",
         "pyyaml",
