@@ -5,10 +5,10 @@
 <head>
 <meta charset="utf-8"/>
 <meta content="width=device-width,initial-scale=1" name="viewport"/>
-<link href="https://mackelab.org/sbi/faq/question_01/" rel="canonical"/>
+<link href="https://mackelab.org/sbi/tutorial/04_density_estimators/" rel="canonical"/>
 <link href="../../assets/images/favicon.png" rel="shortcut icon"/>
 <meta content="mkdocs-1.1.2, mkdocs-material-5.5.3" name="generator"/>
-<title>What should I do when my 'posterior samples are outside of the prior support' in SNPE? - sbi</title>
+<title>Custom density estimators - sbi</title>
 <link href="../../assets/stylesheets/main.947af8d5.min.css" rel="stylesheet"/>
 <link href="../../assets/stylesheets/palette.7f672a1f.min.css" rel="stylesheet"/>
 <meta content="#3f51b5" name="theme-color"/>
@@ -22,7 +22,7 @@
 <input autocomplete="off" class="md-toggle" data-md-toggle="search" id="__search" type="checkbox"/>
 <label class="md-overlay" for="__drawer"></label>
 <div data-md-component="skip">
-<a class="md-skip" href="#what-should-i-do-when-my-posterior-samples-are-outside-of-the-prior-support-in-snpe">
+<a class="md-skip" href="#customizing-the-density-estimator">
           Skip to content
         </a>
 </div>
@@ -43,7 +43,7 @@
           </span>
 <span class="md-header-nav__topic md-ellipsis">
             
-              What should I do when my 'posterior samples are outside of the prior support' in SNPE?
+              Custom density estimators
             
           </span>
 </div>
@@ -122,8 +122,8 @@
       Installation
     </a>
 </li>
-<li class="md-nav__item md-nav__item--nested">
-<input class="md-nav__toggle md-toggle" data-md-toggle="nav-3" id="nav-3" type="checkbox"/>
+<li class="md-nav__item md-nav__item--active md-nav__item--nested">
+<input checked="" class="md-nav__toggle md-toggle" data-md-toggle="nav-3" id="nav-3" type="checkbox"/>
 <label class="md-nav__link" for="nav-3">
       Tutorials and Examples
       <span class="md-nav__icon md-icon">
@@ -155,20 +155,20 @@
       </label>
 <ul class="md-nav__list" data-md-scrollfix="">
 <li class="md-nav__item">
-<a class="md-nav__link" href="../../tutorial/00_getting_started/" title="Getting started">
+<a class="md-nav__link" href="../00_getting_started/" title="Getting started">
       Getting started
     </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="../../tutorial/01_gaussian_amortized/" title="Amortized inference">
+<a class="md-nav__link" href="../01_gaussian_amortized/" title="Amortized inference">
       Amortized inference
     </a>
 </li>
 </ul>
 </nav>
 </li>
-<li class="md-nav__item md-nav__item--nested">
-<input class="md-nav__toggle md-toggle" data-md-toggle="nav-3-2" id="nav-3-2" type="checkbox"/>
+<li class="md-nav__item md-nav__item--active md-nav__item--nested">
+<input checked="" class="md-nav__toggle md-toggle" data-md-toggle="nav-3-2" id="nav-3-2" type="checkbox"/>
 <label class="md-nav__link" for="nav-3-2">
       Advanced
       <span class="md-nav__icon md-icon">
@@ -184,27 +184,59 @@
       </label>
 <ul class="md-nav__list" data-md-scrollfix="">
 <li class="md-nav__item">
-<a class="md-nav__link" href="../../tutorial/02_flexible_interface/" title="Flexible interface">
+<a class="md-nav__link" href="../02_flexible_interface/" title="Flexible interface">
       Flexible interface
     </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="../../tutorial/03_multiround_inference/" title="Multi-round inference">
+<a class="md-nav__link" href="../03_multiround_inference/" title="Multi-round inference">
       Multi-round inference
     </a>
 </li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../../tutorial/04_density_estimators/" title="Custom density estimators">
+<li class="md-nav__item md-nav__item--active">
+<input class="md-nav__toggle md-toggle" data-md-toggle="toc" id="__toc" type="checkbox"/>
+<label class="md-nav__link md-nav__link--active" for="__toc">
+        Custom density estimators
+        <span class="md-nav__icon md-icon">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 9h14V7H3v2m0 4h14v-2H3v2m0 4h14v-2H3v2m16 0h2v-2h-2v2m0-10v2h2V7h-2m0 6h2v-2h-2v2z"></path></svg>
+</span>
+</label>
+<a class="md-nav__link md-nav__link--active" href="./" title="Custom density estimators">
       Custom density estimators
     </a>
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12z"></path></svg>
+</span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#changing-the-type-of-density-estimator">
+    Changing the type of density estimator
+  </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="../../tutorial/05_embedding_net/" title="Learning summary statistics">
+<a class="md-nav__link" href="#changing-hyperparameters-of-density-esitmators">
+    Changing hyperparameters of density esitmators
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#building-new-density-estimators-from-scratch">
+    Building new density estimators from scratch
+  </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../05_embedding_net/" title="Learning summary statistics">
       Learning summary statistics
     </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="../../tutorial/06_provide_presimulated/" title="Providing presimulated data">
+<a class="md-nav__link" href="../06_provide_presimulated/" title="Providing presimulated data">
       Providing presimulated data
     </a>
 </li>
@@ -249,7 +281,7 @@
     </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="../" title="FAQ">
+<a class="md-nav__link" href="../../faq/" title="FAQ">
       FAQ
     </a>
 </li>
@@ -267,49 +299,94 @@
 <div class="md-sidebar__scrollwrap">
 <div class="md-sidebar__inner">
 <nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12z"></path></svg>
+</span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#changing-the-type-of-density-estimator">
+    Changing the type of density estimator
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#changing-hyperparameters-of-density-esitmators">
+    Changing hyperparameters of density esitmators
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#building-new-density-estimators-from-scratch">
+    Building new density estimators from scratch
+  </a>
+</li>
+</ul>
 </nav>
 </div>
 </div>
 </div>
 <div class="md-content">
 <article class="md-content__inner md-typeset">
-<a class="md-content__button md-icon" href="http://github.com/mackelab/sbi/edit/master/docs/faq/question_01.md" title="Edit this page">
+<a class="md-content__button md-icon" href="http://github.com/mackelab/sbi/edit/master/docs/tutorial/04_density_estimators.md" title="Edit this page">
 <svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75L3 17.25z"></path></svg>
 </a>
-<h1 id="what-should-i-do-when-my-posterior-samples-are-outside-of-the-prior-support-in-snpe">What should I do when my ‘posterior samples are outside of the prior support’ in SNPE?<a class="headerlink" href="#what-should-i-do-when-my-posterior-samples-are-outside-of-the-prior-support-in-snpe" title="Permanent link">¶</a></h1>
-<p>When working with <strong>multi-round</strong> SNPE, you might have experienced the following
-warning: 
-<div class="highlight"><pre><span></span><code>Only x% posterior samples are within the prior support. It may take a long time to collect the remaining 10000 samples. Consider interrupting (Ctrl-C) and switching to 'sample_with_mcmc=True'.
-</code></pre></div></p>
-<p>This reason for this issue is described in more detail 
-<a href="https://arxiv.org/abs/2002.03712">here</a> and <a href="https://arxiv.org/abs/1905.07488">here</a>. 
-The following fixes are possible:  </p>
-<ul>
-<li>
-<p>sample with MCMC: <code>samples = posterior((num_samples,), x=x_o, sample_with_mcmc=True)</code>.
-This will make sampling slower, but samples will not ‘leak’.  </p>
-</li>
-<li>
-<p>resort to single-round SNPE and (if necessary) increase your simulation budget.  </p>
-</li>
-<li>
-<p>if your prior is either Gaussian (torch.distributions.multivariateNormal) or Uniform 
-(sbi.utils.BoxUniform), you can avoid leakage by using a mixture density network as 
-density estimator. I.e., using the 
-<a href="https://www.mackelab.org/sbi/tutorial/03_flexible_interface/">flexible interface</a>, set 
-<code>density_estimator='mdn'</code>. When running inference, there should be a print statement 
-“Using SNPE-C with non-atomic loss”</p>
-</li>
-<li>
-<p>use a different algorithm, e.g. SNRE and SNLE. Note, however, that these algorithms
-can have different issues and potential pitfalls.  </p>
-</li>
-</ul>
+<h1 id="customizing-the-density-estimator">Customizing the density estimator<a class="headerlink" href="#customizing-the-density-estimator" title="Permanent link">¶</a></h1>
+<p><code>sbi</code> allows to specify a custom density estimator for each of the implemented methods. For all options, check the API reference <a href="https://www.mackelab.org/sbi/reference/#models">here</a>.</p>
+<h2 id="changing-the-type-of-density-estimator">Changing the type of density estimator<a class="headerlink" href="#changing-the-type-of-density-estimator" title="Permanent link">¶</a></h2>
+<p>One option is to use one of set of preconfigured density estimators by passing a string in the <code>density_estimator</code> keyword argument to the inference object (<code>SNPE</code> or <code>SNLE</code>), e.g., “maf” to use a Masked Autoregressive Flow, of “nsf” to use a Neural Spline Flow with default hyperparameters.</p>
+<div class="highlight"><pre><span></span><code><span class="n">inference</span> <span class="o">=</span> <span class="n">SNPE</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="s1">'maf'</span><span class="p">)</span>
+</code></pre></div>
+<p>In the case of <code>SNRE</code>, the argument is called <code>classifier</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="n">inference</span> <span class="o">=</span> <span class="n">SNRE</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">classifier</span><span class="o">=</span><span class="s1">'resnet'</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="changing-hyperparameters-of-density-esitmators">Changing hyperparameters of density esitmators<a class="headerlink" href="#changing-hyperparameters-of-density-esitmators" title="Permanent link">¶</a></h2>
+<p>Alternatively, you can use a set of utils functions to configure a density estimator yourself, e.g., use a MAF with hyperparameters chosen for your problem at hand.</p>
+<p>Here, because we want to use SN*P*E, we specifiy a neural network targeting the <em>posterior</em> (using the utils function <code>posterior_nn</code>). In this example, we will create a neural spline flow (<code>'nsf'</code>) with <code>60</code> hidden units and <code>3</code> transform layers:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.utils.get_nn_models</span> <span class="kn">import</span> <span class="n">posterior_nn</span>
+
+<span class="n">density_estimator_build_fun</span> <span class="o">=</span> <span class="n">posterior_nn</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s1">'nsf'</span><span class="p">,</span> <span class="n">hidden_features</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span> <span class="n">num_transforms</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+<span class="n">inference</span> <span class="o">=</span> <span class="n">SNPE</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="n">density_estimator_build_fun</span><span class="p">)</span>
+</code></pre></div>
+<p>It is also possible to pass an <code>embedding_net</code> to <code>posterior_nn()</code> which learn summary statistics from high-dimensional simulation outputs. You can find a more detailed tutorial on this <a href="https://www.mackelab.org/sbi/tutorial/05_embedding_net/">here</a>.</p>
+<h2 id="building-new-density-estimators-from-scratch">Building new density estimators from scratch<a class="headerlink" href="#building-new-density-estimators-from-scratch" title="Permanent link">¶</a></h2>
+<p>Finally, it is also possible to implement your own density estimator from scratch, e.g., including embedding nets to preprocess data, or to a density estimator architecture of your choice. </p>
+<p>For this, the <code>density_estimator</code> argument needs to be a function that takes <code>theta</code> and <code>x</code> batches as arguments to then construct the density estimator after the first set of simulations was generated. Our utils functions in <code>sbi/utils/get_nn_models.py</code> return such a function. </p>
 </article>
 </div>
 </div>
 </main>
 <footer class="md-footer">
+<div class="md-footer-nav">
+<nav aria-label="Footer" class="md-footer-nav__inner md-grid">
+<a class="md-footer-nav__link md-footer-nav__link--prev" href="../03_multiround_inference/" rel="prev" title="Multi-round inference">
+<div class="md-footer-nav__button md-icon">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12z"></path></svg>
+</div>
+<div class="md-footer-nav__title">
+<div class="md-ellipsis">
+<span class="md-footer-nav__direction">
+                  Previous
+                </span>
+                Multi-round inference
+              </div>
+</div>
+</a>
+<a class="md-footer-nav__link md-footer-nav__link--next" href="../05_embedding_net/" rel="next" title="Learning summary statistics">
+<div class="md-footer-nav__title">
+<div class="md-ellipsis">
+<span class="md-footer-nav__direction">
+                  Next
+                </span>
+                Learning summary statistics
+              </div>
+</div>
+<div class="md-footer-nav__button md-icon">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11H4z"></path></svg>
+</div>
+</a>
+</nav>
+</div>
 <div class="md-footer-meta md-typeset">
 <div class="md-footer-meta__inner md-grid">
 <div class="md-footer-copyright">

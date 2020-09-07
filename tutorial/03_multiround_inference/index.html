@@ -5,10 +5,10 @@
 <head>
 <meta charset="utf-8"/>
 <meta content="width=device-width,initial-scale=1" name="viewport"/>
-<link href="https://mackelab.org/sbi/tutorial/02_flexible_interface/" rel="canonical"/>
+<link href="https://mackelab.org/sbi/tutorial/03_multiround_inference/" rel="canonical"/>
 <link href="../../assets/images/favicon.png" rel="shortcut icon"/>
 <meta content="mkdocs-1.1.2, mkdocs-material-5.5.3" name="generator"/>
-<title>Flexible interface - sbi</title>
+<title>Multi-round inference - sbi</title>
 <link href="../../assets/stylesheets/main.947af8d5.min.css" rel="stylesheet"/>
 <link href="../../assets/stylesheets/palette.7f672a1f.min.css" rel="stylesheet"/>
 <meta content="#3f51b5" name="theme-color"/>
@@ -22,7 +22,7 @@
 <input autocomplete="off" class="md-toggle" data-md-toggle="search" id="__search" type="checkbox"/>
 <label class="md-overlay" for="__drawer"></label>
 <div data-md-component="skip">
-<a class="md-skip" href="#the-flexible-interface">
+<a class="md-skip" href="#multi-round-inference">
           Skip to content
         </a>
 </div>
@@ -43,7 +43,7 @@
           </span>
 <span class="md-header-nav__topic md-ellipsis">
             
-              Flexible interface
+              Multi-round inference
             
           </span>
 </div>
@@ -183,16 +183,21 @@
         Advanced
       </label>
 <ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../02_flexible_interface/" title="Flexible interface">
+      Flexible interface
+    </a>
+</li>
 <li class="md-nav__item md-nav__item--active">
 <input class="md-nav__toggle md-toggle" data-md-toggle="toc" id="__toc" type="checkbox"/>
 <label class="md-nav__link md-nav__link--active" for="__toc">
-        Flexible interface
+        Multi-round inference
         <span class="md-nav__icon md-icon">
 <svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 9h14V7H3v2m0 4h14v-2H3v2m0 4h14v-2H3v2m16 0h2v-2h-2v2m0-10v2h2V7h-2m0 6h2v-2h-2v2z"></path></svg>
 </span>
 </label>
-<a class="md-nav__link md-nav__link--active" href="./" title="Flexible interface">
-      Flexible interface
+<a class="md-nav__link md-nav__link--active" href="./" title="Multi-round inference">
+      Multi-round inference
     </a>
 <nav aria-label="Table of contents" class="md-nav md-nav--secondary">
 <label class="md-nav__title" for="__toc">
@@ -203,8 +208,8 @@
     </label>
 <ul class="md-nav__list" data-md-scrollfix="">
 <li class="md-nav__item">
-<a class="md-nav__link" href="#features">
-    Features
+<a class="md-nav__link" href="#main-syntax">
+    Main syntax
   </a>
 </li>
 <li class="md-nav__item">
@@ -214,11 +219,6 @@
 </li>
 </ul>
 </nav>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../03_multiround_inference/" title="Multi-round inference">
-      Multi-round inference
-    </a>
 </li>
 <li class="md-nav__item">
 <a class="md-nav__link" href="../04_density_estimators/" title="Custom density estimators">
@@ -302,8 +302,8 @@
     </label>
 <ul class="md-nav__list" data-md-scrollfix="">
 <li class="md-nav__item">
-<a class="md-nav__link" href="#features">
-    Features
+<a class="md-nav__link" href="#main-syntax">
+    Main syntax
   </a>
 </li>
 <li class="md-nav__item">
@@ -318,33 +318,35 @@
 </div>
 <div class="md-content">
 <article class="md-content__inner md-typeset">
-<a class="md-content__button md-icon" href="http://github.com/mackelab/sbi/edit/master/docs/tutorial/02_flexible_interface.md" title="Edit this page">
+<a class="md-content__button md-icon" href="http://github.com/mackelab/sbi/edit/master/docs/tutorial/03_multiround_inference.md" title="Edit this page">
 <svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75L3 17.25z"></path></svg>
 </a>
-<h1 id="the-flexible-interface">The flexible interface<a class="headerlink" href="#the-flexible-interface" title="Permanent link">¶</a></h1>
-<p>In the previous tutorial, we have demonstrated how <code>sbi</code> can be used to run simulation-based inference with just a single line of code.</p>
-<p>In addition to this simple interface, <code>sbi</code> also provides a <strong>flexible interface</strong> which unlocks several additional features implemented in <code>sbi</code>.</p>
-<p>Note, you find the original version of this notebook at <a href="https://github.com/mackelab/sbi/blob/main/tutorial/02_flexible_interface.ipynb">https://github.com/mackelab/sbi/blob/main/tutorial/02_flexible_interface.ipynb</a> in the <code>sbi</code> repository.</p>
-<h2 id="features">Features<a class="headerlink" href="#features" title="Permanent link">¶</a></h2>
-<p>The flexible interface offers the following features:</p>
-<ul>
-<li>performing sequential posterior estimation by using multiple rounds. This can decrease the number of simulations one has to run, but the inference procedure is no longer amortized (<a href="https://www.mackelab.org/sbi/tutorial/03_multiround_inference/">tutorial</a>).    </li>
-<li>specify your own density estimator, or change hyperparameters of existing ones (e.g. number of hidden units for <a href="https://arxiv.org/abs/1906.04032">NSF</a>) (<a href="https://www.mackelab.org/sbi/tutorial/04_density_estimators/">tutorial</a>).    </li>
-<li>use an <code>embedding_net</code> to learn summary features from high-dimensional simulation outputs (<a href="https://www.mackelab.org/sbi/tutorial/05_embedding_net/">tutorial</a>).  </li>
-<li>provide presimulated data (<a href="https://www.mackelab.org/sbi/tutorial/06_provide_presimulated/">tutorial</a>)  </li>
-<li>run simulations in batches, which can speed up simulations.  </li>
-<li>when it makes sense, choose between different methods to sample from the posterior.  </li>
-<li>use calibration kernels as proposed by <a href="https://arxiv.org/abs/1711.01861">Lueckmann, Goncalves et al. 2017</a>.</li>
-</ul>
+<h1 id="multi-round-inference">Multi-round inference<a class="headerlink" href="#multi-round-inference" title="Permanent link">¶</a></h1>
+<p>In the previous tutorials, we have inferred the posterior using <strong>single-round inference</strong>. In <strong>single-round inference</strong>, we draw parameters from the prior, simulate them, and then train a neural network to estimate the posterior. However, sampling from the prior can be inefficient in the number of simulations. In this tutorial, we show how one can alleviate this issue by performing <strong>multi-round inference</strong> with <code>sbi</code>.  </p>
+<p><strong>Multi-round inference</strong> also starts by drawing parameters from the prior, simulating them, and training a neural network to estimate the posterior distribution. After this, it draws samples from the obtained posterior distribution, simulates these, and trains the network again. This process can be repeated arbitrarily often to get increasingly good approximations to the true posterior distribution.</p>
+<p>Running multi-round inference can be more efficient in the number of simulations, but it will lead to the posterior no longer being amortized (i.e. it will be accurate only for a specific observation <code>x_o</code>, not for any <code>x</code>).</p>
+<p>Note, you can find the original version of this notebook at <a href="https://github.com/mackelab/sbi/blob/main/tutorial/03_multiround_inference.ipynb">https://github.com/mackelab/sbi/blob/main/tutorial/03_multiround_inference.ipynb</a> in the <code>sbi</code> repository.</p>
+<h2 id="main-syntax">Main syntax<a class="headerlink" href="#main-syntax" title="Permanent link">¶</a></h2>
+<div class="highlight"><pre><span></span><code><span class="n">num_rounds</span> <span class="o">=</span> <span class="mi">2</span>  <span class="c1"># 2 rounds: first round simulates from the prior, second round simulates from the obtained posterior.</span>
+<span class="n">x_o</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="p">,)</span>
+
+<span class="n">posteriors</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="n">proposal</span> <span class="o">=</span> <span class="kc">None</span>
+
+<span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_rounds</span><span class="p">):</span>
+    <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="p">(</span><span class="n">num_simulations</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">proposal</span><span class="o">=</span><span class="n">proposal</span><span class="p">)</span>
+    <span class="n">posteriors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">posterior</span><span class="p">)</span>
+    <span class="n">proposal</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">x_o</span><span class="p">)</span>
+</code></pre></div>
 <h2 id="linear-gaussian-example">Linear Gaussian example<a class="headerlink" href="#linear-gaussian-example" title="Permanent link">¶</a></h2>
-<p>We will show an example of how we can use the flexible interface to infer the posterior for an example with a Gaussian likelihood (same example as before). First, we import the inference method we want to use (<code>SNPE</code>, <code>SNLE</code>, or <code>SNRE</code>) and other helper functions.</p>
+<p>Below, we give a full example of inferring the posterior distribution over multiple rounds.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">torch</span>
 
 <span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">SNPE</span><span class="p">,</span> <span class="n">prepare_for_sbi</span>
 <span class="kn">from</span> <span class="nn">sbi.utils.get_nn_models</span> <span class="kn">import</span> <span class="n">posterior_nn</span>
 <span class="kn">import</span> <span class="nn">sbi.utils</span> <span class="k">as</span> <span class="nn">utils</span>
 </code></pre></div>
-<p>Next, we define the prior and simulator:</p>
+<p>First, we define a simple prior and simulator and ensure that they comply with <code>sbi</code> by using <code>prepare_for_sbi</code>:</p>
 <div class="highlight"><pre><span></span><code><span class="n">num_dim</span> <span class="o">=</span> <span class="mi">3</span>
 <span class="n">prior</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">BoxUniform</span><span class="p">(</span><span class="n">low</span><span class="o">=-</span><span class="mi">2</span><span class="o">*</span><span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">num_dim</span><span class="p">),</span> 
                          <span class="n">high</span><span class="o">=</span><span class="mi">2</span><span class="o">*</span><span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">num_dim</span><span class="p">))</span>
@@ -352,24 +354,47 @@
 <div class="highlight"><pre><span></span><code><span class="k">def</span> <span class="nf">linear_gaussian</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
     <span class="k">return</span> <span class="n">theta</span> <span class="o">+</span> <span class="mf">1.0</span> <span class="o">+</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn_like</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.1</span>
 </code></pre></div>
-<p>In the flexible interface, you have to ensure that your simulator and prior adhere the requirements of <code>sbi</code>. You can do so with the <code>prepare_for_sbi()</code> function.</p>
 <div class="highlight"><pre><span></span><code><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span> <span class="o">=</span> <span class="n">prepare_for_sbi</span><span class="p">(</span><span class="n">linear_gaussian</span><span class="p">,</span> <span class="n">prior</span><span class="p">)</span>
 </code></pre></div>
 <p>Then, we instantiate the inference object:</p>
 <div class="highlight"><pre><span></span><code><span class="n">inference</span> <span class="o">=</span> <span class="n">SNPE</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">)</span>
 </code></pre></div>
-<p>And then, we run inference. The last argument <code>proposal=None</code> below indicates that the parameters should be drawn from the prior (<code>None</code> is also the default value). You can find a full list of arguments <a href="https://www.mackelab.org/sbi/reference/#sbi.inference.snpe.snpe_c.SNPE_C">here</a>.</p>
-<div class="highlight"><pre><span></span><code><span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="p">(</span><span class="n">num_simulations</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">proposal</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+<p>And we can run inference. In this example, we will run inference over <code>2</code> rounds, potentially leading to a more focused posterior around the observation <code>x_o</code>.</p>
+<div class="highlight"><pre><span></span><code><span class="n">num_rounds</span> <span class="o">=</span> <span class="mi">2</span>
+<span class="n">x_o</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="p">,)</span>
+
+<span class="n">posteriors</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="n">proposal</span> <span class="o">=</span> <span class="kc">None</span>
+
+<span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_rounds</span><span class="p">):</span>
+    <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="p">(</span><span class="n">num_simulations</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">proposal</span><span class="o">=</span><span class="n">proposal</span><span class="p">)</span>
+    <span class="n">posteriors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">posterior</span><span class="p">)</span>
+    <span class="n">proposal</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">x_o</span><span class="p">)</span>
 </code></pre></div>
 <div class="codehilite"><pre><span></span><code>HBox(children=(FloatProgress(value=0.0, description='Running 500 simulations.', max=500.0, style=ProgressStyle…
 
 
 
-Neural network successfully converged after 142 epochs.
+Neural network successfully converged after 152 epochs.
+Using SNPE-C with atomic loss
+
+
+
+HBox(children=(FloatProgress(value=0.0, description='Drawing 500 posterior samples', max=500.0, style=Progress…
+
+
+
+
+
+
+HBox(children=(FloatProgress(value=0.0, description='Running 500 simulations.', max=500.0, style=ProgressStyle…
+
+
+
+Neural network successfully converged after 32 epochs.
 </code></pre></div>
+<p>Note that, for <code>num_rounds&gt;1</code>, the posterior is no longer amortized: it will give good results when sampled around <code>x=observation</code>, but possibly bad results for other <code>x</code>.</p>
 <p>Once we have obtained the posterior, we can <code>.sample()</code>, <code>.log_prob()</code>, or <code>.pairplot()</code> in the same way as for the simple interface.</p>
-<div class="highlight"><pre><span></span><code><span class="n">x_o</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="p">,)</span>
-</code></pre></div>
 <div class="highlight"><pre><span></span><code><span class="n">posterior_samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_o</span><span class="p">)</span>
 
 <span class="c1"># plot posterior samples</span>
@@ -378,11 +403,11 @@ Neural network successfully converged after 142 epochs.
 </code></pre></div>
 <div class="codehilite"><pre><span></span><code>HBox(children=(FloatProgress(value=0.0, description='Drawing 10000 posterior samples', max=10000.0, style=Prog…
 </code></pre></div>
-<p><img alt="png" src="../02_flexible_interface_files/02_flexible_interface_17_2.png"/></p>
+<p><img alt="png" src="../03_multiround_inference_files/03_multiround_inference_16_2.png"/></p>
 <p>We can always print the posterior to know how it was trained:</p>
 <div class="highlight"><pre><span></span><code><span class="nb">print</span><span class="p">(</span><span class="n">posterior</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>Posterior conditional density p(θ|x) (amortized).
+<div class="codehilite"><pre><span></span><code>Posterior conditional density p(θ|x) (multi-round). Evaluates and samples by default at x=[[0.0, 0.0, 0.0]].
 
 This DirectPosterior-object was obtained with a SNPE-class method using a flow.
 It allows to .sample() and .log_prob() the posterior and wraps the output of the .net to avoid leakage into regions with 0 prior probability.
@@ -394,7 +419,7 @@ It allows to .sample() and .log_prob() the posterior and wraps the output of the
 <footer class="md-footer">
 <div class="md-footer-nav">
 <nav aria-label="Footer" class="md-footer-nav__inner md-grid">
-<a class="md-footer-nav__link md-footer-nav__link--prev" href="../01_gaussian_amortized/" rel="prev" title="Amortized inference">
+<a class="md-footer-nav__link md-footer-nav__link--prev" href="../02_flexible_interface/" rel="prev" title="Flexible interface">
 <div class="md-footer-nav__button md-icon">
 <svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12z"></path></svg>
 </div>
@@ -403,17 +428,17 @@ It allows to .sample() and .log_prob() the posterior and wraps the output of the
 <span class="md-footer-nav__direction">
                   Previous
                 </span>
-                Amortized inference
+                Flexible interface
               </div>
 </div>
 </a>
-<a class="md-footer-nav__link md-footer-nav__link--next" href="../03_multiround_inference/" rel="next" title="Multi-round inference">
+<a class="md-footer-nav__link md-footer-nav__link--next" href="../04_density_estimators/" rel="next" title="Custom density estimators">
 <div class="md-footer-nav__title">
 <div class="md-ellipsis">
 <span class="md-footer-nav__direction">
                   Next
                 </span>
-                Multi-round inference
+                Custom density estimators
               </div>
 </div>
 <div class="md-footer-nav__button md-icon">
