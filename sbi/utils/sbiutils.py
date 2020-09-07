@@ -74,10 +74,13 @@ def standardizing_transform(
 
 
 class Standardize(nn.Module):
-    def __init__(self, mean, std):
+    def __init__(self, mean: Union[Tensor, float], std: Union[Tensor, float]):
         super(Standardize, self).__init__()
+        mean, std = map(torch.as_tensor, (mean, std))                
         self.mean = mean
         self.std = std
+        self.register_buffer("_mean", mean)  
+        self.register_buffer("_std", std)              
 
     def forward(self, tensor):
         return (tensor - self.mean) / self.std
@@ -99,8 +102,16 @@ def standardizing_net(batch_t: Tensor, min_std: float = 1e-7) -> nn.Module:
     is_valid_t, *_ = handle_invalid_x(batch_t, True)
 
     t_mean = torch.mean(batch_t[is_valid_t], dim=0)
-    t_std = torch.std(batch_t[is_valid_t], dim=0)
-    t_std[t_std < min_std] = min_std
+    if len(batch_t > 1):
+        t_std = torch.std(batch_t[is_valid_t], dim=0)
+        t_std[t_std < min_std] = min_std
+    else:
+        t_std = 1
+        logging.warning(
+            f"""Using a one-dimensional batch will instantiate a Standardize transform 
+            with (mean, std) parameters which are not representative of the data. We allow
+            this behavior because you might be loading a pre-trained. If this is not the case, 
+            please be sure to use a larger batch.""")    
 
     return Standardize(t_mean, t_std)
 
