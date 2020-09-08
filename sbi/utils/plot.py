@@ -423,9 +423,15 @@ def conditional_pairplot(
 
     Returns: figure and axis of posterior distribution plot
     """
+
+    # Setting these is required because _pairplot_scaffold will check if opts['diag'] is
+    # `None`. This would break if opts has no key 'diag'. Same for 'upper'.
+    diag = "cond"
+    upper = "cond"
+
     # get default values of function arguments
     # https://stackoverflow.com/questions/12627118/get-a-function-arguments-default-value
-    spec = inspect.getfullargspec(pairplot)
+    spec = inspect.getfullargspec(conditional_pairplot)
 
     # build a dict for the defaults
     # https://stackoverflow.com/questions/12627118/get-a-function-arguments-default-value
@@ -437,7 +443,7 @@ def conditional_pairplot(
     opts = _update(default_val_dict, locals())
 
     # Dimensions
-    dim = condition.shape[1]
+    dim = condition.shape[-1]
 
     # Prepare limits
     if len(opts["limits"]) == 1:

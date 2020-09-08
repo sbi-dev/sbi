@@ -1,9 +1,16 @@
-import torch
-from torch.distributions import MultivariateNormal
-from torch import Tensor
-
-from sbi.utils import eval_conditional_density
 from typing import Tuple
+
+import pytest
+import torch
+from torch import Tensor
+from torch.distributions import MultivariateNormal
+
+from sbi.utils import (
+    conditional_corrcoeff,
+    eval_conditional_density,
+    av_conditional_corr_matrix,
+    conditional_pairplot,
+)
 
 
 def test_conditional_density_1d():
@@ -25,7 +32,7 @@ def test_conditional_density_1d():
 
     # Solution with sbi.
     probs = eval_conditional_density(
-        pdf=joint_dist,
+        density=joint_dist,
         condition=full_condition,
         limits=torch.tensor([[-3, 3], [-3, 3], [-3, 3]]),
         dim1=0,
@@ -72,7 +79,7 @@ def test_conditional_density_2d():
 
     # Solution with sbi.
     probs = eval_conditional_density(
-        pdf=joint_dist,
+        density=joint_dist,
         condition=full_condition,
         limits=torch.tensor([[-3, 3], [-3, 3], [-3, 3]]),
         dim1=0,
@@ -96,6 +103,23 @@ def test_conditional_density_2d():
     assert torch.all(torch.abs(probs_analytical - probs_sbi) < 1e-5)
 
 
+def test_conditional_pairplot():
+    """
+    This only tests whether `conditional.pairplot()` runs without errors. If does not
+    test its correctness. See `test_conditional_density_2d` for a test on
+    `eval_conditional_density`, which is the core building block of
+    `conditional.pairplot()`
+    """
+    d = MultivariateNormal(
+        torch.tensor([0.6, 5.0]), torch.tensor([[0.1, 0.99], [0.99, 10.0]])
+    )
+    _ = conditional_pairplot(
+        density=d,
+        condition=torch.ones(1, 2),
+        limits=torch.tensor([[-1.0, 1.0], [-30, 30]]),
+    )
+
+
 def conditional_of_mvn(
     loc: Tensor, cov: Tensor, condition: Tensor
 ) -> Tuple[Tensor, Tensor]:
@@ -107,7 +131,7 @@ def conditional_of_mvn(
     Args:
         loc: Mean of the joint distribution.
         cov: Covariance matrix of the joint distribution.
-        condition: Condition. Should have less entries than mean.
+        condition: Condition. Should have less entries than `loc`.
     """
 
     num_of_condition_dims = loc.shape[0] - condition.shape[0]
@@ -131,3 +155,41 @@ def conditional_of_mvn(
     conditional_cov = cov_11 - cov_prec_cov
 
     return conditional_mean, conditional_cov
+
+
+@pytest.mark.parametrize("corr", (0.99, 0.95, 0.0))
+def test_conditional_corrcoeff(corr):
+    """
+    Test whether the conditional correlation coefficient is computed correctly.
+    """
+    d = MultivariateNormal(
+        torch.tensor([0.6, 5.0]), torch.tensor([[0.1, corr], [corr, 10.0]])
+    )
+    estimated_corr = conditional_corrcoeff(
+        density=d,
+        condition=torch.ones(1, 2),
+        limits=torch.tensor([[-3.0, 3.0], [-90, 90]]),
+        dim1=0,
+        dim2=1,
+        resolution=500,
+    )
+
+    assert torch.abs(corr - estimated_corr) < 1e-3
+
+
+def test_average_cond_coeff_matrix():
+    d = MultivariateNormal(
+        torch.tensor([10.0, 5, 1]),
+        torch.tensor([[100.0, 30.0, 0], [30.0, 10.0, 0], [0, 0, 1.0]]),
+    )
+    cond_mat = av_conditional_corr_matrix(
+        density=d,
+        limits=torch.tensor([[-60.0, 60.0], [-20, 20], [-7, 7]]),
+        resolution=500,
+    )
+    corr_dim12 = torch.sqrt(torch.tensor(30.0 ** 2 / 100.0 / 10.0))
+    gt_matrix = torch.tensor(
+        [[1.0, corr_dim12, 0.0], [corr_dim12, 1.0, 0.0], [0.0, 0.0, 1.0]]
+    )
+
+    assert (torch.abs(gt_matrix - cond_mat) < 1e-3).all()

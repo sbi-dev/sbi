@@ -1,16 +1,18 @@
-from typing import Any, Union
+from typing import Any, Callable, List, Optional, Tuple, Union
 
 import torch
 from torch import Tensor
 
+from sbi.utils.torchutils import ensure_theta_batched
+
 
 def eval_conditional_density(
-    pdf: Any,
+    density: Any,
     condition: Tensor,
     limits: Tensor,
     dim1: int,
     dim2: int,
-    resolution: int = 20,
+    resolution: int = 50,
     eps_margins1: Union[Tensor, float] = 1e-32,
     eps_margins2: Union[Tensor, float] = 1e-32,
 ) -> Tensor:
@@ -21,9 +23,9 @@ def eval_conditional_density(
         $p(x1 | x2) = p(x1, x2) / p(x2) \propto p(x1, x2)$
 
     Args:
-        pdf: Probability density function with `.log_prob()` method.
+        density: Probability density function with `.log_prob()` method.
         condition: Parameter set that all dimensions other than dim1 and dim2 will be
-            fixed to. The condition be of shape (1, dim_theta), i.e. it could e.g. be
+            fixed to. Should be of shape (1, dim_theta), i.e. it could e.g. be
             a sample from the posterior distribution. The entries at `dim1` and `dim2`
             will be ignored.
         limits: Bounds within which to evaluate the density. Shape (dim_theta, 2).
@@ -42,6 +44,8 @@ def eval_conditional_density(
         (resolution). If `dim1 != dim2`, it will have shape (resolution, resolution).
     """
 
+    condition = ensure_theta_batched(condition)
+
     theta_grid_dim1 = torch.linspace(
         float(limits[dim1, 0] + eps_margins1),
         float(limits[dim1, 1] - eps_margins1),
@@ -57,7 +61,7 @@ def eval_conditional_density(
         repeated_condition = condition.repeat(resolution, 1)
         repeated_condition[:, dim1] = theta_grid_dim1
 
-        log_probs_on_grid = pdf.log_prob(repeated_condition)
+        log_probs_on_grid = density.log_prob(repeated_condition)
     else:
         repeated_condition = condition.repeat(resolution ** 2, 1)
         repeated_condition[:, dim1] = theta_grid_dim1.repeat(resolution)
@@ -65,8 +69,226 @@ def eval_conditional_density(
             theta_grid_dim2, resolution
         )
 
-        log_probs_on_grid = pdf.log_prob(repeated_condition)
+        log_probs_on_grid = density.log_prob(repeated_condition)
         log_probs_on_grid = torch.reshape(log_probs_on_grid, (resolution, resolution))
 
     # Subtract maximum for numerical stability.
     return torch.exp(log_probs_on_grid - torch.max(log_probs_on_grid))
+
+
+def conditional_corrcoeff(
+    density: Any,
+    limits: Tensor,
+    condition: Tensor,
+    subset: Optional[List[int]] = None,
+    resolution: int = 20,
+) -> Tensor:
+    r"""
+    Returns the average conditional correlation matrix of a distribution.
+
+    To compute the conditional distribution, we condition all but two parameters to
+    values samples from `density`, and then compute the pearson correlation
+    coefficient $\rho$ between the remaining two parameters under the distribution
+    `density`. We do so for any pair of parameters specified in `subset`, thus
+    creating a matrix containing conditional correlations between any pair of
+    parameters. Then, this entire process is repeated `num_samples` times, each time
+    with a different condition sampled from `density`. Lastly, we return the mean
+    across the `num_samples` conditional correlation matrices.
+
+    Args:
+        density: Probability density function (pdf) with `.sample()` and `.log_prob()`
+            functions.
+        limits: Limits within which to evaluate the `density`.
+        condition: Vales to condition the `pdf` on. If a batch of conditions is passed,
+            we compute the conditional correlation matrix for each of them and return
+            the average conditional correlation matrix.
+        subset: Evaluate the conditional distribution only a subset of dimensions. Uses
+            all dimensions if set to `None`.
+        resolution: Number of grid points on which the conditional distribution is
+            evaluated.
+
+    Returns: Average conditional correlation matrix of shape either (num_dim, num_dim)
+        or (len(subset), len(subset)) if `subset` was specified.
+    """
+
+    condition = ensure_theta_batched(condition)
+
+    if subset is None:
+        subset = range(condition.shape[1])
+
+    correlation_matrices = []
+    for cond in condition:
+        correlation_matrices.append(
+            torch.stack(
+                [
+                    compute_corrcoeff(
+                        eval_conditional_density(
+                            density,
+                            cond,
+                            limits,
+                            dim1=dim1,
+                            dim2=dim2,
+                            resolution=resolution,
+                        ),
+                        limits[[dim1, dim2]],
+                    )
+                    for dim1 in subset
+                    for dim2 in subset
+                    if dim1 < dim2
+                ]
+            )
+        )
+
+    average_correlations = torch.mean(torch.stack(correlation_matrices), dim=0)
+
+    # `average_correlations` is still a vector containing the upper triangular entries.
+    # Below, assemble them into a matrix:
+    av_correlation_matrix = torch.zeros((len(subset), len(subset)))
+    triu_indices = torch.triu_indices(row=len(subset), col=len(subset), offset=1)
+    av_correlation_matrix[triu_indices[0], triu_indices[1]] = average_correlations
+
+    # Make the matrix symmetric by copying upper diagonal to lower diagonal.
+    av_correlation_matrix = torch.triu(av_correlation_matrix) + torch.tril(
+        av_correlation_matrix.T
+    )
+
+    av_correlation_matrix.fill_diagonal_(1.0)
+    return av_correlation_matrix
+
+
+def compute_corrcoeff(probs: Tensor, limits: Tensor):
+    """
+    Given a matrix of probabilities `probs`, return the correlation coefficient.
+
+    Args:
+        probs: Matrix of (unnormalized) evaluations of a 2D density.
+        limits: Limits within which the entries of the matrix are evenly spaced.
+
+    Returns: Pearson correlation coefficient.
+    """
+
+    normalized_probs = normalize_probs(probs, limits)
+    covariance = compute_covariance(normalized_probs, limits)
+
+    marginal_x, marginal_y = calc_marginals(normalized_probs, limits)
+    variance_x = compute_covariance(marginal_x, limits[0], lambda x: x ** 2)
+    variance_y = compute_covariance(marginal_y, limits[1], lambda x: x ** 2)
+
+    return covariance / torch.sqrt(variance_x * variance_y)
+
+
+def compute_covariance(
+    probs: Tensor, limits: Tensor, f: Callable = lambda x, y: x * y
+) -> Tensor:
+    """
+    Return the covariance between two RVs from evaluations of their pdf on a grid.
+
+    The function computes the covariance as:
+    Cov(X,Y) = E[X*Y] - E[X] * E[Y]
+
+    In the more general case, when using a different function `f`, it returns:
+    E[f(X,Y)] - f(E[X], E[Y])
+
+    By using different function `f`, this function can be also deal with more than two
+    dimensions, but this has not been tested.
+
+    Lastly, this function can also compute the variance of a 1D distribution. In that
+    case, `probs` will be a vector, and f would be: f = lambda x: x**2:
+    Var(X,Y) = E[X**2] - E[X]**2
+
+    Args:
+        probs: probs: Matrix of evaluations of a 2D density.
+        limits: Limits within which the entries of the matrix are evenly spaced.
+        f: The operation to be applied to the expected values, usually just the product.
+
+    Returns: Covariance.
+    """
+
+    probs = ensure_theta_batched(probs)
+    limits = ensure_theta_batched(limits)
+
+    # Compute E[X*Y].
+    expected_value_of_joint = expected_value_f_of_x(probs, limits, f)
+
+    # Compute E[X] * E[Y].
+    expected_values_of_marginals = [
+        expected_value_f_of_x(prob.unsqueeze(0), lim.unsqueeze(0))
+        for prob, lim in zip(calc_marginals(probs, limits), limits)
+    ]
+
+    return expected_value_of_joint - f(*expected_values_of_marginals)
+
+
+def expected_value_f_of_x(
+    probs: Tensor, limits: Tensor, f: Callable = lambda x: x
+) -> Tensor:
+    """
+    Return the expected value of a function of random variable(s) E[f(X_i,...,X_k)].
+
+    The expected value is computed from evaluations of the joint density on an evenly
+    spaced grid, passed as `probs`.
+
+    This function can not deal with functions `f` that have multiple outputs. They will
+    simply be summed over.
+
+    Args:
+        probs: probs: Matrix of evaluations of the density.
+        limits: Limits within which the entries of the matrix are evenly spaced.
+        f: The operation to be applied to the expected values.
+
+    Returns: Expected value.
+    """
+
+    probs = ensure_theta_batched(probs)
+    limits = ensure_theta_batched(limits)
+
+    x_values_over_which_we_integrate = [
+        torch.linspace(lim[0], lim[1], prob.shape[0])
+        for lim, prob in zip(limits, probs)
+    ]
+    grids = list(torch.meshgrid(x_values_over_which_we_integrate))
+    expected_val = torch.sum(f(*grids) * probs)
+
+    limits_diff = torch.prod(limits[:, 1] - limits[:, 0])
+    expected_val /= probs.numel() / limits_diff.item()
+
+    return expected_val
+
+
+def calc_marginals(
+    probs: Tensor, limits: Tensor
+) -> Union[Tensor, Tuple[Tensor, Tensor]]:
+    """
+    Given a 2D matrix of probabilities, return the normalized marginal vectors.
+
+    Args:
+        probs: Matrix of evaluations of a 2D density.
+        limits: Limits within which the entries of the matrix are evenly spaced.
+    """
+
+    if probs.shape[0] > 1:
+        # Only marginalize if multi-D distribution.
+        marginal_x = torch.sum(probs, dim=0)
+        marginal_y = torch.sum(probs, dim=1)
+
+        marginal_x = normalize_probs(marginal_x, limits[0].unsqueeze(0))
+        marginal_y = normalize_probs(marginal_y, limits[1].unsqueeze(0))
+        return marginal_x, marginal_y
+    else:
+        # Only normalize if already a 1D distribution.
+        return normalize_probs(probs, limits)
+
+
+def normalize_probs(probs: Tensor, limits: Tensor) -> Tensor:
+    """
+    Given a matrix or a vector of probabilities, return the normalized matrix or vector.
+
+    Args:
+        probs: Matrix / vector of probabilities.
+        limits: Limits within which the entries of the matrix / vector are evenly
+            spaced. Must have a batch dimension if probs is a vector.
+
+    Returns: Normalized probabilities.
+    """
+    limits_diff = torch.prod(limits[:, 1] - limits[:, 0])
+    return probs * probs.numel() / limits_diff / torch.sum(probs)
