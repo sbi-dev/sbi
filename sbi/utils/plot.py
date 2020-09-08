@@ -350,6 +350,7 @@ def conditional_pairplot(
     ] = None,
     subset: List[int] = None,
     resolution: int = 50,
+    fig_size: Tuple = (10, 10),
     title: Optional[str] = None,
     legend: Optional[bool] = False,
     labels=None,
@@ -362,7 +363,6 @@ def conditional_pairplot(
     tick_labels=None,
     points_diag={},
     points_offdiag={"marker": ".", "markersize": 20},
-    fig_size: Tuple = (10, 10),
     fig_bg_colors={"upper": None, "diag": None, "lower": None},
     fig_subplots_adjust={"top": 0.9},
     subplots={},
@@ -375,10 +375,10 @@ def conditional_pairplot(
     The conditionals can be interpreted as slices through the `density` at a location
     given by `condition`.
 
-    Example:
+    For example:
     Say we have a 3D density with parameters $\theta_0$, $\theta_1$, $\theta_2$ and
     a condition $c$ passed by the user in the `condition` argument.
-    For the diagonal plot of parameter $\theta_1$, this will plot the conditional
+    For the plot of $\theta_0$ on the diagonal, this will plot the conditional
     $p(\theta_0 | \theta_1=c[1], \theta_2=c[2])$. For the upper
     diagonal of $\theta_1$ and $\theta_2$, it will plot
     $p(\theta_1, \theta_2 | \theta_0=c[0])$. All other diagonals and upper-diagonals
@@ -399,6 +399,7 @@ def conditional_pairplot(
             plot only the 1st and 3rd dimension but will discard the 0th and 2nd (and,
             if they exist, the 4th, 5th and so on)
         resolution: Resolution of the grid at which we evaluate the `pdf`.
+        fig_size: size of the entire figure
         title: title string
         legend: whether to plot a legend for the points
         labels: np.ndarray of strings specifying the names of the parameters
@@ -413,7 +414,6 @@ def conditional_pairplot(
         points_diag: dictionary for plt.plot() used for plotting points on diagonal
         points_offdiag: dictionary for plt.plot() used for plotting points on off
             diagonal
-        fig_size: size of the entire figure
         fig_bg_colors: Dictionary that contains `upper`, `diag`, `lower`, and specifies
             the respective background colors. Passed to ax.set_facecolor()
         fig_subplots_adjust: dictionary passed to fig.subplots_adjust()
@@ -507,6 +507,7 @@ def pairplot(
     subset: List[int] = None,
     upper: Optional[str] = "hist",
     diag: Optional[str] = "hist",
+    fig_size: Tuple = (10, 10),
     title: Optional[str] = None,
     legend: Optional[bool] = False,
     labels=None,
@@ -527,7 +528,6 @@ def pairplot(
     plot_offdiag={},
     points_diag={},
     points_offdiag={"marker": ".", "markersize": 20},
-    fig_size: Tuple = (10, 10),
     fig_bg_colors={"upper": None, "diag": None, "lower": None},
     fig_subplots_adjust={"top": 0.9},
     subplots={},
@@ -535,7 +535,11 @@ def pairplot(
     title_format={"fontsize": 16},
 ):
     """
-    Plot samples and points.
+    Plot samples in a 2D grid showing marginals and pairwise marginals.
+
+    Each of the diagonal plots can be interpreted as a 1D-marginal of the distribution
+    that the samples were drawn from. Each upper-diagonal plot can be interpreted as a
+    2D-marginal of the distribution.
 
     For developers: if you add arguments that expect dictionaries, make sure to access
     them via the opts dictionary instantiated below. E.g. if you want to access the dict
@@ -543,9 +547,13 @@ def pairplot(
 
     Args:
         samples: posterior samples used to build the histogram
-        points: list of additional points to scatter
+        points: list of additional points to scatter.
+        subset: List containing the dimensions to plot. E.g. subset=[1,3] will plot
+            plot only the 1st and 3rd dimension but will discard the 0th and 2nd (and,
+            if they exist, the 4th, 5th and so on)
         upper: plotting style for upper diagonal, {hist, scatter, contour, cond, None}
         diag: plotting style for diagonal, {hist, cond, None}
+        fig_size: size of the entire figure
         title: title string
         legend: whether to plot a legend for the points
         labels: np.ndarray of strings specifying the names of the parameters
@@ -553,9 +561,6 @@ def pairplot(
         labels_samples: np.ndarray of strings specifying the names of the passed samples
         samples_colors: colors of the samples
         points_colors: colors of the points
-        subset: List containing the dimensions to plot. E.g. subset=[1,3] will plot
-            plot only the 1st and 3rd dimension but will discard the 0th and 2nd (and,
-            if they exist, the 4th, 5th and so on)
         limits: array containing the plot xlim for each parameter dimension. If None,
             just use the min and max of the passed samples
         ticks: location of the ticks for each parameter. If None, just use the min and
@@ -579,7 +584,6 @@ def pairplot(
         points_diag: dictionary for plt.plot() used for plotting points on diagonal
         points_offdiag: dictionary for plt.plot() used for plotting points on off
             diagonal
-        fig_size: size of the entire figure
         fig_bg_colors: Dictionary that contains `upper`, `diag`, `lower`, and specifies
             the respective background colors. Passed to ax.set_facecolor()
         fig_subplots_adjust: dictionary passed to fig.subplots_adjust()

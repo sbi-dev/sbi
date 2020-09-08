@@ -1,3 +1,7 @@
+# v0.13.0
+- Conditional distributions and correlations for analysing the posterior (#321)
+
+
 # v0.12.2
 
 - Bug fix for zero simulations in later rounds (#318)
