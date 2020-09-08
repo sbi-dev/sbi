@@ -81,34 +81,35 @@ def conditional_corrcoeff(
     limits: Tensor,
     condition: Tensor,
     subset: Optional[List[int]] = None,
-    resolution: int = 20,
+    resolution: int = 50,
 ) -> Tensor:
     r"""
-    Returns the average conditional correlation matrix of a distribution.
+    Returns the conditional correlation matrix of a distribution.
 
     To compute the conditional distribution, we condition all but two parameters to
-    values samples from `density`, and then compute the pearson correlation
+    values from `condition`, and then compute the Pearson correlation
     coefficient $\rho$ between the remaining two parameters under the distribution
     `density`. We do so for any pair of parameters specified in `subset`, thus
     creating a matrix containing conditional correlations between any pair of
-    parameters. Then, this entire process is repeated `num_samples` times, each time
-    with a different condition sampled from `density`. Lastly, we return the mean
-    across the `num_samples` conditional correlation matrices.
+    parameters.
+
+    If `condition` is a batch of conditions, this function computes the conditional
+    correlation matrix for each one of them and returns the mean.
 
     Args:
-        density: Probability density function (pdf) with `.sample()` and `.log_prob()`
-            functions.
+        density: Probability density function with `.log_prob()` function.
         limits: Limits within which to evaluate the `density`.
-        condition: Vales to condition the `pdf` on. If a batch of conditions is passed,
-            we compute the conditional correlation matrix for each of them and return
-            the average conditional correlation matrix.
-        subset: Evaluate the conditional distribution only a subset of dimensions. Uses
-            all dimensions if set to `None`.
+        condition: Values to condition the `density` on. If a batch of conditions is
+            passed, we compute the conditional correlation matrix for each of them and
+            return the average conditional correlation matrix.
+        subset: Evaluate the conditional distribution only on a subset of dimensions.
+            If `None` this function uses all dimensions.
         resolution: Number of grid points on which the conditional distribution is
-            evaluated.
+            evaluated. A higher value increases the accuracy of the estimated
+            correlation but also increases the computational cost.
 
-    Returns: Average conditional correlation matrix of shape either (num_dim, num_dim)
-        or (len(subset), len(subset)) if `subset` was specified.
+    Returns: Average conditional correlation matrix of shape either `(num_dim, num_dim)`
+    or `(len(subset), len(subset))` if `subset` was specified.
     """
 
     condition = ensure_theta_batched(condition)
@@ -121,7 +122,7 @@ def conditional_corrcoeff(
         correlation_matrices.append(
             torch.stack(
                 [
-                    compute_corrcoeff(
+                    _compute_corrcoeff(
                         eval_conditional_density(
                             density,
                             cond,
@@ -156,7 +157,7 @@ def conditional_corrcoeff(
     return av_correlation_matrix
 
 
-def compute_corrcoeff(probs: Tensor, limits: Tensor):
+def _compute_corrcoeff(probs: Tensor, limits: Tensor):
     """
     Given a matrix of probabilities `probs`, return the correlation coefficient.
 
@@ -167,17 +168,17 @@ def compute_corrcoeff(probs: Tensor, limits: Tensor):
     Returns: Pearson correlation coefficient.
     """
 
-    normalized_probs = normalize_probs(probs, limits)
-    covariance = compute_covariance(normalized_probs, limits)
+    normalized_probs = _normalize_probs(probs, limits)
+    covariance = _compute_covariance(normalized_probs, limits)
 
-    marginal_x, marginal_y = calc_marginals(normalized_probs, limits)
-    variance_x = compute_covariance(marginal_x, limits[0], lambda x: x ** 2)
-    variance_y = compute_covariance(marginal_y, limits[1], lambda x: x ** 2)
+    marginal_x, marginal_y = _calc_marginals(normalized_probs, limits)
+    variance_x = _compute_covariance(marginal_x, limits[0], lambda x: x ** 2)
+    variance_y = _compute_covariance(marginal_y, limits[1], lambda x: x ** 2)
 
     return covariance / torch.sqrt(variance_x * variance_y)
 
 
-def compute_covariance(
+def _compute_covariance(
     probs: Tensor, limits: Tensor, f: Callable = lambda x, y: x * y
 ) -> Tensor:
     """
@@ -208,18 +209,18 @@ def compute_covariance(
     limits = ensure_theta_batched(limits)
 
     # Compute E[X*Y].
-    expected_value_of_joint = expected_value_f_of_x(probs, limits, f)
+    expected_value_of_joint = _expected_value_f_of_x(probs, limits, f)
 
     # Compute E[X] * E[Y].
     expected_values_of_marginals = [
-        expected_value_f_of_x(prob.unsqueeze(0), lim.unsqueeze(0))
-        for prob, lim in zip(calc_marginals(probs, limits), limits)
+        _expected_value_f_of_x(prob.unsqueeze(0), lim.unsqueeze(0))
+        for prob, lim in zip(_calc_marginals(probs, limits), limits)
     ]
 
     return expected_value_of_joint - f(*expected_values_of_marginals)
 
 
-def expected_value_f_of_x(
+def _expected_value_f_of_x(
     probs: Tensor, limits: Tensor, f: Callable = lambda x: x
 ) -> Tensor:
     """
@@ -255,7 +256,7 @@ def expected_value_f_of_x(
     return expected_val
 
 
-def calc_marginals(
+def _calc_marginals(
     probs: Tensor, limits: Tensor
 ) -> Union[Tensor, Tuple[Tensor, Tensor]]:
     """
@@ -267,19 +268,19 @@ def calc_marginals(
     """
 
     if probs.shape[0] > 1:
-        # Only marginalize if multi-D distribution.
+        # Marginalize and normalize if multi-D distribution.
         marginal_x = torch.sum(probs, dim=0)
         marginal_y = torch.sum(probs, dim=1)
 
-        marginal_x = normalize_probs(marginal_x, limits[0].unsqueeze(0))
-        marginal_y = normalize_probs(marginal_y, limits[1].unsqueeze(0))
+        marginal_x = _normalize_probs(marginal_x, limits[0].unsqueeze(0))
+        marginal_y = _normalize_probs(marginal_y, limits[1].unsqueeze(0))
         return marginal_x, marginal_y
     else:
         # Only normalize if already a 1D distribution.
-        return normalize_probs(probs, limits)
+        return _normalize_probs(probs, limits)
 
 
-def normalize_probs(probs: Tensor, limits: Tensor) -> Tensor:
+def _normalize_probs(probs: Tensor, limits: Tensor) -> Tensor:
     """
     Given a matrix or a vector of probabilities, return the normalized matrix or vector.
 
