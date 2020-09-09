@@ -48,5 +48,4 @@ from sbi.utils.typechecks import (
 from sbi.utils.conditional_density import (
     eval_conditional_density,
     conditional_corrcoeff,
-    av_conditional_corr_matrix,
 )

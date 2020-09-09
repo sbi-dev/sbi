@@ -104,7 +104,7 @@
       show_root_heading: true
       show_object_full_path: true
       
-::: sbi.utils.plot.conditional_corrcoeff
+::: sbi.utils.conditional_density.conditional_corrcoeff
     rendering:
       show_root_heading: true
       show_object_full_path: true
