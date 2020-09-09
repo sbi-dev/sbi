@@ -6,9 +6,8 @@ from torch import Tensor
 from torch.distributions import MultivariateNormal
 
 from sbi.utils import (
-    conditional_corrcoeff,
     eval_conditional_density,
-    av_conditional_corr_matrix,
+    conditional_corrcoeff,
     conditional_pairplot,
 )
 
@@ -169,10 +168,8 @@ def test_conditional_corrcoeff(corr):
         density=d,
         condition=torch.ones(1, 2),
         limits=torch.tensor([[-3.0, 3.0], [-90, 90]]),
-        dim1=0,
-        dim2=1,
         resolution=500,
-    )
+    )[0, 1]
 
     assert torch.abs(corr - estimated_corr) < 1e-3
 
@@ -182,8 +179,9 @@ def test_average_cond_coeff_matrix():
         torch.tensor([10.0, 5, 1]),
         torch.tensor([[100.0, 30.0, 0], [30.0, 10.0, 0], [0, 0, 1.0]]),
     )
-    cond_mat = av_conditional_corr_matrix(
+    cond_mat = conditional_corrcoeff(
         density=d,
+        condition=torch.zeros(1, 3),
         limits=torch.tensor([[-60.0, 60.0], [-20, 20], [-7, 7]]),
         resolution=500,
     )
