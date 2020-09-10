@@ -4,7 +4,7 @@
 
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Any, Callable, Dict, Optional, Union, cast
+from typing import Any, Callable, Dict, List, Optional, Union, cast
 from warnings import warn
 
 import numpy as np
@@ -188,7 +188,6 @@ class PosteriorEstimator(NeuralInference, ABC):
                 sample_with_mcmc=self._sample_with_mcmc,
                 mcmc_method=self._mcmc_method,
                 mcmc_parameters=self._mcmc_parameters,
-                get_potential_function=PotentialFunctionProvider(),
             )
 
         # Fit posterior using newly aggregated data set.
@@ -387,80 +386,3 @@ class PosteriorEstimator(NeuralInference, ABC):
             log_prob = self._log_prob_proposal_posterior(theta, x, masks, proposal)
 
         return -(calibration_kernel(x) * log_prob)
-
-
-class PotentialFunctionProvider:
-    """
-    This class is initialized without arguments during the initialization of the
-    Posterior class. When called, it specializes to the potential function appropriate
-    to the requested `mcmc_method`.
-
-    NOTE: Why use a class?
-    ----------------------
-    During inference, we use deepcopy to save untrained posteriors in memory. deepcopy
-    uses pickle which can't serialize nested functions
-    (https://stackoverflow.com/a/12022055).
-
-    It is important to NOT initialize attributes upon instantiation, because we need the
-     most current trained posterior neural net.
-
-    Returns:
-        Potential function for use by either numpy or pyro sampler
-    """
-
-    def __call__(
-        self, prior, posterior_nn: nn.Module, x: Tensor, mcmc_method: str
-    ) -> Callable:
-        """Return potential function.
-
-        Switch on numpy or pyro potential function based on `mcmc_method`.
-
-        """
-        self.posterior_nn = posterior_nn
-        self.prior = prior
-        self.x = x
-
-        if mcmc_method in ("slice", "hmc", "nuts"):
-            return self.pyro_potential
-        else:
-            return self.np_potential
-
-    def np_potential(self, theta: np.ndarray) -> ScalarFloat:
-        r"""Return posterior theta log prob. $p(\theta|x)$, $-\infty$ if outside prior."
-
-        Args:
-            theta: Parameters $\theta$, batch dimension 1.
-
-        Returns:
-            Posterior log probability $\log(p(\theta|x))$.
-        """
-        theta = torch.as_tensor(theta, dtype=torch.float32)
-
-        is_within_prior = torch.isfinite(self.prior.log_prob(theta))
-        if is_within_prior:
-            target_log_prob = self.posterior_nn.log_prob(
-                inputs=theta.reshape(1, -1), context=self.x.reshape(1, -1),
-            )
-        else:
-            target_log_prob = -float("Inf")
-
-        return target_log_prob
-
-    def pyro_potential(self, theta: Dict[str, Tensor]) -> Tensor:
-        r"""Return posterior log prob. of theta $p(\theta|x)$, -inf where outside prior.
-
-        Args:
-            theta: Parameters $\theta$ (from pyro sampler).
-
-        Returns:
-            Posterior log probability $p(\theta|x)$, masked outside of prior.
-        """
-
-        theta = next(iter(theta.values()))
-        # Notice opposite sign to numpy.
-        log_prob_posterior = -self.posterior_nn.log_prob(inputs=theta, context=self.x)
-        log_prob_prior = self.prior.log_prob(theta)
-
-        within_prior = torch.isfinite(log_prob_prior)
-
-        return torch.where(within_prior, log_prob_posterior, log_prob_prior)

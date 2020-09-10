@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
+from copy import deepcopy
 from typing import (
     Any,
     Callable,
@@ -14,14 +15,19 @@ from typing import (
     cast,
 )
 
+import numpy as np
 import torch
 from torch import Tensor, log, nn
 
 from sbi import utils as utils
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
-from sbi.types import Shape
+from sbi.types import ScalarFloat, Shape
 from sbi.utils import del_entries
-from sbi.utils.torchutils import atleast_2d_float32_tensor, batched_first_of_batch
+from sbi.utils.torchutils import (
+    atleast_2d_float32_tensor,
+    batched_first_of_batch,
+    ensure_theta_batched,
+)
 
 
 class DirectPosterior(NeuralPosterior):
@@ -49,7 +55,6 @@ class DirectPosterior(NeuralPosterior):
         sample_with_mcmc: bool = True,
         mcmc_method: str = "slice_np",
         mcmc_parameters: Optional[Dict[str, Any]] = None,
-        get_potential_function: Optional[Callable] = None,
     ):
         """
         Args:
@@ -72,8 +77,6 @@ class DirectPosterior(NeuralPosterior):
                 will draw init locations from prior, whereas `sir` will use Sequential-
                 Importance-Resampling using `init_strategy_num_candidates` to find init
                 locations.
-            get_potential_function: Callable that returns the potential function used
-                for MCMC sampling.
         """
 
         kwargs = del_entries(
@@ -276,8 +279,9 @@ class DirectPosterior(NeuralPosterior):
 
         if sample_with_mcmc:
             samples = self._sample_posterior_mcmc(
-                x=x,
                 num_samples=num_samples,
+                x=x,
+                potential_fn_provider=PotentialFunctionProvider(),
                 show_progress_bars=show_progress_bars,
                 mcmc_method=mcmc_method,
                 **mcmc_parameters,
@@ -293,3 +297,217 @@ class DirectPosterior(NeuralPosterior):
             )
 
         return samples.reshape((*sample_shape, -1))
+
+    def sample_conditional(
+        self,
+        sample_shape: Shape,
+        condition: Tensor,
+        dims_to_sample: List[int],
+        x: Optional[Tensor] = None,
+        show_progress_bars: bool = True,
+        mcmc_method: Optional[str] = None,
+        mcmc_parameters: Optional[Dict[str, Any]] = None,
+    ) -> Tensor:
+
+        r"""
+        Return samples from conditional posterior $p(\theta_i|\theta_j, x)$.
+
+        In this function, we do not sample from the full posterior, but instead only
+        from a few parameter dimensions while the other parameter dimensions are kept
+        fixed at values specified in `condition`.
+
+        Samples are obtained with MCMC.
+
+        Args:
+            sample_shape: Desired shape of samples that are drawn from posterior. If
+                sample_shape is multidimensional we simply draw `sample_shape.numel()`
+                samples and then reshape into the desired shape.
+            condition: Parameter set that all dimensions not specified in
+                `dims_to_sample` will be fixed to. Should contain dim_theta elements,
+                i.e. it could e.g. be a sample from the posterior distribution.
+                The entries at all `dims_to_sample` will be ignored.
+            dims_to_sample: Which dimensions to sample from. The dimensions not
+                specified in `dims_to_sample` will be fixed to values given in
+                `condition`.
+            x: Conditioning context for posterior $p(\theta|x)$. If not provided,
+                fall back onto `x_o` if previously provided for multiround training, or
+                to a set default (see `set_default_x()` method).
+            show_progress_bars: Whether to show sampling progress monitor.
+            mcmc_method: Optional parameter to override `self.mcmc_method`.
+            mcmc_parameters: Dictionary overriding the default parameters for MCMC.
+                The following parameters are supported: `thin` to set the thinning
+                factor for the chain, `warmup_steps` to set the initial number of
+                samples to discard, `num_chains` for the number of chains,
+                `init_strategy` for the initialisation strategy for chains; `prior`
+                will draw init locations from prior, whereas `sir` will use Sequential-
+                Importance-Resampling using `init_strategy_num_candidates` to find init
+                locations.
+
+        Returns:
+            Samples from conditional posterior.
+        """
+
+        x, num_samples, mcmc_method, mcmc_parameters = self._prepare_for_sample(
+            x, sample_shape, mcmc_method, mcmc_parameters
+        )
+
+        samples = self._sample_posterior_mcmc(
+            num_samples=num_samples,
+            x=x,
+            potential_fn_provider=ConditionalPotentialFunctionProvider(
+                condition, dims_to_sample
+            ),
+            dims_to_sample=dims_to_sample,
+            show_progress_bars=show_progress_bars,
+            mcmc_method=mcmc_method,
+            **mcmc_parameters,
+        )
+
+        return samples.reshape((*sample_shape, -1))
+
+
+class PotentialFunctionProvider:
+    """
+    This class is initialized without arguments during the initialization of the
+    Posterior class. When called, it specializes to the potential function appropriate
+    to the requested `mcmc_method`.
+
+    NOTE: Why use a class?
+    ----------------------
+    During inference, we use deepcopy to save untrained posteriors in memory. deepcopy
+    uses pickle which can't serialize nested functions
+    (https://stackoverflow.com/a/12022055).
+
+    It is important to NOT initialize attributes upon instantiation, because we need the
+     most current trained posterior neural net.
+
+    Returns:
+        Potential function for use by either numpy or pyro sampler
+    """
+
+    def __call__(
+        self, prior, posterior_nn: nn.Module, x: Tensor, mcmc_method: str,
+    ) -> Callable:
+        """Return potential function.
+
+        Switch on numpy or pyro potential function based on `mcmc_method`.
+        """
+        self.posterior_nn = posterior_nn
+        self.prior = prior
+        self.x = x
+
+        if mcmc_method in ("slice", "hmc", "nuts"):
+            return self.pyro_potential
+        else:
+            return self.np_potential
+
+    def np_potential(self, theta: np.ndarray) -> ScalarFloat:
+        r"""Return posterior theta log prob. $p(\theta|x)$, $-\infty$ if outside prior."
+
+        Args:
+            theta: Parameters $\theta$, batch dimension 1.
+
+        Returns:
+            Posterior log probability $\log(p(\theta|x))$.
+        """
+        theta = torch.as_tensor(theta, dtype=torch.float32)
+
+        is_within_prior = torch.isfinite(self.prior.log_prob(theta))
+        if is_within_prior:
+            target_log_prob = self.posterior_nn.log_prob(
+                inputs=theta.reshape(1, -1), context=self.x.reshape(1, -1),
+            )
+        else:
+            target_log_prob = -float("Inf")
+
+        return target_log_prob
+
+    def pyro_potential(self, theta: Dict[str, Tensor]) -> Tensor:
+        r"""Return posterior log prob. of theta $p(\theta|x)$, -inf where outside prior.
+
+        Args:
+            theta: Parameters $\theta$ (from pyro sampler).
+
+        Returns:
+            Posterior log probability $p(\theta|x)$, masked outside of prior.
+        """
+
+        theta = next(iter(theta.values()))
+
+        # Notice opposite sign to numpy.
+        log_prob_posterior = -self.posterior_nn.log_prob(inputs=theta, context=self.x)
+        log_prob_prior = self.prior.log_prob(theta)
+
+        within_prior = torch.isfinite(log_prob_prior)
+
+        return torch.where(within_prior, log_prob_posterior, log_prob_prior)
+
+
+class ConditionalPotentialFunctionProvider(PotentialFunctionProvider):
+    """
+    Wraps the potential functions to allow for sampling from the conditional posterior.
+    """
+
+    def __init__(
+        self, condition: Tensor, dims_to_sample: List[int],
+    ):
+        """
+        Args:
+            condition: Parameter set that all dimensions not specified in
+                `dims_to_sample` will be fixed to. Should contain dim_theta elements,
+                i.e. it could e.g. be a sample from the posterior distribution.
+                The entries at all `dims_to_sample` will be ignored.
+            dims_to_sample: Which dimensions to sample from. The dimensions not
+                specified in `dims_to_sample` will be fixed to values given in
+                `condition`.
+        """
+
+        self.condition = ensure_theta_batched(condition)
+        self.dims_to_sample = dims_to_sample
+
+    def __call__(
+        self, prior, posterior_nn: nn.Module, x: Tensor, mcmc_method: str,
+    ) -> Callable:
+        """Return potential function.
+
+        Switch on numpy or pyro potential function based on `mcmc_method`.
+        """
+
+        return super().__call__(prior, posterior_nn, x, mcmc_method)
+
+    def np_potential(self, theta: np.ndarray) -> ScalarFloat:
+        r"""
+        Return conditional posterior log-probability or $-\infty$ if outside prior.
+
+        Args:
+            theta: Free parameters $\theta_i$, batch dimension 1.
+
+        Returns:
+            Conditional posterior log-probability $\log(p(\theta_i|\theta_j, x))$,
+            masked outside of prior.
+        """
+        theta = torch.as_tensor(theta, dtype=torch.float32)
+
+        theta_condition = deepcopy(self.condition)
+        theta_condition[:, self.dims_to_sample] = theta
+
+        return super().np_potential(utils.tensor2numpy(theta_condition))
+
+    def pyro_potential(self, theta: Dict[str, Tensor]) -> Tensor:
+        r"""
+        Return conditional posterior log-probability or $-\infty$ if outside prior.
+
+        Args:
+            theta: Free parameters $\theta_i$ (from pyro sampler).
+
+        Returns:
+            Conditional posterior log-probability $\log(p(\theta_i|\theta_j, x))$,
+            masked outside of prior.
+        """
+
+        theta = next(iter(theta.values()))
+
+        theta_condition = deepcopy(self.condition)
+        theta_condition[:, self.dims_to_sample] = theta
+
+        return super().pyro_potential({"": theta_condition})

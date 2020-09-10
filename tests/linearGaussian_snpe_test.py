@@ -3,7 +3,10 @@
 
 from __future__ import annotations
 
+import numpy as np
 import pytest
+import torch
+from scipy.stats import gaussian_kde
 from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
@@ -351,6 +354,96 @@ def test_api_snpe_c_posterior_correction(
 
     # Evaluate the samples to check correction factor.
     posterior.log_prob(samples, x=x_o)
+
+
+@pytest.mark.slow
+def test_sample_conditional(set_seed):
+    """
+    Test whether sampling from the conditional gives the same results as evaluating.
+
+    This compares samples that get smoothed with a Gaussian kde to evaluating the
+    conditional log-probability with `eval_conditional_density`.
+
+    `eval_conditional_density` is itself tested in `sbiutils_test.py`. Here, we use
+    a bimodal posterior to test the conditional.
+    """
+
+    num_dim = 3
+    dim_to_sample_1 = 0
+    dim_to_sample_2 = 2
+
+    device = "cpu"
+    configure_default_device(device)
+    x_o = zeros(1, num_dim)
+
+    likelihood_shift = -1.0 * ones(num_dim)
+    likelihood_cov = 0.1 * eye(num_dim)
+
+    prior = utils.BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
+
+    def simulator(theta):
+        if torch.rand(1) > 0.5:
+            return linear_gaussian(theta, likelihood_shift, likelihood_cov)
+        else:
+            return linear_gaussian(theta, -likelihood_shift, likelihood_cov)
+
+    net = utils.posterior_nn("maf", hidden_features=20)
+
+    inference = SNPE_C(
+        *prepare_for_sbi(simulator, prior),
+        density_estimator=net,
+        simulation_batch_size=1,
+        show_progress_bars=True,
+        device=device,
+    )
+
+    # We need a pretty big dataset to properly model the bimodality.
+    posterior = inference(
+        num_simulations=10000, proposal=None, max_num_epochs=50
+    ).set_default_x(x_o)
+    samples = posterior.sample((50,))
+
+    # Evaluate the conditional density be drawing samples and smoothing with a Gaussian
+    # kde.
+    cond_samples = posterior.sample_conditional(
+        (500,), condition=samples[0], dims_to_sample=[dim_to_sample_1, dim_to_sample_2]
+    )
+    _ = utils.pairplot(
+        cond_samples,
+        limits=[[-2, 2], [-2, 2], [-2, 2]],
+        fig_size=(2, 2),
+        diag="kde",
+        upper="kde",
+    )
+
+    limits = [[-2, 2], [-2, 2], [-2, 2]]
+
+    density = gaussian_kde(cond_samples.numpy().T, bw_method="scott")
+
+    X, Y = np.meshgrid(
+        np.linspace(limits[0][0], limits[0][1], 50,),
+        np.linspace(limits[1][0], limits[1][1], 50,),
+    )
+    positions = np.vstack([X.ravel(), Y.ravel()])
+    sample_kde_grid = np.reshape(density(positions).T, X.shape)
+
+    # Evaluate the conditional with eval_conditional_density.
+    eval_grid = utils.eval_conditional_density(
+        posterior,
+        condition=samples[0],
+        dim1=dim_to_sample_1,
+        dim2=dim_to_sample_2,
+        limits=torch.tensor([[-2, 2], [-2, 2], [-2, 2]]),
+    )
+
+    # Compare the two densities.
+    sample_kde_grid = sample_kde_grid / np.sum(sample_kde_grid)
+    eval_grid = eval_grid / torch.sum(eval_grid)
+
+    error = np.abs(sample_kde_grid - eval_grid.numpy())
+
+    max_err = np.max(error)
+    assert max_err < 0.0025
 
 
 def example_posterior():
