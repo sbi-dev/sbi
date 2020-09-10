@@ -47,7 +47,6 @@ class NeuralPosterior(ABC):
         x_shape: torch.Size,
         mcmc_method: str = "slice_np",
         mcmc_parameters: Optional[Dict[str, Any]] = None,
-        get_potential_function: Optional[Callable] = None,
     ):
         """
         Args:
@@ -67,8 +66,6 @@ class NeuralPosterior(ABC):
                 will draw init locations from prior, whereas `sir` will use Sequential-
                 Importance-Resampling using `init_strategy_num_candidates` to find init
                 locations.
-            get_potential_function: Callable that returns the potential function used
-                for MCMC sampling.
         """
         if method_family in ("snpe", "snle", "snre_a", "snre_b"):
             self._method_family = method_family
@@ -80,7 +77,6 @@ class NeuralPosterior(ABC):
         self.set_mcmc_method(mcmc_method)
         self.set_mcmc_parameters(mcmc_parameters)
 
-        self._get_potential_function = get_potential_function
         self._leakage_density_correction_factor = None  # Correction factor for SNPE.
         self._mcmc_init_params = None
         self._num_trained_rounds = 0
@@ -276,6 +272,8 @@ class NeuralPosterior(ABC):
         self,
         num_samples: int,
         x: Tensor,
+        potential_fn_provider: Callable,
+        dims_to_sample: Optional[List[int]] = None,
         mcmc_method: str = "slice_np",
         thin: int = 10,
         warmup_steps: int = 20,
@@ -294,6 +292,11 @@ class NeuralPosterior(ABC):
         Args:
             num_samples: Desired number of samples.
             x: Conditioning context for posterior $p(\theta|x)$.
+            potential_fn_provider: Callable that returns the potential function used
+                for MCMC sampling.
+            dims_to_sample: Which dimensions to sample from. If `None`, sample from the
+                full posterior distribution. Required for selecting the relevant
+                dimensions of the `init_params`.
             mcmc_method: Sampling method. Currently defaults to `slice_np` for a custom
                 numpy implementation of slice sampling; select `hmc`, `nuts` or `slice`
                 for Pyro-based sampling.
@@ -312,16 +315,22 @@ class NeuralPosterior(ABC):
         Returns:
             Tensor of shape (num_samples, shape_of_single_theta).
         """
+        if dims_to_sample is None:
+            dims_to_sample = list(range(len(self._prior.mean)))
+
         # Find init points depending on `init_strategy` if no init is set
         if self._mcmc_init_params is None:
             if init_strategy == "prior":
-                self._mcmc_init_params = self._prior.sample((num_chains,)).detach()
+                self._mcmc_init_params = self._prior.sample((num_chains,)).detach()[
+                    :, dims_to_sample
+                ]
             elif init_strategy == "sir":
                 self.net.eval()
                 init_param_candidates = self._prior.sample(
                     (init_strategy_num_candidates,)
-                ).detach()
-                potential_function = self._get_potential_function(
+                ).detach()[:, dims_to_sample]
+
+                potential_function = potential_fn_provider(
                     self._prior, self.net, x, "slice_np"
                 )
                 log_weights = torch.cat(
@@ -347,9 +356,7 @@ class NeuralPosterior(ABC):
             else:
                 raise NotImplementedError
 
-        potential_fn = self._get_potential_function(
-            self._prior, self.net, x, mcmc_method
-        )
+        potential_fn = potential_fn_provider(self._prior, self.net, x, mcmc_method)
         track_gradients = mcmc_method != "slice" and mcmc_method != "slice_np"
         with torch.set_grad_enabled(track_gradients):
             if mcmc_method == "slice_np":
@@ -430,7 +437,7 @@ class NeuralPosterior(ABC):
         num_chains: Optional[int] = 1,
         show_progress_bars: bool = True,
     ):
-        r"""Return samples obtained using Pyro HMC, NUTS or slice kernels.
+        r"""Return samples obtained using Pyro HMC, NUTS for slice kernels.
 
         Args:
             num_samples: Desired number of samples.
@@ -463,7 +470,7 @@ class NeuralPosterior(ABC):
         )
         sampler.run()
         samples = next(iter(sampler.get_samples().values())).reshape(
-            -1, len(self._prior.mean)  # len(prior.mean) = dim of theta
+            -1, self._mcmc_init_params.shape[1]  # .shape[1] = dim of theta
         )
 
         samples = samples[::thin][:num_samples]

@@ -219,6 +219,7 @@ def pairplot(
             limits = [limits[0] for _ in range(dim)]
         else:
             limits = limits
+    limits = torch.as_tensor(limits)
 
     # Prepare diag/upper/lower
     if type(opts["diag"]) is not list:
