@@ -28,11 +28,11 @@ REQUIRED = [
     "matplotlib",
     "numpy",
     "pillow",
-    "pyknos>=0.14",
+    "pyknos>=0.14.0",
     "pyro-ppl>=1.3.1",
     "scipy",
     "tensorboard",
-    "torch>=1.5.1",
+    "torch>=1.6.0",
     "tqdm",
 ]
 
