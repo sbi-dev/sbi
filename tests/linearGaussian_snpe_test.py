@@ -18,7 +18,6 @@ from sbi.simulators.linear_gaussian import (
     samples_true_posterior_linear_gaussian_uniform_prior,
     true_posterior_linear_gaussian_mvn_prior,
 )
-from sbi.utils.torchutils import configure_default_device
 from tests.test_utils import (
     check_c2st,
     get_dkl_gaussian_prior,
@@ -39,8 +38,6 @@ def test_c2st_snpe_on_linearGaussian(
         set_seed: fixture for manual seeding
     """
 
-    device = "cpu"
-    configure_default_device(device)
     x_o = zeros(1, num_dim)
     num_samples = 1000
 
@@ -66,7 +63,7 @@ def test_c2st_snpe_on_linearGaussian(
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     simulator, prior = prepare_for_sbi(simulator, prior)
-    inference = SNPE_C(prior, show_progress_bars=False, device=device,)
+    inference = SNPE_C(prior, show_progress_bars=False,)
 
     theta, x = simulate_for_sbi(simulator, prior, 2000, simulation_batch_size=1000)
     _ = inference.append_simulations(theta, x).train(training_batch_size=100)

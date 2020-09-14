@@ -194,6 +194,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
             sampler=SubsetRandomSampler(val_indices),
         )
 
+        self._neural_net.to(self._device)
         optimizer = optim.Adam(list(self._neural_net.parameters()), lr=learning_rate,)
 
         epoch, self._val_log_prob = 0, float("-Inf")
@@ -292,6 +293,11 @@ class LikelihoodEstimator(NeuralInference, ABC):
 
         if density_estimator is None:
             density_estimator = self._neural_net
+            # If internal net is used device is defined.
+            device = self._device
+        else:
+            # Otherwise, infer it from the device of the net parameters.
+            device = next(density_estimator.parameters()).device
 
         self._posterior = LikelihoodBasedPosterior(
             method_family="snle",
@@ -300,6 +306,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
             x_shape=self._x_shape,
             mcmc_method=mcmc_method,
             mcmc_parameters=mcmc_parameters,
+            device=device,
         )
 
         self._posterior._num_trained_rounds = self._round + 1

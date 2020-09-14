@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Any, Callable, Dict, NewType, Optional, Union
+from typing import Any, Callable, Dict, Optional, Union
 
 import torch
 from torch import Tensor, eye, ones, optim
@@ -16,7 +16,6 @@ from sbi.types import TorchModule
 from sbi.utils import (
     check_estimator_arg,
     clamp_and_warn,
-    test_posterior_net_for_multi_d_x,
     validate_theta_and_x,
     x_shape_from_simulation,
 )
@@ -204,6 +203,7 @@ class RatioEstimator(NeuralInference, ABC):
             sampler=SubsetRandomSampler(val_indices),
         )
 
+        self._neural_net.to(self._device)
         optimizer = optim.Adam(list(self._neural_net.parameters()), lr=learning_rate,)
 
         epoch, self._val_log_prob = 0, float("-Inf")
@@ -303,6 +303,11 @@ class RatioEstimator(NeuralInference, ABC):
 
         if density_estimator is None:
             density_estimator = self._neural_net
+            # If internal net is used device is defined.
+            device = self._device
+        else:
+            # Otherwise, infer it from the device of the net parameters.
+            device = next(density_estimator.parameters()).device
 
         self._posterior = RatioBasedPosterior(
             method_family=self.__class__.__name__.lower(),
@@ -311,6 +316,7 @@ class RatioEstimator(NeuralInference, ABC):
             x_shape=self._x_shape,
             mcmc_method=mcmc_method,
             mcmc_parameters=mcmc_parameters,
+            device=device,
         )
 
         self._posterior._num_trained_rounds = self._round + 1

@@ -7,11 +7,6 @@ from typing import (
     Dict,
     List,
     Optional,
-    Sequence,
-    Tuple,
-    TypeVar,
-    Union,
-    cast,
 )
 from warnings import warn
 
@@ -24,7 +19,6 @@ from sbi.types import Shape
 from sbi.utils import del_entries
 from sbi.utils.torchutils import (
     ScalarFloat,
-    atleast_2d_float32_tensor,
     ensure_theta_batched,
     ensure_x_batched,
 )
@@ -52,6 +46,7 @@ class RatioBasedPosterior(NeuralPosterior):
         x_shape: torch.Size,
         mcmc_method: str = "slice_np",
         mcmc_parameters: Optional[Dict[str, Any]] = None,
+        device: str = "cpu",
     ):
         """
         Args:
@@ -71,6 +66,7 @@ class RatioBasedPosterior(NeuralPosterior):
                 will draw init locations from prior, whereas `sir` will use Sequential-
                 Importance-Resampling using `init_strategy_num_candidates` to find init
                 locations.
+            device: Training device, e.g., cpu or cuda:0.
         """
         kwargs = del_entries(locals(), entries=("self", "__class__"))
         super().__init__(**kwargs)
@@ -107,7 +103,12 @@ class RatioBasedPosterior(NeuralPosterior):
         self._warn_log_prob_snre()
 
         with torch.set_grad_enabled(track_gradients):
-            log_ratio = self.net(torch.cat((theta, x), dim=1)).reshape(-1)
+            # Send to device for evaluation, send to CPU for comparison with prior.
+            log_ratio = (
+                self.net(torch.cat((theta.to(self._device), x.to(self._device)), dim=1))
+                .reshape(-1)
+                .to("cpu")
+            )
             return log_ratio + self._prior.log_prob(theta)
 
     def _warn_log_prob_snre(self) -> None:
@@ -338,8 +339,10 @@ class PotentialFunctionProvider:
         ), """X must not be multidimensional for ratio-based methods because it will be
               concatenated with theta."""
         with torch.set_grad_enabled(False):
-            log_ratio = self.classifier(torch.cat((theta, x_repeated), dim=1)).reshape(
-                -1
+            log_ratio = (
+                self.classifier(torch.cat((theta.to(self.x.device), x_repeated), dim=1))
+                .reshape(-1)
+                .cpu()
             )
 
         # Notice opposite sign to pyro potential.
@@ -363,6 +366,8 @@ class PotentialFunctionProvider:
         theta = ensure_theta_batched(theta)
         x = ensure_x_batched(self.x)
 
-        log_ratio = self.classifier(torch.cat((theta, x), dim=1).reshape(1, -1))
+        log_ratio = self.classifier(
+            torch.cat((theta.to(x.device), x), dim=1).reshape(1, -1)
+        ).cpu()
 
         return -(log_ratio + self.prior.log_prob(theta))

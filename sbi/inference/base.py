@@ -22,9 +22,8 @@ from sbi.utils import (
     warn_on_invalid_x,
     warn_on_invalid_x_for_snpec_leakage,
 )
-from sbi.utils.plot import pairplot
 from sbi.utils.sbiutils import get_simulations_since_round
-from sbi.utils.torchutils import configure_default_device
+from sbi.utils.torchutils import process_device
 
 
 def infer(
@@ -101,7 +100,8 @@ class NeuralInference(ABC):
                 parameters, e.g. which ranges are meaningful for them. Any
                 object with `.log_prob()`and `.sample()` (for example, a PyTorch
                 distribution) can be used.
-            device: torch device on which to compute, e.g. gpu or cpu.
+            device: torch device on which to train the neural net and on which to
+                perform all posterior operations, e.g. gpu or cpu.
             logging_level: Minimum severity of messages to log. One of the strings
                "INFO", "WARNING", "DEBUG", "ERROR" and "CRITICAL".
             summary_writer: A `SummaryWriter` to control, among others, log
@@ -113,13 +113,7 @@ class NeuralInference(ABC):
                 0.14.0 is more mature, we will remove this argument.
         """
 
-        # We set the device globally by setting the default tensor type for all tensors.
-        assert device in (
-            "gpu",
-            "cpu",
-        ), "Currently, only 'gpu' or 'cpu' are supported as devices."
-
-        self._device = configure_default_device(device)
+        self._device = process_device(device)
 
         if unused_args:
             warn(

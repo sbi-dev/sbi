@@ -8,30 +8,33 @@ from typing import Union
 
 import numpy as np
 import torch
-from torch import Tensor, device, float32
+from torch import Tensor, float32
 from torch.distributions import Independent, Uniform
 
 from sbi import utils as utils
 from sbi.types import Array, OneOrMore, ScalarFloat
 
 
-def configure_default_device(device: str) -> device:
+def process_device(device: str) -> str:
     """Set and return the default device to cpu or gpu."""
 
-    if device == "cpu":
-        torch.set_default_tensor_type("torch.FloatTensor")
-    elif device == "gpu":
-        warnings.warn(
-            """Gpu was selected as device, the default tensor type will be set to cuda.
-            Note that currently we do not expect computation speed improvements by
-            moving computation to the GPU. We are working on a better solution and
-            recommend to use device='cpu' for now."""
-        )
-        torch.set_default_tensor_type("torch.cuda.FloatTensor")
-    else:
-        raise ValueError(f"Device '{device}' not supported, use 'cpu' or 'gpu'.")
+    if not device == "cpu":
+        if device == "gpu":
+            device = "cuda"
+        try:
+            torch.zeros(1).to(device)
+            warnings.warn(
+                """GPU was selected as a device for training the neural network. Note
+                   that we expect **no** significant speed ups in training for the
+                   default architectures we provide. Using the GPU will be effective
+                   only for large neural networks with operations that are fast on the
+                   GPU, e.g., for a CNN or RNN `embedding_net`."""
+            )
+        except (RuntimeError, AssertionError):
+            warnings.warn(f"Device {device} not available, falling back to CPU.")
+            device = "cpu"
 
-    return torch.ones((1,)).device
+    return device
 
 
 def tile(x, n):
