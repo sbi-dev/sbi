@@ -74,7 +74,7 @@ class Standardize(nn.Module):
         self.register_buffer("_std", std)
 
     def forward(self, tensor):
-        return (tensor - self.mean) / self.std
+        return (tensor - self._mean) / self._std
 
 
 def standardizing_net(batch_t: Tensor, min_std: float = 1e-7) -> nn.Module:
@@ -166,8 +166,10 @@ def sample_posterior_within_prior(
     while num_remaining > 0:
 
         # Sample and reject.
-        candidates = posterior_nn.sample(sampling_batch_size, context=x).reshape(
-            sampling_batch_size, -1
+        candidates = (
+            posterior_nn.sample(sampling_batch_size, context=x)
+            .reshape(sampling_batch_size, -1)
+            .cpu()  # Move to cpu to evaluate under prior.
         )
         are_within_prior = torch.isfinite(prior.log_prob(candidates))
         samples = candidates[are_within_prior]

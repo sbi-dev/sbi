@@ -7,11 +7,6 @@ from typing import (
     Dict,
     List,
     Optional,
-    Sequence,
-    Tuple,
-    TypeVar,
-    Union,
-    cast,
 )
 from warnings import warn
 
@@ -24,7 +19,6 @@ from sbi.types import Shape
 from sbi.utils import del_entries
 from sbi.utils.torchutils import (
     ScalarFloat,
-    atleast_2d_float32_tensor,
     ensure_theta_batched,
     ensure_x_batched,
 )
@@ -48,6 +42,7 @@ class LikelihoodBasedPosterior(NeuralPosterior):
         x_shape: torch.Size,
         mcmc_method: str = "slice_np",
         mcmc_parameters: Optional[Dict[str, Any]] = None,
+        device: str = "cpu",
     ):
         """
         Args:
@@ -67,6 +62,7 @@ class LikelihoodBasedPosterior(NeuralPosterior):
                 will draw init locations from prior, whereas `sir` will use Sequential-
                 Importance-Resampling using `init_strategy_num_candidates` to find init
                 locations.
+            device: Training device, e.g., cpu or cuda:0.
         """
 
         kwargs = del_entries(locals(), entries=("self", "__class__"))
@@ -109,7 +105,10 @@ class LikelihoodBasedPosterior(NeuralPosterior):
         )
 
         with torch.set_grad_enabled(track_gradients):
-            return self.net.log_prob(x, theta) + self._prior.log_prob(theta)
+            # Evaluate on device, move to cpu for comparison with prior.
+            return self.net.log_prob(
+                x.to(self._device), theta.to(self._device)
+            ).cpu() + self._prior.log_prob(theta)
 
     def sample(
         self,
@@ -289,7 +288,10 @@ class PotentialFunctionProvider:
         x = ensure_x_batched(self.x).repeat(num_batch, 1)
 
         with torch.set_grad_enabled(False):
-            log_likelihood = self.likelihood_nn.log_prob(inputs=x, context=theta)
+            # Evaluate on device, move back to cpu for comparison with prior.
+            log_likelihood = self.likelihood_nn.log_prob(
+                inputs=x, context=theta.to(x.device)
+            ).cpu()
 
         # Notice opposite sign to pyro potential.
         return log_likelihood + self.prior.log_prob(theta)
@@ -308,8 +310,9 @@ class PotentialFunctionProvider:
 
         theta = next(iter(theta.values()))
 
+        # Evaluate on device, move back to cpu for comparison with prior.
         log_likelihood = self.likelihood_nn.log_prob(
-            inputs=self.x.reshape(1, -1), context=theta.reshape(1, -1)
-        )
+            inputs=self.x.reshape(1, -1), context=theta.reshape(1, -1).to(self.x.device)
+        ).cpu()
 
         return -(log_likelihood + self.prior.log_prob(theta))

@@ -15,3 +15,7 @@ def set_default_tensor_type():
 def set_seed():
     torch.manual_seed(seed)
     numpy.random.seed(seed)
+
+
+def pytest_configure(config):
+    config.addinivalue_line("markers", "requires_cuda: mark test that requires cuda.")

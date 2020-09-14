@@ -16,7 +16,6 @@ from sbi.simulators.linear_gaussian import (
     samples_true_posterior_linear_gaussian_uniform_prior,
     true_posterior_linear_gaussian_mvn_prior,
 )
-from sbi.utils.torchutils import configure_default_device
 from tests.test_utils import check_c2st, get_prob_outside_uniform_prior
 
 
@@ -57,8 +56,6 @@ def test_c2st_snl_on_linearGaussian_different_dims(set_seed):
         set_seed: fixture for manual seeding
     """
 
-    device = "cpu"
-    configure_default_device(device)
     theta_dim = 3
     x_dim = 2
     discard_dims = theta_dim - x_dim
@@ -88,7 +85,7 @@ def test_c2st_snl_on_linearGaussian_different_dims(set_seed):
     )
 
     simulator, prior = prepare_for_sbi(simulator, prior)
-    inference = SNL(prior, show_progress_bars=False, device=device,)
+    inference = SNL(prior, show_progress_bars=False,)
 
     theta, x = simulate_for_sbi(simulator, prior, 5000, simulation_batch_size=50)
     _ = inference.append_simulations(theta, x).train()
