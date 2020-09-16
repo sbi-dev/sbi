@@ -20,7 +20,10 @@ import torch
 from torch import Tensor, log, nn
 
 from sbi import utils as utils
-from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.inference.posteriors.base_posterior import (
+    NeuralPosterior,
+    ConditionalPotentialFunctionProvider,
+)
 from sbi.types import ScalarFloat, Shape
 from sbi.utils import del_entries
 from sbi.utils.torchutils import (
@@ -278,12 +281,16 @@ class DirectPosterior(NeuralPosterior):
         )
 
         if sample_with_mcmc:
+            init_fn = self._build_mcmc_init_fn(
+                x, PotentialFunctionProvider(), **mcmc_parameters,
+            )
             samples = self._sample_posterior_mcmc(
                 num_samples=num_samples,
                 x=x,
                 potential_fn_provider=PotentialFunctionProvider(),
                 show_progress_bars=show_progress_bars,
                 mcmc_method=mcmc_method,
+                init_fn=init_fn,
                 **mcmc_parameters,
             )
         else:
@@ -308,7 +315,6 @@ class DirectPosterior(NeuralPosterior):
         mcmc_method: Optional[str] = None,
         mcmc_parameters: Optional[Dict[str, Any]] = None,
     ) -> Tensor:
-
         r"""
         Return samples from conditional posterior $p(\theta_i|\theta_j, x)$.
 
@@ -347,23 +353,16 @@ class DirectPosterior(NeuralPosterior):
             Samples from conditional posterior.
         """
 
-        x, num_samples, mcmc_method, mcmc_parameters = self._prepare_for_sample(
-            x, sample_shape, mcmc_method, mcmc_parameters
+        return super().sample_conditional(
+            PotentialFunctionProvider(),
+            sample_shape,
+            condition,
+            dims_to_sample,
+            x,
+            show_progress_bars,
+            mcmc_method,
+            mcmc_parameters,
         )
-
-        samples = self._sample_posterior_mcmc(
-            num_samples=num_samples,
-            x=x,
-            potential_fn_provider=ConditionalPotentialFunctionProvider(
-                condition, dims_to_sample
-            ),
-            dims_to_sample=dims_to_sample,
-            show_progress_bars=show_progress_bars,
-            mcmc_method=mcmc_method,
-            **mcmc_parameters,
-        )
-
-        return samples.reshape((*sample_shape, -1))
 
 
 class PotentialFunctionProvider:
@@ -441,73 +440,3 @@ class PotentialFunctionProvider:
         within_prior = torch.isfinite(log_prob_prior)
 
         return torch.where(within_prior, log_prob_posterior, log_prob_prior)
-
-
-class ConditionalPotentialFunctionProvider(PotentialFunctionProvider):
-    """
-    Wraps the potential functions to allow for sampling from the conditional posterior.
-    """
-
-    def __init__(
-        self, condition: Tensor, dims_to_sample: List[int],
-    ):
-        """
-        Args:
-            condition: Parameter set that all dimensions not specified in
-                `dims_to_sample` will be fixed to. Should contain dim_theta elements,
-                i.e. it could e.g. be a sample from the posterior distribution.
-                The entries at all `dims_to_sample` will be ignored.
-            dims_to_sample: Which dimensions to sample from. The dimensions not
-                specified in `dims_to_sample` will be fixed to values given in
-                `condition`.
-        """
-
-        self.condition = ensure_theta_batched(condition)
-        self.dims_to_sample = dims_to_sample
-
-    def __call__(
-        self, prior, posterior_nn: nn.Module, x: Tensor, mcmc_method: str,
-    ) -> Callable:
-        """Return potential function.
-
-        Switch on numpy or pyro potential function based on `mcmc_method`.
-        """
-
-        return super().__call__(prior, posterior_nn, x, mcmc_method)
-
-    def np_potential(self, theta: np.ndarray) -> ScalarFloat:
-        r"""
-        Return conditional posterior log-probability or $-\infty$ if outside prior.
-
-        Args:
-            theta: Free parameters $\theta_i$, batch dimension 1.
-
-        Returns:
-            Conditional posterior log-probability $\log(p(\theta_i|\theta_j, x))$,
-            masked outside of prior.
-        """
-        theta = torch.as_tensor(theta, dtype=torch.float32)
-
-        theta_condition = deepcopy(self.condition)
-        theta_condition[:, self.dims_to_sample] = theta
-
-        return super().np_potential(utils.tensor2numpy(theta_condition))
-
-    def pyro_potential(self, theta: Dict[str, Tensor]) -> Tensor:
-        r"""
-        Return conditional posterior log-probability or $-\infty$ if outside prior.
-
-        Args:
-            theta: Free parameters $\theta_i$ (from pyro sampler).
-
-        Returns:
-            Conditional posterior log-probability $\log(p(\theta_i|\theta_j, x))$,
-            masked outside of prior.
-        """
-
-        theta = next(iter(theta.values()))
-
-        theta_condition = deepcopy(self.condition)
-        theta_condition[:, self.dims_to_sample] = theta
-
-        return super().pyro_potential({"": theta_condition})

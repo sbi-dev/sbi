@@ -15,13 +15,14 @@ from typing import (
 )
 from warnings import warn
 
+import numpy as np
 import torch
 from torch import Tensor, nn
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.types import Shape
 from sbi.utils import del_entries
-from sbi.utils.torchutils import atleast_2d_float32_tensor
+from sbi.utils.torchutils import ScalarFloat, atleast_2d_float32_tensor
 
 
 class LikelihoodBasedPosterior(NeuralPosterior):
@@ -147,12 +148,99 @@ class LikelihoodBasedPosterior(NeuralPosterior):
             x, sample_shape, mcmc_method, mcmc_parameters
         )
 
+        init_fn = self._build_mcmc_init_fn(
+            x, PotentialFunctionProvider(), **mcmc_parameters,
+        )
         samples = self._sample_posterior_mcmc(
-            x=x,
             num_samples=num_samples,
+            x=x,
+            potential_fn_provider=PotentialFunctionProvider(),
             show_progress_bars=show_progress_bars,
             mcmc_method=mcmc_method,
+            init_fn=init_fn,
             **mcmc_parameters,
         )
 
         return samples.reshape((*sample_shape, -1))
+
+
+class PotentialFunctionProvider:
+    """
+    This class is initialized without arguments during the initialization of the
+     Posterior class. When called, it specializes to the potential function appropriate
+     to the requested mcmc_method.
+
+    NOTE: Why use a class?
+    ----------------------
+    During inference, we use deepcopy to save untrained posteriors in memory. deepcopy
+    uses pickle which can't serialize nested functions
+    (https://stackoverflow.com/a/12022055).
+
+    It is important to NOT initialize attributes upon instantiation, because we need the
+    most current trained posterior neural net.
+
+    Returns:
+        Potential function for use by either numpy or pyro sampler.
+    """
+
+    def __call__(
+        self, prior, likelihood_nn: nn.Module, x: Tensor, mcmc_method: str,
+    ) -> Callable:
+        r"""Return potential function for posterior $p(\theta|x)$.
+
+        Switch on numpy or pyro potential function based on mcmc_method.
+
+        Args:
+            prior: Prior distribution that can be evaluated.
+            likelihood_nn: Neural likelihood estimator that can be evaluated.
+            x: Conditioning variable for posterior $p(\theta|x)$.
+            mcmc_method: One of `slice_np`, `slice`, `hmc` or `nuts`.
+
+        Returns:
+            Potential function for sampler.
+        """
+        self.likelihood_nn = likelihood_nn
+        self.prior = prior
+        self.x = x
+
+        if mcmc_method in ("slice", "hmc", "nuts"):
+            return self.pyro_potential
+        else:
+            return self.np_potential
+
+    def np_potential(self, theta: np.array) -> ScalarFloat:
+        r"""Return posterior log prob. of theta $p(\theta|x)$"
+
+        Args:
+            theta: Parameters $\theta$, batch dimension 1.
+
+        Returns:
+            Posterior log probability of the theta, $-\infty$ if impossible under prior.
+        """
+        theta = torch.as_tensor(theta, dtype=torch.float32)
+        log_likelihood = self.likelihood_nn.log_prob(
+            inputs=self.x.reshape(1, -1), context=theta.reshape(1, -1)
+        )
+
+        # Notice opposite sign to pyro potential.
+        return log_likelihood + self.prior.log_prob(theta)
+
+    def pyro_potential(self, theta: Dict[str, Tensor]) -> Tensor:
+        r"""Return posterior log probability of parameters $p(\theta|x)$.
+
+         Args:
+            theta: Parameters $\theta$. The tensor's shape will be
+                (1, shape_of_single_theta) if running a single chain or just
+                (shape_of_single_theta) for multiple chains.
+
+        Returns:
+            The potential $-[\log r(x_o, \theta) + \log p(\theta)]$.
+        """
+
+        theta = next(iter(theta.values()))
+
+        log_likelihood = self.likelihood_nn.log_prob(
+            inputs=self.x.reshape(1, -1), context=theta.reshape(1, -1)
+        )
+
+        return -(log_likelihood + self.prior.log_prob(theta))
