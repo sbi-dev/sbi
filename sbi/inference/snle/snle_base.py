@@ -156,7 +156,6 @@ class LikelihoodEstimator(NeuralInference, ABC):
                 x_shape=x_shape,
                 mcmc_method=self._mcmc_method,
                 mcmc_parameters=self._mcmc_parameters,
-                get_potential_function=PotentialFunctionProvider(),
             )
 
         # Fit neural likelihood to newly aggregated dataset.

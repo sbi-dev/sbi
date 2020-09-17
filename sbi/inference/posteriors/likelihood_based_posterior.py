@@ -43,7 +43,6 @@ class LikelihoodBasedPosterior(NeuralPosterior):
         x_shape: torch.Size,
         mcmc_method: str = "slice_np",
         mcmc_parameters: Optional[Dict[str, Any]] = None,
-        get_potential_function: Optional[Callable] = None,
     ):
         """
         Args:
@@ -63,8 +62,6 @@ class LikelihoodBasedPosterior(NeuralPosterior):
                 will draw init locations from prior, whereas `sir` will use Sequential-
                 Importance-Resampling using `init_strategy_num_candidates` to find init
                 locations.
-            get_potential_function: Callable that returns the potential function used
-                for MCMC sampling.
         """
 
         kwargs = del_entries(locals(), entries=("self", "__class__"))
@@ -148,20 +145,78 @@ class LikelihoodBasedPosterior(NeuralPosterior):
             x, sample_shape, mcmc_method, mcmc_parameters
         )
 
-        init_fn = self._build_mcmc_init_fn(
-            x, PotentialFunctionProvider(), **mcmc_parameters,
-        )
+        potential_fn_provider = PotentialFunctionProvider()
         samples = self._sample_posterior_mcmc(
             num_samples=num_samples,
-            x=x,
-            potential_fn_provider=PotentialFunctionProvider(),
-            show_progress_bars=show_progress_bars,
+            potential_fn=potential_fn_provider(self._prior, self.net, x, mcmc_method),
+            init_fn=self._build_mcmc_init_fn(
+                self._prior, x, potential_fn_provider, **mcmc_parameters,
+            ),
             mcmc_method=mcmc_method,
-            init_fn=init_fn,
+            show_progress_bars=show_progress_bars,
             **mcmc_parameters,
         )
 
         return samples.reshape((*sample_shape, -1))
+
+    def sample_conditional(
+        self,
+        sample_shape: Shape,
+        condition: Tensor,
+        dims_to_sample: List[int],
+        x: Optional[Tensor] = None,
+        show_progress_bars: bool = True,
+        mcmc_method: Optional[str] = None,
+        mcmc_parameters: Optional[Dict[str, Any]] = None,
+    ) -> Tensor:
+        r"""
+        Return samples from conditional posterior $p(\theta_i|\theta_j, x)$.
+
+        In this function, we do not sample from the full posterior, but instead only
+        from a few parameter dimensions while the other parameter dimensions are kept
+        fixed at values specified in `condition`.
+
+        Samples are obtained with MCMC.
+
+        Args:
+            sample_shape: Desired shape of samples that are drawn from posterior. If
+                sample_shape is multidimensional we simply draw `sample_shape.numel()`
+                samples and then reshape into the desired shape.
+            condition: Parameter set that all dimensions not specified in
+                `dims_to_sample` will be fixed to. Should contain dim_theta elements,
+                i.e. it could e.g. be a sample from the posterior distribution.
+                The entries at all `dims_to_sample` will be ignored.
+            dims_to_sample: Which dimensions to sample from. The dimensions not
+                specified in `dims_to_sample` will be fixed to values given in
+                `condition`.
+            x: Conditioning context for posterior $p(\theta|x)$. If not provided,
+                fall back onto `x_o` if previously provided for multiround training, or
+                to a set default (see `set_default_x()` method).
+            show_progress_bars: Whether to show sampling progress monitor.
+            mcmc_method: Optional parameter to override `self.mcmc_method`.
+            mcmc_parameters: Dictionary overriding the default parameters for MCMC.
+                The following parameters are supported: `thin` to set the thinning
+                factor for the chain, `warmup_steps` to set the initial number of
+                samples to discard, `num_chains` for the number of chains,
+                `init_strategy` for the initialisation strategy for chains; `prior`
+                will draw init locations from prior, whereas `sir` will use Sequential-
+                Importance-Resampling using `init_strategy_num_candidates` to find init
+                locations.
+
+        Returns:
+            Samples from conditional posterior.
+        """
+
+        return super().sample_conditional(
+            PotentialFunctionProvider(),
+            sample_shape,
+            condition,
+            dims_to_sample,
+            x,
+            show_progress_bars,
+            mcmc_method,
+            mcmc_parameters,
+        )
 
 
 class PotentialFunctionProvider:

@@ -162,7 +162,6 @@ class RatioEstimator(NeuralInference, ABC):
                 x_shape=x_shape,
                 mcmc_method=self._mcmc_method,
                 mcmc_parameters=self._mcmc_parameters,
-                get_potential_function=PotentialFunctionProvider(),
             )
 
         # Fit posterior using newly aggregated data set.
@@ -329,92 +328,3 @@ class RatioEstimator(NeuralInference, ABC):
     @abstractmethod
     def _loss(self, theta: Tensor, x: Tensor, num_atoms: int) -> Tensor:
         raise NotImplementedError
-
-
-class PotentialFunctionProvider:
-    """
-    This class is initialized without arguments during the initialization of the
-    Posterior class. When called, it specializes to the potential function appropriate
-    to the requested `mcmc_method`.
-
-    NOTE: Why use a class?
-    ----------------------
-    During inference, we use deepcopy to save untrained posteriors in memory. deepcopy
-    uses pickle which can't serialize nested functions
-    (https://stackoverflow.com/a/12022055).
-
-    It is important to NOT initialize attributes upon instantiation, because we need the
-     most current trained posterior neural net.
-
-    Returns:
-        Potential function for use by either numpy or pyro sampler
-    """
-
-    def __call__(
-        self, prior, classifier: nn.Module, x: Tensor, mcmc_method: str,
-    ) -> Callable:
-        r"""Return potential function for posterior $p(\theta|x)$.
-
-        Switch on numpy or pyro potential function based on `mcmc_method`.
-
-        Args:
-            prior: Prior distribution that can be evaluated.
-            classifier: Binary classifier approximating the likelihood up to a constant.
-
-            x: Conditioning variable for posterior $p(\theta|x)$.
-            mcmc_method: One of `slice_np`, `slice`, `hmc` or `nuts`.
-
-        Returns:
-            Potential function for sampler.
-        """
-
-        self.classifier = classifier
-        self.prior = prior
-        self.x = x
-
-        if mcmc_method in ("slice", "hmc", "nuts"):
-            return self.pyro_potential
-        else:
-            return self.np_potential
-
-    def np_potential(self, theta: np.array) -> ScalarFloat:
-        """Return potential for Numpy slice sampler."
-
-        Args:
-            theta: Parameters $\theta$, batch dimension 1.
-
-        Returns:
-            Posterior log probability of theta.
-        """
-        theta = torch.as_tensor(theta, dtype=torch.float32)
-
-        # Theta and x should have shape (1, dim).
-        theta = ensure_theta_batched(theta)
-        x = ensure_x_batched(self.x)
-
-        log_ratio = self.classifier(torch.cat((theta, x), dim=1).reshape(1, -1))
-
-        # Notice opposite sign to pyro potential.
-        return log_ratio + self.prior.log_prob(theta)
-
-    def pyro_potential(self, theta: Dict[str, Tensor]) -> Tensor:
-        r"""Return potential for Pyro sampler.
-
-        Args:
-            theta: Parameters $\theta$. The tensor's shape will be
-             (1, shape_of_single_theta) if running a single chain or just
-             (shape_of_single_theta) for multiple chains.
-
-        Returns:
-            Potential $-(\log r(x_o, \theta) + \log p(\theta))$.
-        """
-
-        theta = next(iter(theta.values()))
-
-        # Theta and x should have shape (1, dim).
-        theta = ensure_theta_batched(theta)
-        x = ensure_x_batched(self.x)
-
-        log_ratio = self.classifier(torch.cat((theta, x), dim=1).reshape(1, -1))
-
-        return -(log_ratio + self.prior.log_prob(theta))

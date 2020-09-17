@@ -17,8 +17,6 @@ def sir(
     x: Tensor,
     potential_fn_provider: Callable,
     init_strategy_num_candidates: int,
-    condition: Optional[Tensor] = None,
-    dims_to_sample: Optional[List] = None,
 ) -> Tensor:
     r"""
     Return a sample obtained by sequential importance reweighing.
@@ -34,14 +32,6 @@ def sir(
         potential_fn_provider: Returns the potential function that the candidate
             samples are weighted with.
         init_strategy_num_candidates: Number of candidate samples drawn.
-        condition: If provided, we evaluate the candidate samples on the conditional
-            log-probability. Should contain dim_theta elements, i.e. it could e.g. be
-            a sample from the posterior distribution. The entries at all
-            `dims_to_sample` will be ignored.
-        dims_to_sample: Which dimensions to sample from. If `None`, sample from the
-            full posterior distribution. If not `None`, we sample only from the
-            dimensions in the list while the others are fixed to values specified in
-            `condition`.
 
     Returns:
         A single sample.
@@ -51,17 +41,9 @@ def sir(
     potential_fn = potential_fn_provider(prior, net, x, "slice_np")
     init_param_candidates = prior.sample((init_strategy_num_candidates,)).detach()
 
-    if condition is None:
-        theta_dim = len(prior.mean)
-        dims_to_sample = list(range(theta_dim))
-        condition = torch.empty(1, theta_dim)
-
-    conditional_candidates = deepcopy(condition).repeat(init_strategy_num_candidates, 1)
-    conditional_candidates[:, dims_to_sample] = init_param_candidates
-
     log_weights = torch.cat(
         [
-            potential_fn(conditional_candidates[i, :]).detach()
+            potential_fn(init_param_candidates[i, :]).detach()
             for i in range(init_strategy_num_candidates)
         ]
     )
@@ -73,4 +55,4 @@ def sir(
         a=np.arange(init_strategy_num_candidates), size=1, replace=False, p=probs,
     )
     net.train(True)
-    return conditional_candidates[torch.from_numpy(idxs.astype(int)), :]
+    return init_param_candidates[torch.from_numpy(idxs.astype(int)), :]

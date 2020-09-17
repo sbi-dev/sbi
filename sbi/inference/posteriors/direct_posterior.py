@@ -21,8 +21,8 @@ from torch import Tensor, log, nn
 
 from sbi import utils as utils
 from sbi.inference.posteriors.base_posterior import (
-    NeuralPosterior,
     ConditionalPotentialFunctionProvider,
+    NeuralPosterior,
 )
 from sbi.types import ScalarFloat, Shape
 from sbi.utils import del_entries
@@ -245,7 +245,7 @@ class DirectPosterior(NeuralPosterior):
         Return samples from posterior distribution $p(\theta|x)$.
 
         Samples are obtained either with rejection sampling or MCMC. Rejection sampling
-        will be a lot faster if leakage is rather low. If leakage is high (e.g. above
+        will be a lot faster if leakage is rather low. If leakage is high (e.g. over
         99%, which can happen in multi-round SNPE), MCMC can be faster than rejection
         sampling.
 
@@ -281,16 +281,17 @@ class DirectPosterior(NeuralPosterior):
         )
 
         if sample_with_mcmc:
-            init_fn = self._build_mcmc_init_fn(
-                x, PotentialFunctionProvider(), **mcmc_parameters,
-            )
+            potential_fn_provider = PotentialFunctionProvider()
             samples = self._sample_posterior_mcmc(
                 num_samples=num_samples,
-                x=x,
-                potential_fn_provider=PotentialFunctionProvider(),
-                show_progress_bars=show_progress_bars,
+                potential_fn=potential_fn_provider(
+                    self._prior, self.net, x, mcmc_method
+                ),
+                init_fn=self._build_mcmc_init_fn(
+                    self._prior, x, potential_fn_provider, **mcmc_parameters,
+                ),
                 mcmc_method=mcmc_method,
-                init_fn=init_fn,
+                show_progress_bars=show_progress_bars,
                 **mcmc_parameters,
             )
         else:
@@ -409,6 +410,7 @@ class PotentialFunctionProvider:
         Returns:
             Posterior log probability $\log(p(\theta|x))$.
         """
+
         theta = torch.as_tensor(theta, dtype=torch.float32)
 
         is_within_prior = torch.isfinite(self.prior.log_prob(theta))
