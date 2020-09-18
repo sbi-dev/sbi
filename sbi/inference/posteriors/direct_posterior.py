@@ -280,6 +280,8 @@ class DirectPosterior(NeuralPosterior):
             sample_with_mcmc if sample_with_mcmc is not None else self.sample_with_mcmc
         )
 
+        self.net.eval()
+
         if sample_with_mcmc:
             potential_fn_provider = PotentialFunctionProvider()
             samples = self._sample_posterior_mcmc(
@@ -288,7 +290,9 @@ class DirectPosterior(NeuralPosterior):
                     self._prior, self.net, x, mcmc_method
                 ),
                 init_fn=self._build_mcmc_init_fn(
-                    self._prior, x, potential_fn_provider, **mcmc_parameters,
+                    self._prior,
+                    potential_fn_provider(self._prior, self.net, x, "slice_np"),
+                    **mcmc_parameters,
                 ),
                 mcmc_method=mcmc_method,
                 show_progress_bars=show_progress_bars,
@@ -303,6 +307,8 @@ class DirectPosterior(NeuralPosterior):
                 num_samples=num_samples,
                 show_progress_bars=show_progress_bars,
             )
+
+        self.net.train(True)
 
         return samples.reshape((*sample_shape, -1))
 
