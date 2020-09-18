@@ -2,6 +2,7 @@
 - Conditional distributions and correlations for analysing the posterior (#321)
 - Moved rarely used arguments from pairplot into kwargs (#321)
 - Sampling from conditional posterior (#327)
+- Allow inference with multi-dimensional x when appropriate embedding is passed (#335)
 
 
 # v0.12.2

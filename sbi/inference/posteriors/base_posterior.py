@@ -9,18 +9,14 @@ from typing import (
     Dict,
     List,
     Optional,
-    Sequence,
     Tuple,
-    TypeVar,
-    Union,
-    cast,
 )
 
 import numpy as np
 import torch
 from pyro.infer.mcmc import HMC, NUTS
 from pyro.infer.mcmc.api import MCMC
-from torch import Tensor, log
+from torch import Tensor
 from torch import multiprocessing as mp
 from torch import nn
 
