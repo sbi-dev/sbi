@@ -12,11 +12,7 @@ def prior_init(prior: Any) -> Tensor:
 
 
 def sir(
-    prior: Any,
-    net: Any,
-    x: Tensor,
-    potential_fn_provider: Callable,
-    init_strategy_num_candidates: int,
+    prior: Any, potential_fn: Callable, init_strategy_num_candidates: int,
 ) -> Tensor:
     r"""
     Return a sample obtained by sequential importance reweighing.
@@ -26,19 +22,13 @@ def sir(
 
     Args:
         prior: Prior distribution, candidate samples are drawn from it.
-        net: Neural network with `.log_prob()` method. Used to obtain weights for the
-            candidate samples.
-        x: Context at which to evaluate the `net`.
-        potential_fn_provider: Returns the potential function that the candidate
-            samples are weighted with.
+        potential_fn: Potential function that the candidate samples are weighted with.
         init_strategy_num_candidates: Number of candidate samples drawn.
 
     Returns:
         A single sample.
     """
 
-    net.eval()
-    potential_fn = potential_fn_provider(prior, net, x, "slice_np")
     init_param_candidates = prior.sample((init_strategy_num_candidates,)).detach()
 
     log_weights = torch.cat(
@@ -54,5 +44,4 @@ def sir(
     idxs = np.random.choice(
         a=np.arange(init_strategy_num_candidates), size=1, replace=False, p=probs,
     )
-    net.train(True)
     return init_param_candidates[torch.from_numpy(idxs.astype(int)), :]

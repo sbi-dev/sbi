@@ -282,7 +282,6 @@ class NeuralPosterior(ABC):
         thin: int = 10,
         warmup_steps: int = 20,
         num_chains: Optional[int] = 1,
-        resume_and_save_state: bool = True,
         show_progress_bars: bool = True,
         **kwargs,
     ) -> Tensor:
@@ -305,10 +304,6 @@ class NeuralPosterior(ABC):
                 sample will be returned, until a total of `num_samples`.
             warmup_steps: Initial number of samples to discard.
             num_chains: Whether to sample in parallel. If None, use all but one CPU.
-            resume_and_save_state: If `True`, two things will be triggered: first, if
-                available, the last last sample from the previous chain will be used as
-                the initial parameter for the current chain. Second, the last sample
-                from the current chain will be stored to be used in the same way later.
             show_progress_bars: Whether to show a progressbar during sampling.
             kwargs: Absorbs passed but unused arguments. E.g. in
                 `DirectPosterior.sample()` we pass `mcmc_parameters` which might
@@ -319,12 +314,7 @@ class NeuralPosterior(ABC):
             Tensor of shape (num_samples, shape_of_single_theta).
         """
 
-        # Find init points depending on `init_strategy` if no init is set or we do not
-        # want to resume the previous state of the chain.
-        if self._mcmc_init_params is None or not resume_and_save_state:
-            initial_params = torch.cat([init_fn() for _ in range(num_chains)])
-        else:
-            initial_params = self._mcmc_init_params
+        initial_params = torch.cat([init_fn() for _ in range(num_chains)])
 
         track_gradients = mcmc_method != "slice" and mcmc_method != "slice_np"
         with torch.set_grad_enabled(track_gradients):
@@ -335,7 +325,6 @@ class NeuralPosterior(ABC):
                     initial_params=initial_params,
                     thin=thin,
                     warmup_steps=warmup_steps,
-                    save_chain_state=resume_and_save_state,
                 )
             elif mcmc_method in ("hmc", "nuts", "slice"):
                 samples = self._pyro_mcmc(
@@ -360,7 +349,6 @@ class NeuralPosterior(ABC):
         initial_params: Tensor,
         thin: int,
         warmup_steps: int,
-        save_chain_state: bool,
     ) -> Tensor:
         """
         Custom implementation of slice sampling using Numpy.
@@ -374,8 +362,6 @@ class NeuralPosterior(ABC):
 
         Returns: Tensor of shape (num_samples, shape_of_single_theta).
         """
-        # Go into eval mode for evaluating during sampling
-        self.net.eval()
 
         num_chains = initial_params.shape[0]
         dim_samples = initial_params.shape[1]
@@ -394,15 +380,11 @@ class NeuralPosterior(ABC):
 
         samples = torch.from_numpy(all_samples)  # chains x samples x dim
 
-        # Final sample will be next init location.
-        if save_chain_state:
-            self._mcmc_init_params = samples[:, -1, :].reshape(num_chains, dim_samples)
+        # Save sample as potential next init (if init_strategy == 'latest_sample').
+        self._mcmc_init_params = samples[:, -1, :].reshape(num_chains, dim_samples)
 
         samples = samples.reshape(-1, dim_samples)[:num_samples, :]
         assert samples.shape[0] == num_samples
-
-        # Back to training mode
-        self.net.train(True)
 
         return samples.type(torch.float32)
 
@@ -434,9 +416,6 @@ class NeuralPosterior(ABC):
         """
         num_chains = mp.cpu_count - 1 if num_chains is None else num_chains
 
-        # Go into eval mode for evaluating during sampling
-        self.net.eval()
-
         kernels = dict(slice=Slice, hmc=HMC, nuts=NUTS)
 
         sampler = MCMC(
@@ -455,9 +434,6 @@ class NeuralPosterior(ABC):
 
         samples = samples[::thin][:num_samples]
         assert samples.shape[0] == num_samples
-
-        # Back to training mode
-        self.net.train(True)
 
         return samples
 
@@ -516,19 +492,16 @@ class NeuralPosterior(ABC):
             x, sample_shape, mcmc_method, mcmc_parameters
         )
 
-        cond_potential_fn_provider = ConditionalPotentialFunctionProvider(
-            potential_fn_provider, condition, dims_to_sample
-        )
-
         class PriorWithFewerDims:
             """
-            Creates a prior which samples only from the free dimensions.
+            Prior which samples only from the free dimensions of the conditional.
 
             This is needed for the the MCMC initialization functions when conditioning.
-            For prior init, we could post-hoc select the relevant dimensions. But for
-            SIR, we want to evaluate the conditional posterior, which takes only a
-            subset of dimensions. This subset is provided by `.sample()` from this
-            class.
+            For the prior init, we could post-hoc select the relevant dimensions. But
+            for SIR, we want to evaluate the `potential_fn` of the conditional
+            posterior, which takes only a subset of the full parameter vector theta
+            (only the `dims_to_sample`). This subset is provided by `.sample()` from
+            this class.
             """
 
             def __init__(self, full_prior: Any):
@@ -548,6 +521,12 @@ class NeuralPosterior(ABC):
                 """
                 return self.full_prior.log_prob(*args, **kwargs)
 
+        self.net.eval()
+
+        cond_potential_fn_provider = ConditionalPotentialFunctionProvider(
+            potential_fn_provider, condition, dims_to_sample
+        )
+
         samples = self._sample_posterior_mcmc(
             num_samples=num_samples,
             potential_fn=cond_potential_fn_provider(
@@ -555,25 +534,24 @@ class NeuralPosterior(ABC):
             ),
             init_fn=self._build_mcmc_init_fn(
                 PriorWithFewerDims(self._prior),
-                x,
-                cond_potential_fn_provider,
+                cond_potential_fn_provider(self._prior, self.net, x, "slice_np"),
                 **mcmc_parameters,
             ),
             mcmc_method=mcmc_method,
             condition=condition,
             dims_to_sample=dims_to_sample,
-            resume_and_save_state=False,
             show_progress_bars=show_progress_bars,
             **mcmc_parameters,
         )
+
+        self.net.train(True)
 
         return samples.reshape((*sample_shape, -1))
 
     def _build_mcmc_init_fn(
         self,
         prior: Any,
-        x: Tensor,
-        potential_fn_provider: Callable,
+        potential_fn: Callable,
         init_strategy: str = "prior",
         init_strategy_num_candidates: int = 10000,
         **kwargs,
@@ -583,9 +561,8 @@ class NeuralPosterior(ABC):
 
         Args:
             prior: Prior distribution.
-            x: Context at which to evaluate the density estimator.
-            potential_fn_provider: Returns the potential function that the candidate
-                samples are weighted with.
+            potential_fn: Potential function that the candidate samples are weighted
+                with.
             init_strategy: Specifies the initialization method. Either of
                 [`prior`|`sir`].
             init_strategy_num_candidates: Number of candidate samples drawn.
@@ -599,9 +576,9 @@ class NeuralPosterior(ABC):
         if init_strategy == "prior":
             return lambda: prior_init(prior)
         elif init_strategy == "sir":
-            return lambda: sir(
-                prior, self.net, x, potential_fn_provider, init_strategy_num_candidates,
-            )
+            return lambda: sir(prior, potential_fn, init_strategy_num_candidates,)
+        elif init_strategy == "latest_sample":
+            return lambda: self._mcmc_init_params
         else:
             raise NotImplementedError
 

@@ -162,17 +162,23 @@ class RatioBasedPosterior(NeuralPosterior):
             x, sample_shape, mcmc_method, mcmc_parameters
         )
 
+        self.net.eval()
+
         potential_fn_provider = PotentialFunctionProvider()
         samples = self._sample_posterior_mcmc(
             num_samples=num_samples,
             potential_fn=potential_fn_provider(self._prior, self.net, x, mcmc_method),
             init_fn=self._build_mcmc_init_fn(
-                self._prior, x, potential_fn_provider, **mcmc_parameters,
+                self._prior,
+                potential_fn_provider(self._prior, self.net, x, "slice_np"),
+                **mcmc_parameters,
             ),
             mcmc_method=mcmc_method,
             show_progress_bars=show_progress_bars,
             **mcmc_parameters,
         )
+
+        self.net.train(True)
 
         return samples.reshape((*sample_shape, -1))
 
