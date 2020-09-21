@@ -4,15 +4,11 @@
 import logging
 from typing import (
     Any,
-    Callable,
     Dict,
     List,
-    Optional,
     Sequence,
     Tuple,
-    TypeVar,
     Union,
-    cast,
 )
 
 import torch
@@ -21,10 +17,21 @@ from torch import Tensor, as_tensor
 from torch import nn as nn
 from torch import ones, zeros
 from tqdm.auto import tqdm
+import warnings
 
 
 def x_shape_from_simulation(batch_x: Tensor) -> torch.Size:
-    assert batch_x.ndim == 2, "Simulated data must be a batch with two dimensions."
+    ndims = batch_x.ndim
+    assert ndims >= 2, "Simulated data must be a batch with at least two dimensions."
+
+    # Warn in case of multi-dimensional x.
+    if ndims > 2:
+        warnings.warn(
+            f"""The simulated data x has {ndims-1} dimensions. With default settings, 
+            sbi cannot deal with multidimensional simulations. Make sure to use an
+            embedding net that reduces the dimensionality, e.g., a CNN in case of
+            images, or change the simulator to return one-dimensional x."""
+        )
     return batch_x[0].unsqueeze(0).shape
 
 
@@ -76,11 +83,11 @@ def standardizing_transform(
 class Standardize(nn.Module):
     def __init__(self, mean: Union[Tensor, float], std: Union[Tensor, float]):
         super(Standardize, self).__init__()
-        mean, std = map(torch.as_tensor, (mean, std))                
+        mean, std = map(torch.as_tensor, (mean, std))
         self.mean = mean
         self.std = std
-        self.register_buffer("_mean", mean)  
-        self.register_buffer("_std", std)              
+        self.register_buffer("_mean", mean)
+        self.register_buffer("_std", std)
 
     def forward(self, tensor):
         return (tensor - self.mean) / self.std
@@ -111,7 +118,8 @@ def standardizing_net(batch_t: Tensor, min_std: float = 1e-7) -> nn.Module:
             f"""Using a one-dimensional batch will instantiate a Standardize transform 
             with (mean, std) parameters which are not representative of the data. We allow
             this behavior because you might be loading a pre-trained. If this is not the case, 
-            please be sure to use a larger batch.""")    
+            please be sure to use a larger batch."""
+        )
 
     return Standardize(t_mean, t_std)
 
@@ -231,6 +239,9 @@ def handle_invalid_x(
     """
 
     batch_size = x.shape[0]
+
+    # Squeeze to cover all dimensions in case of multidimensional x.
+    x = x.reshape(batch_size, -1)
 
     x_is_nan = torch.isnan(x).any(dim=1)
     x_is_inf = torch.isinf(x).any(dim=1)

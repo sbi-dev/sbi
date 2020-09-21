@@ -257,14 +257,6 @@ def check_for_possibly_batched_x_shape(x_shape):
             respectively, without the user needing to wrap or unsqueeze them.
             """
         )
-    # Warn on multidimensional data with `batch_size` one.
-    elif inferred_data_ndim > 1 and inferred_batch_shape == 1:
-        warnings.warn(
-            f"""Beware: The observed data (x_o) you passed was interpreted to have
-            matrix shape: {inferred_data_shape}. The current implementation of sbi
-            might not provide stable support for this and result in shape mismatches.
-            """
-        )
     else:
         pass
 
