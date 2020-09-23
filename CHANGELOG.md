@@ -7,6 +7,7 @@
 - Fixes a bug with clamp_and_warn not overriding num_atoms for SNRE and the warning message itself (#338)
 - Compatibility with Pyro 1.4.0 (#339)
 - Speed up posterior rejection sampling by introducing batch size (#340)
+- Allow vectorized evaluation of numpy potentials (#341)
 
 
 # v0.12.2
