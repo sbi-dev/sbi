@@ -156,6 +156,9 @@ def sample_posterior_within_prior(
             `leakage_correction()`. False otherwise. Will be used to adapt the leakage
              warning.
         max_sampling_batch_size: Batch size for drawing samples from the posterior.
+            Takes effect only in the second iteration of the loop below, i.e., in case
+            of leakage or `num_samples>max_sampling_batch_size`. Larger batch size
+            speeds up sampling.
 
     Returns:
         Accepted samples and acceptance rate as scalar Tensor.

@@ -33,6 +33,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         sample_with_mcmc: bool = False,
         mcmc_method: str = "slice_np",
         mcmc_parameters: Optional[Dict[str, Any]] = None,
+        rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
@@ -64,6 +65,11 @@ class PosteriorEstimator(NeuralInference, ABC):
                 draw init locations from prior, whereas `sir` will use
                 Sequential-Importance-Resampling using `init_strategy_num_candidates`
                 to find init locations.
+            rejection_sampling_parameters: Dictonary overriding the default parameters
+                for rejection sampling. The following parameters are supported:
+                `max_sampling_batch_size` to set the batch size for drawing new
+                samples from the candidate distribution, e.g., the posterior. Larger
+                batch size speeds up sampling.
 
         See docstring of `NeuralInference` class for all other arguments.
         """
@@ -94,6 +100,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         self._sample_with_mcmc = sample_with_mcmc
         self._mcmc_method = mcmc_method
         self._mcmc_parameters = mcmc_parameters
+        self._rejection_sampling_parameters = rejection_sampling_parameters
 
         self._model_bank = []
         self.use_non_atomic_loss = False
@@ -188,6 +195,7 @@ class PosteriorEstimator(NeuralInference, ABC):
                 sample_with_mcmc=self._sample_with_mcmc,
                 mcmc_method=self._mcmc_method,
                 mcmc_parameters=self._mcmc_parameters,
+                rejection_sampling_parameters=self._rejection_sampling_parameters,
             )
 
         # Fit posterior using newly aggregated data set.

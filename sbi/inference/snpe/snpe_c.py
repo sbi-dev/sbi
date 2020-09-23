@@ -3,10 +3,9 @@
 
 
 from math import pi
-from typing import Any, Callable, Dict, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Optional, Union
 
 import torch
-import torch.nn as nn
 from pyknos.mdn.mdn import MultivariateGaussianMDN as mdn
 from pyknos.nflows.transforms import CompositeTransform
 from torch import Tensor, eye, ones
@@ -36,6 +35,7 @@ class SNPE_C(PosteriorEstimator):
         sample_with_mcmc: bool = False,
         mcmc_method: str = "slice_np",
         mcmc_parameters: Optional[Dict[str, Any]] = None,
+        rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
         use_combined_loss: bool = False,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
@@ -105,6 +105,11 @@ class SNPE_C(PosteriorEstimator):
                 draw init locations from prior, whereas `sir` will use
                 Sequential-Importance-Resampling using `init_strategy_num_candidates`
                 to find init locations.
+            rejection_sampling_parameters: Dictonary overriding the default parameters
+                for rejection sampling. The following parameters are supported:
+                `max_sampling_batch_size` to set the batch size for drawing new
+                samples from the candidate distribution, e.g., the posterior. Larger
+                batch size speeds up sampling.
             use_combined_loss: Whether to train the neural net also on prior samples
                 using maximum likelihood in addition to training it on all samples using
                 atomic loss. The extra MLE loss helps prevent density leaking with
