@@ -547,7 +547,11 @@ class NeuralPosterior(ABC):
         return samples.reshape((*sample_shape, -1))
 
     def _build_mcmc_init_fn(
-        self, prior: Any, potential_fn: Callable, init_strategy: str, **kwargs,
+        self,
+        prior: Any,
+        potential_fn: Callable,
+        init_strategy: str = "prior",
+        **kwargs,
     ) -> Callable:
         """
         Return function that, when called, creates an initial parameter set for MCMC.
