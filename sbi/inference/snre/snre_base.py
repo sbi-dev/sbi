@@ -234,8 +234,9 @@ class RatioEstimator(NeuralInference, ABC):
 
         clipped_batch_size = min(training_batch_size, num_validation_examples)
 
-        # num_atoms = theta.shape[0]
-        clamp_and_warn("num_atoms", num_atoms, min_val=2, max_val=clipped_batch_size)
+        num_atoms = clamp_and_warn(
+            "num_atoms", num_atoms, min_val=2, max_val=clipped_batch_size
+        )
 
         # Dataset is shared for training and validation loaders.
         dataset = data.TensorDataset(theta, x)

@@ -50,7 +50,7 @@ def clamp_and_warn(name: str, value: float, min_val: float, max_val: float) -> f
     if clamped_val != value:
         logging.warning(
             f"{name}={value} was clamped to {clamped_val}; "
-            "must be in [{min_val},{max_val}] range"
+            f"must be in [{min_val},{max_val}] range"
         )
 
     return clamped_val

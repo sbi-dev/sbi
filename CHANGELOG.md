@@ -1,8 +1,12 @@
 # v0.13.0
+
 - Conditional distributions and correlations for analysing the posterior (#321)
 - Moved rarely used arguments from pairplot into kwargs (#321)
 - Sampling from conditional posterior (#327)
 - Allow inference with multi-dimensional x when appropriate embedding is passed (#335)
+- Fixes a bug with clamp_and_warn not overriding num_atoms for SNRE and the warning message itself (#338)
+- Compatibility with Pyro 1.4.0 (#339)
+- Speed up posterior rejection sampling by introducing batch size (#340)
 
 
 # v0.12.2
