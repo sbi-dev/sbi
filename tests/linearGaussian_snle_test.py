@@ -255,8 +255,15 @@ def test_c2st_multi_round_snl_on_linearGaussian(set_seed):
 
 @pytest.mark.slow
 @pytest.mark.parametrize(
-    "mcmc_method, prior_str", (("slice", "gaussian"),("slice", "uniform"), ("slice_np", "gaussian"), ("slice_np", "uniform"),
-    ("slice_np_vectorized", "gaussian"), ("slice_np_vectorized", "uniform"),),
+    "mcmc_method, prior_str",
+    (
+        ("slice", "gaussian"),
+        ("slice", "uniform"),
+        ("slice_np", "gaussian"),
+        ("slice_np", "uniform"),
+        ("slice_np_vectorized", "gaussian"),
+        ("slice_np_vectorized", "uniform"),
+    ),
 )
 def test_api_snl_sampling_methods(mcmc_method: str, prior_str: str, set_seed):
     """Runs SNL on linear Gaussian and tests sampling from posterior via mcmc.
