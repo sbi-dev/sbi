@@ -65,8 +65,8 @@ class NeuralPosterior(ABC):
                 samples to discard, `num_chains` for the number of chains,
                 `init_strategy` for the initialisation strategy for chains; `prior`
                 will draw init locations from prior, whereas `sir` will use Sequential-
-                Importance-Resampling using `init_strategy_num_candidates` to find init
-                locations.
+                Importance-Resampling. Init strategies may have their own keywords
+                which can also be set from `mcmc_parameters`.
         """
         if method_family in ("snpe", "snle", "snre_a", "snre_b"):
             self._method_family = method_family
@@ -550,7 +550,6 @@ class NeuralPosterior(ABC):
         prior: Any,
         potential_fn: Callable,
         init_strategy: str = "prior",
-        init_strategy_num_candidates: int = 10000,
         **kwargs,
     ) -> Callable:
         """
@@ -561,19 +560,16 @@ class NeuralPosterior(ABC):
             potential_fn: Potential function that the candidate samples are weighted
                 with.
             init_strategy: Specifies the initialization method. Either of
-                [`prior`|`sir`].
-            init_strategy_num_candidates: Number of candidate samples drawn.
-            kwargs: Absorbs passed but unused arguments. E.g. in
-                `DirectPosterior.sample()` we pass `mcmc_parameters` which might
-                contain entries that are not used here.
+                [`prior`|`sir`|`latest_sample`].
+            kwargs: Passed on to init function. This way, init specific keywords can
+                be set through `mcmc_parameters`. Unused arguments should be absorbed.
 
         Returns: Initialization function.
         """
-
         if init_strategy == "prior":
-            return lambda: prior_init(prior)
+            return lambda: prior_init(prior, **kwargs)
         elif init_strategy == "sir":
-            return lambda: sir(prior, potential_fn, init_strategy_num_candidates,)
+            return lambda: sir(prior, potential_fn, **kwargs)
         elif init_strategy == "latest_sample":
             return lambda: self._mcmc_init_params
         else:

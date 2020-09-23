@@ -22,7 +22,12 @@ from torch import Tensor, nn
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.types import Shape
 from sbi.utils import del_entries
-from sbi.utils.torchutils import ScalarFloat, atleast_2d_float32_tensor
+from sbi.utils.torchutils import (
+    ScalarFloat,
+    atleast_2d_float32_tensor,
+    ensure_theta_batched,
+    ensure_x_batched,
+)
 
 
 class LikelihoodBasedPosterior(NeuralPosterior):
@@ -279,9 +284,12 @@ class PotentialFunctionProvider:
             Posterior log probability of the theta, $-\infty$ if impossible under prior.
         """
         theta = torch.as_tensor(theta, dtype=torch.float32)
-        log_likelihood = self.likelihood_nn.log_prob(
-            inputs=self.x.reshape(1, -1), context=theta.reshape(1, -1)
-        )
+        theta = ensure_theta_batched(theta)
+        num_batch = theta.shape[0]
+        x = ensure_x_batched(self.x).repeat(num_batch, 1)
+
+        with torch.set_grad_enabled(False):
+            log_likelihood = self.likelihood_nn.log_prob(inputs=x, context=theta)
 
         # Notice opposite sign to pyro potential.
         return log_likelihood + self.prior.log_prob(theta)

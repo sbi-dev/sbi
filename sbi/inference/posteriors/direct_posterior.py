@@ -30,6 +30,7 @@ from sbi.utils.torchutils import (
     atleast_2d_float32_tensor,
     batched_first_of_batch,
     ensure_theta_batched,
+    ensure_x_batched,
 )
 
 
@@ -416,16 +417,15 @@ class PotentialFunctionProvider:
         Returns:
             Posterior log probability $\log(p(\theta|x))$.
         """
-
         theta = torch.as_tensor(theta, dtype=torch.float32)
+        theta = ensure_theta_batched(theta)
+        num_batch = theta.shape[0]
+        x = ensure_x_batched(self.x).repeat(num_batch, 1)
 
-        is_within_prior = torch.isfinite(self.prior.log_prob(theta))
-        if is_within_prior:
-            target_log_prob = self.posterior_nn.log_prob(
-                inputs=theta.reshape(1, -1), context=self.x.reshape(1, -1),
-            )
-        else:
-            target_log_prob = -float("Inf")
+        with torch.set_grad_enabled(False):
+            target_log_prob = self.posterior_nn.log_prob(inputs=theta, context=self.x,)
+            is_within_prior = torch.isfinite(self.prior.log_prob(theta))
+            target_log_prob[~is_within_prior] = -float("Inf")
 
         return target_log_prob
 
