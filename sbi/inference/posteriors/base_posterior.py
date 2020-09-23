@@ -561,7 +561,7 @@ class NeuralPosterior(ABC):
                 with.
             init_strategy: Specifies the initialization method. Either of
                 [`prior`|`sir`|`latest_sample`].
-            kwargs: Passed on init function. This way, init specific keywords can
+            kwargs: Passed on to init function. This way, init specific keywords can
                 be set through `mcmc_parameters`. Unused arguments should be absorbed.
 
         Returns: Initialization function.
