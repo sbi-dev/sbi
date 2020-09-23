@@ -156,12 +156,14 @@ def test_c2st_snle_external_data_on_linearGaussian(set_seed):
 @pytest.mark.slow
 @pytest.mark.parametrize("num_dim", (1, 2))
 @pytest.mark.parametrize("prior_str", ("uniform", "gaussian"))
-def test_c2st_snl_on_linearGaussian(num_dim: int, prior_str: str, set_seed):
+@pytest.mark.parametrize("mcmc_method", ("slice", "slice_np", "slice_np_vectorized"))
+def test_c2st_snl_on_linearGaussian(num_dim: int, prior_str: str, mcmc_method: str, set_seed):
     """Test SNL on linear Gaussian, comparing to ground truth posterior via c2st.
 
     Args:
         num_dim: parameter dimension of the gaussian model
         prior_str: one of "gaussian" or "uniform"
+        mcmc_method: which mcmc method to use for sampling
         set_seed: fixture for manual seeding
     """
 
@@ -190,7 +192,8 @@ def test_c2st_snl_on_linearGaussian(num_dim: int, prior_str: str, set_seed):
 
     infer = SNL(
         *prepare_for_sbi(simulator, prior),
-        mcmc_method="slice_np",
+        mcmc_method=mcmc_method,
+        mcmc_parameters={"num_chains": 5},
         show_progress_bars=False,
     )
 
@@ -212,10 +215,12 @@ def test_c2st_snl_on_linearGaussian(num_dim: int, prior_str: str, set_seed):
 
 
 @pytest.mark.slow
-def test_c2st_multi_round_snl_on_linearGaussian(set_seed):
+@pytest.mark.parametrize("mcmc_method", ("slice", "slice_np", "slice_np_vectorized"))
+def test_c2st_multi_round_snl_on_linearGaussian(mcmc_method: str, set_seed):
     """Test SNL on linear Gaussian, comparing to ground truth posterior via c2st.
 
     Args:
+        mcmc_method: which mcmc method to use for sampling
         set_seed: fixture for manual seeding
     """
 
@@ -240,7 +245,8 @@ def test_c2st_multi_round_snl_on_linearGaussian(set_seed):
     infer = SNL(
         *prepare_for_sbi(simulator, prior),
         simulation_batch_size=50,
-        mcmc_method="slice",
+        mcmc_method=mcmc_method,
+        mcmc_parameters={"num_chains": 5},
         show_progress_bars=False,
     )
 
@@ -254,23 +260,14 @@ def test_c2st_multi_round_snl_on_linearGaussian(set_seed):
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize(
-    "mcmc_method, prior_str",
-    (
-        ("slice", "gaussian"),
-        ("slice", "uniform"),
-        ("slice_np", "gaussian"),
-        ("slice_np", "uniform"),
-        ("slice_np_vectorized", "gaussian"),
-        ("slice_np_vectorized", "uniform"),
-    ),
-)
-def test_api_snl_sampling_methods(mcmc_method: str, prior_str: str, set_seed):
+@pytest.mark.parametrize("prior_str", ("uniform", "gaussian"))
+@pytest.mark.parametrize("mcmc_method", ("slice", "slice_np", "slice_np_vectorized"))
+def test_api_snl_sampling_methods(prior_str: str, mcmc_method: str, set_seed):
     """Runs SNL on linear Gaussian and tests sampling from posterior via mcmc.
 
     Args:
-        mcmc_method: which mcmc method to use for sampling
         prior_str: use gaussian or uniform prior
+        mcmc_method: which mcmc method to use for sampling
         set_seed: fixture for manual seeding
     """
 
@@ -287,7 +284,7 @@ def test_api_snl_sampling_methods(mcmc_method: str, prior_str: str, set_seed):
         *prepare_for_sbi(diagonal_linear_gaussian, prior),
         simulation_batch_size=50,
         mcmc_method=mcmc_method,
-        mcmc_parameters={"num_chains": 10},
+        mcmc_parameters={"num_chains": 5},
         show_progress_bars=False,
     )
 
