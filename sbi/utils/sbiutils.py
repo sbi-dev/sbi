@@ -133,7 +133,7 @@ def sample_posterior_within_prior(
     show_progress_bars: bool = False,
     warn_acceptance: float = 0.01,
     sample_for_correction_factor: bool = False,
-    max_sampling_batch_size: int = 1000,
+    max_sampling_batch_size: int = 10_000,
 ) -> Tuple[Tensor, Tensor]:
     r"""Return samples from a posterior $p(\theta|x)$ only within the prior support.
 
