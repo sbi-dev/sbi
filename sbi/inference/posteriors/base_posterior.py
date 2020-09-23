@@ -3,7 +3,6 @@
 
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from sbi.mcmc import init_strategy
 from typing import (
     Any,
     Callable,
