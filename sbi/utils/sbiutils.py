@@ -133,6 +133,7 @@ def sample_posterior_within_prior(
     show_progress_bars: bool = False,
     warn_acceptance: float = 0.01,
     sample_for_correction_factor: bool = False,
+    max_sampling_batch_size: int = 1000,
 ) -> Tuple[Tensor, Tensor]:
     r"""Return samples from a posterior $p(\theta|x)$ only within the prior support.
 
@@ -154,6 +155,7 @@ def sample_posterior_within_prior(
         sample_for_correction_factor: True if this function was called by
             `leakage_correction()`. False otherwise. Will be used to adapt the leakage
              warning.
+        max_sampling_batch_size: Batch size for drawing samples from the posterior.
 
     Returns:
         Accepted samples and acceptance rate as scalar Tensor.
@@ -168,31 +170,34 @@ def sample_posterior_within_prior(
         desc=f"Drawing {num_samples} posterior samples",
     )
 
-    num_remaining, num_sampled_total = num_samples, 0
+    num_sampled_total, num_remaining = 0, num_samples
     accepted, acceptance_rate = [], float("Nan")
     leakage_warning_raised = False
-    # In each iteration of the loop we sample the remaining number of samples from the
-    # posterior. Some of these samples have 0 probability under the prior, i.e. there
-    # is leakage (acceptance rate<1) so sample again until reaching `num_samples`.
+
+    # To cover cases with few samples without leakage:
+    sampling_batch_size = min(num_samples, max_sampling_batch_size)
     while num_remaining > 0:
 
-        candidates = posterior_nn.sample(num_remaining, context=x)
-        # TODO we need this reshape here because posterior_nn.sample sometimes return
-        # leading singleton dimension instead of (num_samples), e.g., (1, 10000, 4)
-        # instead of (10000, 4). This can't be handled by MultipleIndependent, see #141.
-        candidates = candidates.reshape(num_remaining, -1)
-        num_sampled_total += num_remaining
-
+        # Sample and reject.
+        candidates = posterior_nn.sample(sampling_batch_size, context=x).reshape(
+            sampling_batch_size, -1
+        )
         are_within_prior = torch.isfinite(prior.log_prob(candidates))
-        accepted.append(candidates[are_within_prior])
+        samples = candidates[are_within_prior]
+        accepted.append(samples)
 
-        num_accepted = are_within_prior.sum().item()
-        pbar.update(num_accepted)
-        num_remaining -= num_accepted
+        # Update.
+        num_sampled_total += sampling_batch_size
+        num_remaining -= samples.shape[0]
+        pbar.update(samples.shape[0])
 
         # To avoid endless sampling when leakage is high, we raise a warning if the
         # acceptance rate is too low after the first 1_000 samples.
         acceptance_rate = (num_samples - num_remaining) / num_sampled_total
+
+        # For remaining iterations (leakage or many samples) continue sampling with
+        # fixed batch size.
+        sampling_batch_size = max_sampling_batch_size
         if (
             num_sampled_total > 1000
             and acceptance_rate < warn_acceptance
@@ -224,7 +229,13 @@ def sample_posterior_within_prior(
 
     pbar.close()
 
-    return torch.cat(accepted), as_tensor(acceptance_rate)
+    # When in case of leakage a batch size was used there could be too many samples.
+    samples = torch.cat(accepted)[:num_samples]
+    assert (
+        samples.shape[0] == num_samples
+    ), "Number of accepted samples must match required samples."
+
+    return samples, as_tensor(acceptance_rate)
 
 
 def handle_invalid_x(
