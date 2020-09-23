@@ -1,18 +1,12 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
-from copy import deepcopy
 from typing import (
     Any,
     Callable,
     Dict,
     List,
     Optional,
-    Sequence,
-    Tuple,
-    TypeVar,
-    Union,
-    cast,
 )
 
 import numpy as np
@@ -20,14 +14,10 @@ import torch
 from torch import Tensor, log, nn
 
 from sbi import utils as utils
-from sbi.inference.posteriors.base_posterior import (
-    ConditionalPotentialFunctionProvider,
-    NeuralPosterior,
-)
+from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.types import ScalarFloat, Shape
 from sbi.utils import del_entries
 from sbi.utils.torchutils import (
-    atleast_2d_float32_tensor,
     batched_first_of_batch,
     ensure_theta_batched,
     ensure_x_batched,
@@ -59,6 +49,7 @@ class DirectPosterior(NeuralPosterior):
         sample_with_mcmc: bool = True,
         mcmc_method: str = "slice_np",
         mcmc_parameters: Optional[Dict[str, Any]] = None,
+        rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
     ):
         """
         Args:
@@ -81,14 +72,26 @@ class DirectPosterior(NeuralPosterior):
                 will draw init locations from prior, whereas `sir` will use Sequential-
                 Importance-Resampling using `init_strategy_num_candidates` to find init
                 locations.
+            rejection_sampling_parameters: Dictonary overriding the default parameters
+                for rejection sampling. The following parameters are supported:
+                `max_sampling_batch_size` to set the batch size for drawing new
+                samples from the candidate distribution, e.g., the posterior. Larger
+                batch size speeds up sampling.
         """
 
         kwargs = del_entries(
-            locals(), entries=("self", "__class__", "sample_with_mcmc")
+            locals(),
+            entries=(
+                "self",
+                "__class__",
+                "sample_with_mcmc",
+                "rejection_sampling_parameters",
+            ),
         )
         super().__init__(**kwargs)
 
         self.set_sample_with_mcmc(sample_with_mcmc)
+        self.set_rejection_sampling_parameters(rejection_sampling_parameters)
         self._purpose = (
             "It allows to .sample() and .log_prob() the posterior and wraps the "
             "output of the .net to avoid leakage into regions with 0 prior probability."
@@ -120,6 +123,37 @@ class DirectPosterior(NeuralPosterior):
                 do not support rejection sampling.
         """
         self._sample_with_mcmc = use_mcmc
+        return self
+
+    @property
+    def rejection_sampling_parameters(self) -> dict:
+        """Returns rejection sampling parameter."""
+        if self._rejection_sampling_parameters is None:
+            return {}
+        else:
+            return self._rejection_sampling_parameters
+
+    @rejection_sampling_parameters.setter
+    def rejection_sampling_parameters(self, parameters: Dict[str, Any]) -> None:
+        """See `set_rejection_sampling_parameters`."""
+        self.set_rejection_sampling_parameters(parameters)
+
+    def set_rejection_sampling_parameters(
+        self, parameters: Dict[str, Any]
+    ) -> "NeuralPosterior":
+        """Sets parameters for rejection sampling and returns `NeuralPosterior`.
+
+        Args:
+            parameters: Dictonary overriding the default parameters
+                for rejection sampling. The following parameters are supported:
+                `max_sampling_batch_size` to the set the batch size for drawing new
+                samples from the candidate distribution, e.g., the posterior. Larger
+                batch size speeds up sampling.
+
+        Returns:
+            `NeuralPosterior for chainable calls.
+        """
+        self._rejection_sampling_parameters = parameters
         return self
 
     def log_prob(
@@ -186,6 +220,7 @@ class DirectPosterior(NeuralPosterior):
         num_rejection_samples: int = 10_000,
         force_update: bool = False,
         show_progress_bars: bool = False,
+        rejection_sampling_batch_size: int = 10_000,
     ) -> Tensor:
         r"""Return leakage correction factor for a leaky posterior density estimate.
 
@@ -204,6 +239,7 @@ class DirectPosterior(NeuralPosterior):
                 if the context `x` is the same as `self.default_x`. This is useful to
                 enforce a new leakage estimate for rounds after the first (2, 3,..).
             show_progress_bars: Whether to show a progress bar during sampling.
+            rejection_sampling_batch_size: Batch size for rejection sampling.
 
         Returns:
             Saved or newly-estimated correction factor (as a scalar `Tensor`).
@@ -217,6 +253,7 @@ class DirectPosterior(NeuralPosterior):
                 num_rejection_samples,
                 show_progress_bars,
                 sample_for_correction_factor=True,
+                max_sampling_batch_size=rejection_sampling_batch_size,
             )[1]
 
         # Check if the provided x matches the default x (short-circuit on identity).
@@ -241,6 +278,7 @@ class DirectPosterior(NeuralPosterior):
         sample_with_mcmc: Optional[bool] = None,
         mcmc_method: Optional[str] = None,
         mcmc_parameters: Optional[Dict[str, Any]] = None,
+        rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
     ) -> Tensor:
         r"""
         Return samples from posterior distribution $p(\theta|x)$.
@@ -268,7 +306,11 @@ class DirectPosterior(NeuralPosterior):
                 will draw init locations from prior, whereas `sir` will use Sequential-
                 Importance-Resampling using `init_strategy_num_candidates` to find init
                 locations.
-
+            rejection_sampling_parameters: Dictonary overriding the default parameters
+                for rejection sampling. The following parameters are supported:
+                `max_sampling_batch_size` to set the batch size for drawing new
+                samples from the candidate distribution, e.g., the posterior. Larger
+                batch size speeds up sampling.
         Returns:
             Samples from posterior.
         """
@@ -307,6 +349,9 @@ class DirectPosterior(NeuralPosterior):
                 x,
                 num_samples=num_samples,
                 show_progress_bars=show_progress_bars,
+                **rejection_sampling_parameters
+                if (rejection_sampling_parameters is not None)
+                else self.rejection_sampling_parameters,
             )
 
         self.net.train(True)
