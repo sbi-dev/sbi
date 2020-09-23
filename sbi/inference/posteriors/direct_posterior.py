@@ -185,6 +185,7 @@ class DirectPosterior(NeuralPosterior):
         num_rejection_samples: int = 10_000,
         force_update: bool = False,
         show_progress_bars: bool = False,
+        max_sampling_batch_size: int = 10_000,
     ) -> Tensor:
         r"""Return leakage correction factor for a leaky posterior density estimate.
 
@@ -203,6 +204,7 @@ class DirectPosterior(NeuralPosterior):
                 if the context `x` is the same as `self.default_x`. This is useful to
                 enforce a new leakage estimate for rounds after the first (2, 3,..).
             show_progress_bars: Whether to show a progress bar during sampling.
+            max_sampling_batch_size: Batch size for rejection sampling.
 
         Returns:
             Saved or newly-estimated correction factor (as a scalar `Tensor`).
@@ -216,6 +218,7 @@ class DirectPosterior(NeuralPosterior):
                 num_rejection_samples,
                 show_progress_bars,
                 sample_for_correction_factor=True,
+                max_sampling_batch_size=max_sampling_batch_size,
             )[1]
 
         # Check if the provided x matches the default x (short-circuit on identity).
@@ -240,6 +243,7 @@ class DirectPosterior(NeuralPosterior):
         sample_with_mcmc: Optional[bool] = None,
         mcmc_method: Optional[str] = None,
         mcmc_parameters: Optional[Dict[str, Any]] = None,
+        max_sampling_batch_size: int = 1000,
     ) -> Tensor:
         r"""
         Return samples from posterior distribution $p(\theta|x)$.
@@ -267,6 +271,9 @@ class DirectPosterior(NeuralPosterior):
                 will draw init locations from prior, whereas `sir` will use Sequential-
                 Importance-Resampling using `init_strategy_num_candidates` to find init
                 locations.
+            max_sampling_batch_size: Batch size with which to draw posterior samples
+                during rejection sampling. Will take effect only in case of leakage or
+                large num_samples.
 
         Returns:
             Samples from posterior.
@@ -306,6 +313,7 @@ class DirectPosterior(NeuralPosterior):
                 x,
                 num_samples=num_samples,
                 show_progress_bars=show_progress_bars,
+                max_sampling_batch_size=max_sampling_batch_size,
             )
 
         self.net.train(True)
