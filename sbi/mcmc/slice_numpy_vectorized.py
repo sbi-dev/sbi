@@ -5,7 +5,7 @@ import numpy as np
 import os
 import sys
 
-from tqdm import trange
+from tqdm import tqdm
 
 from typing import Callable, Union
 
@@ -82,6 +82,9 @@ class SliceSamplerVectorized:
             self.state[c]["state"] = "BEGIN"
 
             self.state[c]["width"] = np.full(self.n_dims, self.init_width)
+
+        if self.verbose:
+            pbar = tqdm(range(self.num_chains * num_samples))
 
         num_chains_finished = 0
         while num_chains_finished != self.num_chains:
@@ -216,7 +219,9 @@ class SliceSamplerVectorized:
                                 self.state[c]["order"] = list(range(self.n_dims))
                                 self.rng.shuffle(self.state[c]["order"])
 
-                                # print(f"{c}: t={sc['t']}")
+                                if self.verbose:
+                                    if sc["t"] % 10 == 0:
+                                        pbar.update(10)
 
                         else:
                             sc["state"] = "DONE"
