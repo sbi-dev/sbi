@@ -28,6 +28,7 @@ def sir(
         potential_fn: Potential function that the candidate samples are weighted with.
             Note that the function needs to return log probabilities.
         init_strategy_num_candidates: Number of candidate samples drawn.
+        batch_size: Batch size used for evaluating candidates.
 
     Returns:
         A single sample.
