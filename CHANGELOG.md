@@ -5,6 +5,7 @@
 - Sampling from conditional posterior (#327)
 - Allow inference with multi-dimensional x when appropriate embedding is passed (#335)
 - Fixes a bug with clamp_and_warn not overriding num_atoms for SNRE and the warning message itself (#338)
+- Compatibility with Pyro 1.4.0 (#339)
 
 
 # v0.12.2

@@ -28,8 +28,8 @@ REQUIRED = [
     "matplotlib",
     "numpy",
     "pillow",
-    "pyknos==0.12",
-    "pyro-ppl==1.3.1",  # TODO: Remove once #286 is addressed
+    "pyknos>=0.12",
+    "pyro-ppl>=1.3.1",
     "scipy",
     "tensorboard",
     "torch>=1.5.1",

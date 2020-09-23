@@ -422,6 +422,7 @@ class NeuralPosterior(ABC):
             num_chains=num_chains,
             mp_context="fork",
             disable_progbar=not show_progress_bars,
+            transforms={},
         )
         sampler.run()
         samples = next(iter(sampler.get_samples().values())).reshape(
