@@ -325,12 +325,12 @@ class PotentialFunctionProvider:
             Posterior log probability of theta.
         """
         theta = torch.as_tensor(theta, dtype=torch.float32)
-
-        # Theta and x should have shape (1, dim).
         theta = ensure_theta_batched(theta)
-        x = ensure_x_batched(self.x)
+        num_batch = theta.shape[0]
+        x = ensure_x_batched(self.x).repeat(num_batch, 1)
 
-        log_ratio = self.classifier(torch.cat((theta, x), dim=1).reshape(1, -1))
+        with torch.set_grad_enabled(False):
+            log_ratio = self.classifier(torch.cat((theta, x), dim=1)).reshape(-1)
 
         # Notice opposite sign to pyro potential.
         return log_ratio + self.prior.log_prob(theta)
