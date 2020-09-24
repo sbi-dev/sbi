@@ -11,7 +11,7 @@ def set_default_tensor_type():
     torch.set_default_tensor_type("torch.FloatTensor")
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def set_seed():
     torch.manual_seed(seed)
     numpy.random.seed(seed)
