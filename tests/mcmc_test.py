@@ -16,11 +16,10 @@ from tests.test_utils import check_c2st
 
 @pytest.mark.parametrize("num_dim", (1, 2))
 def test_c2st_slice_np_on_Gaussian(num_dim: int, set_seed):
-    """Test SNL on linear Gaussian, comparing to ground truth posterior via c2st.
+    """Test MCMC on Gaussian, comparing to ground truth target via c2st.
 
     Args:
         num_dim: parameter dimension of the gaussian model
-        mcmc_method: which mcmc method to use for sampling
         set_seed: fixture for manual seeding
     """
     warmup = 100
@@ -50,11 +49,10 @@ def test_c2st_slice_np_on_Gaussian(num_dim: int, set_seed):
 
 @pytest.mark.parametrize("num_dim", (1, 2))
 def test_c2st_slice_np_vectorized_on_Gaussian(num_dim: int, set_seed):
-    """Test SNL on linear Gaussian, comparing to ground truth posterior via c2st.
+    """Test MCMC on Gaussian, comparing to ground truth target via c2st.
 
     Args:
         num_dim: parameter dimension of the gaussian model
-        mcmc_method: which mcmc method to use for sampling
         set_seed: fixture for manual seeding
     """
     num_samples = 500
