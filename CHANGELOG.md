@@ -8,6 +8,7 @@
 - Compatibility with Pyro 1.4.0 (#339)
 - Speed up posterior rejection sampling by introducing batch size (#340, #343)
 - Allow vectorized evaluation of numpy potentials (#341)
+- Adds vectorized version of numpy slice sampler which allows parallel log prob evaluations across all chains (#344)
 
 
 # v0.12.2
