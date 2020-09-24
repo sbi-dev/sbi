@@ -14,6 +14,7 @@ from typing import (
 
 import numpy as np
 import torch
+from math import ceil
 from pyro.infer.mcmc import HMC, NUTS
 from pyro.infer.mcmc.api import MCMC
 from torch import Tensor
@@ -21,7 +22,7 @@ from torch import multiprocessing as mp
 from torch import nn
 
 from sbi import utils as utils
-from sbi.mcmc import Slice, SliceSampler, prior_init, sir
+from sbi.mcmc import Slice, SliceSampler, SliceSamplerVectorized, prior_init, sir
 from sbi.types import Array, Shape
 from sbi.user_input.user_input_checks import process_x
 from sbi.utils.torchutils import (
@@ -312,15 +313,17 @@ class NeuralPosterior(ABC):
 
         initial_params = torch.cat([init_fn() for _ in range(num_chains)])
 
-        track_gradients = mcmc_method != "slice" and mcmc_method != "slice_np"
+        track_gradients = mcmc_method in ("hmc", "nuts")
         with torch.set_grad_enabled(track_gradients):
-            if mcmc_method == "slice_np":
+            if mcmc_method in ("slice_np", "slice_np_vectorized"):
                 samples = self._slice_np_mcmc(
                     num_samples=num_samples,
                     potential_function=potential_fn,
                     initial_params=initial_params,
                     thin=thin,
                     warmup_steps=warmup_steps,
+                    vectorized=(mcmc_method == "slice_np_vectorized"),
+                    show_progress_bars=show_progress_bars,
                 )
             elif mcmc_method in ("hmc", "nuts", "slice"):
                 samples = self._pyro_mcmc(
@@ -345,6 +348,8 @@ class NeuralPosterior(ABC):
         initial_params: Tensor,
         thin: int,
         warmup_steps: int,
+        vectorized: bool = False,
+        show_progress_bars: bool = True,
     ) -> Tensor:
         """
         Custom implementation of slice sampling using Numpy.
@@ -355,26 +360,44 @@ class NeuralPosterior(ABC):
             initial_params: Initial parameters for MCMC chain.
             thin: Thinning (subsampling) factor.
             warmup_steps: Initial number of samples to discard.
+            vectorized: Whether to use a vectorized implementation of
+                the Slice sampler (still experimental).
+            show_progress_bars: Whether to show a progressbar during sampling;
+                can only be turned off for vectorized sampler.
 
         Returns: Tensor of shape (num_samples, shape_of_single_theta).
         """
-
         num_chains = initial_params.shape[0]
         dim_samples = initial_params.shape[1]
 
-        all_samples = []
-        for c in range(num_chains):
-            posterior_sampler = SliceSampler(
-                utils.tensor2numpy(initial_params[c, :]).reshape(-1),
-                lp_f=potential_function,
-                thin=thin,
+        if not vectorized:  # Sample all chains sequentially
+            all_samples = []
+            for c in range(num_chains):
+                posterior_sampler = SliceSampler(
+                    utils.tensor2numpy(initial_params[c, :]).reshape(-1),
+                    lp_f=potential_function,
+                    thin=thin,
+                )
+                if warmup_steps > 0:
+                    posterior_sampler.gen(int(warmup_steps))
+                all_samples.append(
+                    posterior_sampler.gen(ceil(num_samples / num_chains))
+                )
+            all_samples = np.stack(all_samples).astype(np.float32)
+            samples = torch.from_numpy(all_samples)  # chains x samples x dim
+        else:  # Sample all chains at the same time
+            posterior_sampler = SliceSamplerVectorized(
+                init_params=utils.tensor2numpy(initial_params),
+                log_prob_fn=potential_function,
+                num_chains=num_chains,
+                verbose=show_progress_bars,
             )
-            if warmup_steps > 0:
-                posterior_sampler.gen(int(warmup_steps))
-            all_samples.append(posterior_sampler.gen(int(num_samples / num_chains)))
-        all_samples = np.stack(all_samples).astype(np.float32)
-
-        samples = torch.from_numpy(all_samples)  # chains x samples x dim
+            warmup_ = warmup_steps * thin
+            num_samples_ = ceil((num_samples * thin) / num_chains)
+            samples = posterior_sampler.run(warmup_ + num_samples_)
+            samples = samples[:, warmup_:, :]  # discard warmup steps
+            samples = samples[:, ::thin, :]  # thin chains
+            samples = torch.from_numpy(samples)  # chains x samples x dim
 
         # Save sample as potential next init (if init_strategy == 'latest_sample').
         self._mcmc_init_params = samples[:, -1, :].reshape(num_chains, dim_samples)
