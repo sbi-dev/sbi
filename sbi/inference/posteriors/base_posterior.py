@@ -14,6 +14,7 @@ from typing import (
 
 import numpy as np
 import torch
+from math import ceil
 from pyro.infer.mcmc import HMC, NUTS
 from pyro.infer.mcmc.api import MCMC
 from torch import Tensor
@@ -379,7 +380,9 @@ class NeuralPosterior(ABC):
                 )
                 if warmup_steps > 0:
                     posterior_sampler.gen(int(warmup_steps))
-                all_samples.append(posterior_sampler.gen(int(num_samples / num_chains)))
+                all_samples.append(
+                    posterior_sampler.gen(ceil(num_samples / num_chains))
+                )
             all_samples = np.stack(all_samples).astype(np.float32)
             samples = torch.from_numpy(all_samples)  # chains x samples x dim
         else:  # Sample all chains at the same time
@@ -390,7 +393,7 @@ class NeuralPosterior(ABC):
                 verbose=show_progress_bars,
             )
             warmup_ = warmup_steps * thin
-            num_samples_ = int((num_samples * thin) / num_chains)
+            num_samples_ = ceil((num_samples * thin) / num_chains)
             samples = posterior_sampler.run(warmup_ + num_samples_)
             samples = samples[:, warmup_:, :]  # discard warmup steps
             samples = samples[:, ::thin, :]  # thin chains
