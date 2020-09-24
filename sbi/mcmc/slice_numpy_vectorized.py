@@ -41,8 +41,6 @@ class SliceSamplerVectorized:
         self.init_width = init_width
         self.max_width = max_width
 
-        self.logger = open(os.devnull, "w") if not self.verbose else sys.stdout
-
         self.n_dims = self.x.size
 
         self._reset()
