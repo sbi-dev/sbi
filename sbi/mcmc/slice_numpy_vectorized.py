@@ -228,6 +228,6 @@ class SliceSamplerVectorized:
                 if sc["state"] == "DONE":
                     num_chains_finished += 1
 
-        samples = np.stack(self.state[c]["samples"] for c in range(self.num_chains))
+        samples = np.stack([self.state[c]["samples"] for c in range(self.num_chains)])
 
         return samples
