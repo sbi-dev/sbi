@@ -1,3 +1,8 @@
+# v0.13.1
+
+- Make logging of vectorized numpy slice sampler slightly less verbose and address NumPy future warning.
+
+
 # v0.13.0
 
 - Conditional distributions and correlations for analysing the posterior (#321)
