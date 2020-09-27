@@ -22,7 +22,14 @@ from torch import multiprocessing as mp
 from torch import nn
 
 from sbi import utils as utils
-from sbi.mcmc import Slice, SliceSampler, SliceSamplerVectorized, prior_init, sir
+from sbi.mcmc import (
+    Slice,
+    SliceSampler,
+    SliceSamplerVectorized,
+    IterateParameters,
+    prior_init,
+    sir,
+)
 from sbi.types import Array, Shape
 from sbi.user_input.user_input_checks import process_x
 from sbi.utils.torchutils import (
@@ -594,7 +601,8 @@ class NeuralPosterior(ABC):
         elif init_strategy == "sir":
             return lambda: sir(prior, potential_fn, **kwargs)
         elif init_strategy == "latest_sample":
-            return lambda: self._mcmc_init_params
+            latest_sample = IterateParameters(self._mcmc_init_params, **kwargs)
+            return latest_sample
         else:
             raise NotImplementedError
 

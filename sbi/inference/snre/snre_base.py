@@ -164,6 +164,10 @@ class RatioEstimator(NeuralInference, ABC):
                 mcmc_parameters=self._mcmc_parameters,
             )
 
+        # Copy MCMC init parameters for latest sample init
+        if hasattr(proposal, "_mcmc_init_params"):
+            self._posterior._mcmc_init_params = proposal._mcmc_init_params
+
         # Fit posterior using newly aggregated data set.
         self._train(
             num_atoms=num_atoms,

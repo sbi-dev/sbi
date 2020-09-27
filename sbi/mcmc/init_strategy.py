@@ -9,6 +9,22 @@ import torch
 from torch import Tensor
 
 
+class IterateParameters:
+    """Iterates through parameters by rows
+    """
+
+    def __init__(self, parameters: torch.Tensor, **kwargs):
+        self.iter = self._make_iterator(parameters)
+
+    @staticmethod
+    def _make_iterator(t):
+        for i in range(t.shape[0]):
+            yield t[i, :].reshape(1, -1)
+
+    def __call__(self):
+        return next(self.iter)
+
+
 def prior_init(prior: Any, **kwargs: Any) -> Tensor:
     """Return a sample from the prior."""
     return prior.sample((1,)).detach()
