@@ -1,6 +1,6 @@
 # v0.13.1
 
-- Make logging of vectorized numpy slice sampler slightly less verbose and address NumPy future warning.
+- Make logging of vectorized numpy slice sampler slightly less verbose and address NumPy future warning (#347)
 
 
 # v0.13.0
