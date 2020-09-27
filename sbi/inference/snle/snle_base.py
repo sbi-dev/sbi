@@ -158,6 +158,10 @@ class LikelihoodEstimator(NeuralInference, ABC):
                 mcmc_parameters=self._mcmc_parameters,
             )
 
+        # Copy MCMC init parameters for latest sample init
+        if hasattr(proposal, "_mcmc_init_params"):
+            self._posterior._mcmc_init_params = proposal._mcmc_init_params
+
         # Fit neural likelihood to newly aggregated dataset.
         self._train(
             training_batch_size=training_batch_size,

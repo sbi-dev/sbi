@@ -198,6 +198,10 @@ class PosteriorEstimator(NeuralInference, ABC):
                 rejection_sampling_parameters=self._rejection_sampling_parameters,
             )
 
+        # Copy MCMC init parameters for latest sample init
+        if hasattr(proposal, "_mcmc_init_params"):
+            self._posterior._mcmc_init_params = proposal._mcmc_init_params
+
         # Fit posterior using newly aggregated data set.
         self._train(
             proposal=proposal,
