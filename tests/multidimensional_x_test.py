@@ -4,7 +4,7 @@ from torch import zeros
 import torch
 import pytest
 from sbi import utils as utils
-from sbi.inference import SNPE, prepare_for_sbi
+from sbi.inference import SNPE, SNLE, SNRE, prepare_for_sbi
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -39,13 +39,25 @@ class CNNEmbedding(nn.Module):
 
 
 @pytest.mark.parametrize(
-    "embedding",
+    "embedding, method",
     (
-        pytest.param(nn.Identity, marks=pytest.mark.xfail(reason="Invalid embedding.")),
-        pytest.param(CNNEmbedding),
+        pytest.param(
+            nn.Identity, SNPE, marks=pytest.mark.xfail(reason="Invalid embedding.")
+        ),
+        pytest.param(
+            nn.Identity,
+            SNRE,
+            marks=pytest.mark.xfail(reason="SNLE cannot handle multiD x."),
+        ),
+        pytest.param(
+            CNNEmbedding,
+            SNLE,
+            marks=pytest.mark.xfail(reason="SNRE cannot handle multiD x."),
+        ),
+        pytest.param(CNNEmbedding, SNPE),
     ),
 )
-def test_inference_with_2d_x(embedding):
+def test_inference_with_2d_x(embedding, method):
 
     num_dim = 2
     num_samples = 10
@@ -58,12 +70,14 @@ def test_inference_with_2d_x(embedding):
     theta_o = torch.ones(1, num_dim)
     x_o = simulator(theta_o)
 
-    infer = SNPE(
-        simulator,
-        prior,
-        show_progress_bars=False,
-        density_estimator=utils.posterior_nn(model="mdn", embedding_net=embedding(),),
-    )
+    if method == SNPE:
+        net_provider = utils.posterior_nn(model="mdn", embedding_net=embedding(),)
+    elif method == SNLE:
+        net_provider = utils.likelihood_nn(model="mdn", embedding_net=embedding())
+    else:
+        net_provider = utils.classifier_nn(model="mlp", embedding_net_x=embedding(),)
+
+    infer = method(simulator, prior, 1, 1, net_provider, show_progress_bars=False,)
 
     posterior = infer(
         num_simulations=num_simulations, training_batch_size=100, max_num_epochs=10

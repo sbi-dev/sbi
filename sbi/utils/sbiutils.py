@@ -17,21 +17,12 @@ from torch import Tensor, as_tensor
 from torch import nn as nn
 from torch import ones, zeros
 from tqdm.auto import tqdm
-import warnings
 
 
 def x_shape_from_simulation(batch_x: Tensor) -> torch.Size:
     ndims = batch_x.ndim
     assert ndims >= 2, "Simulated data must be a batch with at least two dimensions."
 
-    # Warn in case of multi-dimensional x.
-    if ndims > 2:
-        warnings.warn(
-            f"""The simulated data x has {ndims-1} dimensions. With default settings, 
-            sbi cannot deal with multidimensional simulations. Make sure to use an
-            embedding net that reduces the dimensionality, e.g., a CNN in case of
-            images, or change the simulator to return one-dimensional x."""
-        )
     return batch_x[0].unsqueeze(0).shape
 
 

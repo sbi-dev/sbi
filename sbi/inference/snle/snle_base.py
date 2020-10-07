@@ -6,9 +6,8 @@ from abc import ABC
 from copy import deepcopy
 from typing import Any, Callable, Dict, Optional, Union
 
-import numpy as np
 import torch
-from torch import Tensor, nn, optim
+from torch import optim
 from torch.nn.utils import clip_grad_norm_
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
@@ -17,7 +16,6 @@ from torch.utils.tensorboard import SummaryWriter
 from sbi import utils as utils
 from sbi.inference import NeuralInference
 from sbi.inference.posteriors.likelihood_based_posterior import LikelihoodBasedPosterior
-from sbi.types import ScalarFloat
 from sbi.utils import check_estimator_arg, x_shape_from_simulation
 
 
@@ -149,6 +147,9 @@ class LikelihoodEstimator(NeuralInference, ABC):
         # can `sample()` and `log_prob()`. The network is accessible via `.net`.
         if self._posterior is None or retrain_from_scratch_each_round:
             x_shape = x_shape_from_simulation(x)
+            assert (
+                len(x_shape) < 3
+            ), "SNLE cannot handle multi-dimensional simulator output."
             self._posterior = LikelihoodBasedPosterior(
                 method_family="snle",
                 neural_net=self._build_neural_net(theta, x),

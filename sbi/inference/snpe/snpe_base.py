@@ -4,12 +4,10 @@
 
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Any, Callable, Dict, List, Optional, Union, cast
-from warnings import warn
+from typing import Any, Callable, Dict, Optional, Union, cast
 
-import numpy as np
 import torch
-from torch import Tensor, nn, ones, optim
+from torch import Tensor, ones, optim
 from torch.nn.utils import clip_grad_norm_
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
@@ -18,8 +16,11 @@ from torch.utils.tensorboard import SummaryWriter
 from sbi import utils as utils
 from sbi.inference import NeuralInference
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
-from sbi.types import ScalarFloat
-from sbi.utils import check_estimator_arg, x_shape_from_simulation
+from sbi.utils import (
+    check_estimator_arg,
+    x_shape_from_simulation,
+    test_posterior_net_for_multi_d_x,
+)
 
 
 class PosteriorEstimator(NeuralInference, ABC):
@@ -197,6 +198,7 @@ class PosteriorEstimator(NeuralInference, ABC):
                 mcmc_parameters=self._mcmc_parameters,
                 rejection_sampling_parameters=self._rejection_sampling_parameters,
             )
+            test_posterior_net_for_multi_d_x(self._posterior.net, theta, x)
 
         # Copy MCMC init parameters for latest sample init
         if hasattr(proposal, "_mcmc_init_params"):
