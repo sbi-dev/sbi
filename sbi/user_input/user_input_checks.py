@@ -527,3 +527,28 @@ def check_estimator_arg(estimator: Union[str, Callable]) -> None:
         "The passed density estimator / classifier must be a string or a function "
         f"returning a nn.Module, but is {type(estimator)}"
     )
+
+
+def test_posterior_net_for_multi_d_x(net: nn.Module, theta: Tensor, x: Tensor) -> None:
+    """Test log prob method of the net.
+
+    This is done to make sure the net can handle multidimensional inputs via an
+    embedding net. If not, it usually fails with a RuntimeError. Here we catch the
+    error, append a debug hint and raise it again.
+    """
+
+    try:
+        # torch.nn.functional needs at least two inputs here.
+        net.log_prob(theta[:2], x[:2])
+    except RuntimeError as rte:
+        ndims = x.ndim
+        if ndims > 2:
+            message = f"""Debug hint: The simulated data x has {ndims-1} dimensions.
+            With default settings, sbi cannot deal with multidimensional simulations.
+            Make sure to use an embedding net that reduces the dimensionality, e.g., a
+            CNN in case of images, or change the simulator to return one-dimensional x.
+            """
+        else:
+            message = ""
+
+        raise RuntimeError(rte, message)
