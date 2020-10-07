@@ -122,7 +122,7 @@ def maybe_wrap_prior_as_pytorch(prior) -> Tuple[Distribution, bool]:
         is_prior_numpy = True
     else:
         raise TypeError(
-            "Prior must return torch.Tensor or ndarray, but returns {type(theta)}"
+            f"Prior must return torch.Tensor or ndarray, but returns {type(theta)}"
         )
 
     return cast(Distribution, prior), is_prior_numpy
