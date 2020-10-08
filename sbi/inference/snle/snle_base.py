@@ -6,9 +6,8 @@ from abc import ABC
 from copy import deepcopy
 from typing import Any, Callable, Dict, Optional, Union
 
-import numpy as np
 import torch
-from torch import Tensor, nn, optim
+from torch import optim
 from torch.nn.utils import clip_grad_norm_
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
@@ -17,7 +16,6 @@ from torch.utils.tensorboard import SummaryWriter
 from sbi import utils as utils
 from sbi.inference import NeuralInference
 from sbi.inference.posteriors.likelihood_based_posterior import LikelihoodBasedPosterior
-from sbi.types import ScalarFloat
 from sbi.utils import check_estimator_arg, x_shape_from_simulation
 
 
@@ -149,6 +147,9 @@ class LikelihoodEstimator(NeuralInference, ABC):
         # can `sample()` and `log_prob()`. The network is accessible via `.net`.
         if self._posterior is None or retrain_from_scratch_each_round:
             x_shape = x_shape_from_simulation(x)
+            assert (
+                len(x_shape) < 3
+            ), "SNLE cannot handle multi-dimensional simulator output."
             self._posterior = LikelihoodBasedPosterior(
                 method_family="snle",
                 neural_net=self._build_neural_net(theta, x),
@@ -227,7 +228,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         )
 
         # Dataset is shared for training and validation loaders.
-        dataset = data.TensorDataset(x, theta)
+        dataset = data.TensorDataset(theta, x)
 
         # Create neural net and validation loaders using a subset sampler.
         train_loader = data.DataLoader(
@@ -259,7 +260,8 @@ class LikelihoodEstimator(NeuralInference, ABC):
                     batch[0].to(self._device),
                     batch[1].to(self._device),
                 )
-                log_prob = self._posterior.net.log_prob(theta_batch, context=x_batch)
+                # Evaluate on x with theta as context.
+                log_prob = self._posterior.net.log_prob(x_batch, context=theta_batch)
                 loss = -torch.mean(log_prob)
                 loss.backward()
                 if clip_max_norm is not None:
@@ -279,8 +281,9 @@ class LikelihoodEstimator(NeuralInference, ABC):
                         batch[0].to(self._device),
                         batch[1].to(self._device),
                     )
+                    # Evaluate on x with theta as context.
                     log_prob = self._posterior.net.log_prob(
-                        theta_batch, context=x_batch
+                        x_batch, context=theta_batch
                     )
                     log_prob_sum += log_prob.sum().item()
             self._val_log_prob = log_prob_sum / num_validation_examples
