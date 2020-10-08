@@ -1,3 +1,9 @@
+# v0.13.2
+
+- fix bug in SNRE (#363)
+- fix warnings for multi-D x (#361)
+- small improvements to MCMC, verbosity and continuing of chains (#347, #348)
+
 # v0.13.1
 
 - Make logging of vectorized numpy slice sampler slightly less verbose and address NumPy future warning (#347)
