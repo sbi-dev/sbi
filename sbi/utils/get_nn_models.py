@@ -76,13 +76,13 @@ def classifier_nn(
     def build_fn(batch_theta, batch_x):
         if model == "linear":
             return build_linear_classifier(
-                batch_x=batch_x, batch_y=batch_theta, **kwargs
+                batch_x=batch_theta, batch_y=batch_x, **kwargs
             )
         if model == "mlp":
-            return build_mlp_classifier(batch_x=batch_x, batch_y=batch_theta, **kwargs)
+            return build_mlp_classifier(batch_x=batch_theta, batch_y=batch_x, **kwargs)
         if model == "resnet":
             return build_resnet_classifier(
-                batch_x=batch_x, batch_y=batch_theta, **kwargs
+                batch_x=batch_theta, batch_y=batch_x, **kwargs
             )
         else:
             raise NotImplementedError
