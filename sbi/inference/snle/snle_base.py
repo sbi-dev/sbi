@@ -228,7 +228,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         )
 
         # Dataset is shared for training and validation loaders.
-        dataset = data.TensorDataset(x, theta)
+        dataset = data.TensorDataset(theta, x)
 
         # Create neural net and validation loaders using a subset sampler.
         train_loader = data.DataLoader(
@@ -260,7 +260,8 @@ class LikelihoodEstimator(NeuralInference, ABC):
                     batch[0].to(self._device),
                     batch[1].to(self._device),
                 )
-                log_prob = self._posterior.net.log_prob(theta_batch, context=x_batch)
+                # Evaluate on x with theta as context.
+                log_prob = self._posterior.net.log_prob(x_batch, context=theta_batch)
                 loss = -torch.mean(log_prob)
                 loss.backward()
                 if clip_max_norm is not None:
@@ -280,8 +281,9 @@ class LikelihoodEstimator(NeuralInference, ABC):
                         batch[0].to(self._device),
                         batch[1].to(self._device),
                     )
+                    # Evaluate on x with theta as context.
                     log_prob = self._posterior.net.log_prob(
-                        theta_batch, context=x_batch
+                        x_batch, context=theta_batch
                     )
                     log_prob_sum += log_prob.sum().item()
             self._val_log_prob = log_prob_sum / num_validation_examples
