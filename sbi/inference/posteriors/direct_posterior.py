@@ -29,8 +29,8 @@ class DirectPosterior(NeuralPosterior):
     SNPE.<br/><br/>
     SNPE trains a neural network to directly approximate the posterior distribution.
     However, for bounded priors, the neural network can have leakage: it puts non-zero
-    mass in regions where the prior is zero. The `SnpePosterior` class wraps the trained
-    network to deal with these cases.<br/><br/>
+    mass in regions where the prior is zero. The `DirectPosterior` class wraps the
+    trained network to deal with these cases.<br/><br/>
     Specifically, this class offers the following functionality:<br/>
     - correct the calculation of the log probability such that it compensates for the
       leakage.<br/>
@@ -438,7 +438,11 @@ class PotentialFunctionProvider:
     """
 
     def __call__(
-        self, prior, posterior_nn: nn.Module, x: Tensor, mcmc_method: str,
+        self,
+        prior,
+        posterior_nn: nn.Module,
+        x: Tensor,
+        mcmc_method: str,
     ) -> Callable:
         """Return potential function.
 
@@ -468,7 +472,10 @@ class PotentialFunctionProvider:
         x = ensure_x_batched(self.x).repeat(num_batch, 1)
 
         with torch.set_grad_enabled(False):
-            target_log_prob = self.posterior_nn.log_prob(inputs=theta, context=self.x,)
+            target_log_prob = self.posterior_nn.log_prob(
+                inputs=theta,
+                context=self.x,
+            )
             is_within_prior = torch.isfinite(self.prior.log_prob(theta))
             target_log_prob[~is_within_prior] = -float("Inf")
 
