@@ -1,8 +1,14 @@
+# v0.13.3
+
+- Fixed typo in docs for `infer` (thanks @glouppe, #370)
+
+
 # v0.13.2
 
-- fix bug in SNRE (#363)
-- fix warnings for multi-D x (#361)
-- small improvements to MCMC, verbosity and continuing of chains (#347, #348)
+- Fix bug in SNRE (#363)
+- Fix warnings for multi-D x (#361)
+- Small improvements to MCMC, verbosity and continuing of chains (#347, #348)
+
 
 # v0.13.1
 
