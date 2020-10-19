@@ -8,7 +8,7 @@ Inference can be run in a single
 line of code:
 
 ```python
-posterior = infer(prior, simulator, num_simulations=1000, method='SNPE')
+posterior = infer(simulator, infer, num_simulations=1000, method='SNPE')
 ```
 
 - To learn about the general motivation behind simulation-based inference, and the
