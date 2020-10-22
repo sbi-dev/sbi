@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
+from typing import Callable, Optional
 import numpy as np
 import os
 import sys
@@ -8,27 +9,28 @@ import sys
 from matplotlib import pyplot as plt
 from tqdm import trange
 
-# from .base import MCMCSampler
-
 
 class MCMCSampler:
     """
     Superclass for MCMC samplers.
     """
 
-    def __init__(self, x, lp_f, thin):
+    def __init__(self, x, lp_f: Callable, thin: Optional[int], verbose: bool = False):
         """
-        :param x: initial state
-        :param lp_f: function that returns the log prob
-        :param thin: amount of thinning; if None, no thinning
+
+        Args:
+            x: initial state
+            lp_f: Function that returns the log prob.
+            thin: amount of thinning; if None, no thinning.
+            verbose: Whether to show progress bars (False).
         """
 
         self.x = np.array(x, dtype=float)
         self.lp_f = lp_f
         self.L = lp_f(self.x)
         self.thin = 1 if thin is None else thin
-        # print(self.x.size, self.x.ndim)
         self.n_dims = self.x.size if self.x.ndim == 1 else self.x.shape[1]
+        self.verbose = verbose
 
     def set_state(self, x):
         """
@@ -46,30 +48,38 @@ class MCMCSampler:
 
 
 class SliceSampler(MCMCSampler):
-    """
-    Slice sampling for multivariate continuous probability distributions.
-    It cycles sampling from each conditional using univariate slice sampling.
-    """
+    def __init__(
+        self, x, lp_f, max_width=float("inf"), thin=None, verbose: bool = False
+    ):
+        """Slice sampling for multivariate continuous probability distributions.
 
-    def __init__(self, x, lp_f, max_width=float("inf"), thin=None):
-        """
-        :param x: initial state
-        :param lp_f: function that returns the log prob
-        :param max_width: maximum bracket width
-        :param thin: amount of thinning; if None, no thinning
+        It cycles sampling from each conditional using univariate slice sampling.
+
+        Args:
+            x: initial state
+            lp_f: Function that returns the log prob.
+            max_width: maximum bracket width
+            thin: amount of thinning; if None, no thinning.
+            verbose: Whether to show progress bars (False).
         """
 
-        MCMCSampler.__init__(self, x, lp_f, thin)
+        MCMCSampler.__init__(self, x, lp_f, thin, verbose=verbose)
         self.max_width = max_width
         self.width = None
 
-    def gen(self, n_samples, logger=sys.stdout, show_info=False, rng=np.random):
+    def gen(
+        self, n_samples: int, logger=sys.stdout, show_info: bool = False, rng=np.random
+    ):
         """
-        :param n_samples: number of samples
-        :param logger: logger for logging messages. If None, no logging takes place
-        :param show_info: whether to plot info at the end of sampling
-        :param rng: random number generator to use
-        :return: numpy array of samples
+        Return samples using slice sampling. 
+
+        Args:
+            n_samples: number of samples
+            logger: logger for logging messages. If None, no logging takes place
+            show_info: whether to plot info at the end of sampling
+            rng: random number generator to use
+        Returns:
+            sampels: numpy array of samples
         """
 
         assert n_samples >= 0, "number of samples can't be negative"
@@ -83,7 +93,7 @@ class SliceSampler(MCMCSampler):
             # logger.write('tuning bracket width...\n')
             self._tune_bracket_width(rng)
 
-        tbar = trange(int(n_samples), miniters=10)
+        tbar = trange(int(n_samples), miniters=10, disable=not self.verbose)
         tbar.set_description("Generating samples")
         for n in tbar:
             # for n in range(int(n_samples)):
@@ -116,7 +126,9 @@ class SliceSampler(MCMCSampler):
         """
         Initial test run for tuning bracket width.
         Note that this is not correct sampling; samples are thrown away.
-        :param rng: random number generator to use
+
+        Args:
+            rng: Random number generator to use.
         """
 
         n_samples = 50
@@ -124,7 +136,7 @@ class SliceSampler(MCMCSampler):
         x = self.x.copy()
         self.width = np.full(self.n_dims, 0.01)
 
-        tbar = trange(n_samples, miniters=10)
+        tbar = trange(n_samples, miniters=10, disable=not self.verbose)
         tbar.set_description("Tuning bracket width...")
         for n in tbar:
             # for n in range(int(n_samples)):
@@ -134,13 +146,17 @@ class SliceSampler(MCMCSampler):
                 x[i], wi = self._sample_from_conditional(i, x[i], rng)
                 self.width[i] += (wi - self.width[i]) / (n + 1)
 
-    def _sample_from_conditional(self, i, cxi, rng):
+    def _sample_from_conditional(self, i: int, cxi, rng):
         """
         Samples uniformly from conditional by constructing a bracket.
-        :param i: conditional to sample from
-        :param cxi: current state of variable to sample
-        :param rng: random number generator to use
-        :return: new state, final bracket width
+
+        Args:
+            i: conditional to sample from
+            cxi: current state of variable to sample
+            rng: random number generator to use
+
+        Returns:
+            new state, final bracket width
         """
 
         # conditional log prob
@@ -178,8 +194,6 @@ class SliceSampler(MCMCSampler):
 
 def test_():
     from scipy import stats
-    import utils
-    from matplotlib import pyplot as plt
 
     mean = np.zeros(2)
     cov = np.array([[1, 0.9], [0.9, 1]])

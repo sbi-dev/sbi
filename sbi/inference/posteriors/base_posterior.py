@@ -384,6 +384,7 @@ class NeuralPosterior(ABC):
                     utils.tensor2numpy(initial_params[c, :]).reshape(-1),
                     lp_f=potential_function,
                     thin=thin,
+                    verbose=show_progress_bars,
                 )
                 if warmup_steps > 0:
                     posterior_sampler.gen(int(warmup_steps))
