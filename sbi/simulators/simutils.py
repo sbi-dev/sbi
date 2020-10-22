@@ -2,24 +2,11 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 
-from typing import (
-    Callable,
-    Optional,
-    Union,
-    Dict,
-    Any,
-    Tuple,
-    Union,
-    cast,
-    List,
-    Sequence,
-    TypeVar,
-)
+from typing import Callable
 
 import torch
 from torch import Tensor
 from tqdm.auto import tqdm
-import logging
 from joblib import Parallel, delayed
 
 

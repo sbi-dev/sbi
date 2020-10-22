@@ -4,18 +4,7 @@
 """Various PyTorch utility functions."""
 
 import warnings
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    List,
-    Optional,
-    Sequence,
-    Tuple,
-    TypeVar,
-    Union,
-    cast,
-)
+from typing import Union
 
 import numpy as np
 import torch

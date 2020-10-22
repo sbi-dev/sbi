@@ -1,8 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
-from copy import deepcopy
-from typing import Any, Callable, List, Optional
+from typing import Any, Callable
 
 import numpy as np
 import torch

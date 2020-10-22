@@ -2,10 +2,8 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 
-from typing import Callable, Optional, Union, Dict, Any, Tuple, Union, cast, List, Sequence, TypeVar
+from typing import Callable, Optional, Union
 
-import torch
-from torch import nn
 from torch.utils.tensorboard import SummaryWriter
 
 from sbi.inference.snpe.snpe_base import PosteriorEstimator

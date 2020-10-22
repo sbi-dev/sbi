@@ -2,8 +2,6 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 import numpy as np
-import os
-import sys
 
 from tqdm import tqdm
 
