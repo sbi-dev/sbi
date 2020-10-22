@@ -519,35 +519,6 @@ class NeuralPosterior(ABC):
             x, sample_shape, mcmc_method, mcmc_parameters
         )
 
-        class PriorWithFewerDims:
-            """
-            Prior which samples only from the free dimensions of the conditional.
-
-            This is needed for the the MCMC initialization functions when conditioning.
-            For the prior init, we could post-hoc select the relevant dimensions. But
-            for SIR, we want to evaluate the `potential_fn` of the conditional
-            posterior, which takes only a subset of the full parameter vector theta
-            (only the `dims_to_sample`). This subset is provided by `.sample()` from
-            this class.
-            """
-
-            def __init__(self, full_prior: Any):
-                self.full_prior = full_prior
-
-            def sample(self, *args, **kwargs):
-                """
-                Sample only from the relevant dimension. Other dimensions are filled in
-                by the `ConditionalPotentialFunctionProvider()` during MCMC.
-                """
-                return self.full_prior.sample(*args, **kwargs)[:, dims_to_sample]
-
-            def log_prob(self, *args, **kwargs):
-                r"""
-                `log_prob` is same as for the full prior, because we usually evaluate
-                the $\theta$ under the full joint once we have added the condition.
-                """
-                return self.full_prior.log_prob(*args, **kwargs)
-
         self.net.eval()
 
         cond_potential_fn_provider = ConditionalPotentialFunctionProvider(
@@ -560,7 +531,8 @@ class NeuralPosterior(ABC):
                 self._prior, self.net, x, mcmc_method
             ),
             init_fn=self._build_mcmc_init_fn(
-                PriorWithFewerDims(self._prior),
+                # Restrict prior to sample only free dimensions.
+                RestrictedPriorForConditional(self._prior, dims_to_sample),
                 cond_potential_fn_provider(self._prior, self.net, x, "slice_np"),
                 **mcmc_parameters,
             ),
@@ -820,3 +792,38 @@ class ConditionalPotentialFunctionProvider:
         theta_condition[:, self.dims_to_sample] = theta
 
         return self.potential_fn_provider.pyro_potential({"": theta_condition})
+
+
+class RestrictedPriorForConditional:
+    """
+    Class to restrict a prior to fewer dimensions as needed for conditional sampling.
+
+    The resulting prior samples only from the free dimensions of the conditional.
+
+    This is needed for the the MCMC initialization functions when conditioning.
+    For the prior init, we could post-hoc select the relevant dimensions. But
+    for SIR, we want to evaluate the `potential_fn` of the conditional
+    posterior, which takes only a subset of the full parameter vector theta
+    (only the `dims_to_sample`). This subset is provided by `.sample()` from
+    this class.
+    """
+
+    def __init__(
+        self, full_prior: Any, dims_to_sample: List[int],
+    ):
+        self.full_prior = full_prior
+        self.dims_to_sample = dims_to_sample
+
+    def sample(self, *args, **kwargs):
+        """
+        Sample only from the relevant dimension. Other dimensions are filled in
+        by the `ConditionalPotentialFunctionProvider()` during MCMC.
+        """
+        return self.full_prior.sample(*args, **kwargs)[:, self.dims_to_sample]
+
+    def log_prob(self, *args, **kwargs):
+        r"""
+        `log_prob` is same as for the full prior, because we usually evaluate
+        the $\theta$ under the full joint once we have added the condition.
+        """
+        return self.full_prior.log_prob(*args, **kwargs)
