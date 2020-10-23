@@ -465,10 +465,17 @@ class PotentialFunctionProvider:
         theta = torch.as_tensor(theta, dtype=torch.float32)
         theta = ensure_theta_batched(theta)
         num_batch = theta.shape[0]
-        x = ensure_x_batched(self.x).repeat(num_batch, 1)
+
+        x_batched = ensure_x_batched(self.x)
+        # Repeat x over batch dim to match theta batch, accounting for multi-D x.
+        x_repeated = x_batched.repeat(
+            num_batch, *(1 for _ in range(x_batched.ndim - 1))
+        )
 
         with torch.set_grad_enabled(False):
-            target_log_prob = self.posterior_nn.log_prob(inputs=theta, context=self.x,)
+            target_log_prob = self.posterior_nn.log_prob(
+                inputs=theta, context=x_repeated,
+            )
             is_within_prior = torch.isfinite(self.prior.log_prob(theta))
             target_log_prob[~is_within_prior] = -float("Inf")
 

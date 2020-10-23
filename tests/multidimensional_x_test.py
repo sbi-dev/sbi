@@ -71,13 +71,34 @@ def test_inference_with_2d_x(embedding, method):
     x_o = simulator(theta_o)
 
     if method == SNPE:
-        net_provider = utils.posterior_nn(model="mdn", embedding_net=embedding(),)
+        kwargs = dict(
+            density_estimator=utils.posterior_nn(
+                model="mdn", embedding_net=embedding(),
+            ),
+            sample_with_mcmc=True,
+        )
     elif method == SNLE:
-        net_provider = utils.likelihood_nn(model="mdn", embedding_net=embedding())
+        kwargs = dict(
+            density_estimator=utils.likelihood_nn(
+                model="mdn", embedding_net=embedding()
+            )
+        )
     else:
-        net_provider = utils.classifier_nn(model="mlp", embedding_net_x=embedding(),)
+        kwargs = dict(
+            density_estimator=utils.classifier_nn(
+                model="mlp", embedding_net_x=embedding(),
+            )
+        )
 
-    infer = method(simulator, prior, 1, 1, net_provider, show_progress_bars=False,)
+    infer = method(
+        simulator,
+        prior,
+        1,
+        1,
+        show_progress_bars=False,
+        mcmc_method="slice_np",
+        **kwargs,
+    )
 
     posterior = infer(
         num_simulations=num_simulations, training_batch_size=100, max_num_epochs=10
