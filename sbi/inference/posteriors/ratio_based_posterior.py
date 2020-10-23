@@ -327,10 +327,20 @@ class PotentialFunctionProvider:
         theta = torch.as_tensor(theta, dtype=torch.float32)
         theta = ensure_theta_batched(theta)
         num_batch = theta.shape[0]
-        x = ensure_x_batched(self.x).repeat(num_batch, 1)
+        x_batched = ensure_x_batched(self.x)
+        # Repeat x over batch dim to match theta batch, accounting for multi-D x.
+        x_repeated = x_batched.repeat(
+            num_batch, *(1 for _ in range(x_batched.ndim - 1))
+        )
 
+        assert (
+            x_batched.ndim == 2
+        ), """X must not be multidimensional for ratio-based methods because it will be
+              concatenated with theta."""
         with torch.set_grad_enabled(False):
-            log_ratio = self.classifier(torch.cat((theta, x), dim=1)).reshape(-1)
+            log_ratio = self.classifier(torch.cat((theta, x_repeated), dim=1)).reshape(
+                -1
+            )
 
         # Notice opposite sign to pyro potential.
         return log_ratio + self.prior.log_prob(theta)
