@@ -27,21 +27,13 @@ from sbi.utils import (
 class SNPE_C(PosteriorEstimator):
     def __init__(
         self,
-        simulator: Callable,
         prior,
-        num_workers: int = 1,
-        simulation_batch_size: int = 1,
         density_estimator: Union[str, Callable] = "maf",
-        sample_with_mcmc: bool = False,
-        mcmc_method: str = "slice_np",
-        mcmc_parameters: Optional[Dict[str, Any]] = None,
-        rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
-        use_combined_loss: bool = False,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[TensorboardSummaryWriter] = None,
         show_progress_bars: bool = True,
-        show_round_summary: bool = False,
+        **unused_args,
     ):
         r"""SNPE-C / APT [1].
 
@@ -70,19 +62,10 @@ class SNPE_C(PosteriorEstimator):
         the atomic loss.
 
         Args:
-            simulator: A function that takes parameters $\theta$ and maps them to
-                simulations, or observations, `x`, $\mathrm{sim}(\theta)\to x$. Any
-                regular Python callable (i.e. function or class with `__call__` method)
-                can be used.
             prior: A probability distribution that expresses prior knowledge about the
                 parameters, e.g. which ranges are meaningful for them. Any
                 object with `.log_prob()`and `.sample()` (for example, a PyTorch
                 distribution) can be used.
-            num_workers: Number of parallel workers to use for simulations.
-            simulation_batch_size: Number of parameter sets that the simulator
-                maps to data x at once. If None, we simulate all parameter sets at the
-                same time. If >= 1, the simulator has to process data of shape
-                (simulation_batch_size, parameter_dimension).
             density_estimator: If it is a string, use a pre-configured network of the
                 provided type (one of nsf, maf, mdn, made). Alternatively, a function
                 that builds a custom neural network can be provided. The function will
@@ -91,51 +74,22 @@ class SNPE_C(PosteriorEstimator):
                 needs to return a PyTorch `nn.Module` implementing the density
                 estimator. The density estimator needs to provide the methods
                 `.log_prob` and `.sample()`.
-            sample_with_mcmc: Whether to sample with MCMC. MCMC can be used to deal
-                with high leakage.
-            mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`,
-                `hmc`, `nuts`. Currently defaults to `slice_np` for a custom numpy
-                implementation of slice sampling; select `hmc`, `nuts` or `slice` for
-                Pyro-based sampling.
-            mcmc_parameters: Dictionary overriding the default parameters for MCMC.
-                The following parameters are supported: `thin` to set the thinning
-                factor for the chain, `warmup_steps` to set the initial number of
-                samples to discard, `num_chains` for the number of chains,
-                `init_strategy` for the initialisation strategy for chains; `prior` will
-                draw init locations from prior, whereas `sir` will use
-                Sequential-Importance-Resampling using `init_strategy_num_candidates`
-                to find init locations.
-            rejection_sampling_parameters: Dictonary overriding the default parameters
-                for rejection sampling. The following parameters are supported:
-                `max_sampling_batch_size` to set the batch size for drawing new
-                samples from the candidate distribution, e.g., the posterior. Larger
-                batch size speeds up sampling.
-            use_combined_loss: Whether to train the neural net also on prior samples
-                using maximum likelihood in addition to training it on all samples using
-                atomic loss. The extra MLE loss helps prevent density leaking with
-                bounded priors.
             device: torch device on which to compute, e.g. gpu, cpu.
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
             summary_writer: A tensorboard `SummaryWriter` to control, among others, log
                 file location (default is `<current working directory>/logs`.)
-            show_progress_bars: Whether to show a progressbar during simulation and
-                sampling.
-            show_round_summary: Whether to show the validation loss and leakage after
-                each round.
+            show_progress_bars: Whether to show a progressbar during training.
+            unused_args: Absorbs additional arguments. No entries will be used. If it
+                is not empty, we warn. In future versions, when the new interface of
+                0.14.0 is more mature, we will remove this argument.
         """
 
-        self._use_combined_loss = use_combined_loss
+        kwargs = del_entries(locals(), entries=("self", "__class__", "unused_args"))
+        super().__init__(**kwargs, **unused_args)
 
-        kwargs = del_entries(
-            locals(), entries=("self", "__class__", "use_combined_loss")
-        )
-        super().__init__(**kwargs)
-
-    def __call__(
+    def train(
         self,
-        num_simulations: int,
-        proposal: Optional[Any] = None,
         num_atoms: int = 10,
         training_batch_size: int = 50,
         learning_rate: float = 5e-4,
@@ -146,18 +100,15 @@ class SNPE_C(PosteriorEstimator):
         calibration_kernel: Optional[Callable] = None,
         exclude_invalid_x: bool = True,
         discard_prior_samples: bool = False,
+        use_combined_loss: bool = False,
         retrain_from_scratch_each_round: bool = False,
+        show_train_summary: bool = False,
     ) -> DirectPosterior:
         r"""Run SNPE.
 
-        Return posterior $p(\theta|x)$ after inference.
+        Train the density estimator to learn the distribution $p(\theta|x)#.
 
         Args:
-            num_simulations: Number of simulator calls.
-            proposal: Distribution that the parameters $\theta$ are drawn from.
-                `proposal=None` uses the prior. Setting the proposal to a distribution
-                targeted on a specific observation, e.g. a posterior $p(\theta|x_o)$
-                obtained previously, can lead to less required simulations.
             num_atoms: Number of atoms to use for classification.
             training_batch_size: Training batch size.
             learning_rate: Learning rate for Adam optimizer.
@@ -176,8 +127,14 @@ class SNPE_C(PosteriorEstimator):
             discard_prior_samples: Whether to discard samples simulated in round 1, i.e.
                 from the prior. Training may be sped up by ignoring such less targeted
                 samples.
+            use_combined_loss: Whether to train the neural net also on prior samples
+                using maximum likelihood in addition to training it on all samples using
+                atomic loss. The extra MLE loss helps prevent density leaking with
+                bounded priors.
             retrain_from_scratch_each_round: Whether to retrain the conditional density
                 estimator for the posterior from scratch each round.
+            show_train_summary: Whether to print the number of epochs and validation
+                loss and leakage after the training.
 
         Returns:
             Posterior $p(\theta|x)$ that can be sampled and evaluated.
@@ -187,14 +144,21 @@ class SNPE_C(PosteriorEstimator):
         # requiring the signature to have `num_atoms`, save it for use below, and
         # continue. It's sneaky because we are using the object (self) as a namespace
         # to pass arguments between functions, and that's implicit state management.
-
         self._num_atoms = num_atoms
-        kwargs = del_entries(locals(), entries=("self", "__class__", "num_atoms"))
+        self._use_combined_loss = use_combined_loss
+        kwargs = del_entries(
+            locals(), entries=("self", "__class__", "num_atoms", "use_combined_loss")
+        )
+
+        # Set the proposal to the last proposal that was passed by the user. For atomic
+        # SNPE, it does not matter what the proposal is. For non-atomic SNPE, we only
+        # use the latest data that was passed, i.e. the one from the last proposal.
+        proposal = self._proposal_roundwise[-1]
 
         if proposal is not None:
             self.use_non_atomic_loss = (
                 isinstance(proposal.net._distribution, mdn)
-                and isinstance(self._posterior.net._distribution, mdn)
+                and isinstance(self._neural_net._distribution, mdn)
                 and (
                     isinstance(self._prior, utils.BoxUniform)
                     or isinstance(self._prior, MultivariateNormal)
@@ -208,7 +172,7 @@ class SNPE_C(PosteriorEstimator):
                 # Take care of z-scoring, pre-compute and store prior terms.
                 self._set_state_for_mog_proposal()
 
-        return super().__call__(**kwargs)
+        return super().train(**kwargs)
 
     def _set_state_for_mog_proposal(self) -> None:
         """
@@ -223,9 +187,7 @@ class SNPE_C(PosteriorEstimator):
             training step if the prior is Gaussian.
         """
 
-        self.z_score_theta = isinstance(
-            self._posterior.net._transform, CompositeTransform
-        )
+        self.z_score_theta = isinstance(self._neural_net._transform, CompositeTransform)
 
         self._set_maybe_z_scored_prior()
 
@@ -256,8 +218,8 @@ class SNPE_C(PosteriorEstimator):
         """
 
         if self.z_score_theta:
-            scale = self._posterior.net._transform._transforms[0]._scale
-            shift = self._posterior.net._transform._transforms[0]._shift
+            scale = self._neural_net._transform._transforms[0]._scale
+            shift = self._neural_net._transform._transforms[0]._shift
 
             # Following the definintion of the linear transform in
             # `standardizing_transform` in `sbiutils.py`:
@@ -361,7 +323,7 @@ class SNPE_C(PosteriorEstimator):
         )
 
         # Evaluate large batch giving (batch_size * num_atoms) log prob posterior evals.
-        log_prob_posterior = self._posterior.net.log_prob(atomic_theta, repeated_x)
+        log_prob_posterior = self._neural_net.log_prob(atomic_theta, repeated_x)
         self._assert_all_finite(log_prob_posterior, "posterior eval")
         log_prob_posterior = log_prob_posterior.reshape(batch_size, num_atoms)
 
@@ -381,7 +343,7 @@ class SNPE_C(PosteriorEstimator):
 
         # XXX This evaluates the posterior on _all_ prior samples
         if self._use_combined_loss:
-            log_prob_posterior_non_atomic = self._posterior.net.log_prob(theta, x)
+            log_prob_posterior_non_atomic = self._neural_net.log_prob(theta, x)
             masks = masks.reshape(-1)
             log_prob_proposal_posterior = (
                 masks * log_prob_posterior_non_atomic + log_prob_proposal_posterior
@@ -428,8 +390,8 @@ class SNPE_C(PosteriorEstimator):
         norm_logits_p = logits_p - torch.logsumexp(logits_p, dim=-1, keepdim=True)
 
         # Evaluate the density estimator.
-        encoded_x = self._posterior.net._embedding_net(x)
-        dist = self._posterior.net._distribution  # defined to avoid black formatting.
+        encoded_x = self._neural_net._embedding_net(x)
+        dist = self._neural_net._distribution  # defined to avoid black formatting.
         logits_d, m_d, prec_d, _, _ = dist.get_mixture_components(encoded_x)
         norm_logits_d = logits_d - torch.logsumexp(logits_d, dim=-1, keepdim=True)
 
@@ -656,7 +618,7 @@ class SNPE_C(PosteriorEstimator):
         """Return potentially standardized theta if z-scoring was requested."""
 
         if self.z_score_theta:
-            theta, _ = self._posterior.net._transform(theta)
+            theta, _ = self._neural_net._transform(theta)
 
         return theta
 

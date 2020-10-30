@@ -1,12 +1,17 @@
 # flake8: noqa
 from sbi.user_input.user_input_checks import (
     check_estimator_arg,
+    check_theta_and_x,
     test_posterior_net_for_multi_d_x,
 )
 from sbi.user_input.user_input_checks_utils import MultipleIndependent
+from sbi.utils.conditional_density import (
+    conditional_corrcoeff,
+    eval_conditional_density,
+)
 from sbi.utils.get_nn_models import classifier_nn, likelihood_nn, posterior_nn
 from sbi.utils.io import get_data_root, get_log_root, get_project_root
-from sbi.utils.plot import pairplot, conditional_pairplot
+from sbi.utils.plot import conditional_pairplot, pairplot
 from sbi.utils.sbiutils import (
     batched_mixture_mv,
     batched_mixture_vmv,
@@ -47,8 +52,4 @@ from sbi.utils.typechecks import (
     is_nonnegative_int,
     is_positive_int,
     is_power_of_two,
-)
-from sbi.utils.conditional_density import (
-    eval_conditional_density,
-    conditional_corrcoeff,
 )
