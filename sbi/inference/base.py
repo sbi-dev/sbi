@@ -85,6 +85,7 @@ class NeuralInference(ABC):
         summary_writer: Optional[SummaryWriter] = None,
         show_progress_bars: bool = True,
         show_round_summary: bool = False,
+        **unused_args,
     ):
         r"""
         Base class for inference methods.
@@ -103,6 +104,9 @@ class NeuralInference(ABC):
                 sampling.
             show_round_summary: Whether to show the validation loss and leakage after
                 each round.
+            unused_args: Absorbs additional arguments. No entries will be used. If it
+                is not empty, we warn. In future versions, when the new interface of
+                0.14.0 is more mature, we will remove the kwargs argument.
         """
 
         # We set the device globally by setting the default tensor type for all tensors.
@@ -112,6 +116,18 @@ class NeuralInference(ABC):
         ), "Currently, only 'gpu' or 'cpu' are supported as devices."
 
         self._device = configure_default_device(device)
+
+        if unused_args.keys():
+            warn(
+                f"You passed some keyword arguments that will not be used. "
+                f"Specifically, the unused arguments are: {list(unused_args.keys())}. "
+                f"These arguments might have been supported in sbi "
+                f"versions <0.14.0. Since 0.14.0, the API was changed. Please consult "
+                f"the corresponding pull request on github: "
+                f"https://github.com/mackelab/sbi/pull/378 and tutorials: "
+                f"https://www.mackelab.org/sbi/tutorial/02_flexible_interface/ for "
+                f"further information.",
+            )
 
         self._prior = prior
 
@@ -141,49 +157,18 @@ class NeuralInference(ABC):
             median_observation_distances=[], epochs=[], best_validation_log_probs=[],
         )
 
-    def simulate(
-        self,
-        num_simulations: int,
-        simulator: Callable,
-        proposal: Any = None,
-        num_workers: int = 1,
-        simulation_batch_size: int = 1,
-    ) -> Tuple[Tensor, Tensor]:
-        """
-        Todo
-
-        Args:
-            num_simulations:
-            simulator:
-            proposal:
-            num_workers:
-            simulation_batch_size:
-
-        Returns:
-
-        """
-        batched_simulator = lambda theta: simulate_in_batches(
-            simulator,
-            theta,
-            simulation_batch_size,
-            num_workers,
-            self._show_progress_bars,
-        )
-
-        if proposal is None or num_simulations == 0:
-            theta = self._prior.sample((num_simulations,))
-        else:
-            theta = proposal.sample((num_simulations,))
-
-        x = batched_simulator(theta)
-
-        return theta, x
-
-    # TODO: this is redundant with _append_to_data_bank()
     def provide_presimulated(
         self, theta: Tensor, x: Tensor, from_round: int = 0
     ) -> None:
         r"""
+        Deprecated since sbi 0.14.0.
+
+        Instead of using this, simply pass theta an x to `.train()`. Please consult the
+        corresponding pull request on github:  https://github.com/mackelab/sbi/pull/378
+        and tutorials:
+        https://www.mackelab.org/sbi/tutorial/02_flexible_interface/
+        for further information.
+
         Provide external $\theta$ and $x$ to be used for training later on.
 
         Args:
@@ -192,7 +177,16 @@ class NeuralInference(ABC):
             from_round: Which round the data was simulated from. `from_round=0` means
                 that the data came from the first round, i.e. the prior.
         """
-        self._append_to_data_bank(theta, x, from_round)
+        raise NameError(
+            ".provide_presimulated() does not longer exist in sbi "
+            "versions >=0.14.0. Instead, simply pass theta an x to "
+            ".train()."
+            "Please consult "
+            "the corresponding pull request on github: "
+            "https://github.com/mackelab/sbi/pull/378 and tutorials: "
+            "https://www.mackelab.org/sbi/tutorial/02_flexible_interface/ for further "
+            "information."
+        )
 
     def _append_to_data_bank(self, theta: Tensor, x: Tensor, from_round: int) -> None:
         r"""
@@ -214,7 +208,6 @@ class NeuralInference(ABC):
         self._prior_masks.append(mask_sims_from_prior(from_round, theta.size(0)))
         self._data_round_index.append(from_round)
 
-    # TODO: make public
     def _get_from_data_bank(
         self,
         starting_round: int = 0,
@@ -257,35 +250,6 @@ class NeuralInference(ABC):
 
         return theta[is_valid_x], x[is_valid_x], prior_masks[is_valid_x]
 
-    # TODO:  REMOVE
-    def _run_simulations(
-        self, proposal: Optional[Any], num_sims: int,
-    ) -> Tuple[Tensor, Tensor]:
-        r"""
-        Run the simulations for a given round.
-
-        Args:
-            proposal: Distribution from which to draw $\theta$.
-            num_sims: Number of desired simulations for the round.
-
-        Returns:
-            theta: Parameters used for training.
-            x: Simulations used for training.
-            prior_mask: Whether each simulation came from a prior parameter sample.
-        """
-
-        # Some proposals (e.g. flows) can not deal with `num_sims=0`. So we just draw
-        # 0 prior samples instead (does not matter because it is 0 samples anyway).
-        # `num_sims=0` happens often when presimulated data is provided.
-        if proposal is None or num_sims == 0:
-            theta = self._prior.sample((num_sims,))
-        else:
-            theta = proposal.sample((num_sims,))
-
-        x = self._batched_simulator(theta)
-
-        return theta, x
-
     def _converged(self, epoch: int, stop_after_epochs: int) -> bool:
         """Return whether the training converged yet and save best model state so far.
 
@@ -319,18 +283,10 @@ class NeuralInference(ABC):
 
     def _default_summary_writer(self) -> SummaryWriter:
         """Return summary writer logging to method- and simulator-specific directory."""
-        try:
-            simulator = self._simulator.__name__
-        except AttributeError:
-            # TODO: how do we infer the name of the simulator?
-            simulator = "None"
 
         method = self.__class__.__name__
         logdir = Path(
-            get_log_root(),
-            simulator,
-            method,
-            datetime.now().isoformat().replace(":", "_"),
+            get_log_root(), method, datetime.now().isoformat().replace(":", "_"),
         )
         return SummaryWriter(logdir)
 
@@ -512,3 +468,39 @@ class NeuralInference(ABC):
                 "However, previously, you had already specified a proposal. "
                 "This scenario is currently not allowed."
             )
+
+
+def simulate_for_sbi(
+    num_simulations: int,
+    simulator: Callable,
+    proposal: Any,
+    num_workers: int = 1,
+    simulation_batch_size: int = 1,
+    show_progress_bar: bool = True,
+) -> Tuple[Tensor, Tensor]:
+    r"""
+    Returns ($\theta, x$) pairs obtained from sampling the proposal and simulating.
+
+    Args:
+        num_simulations: Number of simulations that are run.
+        simulator: Simulator function.
+        proposal: Probability distribution that
+        num_workers: Number of parallel workers to use for simulations.
+        simulation_batch_size: Number of parameter sets that the simulator
+            maps to data x at once. If None, we simulate all parameter sets at the
+            same time. If >= 1, the simulator has to process data of shape
+            (simulation_batch_size, parameter_dimension).
+        show_progress_bar: Whether to show a progress bar for simulating. This will not
+            affect whether there will be a progressbar while drawing samples from the
+            proposal.
+
+    Returns: Sampled parameters $\theta$ and simulation-outputs $x$.
+    """
+
+    theta = proposal.sample((num_simulations,))
+
+    x = simulate_in_batches(
+        simulator, theta, simulation_batch_size, num_workers, show_progress_bar,
+    )
+
+    return theta, x

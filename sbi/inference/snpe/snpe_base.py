@@ -33,6 +33,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         summary_writer: Optional[SummaryWriter] = None,
         show_progress_bars: bool = True,
         show_round_summary: bool = False,
+        **unused_args
     ):
         """Base class for Sequential Neural Posterior Estimation methods.
 
@@ -45,6 +46,9 @@ class PosteriorEstimator(NeuralInference, ABC):
                 needs to return a PyTorch `nn.Module` implementing the density
                 estimator. The density estimator needs to provide the methods
                 `.log_prob` and `.sample()`.
+            unused_args: Absorbs additional arguments. No entries will be used. If it
+                is not empty, we warn. In future versions, when the new interface of
+                0.14.0 is more mature, we will remove the kwargs argument.
 
         See docstring of `NeuralInference` class for all other arguments.
         """
@@ -56,6 +60,7 @@ class PosteriorEstimator(NeuralInference, ABC):
             summary_writer=summary_writer,
             show_progress_bars=show_progress_bars,
             show_round_summary=show_round_summary,
+            **unused_args,
         )
 
         # As detailed in the docstring, `density_estimator` is either a string or

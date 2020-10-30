@@ -1,2 +1,2 @@
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
-from sbi.simulators.simutils import simulate_in_batches
+from sbi.simulators.simutils import simulate_for_sbi, simulate_in_batches

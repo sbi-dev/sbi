@@ -34,6 +34,7 @@ class SNPE_C(PosteriorEstimator):
         summary_writer: Optional[TensorboardSummaryWriter] = None,
         show_progress_bars: bool = True,
         show_round_summary: bool = False,
+        **unused_args,
     ):
         r"""SNPE-C / APT [1].
 
@@ -83,10 +84,25 @@ class SNPE_C(PosteriorEstimator):
                 sampling.
             show_round_summary: Whether to show the validation loss and leakage after
                 each round.
+            unused_args: Absorbs additional arguments. No entries will be used. If it
+                is not empty, we warn. In future versions, when the new interface of
+                0.14.0 is more mature, we will remove the kwargs argument.
         """
 
-        kwargs = del_entries(locals(), entries=("self", "__class__"))
-        super().__init__(**kwargs)
+        kwargs = del_entries(locals(), entries=("self", "__class__", "unused_args"))
+        super().__init__(**kwargs, **unused_args)
+
+    def __call__(self, **kwargs):
+        raise NameError(
+            "Calling SNPE is no longer possible in sbi versions >=0.14.0. Instead, run "
+            "simulations with `.simulate_for_sbi()` and obtain the posterior with "
+            "`.train()`."
+            "Please consult "
+            "the corresponding pull request on github: "
+            "https://github.com/mackelab/sbi/pull/378 and tutorials: "
+            "https://www.mackelab.org/sbi/tutorial/02_flexible_interface/ for further "
+            "information."
+        )
 
     def train(
         self,
@@ -111,6 +127,10 @@ class SNPE_C(PosteriorEstimator):
         Return posterior $p(\theta|x)$ after inference.
 
         Args:
+            theta: Parameters used for training. In SNPE, these parameters will be the
+                labels for the neural density estimator.
+            x: Simulation outputs used for training. In SNPE, these data are the inputs
+                to the neural density estimator.
             proposal: Distribution that the parameters $\theta$ were drawn from during
                 simulation. In this function, it is used to correct the loss-function.
                 `proposal=None` uses the prior.
