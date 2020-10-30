@@ -79,10 +79,7 @@ class NeuralInference(ABC):
 
     def __init__(
         self,
-        simulator: Callable,
         prior,
-        num_workers: int = 1,
-        simulation_batch_size: int = 1,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
@@ -93,19 +90,10 @@ class NeuralInference(ABC):
         Base class for inference methods.
 
         Args:
-            simulator: A function that takes parameters $\theta$ and maps them to
-                simulations, or observations, `x`, $\mathrm{sim}(\theta)\to x$. Any
-                regular Python callable (i.e. function or class with `__call__` method)
-                can be used.
             prior: A probability distribution that expresses prior knowledge about the
                 parameters, e.g. which ranges are meaningful for them. Any
                 object with `.log_prob()`and `.sample()` (for example, a PyTorch
                 distribution) can be used.
-            num_workers: Number of parallel workers to use for simulations.
-            simulation_batch_size: Number of parameter sets that the simulator
-                maps to data x at once. If None, we simulate all parameter sets at the
-                same time. If >= 1, the simulator has to process data of shape
-                (simulation_batch_size, parameter_dimension).
             device: torch device on which to compute, e.g. gpu or cpu.
             logging_level: Minimum severity of messages to log. One of the strings
                "INFO", "WARNING", "DEBUG", "ERROR" and "CRITICAL".
@@ -125,18 +113,10 @@ class NeuralInference(ABC):
 
         self._device = configure_default_device(device)
 
-        self._simulator, self._prior = simulator, prior
+        self._prior = prior
 
         self._show_progress_bars = show_progress_bars
         self._show_round_summary = show_round_summary
-
-        self._batched_simulator = lambda theta: simulate_in_batches(
-            self._simulator,
-            theta,
-            simulation_batch_size,
-            num_workers,
-            self._show_progress_bars,
-        )
 
         # Initialize roundwise (theta, x, prior_masks) for storage of parameters,
         # simulations and masks indicating if simulations came from prior.
@@ -161,6 +141,45 @@ class NeuralInference(ABC):
             median_observation_distances=[], epochs=[], best_validation_log_probs=[],
         )
 
+    def simulate(
+        self,
+        num_simulations: int,
+        simulator: Callable,
+        proposal: Any = None,
+        num_workers: int = 1,
+        simulation_batch_size: int = 1,
+    ) -> Tuple[Tensor, Tensor]:
+        """
+        Todo
+
+        Args:
+            num_simulations:
+            simulator:
+            proposal:
+            num_workers:
+            simulation_batch_size:
+
+        Returns:
+
+        """
+        batched_simulator = lambda theta: simulate_in_batches(
+            simulator,
+            theta,
+            simulation_batch_size,
+            num_workers,
+            self._show_progress_bars,
+        )
+
+        if proposal is None or num_simulations == 0:
+            theta = self._prior.sample((num_simulations,))
+        else:
+            theta = proposal.sample((num_simulations,))
+
+        x = batched_simulator(theta)
+
+        return theta, x
+
+    # TODO: this is redundant with _append_to_data_bank()
     def provide_presimulated(
         self, theta: Tensor, x: Tensor, from_round: int = 0
     ) -> None:
@@ -195,6 +214,7 @@ class NeuralInference(ABC):
         self._prior_masks.append(mask_sims_from_prior(from_round, theta.size(0)))
         self._data_round_index.append(from_round)
 
+    # TODO: make public
     def _get_from_data_bank(
         self,
         starting_round: int = 0,
@@ -237,6 +257,7 @@ class NeuralInference(ABC):
 
         return theta[is_valid_x], x[is_valid_x], prior_masks[is_valid_x]
 
+    # TODO:  REMOVE
     def _run_simulations(
         self, proposal: Optional[Any], num_sims: int,
     ) -> Tuple[Tensor, Tensor]:
@@ -279,7 +300,7 @@ class NeuralInference(ABC):
         """
         converged = False
 
-        posterior_nn = self._posterior.net
+        posterior_nn = self._neural_net
 
         # (Re)-start the epoch count with the first epoch or any improvement.
         if epoch == 0 or self._val_log_prob > self._best_val_log_prob:
@@ -301,7 +322,8 @@ class NeuralInference(ABC):
         try:
             simulator = self._simulator.__name__
         except AttributeError:
-            simulator = self._simulator.__class__.__name__
+            # TODO: how do we infer the name of the simulator?
+            simulator = "None"
 
         method = self.__class__.__name__
         logdir = Path(

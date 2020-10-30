@@ -18,23 +18,16 @@ from sbi.inference import NeuralInference
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.utils import (
     check_estimator_arg,
-    x_shape_from_simulation,
     test_posterior_net_for_multi_d_x,
+    x_shape_from_simulation,
 )
 
 
 class PosteriorEstimator(NeuralInference, ABC):
     def __init__(
         self,
-        simulator: Callable,
         prior,
-        num_workers: int = 1,
-        simulation_batch_size: int = 1,
         density_estimator: Union[str, Callable] = "maf",
-        sample_with_mcmc: bool = False,
-        mcmc_method: str = "slice_np",
-        mcmc_parameters: Optional[Dict[str, Any]] = None,
-        rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
@@ -52,34 +45,12 @@ class PosteriorEstimator(NeuralInference, ABC):
                 needs to return a PyTorch `nn.Module` implementing the density
                 estimator. The density estimator needs to provide the methods
                 `.log_prob` and `.sample()`.
-            sample_with_mcmc: Whether to sample with MCMC. MCMC can be used to deal
-                with high leakage.
-            mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`,
-                `hmc`, `nuts`. Currently defaults to `slice_np` for a custom numpy
-                implementation of slice sampling; select `hmc`, `nuts` or `slice` for
-                Pyro-based sampling.
-            mcmc_parameters: Dictionary overriding the default parameters for MCMC.
-                The following parameters are supported: `thin` to set the thinning
-                factor for the chain, `warmup_steps` to set the initial number of
-                samples to discard, `num_chains` for the number of chains,
-                `init_strategy` for the initialisation strategy for chains; `prior` will
-                draw init locations from prior, whereas `sir` will use
-                Sequential-Importance-Resampling using `init_strategy_num_candidates`
-                to find init locations.
-            rejection_sampling_parameters: Dictonary overriding the default parameters
-                for rejection sampling. The following parameters are supported:
-                `max_sampling_batch_size` to set the batch size for drawing new
-                samples from the candidate distribution, e.g., the posterior. Larger
-                batch size speeds up sampling.
 
         See docstring of `NeuralInference` class for all other arguments.
         """
 
         super().__init__(
-            simulator=simulator,
             prior=prior,
-            num_workers=num_workers,
-            simulation_batch_size=simulation_batch_size,
             device=device,
             logging_level=logging_level,
             summary_writer=summary_writer,
@@ -98,10 +69,8 @@ class PosteriorEstimator(NeuralInference, ABC):
         else:
             self._build_neural_net = density_estimator
         self._posterior = None
-        self._sample_with_mcmc = sample_with_mcmc
-        self._mcmc_method = mcmc_method
-        self._mcmc_parameters = mcmc_parameters
-        self._rejection_sampling_parameters = rejection_sampling_parameters
+        self._neural_net = None
+        self._x_shape = None
 
         self._model_bank = []
         self.use_non_atomic_loss = False
@@ -109,9 +78,10 @@ class PosteriorEstimator(NeuralInference, ABC):
         # Extra SNPE-specific fields summary_writer.
         self._summary.update({"rejection_sampling_acceptance_rates": []})  # type:ignore
 
-    def __call__(
+    def train(
         self,
-        num_simulations: int,
+        theta: Tensor,
+        x: Tensor,
         proposal: Optional[Any] = None,
         training_batch_size: int = 50,
         learning_rate: float = 5e-4,
@@ -124,16 +94,12 @@ class PosteriorEstimator(NeuralInference, ABC):
         discard_prior_samples: bool = False,
         retrain_from_scratch_each_round: bool = False,
     ) -> DirectPosterior:
-        r"""Run SNPE.
-
-        Return posterior $p(\theta|x)$ after inference.
+        r"""Train deep neural density estimator.
 
         Args:
-            num_simulations: Number of simulator calls.
-            proposal: Distribution that the parameters $\theta$ are drawn from.
-                `proposal=None` uses the prior. Setting the proposal to a distribution
-                targeted on a specific observation, e.g. a posterior $p(\theta|x_o)$
-                obtained previously, can lead to less required simulations.
+            proposal: Distribution that the parameters $\theta$ were drawn from during
+                simulation. In this function, it is used to correct the loss-function.
+                `proposal=None` uses the prior.
             training_batch_size: Training batch size.
             learning_rate: Learning rate for Adam optimizer.
             validation_fraction: The fraction of data to use for validation.
@@ -174,8 +140,6 @@ class PosteriorEstimator(NeuralInference, ABC):
         if self._data_round_index:
             self._round = max(self._round, max(self._data_round_index))
 
-        # Run simulations for the round.
-        theta, x = self._run_simulations(proposal, num_simulations)
         self._append_to_data_bank(theta, x, self._round)
 
         # Load data from most recent round.
@@ -186,25 +150,12 @@ class PosteriorEstimator(NeuralInference, ABC):
         # arguments, which will build the neural network.
         # This is passed into NeuralPosterior, to create a neural posterior which
         # can `sample()` and `log_prob()`. The network is accessible via `.net`.
-        if self._posterior is None or retrain_from_scratch_each_round:
-            x_shape = x_shape_from_simulation(x)
-            self._posterior = DirectPosterior(
-                method_family="snpe",
-                neural_net=self._build_neural_net(theta, x),
-                prior=self._prior,
-                x_shape=x_shape,
-                sample_with_mcmc=self._sample_with_mcmc,
-                mcmc_method=self._mcmc_method,
-                mcmc_parameters=self._mcmc_parameters,
-                rejection_sampling_parameters=self._rejection_sampling_parameters,
-            )
-            test_posterior_net_for_multi_d_x(self._posterior.net, theta, x)
+        if self._neural_net is None or retrain_from_scratch_each_round:
+            self._neural_net = self._build_neural_net(theta, x)
+            test_posterior_net_for_multi_d_x(self._neural_net, theta, x)
+            self._x_shape = x_shape_from_simulation(x)
 
-        # Copy MCMC init parameters for latest sample init
-        if hasattr(proposal, "_mcmc_init_params"):
-            self._posterior._mcmc_init_params = proposal._mcmc_init_params
-
-        # Fit posterior using newly aggregated data set.
+        # Fit neural network using newly aggregated data set.
         self._train(
             proposal=proposal,
             training_batch_size=training_batch_size,
@@ -217,6 +168,22 @@ class PosteriorEstimator(NeuralInference, ABC):
             exclude_invalid_x=exclude_invalid_x,
             discard_prior_samples=discard_prior_samples,
         )
+
+        # Build posterior from the neural net.
+        self._posterior = DirectPosterior(
+            method_family="snpe",
+            neural_net=self._neural_net,
+            prior=self._prior,
+            x_shape=self._x_shape,
+            sample_with_mcmc=False,
+            mcmc_method="slice_np",
+            mcmc_parameters=None,
+            rejection_sampling_parameters=None,
+        )
+
+        # Copy MCMC init parameters for latest sample init.
+        if hasattr(proposal, "_mcmc_init_params"):
+            self._posterior._mcmc_init_params = proposal._mcmc_init_params
 
         # Store models at end of each round.
         self._model_bank.append(deepcopy(self._posterior))
@@ -319,15 +286,13 @@ class PosteriorEstimator(NeuralInference, ABC):
             sampler=SubsetRandomSampler(val_indices),
         )
 
-        optimizer = optim.Adam(
-            list(self._posterior.net.parameters()), lr=learning_rate,
-        )
+        optimizer = optim.Adam(list(self._neural_net.parameters()), lr=learning_rate,)
 
         epoch, self._val_log_prob = 0, float("-Inf")
         while epoch <= max_num_epochs and not self._converged(epoch, stop_after_epochs):
 
             # Train for a single epoch.
-            self._posterior.net.train()
+            self._neural_net.train()
             for batch in train_loader:
                 optimizer.zero_grad()
                 theta_batch, x_batch, masks_batch = (
@@ -344,14 +309,14 @@ class PosteriorEstimator(NeuralInference, ABC):
                 batch_loss.backward()
                 if clip_max_norm is not None:
                     clip_grad_norm_(
-                        self._posterior.net.parameters(), max_norm=clip_max_norm,
+                        self._neural_net.parameters(), max_norm=clip_max_norm,
                     )
                 optimizer.step()
 
             epoch += 1
 
             # Calculate validation performance.
-            self._posterior.net.eval()
+            self._neural_net.eval()
             log_prob_sum = 0
             with torch.no_grad():
                 for batch in val_loader:
@@ -395,7 +360,7 @@ class PosteriorEstimator(NeuralInference, ABC):
 
         if self._round == 0:
             # Use posterior log prob (without proposal correction) for first round.
-            log_prob = self._posterior.net.log_prob(theta, x)
+            log_prob = self._neural_net.log_prob(theta, x)
         else:
             log_prob = self._log_prob_proposal_posterior(theta, x, masks, proposal)
 
