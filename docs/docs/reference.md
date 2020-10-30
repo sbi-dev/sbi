@@ -9,6 +9,10 @@
 ::: sbi.user_input.user_input_checks.prepare_for_sbi
     rendering:
       show_root_heading: true
+      
+::: sbi.inference.base.simulate_for_sbi
+    rendering:
+      show_root_heading: true
 
 ::: sbi.inference.snpe.snpe_c.SNPE_C
     rendering:

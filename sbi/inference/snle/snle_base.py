@@ -135,10 +135,10 @@ class LikelihoodEstimator(NeuralInference, ABC):
 
         # Run simulations for the round.
         theta, x = self._run_simulations(proposal, num_simulations)
-        self._append_to_data_bank(theta, x, self._round)
+        self.add_data(theta, x, self._round)
 
         # Load data from most recent round.
-        theta, x, _ = self._get_from_data_bank(self._round, exclude_invalid_x, False)
+        theta, x, _ = self.get_data(self._round, exclude_invalid_x, False)
 
         # First round or if retraining from scratch:
         # Call the `self._build_neural_net` with the rounds' thetas and xs as
@@ -213,7 +213,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
 
         # Starting index for the training set (1 = discard round-0 samples).
         start_idx = int(discard_prior_samples and self._round > 0)
-        theta, x, _ = self._get_from_data_bank(start_idx, exclude_invalid_x)
+        theta, x, _ = self.get_data(start_idx, exclude_invalid_x)
 
         # Get total number of training examples.
         num_examples = len(theta)

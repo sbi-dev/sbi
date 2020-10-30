@@ -3,14 +3,7 @@
 
 
 import warnings
-from typing import (
-    Callable,
-    Optional,
-    Union,
-    Tuple,
-    cast,
-    Sequence,
-)
+from typing import Any, Callable, Optional, Sequence, Tuple, Union, cast
 
 import torch
 from numpy import ndarray
@@ -527,6 +520,35 @@ def check_estimator_arg(estimator: Union[str, Callable]) -> None:
         "The passed density estimator / classifier must be a string or a function "
         f"returning a nn.Module, but is {type(estimator)}"
     )
+
+
+def check_theta_and_x(theta: Any, x: Any) -> None:
+    r"""
+    Checks if the passe $(\theta, x)$ are valid.
+
+    Specifically, we check:
+    1) If they are tensors.
+    2) If they have the same batchsize.
+    3) If they are of `dtype=float32`.
+
+    Args:
+        theta: Parameters.
+        x: Simulation outputs.
+    """
+    assert isinstance(theta, Tensor), "Parameters theta must be a `Tensor`."
+    assert isinstance(x, Tensor), "Simulator output must be a `Tensor`."
+
+    assert theta.shape[0] == x.shape[0], (
+        f"Number of parameter sets (={theta.shape[0]} must match the number of "
+        f"simulation outputs (={x.shape[0]})"
+    )
+
+    # I did not fuse these asserts with the `isinstance(x, Tensor)` asserts in order
+    # to give more explicit errors.
+    assert isinstance(theta, torch.FloatTensor), "Type of parameters must be float32."
+    assert isinstance(
+        x, torch.FloatTensor
+    ), "Type of simulator outputs must be float32."
 
 
 def test_posterior_net_for_multi_d_x(net: nn.Module, theta: Tensor, x: Tensor) -> None:

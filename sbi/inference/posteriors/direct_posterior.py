@@ -1,13 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    List,
-    Optional,
-)
+from typing import Any, Callable, Dict, List, Optional
 
 import numpy as np
 import torch
@@ -46,10 +40,10 @@ class DirectPosterior(NeuralPosterior):
         neural_net: nn.Module,
         prior,
         x_shape: torch.Size,
+        rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
         sample_with_mcmc: bool = True,
         mcmc_method: str = "slice_np",
         mcmc_parameters: Optional[Dict[str, Any]] = None,
-        rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
     ):
         """
         Args:
@@ -57,6 +51,11 @@ class DirectPosterior(NeuralPosterior):
             neural_net: A classifier for SNRE, a density estimator for SNPE and SNL.
             prior: Prior distribution with `.log_prob()` and `.sample()`.
             x_shape: Shape of a single simulator output.
+            rejection_sampling_parameters: Dictonary overriding the default parameters
+                for rejection sampling. The following parameters are supported:
+                `max_sampling_batch_size` to set the batch size for drawing new
+                samples from the candidate distribution, e.g., the posterior. Larger
+                batch size speeds up sampling.
             sample_with_mcmc: Whether to sample with MCMC. Will always be `True` for SRE
                 and SNL, but can also be set to `True` for SNPE if MCMC is preferred to
                 deal with leakage over rejection sampling.
@@ -72,11 +71,6 @@ class DirectPosterior(NeuralPosterior):
                 will draw init locations from prior, whereas `sir` will use Sequential-
                 Importance-Resampling using `init_strategy_num_candidates` to find init
                 locations.
-            rejection_sampling_parameters: Dictonary overriding the default parameters
-                for rejection sampling. The following parameters are supported:
-                `max_sampling_batch_size` to set the batch size for drawing new
-                samples from the candidate distribution, e.g., the posterior. Larger
-                batch size speeds up sampling.
         """
 
         kwargs = del_entries(
