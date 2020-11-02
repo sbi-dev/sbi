@@ -253,7 +253,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         while epoch <= max_num_epochs and not self._converged(epoch, stop_after_epochs):
 
             # Train for a single epoch.
-            self._posterior.net.__call__()
+            self._posterior.net.train()
             for batch in train_loader:
                 optimizer.zero_grad()
                 theta_batch, x_batch = (

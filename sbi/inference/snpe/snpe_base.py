@@ -32,7 +32,6 @@ class PosteriorEstimator(NeuralInference, ABC):
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
         show_progress_bars: bool = True,
-        show_round_summary: bool = False,
         **unused_args
     ):
         """Base class for Sequential Neural Posterior Estimation methods.
@@ -59,7 +58,6 @@ class PosteriorEstimator(NeuralInference, ABC):
             logging_level=logging_level,
             summary_writer=summary_writer,
             show_progress_bars=show_progress_bars,
-            show_round_summary=show_round_summary,
             **unused_args,
         )
 
@@ -98,6 +96,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         exclude_invalid_x: bool = True,
         discard_prior_samples: bool = False,
         retrain_from_scratch_each_round: bool = False,
+        show_train_summary: bool = False,
     ) -> DirectPosterior:
         r"""
 
@@ -135,6 +134,8 @@ class PosteriorEstimator(NeuralInference, ABC):
                 samples.
             retrain_from_scratch_each_round: Whether to retrain the conditional density
                 estimator for the posterior from scratch each round.
+            show_train_summary: Whether to print the number of epochs and validation
+                loss and leakage after the training.
 
         Returns:
             Posterior $p(\theta|x)$ that can be sampled and evaluated.
@@ -205,31 +206,16 @@ class PosteriorEstimator(NeuralInference, ABC):
         self._model_bank.append(deepcopy(self._posterior))
         self._model_bank[-1].net.eval()
 
-        # Making the call to `leakage_correction()` and the update of
-        # self._leakage_density_correction_factor explicit here. This is just
-        # to make sure this update never gets lost when we e.g. do not log our
-        # things to tensorboard anymore. Calling `leakage_correction()` is needed
-        # to update the leakage after each round.
-        if self._posterior.default_x is None:
-            acceptance_rate = torch.tensor(float("nan"))
-        else:
-            acceptance_rate = self._posterior.leakage_correction(
-                x=self._posterior.default_x,
-                force_update=True,
-                show_progress_bars=self._show_progress_bars,
-            )
-
         # Update tensorboard and summary dict.
         self._summarize(
             round_=self._round,
             x_o=self._posterior.default_x,
             theta_bank=theta,
             x_bank=x,
-            posterior_samples_acceptance_rate=acceptance_rate,
         )
 
         # Update description for progress bar.
-        if self._show_round_summary:
+        if show_train_summary:
             print(self._describe_round(self._round, self._summary))
 
         self._posterior._num_trained_rounds = self._round + 1
@@ -308,7 +294,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         while epoch <= max_num_epochs and not self._converged(epoch, stop_after_epochs):
 
             # Train for a single epoch.
-            self._neural_net.__call__()
+            self._neural_net.train()
             for batch in train_loader:
                 optimizer.zero_grad()
                 theta_batch, x_batch, masks_batch = (

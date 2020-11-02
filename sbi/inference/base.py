@@ -84,7 +84,6 @@ class NeuralInference(ABC):
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
         show_progress_bars: bool = True,
-        show_round_summary: bool = False,
         **unused_args,
     ):
         r"""
@@ -102,8 +101,6 @@ class NeuralInference(ABC):
                 file location (default is `<current working directory>/logs`.)
             show_progress_bars: Whether to show a progressbar during simulation and
                 sampling.
-            show_round_summary: Whether to show the validation loss and leakage after
-                each round.
             unused_args: Absorbs additional arguments. No entries will be used. If it
                 is not empty, we warn. In future versions, when the new interface of
                 0.14.0 is more mature, we will remove this argument.
@@ -132,7 +129,6 @@ class NeuralInference(ABC):
         self._prior = prior
 
         self._show_progress_bars = show_progress_bars
-        self._show_round_summary = show_round_summary
 
         # Initialize roundwise (theta, x, prior_masks) for storage of parameters,
         # simulations and masks indicating if simulations came from prior.
@@ -311,15 +307,6 @@ class NeuralInference(ABC):
     def _describe_round(round_: int, summary: Dict[str, list]) -> str:
         epochs = summary["epochs"][-1]
         best_validation_log_probs = summary["best_validation_log_probs"][-1]
-        if "rejection_sampling_acceptance_rates" in summary:
-            # If this key exists, we are using SNPE.
-            posterior_acceptance_prob = summary["rejection_sampling_acceptance_rates"][
-                -1
-            ]
-        else:
-            # For all other methods, `rejection_sampling_acceptance_rates` is not logged
-            # because the acceptance probability is by definition 1.0.
-            posterior_acceptance_prob = 1.0
 
         description = f"""
         -------------------------
@@ -327,7 +314,6 @@ class NeuralInference(ABC):
         -------------------------
         Epochs trained: {epochs}
         Best validation performance: {best_validation_log_probs:.4f}
-        Acceptance rate: {posterior_acceptance_prob:.4f}
         -------------------------
         """
 
@@ -359,12 +345,7 @@ class NeuralInference(ABC):
         assert torch.isfinite(quantity).all(), msg
 
     def _summarize(
-        self,
-        round_: int,
-        x_o: Union[Tensor, None],
-        theta_bank: Tensor,
-        x_bank: Tensor,
-        posterior_samples_acceptance_rate: Optional[Tensor] = None,
+        self, round_: int, x_o: Union[Tensor, None], theta_bank: Tensor, x_bank: Tensor,
     ) -> None:
         """Update the summary_writer with statistics for a given round.
 
@@ -388,18 +369,6 @@ class NeuralInference(ABC):
             self._summary_writer.add_scalar(
                 tag="median_observation_distance",
                 scalar_value=self._summary["median_observation_distances"][-1],
-                global_step=round_ + 1,
-            )
-
-        # Rejection sampling acceptance rate, only for SNPE.
-        if posterior_samples_acceptance_rate is not None:
-            self._summary["rejection_sampling_acceptance_rates"].append(
-                posterior_samples_acceptance_rate.item()
-            )
-
-            self._summary_writer.add_scalar(
-                tag="rejection_sampling_acceptance_rate",
-                scalar_value=self._summary["rejection_sampling_acceptance_rates"][-1],
                 global_step=round_ + 1,
             )
 

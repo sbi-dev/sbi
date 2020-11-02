@@ -33,7 +33,6 @@ class SNPE_C(PosteriorEstimator):
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[TensorboardSummaryWriter] = None,
         show_progress_bars: bool = True,
-        show_round_summary: bool = False,
         **unused_args,
     ):
         r"""SNPE-C / APT [1].
@@ -80,10 +79,7 @@ class SNPE_C(PosteriorEstimator):
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
             summary_writer: A tensorboard `SummaryWriter` to control, among others, log
                 file location (default is `<current working directory>/logs`.)
-            show_progress_bars: Whether to show a progressbar during simulation and
-                sampling.
-            show_round_summary: Whether to show the validation loss and leakage after
-                each round.
+            show_progress_bars: Whether to show a progressbar during training.
             unused_args: Absorbs additional arguments. No entries will be used. If it
                 is not empty, we warn. In future versions, when the new interface of
                 0.14.0 is more mature, we will remove this argument.
@@ -109,6 +105,7 @@ class SNPE_C(PosteriorEstimator):
         discard_prior_samples: bool = False,
         use_combined_loss: bool = False,
         retrain_from_scratch_each_round: bool = False,
+        show_train_summary: bool = False,
     ) -> DirectPosterior:
         r"""Run SNPE.
 
@@ -150,6 +147,8 @@ class SNPE_C(PosteriorEstimator):
                 bounded priors.
             retrain_from_scratch_each_round: Whether to retrain the conditional density
                 estimator for the posterior from scratch each round.
+            show_train_summary: Whether to print the number of epochs and validation
+                loss and leakage after the training.
 
         Returns:
             Posterior $p(\theta|x)$ that can be sampled and evaluated.

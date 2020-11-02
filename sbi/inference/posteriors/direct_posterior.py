@@ -348,7 +348,7 @@ class DirectPosterior(NeuralPosterior):
                 else self.rejection_sampling_parameters,
             )
 
-        self.net.__call__(True)
+        self.net.train(True)
 
         return samples.reshape((*sample_shape, -1))
 
