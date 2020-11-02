@@ -1,13 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    List,
-    Optional,
-)
+from typing import Any, Callable, Dict, List, Optional
 
 import numpy as np
 import torch
@@ -354,7 +348,7 @@ class DirectPosterior(NeuralPosterior):
                 else self.rejection_sampling_parameters,
             )
 
-        self.net.train(True)
+        self.net.__call__(True)
 
         return samples.reshape((*sample_shape, -1))
 

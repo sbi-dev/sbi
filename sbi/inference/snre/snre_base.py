@@ -12,11 +12,7 @@ from torch.utils.tensorboard import SummaryWriter
 from sbi import utils as utils
 from sbi.inference.base import NeuralInference
 from sbi.inference.posteriors.ratio_based_posterior import RatioBasedPosterior
-from sbi.utils import (
-    check_estimator_arg,
-    clamp_and_warn,
-    x_shape_from_simulation,
-)
+from sbi.utils import check_estimator_arg, clamp_and_warn, x_shape_from_simulation
 
 
 class RatioEstimator(NeuralInference, ABC):
@@ -144,10 +140,10 @@ class RatioEstimator(NeuralInference, ABC):
 
         # Run simulations for the round.
         theta, x = self._run_simulations(proposal, num_simulations)
-        self._append_to_data_bank(theta, x, self._round)
+        self.append_to_data_bank(theta, x, self._round)
 
         # Load data from most recent round.
-        theta, x, _ = self._get_from_data_bank(self._round, exclude_invalid_x, False)
+        theta, x, _ = self.get_from_data_bank(self._round, exclude_invalid_x, False)
 
         # First round or if retraining from scratch:
         # Call the `self._build_neural_net` with the rounds' thetas and xs as
@@ -226,7 +222,7 @@ class RatioEstimator(NeuralInference, ABC):
 
         # Starting index for the training set (1 = discard round-0 samples).
         start_idx = int(discard_prior_samples and self._round > 0)
-        theta, x, _ = self._get_from_data_bank(start_idx, exclude_invalid_x)
+        theta, x, _ = self.get_from_data_bank(start_idx, exclude_invalid_x)
 
         # Get total number of training examples.
         num_examples = len(theta)
@@ -273,7 +269,7 @@ class RatioEstimator(NeuralInference, ABC):
         while epoch <= max_num_epochs and not self._converged(epoch, stop_after_epochs):
 
             # Train for a single epoch.
-            self._posterior.net.train()
+            self._posterior.net.__call__()
             for batch in train_loader:
                 optimizer.zero_grad()
                 theta_batch, x_batch = (

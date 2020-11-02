@@ -106,7 +106,7 @@ class NeuralInference(ABC):
                 each round.
             unused_args: Absorbs additional arguments. No entries will be used. If it
                 is not empty, we warn. In future versions, when the new interface of
-                0.14.0 is more mature, we will remove the kwargs argument.
+                0.14.0 is more mature, we will remove this argument.
         """
 
         # We set the device globally by setting the default tensor type for all tensors.
@@ -163,8 +163,9 @@ class NeuralInference(ABC):
         r"""
         Deprecated since sbi 0.14.0.
 
-        Instead of using this, simply pass theta an x to `.train()`. Please consult the
-        corresponding pull request on github:  https://github.com/mackelab/sbi/pull/378
+        Instead of using this, simply pass theta an x to `.__call__()`. Please consult
+        the corresponding pull request on github:
+        https://github.com/mackelab/sbi/pull/378
         and tutorials:
         https://www.mackelab.org/sbi/tutorial/02_flexible_interface/
         for further information.
@@ -180,7 +181,7 @@ class NeuralInference(ABC):
         raise NameError(
             ".provide_presimulated() does not longer exist in sbi "
             "versions >=0.14.0. Instead, simply pass theta an x to "
-            ".train()."
+            ".__call__()."
             "Please consult "
             "the corresponding pull request on github: "
             "https://github.com/mackelab/sbi/pull/378 and tutorials: "
@@ -188,7 +189,7 @@ class NeuralInference(ABC):
             "information."
         )
 
-    def _append_to_data_bank(self, theta: Tensor, x: Tensor, from_round: int) -> None:
+    def append_to_data_bank(self, theta: Tensor, x: Tensor, from_round: int) -> None:
         r"""
         Store data in as entries in a list for each type of variable (parameter/data).
 
@@ -208,7 +209,7 @@ class NeuralInference(ABC):
         self._prior_masks.append(mask_sims_from_prior(from_round, theta.size(0)))
         self._data_round_index.append(from_round)
 
-    def _get_from_data_bank(
+    def get_from_data_bank(
         self,
         starting_round: int = 0,
         exclude_invalid_x: bool = True,

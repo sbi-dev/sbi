@@ -166,7 +166,7 @@ class LikelihoodBasedPosterior(NeuralPosterior):
             **mcmc_parameters,
         )
 
-        self.net.train(True)
+        self.net.__call__(True)
 
         return samples.reshape((*sample_shape, -1))
 

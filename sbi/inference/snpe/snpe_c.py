@@ -86,25 +86,13 @@ class SNPE_C(PosteriorEstimator):
                 each round.
             unused_args: Absorbs additional arguments. No entries will be used. If it
                 is not empty, we warn. In future versions, when the new interface of
-                0.14.0 is more mature, we will remove the kwargs argument.
+                0.14.0 is more mature, we will remove this argument.
         """
 
         kwargs = del_entries(locals(), entries=("self", "__class__", "unused_args"))
         super().__init__(**kwargs, **unused_args)
 
-    def __call__(self, **kwargs):
-        raise NameError(
-            "Calling SNPE is no longer possible in sbi versions >=0.14.0. Instead, run "
-            "simulations with `.simulate_for_sbi()` and obtain the posterior with "
-            "`.train()`."
-            "Please consult "
-            "the corresponding pull request on github: "
-            "https://github.com/mackelab/sbi/pull/378 and tutorials: "
-            "https://www.mackelab.org/sbi/tutorial/02_flexible_interface/ for further "
-            "information."
-        )
-
-    def train(
+    def __call__(
         self,
         theta: Tensor,
         x: Tensor,
@@ -124,13 +112,17 @@ class SNPE_C(PosteriorEstimator):
     ) -> DirectPosterior:
         r"""Run SNPE.
 
-        Return posterior $p(\theta|x)$ after inference.
+        Train neural density estimator and return posterior $p(\theta|x)$.
+
+        The neural density estimator will always be trained on **all** ($\theta, x$)
+        pairs that have been provided to this object, not only on the new ($\theta, x$)
+        pairs that have been passed in a specific call to this function.
 
         Args:
-            theta: Parameters used for training. In SNPE, these parameters will be the
-                labels for the neural density estimator.
-            x: Simulation outputs used for training. In SNPE, these data are the inputs
-                to the neural density estimator.
+            theta: New parameters used for training. In SNPE, these parameters will be
+                the labels for the neural density estimator.
+            x: New simulation outputs used for training. In SNPE, these data are the
+                inputs to the neural density estimator.
             proposal: Distribution that the parameters $\theta$ were drawn from during
                 simulation. In this function, it is used to correct the loss-function.
                 `proposal=None` uses the prior.
@@ -191,7 +183,7 @@ class SNPE_C(PosteriorEstimator):
                 # Take care of z-scoring, pre-compute and store prior terms.
                 self._set_state_for_mog_proposal()
 
-        return super().train(**kwargs)
+        return super().__call__(**kwargs)
 
     def _set_state_for_mog_proposal(self) -> None:
         """

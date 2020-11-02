@@ -48,7 +48,7 @@ class PosteriorEstimator(NeuralInference, ABC):
                 `.log_prob` and `.sample()`.
             unused_args: Absorbs additional arguments. No entries will be used. If it
                 is not empty, we warn. In future versions, when the new interface of
-                0.14.0 is more mature, we will remove the kwargs argument.
+                0.14.0 is more mature, we will remove this argument.
 
         See docstring of `NeuralInference` class for all other arguments.
         """
@@ -83,7 +83,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         # Extra SNPE-specific fields summary_writer.
         self._summary.update({"rejection_sampling_acceptance_rates": []})  # type:ignore
 
-    def train(
+    def __call__(
         self,
         theta: Tensor,
         x: Tensor,
@@ -99,9 +99,20 @@ class PosteriorEstimator(NeuralInference, ABC):
         discard_prior_samples: bool = False,
         retrain_from_scratch_each_round: bool = False,
     ) -> DirectPosterior:
-        r"""Train deep neural density estimator.
+        r"""
+
+        Train neural density estimator and return posterior $p(\theta|x)$.
+
+        Three steps are performed in this function:
+        1) Append the ($\theta, x)$ pairs to the full data bank.
+        2) Train the neural density estimator on the full data bank.
+        3) Build the posterior from the neural density estimator and return it.
 
         Args:
+            theta: Parameters used for training. In SNPE, these parameters will be the
+                labels for the neural density estimator.
+            x: Simulation outputs used for training. In SNPE, these data are the inputs
+                to the neural density estimator.
             proposal: Distribution that the parameters $\theta$ were drawn from during
                 simulation. In this function, it is used to correct the loss-function.
                 `proposal=None` uses the prior.
@@ -145,10 +156,10 @@ class PosteriorEstimator(NeuralInference, ABC):
         if self._data_round_index:
             self._round = max(self._round, max(self._data_round_index))
 
-        self._append_to_data_bank(theta, x, self._round)
+        self.append_to_data_bank(theta, x, self._round)
 
         # Load data from most recent round.
-        theta, x, _ = self._get_from_data_bank(self._round, exclude_invalid_x, False)
+        theta, x, _ = self.get_from_data_bank(self._round, exclude_invalid_x, False)
 
         # First round or if retraining from scratch:
         # Call the `self._build_neural_net` with the rounds' thetas and xs as
@@ -261,7 +272,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         if self.use_non_atomic_loss:
             start_idx = self._round
 
-        theta, x, prior_masks = self._get_from_data_bank(start_idx, exclude_invalid_x)
+        theta, x, prior_masks = self.get_from_data_bank(start_idx, exclude_invalid_x)
 
         # Select random neural net and validation splits from (theta, x) pairs.
         num_total_examples = len(theta)
@@ -297,7 +308,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         while epoch <= max_num_epochs and not self._converged(epoch, stop_after_epochs):
 
             # Train for a single epoch.
-            self._neural_net.train()
+            self._neural_net.__call__()
             for batch in train_loader:
                 optimizer.zero_grad()
                 theta_batch, x_batch, masks_batch = (
