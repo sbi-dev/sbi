@@ -17,6 +17,7 @@ from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.simulators.simutils import simulate_in_batches
 from sbi.user_input.user_input_checks import prepare_for_sbi
 from sbi.utils import (
+    check_theta_and_x,
     get_log_root,
     handle_invalid_x,
     warn_on_invalid_x,
@@ -206,7 +207,7 @@ class NeuralInference(ABC):
                 counting from round 0.
         """
 
-        # TODO: run checks if theta and x have the correct shape and dtype.
+        check_theta_and_x(theta, x)
 
         self._theta_roundwise.append(theta)
         self._x_roundwise.append(x)
