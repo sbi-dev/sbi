@@ -40,7 +40,7 @@ def infer(
     The scope of this function is limited to the most essential features of sbi. For
     more flexibility (e.g. multi-round inference, different density estimators) please
     use the flexible interface described here:
-    https://www.mackelab.org/sbi/tutorial/03_flexible_interface/
+    https://www.mackelab.org/sbi/tutorial/02_flexible_interface/
 
     Args:
         simulator: A function that takes parameters $\theta$ and maps them to
@@ -68,8 +68,14 @@ def infer(
 
     simulator, prior = prepare_for_sbi(simulator, prior)
 
-    infer_ = method_fun(simulator, prior, num_workers=num_workers)
-    posterior = infer_(num_simulations=num_simulations)
+    inference = method_fun(prior)
+    theta, x = simulate_for_sbi(
+        simulator=simulator,
+        proposal=prior,
+        num_simulations=num_simulations,
+        num_workers=num_workers,
+    )
+    posterior = inference(theta, x)
 
     return posterior
 
@@ -175,7 +181,7 @@ class NeuralInference(ABC):
                 that the data came from the first round, i.e. the prior.
         """
         raise NameError(
-            ".provide_presimulated() does not longer exist in sbi "
+            ".provide_presimulated() does no longer exist in sbi "
             "versions >=0.14.0. Instead, simply pass theta an x to "
             ".__call__()."
             "Please consult "
@@ -199,6 +205,8 @@ class NeuralInference(ABC):
             from_round: What round the $(\theta, x)$ pairs are coming from. We start
                 counting from round 0.
         """
+
+        # TODO: run checks if theta and x have the correct shape and dtype.
 
         self._theta_roundwise.append(theta)
         self._x_roundwise.append(x)
@@ -441,9 +449,9 @@ class NeuralInference(ABC):
 
 
 def simulate_for_sbi(
-    num_simulations: int,
     simulator: Callable,
     proposal: Any,
+    num_simulations: int,
     num_workers: int = 1,
     simulation_batch_size: int = 1,
     show_progress_bar: bool = True,
@@ -451,10 +459,14 @@ def simulate_for_sbi(
     r"""
     Returns ($\theta, x$) pairs obtained from sampling the proposal and simulating.
 
+    This function performs two steps:
+    1) Sample parameters $\theta$ from the `proposal`.
+    2) Simulate these parameters to obtain $x$.
+
     Args:
         num_simulations: Number of simulations that are run.
         simulator: Simulator function.
-        proposal: Probability distribution that
+        proposal: Probability distribution that the parameters are sampled from.
         num_workers: Number of parallel workers to use for simulations.
         simulation_batch_size: Number of parameter sets that the simulator
             maps to data x at once. If None, we simulate all parameter sets at the
