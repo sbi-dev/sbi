@@ -166,7 +166,7 @@ class NeuralInference(ABC):
         r"""
         Deprecated since sbi 0.14.0.
 
-        Instead of using this, simply pass theta an x to `.__call__()`. Please consult
+        Instead of using this, simply pass theta and x to `.__call__()`. Please consult
         the corresponding pull request on github:
         https://github.com/mackelab/sbi/pull/378
         and tutorials:
@@ -183,7 +183,7 @@ class NeuralInference(ABC):
         """
         raise NameError(
             ".provide_presimulated() does no longer exist in sbi "
-            "versions >=0.14.0. Instead, simply pass theta an x to "
+            "versions >=0.14.0. Instead, simply pass theta and x to "
             ".__call__()."
             "Please consult "
             "the corresponding pull request on github: "

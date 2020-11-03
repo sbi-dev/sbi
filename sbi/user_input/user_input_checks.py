@@ -527,9 +527,9 @@ def check_theta_and_x(theta: Any, x: Any) -> None:
     Checks if the passe $(\theta, x)$ are valid.
 
     Specifically, we check:
-    1) If they are tensors
-    2) If they have the same batchsize
-    3) If they are of `dtype=float32`
+    1) If they are tensors.
+    2) If they have the same batchsize.
+    3) If they are of `dtype=float32`.
 
     Args:
         theta: Parameters.

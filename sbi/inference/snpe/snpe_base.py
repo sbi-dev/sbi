@@ -135,7 +135,7 @@ class PosteriorEstimator(NeuralInference, ABC):
             retrain_from_scratch_each_round: Whether to retrain the conditional density
                 estimator for the posterior from scratch each round.
             show_train_summary: Whether to print the number of epochs and validation
-                loss and leakage after the training.
+                loss after the training.
 
         Returns:
             Posterior $p(\theta|x)$ that can be sampled and evaluated.

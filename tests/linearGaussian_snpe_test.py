@@ -11,7 +11,7 @@ from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
 from sbi import utils as utils
-from sbi.inference import SNPE_B, SNPE_C, prepare_for_sbi
+from sbi.inference import SNPE_B, SNPE_C, prepare_for_sbi, simulate_for_sbi
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     samples_true_posterior_linear_gaussian_mvn_prior_different_dims,
@@ -65,15 +65,11 @@ def test_c2st_snpe_on_linearGaussian(
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    infer = SNPE_C(
-        *prepare_for_sbi(simulator, prior),
-        simulation_batch_size=1000,
-        show_progress_bars=False,
-        sample_with_mcmc=False,
-        device=device,
-    )
+    simulator, prior = prepare_for_sbi(simulator, prior)
+    inference = SNPE_C(prior, show_progress_bars=False, device=device,)
 
-    posterior = infer(num_simulations=2000, training_batch_size=100).set_default_x(x_o)
+    theta, x = simulate_for_sbi(simulator, prior, 2000, simulation_batch_size=1000)
+    posterior = inference(theta, x, training_batch_size=100).set_default_x(x_o)
     samples = posterior.sample((num_samples,))
 
     # Compute the c2st and assert it is near chance level of 0.5.
@@ -157,15 +153,11 @@ def test_c2st_snpe_on_linearGaussian_different_dims(set_seed):
             theta, likelihood_shift, likelihood_cov, num_discarded_dims=discard_dims
         )
 
-    infer = SNPE_C(
-        *prepare_for_sbi(simulator, prior),
-        density_estimator="maf",
-        simulation_batch_size=1,
-        show_progress_bars=False,
-        sample_with_mcmc=False,
-    )
+    simulator, prior = prepare_for_sbi(simulator, prior)
+    inference = SNPE_C(prior, density_estimator="maf", show_progress_bars=False,)
 
-    posterior = infer(num_simulations=2000)  # type: ignore
+    theta, x = simulate_for_sbi(simulator, prior, 2000, simulation_batch_size=1)  # type: ignore
+    posterior = inference(theta, x)
     samples = posterior.sample((num_samples,), x=x_o)
 
     # Compute the c2st and assert it is near chance level of 0.5.
@@ -229,74 +221,28 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str, set_seed):
     )
 
     if method_str == "snpe_b":
-        infer = SNPE_B(simulation_batch_size=10, **creation_args)
-        posterior1 = infer(num_simulations=1000)
-        posterior1.set_default_x(x_o)
-        posterior = infer(num_simulations=1000, proposal=posterior1)
-    elif method_str == "snpe_c":
-        infer = SNPE_C(
-            simulation_batch_size=50, sample_with_mcmc=False, **creation_args
+        inference = SNPE_B(**creation_args)
+        theta, x = simulate_for_sbi(simulator, prior, 500, simulation_batch_size=10)
+        posterior1 = inference(theta, x).set_default_x(x_o)
+        theta, x = simulate_for_sbi(
+            simulator, posterior1, 1000, simulation_batch_size=10
         )
-        posterior = infer(num_simulations=500, num_atoms=10).set_default_x(x_o)
-        posterior = infer(
-            num_simulations=1000, num_atoms=10, proposal=posterior
+        posterior = inference(theta, x, proposal=posterior1).set_default_x(x_o)
+    elif method_str == "snpe_c":
+        inference = SNPE_C(**creation_args)
+        theta, x = simulate_for_sbi(simulator, prior, 500, simulation_batch_size=50)
+        posterior1 = inference(theta, x).set_default_x(x_o)
+        theta, x = simulate_for_sbi(
+            simulator, posterior1, 1000, simulation_batch_size=50
+        )
+        posterior = inference(
+            theta, x, proposal=posterior1, num_atoms=10
         ).set_default_x(x_o)
 
     samples = posterior.sample((num_samples,))
 
     # Compute the c2st and assert it is near chance level of 0.5.
     check_c2st(samples, target_samples, alg=method_str)
-
-
-@pytest.mark.slow
-def test_c2st_snpe_external_data_on_linearGaussian(set_seed):
-    """Test whether SNPE C infers well a simple example with available ground truth.
-
-    Args:
-        set_seed: fixture for manual seeding
-    """
-
-    num_dim = 2
-
-    device = "cpu"
-    configure_default_device(device)
-    x_o = zeros(1, num_dim)
-    num_samples = 1000
-
-    # likelihood_mean will be likelihood_shift+theta
-    likelihood_shift = -1.0 * ones(num_dim)
-    likelihood_cov = 0.3 * eye(num_dim)
-
-    prior_mean = zeros(num_dim)
-    prior_cov = eye(num_dim)
-    prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
-    gt_posterior = true_posterior_linear_gaussian_mvn_prior(
-        x_o[0], likelihood_shift, likelihood_cov, prior_mean, prior_cov
-    )
-    target_samples = gt_posterior.sample((num_samples,))
-
-    def simulator(theta):
-        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
-
-    infer = SNPE_C(
-        *prepare_for_sbi(simulator, prior),
-        simulation_batch_size=1000,
-        density_estimator="nsf",
-        show_progress_bars=False,
-        sample_with_mcmc=False,
-        device=device,
-    )
-
-    external_theta = prior.sample((500,))
-    external_x = simulator(external_theta)
-
-    infer.provide_presimulated(external_theta, external_x)
-
-    posterior = infer(num_simulations=500, training_batch_size=50).set_default_x(x_o)
-    samples = posterior.sample((num_samples,))
-
-    # Compute the c2st and assert it is near chance level of 0.5.
-    check_c2st(samples, target_samples, alg="snpe_c")
 
 
 # Testing rejection and mcmc sampling methods.
@@ -338,8 +284,9 @@ def test_api_snpe_c_posterior_correction(
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
+    simulator, prior = prepare_for_sbi(simulator, prior)
     infer = SNPE_C(
-        *prepare_for_sbi(simulator, prior),
+        prior,
         density_estimator="maf",
         simulation_batch_size=50,
         sample_with_mcmc=sample_with_mcmc,
@@ -347,7 +294,11 @@ def test_api_snpe_c_posterior_correction(
         show_progress_bars=False,
     )
 
-    posterior = infer(num_simulations=1000, max_num_epochs=5)
+    theta, x = simulate_for_sbi(simulator, prior, 1000)
+    posterior = infer(theta, x, max_num_epochs=5)
+    posterior = posterior.set_sample_with_mcmc(sample_with_mcmc).set_mcmc_method(
+        mcmc_method
+    )
 
     # Posterior should be corrected for leakage even if num_rounds just 1.
     samples = posterior.sample((10,), x=x_o)
@@ -389,18 +340,14 @@ def test_sample_conditional(set_seed):
 
     net = utils.posterior_nn("maf", hidden_features=20)
 
+    simulator, prior = prepare_for_sbi(simulator, prior)
     inference = SNPE_C(
-        *prepare_for_sbi(simulator, prior),
-        density_estimator=net,
-        simulation_batch_size=1,
-        show_progress_bars=True,
-        device=device,
+        prior, density_estimator=net, show_progress_bars=False, device=device,
     )
 
     # We need a pretty big dataset to properly model the bimodality.
-    posterior = inference(
-        num_simulations=10000, proposal=None, max_num_epochs=50
-    ).set_default_x(x_o)
+    theta, x = simulate_for_sbi(simulator, prior, 10000)
+    posterior = inference(theta, x, max_num_epochs=50).set_default_x(x_o)
     samples = posterior.sample((50,))
 
     # Evaluate the conditional density be drawing samples and smoothing with a Gaussian
@@ -462,12 +409,10 @@ def example_posterior():
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    infer = SNPE_C(
-        *prepare_for_sbi(simulator, prior),
-        simulation_batch_size=10,
-        num_workers=6,
-        show_progress_bars=False,
-        sample_with_mcmc=False,
+    simulator, prior = prepare_for_sbi(simulator, prior)
+    infer = SNPE_C(prior, show_progress_bars=False,)
+    theta, x = simulate_for_sbi(
+        simulator, prior, 1000, simulation_batch_size=10, num_workers=6
     )
 
-    return infer(num_simulations=1000).set_default_x(x_o)
+    return infer(theta, x).set_default_x(x_o)
