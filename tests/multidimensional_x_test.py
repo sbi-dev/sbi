@@ -81,7 +81,7 @@ def test_inference_with_2d_x(embedding, method):
         net_provider = utils.classifier_nn(model="mlp", embedding_net_x=embedding(),)
         sample_kwargs = {}
 
-    inference = method(prior, density_estimator=net_provider, show_progress_bars=False)
+    inference = method(prior, net_provider, show_progress_bars=False)
     theta, x = simulate_for_sbi(simulator, prior, num_simulations)
     _ = inference.append_simulations(theta, x).train(
         training_batch_size=100, max_num_epochs=10

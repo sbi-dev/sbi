@@ -87,9 +87,7 @@ def test_c2st_sre_on_linearGaussian_different_dims(set_seed):
         )
 
     simulator, prior = prepare_for_sbi(simulator, prior)
-    inference = SRE(
-        prior, classifier="resnet", show_progress_bars=False, device=device,
-    )
+    inference = SRE(prior, classifier="resnet", show_progress_bars=False,)
 
     theta, x = simulate_for_sbi(simulator, prior, 5000, simulation_batch_size=50)
     _ = inference.append_simulations(theta, x).train()
