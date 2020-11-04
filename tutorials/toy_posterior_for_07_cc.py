@@ -1,5 +1,5 @@
 import torch
-import sbi.utils as utils
+from sbi import utils as utils
 from torch import Tensor
 
 
