@@ -17,7 +17,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 
 # sbi
-import sbi.utils as utils
+from sbi import utils as utils
 from sbi.inference.base import infer
 ```
 
