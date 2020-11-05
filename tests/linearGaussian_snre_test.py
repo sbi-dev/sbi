@@ -156,7 +156,7 @@ def test_c2st_sre_on_linearGaussian(
     # Should use default `num_atoms=10` for SRE; `num_atoms=2` for AALR
     theta, x = simulate_for_sbi(simulator, prior, 1000, simulation_batch_size=50)
     _ = inference.add_data(theta, x).train()
-    posterior = inference.build_posterior()
+    posterior = inference.build_posterior().set_default_x(x_o)
 
     samples = posterior.sample(sample_shape=(num_samples,), mcmc_parameters={"thin": 3})
 

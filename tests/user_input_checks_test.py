@@ -3,7 +3,18 @@
 
 from __future__ import annotations
 
-from typing import Callable, Optional, Union, Dict, Any, Tuple, Union, cast, List, Sequence, TypeVar
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    TypeVar,
+    Union,
+    cast,
+)
 
 import pytest
 import torch
@@ -12,7 +23,7 @@ from scipy.stats import beta, multivariate_normal, uniform
 from torch import Tensor, eye, nn, ones, zeros
 from torch.distributions import Beta, Distribution, Gamma, MultivariateNormal, Uniform
 
-from sbi.inference import SNPE_C
+from sbi.inference import SNPE_C, simulate_for_sbi
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
 from sbi.user_input.user_input_checks import (
     prepare_for_sbi,
@@ -266,15 +277,13 @@ def test_inference_with_user_sbi_problems(user_simulator: Callable, user_prior):
     Test inference with combinations of user defined simulators, priors and x_os.
     """
 
-    infer = SNPE_C(
-        *prepare_for_sbi(user_simulator, user_prior),
-        density_estimator="maf",
-        simulation_batch_size=1,
-        show_progress_bars=False,
-    )
+    simulator, prior = prepare_for_sbi(user_simulator, user_prior)
+    inference = SNPE_C(prior, density_estimator="maf", show_progress_bars=False,)
 
     # Run inference.
-    _ = infer(num_simulations=100, max_num_epochs=2)
+    theta, x = simulate_for_sbi(simulator, prior, 100)
+    _ = inference.add_data(theta, x).train(max_num_epochs=2)
+    _ = inference.build_posterior()
 
 
 @pytest.mark.parametrize(
@@ -376,8 +385,6 @@ def test_invalid_inputs():
         joint.log_prob(ones(10, 4, 1))
 
 
-
-
 @pytest.mark.parametrize(
     "arg",
     [
@@ -427,4 +434,4 @@ def test_passing_custom_density_estimator(arg):
     else:
         density_estimator = arg
     prior = MultivariateNormal(torch.zeros(2), torch.eye(2))
-    SNPE_C(diagonal_linear_gaussian, prior, density_estimator=density_estimator)
+    _ = SNPE_C(prior=prior, density_estimator=density_estimator)

@@ -75,7 +75,8 @@ def infer(
         num_simulations=num_simulations,
         num_workers=num_workers,
     )
-    posterior = inference(theta, x)
+    _ = inference.add_data(theta, x).train()
+    posterior = inference.build_posterior()
 
     return posterior
 
@@ -188,21 +189,13 @@ class NeuralInference(ABC):
                 that the data came from the first round, i.e. the prior.
         """
         raise NameError(
-            ".provide_presimulated() does no longer exist in sbi "
-            "versions >=0.14.0. Instead, simply pass theta and x to "
-            ".__call__()."
-            "Please consult "
-            "the corresponding pull request on github: "
-            "https://github.com/mackelab/sbi/pull/378 and tutorials: "
+            ".provide_presimulated() is deprecated since sbi version 0.14.0. Instead, "
+            "simply pass theta and x to .__call__(). Please consult the corresponding "
+            "pull request on github: https://github.com/mackelab/sbi/pull/378 "
+            "and tutorials: "
             "https://www.mackelab.org/sbi/tutorial/02_flexible_interface/ for further "
             "information."
         )
-
-    @abstractmethod
-    def add_data(
-        self, theta: Tensor, x: Tensor, theta_from_proposal: Union[bool, int] = False
-    ) -> "NeuralInference":
-        raise NotImplementedError
 
     def get_data(
         self,
@@ -277,19 +270,19 @@ class NeuralInference(ABC):
         """
         converged = False
 
-        posterior_nn = self._neural_net
+        neural_net = self._neural_net
 
         # (Re)-start the epoch count with the first epoch or any improvement.
         if epoch == 0 or self._val_log_prob > self._best_val_log_prob:
             self._best_val_log_prob = self._val_log_prob
             self._epochs_since_last_improvement = 0
-            self._best_model_state_dict = deepcopy(posterior_nn.state_dict())
+            self._best_model_state_dict = deepcopy(neural_net.state_dict())
         else:
             self._epochs_since_last_improvement += 1
 
         # If no validation improvement over many epochs, stop training.
         if self._epochs_since_last_improvement > stop_after_epochs - 1:
-            posterior_nn.load_state_dict(self._best_model_state_dict)
+            neural_net.load_state_dict(self._best_model_state_dict)
             converged = True
 
         return converged
@@ -439,8 +432,8 @@ def simulate_for_sbi(
     r"""
     Returns ($\theta, x$) pairs obtained from sampling the proposal and simulating.
 
-    This function performs two steps:
-    1) Sample parameters $\theta$ from the `proposal`.
+    This function performs two steps:<br/>
+    1) Sample parameters $\theta$ from the `proposal`.<br/>
     2) Simulate these parameters to obtain $x$.
 
     Args:
@@ -448,7 +441,8 @@ def simulate_for_sbi(
             simulations, or observations, `x`, $\text{sim}(\theta)\to x$. Any
             regular Python callable (i.e. function or class with `__call__` method)
             can be used.
-        proposal: Probability distribution that the parameters are sampled from.
+        proposal: Probability distribution that the parameters $\theta$ are sampled
+            from.
         num_simulations: Number of simulations that are run.
         num_workers: Number of parallel workers to use for simulations.
         simulation_batch_size: Number of parameter sets that the simulator

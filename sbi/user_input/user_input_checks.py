@@ -457,10 +457,10 @@ def prepare_for_sbi(simulator: Callable, prior,) -> Tuple[Callable, Distribution
 
     One of the goals is to allow you to use sbi with inputs computed in numpy.
 
-    Attempts to meet the following requirements by reshaping and type-casting:
-    - the simulator function receives as input and returns a Tensor.
-    - the simulator can simulate batches of parameters and return batches of data.
-    - the prior does not produce batches and samples and evaluates to Tensor.
+    Attempts to meet the following requirements by reshaping and type-casting:<br/>
+    - the simulator function receives as input and returns a Tensor.<br/>
+    - the simulator can simulate batches of parameters and return batches of data.<br/>
+    - the prior does not produce batches and samples and evaluates to Tensor.<br/>
     - the output shape is a `torch.Size((1,N))` (i.e, has a leading batch dimension 1).
 
     If this is not possible, a suitable exception will be raised.

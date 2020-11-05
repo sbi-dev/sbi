@@ -23,8 +23,8 @@ class DirectPosterior(NeuralPosterior):
     SNPE.<br/><br/>
     SNPE trains a neural network to directly approximate the posterior distribution.
     However, for bounded priors, the neural network can have leakage: it puts non-zero
-    mass in regions where the prior is zero. The `SnpePosterior` class wraps the trained
-    network to deal with these cases.<br/><br/>
+    mass in regions where the prior is zero. The `DirectPosterior` class wraps the
+    trained network to deal with these cases.<br/><br/>
     Specifically, this class offers the following functionality:<br/>
     - correct the calculation of the log probability such that it compensates for the
       leakage.<br/>

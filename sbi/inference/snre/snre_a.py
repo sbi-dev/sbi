@@ -65,9 +65,8 @@ class SNRE_A(RatioEstimator):
         retrain_from_scratch_each_round: bool = False,
         show_train_summary: bool = False,
     ) -> NeuralPosterior:
-        r"""Run AALR / SNRE_A.
-
-        Train a classifier to learn the density ratio $p(\theta,x)/p(\theta)p(x)$.
+        r"""
+        Return classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
 
         Args:
             training_batch_size: Training batch size.
@@ -91,7 +90,7 @@ class SNRE_A(RatioEstimator):
                 loss and leakage after the training.
 
         Returns:
-            Classifier that has learned the density ratio $p(\theta,x)/p(\theta)p(x)$.
+            Classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
         """
 
         # AALR is defined for `num_atoms=2`.

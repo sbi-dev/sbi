@@ -4,10 +4,9 @@
 
 from abc import ABC
 from copy import deepcopy
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Callable, Dict, NewType, Optional, Union
 
 import torch
-import torch.nn as nn
 from torch import Tensor, optim
 from torch.nn.utils import clip_grad_norm_
 from torch.utils import data
@@ -17,6 +16,7 @@ from torch.utils.tensorboard import SummaryWriter
 from sbi import utils as utils
 from sbi.inference import NeuralInference
 from sbi.inference.posteriors.likelihood_based_posterior import LikelihoodBasedPosterior
+from sbi.types import TorchModule
 from sbi.utils import (
     check_estimator_arg,
     check_theta_and_x,
@@ -24,6 +24,12 @@ from sbi.utils import (
     x_shape_from_simulation,
 )
 from sbi.utils.sbiutils import mask_sims_from_prior
+
+# This is needed to avoid extremely long types on mkdocs when it is `Optional`, e.g.
+# sbi.inference.posterior.likelihood_based_posterior.LikelihoodBasedPosterior
+LikelihoodBasedPosteriorType = NewType(
+    "LikelihoodBasedPosterior", LikelihoodBasedPosterior
+)
 
 
 class LikelihoodEstimator(NeuralInference, ABC):
@@ -51,7 +57,6 @@ class LikelihoodEstimator(NeuralInference, ABC):
             unused_args: Absorbs additional arguments. No entries will be used. If it
                 is not empty, we warn. In future versions, when the new interface of
                 0.14.0 is more mature, we will remove this argument.
-
 
         See docstring of `NeuralInference` class for all other arguments.
         """
@@ -83,7 +88,9 @@ class LikelihoodEstimator(NeuralInference, ABC):
         self, theta: Tensor, x: Tensor, from_round: int = 0,
     ) -> "NeuralInference":
         r"""
-        Store data as entries in a list for each type of variable (parameter/data).
+        Store parameters and simulation outputs to use them for training later.
+
+        Data ar stored as entries in lists for each type of variable (parameter/data).
 
         Stores $\theta$, $x$, prior_masks (indicating if simulations are coming from the
         prior or not) and a index indicating which round the batch of simulations came
@@ -123,8 +130,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         retrain_from_scratch_each_round: bool = False,
         show_train_summary: bool = False,
     ) -> LikelihoodBasedPosterior:
-        r"""Run SNLE.
-
+        r"""
         Train the density estimator to learn the distribution $p(x|\theta)$.
 
         Args:
@@ -256,12 +262,12 @@ class LikelihoodEstimator(NeuralInference, ABC):
 
     def build_posterior(
         self,
-        density_estimator: Optional[nn.Module] = None,
+        density_estimator: Optional[TorchModule] = None,
         mcmc_method: str = "slice_np",
         mcmc_parameters: Optional[Dict[str, Any]] = None,
-        copy_state_from: Optional[LikelihoodBasedPosterior] = None,
-    ):
-        """
+        copy_state_from: Optional[LikelihoodBasedPosteriorType] = None,
+    ) -> LikelihoodBasedPosterior:
+        r"""
         Build posterior from the neural density estimator.
 
         SNLE trains a neural network to approximate the likelihood $p(x|\theta)$. The

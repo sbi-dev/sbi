@@ -1,5 +1,5 @@
-# v0.13.3
-
+# v0.14.0
+- New flexible interface API (#378)
 - Fixed typo in docs for `infer` (thanks @glouppe, #370)
 
 

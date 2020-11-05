@@ -66,9 +66,8 @@ class SNRE_B(RatioEstimator):
         retrain_from_scratch_each_round: bool = False,
         show_train_summary: bool = False,
     ) -> NeuralPosterior:
-        r"""Run SRE / SNRE_B.
-
-        Train a classifier to learn the density ratio $p(\theta,x)/p(\theta)p(x)$.
+        r"""
+        Return classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
 
         Args:
             num_atoms: Number of atoms to use for classification.
@@ -93,7 +92,7 @@ class SNRE_B(RatioEstimator):
                 loss and leakage after the training.
 
         Returns:
-            Classifier that has learned the density ratio $p(\theta,x)/p(\theta)p(x)$.
+            Classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
         """
         kwargs = del_entries(locals(), entries=("self", "__class__"))
         return super().train(**kwargs)
