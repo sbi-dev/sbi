@@ -158,7 +158,10 @@ class NeuralInference(ABC):
 
         # Logging during training (by SummaryWriter).
         self._summary = dict(
-            median_observation_distances=[], epochs=[], best_validation_log_probs=[],
+            median_observation_distances=[],
+            epochs=[],
+            best_validation_log_probs=[],
+            validation_log_probs=[],
         )
 
     def provide_presimulated(
@@ -446,6 +449,16 @@ class NeuralInference(ABC):
             scalar_value=self._summary["best_validation_log_probs"][-1],
             global_step=round_ + 1,
         )
+
+        # Add validation log prob for every epoch.
+        # Offset with all previous epochs.
+        offset = torch.tensor(self._summary["epochs"][:-1], dtype=int).sum().item()
+        for i, vlp in enumerate(self._summary["validation_log_probs"][offset:]):
+            self._summary_writer.add_scalar(
+                tag="validation_log_probs_across_rounds",
+                scalar_value=vlp,
+                global_step=offset + i,
+            )
 
         self._summary_writer.flush()
 

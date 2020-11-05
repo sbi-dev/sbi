@@ -367,6 +367,8 @@ class PosteriorEstimator(NeuralInference, ABC):
                     log_prob_sum += batch_log_prob.sum().item()
 
             self._val_log_prob = log_prob_sum / num_validation_examples
+            # Log validation log prob for every epoch.
+            self._summary["validation_log_probs"].append(self._val_log_prob)
 
             self._maybe_show_progress(self._show_progress_bars, epoch)
 
