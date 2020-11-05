@@ -289,7 +289,8 @@ class LikelihoodEstimator(NeuralInference, ABC):
                 overwritten.
 
         Returns:
-            Posterior $p(\theta|x)$ that can be sampled and evaluated.
+            Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods
+            (the returned log-probability is unnormalized).
         """
 
         if density_estimator is None:

@@ -343,7 +343,7 @@ class PosteriorEstimator(NeuralInference, ABC):
                 overwritten.
 
         Returns:
-            Posterior $p(\theta|x)$ that can be sampled and evaluated.
+            Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods.
         """
 
         if density_estimator is None:
