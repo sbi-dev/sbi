@@ -12,18 +12,13 @@ from sbi.utils import del_entries
 class SNRE_B(RatioEstimator):
     def __init__(
         self,
-        simulator: Callable,
         prior,
-        num_workers: int = 1,
-        simulation_batch_size: int = 1,
         classifier: Union[str, Callable] = "resnet",
-        mcmc_method: str = "slice_np",
-        mcmc_parameters: Optional[Dict[str, Any]] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "warning",
         summary_writer: Optional[TensorboardSummaryWriter] = None,
         show_progress_bars: bool = True,
-        show_round_summary: bool = False,
+        **unused_args
     ):
         r"""SRE[1], here known as SNRE_B.
 
@@ -31,19 +26,10 @@ class SNRE_B(RatioEstimator):
             ICML 2020, https://arxiv.org/pdf/2002.03712
 
         Args:
-            simulator: A function that takes parameters $\theta$ and maps them to
-                simulations, or observations, `x`, $\mathrm{sim}(\theta)\to x$. Any
-                regular Python callable (i.e. function or class with `__call__` method)
-                can be used.
             prior: A probability distribution that expresses prior knowledge about the
                 parameters, e.g. which ranges are meaningful for them. Any
                 object with `.log_prob()`and `.sample()` (for example, a PyTorch
                 distribution) can be used.
-            num_workers: Number of parallel workers to use for simulations.
-            simulation_batch_size: Number of parameter sets that the simulator
-                maps to data x at once. If None, we simulate all parameter sets at the
-                same time. If >= 1, the simulator has to process data of shape
-                (simulation_batch_size, parameter_dimension).
             classifier: Classifier trained to approximate likelihood ratios. If it is
                 a string, use a pre-configured network of the provided type (one of
                 linear, mlp, resnet). Alternatively, a function that builds a custom
@@ -51,17 +37,6 @@ class SNRE_B(RatioEstimator):
                 first batch of simulations (theta, x), which can thus be used for shape
                 inference and potentially for z-scoring. It needs to return a PyTorch
                 `nn.Module` implementing the classifier.
-            mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`, `hmc`, `nuts`.
-                Currently defaults to `slice_np` for a custom numpy implementation of
-                slice sampling; select `hmc`, `nuts` or `slice` for Pyro-based sampling.
-            mcmc_parameters: Dictionary overriding the default parameters for MCMC.
-                The following parameters are supported: `thin` to set the thinning
-                factor for the chain, `warmup_steps` to set the initial number of
-                samples to discard, `num_chains` for the number of chains, `init_strategy`
-                for the initialisation strategy for chains; `prior` will draw init
-                locations from prior, whereas `sir` will use Sequential-Importance-
-                Resampling using `init_strategy_num_candidates` to find init
-                locations.
             device: torch device on which to compute, e.g. gpu, cpu.
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
@@ -69,17 +44,16 @@ class SNRE_B(RatioEstimator):
                 file location (default is `<current working directory>/logs`.)
             show_progress_bars: Whether to show a progressbar during simulation and
                 sampling.
-            show_round_summary: Whether to show the validation loss and leakage after
-                each round.
+            unused_args: Absorbs additional arguments. No entries will be used. If it
+                is not empty, we warn. In future versions, when the new interface of
+                0.14.0 is more mature, we will remove this argument.
         """
 
-        kwargs = del_entries(locals(), entries=("self", "__class__"))
-        super().__init__(**kwargs)
+        kwargs = del_entries(locals(), entries=("self", "__class__", "unused_args"))
+        super().__init__(**kwargs, **unused_args)
 
-    def __call__(
+    def train(
         self,
-        num_simulations: int,
-        proposal: Optional[Any] = None,
         num_atoms: int = 10,
         training_batch_size: int = 50,
         learning_rate: float = 5e-4,
@@ -90,17 +64,14 @@ class SNRE_B(RatioEstimator):
         exclude_invalid_x: bool = True,
         discard_prior_samples: bool = False,
         retrain_from_scratch_each_round: bool = False,
+        show_train_summary: bool = False,
     ) -> NeuralPosterior:
         r"""Run SRE / SNRE_B.
 
-        Return posterior $p(\theta|x)$ after inference (possibly over several rounds).
+        Train a classifier to learn the density ratio $p(\theta,x)/p(\theta)p(x)$.
 
         Args:
-            num_simulations: Number of simulator calls.
-            proposal: Distribution that the parameters $\theta$ are drawn from.
-                `proposal=None` uses the prior. Setting the proposal to a distribution
-                targeted on a specific observation, e.g. a posterior $p(\theta|x_o)$
-                obtained previously, can lead to less required simulations.
+            num_atoms: Number of atoms to use for classification.
             training_batch_size: Training batch size.
             learning_rate: Learning rate for Adam optimizer.
             validation_fraction: The fraction of data to use for validation.
@@ -118,12 +89,14 @@ class SNRE_B(RatioEstimator):
                 samples.
             retrain_from_scratch_each_round: Whether to retrain the conditional density
                 estimator for the posterior from scratch each round.
+            show_train_summary: Whether to print the number of epochs and validation
+                loss and leakage after the training.
 
         Returns:
-            Posterior $p(\theta|x)$ that can be sampled and evaluated.
+            Classifier that has learned the density ratio $p(\theta,x)/p(\theta)p(x)$.
         """
         kwargs = del_entries(locals(), entries=("self", "__class__"))
-        return super().__call__(**kwargs)
+        return super().train(**kwargs)
 
     def _loss(self, theta: Tensor, x: Tensor, num_atoms: int) -> Tensor:
         """

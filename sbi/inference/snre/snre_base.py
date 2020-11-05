@@ -3,6 +3,7 @@ from copy import deepcopy
 from typing import Any, Callable, Dict, Optional, Union
 
 import torch
+import torch.nn as nn
 from torch import Tensor, eye, ones, optim
 from torch.nn.utils import clip_grad_norm_
 from torch.utils import data
@@ -12,24 +13,26 @@ from torch.utils.tensorboard import SummaryWriter
 from sbi import utils as utils
 from sbi.inference.base import NeuralInference
 from sbi.inference.posteriors.ratio_based_posterior import RatioBasedPosterior
-from sbi.utils import check_estimator_arg, clamp_and_warn, x_shape_from_simulation
+from sbi.utils import (
+    check_estimator_arg,
+    check_theta_and_x,
+    clamp_and_warn,
+    test_posterior_net_for_multi_d_x,
+    x_shape_from_simulation,
+)
+from sbi.utils.sbiutils import mask_sims_from_prior
 
 
 class RatioEstimator(NeuralInference, ABC):
     def __init__(
         self,
-        simulator: Callable,
         prior,
-        num_workers: int = 1,
-        simulation_batch_size: int = 1,
         classifier: Union[str, Callable] = "resnet",
-        mcmc_method: str = "slice_np",
-        mcmc_parameters: Optional[Dict[str, Any]] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "warning",
         summary_writer: Optional[SummaryWriter] = None,
         show_progress_bars: bool = True,
-        show_round_summary: bool = False,
+        **unused_args
     ):
         r"""Sequential Neural Ratio Estimation.
 
@@ -49,31 +52,20 @@ class RatioEstimator(NeuralInference, ABC):
                 first batch of simulations (theta, x), which can thus be used for shape
                 inference and potentially for z-scoring. It needs to return a PyTorch
                 `nn.Module` implementing the classifier.
-            mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`, `hmc`, `nuts`.
-                Currently defaults to `slice_np` for a custom numpy implementation of
-                slice sampling; select `hmc`, `nuts` or `slice` for Pyro-based sampling.
-            mcmc_parameters: Dictionary overriding the default parameters for MCMC.
-                The following parameters are supported: `thin` to set the thinning
-                factor for the chain, `warmup_steps` to set the initial number of
-                samples to discard, `num_chains` for the number of chains, `init_strategy`
-                for the initialisation strategy for chains; `prior` will draw init
-                locations from prior, whereas `sir` will use Sequential-Importance-
-                Resampling using `init_strategy_num_candidates` to find init
-                locations.
+            unused_args: Absorbs additional arguments. No entries will be used. If it
+                is not empty, we warn. In future versions, when the new interface of
+                0.14.0 is more mature, we will remove this argument.
 
         See docstring of `NeuralInference` class for all other arguments.
         """
 
         super().__init__(
-            simulator=simulator,
             prior=prior,
-            num_workers=num_workers,
-            simulation_batch_size=simulation_batch_size,
             device=device,
             logging_level=logging_level,
             summary_writer=summary_writer,
             show_progress_bars=show_progress_bars,
-            show_round_summary=show_round_summary,
+            **unused_args
         )
 
         # As detailed in the docstring, `density_estimator` is either a string or
@@ -86,17 +78,40 @@ class RatioEstimator(NeuralInference, ABC):
             self._build_neural_net = utils.classifier_nn(model=classifier)
         else:
             self._build_neural_net = classifier
-        self._posterior = None
-        self._mcmc_method = mcmc_method
-        self._mcmc_parameters = mcmc_parameters
 
         # Ratio-based-specific summary_writer fields.
         self._summary.update({"mcmc_times": []})  # type: ignore
 
-    def __call__(
+    def add_data(
+        self, theta: Tensor, x: Tensor, from_round: int = 0,
+    ) -> "NeuralInference":
+        r"""
+        Store data as entries in a list for each type of variable (parameter/data).
+        Stores $\theta$, $x$, prior_masks (indicating if simulations are coming from the
+        prior or not) and a index indicating which round the batch of simulations came
+        from.
+        Args:
+            theta: Parameter sets.
+            x: Simulation outputs.
+            from_round: Which round the data stemmed from. Round 0 means from the prior.
+                With default settings, this is not used at all for `SNRE`. Only when
+                the user later on requests `.train(discard_prior_samples=True)`, we
+                use these indices to find which training data stemmed from the prior.
+        Returns:
+            NeuralInference object (returned so that this function is chainable).
+        """
+
+        check_theta_and_x(theta, x)
+
+        self._theta_roundwise.append(theta)
+        self._x_roundwise.append(x)
+        self._prior_masks.append(mask_sims_from_prior(int(from_round), theta.size(0)))
+        self._data_round_index.append(int(from_round))
+
+        return self
+
+    def train(
         self,
-        num_simulations: int,
-        proposal: Optional[Any] = None,
         num_atoms: int = 10,
         training_batch_size: int = 50,
         learning_rate: float = 5e-4,
@@ -107,10 +122,11 @@ class RatioEstimator(NeuralInference, ABC):
         exclude_invalid_x: bool = True,
         discard_prior_samples: bool = False,
         retrain_from_scratch_each_round: bool = False,
+        show_train_summary: bool = False,
     ) -> RatioBasedPosterior:
         r"""Run SNRE.
 
-        Return posterior $p(\theta|x)$ after inference.
+        Train a classifier to learn the density ratio $p(\theta,x)/p(\theta)p(x)$.
 
         Args:
             num_atoms: Number of atoms to use for classification.
@@ -123,26 +139,13 @@ class RatioEstimator(NeuralInference, ABC):
                 estimator for the posterior from scratch each round.
 
         Returns:
-            Posterior $p(\theta|x)$ that can be sampled and evaluated.
+            Classifier that has learned the density ratio $p(\theta,x)/p(\theta)p(x)$.
         """
 
         max_num_epochs = 2 ** 31 - 1 if max_num_epochs is None else max_num_epochs
 
-        self._check_proposal(proposal)
-        self._round = self._round + 1 if (proposal is not None) else 0
-
-        # If presimulated data was provided from a later round, set the self._round to
-        # this value. Otherwise, we would rely on the user to _additionally_ provide the
-        # proposal that the presimulated data was sampled from in order for self._round
-        # to become larger than 0.
-        if self._data_round_index:
-            self._round = max(self._round, max(self._data_round_index))
-
-        # Run simulations for the round.
-        theta, x = self._run_simulations(proposal, num_simulations)
-        self.add_data(theta, x, self._round)
-
         # Load data from most recent round.
+        self._round = max(self._data_round_index)
         theta, x, _ = self.get_data(self._round, exclude_invalid_x, False)
 
         # First round or if retraining from scratch:
@@ -150,75 +153,13 @@ class RatioEstimator(NeuralInference, ABC):
         # arguments, which will build the neural network
         # This is passed into NeuralPosterior, to create a neural posterior which
         # can `sample()` and `log_prob()`. The network is accessible via `.net`.
-        if self._posterior is None or retrain_from_scratch_each_round:
-            x_shape = x_shape_from_simulation(x)
-            assert (
-                len(x_shape) < 3
-            ), "For now, SNRE cannot handle multi-dimensional simulator output, see issue #360."
-            self._posterior = RatioBasedPosterior(
-                method_family=self.__class__.__name__.lower(),
-                neural_net=self._build_neural_net(theta, x),
-                prior=self._prior,
-                x_shape=x_shape,
-                mcmc_method=self._mcmc_method,
-                mcmc_parameters=self._mcmc_parameters,
+        if self._neural_net is None or retrain_from_scratch_each_round:
+            self._neural_net = self._build_neural_net(theta, x)
+            self._x_shape = x_shape_from_simulation(x)
+            assert len(self._x_shape) < 3, (
+                "For now, SNRE cannot handle multi-dimensional simulator output, see "
+                "issue #360."
             )
-
-        # Copy MCMC init parameters for latest sample init
-        if hasattr(proposal, "_mcmc_init_params"):
-            self._posterior._mcmc_init_params = proposal._mcmc_init_params
-
-        # Fit posterior using newly aggregated data set.
-        self._train(
-            num_atoms=num_atoms,
-            training_batch_size=training_batch_size,
-            learning_rate=learning_rate,
-            validation_fraction=validation_fraction,
-            stop_after_epochs=stop_after_epochs,
-            max_num_epochs=max_num_epochs,
-            clip_max_norm=clip_max_norm,
-            exclude_invalid_x=exclude_invalid_x,
-            discard_prior_samples=discard_prior_samples,
-        )
-
-        # Update description for progress bar.
-        if self._show_round_summary:
-            print(self._describe_round(self._round, self._summary))
-
-        # Update tensorboard and summary dict.
-        self._summarize(
-            round_=self._round,
-            x_o=self._posterior.default_x,
-            theta_bank=theta,
-            x_bank=x,
-        )
-
-        self._posterior._num_trained_rounds = self._round + 1
-
-        return deepcopy(self._posterior)
-
-    def _train(
-        self,
-        num_atoms: int,
-        training_batch_size: int,
-        learning_rate: float,
-        validation_fraction: float,
-        stop_after_epochs: int,
-        max_num_epochs: int,
-        clip_max_norm: Optional[float],
-        exclude_invalid_x: bool,
-        discard_prior_samples: bool,
-    ) -> None:
-        r"""
-        Trains the neural classifier.
-
-        Update the classifier weights by maximizing a Bernoulli likelihood which
-        distinguishes between jointly distributed $(\theta, x)$ pairs and randomly
-        chosen $(\theta, x)$ pairs.
-
-        Uses performance on a held-out validation set as a terminating condition (early
-        stopping).
-        """
 
         # Starting index for the training set (1 = discard round-0 samples).
         start_idx = int(discard_prior_samples and self._round > 0)
@@ -260,16 +201,14 @@ class RatioEstimator(NeuralInference, ABC):
             sampler=SubsetRandomSampler(val_indices),
         )
 
-        optimizer = optim.Adam(
-            list(self._posterior.net.parameters()), lr=learning_rate,
-        )
+        optimizer = optim.Adam(list(self._neural_net.parameters()), lr=learning_rate,)
 
         epoch, self._val_log_prob = 0, float("-Inf")
 
         while epoch <= max_num_epochs and not self._converged(epoch, stop_after_epochs):
 
             # Train for a single epoch.
-            self._posterior.net.train()
+            self._neural_net.train()
             for batch in train_loader:
                 optimizer.zero_grad()
                 theta_batch, x_batch = (
@@ -280,14 +219,14 @@ class RatioEstimator(NeuralInference, ABC):
                 loss.backward()
                 if clip_max_norm is not None:
                     clip_grad_norm_(
-                        self._posterior.net.parameters(), max_norm=clip_max_norm,
+                        self._neural_net.parameters(), max_norm=clip_max_norm,
                     )
                 optimizer.step()
 
             epoch += 1
 
             # Calculate validation performance.
-            self._posterior.net.eval()
+            self._neural_net.eval()
             log_prob_sum = 0
             with torch.no_grad():
                 for batch in val_loader:
@@ -308,6 +247,87 @@ class RatioEstimator(NeuralInference, ABC):
         # Update summary.
         self._summary["epochs"].append(epoch)
         self._summary["best_validation_log_probs"].append(self._best_val_log_prob)
+
+        # Update TensorBoard and summary dict.
+        self._summarize(
+            round_=self._round, x_o=None, theta_bank=theta, x_bank=x,
+        )
+
+        # Update description for progress bar.
+        if show_train_summary:
+            print(self._describe_round(self._round, self._summary))
+
+        return deepcopy(self._neural_net)
+
+    def build_posterior(
+        self,
+        density_estimator: Optional[nn.Module] = None,
+        mcmc_method: str = "slice_np",
+        mcmc_parameters: Optional[Dict[str, Any]] = None,
+        copy_state_from: Optional[RatioBasedPosterior] = None,
+    ):
+        """
+        Build posterior from the neural density estimator.
+
+        SNRE trains a neural network to approximate likelihood ratios, which in turn
+        can be used obtain an unnormalized posterior
+        $p(\theta|x) \propto p(x|\theta) \cdot p(\theta)$. The posterior returned here
+        wraps the trained network such that one can directly evaluate the unnormalized
+        posterior log-probability $p(\theta|x) \propto p(x|\theta) \cdot p(\theta)$ and
+        draw samples from the posterior with MCMC. Note that, in the case of
+        single-round SNRE_A / AALR, it is possible to evaluate the log-probability of
+        the **normalized** posterior, but sampling still requires MCMC.
+
+        Args:
+            density_estimator: The density estimator that the posterior is based on.
+                If `None`, use the latest neural density estimator that was trained.
+            mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`,
+                `hmc`, `nuts`. Currently defaults to `slice_np` for a custom numpy
+                implementation of slice sampling; select `hmc`, `nuts` or `slice` for
+                Pyro-based sampling.
+            mcmc_parameters: Dictionary overriding the default parameters for MCMC.
+                The following parameters are supported: `thin` to set the thinning
+                factor for the chain, `warmup_steps` to set the initial number of
+                samples to discard, `num_chains` for the number of chains,
+                `init_strategy` for the initialisation strategy for chains; `prior` will
+                draw init locations from prior, whereas `sir` will use
+                Sequential-Importance-Resampling using `init_strategy_num_candidates`
+                to find init locations.
+            copy_state_from: A previous posterior object from which the
+                entire state is copied and then only the `density_estimator` is
+                swapped in. If this is set, all other arguments to this function are
+                overwritten.
+        Returns:
+            Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods
+            (the returned log-probability is unnormalized).
+        """
+
+        if density_estimator is None:
+            density_estimator = self._neural_net
+
+        if copy_state_from is None:
+            self._posterior = RatioBasedPosterior(
+                method_family=self.__class__.__name__.lower(),
+                neural_net=self._neural_net,
+                prior=self._prior,
+                x_shape=self._x_shape,
+                mcmc_method=mcmc_method,
+                mcmc_parameters=mcmc_parameters,
+            )
+        else:
+            assert isinstance(
+                copy_state_from, RatioBasedPosterior
+            ), "`copy_state_from` must be a `RatioBasedPosterior`."
+            self._posterior = copy_state_from
+            self._posterior.net = density_estimator
+
+        self._posterior._num_trained_rounds = self._round + 1
+
+        # Store models at end of each round.
+        self._model_bank.append(deepcopy(self._posterior))
+        self._model_bank[-1].net.eval()
+
+        return deepcopy(self._posterior)
 
     def _classifier_logits(self, theta: Tensor, x: Tensor, num_atoms: int) -> Tensor:
         """Return logits obtained through classifier forward pass.
@@ -330,7 +350,7 @@ class RatioEstimator(NeuralInference, ABC):
 
         theta_and_x = torch.cat((atomic_theta, repeated_x), dim=1)
 
-        return self._posterior.net(theta_and_x)
+        return self._neural_net(theta_and_x)
 
     @abstractmethod
     def _loss(self, theta: Tensor, x: Tensor, num_atoms: int) -> Tensor:

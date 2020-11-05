@@ -6,8 +6,7 @@ import torch
 from torch import eye, ones, zeros
 
 from sbi import utils as utils
-
-from sbi.inference import SNL, SNPE_C, SRE, prepare_for_sbi
+from sbi.inference import SNL, SNPE_C, SRE, prepare_for_sbi, simulate_for_sbi
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     samples_true_posterior_linear_gaussian_uniform_prior,
@@ -71,11 +70,12 @@ def test_inference_with_nan_simulator(
         prior=prior,
     )
 
-    infer = method(*prepare_for_sbi(linear_gaussian_nan, prior))
+    simulator, prior = prepare_for_sbi(linear_gaussian_nan, prior)
+    inference = method(prior)
 
-    posterior = infer(
-        num_simulations=num_simulations, exclude_invalid_x=exclude_invalid_x,
-    ).set_default_x(x_o)
+    theta, x = simulate_for_sbi(simulator, prior, num_simulations)
+    _ = inference.add_data(theta, x).train(exclude_invalid_x=exclude_invalid_x)
+    posterior = inference.build_posterior().set_default_x(x_o)
 
     samples = posterior.sample((num_samples,))
 
