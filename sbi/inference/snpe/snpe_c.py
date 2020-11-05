@@ -50,10 +50,11 @@ class SNPE_C(PosteriorEstimator):
         or the atomic version is used.
 
         In this codebase, we will automatically switch to the non-atomic loss if the
-        following criteria are fulfilled:
-        - proposal has is a `DirectPosterior` with density_estimator `mdn`, as built
-            with `utils.sbi.posterior_nn()`.
-        - the density estimator is a `mdn`, as built with `utils.sbi.posterior_nn()`.
+        following criteria are fulfilled:<br/>
+        - proposal is a `DirectPosterior` with density_estimator `mdn`, as built
+            with `utils.sbi.posterior_nn()`.<br/>
+        - the density estimator is a `mdn`, as built with
+            `utils.sbi.posterior_nn()`.<br/>
         - `isinstance(prior, MultivariateNormal)` (from `torch.distributions`) or
             `isinstance(prior, sbi.utils.BoxUniform)`
 
@@ -104,9 +105,8 @@ class SNPE_C(PosteriorEstimator):
         retrain_from_scratch_each_round: bool = False,
         show_train_summary: bool = False,
     ) -> DirectPosterior:
-        r"""Run SNPE.
-
-        Train the density estimator to learn the distribution $p(\theta|x)#.
+        r"""
+        Return density estimator that approximates the distribution $p(\theta|x)$.
 
         Args:
             num_atoms: Number of atoms to use for classification.
@@ -137,7 +137,7 @@ class SNPE_C(PosteriorEstimator):
                 loss and leakage after the training.
 
         Returns:
-            Posterior $p(\theta|x)$ that can be sampled and evaluated.
+            Density estimator that approximates the distribution $p(\theta|x)$.
         """
 
         # WARNING: sneaky trick ahead. We proxy the parent's `__call__` here,

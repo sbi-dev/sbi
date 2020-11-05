@@ -8,13 +8,12 @@ import torch
 from torch import Tensor, eye, ones, zeros
 from torch.distributions import MultivariateNormal, Uniform
 
-from sbi.inference import SNLE, SNPE
+from sbi.inference import SNLE, SNPE, prepare_for_sbi, simulate_for_sbi
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     true_posterior_linear_gaussian_mvn_prior,
 )
 from tests.test_utils import check_c2st
-from sbi.user_input.user_input_checks import prepare_for_sbi
 
 
 def test_mdn_with_snpe():
@@ -47,9 +46,13 @@ def mdn_inference_with_different_methods(method):
     def simulator(theta: Tensor) -> Tensor:
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    infer = method(simulator, prior, density_estimator="mdn")
+    simulator, prior = prepare_for_sbi(simulator, prior)
+    inference = method(prior, density_estimator="mdn")
 
-    posterior = infer(num_simulations=1000, training_batch_size=50).set_default_x(x_o)
+    theta, x = simulate_for_sbi(simulator, prior, 1000)
+    _ = inference.add_data(theta, x).train(training_batch_size=50)
+    posterior = inference.build_posterior().set_default_x(x_o)
+
     samples = posterior.sample((num_samples,))
 
     # Compute the c2st and assert it is near chance level of 0.5.
@@ -78,10 +81,12 @@ def test_mdn_with_1D_uniform_prior():
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     simulator, prior = prepare_for_sbi(simulator, prior)
+    inference = SNPE(prior, density_estimator="mdn")
 
-    infer = SNPE(simulator, prior, density_estimator="mdn")
-
-    posterior = infer(num_simulations=100, training_batch_size=50).set_default_x(x_o)
+    theta, x = simulate_for_sbi(simulator, prior, 100)
+    _ = inference.add_data(theta, x).train(training_batch_size=50)
+    posterior = inference.build_posterior().set_default_x(x_o)
     samples = posterior.sample((num_samples,))
     log_probs = posterior.log_prob(samples)
+
     assert log_probs.shape == torch.Size([num_samples])

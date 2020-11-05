@@ -68,9 +68,8 @@ class SNLE_A(LikelihoodEstimator):
         retrain_from_scratch_each_round: bool = False,
         show_train_summary: bool = False,
     ) -> NeuralPosterior:
-        r"""Run SNLE.
-
-        Train the density estimator to learn the distribution $p(x|\theta)$.
+        r"""
+        Return density estimator that approximates the distribution $p(x|\theta)$.
 
         Args:
             training_batch_size: Training batch size.
@@ -94,7 +93,7 @@ class SNLE_A(LikelihoodEstimator):
                 loss and leakage after the training.
 
         Returns:
-            Posterior $p(\theta|x_o)$ that can be sampled and evaluated.
+            Density estimator that approximates the distribution $p(x|\theta)$.
         """
         kwargs = del_entries(locals(), entries=("self", "__class__"))
         return super().train(**kwargs)

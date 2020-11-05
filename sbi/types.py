@@ -12,6 +12,7 @@ from typing import (
 
 import numpy as np
 import torch
+from torch.nn import Module
 from torch.utils.tensorboard import SummaryWriter
 
 Array = Union[np.ndarray, torch.Tensor]
@@ -22,9 +23,16 @@ OneOrMore = Union[T, Sequence[T]]
 
 ScalarFloat = Union[torch.Tensor, float]
 
-# Define a `Writer` because otherwise, the documentation by mkdocs became very long and
+# Define some types because otherwise, the documentation by mkdocs became very long and
 # made the website look ugly.
 TensorboardSummaryWriter = NewType("Writer", SummaryWriter)
+TorchModule = NewType("Module", Module)
 
-
-__all__ = ["Array", "Shape", "OneOrMore", "ScalarFloat", "TensorboardSummaryWriter"]
+__all__ = [
+    "Array",
+    "Shape",
+    "OneOrMore",
+    "ScalarFloat",
+    "TensorboardSummaryWriter",
+    "TorchModule",
+]

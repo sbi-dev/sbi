@@ -1,9 +1,8 @@
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Callable, Dict, NewType, Optional, Union
 
 import torch
-import torch.nn as nn
 from torch import Tensor, eye, ones, optim
 from torch.nn.utils import clip_grad_norm_
 from torch.utils import data
@@ -13,6 +12,7 @@ from torch.utils.tensorboard import SummaryWriter
 from sbi import utils as utils
 from sbi.inference.base import NeuralInference
 from sbi.inference.posteriors.ratio_based_posterior import RatioBasedPosterior
+from sbi.types import TorchModule
 from sbi.utils import (
     check_estimator_arg,
     check_theta_and_x,
@@ -21,6 +21,10 @@ from sbi.utils import (
     x_shape_from_simulation,
 )
 from sbi.utils.sbiutils import mask_sims_from_prior
+
+# This is needed to avoid extremely long types on mkdocs when it is `Optional`, e.g.
+# sbi.inference.posterior.ratio_based_posterior.RatioBasedPosterior
+RatioBasedPosteriorType = NewType("RatioBasedPosterior", RatioBasedPosterior)
 
 
 class RatioEstimator(NeuralInference, ABC):
@@ -86,10 +90,14 @@ class RatioEstimator(NeuralInference, ABC):
         self, theta: Tensor, x: Tensor, from_round: int = 0,
     ) -> "NeuralInference":
         r"""
-        Store data as entries in a list for each type of variable (parameter/data).
+        Store parameters and simulation outputs to use them for training later.
+
+        Data ar stored as entries in lists for each type of variable (parameter/data).
+
         Stores $\theta$, $x$, prior_masks (indicating if simulations are coming from the
         prior or not) and a index indicating which round the batch of simulations came
         from.
+
         Args:
             theta: Parameter sets.
             x: Simulation outputs.
@@ -124,9 +132,8 @@ class RatioEstimator(NeuralInference, ABC):
         retrain_from_scratch_each_round: bool = False,
         show_train_summary: bool = False,
     ) -> RatioBasedPosterior:
-        r"""Run SNRE.
-
-        Train a classifier to learn the density ratio $p(\theta,x)/p(\theta)p(x)$.
+        r"""
+        Return classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
 
         Args:
             num_atoms: Number of atoms to use for classification.
@@ -139,7 +146,7 @@ class RatioEstimator(NeuralInference, ABC):
                 estimator for the posterior from scratch each round.
 
         Returns:
-            Classifier that has learned the density ratio $p(\theta,x)/p(\theta)p(x)$.
+            Classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
         """
 
         max_num_epochs = 2 ** 31 - 1 if max_num_epochs is None else max_num_epochs
@@ -259,12 +266,12 @@ class RatioEstimator(NeuralInference, ABC):
 
     def build_posterior(
         self,
-        density_estimator: Optional[nn.Module] = None,
+        density_estimator: Optional[TorchModule] = None,
         mcmc_method: str = "slice_np",
         mcmc_parameters: Optional[Dict[str, Any]] = None,
-        copy_state_from: Optional[RatioBasedPosterior] = None,
-    ):
-        """
+        copy_state_from: Optional[RatioBasedPosteriorType] = None,
+    ) -> RatioBasedPosterior:
+        r"""
         Build posterior from the neural density estimator.
 
         SNRE trains a neural network to approximate likelihood ratios, which in turn

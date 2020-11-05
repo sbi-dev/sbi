@@ -4,11 +4,10 @@
 
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Any, Callable, Dict, Optional, Union, cast
+from typing import Any, Callable, Dict, NewType, Optional, Union, cast
 from warnings import warn
 
 import torch
-import torch.nn as nn
 from torch import Tensor, ones, optim
 from torch.nn.utils import clip_grad_norm_
 from torch.utils import data
@@ -18,6 +17,7 @@ from torch.utils.tensorboard import SummaryWriter
 from sbi import utils as utils
 from sbi.inference import NeuralInference, check_if_proposal_has_default_x
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
+from sbi.types import TorchModule
 from sbi.utils import (
     check_estimator_arg,
     check_theta_and_x,
@@ -25,6 +25,10 @@ from sbi.utils import (
     x_shape_from_simulation,
 )
 from sbi.utils.sbiutils import mask_sims_from_prior
+
+# This is needed to avoid extremely long types on mkdocs when it is `Optional`, e.g.
+# sbi.inference.posterior.direct_posterior.DirectPosterior
+DirectPosteriorType = NewType("DirectPosterior", DirectPosterior)
 
 
 class PosteriorEstimator(NeuralInference, ABC):
@@ -83,10 +87,12 @@ class PosteriorEstimator(NeuralInference, ABC):
         self._summary.update({"rejection_sampling_acceptance_rates": []})  # type:ignore
 
     def add_data(
-        self, theta: Tensor, x: Tensor, proposal: Optional[DirectPosterior] = None,
+        self, theta: Tensor, x: Tensor, proposal: Optional[Any] = None,
     ) -> "NeuralInference":
         r"""
-        Store data as entries in a list for each type of variable (parameter/data).
+        Store parameters and simulation outputs to use them for training later.
+
+        Data ar stored as entries in lists for each type of variable (parameter/data).
 
         Stores $\theta$, $x$, prior_masks (indicating if simulations are coming from the
         prior or not) and a index indicating which round the batch of simulations came
@@ -137,7 +143,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         show_train_summary: bool = False,
     ) -> DirectPosterior:
         r"""
-        Train the density estimator to learn the distribution $p(\theta|x$).
+        Return density estimator that approximates the distribution $p(\theta|x)$.
 
         Args:
             training_batch_size: Training batch size.
@@ -163,7 +169,7 @@ class PosteriorEstimator(NeuralInference, ABC):
                 loss after the training.
 
         Returns:
-            Density estimator that has learned the distribution $p(\theta|x)$.
+            Density estimator that approximates the distribution $p(\theta|x)$.
         """
 
         # Calibration kernels proposed in Lueckmann, Gonçalves et al., 2017.
@@ -297,18 +303,18 @@ class PosteriorEstimator(NeuralInference, ABC):
 
     def build_posterior(
         self,
-        density_estimator: Optional[nn.Module] = None,
+        density_estimator: Optional[TorchModule] = None,
         rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
         sample_with_mcmc: bool = False,
         mcmc_method: str = "slice_np",
         mcmc_parameters: Optional[Dict[str, Any]] = None,
-        copy_state_from: Optional[DirectPosterior] = None,
-    ):
-        """
+        copy_state_from: Optional[DirectPosteriorType] = None,
+    ) -> DirectPosterior:
+        r"""
         Build posterior from the neural density estimator.
 
         For SNPE, the posterior distribution that is returned here implements the
-        following functionality over the raw neural density estimator:
+        following functionality over the raw neural density estimator:<br/>
         - correct the calculation of the log probability such that it compensates for
             the leakage.<br/>
         - reject samples that lie outside of the prior bounds.<br/>
