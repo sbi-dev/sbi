@@ -300,7 +300,7 @@ class DirectPosterior(NeuralPosterior):
                 will draw init locations from prior, whereas `sir` will use Sequential-
                 Importance-Resampling using `init_strategy_num_candidates` to find init
                 locations.
-            rejection_sampling_parameters: Dictonary overriding the default parameters
+            rejection_sampling_parameters: Dictionary overriding the default parameters
                 for rejection sampling. The following parameters are supported:
                 `max_sampling_batch_size` to set the batch size for drawing new
                 samples from the candidate distribution, e.g., the posterior. Larger

@@ -50,7 +50,7 @@ def mdn_inference_with_different_methods(method):
     inference = method(prior, density_estimator="mdn")
 
     theta, x = simulate_for_sbi(simulator, prior, 1000)
-    _ = inference.add_data(theta, x).train(training_batch_size=50)
+    _ = inference.append_simulations(theta, x).train(training_batch_size=50)
     posterior = inference.build_posterior().set_default_x(x_o)
 
     samples = posterior.sample((num_samples,))
@@ -84,7 +84,7 @@ def test_mdn_with_1D_uniform_prior():
     inference = SNPE(prior, density_estimator="mdn")
 
     theta, x = simulate_for_sbi(simulator, prior, 100)
-    _ = inference.add_data(theta, x).train(training_batch_size=50)
+    _ = inference.append_simulations(theta, x).train(training_batch_size=50)
     posterior = inference.build_posterior().set_default_x(x_o)
     samples = posterior.sample((num_samples,))
     log_probs = posterior.log_prob(samples)

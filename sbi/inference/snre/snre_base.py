@@ -15,16 +15,12 @@ from sbi.inference.posteriors.ratio_based_posterior import RatioBasedPosterior
 from sbi.types import TorchModule
 from sbi.utils import (
     check_estimator_arg,
-    check_theta_and_x,
     clamp_and_warn,
     test_posterior_net_for_multi_d_x,
+    validate_theta_and_x,
     x_shape_from_simulation,
 )
 from sbi.utils.sbiutils import mask_sims_from_prior
-
-# This is needed to avoid extremely long types on mkdocs when it is `Optional`, e.g.
-# sbi.inference.posterior.ratio_based_posterior.RatioBasedPosterior
-RatioBasedPosteriorType = NewType("RatioBasedPosterior", RatioBasedPosterior)
 
 
 class RatioEstimator(NeuralInference, ABC):
@@ -86,16 +82,16 @@ class RatioEstimator(NeuralInference, ABC):
         # Ratio-based-specific summary_writer fields.
         self._summary.update({"mcmc_times": []})  # type: ignore
 
-    def add_data(
+    def append_simulations(
         self, theta: Tensor, x: Tensor, from_round: int = 0,
-    ) -> "NeuralInference":
+    ) -> "RatioEstimator":
         r"""
-        Store parameters and simulation outputs to use them for training later.
+        Store parameters and simulation outputs to use them for later training.
 
-        Data ar stored as entries in lists for each type of variable (parameter/data).
+        Data are stored as entries in lists for each type of variable (parameter/data).
 
         Stores $\theta$, $x$, prior_masks (indicating if simulations are coming from the
-        prior or not) and a index indicating which round the batch of simulations came
+        prior or not) and an index indicating which round the batch of simulations came
         from.
 
         Args:
@@ -109,7 +105,7 @@ class RatioEstimator(NeuralInference, ABC):
             NeuralInference object (returned so that this function is chainable).
         """
 
-        check_theta_and_x(theta, x)
+        validate_theta_and_x(theta, x)
 
         self._theta_roundwise.append(theta)
         self._x_roundwise.append(x)
@@ -153,7 +149,7 @@ class RatioEstimator(NeuralInference, ABC):
 
         # Load data from most recent round.
         self._round = max(self._data_round_index)
-        theta, x, _ = self.get_data(self._round, exclude_invalid_x, False)
+        theta, x, _ = self.get_simulations(self._round, exclude_invalid_x, False)
 
         # First round or if retraining from scratch:
         # Call the `self._build_neural_net` with the rounds' thetas and xs as
@@ -170,7 +166,7 @@ class RatioEstimator(NeuralInference, ABC):
 
         # Starting index for the training set (1 = discard round-0 samples).
         start_idx = int(discard_prior_samples and self._round > 0)
-        theta, x, _ = self.get_data(start_idx, exclude_invalid_x)
+        theta, x, _ = self.get_simulations(start_idx, exclude_invalid_x)
 
         # Get total number of training examples.
         num_examples = len(theta)
@@ -269,7 +265,6 @@ class RatioEstimator(NeuralInference, ABC):
         density_estimator: Optional[TorchModule] = None,
         mcmc_method: str = "slice_np",
         mcmc_parameters: Optional[Dict[str, Any]] = None,
-        copy_state_from: Optional[RatioBasedPosteriorType] = None,
     ) -> RatioBasedPosterior:
         r"""
         Build posterior from the neural density estimator.
@@ -298,10 +293,7 @@ class RatioEstimator(NeuralInference, ABC):
                 draw init locations from prior, whereas `sir` will use
                 Sequential-Importance-Resampling using `init_strategy_num_candidates`
                 to find init locations.
-            copy_state_from: A previous posterior object from which the
-                entire state is copied and then only the `density_estimator` is
-                swapped in. If this is set, all other arguments to this function are
-                overwritten.
+
         Returns:
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods
             (the returned log-probability is unnormalized).
@@ -310,21 +302,14 @@ class RatioEstimator(NeuralInference, ABC):
         if density_estimator is None:
             density_estimator = self._neural_net
 
-        if copy_state_from is None:
-            self._posterior = RatioBasedPosterior(
-                method_family=self.__class__.__name__.lower(),
-                neural_net=self._neural_net,
-                prior=self._prior,
-                x_shape=self._x_shape,
-                mcmc_method=mcmc_method,
-                mcmc_parameters=mcmc_parameters,
-            )
-        else:
-            assert isinstance(
-                copy_state_from, RatioBasedPosterior
-            ), "`copy_state_from` must be a `RatioBasedPosterior`."
-            self._posterior = copy_state_from
-            self._posterior.net = density_estimator
+        self._posterior = RatioBasedPosterior(
+            method_family=self.__class__.__name__.lower(),
+            neural_net=density_estimator,
+            prior=self._prior,
+            x_shape=self._x_shape,
+            mcmc_method=mcmc_method,
+            mcmc_parameters=mcmc_parameters,
+        )
 
         self._posterior._num_trained_rounds = self._round + 1
 

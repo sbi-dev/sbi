@@ -41,7 +41,7 @@ def test_api_snl_on_linearGaussian(num_dim: int, set_seed):
     inference = SNL(prior, show_progress_bars=False,)
 
     theta, x = simulate_for_sbi(simulator, prior, 1000, simulation_batch_size=50)
-    _ = inference.add_data(theta, x).train(max_num_epochs=5)
+    _ = inference.append_simulations(theta, x).train(max_num_epochs=5)
     posterior = inference.build_posterior().set_default_x(x_o)
 
     posterior.sample(sample_shape=(num_samples,), x=x_o, mcmc_parameters={"thin": 3})
@@ -91,7 +91,7 @@ def test_c2st_snl_on_linearGaussian_different_dims(set_seed):
     inference = SNL(prior, show_progress_bars=False, device=device,)
 
     theta, x = simulate_for_sbi(simulator, prior, 5000, simulation_batch_size=50)
-    _ = inference.add_data(theta, x).train()
+    _ = inference.append_simulations(theta, x).train()
     posterior = inference.build_posterior()
     samples = posterior.sample((num_samples,), x=x_o, mcmc_parameters={"thin": 3})
 
@@ -138,7 +138,7 @@ def test_c2st_snl_on_linearGaussian(num_dim: int, prior_str: str, set_seed):
     inference = SNL(prior, show_progress_bars=False,)
 
     theta, x = simulate_for_sbi(simulator, prior, 1000, simulation_batch_size=50)
-    _ = inference.add_data(theta, x).train()
+    _ = inference.append_simulations(theta, x).train()
     posterior = inference.build_posterior().set_default_x(x_o)
 
     samples = posterior.sample(sample_shape=(num_samples,), mcmc_parameters={"thin": 3})
@@ -186,14 +186,14 @@ def test_c2st_multi_round_snl_on_linearGaussian(set_seed):
     inference = SNL(prior, show_progress_bars=False,)
 
     theta, x = simulate_for_sbi(simulator, prior, 750, simulation_batch_size=50)
-    _ = inference.add_data(theta, x).train()
+    _ = inference.append_simulations(theta, x).train()
     posterior1 = inference.build_posterior(
         mcmc_method="slice_np_vectorized", mcmc_parameters={"thin": 5, "num_chains": 20}
     ).set_default_x(x_o)
 
     theta, x = simulate_for_sbi(simulator, posterior1, 750, simulation_batch_size=50)
-    _ = inference.add_data(theta, x).train()
-    posterior = inference.build_posterior(copy_state_from=posterior1).set_default_x(x_o)
+    _ = inference.append_simulations(theta, x).train()
+    posterior = inference.build_posterior().copy_hyperparameters_from(posterior1)
 
     samples = posterior.sample(sample_shape=(num_samples,), mcmc_parameters={"thin": 3})
 
@@ -227,7 +227,7 @@ def test_api_snl_sampling_methods(mcmc_method: str, prior_str: str, set_seed):
     inference = SNL(prior, show_progress_bars=False,)
 
     theta, x = simulate_for_sbi(simulator, prior, 200, simulation_batch_size=50)
-    _ = inference.add_data(theta, x).train(max_num_epochs=5)
+    _ = inference.append_simulations(theta, x).train(max_num_epochs=5)
     posterior = inference.build_posterior(mcmc_method=mcmc_method).set_default_x(x_o)
 
     posterior.sample(sample_shape=(num_samples,), x=x_o, mcmc_parameters={"thin": 3})

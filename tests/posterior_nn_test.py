@@ -19,7 +19,7 @@ def test_log_prob_with_different_x():
     simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior)
     inference = SNPE_C(prior)
     theta, x = simulate_for_sbi(simulator, prior, 1000)
-    _ = inference.add_data(theta, x).train()
+    _ = inference.append_simulations(theta, x).train()
     posterior = inference.build_posterior()
 
     _ = posterior.sample((10,), x=ones(1, num_dim))
