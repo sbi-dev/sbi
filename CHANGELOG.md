@@ -1,5 +1,27 @@
 # v0.14.0
-- New flexible interface API (#378)
+- New flexible interface API (#378). This is going to be a breaking change for users of 
+the flexible interface and you will have to change your code. Old syntax:
+```python
+from sbi.inference import SNPE, prepare_for_sbi
+
+simulator, prior = prepare_for_sbi(simulator, prior)
+inference = SNPE(simulator, prior)
+
+# Simulate, train, and build posterior.
+posterior = inference(num_simulation=1000)
+```
+New syntax:
+```python
+from sbi.inference import SNPE, prepare_for_sbi, simulate_for_sbi
+
+simulator, prior = prepare_for_sbi(simulator, prior)
+inference = SNPE(prior)
+
+theta, x = simulate_for_sbi(simulator, proposal=prior, num_simulations=1000)
+density_estimator = inference.append_simulations(theta, x).train()
+posterior = inference.build_posterior(density_estimator)  # MCMC kwargs go here.
+```
+More information can be found here [here](https://www.mackelab.org/sbi/tutorial/02_flexible_interface/).
 - Fixed typo in docs for `infer` (thanks @glouppe, #370)
 
 

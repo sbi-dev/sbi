@@ -457,7 +457,8 @@ def prepare_for_sbi(simulator: Callable, prior,) -> Tuple[Callable, Distribution
 
     One of the goals is to allow you to use sbi with inputs computed in numpy.
 
-    Attempts to meet the following requirements by reshaping and type-casting:<br/>
+    Attempts to meet the following requirements by reshaping and type-casting:
+
     - the simulator function receives as input and returns a Tensor.<br/>
     - the simulator can simulate batches of parameters and return batches of data.<br/>
     - the prior does not produce batches and samples and evaluates to Tensor.<br/>
@@ -514,6 +515,16 @@ def check_sbi_inputs(simulator: Callable, prior: Distribution) -> None:
 
 def check_estimator_arg(estimator: Union[str, Callable]) -> None:
     """Check (density or ratio) estimator argument passed by the user."""
+    if isinstance(estimator, BoxUniform) or isinstance(estimator, Distribution):
+        raise ValueError(
+            "You passed a distribution as density_estimator. Probably, "
+            "your code is deprecated since sbi v0.14.0, which changed the "
+            "API. Please consult release notes to see how you can update your code: "
+            "https://github.com/mackelab/sbi/releases/tag/v0.14.0 "
+            "More information can be found under the corresponding pull request on "
+            "github: https://github.com/mackelab/sbi/pull/378 and tutorials: "
+            "https://www.mackelab.org/sbi/tutorial/02_flexible_interface/"
+        )
     assert isinstance(estimator, str) or (
         isinstance(estimator, Callable) and not isinstance(estimator, nn.Module)
     ), (
@@ -522,9 +533,9 @@ def check_estimator_arg(estimator: Union[str, Callable]) -> None:
     )
 
 
-def check_theta_and_x(theta: Any, x: Any) -> None:
+def validate_theta_and_x(theta: Any, x: Any) -> None:
     r"""
-    Checks if the passe $(\theta, x)$ are valid.
+    Checks if the passed $(\theta, x)$ are valid.
 
     Specifically, we check:
     1) If they are tensors.

@@ -282,7 +282,7 @@ def test_inference_with_user_sbi_problems(user_simulator: Callable, user_prior):
 
     # Run inference.
     theta, x = simulate_for_sbi(simulator, prior, 100)
-    _ = inference.add_data(theta, x).train(max_num_epochs=2)
+    _ = inference.append_simulations(theta, x).train(max_num_epochs=2)
     _ = inference.build_posterior()
 
 

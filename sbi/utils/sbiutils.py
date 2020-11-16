@@ -2,14 +2,7 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 import logging
-from typing import (
-    Any,
-    Dict,
-    List,
-    Sequence,
-    Tuple,
-    Union,
-)
+from typing import Any, Dict, List, Sequence, Tuple, Union
 
 import torch
 from pyknos.nflows import transforms
@@ -307,7 +300,7 @@ def warn_on_invalid_x_for_snpec_leakage(
             )
 
 
-def get_data_since_round(
+def get_simulations_since_round(
     data: List, data_round_indices: List, starting_round_index: int
 ) -> Tensor:
     """

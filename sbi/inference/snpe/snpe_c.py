@@ -140,7 +140,7 @@ class SNPE_C(PosteriorEstimator):
             Density estimator that approximates the distribution $p(\theta|x)$.
         """
 
-        # WARNING: sneaky trick ahead. We proxy the parent's `__call__` here,
+        # WARNING: sneaky trick ahead. We proxy the parent's `train` here,
         # requiring the signature to have `num_atoms`, save it for use below, and
         # continue. It's sneaky because we are using the object (self) as a namespace
         # to pass arguments between functions, and that's implicit state management.
@@ -155,15 +155,18 @@ class SNPE_C(PosteriorEstimator):
         # use the latest data that was passed, i.e. the one from the last proposal.
         proposal = self._proposal_roundwise[-1]
 
-        if proposal is not None:
-            self.use_non_atomic_loss = (
-                isinstance(proposal.net._distribution, mdn)
-                and isinstance(self._neural_net._distribution, mdn)
-                and (
-                    isinstance(self._prior, utils.BoxUniform)
-                    or isinstance(self._prior, MultivariateNormal)
+        if proposal is not None and proposal is not self._prior:
+            if hasattr(proposal, "net"):
+                self.use_non_atomic_loss = (
+                    isinstance(proposal.net._distribution, mdn)
+                    and isinstance(self._neural_net._distribution, mdn)
+                    and (
+                        isinstance(self._prior, utils.BoxUniform)
+                        or isinstance(self._prior, MultivariateNormal)
+                    )
                 )
-            )
+            else:
+                self.use_non_atomic_loss = False
 
             algorithm = "non-atomic" if self.use_non_atomic_loss else "atomic"
             print(f"Using SNPE-C with {algorithm} loss")

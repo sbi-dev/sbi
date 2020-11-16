@@ -20,15 +20,11 @@ from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.types import TorchModule
 from sbi.utils import (
     check_estimator_arg,
-    check_theta_and_x,
     test_posterior_net_for_multi_d_x,
+    validate_theta_and_x,
     x_shape_from_simulation,
 )
 from sbi.utils.sbiutils import mask_sims_from_prior
-
-# This is needed to avoid extremely long types on mkdocs when it is `Optional`, e.g.
-# sbi.inference.posterior.direct_posterior.DirectPosterior
-DirectPosteriorType = NewType("DirectPosterior", DirectPosterior)
 
 
 class PosteriorEstimator(NeuralInference, ABC):
@@ -86,16 +82,16 @@ class PosteriorEstimator(NeuralInference, ABC):
         # Extra SNPE-specific fields summary_writer.
         self._summary.update({"rejection_sampling_acceptance_rates": []})  # type:ignore
 
-    def add_data(
+    def append_simulations(
         self, theta: Tensor, x: Tensor, proposal: Optional[Any] = None,
-    ) -> "NeuralInference":
+    ) -> "PosteriorEstimator":
         r"""
-        Store parameters and simulation outputs to use them for training later.
+        Store parameters and simulation outputs to use them for later training.
 
-        Data ar stored as entries in lists for each type of variable (parameter/data).
+        Data are stored as entries in lists for each type of variable (parameter/data).
 
         Stores $\theta$, $x$, prior_masks (indicating if simulations are coming from the
-        prior or not) and a index indicating which round the batch of simulations came
+        prior or not) and an index indicating which round the batch of simulations came
         from.
 
         Args:
@@ -109,14 +105,19 @@ class PosteriorEstimator(NeuralInference, ABC):
             NeuralInference object (returned so that this function is chainable).
         """
 
-        check_theta_and_x(theta, x)
+        validate_theta_and_x(theta, x)
         self._check_proposal(proposal)
 
-        if proposal is None:
+        if proposal is None or proposal is self._prior:
+            # The `_data_round_index` will later be used to infer if one should train
+            # with MLE loss or with atomic loss (see, in `train()`:
+            # self._round = max(self._data_round_index))
             self._data_round_index.append(0)
             self._prior_masks.append(mask_sims_from_prior(0, theta.size(0)))
         else:
             if not self._data_round_index:
+                # This catches a pretty specific case: if, in the first round, one
+                # passes data that does not come from the prior.
                 self._data_round_index.append(1)
             else:
                 self._data_round_index.append(max(self._data_round_index) + 1)
@@ -180,7 +181,7 @@ class PosteriorEstimator(NeuralInference, ABC):
 
         # Load data from most recent round.
         self._round = max(self._data_round_index)
-        theta, x, _ = self.get_data(self._round, exclude_invalid_x, False)
+        theta, x, _ = self.get_simulations(self._round, exclude_invalid_x, False)
 
         # First round or if retraining from scratch:
         # Call the `self._build_neural_net` with the rounds' thetas and xs as
@@ -199,7 +200,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         if self.use_non_atomic_loss:
             start_idx = self._round
 
-        theta, x, prior_masks = self.get_data(start_idx, exclude_invalid_x)
+        theta, x, prior_masks = self.get_simulations(start_idx, exclude_invalid_x)
 
         # Set the proposal to the last proposal that was passed by the user. For
         # atomic SNPE, it does not matter what the proposal is. For non-atomic
@@ -310,16 +311,16 @@ class PosteriorEstimator(NeuralInference, ABC):
         sample_with_mcmc: bool = False,
         mcmc_method: str = "slice_np",
         mcmc_parameters: Optional[Dict[str, Any]] = None,
-        copy_state_from: Optional[DirectPosteriorType] = None,
     ) -> DirectPosterior:
         r"""
         Build posterior from the neural density estimator.
 
         For SNPE, the posterior distribution that is returned here implements the
-        following functionality over the raw neural density estimator:<br/>
+        following functionality over the raw neural density estimator:
+
         - correct the calculation of the log probability such that it compensates for
-            the leakage.<br/>
-        - reject samples that lie outside of the prior bounds.<br/>
+            the leakage.
+        - reject samples that lie outside of the prior bounds.
         - alternatively, if leakage is very high (which can happen for multi-round
             SNPE), sample from the posterior with MCMC.
 
@@ -345,10 +346,6 @@ class PosteriorEstimator(NeuralInference, ABC):
                 draw init locations from prior, whereas `sir` will use
                 Sequential-Importance-Resampling using `init_strategy_num_candidates`
                 to find init locations.
-            copy_state_from: A previous posterior object from which the
-                entire state is copied and then only the `density_estimator` is
-                swapped in. If this is set, all other arguments to this function are
-                overwritten.
 
         Returns:
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods.
@@ -357,23 +354,16 @@ class PosteriorEstimator(NeuralInference, ABC):
         if density_estimator is None:
             density_estimator = self._neural_net
 
-        if copy_state_from is None:
-            self._posterior = DirectPosterior(
-                method_family="snpe",
-                neural_net=density_estimator,
-                prior=self._prior,
-                x_shape=self._x_shape,
-                rejection_sampling_parameters=rejection_sampling_parameters,
-                sample_with_mcmc=sample_with_mcmc,
-                mcmc_method=mcmc_method,
-                mcmc_parameters=mcmc_parameters,
-            )
-        else:
-            assert isinstance(
-                copy_state_from, DirectPosterior
-            ), "`copy_state_from` must be a `DirectPosterior`."
-            self._posterior = copy_state_from
-            self._posterior.net = density_estimator
+        self._posterior = DirectPosterior(
+            method_family="snpe",
+            neural_net=density_estimator,
+            prior=self._prior,
+            x_shape=self._x_shape,
+            rejection_sampling_parameters=rejection_sampling_parameters,
+            sample_with_mcmc=sample_with_mcmc,
+            mcmc_method=mcmc_method,
+            mcmc_parameters=mcmc_parameters,
+        )
 
         self._posterior._num_trained_rounds = self._round + 1
 
@@ -424,13 +414,15 @@ class PosteriorEstimator(NeuralInference, ABC):
         if proposal is not None:
             check_if_proposal_has_default_x(proposal)
 
-            if not isinstance(proposal, DirectPosterior):
+            if (
+                not isinstance(proposal, DirectPosterior)
+                and proposal is not self._prior
+            ):
                 warn(
-                    "The proposal you passed is not a `NeuralPosterior` object. If you "
-                    "are an expert user and did so for research purposes, this is fine."
-                    " If not, and you only wanted to do single round inference with"
-                    " `proposal=prior`, please instead set `proposal=None`, which"
-                    " automatically uses the prior as proposal."
+                    "The proposal you passed is neither the prior nor a "
+                    "`NeuralPosterior` object. If you are an expert user and did so "
+                    "for research purposes, this is fine. If not, you might be doing "
+                    "something wrong: feel free to create an issue on Github."
                 )
         elif self._round > 0:
             raise ValueError(

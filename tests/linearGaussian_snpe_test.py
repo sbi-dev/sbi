@@ -69,7 +69,7 @@ def test_c2st_snpe_on_linearGaussian(
     inference = SNPE_C(prior, show_progress_bars=False, device=device,)
 
     theta, x = simulate_for_sbi(simulator, prior, 2000, simulation_batch_size=1000)
-    _ = inference.add_data(theta, x).train(training_batch_size=100)
+    _ = inference.append_simulations(theta, x).train(training_batch_size=100)
     posterior = inference.build_posterior().set_default_x(x_o)
     samples = posterior.sample((num_samples,))
 
@@ -158,7 +158,7 @@ def test_c2st_snpe_on_linearGaussian_different_dims(set_seed):
     inference = SNPE_C(prior, density_estimator="maf", show_progress_bars=False,)
 
     theta, x = simulate_for_sbi(simulator, prior, 2000, simulation_batch_size=1)  # type: ignore
-    _ = inference.add_data(theta, x).train()
+    _ = inference.append_simulations(theta, x).train()
     posterior = inference.build_posterior()
     samples = posterior.sample((num_samples,), x=x_o)
 
@@ -225,22 +225,22 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str, set_seed):
     if method_str == "snpe_b":
         inference = SNPE_B(**creation_args)
         theta, x = simulate_for_sbi(simulator, prior, 500, simulation_batch_size=10)
-        _ = inference.add_data(theta, x).train()
+        _ = inference.append_simulations(theta, x).train()
         posterior1 = inference.build_posterior().set_default_x(x_o)
         theta, x = simulate_for_sbi(
             simulator, posterior1, 1000, simulation_batch_size=10
         )
-        _ = inference.add_data(theta, x, proposal=posterior1).train()
+        _ = inference.append_simulations(theta, x, proposal=posterior1).train()
         posterior = inference.build_posterior().set_default_x(x_o)
     elif method_str == "snpe_c":
         inference = SNPE_C(**creation_args)
         theta, x = simulate_for_sbi(simulator, prior, 500, simulation_batch_size=50)
-        _ = inference.add_data(theta, x).train()
+        _ = inference.append_simulations(theta, x).train()
         posterior1 = inference.build_posterior().set_default_x(x_o)
         theta, x = simulate_for_sbi(
             simulator, posterior1, 1000, simulation_batch_size=50
         )
-        _ = inference.add_data(theta, x, proposal=posterior1).train()
+        _ = inference.append_simulations(theta, x, proposal=posterior1).train()
         posterior = inference.build_posterior().set_default_x(x_o)
 
     samples = posterior.sample((num_samples,))
@@ -299,7 +299,7 @@ def test_api_snpe_c_posterior_correction(
     )
 
     theta, x = simulate_for_sbi(simulator, prior, 1000)
-    _ = inference.add_data(theta, x).train(max_num_epochs=5)
+    _ = inference.append_simulations(theta, x).train(max_num_epochs=5)
     posterior = inference.build_posterior()
     posterior = posterior.set_sample_with_mcmc(sample_with_mcmc).set_mcmc_method(
         mcmc_method
@@ -352,7 +352,7 @@ def test_sample_conditional(set_seed):
 
     # We need a pretty big dataset to properly model the bimodality.
     theta, x = simulate_for_sbi(simulator, prior, 10000)
-    _ = inference.add_data(theta, x).train(max_num_epochs=50)
+    _ = inference.append_simulations(theta, x).train(max_num_epochs=50)
     posterior = inference.build_posterior().set_default_x(x_o)
     samples = posterior.sample((50,))
 
@@ -420,5 +420,5 @@ def example_posterior():
     theta, x = simulate_for_sbi(
         simulator, prior, 1000, simulation_batch_size=10, num_workers=6
     )
-    _ = inference.add_data(theta, x).train()
+    _ = inference.append_simulations(theta, x).train()
     return inference.build_posterior().set_default_x(x_o)

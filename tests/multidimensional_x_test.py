@@ -83,7 +83,9 @@ def test_inference_with_2d_x(embedding, method):
 
     inference = method(prior, density_estimator=net_provider, show_progress_bars=False)
     theta, x = simulate_for_sbi(simulator, prior, num_simulations)
-    _ = inference.add_data(theta, x).train(training_batch_size=100, max_num_epochs=10)
+    _ = inference.append_simulations(theta, x).train(
+        training_batch_size=100, max_num_epochs=10
+    )
     posterior = inference.build_posterior(**sample_kwargs).set_default_x(x_o)
 
     posterior.log_prob(posterior.sample((num_samples,), show_progress_bars=False))

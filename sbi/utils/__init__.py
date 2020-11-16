@@ -1,8 +1,8 @@
 # flake8: noqa
 from sbi.user_input.user_input_checks import (
     check_estimator_arg,
-    check_theta_and_x,
     test_posterior_net_for_multi_d_x,
+    validate_theta_and_x,
 )
 from sbi.user_input.user_input_checks_utils import MultipleIndependent
 from sbi.utils.conditional_density import (
@@ -17,7 +17,7 @@ from sbi.utils.sbiutils import (
     batched_mixture_vmv,
     clamp_and_warn,
     del_entries,
-    get_data_since_round,
+    get_simulations_since_round,
     handle_invalid_x,
     mask_sims_from_prior,
     sample_posterior_within_prior,

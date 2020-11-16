@@ -41,7 +41,7 @@ def test_api_sre_on_linearGaussian(num_dim: int):
     inference = SRE(prior, classifier="resnet", show_progress_bars=False,)
 
     theta, x = simulate_for_sbi(simulator, prior, 1000, simulation_batch_size=50)
-    _ = inference.add_data(theta, x).train(max_num_epochs=5)
+    _ = inference.append_simulations(theta, x).train(max_num_epochs=5)
     posterior = inference.build_posterior()
 
     posterior.sample(sample_shape=(10,), x=x_o, mcmc_parameters={"num_chains": 2})
@@ -95,7 +95,7 @@ def test_c2st_sre_on_linearGaussian_different_dims(set_seed):
     )
 
     theta, x = simulate_for_sbi(simulator, prior, 5000, simulation_batch_size=50)
-    _ = inference.add_data(theta, x).train()
+    _ = inference.append_simulations(theta, x).train()
     posterior = inference.build_posterior()
     samples = posterior.sample((num_samples,), x=x_o, mcmc_parameters={"thin": 3})
 
@@ -155,7 +155,7 @@ def test_c2st_sre_on_linearGaussian(
 
     # Should use default `num_atoms=10` for SRE; `num_atoms=2` for AALR
     theta, x = simulate_for_sbi(simulator, prior, 1000, simulation_batch_size=50)
-    _ = inference.add_data(theta, x).train()
+    _ = inference.append_simulations(theta, x).train()
     posterior = inference.build_posterior().set_default_x(x_o)
 
     samples = posterior.sample(sample_shape=(num_samples,), mcmc_parameters={"thin": 3})
@@ -217,7 +217,7 @@ def test_api_sre_sampling_methods(mcmc_method: str, prior_str: str, set_seed):
     inference = SRE(prior, classifier="resnet", show_progress_bars=False,)
 
     theta, x = simulate_for_sbi(simulator, prior, 200, simulation_batch_size=50)
-    _ = inference.add_data(theta, x).train(max_num_epochs=5)
+    _ = inference.append_simulations(theta, x).train(max_num_epochs=5)
     posterior = inference.build_posterior(mcmc_method=mcmc_method)
 
     posterior.sample(sample_shape=(10,), x=x_o)

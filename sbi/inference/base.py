@@ -23,7 +23,7 @@ from sbi.utils import (
     warn_on_invalid_x_for_snpec_leakage,
 )
 from sbi.utils.plot import pairplot
-from sbi.utils.sbiutils import get_data_since_round
+from sbi.utils.sbiutils import get_simulations_since_round
 from sbi.utils.torchutils import configure_default_device
 
 
@@ -75,7 +75,7 @@ def infer(
         num_simulations=num_simulations,
         num_workers=num_workers,
     )
-    _ = inference.add_data(theta, x).train()
+    _ = inference.append_simulations(theta, x).train()
     posterior = inference.build_posterior()
 
     return posterior
@@ -121,7 +121,7 @@ class NeuralInference(ABC):
 
         self._device = configure_default_device(device)
 
-        if unused_args.keys():
+        if unused_args:
             warn(
                 f"You passed some keyword arguments that will not be used. "
                 f"Specifically, the unused arguments are: {list(unused_args.keys())}. "
@@ -167,18 +167,37 @@ class NeuralInference(ABC):
             validation_log_probs=[],
         )
 
+    def __call__(self, unused_args):
+        """
+        f"Deprecated. The inference object is no longer callable as of `sbi` v0.14.0. "
+        f"Please consult our website for a tutorial on how to adapt your code: "
+        f"https://www.mackelab.org/sbi/tutorial/02_flexible_interface/ . For "
+        f"further information, see the corresponding pull request on github:
+        f"https://github.com/mackelab/sbi/pull/378.",
+        """
+        raise NameError(
+            f"The inference object is no longer callable as of `sbi` v0.14.0. "
+            f"Please consult the release notes for a tutorial on how to adapt your "
+            f"code: https://github.com/mackelab/sbi/releases/tag/v0.14.0"
+            f"For more information, visit our website: "
+            f"https://www.mackelab.org/sbi/tutorial/02_flexible_interface/ or "
+            f"see the corresponding pull request on github: "
+            f"https://github.com/mackelab/sbi/pull/378.",
+        )
+
     def provide_presimulated(
         self, theta: Tensor, x: Tensor, from_round: int = 0
     ) -> None:
         r"""
         Deprecated since sbi 0.14.0.
 
-        Instead of using this, simply pass theta and x to `.__call__()`. Please consult
-        the corresponding pull request on github:
+        Instead of using this, please use `.append_simulations()`. Please consult
+        release notes to see how you can update your code:
+        https://github.com/mackelab/sbi/releases/tag/v0.14.0
+        More information can be found under the corresponding pull request on github:
         https://github.com/mackelab/sbi/pull/378
         and tutorials:
         https://www.mackelab.org/sbi/tutorial/02_flexible_interface/
-        for further information.
 
         Provide external $\theta$ and $x$ to be used for training later on.
 
@@ -189,15 +208,18 @@ class NeuralInference(ABC):
                 that the data came from the first round, i.e. the prior.
         """
         raise NameError(
-            ".provide_presimulated() is deprecated since sbi version 0.14.0. Instead, "
-            "simply pass theta and x to .__call__(). Please consult the corresponding "
-            "pull request on github: https://github.com/mackelab/sbi/pull/378 "
-            "and tutorials: "
-            "https://www.mackelab.org/sbi/tutorial/02_flexible_interface/ for further "
-            "information."
+            f"Deprecated since sbi 0.14.0. "
+            f"Instead of using this, please use `.append_simulations()`. Please "
+            f"consult release notes to see how you can update your code: "
+            f"https://github.com/mackelab/sbi/releases/tag/v0.14.0"
+            f"More information can be found under the corresponding pull request on "
+            f"github: "
+            f"https://github.com/mackelab/sbi/pull/378"
+            f"and tutorials: "
+            f"https://www.mackelab.org/sbi/tutorial/02_flexible_interface/",
         )
 
-    def get_data(
+    def get_simulations(
         self,
         starting_round: int = 0,
         exclude_invalid_x: bool = True,
@@ -219,13 +241,13 @@ class NeuralInference(ABC):
         Returns: Parameters, simulation outputs, prior masks.
         """
 
-        theta = get_data_since_round(
+        theta = get_simulations_since_round(
             self._theta_roundwise, self._data_round_index, starting_round
         )
-        x = get_data_since_round(
+        x = get_simulations_since_round(
             self._x_roundwise, self._data_round_index, starting_round
         )
-        prior_masks = get_data_since_round(
+        prior_masks = get_simulations_since_round(
             self._prior_masks, self._data_round_index, starting_round
         )
 
@@ -432,9 +454,10 @@ def simulate_for_sbi(
     r"""
     Returns ($\theta, x$) pairs obtained from sampling the proposal and simulating.
 
-    This function performs two steps:<br/>
-    1) Sample parameters $\theta$ from the `proposal`.<br/>
-    2) Simulate these parameters to obtain $x$.
+    This function performs two steps:
+
+    - Sample parameters $\theta$ from the `proposal`.
+    - Simulate these parameters to obtain $x$.
 
     Args:
         simulator: A function that takes parameters $\theta$ and maps them to
@@ -467,7 +490,7 @@ def simulate_for_sbi(
     return theta, x
 
 
-def check_if_proposal_has_default_x(proposal):
+def check_if_proposal_has_default_x(proposal: Any):
     """
     Check for validity of the provided proposal distribution.
 
