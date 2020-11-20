@@ -403,16 +403,6 @@ class NeuralInference(ABC):
                 global_step=round_ + 1,
             )
 
-        # Plot most recently sampled parameters.
-        # XXX: need more plotting kwargs, e.g., prior limits.
-        parameters = theta_bank
-
-        figure, axes = pairplot(parameters.to("cpu").numpy())
-
-        self._summary_writer.add_figure(
-            tag="posterior_samples", figure=figure, global_step=round_ + 1
-        )
-
         # Add most recent training stats to summary writer.
         self._summary_writer.add_scalar(
             tag="epochs_trained",
