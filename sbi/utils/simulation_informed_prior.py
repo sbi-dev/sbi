@@ -11,6 +11,7 @@ from tqdm.auto import tqdm
 
 from sbi.types import Shape
 from sbi.utils import handle_invalid_x
+from sbi.utils.sbiutils import standardizing_net
 
 # TODO: why not integrate this into the `simulate_for_sbi` function? Because I would
 #  not use it in this way due to offline simulations. So, I would have to build a
@@ -26,33 +27,72 @@ from sbi.utils import handle_invalid_x
 # simulation_informed_prior = rej_classifier.build_sip(prior, rej_classifier)
 
 
+def build_input_layer(
+    batch_x: Tensor = None,
+    z_score_x: bool = True,
+    embedding_net_x: nn.Module = nn.Identity(),
+) -> nn.Module:
+    """Builds input layer for classifiers that optionally z-scores.
+
+    In SNRE, the classifier will receive batches of thetas and xs.
+
+    Args:
+        batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
+        z_score_x: Whether to z-score xs passing into the network.
+        hidden_features: Number of hidden features.
+        embedding_net_x: Optional embedding network for x.
+
+    Returns:
+        Input layer that optionally z-scores.
+    """
+    if z_score_x:
+        input_layer = nn.Sequential(standardizing_net(batch_x), embedding_net_x)
+    else:
+        input_layer = embedding_net_x
+
+    return input_layer
+
+
 class RejectionClassifier:
     def __init__(
         self,
-        theta_dim: int,
         hidden_features: int = 100,
         num_blocks: int = 5,
         dropout_probability: float = 0.5,
+        z_score: bool = True,
+        embedding_net: nn.Module = nn.Identity(),
     ):
         """
         Classifier that can be trained to reject invalid data.
 
         Args:
-            theta_dim: Dimensionality of the parameter space.
             hidden_features: Number of hidden units.
             num_blocks: Number of hidden layers.
             dropout_probability: Dropout probability.
+            z_score: Whether to z-score the parameters used to train the classifier.
+            embedding_net: Neural network used to encode the parameters before they are
+                passed to the ResNet.
         """
-        self._classifier = nets.ResidualNet(
-            in_features=theta_dim,
-            out_features=1,
-            hidden_features=hidden_features,
-            context_features=None,
-            num_blocks=num_blocks,
-            activation=relu,
-            dropout_probability=dropout_probability,
-            use_batch_norm=True,
-        )
+        self._classifier = None
+
+        def build_nn(theta):
+            classifier = nets.ResidualNet(
+                in_features=theta.shape[1],
+                out_features=1,
+                hidden_features=hidden_features,
+                context_features=None,
+                num_blocks=num_blocks,
+                activation=relu,
+                dropout_probability=dropout_probability,
+                use_batch_norm=True,
+            )
+            input_layer = build_input_layer(theta, z_score, embedding_net)
+            classifier = nn.Sequential(input_layer, classifier)
+
+            return classifier
+
+        self._build_nn = build_nn
+
         self._theta_roundwise = []
         self._x_roundwise = []
 
@@ -102,6 +142,8 @@ class RejectionClassifier:
             reweighing factor for bad simulations, (1-reweigh_factor) will be the
             factor for good simulations.
         """
+        if self._classifier is None:
+            self._classifier = self._build_nn
 
         self._theta_roundwise.append(theta)
         self._x_roundwise.append(x)

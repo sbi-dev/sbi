@@ -27,10 +27,7 @@ from sbi.utils.sbiutils import (
     warn_on_invalid_x_for_snpec_leakage,
     x_shape_from_simulation,
 )
-from sbi.utils.simulation_informed_prior import (
-    RejectionClassifier,
-    build_rejection_classifier,
-)
+from sbi.utils.simulation_informed_prior import RejectionClassifier
 from sbi.utils.torchutils import (
     BoxUniform,
     cbrt,
