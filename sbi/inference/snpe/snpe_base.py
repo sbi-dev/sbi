@@ -19,6 +19,7 @@ from sbi.inference import NeuralInference, check_if_proposal_has_default_x
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.types import TorchModule
 from sbi.utils import (
+    RestrictedPrior,
     check_estimator_arg,
     test_posterior_net_for_multi_d_x,
     validate_theta_and_x,
@@ -108,7 +109,13 @@ class PosteriorEstimator(NeuralInference, ABC):
         validate_theta_and_x(theta, x)
         self._check_proposal(proposal)
 
-        if proposal is None or proposal is self._prior:
+        if (
+            proposal is None
+            or proposal is self._prior
+            or (
+                isinstance(proposal, RestrictedPrior) and proposal._prior is self._prior
+            )
+        ):
             # The `_data_round_index` will later be used to infer if one should train
             # with MLE loss or with atomic loss (see, in `train()`:
             # self._round = max(self._data_round_index))
@@ -180,7 +187,6 @@ class PosteriorEstimator(NeuralInference, ABC):
         max_num_epochs = 2 ** 31 - 1 if max_num_epochs is None else max_num_epochs
 
         # Load data from most recent round.
-        self._round = max(self._data_round_index)
         theta, x, _ = self.get_simulations(self._round, exclude_invalid_x, False)
 
         # First round or if retraining from scratch:
@@ -414,7 +420,16 @@ class PosteriorEstimator(NeuralInference, ABC):
         if proposal is not None:
             check_if_proposal_has_default_x(proposal)
 
-            if (
+            if isinstance(proposal, RestrictedPrior):
+                if proposal._prior is not self._prior:
+                    warn(
+                        "The proposal you passed is a `RestrictedPrior`, but the "
+                        "proposal distribution it uses is not the prior (it can be "
+                        "accessed via `RestrictedPrior._prior`). We do not "
+                        "recommend to mix the `RestrictedPrior` with multi-round "
+                        "SNPE."
+                    )
+            elif (
                 not isinstance(proposal, DirectPosterior)
                 and proposal is not self._prior
             ):

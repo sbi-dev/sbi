@@ -11,6 +11,7 @@ from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     samples_true_posterior_linear_gaussian_uniform_prior,
 )
+from sbi.utils import RestrictionEstimator
 from sbi.utils.sbiutils import handle_invalid_x
 from tests.test_utils import check_c2st
 
@@ -83,3 +84,57 @@ def test_inference_with_nan_simulator(
 
     # Compute the c2st and assert it is near chance level of 0.5.
     check_c2st(samples, target_samples, alg=f"{method}")
+
+
+@pytest.mark.slow
+def test_inference_with_rejection_estimator(set_seed):
+
+    # likelihood_mean will be likelihood_shift+theta
+    num_dim = 3
+    likelihood_shift = -1.0 * ones(num_dim)
+    likelihood_cov = 0.3 * eye(num_dim)
+    x_o = zeros(1, num_dim)
+    num_samples = 500
+    num_simulations = 2000
+
+    def linear_gaussian_nan(
+        theta, likelihood_shift=likelihood_shift, likelihood_cov=likelihood_cov
+    ):
+        condition = theta[:, 0] < 0.0
+        x = linear_gaussian(theta, likelihood_shift, likelihood_cov)
+        x[condition] = float("nan")
+
+        return x
+
+    prior = utils.BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
+    target_samples = samples_true_posterior_linear_gaussian_uniform_prior(
+        x_o,
+        likelihood_shift=likelihood_shift,
+        likelihood_cov=likelihood_cov,
+        num_samples=num_samples,
+        prior=prior,
+    )
+
+    simulator, prior = prepare_for_sbi(linear_gaussian_nan, prior)
+    rejection_estimator = RestrictionEstimator(prior=prior)
+    proposals = [prior]
+    num_rounds = 2
+
+    for r in range(num_rounds):
+        theta, x = simulate_for_sbi(simulator, proposals[-1], 500)
+        rejection_estimator.append_simulations(theta, x)
+        if r < num_rounds - 1:
+            _ = rejection_estimator.train()
+        proposals.append(rejection_estimator.restrict_prior())
+
+    all_theta, all_x, _ = rejection_estimator.get_simulations()
+
+    # Any method can be used in combination with the `RejectionEstimator`.
+    inference = SNPE_C(prior=prior)
+    _ = inference.append_simulations(all_theta, all_x).train()
+    posterior = inference.build_posterior().set_default_x(x_o)
+
+    samples = posterior.sample((num_samples,))
+
+    # Compute the c2st and assert it is near chance level of 0.5.
+    check_c2st(samples, target_samples, alg=f"{SNPE_C}")
