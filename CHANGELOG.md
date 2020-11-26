@@ -23,6 +23,7 @@ posterior = inference.build_posterior(density_estimator)  # MCMC kwargs go here.
 ```
 More information can be found here [here](https://www.mackelab.org/sbi/tutorial/02_flexible_interface/).
 - Fixed typo in docs for `infer` (thanks @glouppe, #370)
+- Added `RestrictionEstimator` to learn regions of bad simulation outputs (#390)
 
 
 # v0.13.2

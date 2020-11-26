@@ -12,6 +12,7 @@ from sbi.utils.conditional_density import (
 from sbi.utils.get_nn_models import classifier_nn, likelihood_nn, posterior_nn
 from sbi.utils.io import get_data_root, get_log_root, get_project_root
 from sbi.utils.plot import conditional_pairplot, pairplot
+from sbi.utils.restriction_estimator import RestrictedPrior, RestrictionEstimator
 from sbi.utils.sbiutils import (
     batched_mixture_mv,
     batched_mixture_vmv,

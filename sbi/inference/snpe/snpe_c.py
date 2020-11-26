@@ -150,12 +150,14 @@ class SNPE_C(PosteriorEstimator):
             locals(), entries=("self", "__class__", "num_atoms", "use_combined_loss")
         )
 
-        # Set the proposal to the last proposal that was passed by the user. For atomic
-        # SNPE, it does not matter what the proposal is. For non-atomic SNPE, we only
-        # use the latest data that was passed, i.e. the one from the last proposal.
-        proposal = self._proposal_roundwise[-1]
+        self._round = max(self._data_round_index)
 
-        if proposal is not None and proposal is not self._prior:
+        if self._round > 0:
+            # Set the proposal to the last proposal that was passed by the user. For
+            # atomic SNPE, it does not matter what the proposal is. For non-atomic
+            # SNPE, we only use the latest data that was passed, i.e. the one from the
+            # last proposal.
+            proposal = self._proposal_roundwise[-1]
             if hasattr(proposal, "net"):
                 self.use_non_atomic_loss = (
                     isinstance(proposal.net._distribution, mdn)
