@@ -1,7 +1,13 @@
 import logging
-from typing import Callable, Optional, Union, Tuple, Union
+from typing import (
+    Callable,
+    Optional,
+    Union,
+    Tuple,
+)
 
 import torch
+import numpy as np
 from numpy import ndarray
 from pyro.distributions import Uniform
 from pyro.distributions.empirical import Empirical
@@ -103,7 +109,7 @@ class SMCABC(ABCBASE):
         num_simulations: int,
         epsilon_decay: float,
         distance_based_decay: bool = False,
-        ess_min: float = 0.5,
+        ess_min: float = None,
         kernel_variance_scale: float = 1.0,
         use_last_pop_samples: bool = True,
         return_summary: bool = False,
@@ -139,7 +145,7 @@ class SMCABC(ABCBASE):
         self.num_simulations = num_simulations
 
         # run initial population
-        particles, epsilon, distances = self._set_xo_and_sample_initial_population(
+        particles, epsilon, distances, x = self._set_xo_and_sample_initial_population(
             x_o, num_particles, num_initial_pop
         )
         log_weights = torch.log(1 / num_particles * ones(num_particles))
@@ -155,6 +161,7 @@ class SMCABC(ABCBASE):
         all_log_weights = [log_weights]
         all_distances = [distances]
         all_epsilons = [epsilon]
+        all_x = [x]
 
         while self.simulation_counter < num_simulations:
 
@@ -175,11 +182,12 @@ class SMCABC(ABCBASE):
                 num_samples=1000,
                 kernel_variance_scale=kernel_variance_scale,
             )
-            particles, log_weights, distances = self._sample_next_population(
+            particles, log_weights, distances, x = self._sample_next_population(
                 particles=all_particles[pop_idx - 1],
                 log_weights=all_log_weights[pop_idx - 1],
                 distances=all_distances[pop_idx - 1],
                 epsilon=epsilon,
+                x=all_x[pop_idx - 1],
                 use_last_pop_samples=use_last_pop_samples,
             )
 
@@ -201,6 +209,7 @@ class SMCABC(ABCBASE):
             all_log_weights.append(log_weights)
             all_distances.append(distances)
             all_epsilons.append(epsilon)
+            all_x.append(x)
 
         posterior = Empirical(all_particles[-1], log_weights=all_log_weights[-1])
 
@@ -212,6 +221,7 @@ class SMCABC(ABCBASE):
                     weights=all_log_weights,
                     epsilons=all_epsilons,
                     distances=all_distances,
+                    xs=all_x,
                 ),
             )
         else:
@@ -242,7 +252,12 @@ class SMCABC(ABCBASE):
         if not torch.isfinite(initial_epsilon):
             initial_epsilon = 1e8
 
-        return particles, initial_epsilon, distances[sortidx][:num_particles]
+        return (
+            particles,
+            initial_epsilon,
+            distances[sortidx][:num_particles],
+            x[sortidx][:num_particles],
+        )
 
     def _sample_next_population(
         self,
@@ -250,6 +265,7 @@ class SMCABC(ABCBASE):
         log_weights: Tensor,
         distances: Tensor,
         epsilon: float,
+        x: Tensor,
         use_last_pop_samples: bool = True,
     ) -> Tuple[Tensor, Tensor, Tensor]:
         """Return particles, weights and distances of new population."""
@@ -257,6 +273,7 @@ class SMCABC(ABCBASE):
         new_particles = []
         new_log_weights = []
         new_distances = []
+        new_x = []
 
         num_accepted_particles = 0
         num_particles = particles.shape[0]
@@ -274,8 +291,8 @@ class SMCABC(ABCBASE):
                 particles, torch.exp(log_weights), num_samples=num_batch
             )
             # Simulate and select based on distance.
-            x = self._simulate_with_budget(particle_candidates)
-            dists = self.distance(self.x_o, x)
+            x_candidates = self._simulate_with_budget(particle_candidates)
+            dists = self.distance(self.x_o, x_candidates)
             is_accepted = dists <= epsilon
             num_accepted_batch = is_accepted.sum().item()
 
@@ -287,6 +304,7 @@ class SMCABC(ABCBASE):
                     )
                 )
                 new_distances.append(dists[is_accepted])
+                new_x.append(x_candidates[is_accepted])
                 num_accepted_particles += num_accepted_batch
 
             # If simulation budget was exceeded and we still need particles, take
@@ -311,6 +329,7 @@ class SMCABC(ABCBASE):
                         )
                     ]
                     new_distances.append(distances[:num_remaining])
+                    new_x.append(x[:num_remaining])
                 else:
                     self.logger.info(
                         "Simulation Budget exceeded, returning previous population."
@@ -318,6 +337,7 @@ class SMCABC(ABCBASE):
                     new_particles = [particles]
                     new_log_weights = [log_weights]
                     new_distances = [distances]
+                    new_x = [x]
 
                 break
 
@@ -325,11 +345,20 @@ class SMCABC(ABCBASE):
         new_particles = torch.cat(new_particles)
         new_log_weights = torch.cat(new_log_weights)
         new_distances = torch.cat(new_distances)
+        new_x = torch.cat(new_x)
 
         # normalize the new weights
         new_log_weights -= torch.logsumexp(new_log_weights, dim=0)
 
-        return new_particles, new_log_weights, new_distances
+        # Return sorted wrt distances.
+        sort_idx = torch.argsort(new_distances)
+
+        return (
+            new_particles[sort_idx],
+            new_log_weights[sort_idx],
+            new_distances[sort_idx],
+            new_x[sort_idx],
+        )
 
     def _get_next_epsilon(self, distances: Tensor, quantile: float) -> float:
         """Return epsilon for next round based on quantile of this round's distances.
