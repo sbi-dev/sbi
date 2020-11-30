@@ -192,9 +192,9 @@ class SMCABC(ABCBASE):
             )
 
             # Resample population if effective sampling size is too small.
-            if self.algorithm_variant == "B":
+            if ess_min is not None:
                 particles, log_weights = self.resample_if_ess_too_small(
-                    particles, log_weights, num_particles, ess_min, pop_idx
+                    particles, log_weights, ess_min, pop_idx
                 )
 
             self.logger.info(
@@ -531,22 +531,18 @@ class SMCABC(ABCBASE):
             raise ValueError(f"Kernel, '{self.kernel}' not supported.")
 
     def resample_if_ess_too_small(
-        self,
-        particles: Tensor,
-        log_weights: Tensor,
-        num_particles: int,
-        ess_min: float,
-        pop_idx: int,
+        self, particles: Tensor, log_weights: Tensor, ess_min: float, pop_idx: int,
     ) -> Tuple[Tensor, Tensor]:
         """Return resampled particles and uniform weights if effectice sampling size is
         too small.
         """
 
+        num_particles = particles.shape[0]
         ess = (1 / torch.sum(torch.exp(2.0 * log_weights), dim=0)) / num_particles
         # Resampling of weights for low ESS only for Sisson et al. 2007.
         if ess < ess_min:
             self.logger.info(f"ESS={ess:.2f} too low, resampling pop {pop_idx}...")
-            # First resample, then set to uniform weights in in Sisson et al. 2007.
+            # First resample, then set to uniform weights as in Sisson et al. 2007.
             particles = self.sample_from_population_with_weights(
                 particles, torch.exp(log_weights), num_samples=num_particles
             )
