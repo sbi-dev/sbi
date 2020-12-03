@@ -113,6 +113,11 @@ class SMCABC(ABCBASE):
         kernel_variance_scale: float = 1.0,
         use_last_pop_samples: bool = True,
         return_summary: bool = False,
+        lra: bool = False,
+        lra_with_weights: bool = False,
+        sass: bool = False,
+        sass_fraction: bool = False,
+        sass_expansion_degree: int = 1,
     ) -> Union[Distribution, Tuple[Distribution, dict]]:
         r"""Run SMCABC.
 
@@ -133,6 +138,14 @@ class SMCABC(ABCBASE):
                 is returned.
             return_summary: Whether to return a dictionary with all accepted particles, 
                 weights, etc. at the end.
+            lra: Whether to run linear regression adjustment as in Beaumont et al. 2002
+            lra_with_weights: Whether to run lra as weighted linear regression with SMC
+                weights
+            sass: Whether to determine semi-automatic summary statistics as in
+                Fearnhead & Prangle 2012.
+            sass_fraction: Fraction of simulation budget used for the initial sass run.
+            sass_expansion_degree: Degree of the polynomial feature expansion for the
+                sass regression, default 1 - no expansion.
 
         Returns:
             posterior: Empirical posterior distribution defined by the accepted
@@ -143,6 +156,21 @@ class SMCABC(ABCBASE):
 
         pop_idx = 0
         self.num_simulations = num_simulations
+
+        # Pilot run for SASS.
+        if sass:
+            num_pilot_simulations = int(sass_fraction * num_simulations)
+            sass_transform = self.run_sass_set_xo(
+                num_particles, num_pilot_simulations, x_o, lra, sass_expansion_degree
+            )
+            # Udpate simulator and xo
+            self.x_o = sass_transform(self.x_o)
+
+            def sass_simulator(theta):
+                self.simulation_counter += theta.shape[0]
+                return sass_transform(self._batched_simulator(theta))
+
+            self._simulate_with_budget = sass_simulator
 
         # run initial population
         particles, epsilon, distances, x = self._set_xo_and_sample_initial_population(
@@ -163,7 +191,7 @@ class SMCABC(ABCBASE):
         all_epsilons = [epsilon]
         all_x = [x]
 
-        while self.simulation_counter < num_simulations:
+        while self.simulation_counter < self.num_simulations:
 
             pop_idx += 1
             # Decay based on quantile of distances from previous pop.
@@ -211,7 +239,18 @@ class SMCABC(ABCBASE):
             all_epsilons.append(epsilon)
             all_x.append(x)
 
-        posterior = Empirical(all_particles[-1], log_weights=all_log_weights[-1])
+        # Maybe run LRA and adjust weights.
+        if lra:
+            adjusted_particels, adjusted_weights = self.run_lra_update_weights(
+                particles=all_particles[-1],
+                xs=all_x[-1],
+                observation=x_o,
+                log_weights=all_log_weights[-1],
+                lra_with_weights=lra_with_weights,
+            )
+            posterior = Empirical(adjusted_particels, log_weights=adjusted_weights)
+        else:
+            posterior = Empirical(all_particles[-1], log_weights=all_log_weights[-1])
 
         if return_summary:
             return (
@@ -477,7 +516,7 @@ class SMCABC(ABCBASE):
             if self.algorithm_variant == "C":
                 # Calculate weighted covariance of particles.
                 population_cov = torch.tensor(
-                    np.cov(particles, rowvar=False, aweights=weights),
+                    np.atleast_2d(np.cov(particles, rowvar=False, aweights=weights)),
                     dtype=torch.float32,
                 )
                 # Make sure variance is not singular.
@@ -549,3 +588,65 @@ class SMCABC(ABCBASE):
             log_weights = torch.log(1 / num_particles * ones(num_particles))
 
         return particles, log_weights
+
+    def run_lra_update_weights(
+        self,
+        particles: Tensor,
+        xs: Tensor,
+        observation: Tensor,
+        log_weights: Tensor,
+        lra_with_weights: bool,
+    ) -> Tuple[Tensor, Tensor]:
+        """Return particles and weights adjusted with LRA.
+
+        Runs (weighted) linear regression from xs onto particles to adjust the
+        particles.
+
+        Updates the SMC weights according to the new particles.
+        """
+
+        adjusted_particels = self.run_lra(
+            theta=particles,
+            x=xs,
+            observation=observation,
+            sample_weight=log_weights.exp() if lra_with_weights else None,
+        )
+
+        # Update SMC weights with LRA adjusted weights
+        adjusted_log_weights = self._calculate_new_log_weights(
+            new_particles=adjusted_particels,
+            old_particles=particles,
+            old_log_weights=log_weights,
+        )
+
+        return adjusted_particels, adjusted_log_weights
+
+    def run_sass_set_xo(
+        self,
+        num_particles: int,
+        num_pilot_simulations: int,
+        x_o,
+        lra: bool = False,
+        sass_expansion_degree: int = 1,
+    ) -> Callable:
+        """Return transform for semi-automatic summary statistics.
+
+        Runs an single round of rejection abc with fixed budget and accepts 
+        num_particles simulations to run the regression for sass.
+
+        Sets self.x_o once the x_shape can be derived from simulations.
+        """
+        (pilot_particles, _, _, pilot_xs,) = self._set_xo_and_sample_initial_population(
+            x_o, num_particles, num_pilot_simulations
+        )
+        # Adjust with LRA.
+        if lra:
+            pilot_particles = self.run_lra(pilot_particles, pilot_xs, self.x_o)
+        sass_transform = self.get_sass_transform(
+            pilot_particles,
+            pilot_xs,
+            expansion_degree=sass_expansion_degree,
+            sample_weight=None,
+        )
+        return sass_transform
+
