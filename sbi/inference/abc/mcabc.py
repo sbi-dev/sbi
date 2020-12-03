@@ -64,6 +64,10 @@ class MCABC(ABCBASE):
         quantile: Optional[float] = None,
         return_distances: bool = False,
         return_x_accepted: bool = False,
+        lra: bool = False,
+        sass: bool = False,
+        sass_fraction: bool = False,
+        sass_expansion_degree: int = 1,
     ) -> Union[Distribution, Tuple[Distribution, Tensor]]:
         r"""Run MCABC.
 
@@ -79,6 +83,12 @@ class MCABC(ABCBASE):
                 the accepted parameters.
             return_distances: Whether to return the simulated data corresponding to
                 the accepted parameters.
+            lra: Whether to run linear regression adjustment as in Beaumont et al. 2002
+            sass: Whether to determine semi-automatic summary statistics as in
+                Fearnhead & Prangle 2012.
+            sass_fraction: Fraction of simulation budget used for the initial sass run.
+            sass_expansion_degree: Degree of the polynomial feature expansion for the
+                sass regression, default 1 - no expansion.
 
         Returns:
             posterior: Empirical distribution based on selected parameters.
@@ -89,9 +99,26 @@ class MCABC(ABCBASE):
             quantile is not None
         ), "Eps or quantile must be passed, but not both."
 
+        # Run SASS and change the simulator and x_o accordingly.
+        if sass:
+            num_pilot_samples = int(sass_fraction * num_simulations)
+            num_simulations -= num_pilot_samples
+
+            pilot_theta = self.prior.sample((num_pilot_samples,))
+            pilot_x = self._batched_simulator(pilot_theta)
+
+            sass_transform = self.get_sass_transform(
+                pilot_theta, pilot_x, sass_expansion_degree
+            )
+
+            simulator = lambda theta: sass_transform(self._batched_simulator(theta))
+            x_o = sass_transform(x_o)
+        else:
+            simulator = self._batched_simulator
+
         # Simulate and calculate distances.
         theta = self.prior.sample((num_simulations,))
-        x = self._batched_simulator(theta)
+        x = simulator(theta)
 
         # Infer shape of x to test and set x_o.
         self.x_shape = x[0].unsqueeze(0).shape
@@ -120,7 +147,14 @@ class MCABC(ABCBASE):
         else:
             raise ValueError("One of epsilon or quantile has to be passed.")
 
-        posterior = Empirical(theta_accepted, log_weights=ones(theta_accepted.shape[0]))
+        # Maybe adjust theta with LRA.
+        theta_adjusted = (
+            self.run_lra(theta_accepted, x_accepted, observation=self.x_o)
+            if lra
+            else theta_accepted
+        )
+
+        posterior = Empirical(theta_adjusted, log_weights=ones(theta_accepted.shape[0]))
 
         if return_distances and return_x_accepted:
             return posterior, distances_accepted, x_accepted

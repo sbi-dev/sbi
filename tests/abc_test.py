@@ -12,7 +12,9 @@ from tests.test_utils import check_c2st
 
 
 @pytest.mark.parametrize("num_dim", (1, 2))
-def test_mcabc_inference_on_linear_gaussian(num_dim):
+def test_mcabc_inference_on_linear_gaussian(
+    num_dim, lra=False, sass=False, sass_expansion_degree=1, sass_fraction=0.5
+):
     x_o = zeros((1, num_dim))
     num_samples = 1000
 
@@ -33,9 +35,32 @@ def test_mcabc_inference_on_linear_gaussian(num_dim):
 
     infer = ABC(simulator, prior, simulation_batch_size=10000)
 
-    phat = infer(x_o, 100000, quantile=0.01)
+    phat = infer(
+        x_o,
+        100000,
+        quantile=0.01,
+        linear_regression_adjustment=lra,
+        sass=sass,
+        sass_expansion_degree=sass_expansion_degree,
+        sass_fraction=sass_fraction,
+    )
 
     check_c2st(phat.sample((num_samples,)), target_samples, alg="MCABC")
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("lra", (True, False))
+@pytest.mark.parametrize("sass_fraction", (0.1, 0.33))
+@pytest.mark.parametrize("sass_expansion_degree", (1, 2))
+def test_mcabc_sass_lra(lra, sass_fraction, sass_expansion_degree):
+
+    test_mcabc_inference_on_linear_gaussian(
+        num_dim=2,
+        lra=lra,
+        sass=True,
+        sass_fraction=sass_fraction,
+        sass_expansion_degree=sass_expansion_degree,
+    )
 
 
 @pytest.mark.parametrize("num_dim", (1, 2))
