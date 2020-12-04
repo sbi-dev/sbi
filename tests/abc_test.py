@@ -39,7 +39,7 @@ def test_mcabc_inference_on_linear_gaussian(
         x_o,
         100000,
         quantile=0.01,
-        linear_regression_adjustment=lra,
+        lra=lra,
         sass=sass,
         sass_expansion_degree=sass_expansion_degree,
         sass_fraction=sass_fraction,
