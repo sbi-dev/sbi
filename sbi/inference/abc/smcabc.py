@@ -1,4 +1,3 @@
-import logging
 from typing import (
     Callable,
     Optional,
@@ -92,8 +91,6 @@ class SMCABC(ABCBASE):
         self.simulation_counter = 0
         self.num_simulations = 0
 
-        self.logger = logging.getLogger(__name__)
-
         # Define simulator that keeps track of budget.
         def simulate_with_budget(theta):
             self.simulation_counter += theta.shape[0]
@@ -109,14 +106,14 @@ class SMCABC(ABCBASE):
         num_simulations: int,
         epsilon_decay: float,
         distance_based_decay: bool = False,
-        ess_min: float = None,
+        ess_min: Optional[float] = None,
         kernel_variance_scale: float = 1.0,
         use_last_pop_samples: bool = True,
         return_summary: bool = False,
         lra: bool = False,
         lra_with_weights: bool = False,
         sass: bool = False,
-        sass_fraction: bool = False,
+        sass_fraction: float = 0.25,
         sass_expansion_degree: int = 1,
     ) -> Union[Distribution, Tuple[Distribution, dict]]:
         r"""Run SMCABC.
@@ -130,7 +127,8 @@ class SMCABC(ABCBASE):
             distance_based_decay: Whether the $\epsilon$ decay is constant over
                 populations or calculated from the previous populations distribution of
                 distances.
-            ess_min: Threshold of effective sampling size for resampling weights.
+            ess_min: Threshold of effective sampling size for resampling weights. Not
+                used when None (default).
             kernel_variance_scale: Factor for scaling the perturbation kernel variance.
             use_last_pop_samples: Whether to fill up the current population with
                 samples from the previous population when the budget is used up. If
@@ -160,6 +158,9 @@ class SMCABC(ABCBASE):
         # Pilot run for SASS.
         if sass:
             num_pilot_simulations = int(sass_fraction * num_simulations)
+            self.logger.info(
+                f"Running SASS with {num_pilot_simulations} pilot samples."
+            )
             sass_transform = self.run_sass_set_xo(
                 num_particles, num_pilot_simulations, x_o, lra, sass_expansion_degree
             )
@@ -241,6 +242,7 @@ class SMCABC(ABCBASE):
 
         # Maybe run LRA and adjust weights.
         if lra:
+            self.logger.info("Running Linear regression adjustment.")
             adjusted_particels, adjusted_weights = self.run_lra_update_weights(
                 particles=all_particles[-1],
                 xs=all_x[-1],

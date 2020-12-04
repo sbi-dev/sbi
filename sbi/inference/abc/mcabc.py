@@ -66,7 +66,7 @@ class MCABC(ABCBASE):
         return_x_accepted: bool = False,
         lra: bool = False,
         sass: bool = False,
-        sass_fraction: bool = False,
+        sass_fraction: float = 0.25,
         sass_expansion_degree: int = 1,
     ) -> Union[Distribution, Tuple[Distribution, Tensor]]:
         r"""Run MCABC.
@@ -101,10 +101,13 @@ class MCABC(ABCBASE):
 
         # Run SASS and change the simulator and x_o accordingly.
         if sass:
-            num_pilot_samples = int(sass_fraction * num_simulations)
-            num_simulations -= num_pilot_samples
+            num_pilot_simulations = int(sass_fraction * num_simulations)
+            self.logger.info(
+                f"Running SASS with {num_pilot_simulations} pilot samples."
+            )
+            num_simulations -= num_pilot_simulations
 
-            pilot_theta = self.prior.sample((num_pilot_samples,))
+            pilot_theta = self.prior.sample((num_pilot_simulations,))
             pilot_x = self._batched_simulator(pilot_theta)
 
             sass_transform = self.get_sass_transform(
@@ -148,11 +151,13 @@ class MCABC(ABCBASE):
             raise ValueError("One of epsilon or quantile has to be passed.")
 
         # Maybe adjust theta with LRA.
-        theta_adjusted = (
-            self.run_lra(theta_accepted, x_accepted, observation=self.x_o)
-            if lra
-            else theta_accepted
-        )
+        if lra:
+            self.logger.info("Running Linear regression adjustment.")
+            theta_adjusted = self.run_lra(
+                theta_accepted, x_accepted, observation=self.x_o
+            )
+        else:
+            theta_adjusted = theta_accepted
 
         posterior = Empirical(theta_adjusted, log_weights=ones(theta_accepted.shape[0]))
 

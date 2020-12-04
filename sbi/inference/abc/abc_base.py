@@ -1,6 +1,7 @@
 from abc import ABC
 from typing import Callable, Union
 
+import logging
 import numpy as np
 import torch
 from torch import Tensor
@@ -62,6 +63,8 @@ class ABCBASE(ABC):
             show_progress_bars=self._show_progress_bars,
         )
 
+        self.logger = logging.getLogger(__name__)
+
     @staticmethod
     def choose_distance_function(distance_type: str = "l2") -> Callable:
         """Return distance function for given distance type."""
@@ -92,13 +95,18 @@ class ABCBASE(ABC):
         return distance_fun
 
     @staticmethod
-    def get_sass_transform(theta, x, expansion_degree=1, sample_weight=None):
+    def get_sass_transform(
+        theta: torch.Tensor,
+        x: torch.Tensor,
+        expansion_degree: int = 1,
+        sample_weight=None,
+    ) -> Callable:
         """Return semi-automatic summary statitics function.
 
-        Running weighted linear regressin as in 
+        Running weighted linear regressin as in
         Fearnhead & Prandle 2012: https://arxiv.org/abs/1004.1112
-        
-        Following implementation in 
+
+        Following implementation in
         https://abcpy.readthedocs.io/en/latest/_modules/abcpy/statistics.html#Identity
         and
         https://pythonhosted.org/abcpy/_modules/abcpy/summaryselections.html#Semiautomatic
@@ -129,8 +137,11 @@ class ABCBASE(ABC):
         x: torch.Tensor,
         observation: torch.Tensor,
         sample_weight=None,
-    ):
-        """Return LRA adjusted parameters."""
+    ) -> torch.Tensor:
+        """Return parameters adjusted with linear regression adjustment.
+
+        Implementation as in Beaumont et al. 2002: https://arxiv.org/abs/1707.01254
+        """
 
         theta_adjusted = theta
         for parameter_idx in range(theta.shape[1]):
