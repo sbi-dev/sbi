@@ -1,4 +1,5 @@
 # v0.14.0
+
 - New flexible interface API (#378). This is going to be a breaking change for users of 
 the flexible interface and you will have to change your code. Old syntax:
 ```python
@@ -23,8 +24,11 @@ posterior = inference.build_posterior(density_estimator)  # MCMC kwargs go here.
 ```
 More information can be found here [here](https://www.mackelab.org/sbi/tutorial/02_flexible_interface/).
 - Fixed typo in docs for `infer` (thanks @glouppe, #370)
-- Added `RestrictionEstimator` to learn regions of bad simulation outputs (#390)
-
+- New `RestrictionEstimator` to learn regions of bad simulation outputs (#390)
+- Improvements for and new ABC methods (#395)
+    - Linear regression adjustment as in Beaumont et al. 2002 for both MCABC and SMCABC
+    - Semi-automatic summary statistics as in Fearnhead & Prangle 2012 for both MCABC and SMCABC
+    - Small fixes to perturbation kernel covariance estimation in SMCABC.
 
 # v0.13.2
 
