@@ -189,7 +189,7 @@ class RestrictionEstimator:
         self._data_round_index = []
         self._validation_log_probs = []
 
-    def append_simulations(self, theta: Tensor, x: Tensor,) -> "RestrictionEstimator":
+    def append_simulations(self, theta: Tensor, x: Tensor) -> "RestrictionEstimator":
         r"""
         Store parameters and simulation outputs to use them for training later.
         Data ar stored as entries in lists for each type of variable (parameter/data).
@@ -330,9 +330,11 @@ class RestrictionEstimator:
         if self._classifier is None:
             self._classifier = self._build_nn(theta[train_indices])
 
-        # We have to save them in order to be able to tune the classifier threshold.
-        self._last_validation_theta = theta[val_indices]
-        self._last_validation_label = label[val_indices]
+        # If we are in the first round, save the validation data in order to be able to
+        # tune the classifier threshold.
+        if max(self._data_round_index) == 0:
+            self._first_round_validation_theta = theta[val_indices]
+            self._first_round_validation_label = label[val_indices]
 
         optimizer = optim.Adam(list(self._classifier.parameters()), lr=learning_rate,)
         max_num_epochs = 2 ** 31 - 1 if max_num_epochs is None else max_num_epochs
@@ -428,8 +430,8 @@ class RestrictionEstimator:
         return RestrictedPrior(
             self._prior,
             classifier,
-            self._last_validation_theta,
-            self._last_validation_label,
+            self._first_round_validation_theta,
+            self._first_round_validation_label,
             allowed_false_negatives,
         )
 
