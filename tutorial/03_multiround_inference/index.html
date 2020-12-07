@@ -231,11 +231,6 @@
     </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="../06_provide_presimulated/" title="Providing presimulated data">
-      Providing presimulated data
-    </a>
-</li>
-<li class="md-nav__item">
 <a class="md-nav__link" href="../07_conditional_distributions/" title="Conditional distributions">
       Conditional distributions
     </a>
@@ -332,16 +327,21 @@
 <p>Running multi-round inference can be more efficient in the number of simulations, but it will lead to the posterior no longer being amortized (i.e. it will be accurate only for a specific observation <code>x_o</code>, not for any <code>x</code>).</p>
 <p>Note, you can find the original version of this notebook at <a href="https://github.com/mackelab/sbi/blob/main/tutorials/03_multiround_inference.ipynb">https://github.com/mackelab/sbi/blob/main/tutorials/03_multiround_inference.ipynb</a> in the <code>sbi</code> repository.</p>
 <h2 id="main-syntax">Main syntax<a class="headerlink" href="#main-syntax" title="Permanent link">¶</a></h2>
-<div class="highlight"><pre><span></span><code><span class="c1"># 2 rounds: first round simulates from the prior, second round simulates from the obtained posterior.</span>
+<div class="highlight"><pre><span></span><code><span class="c1"># 2 rounds: first round simulates from the prior, second round simulates parameter set </span>
+<span class="c1"># that were sampled from the obtained posterior.</span>
 <span class="n">num_rounds</span> <span class="o">=</span> <span class="mi">2</span>
 <span class="c1"># The specific observation we want to focus the inference on.</span>
 <span class="n">x_o</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="p">,)</span>
 
 <span class="n">posteriors</span> <span class="o">=</span> <span class="p">[]</span>
-<span class="n">proposal</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="n">proposal</span> <span class="o">=</span> <span class="n">prior</span>
 
 <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_rounds</span><span class="p">):</span>
-    <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="p">(</span><span class="n">num_simulations</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">proposal</span><span class="o">=</span><span class="n">proposal</span><span class="p">)</span>
+    <span class="n">theta</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="n">simulate_for_sbi</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">proposal</span><span class="p">,</span> <span class="n">num_simulations</span><span class="o">=</span><span class="mi">500</span><span class="p">)</span>
+
+     <span class="c1"># In `SNLE` and `SNRE`, you should not pass the `proposal` to `.append_simulations()`</span>
+    <span class="n">density_estimator</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">proposal</span><span class="o">=</span><span class="n">proposal</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+    <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span><span class="n">density_estimator</span><span class="p">)</span>
     <span class="n">posteriors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">posterior</span><span class="p">)</span>
     <span class="n">proposal</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">x_o</span><span class="p">)</span>
 </code></pre></div>
@@ -349,9 +349,12 @@
 <p>Below, we give a full example of inferring the posterior distribution over multiple rounds.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">torch</span>
 
-<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">SNPE</span><span class="p">,</span> <span class="n">prepare_for_sbi</span>
+<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">SNPE</span><span class="p">,</span> <span class="n">prepare_for_sbi</span><span class="p">,</span> <span class="n">simulate_for_sbi</span>
 <span class="kn">from</span> <span class="nn">sbi.utils.get_nn_models</span> <span class="kn">import</span> <span class="n">posterior_nn</span>
-<span class="kn">import</span> <span class="nn">sbi.utils</span> <span class="k">as</span> <span class="nn">utils</span>
+<span class="kn">from</span> <span class="nn">sbi</span> <span class="kn">import</span> <span class="n">utils</span> <span class="k">as</span> <span class="n">utils</span>
+<span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>&lt;torch._C.Generator at 0x7f094007e490&gt;
 </code></pre></div>
 <p>First, we define a simple prior and simulator and ensure that they comply with <code>sbi</code> by using <code>prepare_for_sbi</code>:</p>
 <div class="highlight"><pre><span></span><code><span class="n">num_dim</span> <span class="o">=</span> <span class="mi">3</span>
@@ -364,17 +367,19 @@
 <div class="highlight"><pre><span></span><code><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span> <span class="o">=</span> <span class="n">prepare_for_sbi</span><span class="p">(</span><span class="n">linear_gaussian</span><span class="p">,</span> <span class="n">prior</span><span class="p">)</span>
 </code></pre></div>
 <p>Then, we instantiate the inference object:</p>
-<div class="highlight"><pre><span></span><code><span class="n">inference</span> <span class="o">=</span> <span class="n">SNPE</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><span class="n">inference</span> <span class="o">=</span> <span class="n">SNPE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">)</span>
 </code></pre></div>
 <p>And we can run inference. In this example, we will run inference over <code>2</code> rounds, potentially leading to a more focused posterior around the observation <code>x_o</code>.</p>
 <div class="highlight"><pre><span></span><code><span class="n">num_rounds</span> <span class="o">=</span> <span class="mi">2</span>
 <span class="n">x_o</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="p">,)</span>
 
 <span class="n">posteriors</span> <span class="o">=</span> <span class="p">[]</span>
-<span class="n">proposal</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="n">proposal</span> <span class="o">=</span> <span class="n">prior</span>
 
 <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_rounds</span><span class="p">):</span>
-    <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="p">(</span><span class="n">num_simulations</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">proposal</span><span class="o">=</span><span class="n">proposal</span><span class="p">)</span>
+    <span class="n">theta</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="n">simulate_for_sbi</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">proposal</span><span class="p">,</span> <span class="n">num_simulations</span><span class="o">=</span><span class="mi">500</span><span class="p">)</span>
+    <span class="n">density_estimator</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">proposal</span><span class="o">=</span><span class="n">proposal</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+    <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span><span class="n">density_estimator</span><span class="p">)</span>
     <span class="n">posteriors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">posterior</span><span class="p">)</span>
     <span class="n">proposal</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">x_o</span><span class="p">)</span>
 </code></pre></div>
@@ -382,8 +387,7 @@
 
 
 
-Neural network successfully converged after 152 epochs.
-Using SNPE-C with atomic loss
+Neural network successfully converged after 194 epochs.
 
 
 
@@ -398,7 +402,8 @@ HBox(children=(FloatProgress(value=0.0, description='Running 500 simulations.', 
 
 
 
-Neural network successfully converged after 32 epochs.
+Using SNPE-C with atomic loss
+Neural network successfully converged after 41 epochs.
 </code></pre></div>
 <p>Note that, for <code>num_rounds&gt;1</code>, the posterior is no longer amortized: it will give good results when sampled around <code>x=observation</code>, but possibly bad results for other <code>x</code>.</p>
 <p>Once we have obtained the posterior, we can <code>.sample()</code>, <code>.log_prob()</code>, or <code>.pairplot()</code> in the same way as for the simple interface.</p>

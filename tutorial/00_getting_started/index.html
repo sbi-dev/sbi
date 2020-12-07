@@ -255,11 +255,6 @@
     </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="../06_provide_presimulated/" title="Providing presimulated data">
-      Providing presimulated data
-    </a>
-</li>
-<li class="md-nav__item">
 <a class="md-nav__link" href="../07_conditional_distributions/" title="Conditional distributions">
       Conditional distributions
     </a>
@@ -377,7 +372,7 @@
 <h1 id="getting-started-with-sbi">Getting started with <code>sbi</code><a class="headerlink" href="#getting-started-with-sbi" title="Permanent link">¶</a></h1>
 <p>Note, you find the original version of this notebook at <a href="https://github.com/mackelab/sbi/blob/main/tutorials/00_getting_started.ipynb">https://github.com/mackelab/sbi/blob/main/tutorials/00_getting_started.ipynb</a> in the <code>sbi</code> repository.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">import</span> <span class="nn">sbi.utils</span> <span class="k">as</span> <span class="nn">utils</span>
+<span class="kn">from</span> <span class="nn">sbi</span> <span class="kn">import</span> <span class="n">utils</span> <span class="k">as</span> <span class="n">utils</span>
 <span class="kn">from</span> <span class="nn">sbi.inference.base</span> <span class="kn">import</span> <span class="n">infer</span>
 </code></pre></div>
 <h2 id="running-the-inference-procedure">Running the inference procedure<a class="headerlink" href="#running-the-inference-procedure" title="Permanent link">¶</a></h2>
@@ -399,7 +394,7 @@
 
 
 
-Neural network successfully converged after 73 epochs.
+Neural network successfully converged after 175 epochs.
 </code></pre></div>
 <p>Let’s say we have made some observation <span class="arithmatex">\(x\)</span>:</p>
 <div class="highlight"><pre><span></span><code><span class="n">observation</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
@@ -435,28 +430,6 @@ Neural network successfully converged after 73 epochs.
 <div class="highlight"><pre><span></span><code><span class="n">posterior</span> <span class="o">=</span> <span class="n">infer</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">'SNPE'</span><span class="p">,</span> <span class="n">num_simulations</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">infer</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">'SNLE'</span><span class="p">,</span> <span class="n">num_simulations</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">infer</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">'SNRE'</span><span class="p">,</span> <span class="n">num_simulations</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
-</code></pre></div>
-<div class="codehilite"><pre><span></span><code>HBox(children=(FloatProgress(value=0.0, description='Running 1000 simulations.', max=1000.0, style=ProgressSty…
-
-
-
-Neural network successfully converged after 99 epochs.
-
-
-
-HBox(children=(FloatProgress(value=0.0, description='Running 1000 simulations.', max=1000.0, style=ProgressSty…
-
-
-
-Neural network successfully converged after 104 epochs.
-
-
-
-HBox(children=(FloatProgress(value=0.0, description='Running 1000 simulations.', max=1000.0, style=ProgressSty…
-
-
-
-Neural network successfully converged after 66 epochs.
 </code></pre></div>
 <p>You can then infer, sample, evaluate, and plot the posterior as described above.</p>
 </article>

@@ -208,6 +208,25 @@
   </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#main-syntax">
+    Main syntax
+  </a>
+<nav aria-label="Main syntax" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#syntax-until-v0132">
+    Syntax until v0.13.2
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#syntax-from-v0140-onwards">
+    Syntax from v0.14.0 onwards
+  </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#linear-gaussian-example">
     Linear Gaussian example
   </a>
@@ -228,11 +247,6 @@
 <li class="md-nav__item">
 <a class="md-nav__link" href="../05_embedding_net/" title="Learning summary statistics">
       Learning summary statistics
-    </a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="../06_provide_presimulated/" title="Providing presimulated data">
-      Providing presimulated data
     </a>
 </li>
 <li class="md-nav__item">
@@ -312,6 +326,25 @@
   </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#main-syntax">
+    Main syntax
+  </a>
+<nav aria-label="Main syntax" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#syntax-until-v0132">
+    Syntax until v0.13.2
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#syntax-from-v0140-onwards">
+    Syntax from v0.14.0 onwards
+  </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#linear-gaussian-example">
     Linear Gaussian example
   </a>
@@ -336,18 +369,39 @@
 <li>performing sequential posterior estimation by focusing on a particular observation over multiple rounds. This can decrease the number of simulations one has to run, but the inference procedure is no longer amortized (<a href="https://www.mackelab.org/sbi/tutorial/03_multiround_inference/">tutorial</a>).    </li>
 <li>specify your own density estimator, or change hyperparameters of existing ones (e.g. number of hidden units for <a href="https://arxiv.org/abs/1906.04032">NSF</a>) (<a href="https://www.mackelab.org/sbi/tutorial/04_density_estimators/">tutorial</a>).    </li>
 <li>use an <code>embedding_net</code> to learn summary features from high-dimensional simulation outputs (<a href="https://www.mackelab.org/sbi/tutorial/05_embedding_net/">tutorial</a>).  </li>
-<li>provide presimulated data (<a href="https://www.mackelab.org/sbi/tutorial/06_provide_presimulated/">tutorial</a>)  </li>
+<li>provide presimulated data  </li>
 <li>run simulations in batches, which can speed up simulations.  </li>
 <li>when it makes sense, choose between different methods to sample from the posterior.  </li>
 <li>use calibration kernels as proposed by <a href="https://arxiv.org/abs/1711.01861">Lueckmann, Goncalves et al. 2017</a>.</li>
 </ul>
+<h2 id="main-syntax">Main syntax<a class="headerlink" href="#main-syntax" title="Permanent link">¶</a></h2>
+<p>The main syntax for the flexible interface was changed in <code>sbi</code> version 0.14.0 (see <a href="https://github.com/mackelab/sbi/pull/378">Github</a> for details). Below, we show the syntax of the flexible interface until and after v0.13.2.</p>
+<h3 id="syntax-until-v0132">Syntax until v0.13.2<a class="headerlink" href="#syntax-until-v0132" title="Permanent link">¶</a></h3>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">SNPE</span><span class="p">,</span> <span class="n">prepare_for_sbi</span>
+
+<span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span> <span class="o">=</span> <span class="n">prepare_for_sbi</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">)</span>
+<span class="n">inference</span> <span class="o">=</span> <span class="n">SNPE</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">)</span>
+
+<span class="c1"># Simulate, train, and build posterior.</span>
+<span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="p">(</span><span class="n">num_simulation</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="syntax-from-v0140-onwards">Syntax from v0.14.0 onwards<a class="headerlink" href="#syntax-from-v0140-onwards" title="Permanent link">¶</a></h3>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">SNPE</span><span class="p">,</span> <span class="n">prepare_for_sbi</span><span class="p">,</span> <span class="n">simulate_for_sbi</span>
+
+<span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span> <span class="o">=</span> <span class="n">prepare_for_sbi</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">)</span>
+<span class="n">inference</span> <span class="o">=</span> <span class="n">SNPE</span><span class="p">(</span><span class="n">prior</span><span class="p">)</span>
+
+<span class="n">theta</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="n">simulate_for_sbi</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">proposal</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">num_simulations</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
+<span class="n">density_estimator</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+<span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span><span class="n">density_estimator</span><span class="p">)</span>  <span class="c1"># MCMC kwargs go here.</span>
+</code></pre></div>
 <h2 id="linear-gaussian-example">Linear Gaussian example<a class="headerlink" href="#linear-gaussian-example" title="Permanent link">¶</a></h2>
-<p>We will show an example of how we can use the flexible interface to infer the posterior for an example with a Gaussian likelihood (same example as before). First, we import the inference method we want to use (<code>SNPE</code>, <code>SNLE</code>, or <code>SNRE</code>) and other helper functions.</p>
+<p>We will show an example of how we can use the flexible interface (v0.14.0 onwards) to infer the posterior for an example with a Gaussian likelihood (same example as before). First, we import the inference method we want to use (<code>SNPE</code>, <code>SNLE</code>, or <code>SNRE</code>) and other helper functions.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">torch</span>
 
-<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">SNPE</span><span class="p">,</span> <span class="n">prepare_for_sbi</span>
+<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">SNPE</span><span class="p">,</span> <span class="n">prepare_for_sbi</span><span class="p">,</span> <span class="n">simulate_for_sbi</span>
 <span class="kn">from</span> <span class="nn">sbi.utils.get_nn_models</span> <span class="kn">import</span> <span class="n">posterior_nn</span>
-<span class="kn">import</span> <span class="nn">sbi.utils</span> <span class="k">as</span> <span class="nn">utils</span>
+<span class="kn">from</span> <span class="nn">sbi</span> <span class="kn">import</span> <span class="n">utils</span> <span class="k">as</span> <span class="n">utils</span>
 </code></pre></div>
 <p>Next, we define the prior and simulator:</p>
 <div class="highlight"><pre><span></span><code><span class="n">num_dim</span> <span class="o">=</span> <span class="mi">3</span>
@@ -361,16 +415,23 @@
 <div class="highlight"><pre><span></span><code><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span> <span class="o">=</span> <span class="n">prepare_for_sbi</span><span class="p">(</span><span class="n">linear_gaussian</span><span class="p">,</span> <span class="n">prior</span><span class="p">)</span>
 </code></pre></div>
 <p>Then, we instantiate the inference object:</p>
-<div class="highlight"><pre><span></span><code><span class="n">inference</span> <span class="o">=</span> <span class="n">SNPE</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><span class="n">inference</span> <span class="o">=</span> <span class="n">SNPE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">)</span>
 </code></pre></div>
-<p>And then, we run inference. The last argument <code>proposal=None</code> below indicates that the parameters should be drawn from the prior (<code>None</code> is also the default value). You can find a full list of arguments <a href="https://www.mackelab.org/sbi/reference/#sbi.inference.snpe.snpe_c.SNPE_C">here</a>.</p>
-<div class="highlight"><pre><span></span><code><span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="p">(</span><span class="n">num_simulations</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">proposal</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+<p>Next, we run simulations. You can do so either by yourself by sampling from the prior and running the simulator (e.g. on a compute cluster), or you can use a helper function provided by <code>sbi</code> called <code>simulate_for_sbi</code>. This function allows to parallelize your code with <code>joblib</code>.</p>
+<div class="highlight"><pre><span></span><code><span class="n">theta</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="n">simulate_for_sbi</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">proposal</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">num_simulations</span><span class="o">=</span><span class="mi">500</span><span class="p">)</span>
 </code></pre></div>
 <div class="codehilite"><pre><span></span><code>HBox(children=(FloatProgress(value=0.0, description='Running 500 simulations.', max=500.0, style=ProgressStyle…
-
-
-
-Neural network successfully converged after 142 epochs.
+</code></pre></div>
+<p>We then pass the simulated data to the inference object. <code>theta</code> and <code>x</code> should both be tensors of type float32.</p>
+<div class="highlight"><pre><span></span><code><span class="n">inference</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
+</code></pre></div>
+<p>Next, we train the neural density estimator.</p>
+<div class="highlight"><pre><span></span><code><span class="n">density_estimator</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>Neural network successfully converged after 191 epochs.
+</code></pre></div>
+<p>Lastly, we can use this density estimator to build the posterior:</p>
+<div class="highlight"><pre><span></span><code><span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span><span class="n">density_estimator</span><span class="p">)</span>
 </code></pre></div>
 <p>Once we have obtained the posterior, we can <code>.sample()</code>, <code>.log_prob()</code>, or <code>.pairplot()</code> in the same way as for the simple interface.</p>
 <div class="highlight"><pre><span></span><code><span class="n">x_o</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="p">,)</span>
@@ -383,7 +444,7 @@ Neural network successfully converged after 142 epochs.
 </code></pre></div>
 <div class="codehilite"><pre><span></span><code>HBox(children=(FloatProgress(value=0.0, description='Drawing 10000 posterior samples', max=10000.0, style=Prog…
 </code></pre></div>
-<p><img alt="png" src="../02_flexible_interface_files/02_flexible_interface_17_2.png"/></p>
+<p><img alt="png" src="../02_flexible_interface_files/02_flexible_interface_28_2.png"/></p>
 <p>We can always print the posterior to know how it was trained:</p>
 <div class="highlight"><pre><span></span><code><span class="nb">print</span><span class="p">(</span><span class="n">posterior</span><span class="p">)</span>
 </code></pre></div>
