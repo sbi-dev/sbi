@@ -13,7 +13,7 @@ from tests.test_utils import check_c2st
 
 @pytest.mark.parametrize("num_dim", (1, 2))
 def test_mcabc_inference_on_linear_gaussian(
-    num_dim, lra=False, sass=False, sass_expansion_degree=1, sass_fraction=0.5
+    num_dim, lra=False, sass=False, sass_expansion_degree=1,
 ):
     x_o = zeros((1, num_dim))
     num_samples = 1000
@@ -42,7 +42,7 @@ def test_mcabc_inference_on_linear_gaussian(
         lra=lra,
         sass=sass,
         sass_expansion_degree=sass_expansion_degree,
-        sass_fraction=sass_fraction,
+        sass_fraction=0.33,
     )
 
     check_c2st(phat.sample((num_samples,)), target_samples, alg="MCABC")
@@ -50,22 +50,17 @@ def test_mcabc_inference_on_linear_gaussian(
 
 @pytest.mark.slow
 @pytest.mark.parametrize("lra", (True, False))
-@pytest.mark.parametrize("sass_fraction", (0.1, 0.33))
 @pytest.mark.parametrize("sass_expansion_degree", (1, 2))
-def test_mcabc_sass_lra(lra, sass_fraction, sass_expansion_degree):
+def test_mcabc_sass_lra(lra, sass_expansion_degree, set_seed):
 
     test_mcabc_inference_on_linear_gaussian(
-        num_dim=2,
-        lra=lra,
-        sass=True,
-        sass_fraction=sass_fraction,
-        sass_expansion_degree=sass_expansion_degree,
+        num_dim=2, lra=lra, sass=True, sass_expansion_degree=sass_expansion_degree,
     )
 
 
 @pytest.mark.parametrize("num_dim", (1, 2))
 def test_smcabc_inference_on_linear_gaussian(
-    num_dim, lra=False, sass=False, sass_fraction=0.1, sass_expansion_degree=1
+    num_dim, lra=False, sass=False, sass_expansion_degree=1
 ):
     x_o = zeros((1, num_dim))
     num_samples = 1000
@@ -94,7 +89,7 @@ def test_smcabc_inference_on_linear_gaussian(
         distance_based_decay=True,
         lra=lra,
         sass=sass,
-        sass_fraction=sass_fraction,
+        sass_fraction=0.5,
         sass_expansion_degree=sass_expansion_degree,
     )
 
@@ -103,10 +98,9 @@ def test_smcabc_inference_on_linear_gaussian(
 
 @pytest.mark.slow
 @pytest.mark.parametrize("lra", (True, False))
-@pytest.mark.parametrize("sass_fraction", (0.1, 0.33))
 @pytest.mark.parametrize("sass_expansion_degree", (1, 2))
-def test_smcabc_sass_lra(lra, sass_fraction, sass_expansion_degree):
+def test_smcabc_sass_lra(lra, sass_expansion_degree, set_seed):
 
     test_smcabc_inference_on_linear_gaussian(
-        2, lra, True, sass_fraction, sass_expansion_degree
+        num_dim=2, lra=lra, sass=True, sass_expansion_degree=sass_expansion_degree
     )
