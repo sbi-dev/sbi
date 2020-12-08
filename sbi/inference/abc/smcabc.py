@@ -208,7 +208,7 @@ class SMCABC(ABCBASE):
             self.kernel_variance = self.get_kernel_variance(
                 all_particles[pop_idx - 1],
                 torch.exp(all_log_weights[pop_idx - 1]),
-                num_samples=1000,
+                samples_per_dim=500,
                 kernel_variance_scale=kernel_variance_scale,
             )
             particles, log_weights, distances, x = self._sample_next_population(
@@ -503,14 +503,9 @@ class SMCABC(ABCBASE):
         self,
         particles: Tensor,
         weights: Tensor,
-        num_samples: int = 1000,
+        samples_per_dim: int = 100,
         kernel_variance_scale: float = 1.0,
     ) -> Tensor:
-
-        # get weighted samples
-        samples = self.sample_from_population_with_weights(
-            particles, weights, num_samples=num_samples
-        )
 
         if self.kernel == "gaussian":
             # For variant C, Beaumont et al. 2009, the kernel variance comes from the
@@ -521,34 +516,28 @@ class SMCABC(ABCBASE):
                     np.atleast_2d(np.cov(particles, rowvar=False, aweights=weights)),
                     dtype=torch.float32,
                 )
-                # Make sure variance is not singular.
+                # Make sure variance is nonsingular.
                 try:
-                    torch.cholesky(population_cov)
+                    torch.cholesky(kernel_variance_scale * population_cov)
                 except RuntimeError:
                     self.logger.warning(
-                        "Sample particale cov singular, using unit variance."
+                        """"Singular particle covariance, using unit covariance."""
                     )
                     population_cov = torch.eye(particles.shape[1])
                 return kernel_variance_scale * population_cov
             # While for Toni et al. and Sisson et al. it comes from the parameter
             # ranges.
             elif self.algorithm_variant in ("A", "B"):
-                # Variance spans the range of parameters for every dimension.
-                parameter_ranges = tensor(
-                    [
-                        max(theta_column) - min(theta_column)
-                        for theta_column in samples.T
-                    ]
+                particle_ranges = self.get_particle_ranges(
+                    particles, weights, samples_per_dim=samples_per_dim
                 )
-                assert parameter_ranges.ndim < 2
-                return kernel_variance_scale * torch.diag(parameter_ranges)
+                return kernel_variance_scale * torch.diag(particle_ranges)
             else:
                 raise ValueError(f"Variant, '{self.algorithm_variant}' not supported.")
-
         elif self.kernel == "uniform":
             # Variance spans the range of parameters for every dimension.
-            return kernel_variance_scale * tensor(
-                [max(theta_column) - min(theta_column) for theta_column in samples.T]
+            return kernel_variance_scale * self.get_particle_ranges(
+                particles, weights, samples_per_dim=samples_per_dim
             )
         else:
             raise ValueError(f"Kernel, '{self.kernel}' not supported.")
@@ -652,3 +641,17 @@ class SMCABC(ABCBASE):
         )
         return sass_transform
 
+    def get_particle_ranges(
+        self, particles: Tensor, weights: Tensor, samples_per_dim: int = 100
+    ) -> Tensor:
+        """Return range of particles in each parameter dimension."""
+
+        # get weighted samples
+        samples = self.sample_from_population_with_weights(
+            particles, weights, num_samples=samples_per_dim * particles.shape[1],
+        )
+
+        # Variance spans the range of particles for every dimension.
+        particle_ranges = tensor([max(column) - min(column) for column in samples.T])
+        assert particle_ranges.ndim < 2
+        return particle_ranges
