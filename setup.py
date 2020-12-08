@@ -28,7 +28,7 @@ REQUIRED = [
     "matplotlib",
     "numpy",
     "pillow",
-    "pyknos>=0.12",
+    "pyknos>=0.14",
     "pyro-ppl>=1.3.1",
     "scipy",
     "tensorboard",
