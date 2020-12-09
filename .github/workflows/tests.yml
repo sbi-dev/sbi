@@ -32,7 +32,7 @@ jobs:
       run: |
         pip install torchtestcase
         pip install pytest pytest-cov
-        pytest -m "not slow" tests/ --cov=sbi --cov-report=xml
+        pytest -m "not slow" -m "not gpu" tests/ --cov=sbi --cov-report=xml
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v1
       with:

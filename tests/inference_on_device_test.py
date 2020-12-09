@@ -12,11 +12,8 @@ from sbi.inference import SNPE, SNLE, SNRE, simulate_for_sbi
 from sbi.utils.torchutils import process_device
 
 
-devices = ["cpu", "cuda:0"]
-
-
 @pytest.mark.slow
-@pytest.mark.requires_cuda
+@pytest.mark.gpu
 @pytest.mark.parametrize(
     "method, model",
     [
@@ -84,6 +81,7 @@ def test_training_and_mcmc_on_device(method, model, device):
     proposals[-1].sample(sample_shape=(num_samples,), x=x_o, **mcmc_kwargs)
 
 
+@pytest.mark.gpu
 @pytest.mark.parametrize("device", ["cpu", "gpu", "cuda", "cuda:0", "cuda:42"])
 def test_process_device(device: str):
     process_device(device)
