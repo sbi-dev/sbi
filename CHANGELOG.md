@@ -1,3 +1,10 @@
+# v0.14.1
+
+- Support for training and sampling on GPU including fixes from `nflows` (#331)
+- Bug fix for SNPE with neural spline flow and MCMC (#398)
+- Small fix for SMCABC particles covariance
+- Small fix for rejection-classifier (#396)
+
 # v0.14.0
 
 - New flexible interface API (#378). This is going to be a breaking change for users of 
