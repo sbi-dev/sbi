@@ -165,7 +165,7 @@ class SMCABC(ABCBASE):
                 num_particles, num_pilot_simulations, x_o, lra, sass_expansion_degree
             )
             # Udpate simulator and xo
-            self.x_o = sass_transform(self.x_o)
+            x_o = sass_transform(self.x_o)
 
             def sass_simulator(theta):
                 self.simulation_counter += theta.shape[0]
