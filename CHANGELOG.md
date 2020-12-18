@@ -1,9 +1,15 @@
+# v0.14.2
+
+- Small fix for SMC-ABC with semi-automatic summary statistics (#402)
+
+
 # v0.14.1
 
 - Support for training and sampling on GPU including fixes from `nflows` (#331)
 - Bug fix for SNPE with neural spline flow and MCMC (#398)
-- Small fix for SMCABC particles covariance
+- Small fix for SMC-ABC particles covariance
 - Small fix for rejection-classifier (#396)
+
 
 # v0.14.0
 
@@ -36,6 +42,7 @@ More information can be found here [here](https://www.mackelab.org/sbi/tutorial/
     - Linear regression adjustment as in Beaumont et al. 2002 for both MCABC and SMCABC
     - Semi-automatic summary statistics as in Fearnhead & Prangle 2012 for both MCABC and SMCABC
     - Small fixes to perturbation kernel covariance estimation in SMCABC.
+
 
 # v0.13.2
 
