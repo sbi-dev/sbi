@@ -1,3 +1,8 @@
+# v0.14.3
+
+- Fixup for conditional correlation matrix (thanks @JBeckUniTb, #404)
+
+
 # v0.14.2
 
 - Small fix for SMC-ABC with semi-automatic summary statistics (#402)

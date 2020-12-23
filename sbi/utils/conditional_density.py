@@ -233,7 +233,7 @@ def _expected_value_f_of_x(
     simply be summed over.
 
     Args:
-        probs: probs: Matrix of evaluations of the density.
+        probs: Matrix of evaluations of the density.
         limits: Limits within which the entries of the matrix are evenly spaced.
         f: The operation to be applied to the expected values.
 
@@ -245,8 +245,8 @@ def _expected_value_f_of_x(
 
     x_values_over_which_we_integrate = [
         torch.linspace(lim[0], lim[1], prob.shape[0])
-        for lim, prob in zip(limits, probs)
-    ]
+        for lim, prob in zip(torch.flip(limits, [0]), probs)
+    ]  # See #403 and #404 for flip().
     grids = list(torch.meshgrid(x_values_over_which_we_integrate))
     expected_val = torch.sum(f(*grids) * probs)
 
