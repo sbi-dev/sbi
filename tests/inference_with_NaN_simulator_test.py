@@ -121,7 +121,7 @@ def test_inference_with_rejection_estimator(set_seed):
     num_rounds = 2
 
     for r in range(num_rounds):
-        theta, x = simulate_for_sbi(simulator, proposals[-1], 500)
+        theta, x = simulate_for_sbi(simulator, proposals[-1], 550)
         rejection_estimator.append_simulations(theta, x)
         if r < num_rounds - 1:
             _ = rejection_estimator.train()

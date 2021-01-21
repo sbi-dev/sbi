@@ -148,18 +148,6 @@ class LikelihoodEstimator(NeuralInference, ABC):
         self._round = max(self._data_round_index)
         theta, x, _ = self.get_simulations(self._round, exclude_invalid_x, False)
 
-        # First round or if retraining from scratch:
-        # Call the `self._build_neural_net` with the rounds' thetas and xs as
-        # arguments, which will build the neural network
-        # This is passed into NeuralPosterior, to create a neural posterior which
-        # can `sample()` and `log_prob()`. The network is accessible via `.net`.
-        if self._neural_net is None or retrain_from_scratch_each_round:
-            self._neural_net = self._build_neural_net(theta, x)
-            self._x_shape = x_shape_from_simulation(x)
-            assert (
-                len(self._x_shape) < 3
-            ), "SNLE cannot handle multi-dimensional simulator output."
-
         # Starting index for the training set (1 = discard round-0 samples).
         start_idx = int(discard_prior_samples and self._round > 0)
         theta, x, _ = self.get_simulations(start_idx, exclude_invalid_x)
@@ -193,6 +181,20 @@ class LikelihoodEstimator(NeuralInference, ABC):
             drop_last=False,
             sampler=SubsetRandomSampler(val_indices),
         )
+
+        # First round or if retraining from scratch:
+        # Call the `self._build_neural_net` with the rounds' thetas and xs as
+        # arguments, which will build the neural network
+        # This is passed into NeuralPosterior, to create a neural posterior which
+        # can `sample()` and `log_prob()`. The network is accessible via `.net`.
+        if self._neural_net is None or retrain_from_scratch_each_round:
+            self._neural_net = self._build_neural_net(
+                theta[train_indices], x[train_indices]
+            )
+            self._x_shape = x_shape_from_simulation(x)
+            assert (
+                len(self._x_shape) < 3
+            ), "SNLE cannot handle multi-dimensional simulator output."
 
         self._neural_net.to(self._device)
         optimizer = optim.Adam(list(self._neural_net.parameters()), lr=learning_rate,)

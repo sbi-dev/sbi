@@ -1,6 +1,7 @@
 # v0.14.3
 
 - Fixup for conditional correlation matrix (thanks @JBeckUniTb, #404)
+- z-score data using only the training data (#411)
 
 
 # v0.14.2
