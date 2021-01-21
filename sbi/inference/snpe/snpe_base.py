@@ -189,16 +189,6 @@ class PosteriorEstimator(NeuralInference, ABC):
         # Load data from most recent round.
         theta, x, _ = self.get_simulations(self._round, exclude_invalid_x, False)
 
-        # First round or if retraining from scratch:
-        # Call the `self._build_neural_net` with the rounds' thetas and xs as
-        # arguments, which will build the neural network.
-        # This is passed into NeuralPosterior, to create a neural posterior which
-        # can `sample()` and `log_prob()`. The network is accessible via `.net`.
-        if self._neural_net is None or retrain_from_scratch_each_round:
-            self._neural_net = self._build_neural_net(theta, x)
-            test_posterior_net_for_multi_d_x(self._neural_net, theta, x)
-            self._x_shape = x_shape_from_simulation(x)
-
         # Starting index for the training set (1 = discard round-0 samples).
         start_idx = int(discard_prior_samples and self._round > 0)
 
@@ -241,6 +231,18 @@ class PosteriorEstimator(NeuralInference, ABC):
             drop_last=True,
             sampler=SubsetRandomSampler(val_indices),
         )
+
+        # First round or if retraining from scratch:
+        # Call the `self._build_neural_net` with the rounds' thetas and xs as
+        # arguments, which will build the neural network.
+        # This is passed into NeuralPosterior, to create a neural posterior which
+        # can `sample()` and `log_prob()`. The network is accessible via `.net`.
+        if self._neural_net is None or retrain_from_scratch_each_round:
+            self._neural_net = self._build_neural_net(
+                theta[train_indices], x[train_indices]
+            )
+            test_posterior_net_for_multi_d_x(self._neural_net, theta, x)
+            self._x_shape = x_shape_from_simulation(x)
 
         # Move entire net to device for training.
         self._neural_net.to(self._device)
