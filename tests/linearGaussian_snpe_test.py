@@ -10,6 +10,7 @@ from scipy.stats import gaussian_kde
 from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
+from sbi import analysis as analysis
 from sbi import utils as utils
 from sbi.inference import SNPE_B, SNPE_C, prepare_for_sbi, simulate_for_sbi
 from sbi.simulators.linear_gaussian import (
@@ -354,7 +355,7 @@ def test_sample_conditional(set_seed):
     cond_samples = posterior.sample_conditional(
         (500,), condition=samples[0], dims_to_sample=[dim_to_sample_1, dim_to_sample_2]
     )
-    _ = utils.pairplot(
+    _ = analysis.pairplot(
         cond_samples,
         limits=[[-2, 2], [-2, 2], [-2, 2]],
         fig_size=(2, 2),
@@ -374,7 +375,7 @@ def test_sample_conditional(set_seed):
     sample_kde_grid = np.reshape(density(positions).T, X.shape)
 
     # Evaluate the conditional with eval_conditional_density.
-    eval_grid = utils.eval_conditional_density(
+    eval_grid = analysis.eval_conditional_density(
         posterior,
         condition=samples[0],
         dim1=dim_to_sample_1,

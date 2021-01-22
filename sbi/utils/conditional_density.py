@@ -1,4 +1,5 @@
 from typing import Any, Callable, List, Optional, Tuple, Union
+from warnings import warn
 
 import torch
 from torch import Tensor
@@ -15,6 +16,7 @@ def eval_conditional_density(
     resolution: int = 50,
     eps_margins1: Union[Tensor, float] = 1e-32,
     eps_margins2: Union[Tensor, float] = 1e-32,
+    warn_about_deprecation: bool = True,
 ) -> Tensor:
     r"""
     Return the unnormalized conditional along `dim1, dim2` given parameters `condition`.
@@ -39,10 +41,20 @@ def eval_conditional_density(
         eps_margins2: We will evaluate the posterior along `dim2` at
             `limits[0]+eps_margins` until `limits[1]-eps_margins`. This avoids
             evaluations potentially exactly at the prior bounds.
+        warn_about_deprecation: With sbi v0.15.0, we depracated the import of this
+            function from `sbi.utils`. Instead, it should be imported from
+            `sbi.analysis`.
 
     Returns: Conditional probabilities. If `dim1 == dim2`, this will have shape
         (resolution). If `dim1 != dim2`, it will have shape (resolution, resolution).
     """
+
+    if warn_about_deprecation:
+        warn(
+            "Importing `eval_conditional_density` from `sbi.utils` is deprecated since "
+            "sbi v0.15.0. Instead, use "
+            "`from sbi.analysis import eval_conditional_density`."
+        )
 
     condition = ensure_theta_batched(condition)
 
@@ -82,6 +94,7 @@ def conditional_corrcoeff(
     condition: Tensor,
     subset: Optional[List[int]] = None,
     resolution: int = 50,
+    warn_about_deprecation: bool = True,
 ) -> Tensor:
     r"""
     Returns the conditional correlation matrix of a distribution.
@@ -107,10 +120,20 @@ def conditional_corrcoeff(
         resolution: Number of grid points on which the conditional distribution is
             evaluated. A higher value increases the accuracy of the estimated
             correlation but also increases the computational cost.
+        warn_about_deprecation: With sbi v0.15.0, we depracated the import of this
+            function from `sbi.utils`. Instead, it should be imported from
+            `sbi.analysis`.
 
     Returns: Average conditional correlation matrix of shape either `(num_dim, num_dim)`
     or `(len(subset), len(subset))` if `subset` was specified.
     """
+
+    if warn_about_deprecation:
+        warn(
+            "Importing `conditional_corrcoeff` from `sbi.utils` is deprecated since "
+            "sbi v0.15.0. Instead, use "
+            "`from sbi.analysis import conditional_corrcoeff`."
+        )
 
     condition = ensure_theta_batched(condition)
 
@@ -198,7 +221,7 @@ def _compute_covariance(
     Var(X,Y) = E[X**2] - E[X]**2
 
     Args:
-        probs: probs: Matrix of evaluations of a 2D density.
+        probs: Matrix of evaluations of a 2D density.
         limits: Limits within which the entries of the matrix are evenly spaced.
         f: The operation to be applied to the expected values, usually just the product.
 

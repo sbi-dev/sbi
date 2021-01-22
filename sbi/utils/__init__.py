@@ -54,4 +54,3 @@ from sbi.utils.typechecks import (
     is_positive_int,
     is_power_of_two,
 )
-from sbi.utils.sensitivity_analysis import ActiveSubspace
