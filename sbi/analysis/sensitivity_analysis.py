@@ -1,3 +1,4 @@
+import logging
 from copy import deepcopy
 from typing import Any, Callable, Optional, Tuple, Union
 from warnings import warn
@@ -10,7 +11,7 @@ from torch.nn.utils import clip_grad_norm_
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 
-from sbi.utils.sbiutils import standardizing_net, handle_invalid_x
+from sbi.utils.sbiutils import handle_invalid_x, standardizing_net
 
 
 class Destandardize(nn.Module):
@@ -49,9 +50,9 @@ def destandardizing_net(batch_t: Tensor, min_std: float = 1e-7) -> nn.Module:
         t_std = 1
         logging.warning(
             f"""Using a one-dimensional batch will instantiate a Standardize transform 
-            with (mean, std) parameters which are not representative of the data. We allow
-            this behavior because you might be loading a pre-trained. If this is not the case, 
-            please be sure to use a larger batch."""
+            with (mean, std) parameters which are not representative of the data. We 
+            allow this behavior because you might be loading a pre-trained. If this is 
+            not the case, please be sure to use a larger batch."""
         )
 
     return Destandardize(t_mean, t_std)
@@ -63,10 +64,11 @@ def build_input_output_layer(
     z_score_theta: bool = True,
     z_score_property: bool = True,
     embedding_net_theta: nn.Module = nn.Identity(),
-) -> nn.Module:
+) -> Tuple[nn.Module, nn.Module]:
     r"""Builds input layer for the `ActiveSubspace` that optionally z-scores.
 
-    The regression network used in the `ActiveSubspace` will receive batches of $\theta$s and properties.
+    The regression network used in the `ActiveSubspace` will receive batches of
+    $\theta$s and properties.
 
     Args:
         batch_theta: Batch of $\theta$s, used to infer dimensionality and (optional)
@@ -75,8 +77,6 @@ def build_input_output_layer(
         z_score_theta: Whether to z-score $\theta$s passing into the network.
         z_score_property: Whether to z-score properties passing into the network.
         embedding_net_theta: Optional embedding network for $\theta$s.
-        unnormalize: Whether the layer should normalize the inputs (`False`) or
-            un-normalize them (`True`).
 
     Returns:
         Input layer that optionally z-scores.
@@ -98,6 +98,12 @@ def build_input_output_layer(
 class ActiveSubspace:
     def __init__(self, posterior: Any):
         """
+        Identify the active subspace for sensitivity analyses.
+
+        - Introduction to active subspaces: Constantine et al. 2015.
+        - Application to analyse the sensitivity in neuroscience models:
+            Deistler et al. 2021, in preparation.
+
         Args:
             posterior: Posterior distribution obtained with `SNPE`, `SNLE`, or `SNRE`.
                 Needs to have a `.sample()` method. If we want to analyse the
@@ -241,11 +247,7 @@ class ActiveSubspace:
                 training even when the validation loss is still decreasing. If None, we
                 train until validation loss increases (see also `stop_after_epochs`).
             clip_max_norm: Value at which to clip the total gradient norm in order to
-                prevent exploding gradients. Use None for no clipping.
-                good_bad_criterion: Should take in the simulation output $x$ and output
-                whether $x$ is counted as `valid` simulation (output 1.0) or as a `bad`
-                simulation output 0.0). By default, the function checks whether $x$
-                contains at least one `nan` or `inf`.
+                prevent exploding gradients. Use `None` for no clipping.
         """
 
         # Get indices for permutation of the data.
@@ -356,18 +358,25 @@ class ActiveSubspace:
         norm_gradients_to_prior: bool = True,
         num_monte_carlo_samples: int = 1000,
     ) -> Tuple[Tensor, Tensor]:
-        """
+        r"""
         Return eigenvectors and values corresponding to directions of sensitivity.
 
         The directions of sensitivity are the directions along which a specific
         property changes in the fastest way.
 
-        This computes:
-        $M = E_p(\theta|x)[\nabla f(\theta)^T \nabla f(\theta)]$
-        where f(\cdot) is the trained regression network. The expected value is
+        This computes the matrix:
+        $\mathbf{M} = \mathbb{E}_{p(\theta|x_o)}[\nabla_{\theta} f(\theta)^T \nabla_{\theta}
+        f(\theta)]$
+        where $f(\cdot)$ is the trained regression network. The expected value is
         approximated with a Monte-Carlo mean. Next, do an eigenvalue
-        decomposition of the matrix $M$:
-        $M = Q \Lambda Q^{-1}$
+        decomposition of the matrix $\mathbf{M}$:
+
+        $\mathbf{M} = \mathbf{Q} \mathbf{\Lambda} \mathbf{Q}^{-1}$
+
+        We then return the eigenvectors and eigenvalues found by this decomposition.
+        Eigenvectors with large eigenvalues are directions along which the property is
+        sensitive to changes in the parameters $\theta$ (`active` directions).
+        Increases along these directions will increase the value of the property.
 
         Args:
             posterior_log_prob_as_property: Whether to use the posterior
@@ -383,9 +392,10 @@ class ActiveSubspace:
                 based on. A larger value will make the results more accurate while
                 requiring more compute time.
 
-        Returns: Eigenvectors and corresponding eigenvalues. They are sorted in
-            ascending order. Note that the column `eigenvectors[:, j]` is the
-            eigenvector corresponding to the `j`-th eigenvalue.
+        Returns:
+            Eigenvectors and corresponding eigenvalues. They are sorted in ascending
+            order. The column `eigenvectors[:, j]` is the eigenvector corresponding to
+            the `j`-th eigenvalue.
         """
 
         self._gradients_are_normed = norm_gradients_to_prior
@@ -459,7 +469,10 @@ class ActiveSubspace:
 
     def project(self, theta: Tensor, num_dimensions: int) -> Tensor:
         r"""
-        Return $theta$ that were projected into the subspace.
+        Return $\theta$ that were projected into the subspace.
+
+        To identify the dimensionality of the active subspace `num_dimensions`,
+        Constantine et al. 2015 suggest to look at gaps in the eigenvalue spectrum.
 
         Performs a linear projection. Also takes care of normalizing the data. The mean
         and standard deviation used for normalizing are the same as used to compute the
@@ -470,7 +483,7 @@ class ActiveSubspace:
             num_dimensions: Dimensionality of the subspace into which to project.
 
         Returns:
-            Projected parameters of shape (theta.shape[0], num_dimensions).
+            Projected parameters of shape `(theta.shape[0], num_dimensions)`.
         """
         if self._gradients_are_normed:
             theta = (theta - self._prior_mean) / self._prior_scale

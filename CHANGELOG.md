@@ -1,3 +1,10 @@
+# v0.15.0
+
+- `pairplot()`, `conditional_pairplot()`, and `conditional_corrcoeff()` should now 
+be imported from `sbi.analysis` instead of `sbi.utils` (#394).
+- Active subspaces for sensitivity analysis (#394)
+
+
 # v0.14.3
 
 - Fixup for conditional correlation matrix (thanks @JBeckUniTb, #404)
@@ -43,16 +50,12 @@ posterior = inference.build_posterior(density_estimator)  # MCMC kwargs go here.
 ```
 More information can be found here [here](https://www.mackelab.org/sbi/tutorial/02_flexible_interface/).
 - Fixed typo in docs for `infer` (thanks @glouppe, #370)
-<<<<<<< HEAD
 - New `RestrictionEstimator` to learn regions of bad simulation outputs (#390)
 - Improvements for and new ABC methods (#395)
     - Linear regression adjustment as in Beaumont et al. 2002 for both MCABC and SMCABC
     - Semi-automatic summary statistics as in Fearnhead & Prangle 2012 for both MCABC and SMCABC
     - Small fixes to perturbation kernel covariance estimation in SMCABC.
 
-=======
-- Active Subspaces for sensitivity analysis (#394)
->>>>>>> Active subspaces for sensitivity analysis
 
 # v0.13.2
 

@@ -96,19 +96,24 @@
       show_root_heading: true
       show_object_full_path: true
 
-## Utils
+## Analysis
 
-::: sbi.utils.plot.pairplot
+::: sbi.analysis.plot.pairplot
     rendering:
       show_root_heading: true
       show_object_full_path: true
       
-::: sbi.utils.plot.conditional_pairplot
+::: sbi.analysis.plot.conditional_pairplot
     rendering:
       show_root_heading: true
       show_object_full_path: true
       
-::: sbi.utils.conditional_density.conditional_corrcoeff
+::: sbi.analysis.conditional_density.conditional_corrcoeff
+    rendering:
+      show_root_heading: true
+      show_object_full_path: true
+
+::: sbi.analysis.ActiveSubspace
     rendering:
       show_root_heading: true
       show_object_full_path: true

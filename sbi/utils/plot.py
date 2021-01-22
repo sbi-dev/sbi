@@ -2,19 +2,8 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 import collections
-import inspect
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    List,
-    Optional,
-    Sequence,
-    Tuple,
-    TypeVar,
-    Union,
-    cast,
-)
+from typing import Any, List, Optional, Tuple, Union
+from warnings import warn
 
 import matplotlib as mpl
 import numpy as np
@@ -153,6 +142,7 @@ def pairplot(
     fig_size: Tuple = (10, 10),
     labels: Optional[List[str]] = None,
     points_colors: List[str] = plt.rcParams["axes.prop_cycle"].by_key()["color"],
+    warn_about_deprecation: bool = True,
     **kwargs
 ):
     """
@@ -175,11 +165,20 @@ def pairplot(
         fig_size: Size of the entire figure.
         labels: List of strings specifying the names of the parameters.
         points_colors: Colors of the `points`.
+        warn_about_deprecation: With sbi v0.15.0, we depracated the import of this
+            function from `sbi.utils`. Instead, it should be imported from
+            `sbi.analysis`.
         **kwargs: Additional arguments to adjust the plot, see the source code in
             `_get_default_opts()` in `sbi.utils.plot` for more details.
 
     Returns: figure and axis of posterior distribution plot
     """
+
+    if warn_about_deprecation:
+        warn(
+            "Importing `pairplot` from `sbi.utils` is deprecated since sbi "
+            "v0.15.0. Instead, use `from sbi.analysis import pairplot`."
+        )
 
     # TODO: add color map support
     # TODO: automatically determine good bin sizes for histograms
@@ -245,7 +244,11 @@ def pairplot(
                         limits[row, 0], limits[row, 1], opts["kde_diag"]["bins"]
                     )
                     ys = density(xs)
-                    h = plt.plot(xs, ys, color=opts["samples_colors"][n],)
+                    h = plt.plot(
+                        xs,
+                        ys,
+                        color=opts["samples_colors"][n],
+                    )
                 else:
                     pass
 
@@ -265,7 +268,12 @@ def pairplot(
                     h = plt.imshow(
                         hist.T,
                         origin="lower",
-                        extent=[xedges[0], xedges[-1], yedges[0], yedges[-1],],
+                        extent=[
+                            xedges[0],
+                            xedges[-1],
+                            yedges[0],
+                            yedges[-1],
+                        ],
                         aspect="auto",
                     )
 
@@ -276,14 +284,19 @@ def pairplot(
                     "contourf",
                 ]:
                     density = gaussian_kde(
-                        v[:, [col, row]].T, bw_method=opts["kde_offdiag"]["bw_method"],
+                        v[:, [col, row]].T,
+                        bw_method=opts["kde_offdiag"]["bw_method"],
                     )
                     X, Y = np.meshgrid(
                         np.linspace(
-                            limits[col][0], limits[col][1], opts["kde_offdiag"]["bins"],
+                            limits[col][0],
+                            limits[col][1],
+                            opts["kde_offdiag"]["bins"],
                         ),
                         np.linspace(
-                            limits[row][0], limits[row][1], opts["kde_offdiag"]["bins"],
+                            limits[row][0],
+                            limits[row][1],
+                            opts["kde_offdiag"]["bins"],
                         ),
                     )
                     positions = np.vstack([X.ravel(), Y.ravel()])
@@ -354,6 +367,7 @@ def conditional_pairplot(
     fig_size: Tuple = (10, 10),
     labels: Optional[List[str]] = None,
     points_colors: List[str] = plt.rcParams["axes.prop_cycle"].by_key()["color"],
+    warn_about_deprecation: bool = True,
     **kwargs
 ):
     r"""
@@ -385,11 +399,20 @@ def conditional_pairplot(
         fig_size: Size of the entire figure.
         labels: List of strings specifying the names of the parameters.
         points_colors: Colors of the `points`.
+        warn_about_deprecation: With sbi v0.15.0, we depracated the import of this
+            function from `sbi.utils`. Instead, it should be imported from
+            `sbi.analysis`.
         **kwargs: Additional arguments to adjust the plot, see the source code in
             `_get_default_opts()` in `sbi.utils.plot` for more details.
 
     Returns: figure and axis of posterior distribution plot
     """
+
+    if warn_about_deprecation:
+        warn(
+            "Importing `conditional_pairplot` from `sbi.utils` is deprecated since sbi "
+            "v0.15.0. Instead, use `from sbi.analysis import conditional_pairplot`."
+        )
 
     # Setting these is required because _pairplot_scaffold will check if opts['diag'] is
     # `None`. This would break if opts has no key 'diag'. Same for 'upper'.
@@ -431,7 +454,11 @@ def conditional_pairplot(
             eps_margins2=eps_margins[row],
         ).numpy()
         h = plt.plot(
-            np.linspace(limits[row, 0], limits[row, 1], resolution,),
+            np.linspace(
+                limits[row, 0],
+                limits[row, 1],
+                resolution,
+            ),
             p_vector,
             c=opts["samples_colors"][0],
         )
@@ -450,7 +477,12 @@ def conditional_pairplot(
         h = plt.imshow(
             p_image.T,
             origin="lower",
-            extent=[limits[col, 0], limits[col, 1], limits[row, 0], limits[row, 1],],
+            extent=[
+                limits[col, 0],
+                limits[col, 1],
+                limits[row, 0],
+                limits[row, 1],
+            ],
             aspect="auto",
         )
 
@@ -627,7 +659,9 @@ def _pairplot_scaffold(diag_func, upper_func, dim, limits, points, opts):
             # Off-diagonals
             else:
                 upper_func(
-                    row=row, col=col, limits=limits,
+                    row=row,
+                    col=col,
+                    limits=limits,
                 )
 
                 if len(points) > 0:
@@ -689,16 +723,27 @@ def _get_default_opts():
         # options for contour
         "contour_offdiag": {"levels": [0.68], "percentile": True},
         # options for scatter
-        "scatter_offdiag": {"alpha": 0.5, "edgecolor": "none", "rasterized": False,},
+        "scatter_offdiag": {
+            "alpha": 0.5,
+            "edgecolor": "none",
+            "rasterized": False,
+        },
         # options for plot
         "plot_offdiag": {},
         # formatting points (scale, markers)
         "points_diag": {},
-        "points_offdiag": {"marker": ".", "markersize": 20,},
+        "points_offdiag": {
+            "marker": ".",
+            "markersize": 20,
+        },
         # other options
         "fig_bg_colors": {"upper": None, "diag": None, "lower": None},
-        "fig_subplots_adjust": {"top": 0.9,},
+        "fig_subplots_adjust": {
+            "top": 0.9,
+        },
         "subplots": {},
-        "despine": {"offset": 5,},
+        "despine": {
+            "offset": 5,
+        },
         "title_format": {"fontsize": 16},
     }
