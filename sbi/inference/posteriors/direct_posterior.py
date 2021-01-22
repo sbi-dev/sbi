@@ -1,12 +1,11 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Union
 
-import cma
 import numpy as np
 import torch
-from torch import Tensor, log, nn, optim
+from torch import Tensor, log, nn
 
 from sbi import utils as utils
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
@@ -415,21 +414,30 @@ class DirectPosterior(NeuralPosterior):
             mcmc_parameters,
         )
 
-    def map_estimate(
+    def map(
         self,
         x: Optional[Tensor] = None,
-        num_iter: int = 500,
+        num_iter: int = 1000,
         learning_rate: float = 1e-2,
-        num_init_samples: int = 10_000,
+        init_method: Union[str, Tensor] = "posterior",
+        num_init_samples: int = 1_000,
         num_to_optimize: int = 100,
-        show_progress_bars: bool = False,
+        save_best_every: int = 10,
+        show_progress_bars: bool = True,
     ) -> Tensor:
         """
         Returns the maximum-a-posteriori estimate (MAP).
 
+        The method can be interrupted (Ctrl-C) when the user sees that the
+        log-probability converges. The best estimate will be saved in `self.map_`.
+
         The MAP is obtained by running gradient ascent from a given number of starting
-        positions (sampled from the posterior) and then selecting the parameter set
-        that has the highest log-probability after the optimization.
+        positions (samples from the posterior with the highest log-probability). After
+        the optimization is done, we select the parameter set that has the highest
+        log-probability after the optimization.
+
+        Warning: The default values used by this function are not well-tested. They
+        might require hand-tuning for the problem at hand.
 
         Args:
             x: Conditioning context for posterior $p(\theta|x)$. If not provided,
@@ -437,168 +445,36 @@ class DirectPosterior(NeuralPosterior):
             num_iter: Number of optimization steps that the algorithm takes
                 to find the MAP.
             learning_rate: Learning rate of the optimizer.
+            init_method: How to select the starting parameters for the optimization. If
+                it is a string, it can be either [`posterior`, `prior`], which samples
+                the respective distribution `num_init_samples` times. If it is a,
+                the tensor will be used as init locations.
             num_init_samples: Draw this number of samples from the posterior and
                 evaluate the log-probability of all of them.
             num_to_optimize: From the drawn `num_init_samples`, use the
                 `num_to_optimize` with highest log-probability as the initial points
                 for the optimization.
+            save_best_every: The best log-probability is computed, saved in the
+                `map`-attribute, and printed every `print_best_every`-th iteration.
+                Computing the best log-probability creates a significant overhead
+                (thus, the default is `10`.)
             show_progress_bars: Whether or not to show a progressbar for sampling from
                 the posterior.
 
-        Returns: The MAP estimate.
+        Returns:
+            The MAP estimate.
         """
-
-        if isinstance(self._prior, utils.BoxUniform):
-
-            def expit(theta_t):
-                ub = self._prior.support.upper_bound
-                lb = self._prior.support.lower_bound
-                r = ub - lb
-                return r / (1 + torch.exp(-theta_t)) + lb
-
-            def logit(theta):
-                ub = self._prior.support.upper_bound
-                lb = self._prior.support.lower_bound
-                r = ub - lb
-                theta_01 = (theta - lb) / r
-
-                return torch.log(theta_01 / (1 - theta_01))
-
-        else:
-
-            def expit(theta_t):
-                return theta_t
-
-            def logit(theta):
-                return theta
-
-        # Find initial position.
-        inits = self.sample((num_init_samples,), show_progress_bars=show_progress_bars)
-        init_probs = self.log_prob(inits, x=x, norm_posterior=False)
-        sort_indices = torch.argsort(init_probs, dim=0)
-
-        # Pick the `num_to_optimize` best init locations.
-        sorted_inits = inits[sort_indices]
-        optimize_inits = sorted_inits[-num_to_optimize:]
-
-        optimize_inits = logit(optimize_inits)
-
-        # Optimize the init locations.
-        optimize_inits.requires_grad_(True)
-        optimizer = optim.Adam([optimize_inits], lr=learning_rate)
-
-        for _ in range(num_iter):
-            optimizer.zero_grad()
-            probs = self.log_prob(
-                expit(optimize_inits), x=x, norm_posterior=False, track_gradients=True
-            ).squeeze()
-            loss = -probs.sum()
-            loss.backward()
-            optimizer.step()
-
-        # Evaluate the optimized locations and pick the best one.
-        log_probs_of_optimized = self.log_prob(
-            expit(optimize_inits), x=x, norm_posterior=False
+        return super().map(
+            x=x,
+            num_iter=num_iter,
+            learning_rate=learning_rate,
+            init_method=init_method,
+            num_init_samples=num_init_samples,
+            num_to_optimize=num_to_optimize,
+            save_best_every=save_best_every,
+            show_progress_bars=show_progress_bars,
+            log_prob_kwargs={"norm_posterior": False},
         )
-        best_theta = optimize_inits[torch.argmax(log_probs_of_optimized)]
-
-        return expit(best_theta)
-
-    def mle_estimate(
-        self,
-        x: Optional[Tensor] = None,
-        num_iter: int = 500,
-        learning_rate: float = 1e-2,
-        num_init_samples: int = 10_000,
-        num_to_optimize: int = 100,
-        show_progress_bars: bool = False,
-    ) -> Tensor:
-        """
-        Returns the maximum-likelihood estimate (MLE) on the prior support.
-
-        The MLE is obtained by running gradient ascent from a given number of starting
-        positions (sampled from the posterior) and then selecting the parameter set
-        that has the highest log-probability after the optimization.
-
-        Args:
-            x: Conditioning context for posterior $p(\theta|x)$. If not provided,
-                fall back onto `x` passed to `set_default_x()`.
-            num_iter: Number of optimization steps that the algorithm takes
-                to find the MAP.
-            learning_rate: Learning rate of the optimizer.
-            num_init_samples: Draw this number of samples from the posterior and
-                evaluate the log-probability of all of them.
-            num_to_optimize: From the drawn `num_init_samples`, use the
-                `num_to_optimize` with highest log-probability as the initial points
-                for the optimization.
-            show_progress_bars: Whether or not to show a progressbar for sampling from
-                the posterior.
-
-        Returns: The MLE estimate.
-        """
-
-        if isinstance(self._prior, utils.BoxUniform):
-
-            def expit(theta_t):
-                ub = self._prior.support.upper_bound
-                lb = self._prior.support.lower_bound
-                r = ub - lb
-                return r / (1 + torch.exp(-theta_t)) + lb
-
-            def logit(theta):
-                ub = self._prior.support.upper_bound
-                lb = self._prior.support.lower_bound
-                r = ub - lb
-                theta_01 = (theta - lb) / r
-
-                return torch.log(theta_01 / (1 - theta_01))
-
-        else:
-
-            def expit(theta_t):
-                return theta_t
-
-            def logit(theta):
-                return theta
-
-        # Find initial position.
-        inits = self.sample((num_init_samples,), show_progress_bars=show_progress_bars)
-        init_probs = self.log_prob(
-            inits, x=x, norm_posterior=False
-        ) - self._prior.log_prob(inits)
-        sort_indices = torch.argsort(init_probs, dim=0)
-
-        # Pick the `num_to_optimize` best init locations.
-        sorted_inits = inits[sort_indices]
-        optimize_inits = sorted_inits[-num_to_optimize:]
-
-        optimize_inits = logit(optimize_inits)
-
-        # Optimize the init locations.
-        optimize_inits.requires_grad_(True)
-        optimizer = optim.Adam([optimize_inits], lr=learning_rate)
-
-        for _ in range(num_iter):
-            optimizer.zero_grad()
-            posterior_log_prob = self.log_prob(
-                expit(optimize_inits), x=x, norm_posterior=False, track_gradients=True
-            ).squeeze()
-
-            prior_log_prob = self._prior.log_prob(expit(optimize_inits))
-
-            likelihood = posterior_log_prob - prior_log_prob
-            loss = -likelihood.sum()
-
-            loss.backward()
-            optimizer.step()
-
-        # Evaluate the optimized locations and pick the best one.
-        log_probs_of_optimized = self.log_prob(
-            expit(optimize_inits), x=x, norm_posterior=False
-        ) - self._prior.log_prob(expit(optimize_inits))
-        best_theta = optimize_inits[torch.argmax(log_probs_of_optimized)]
-
-        return expit(best_theta)
 
 
 class PotentialFunctionProvider:
@@ -621,7 +497,11 @@ class PotentialFunctionProvider:
     """
 
     def __call__(
-        self, prior, posterior_nn: nn.Module, x: Tensor, mcmc_method: str,
+        self,
+        prior,
+        posterior_nn: nn.Module,
+        x: Tensor,
+        mcmc_method: str,
     ) -> Callable:
         """Return potential function.
 
@@ -657,7 +537,8 @@ class PotentialFunctionProvider:
 
         with torch.set_grad_enabled(False):
             target_log_prob = self.posterior_nn.log_prob(
-                inputs=theta.to(self.x.device), context=x_repeated,
+                inputs=theta.to(self.x.device),
+                context=x_repeated,
             )
             is_within_prior = torch.isfinite(self.prior.log_prob(theta))
             target_log_prob[~is_within_prior] = -float("Inf")

@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Union
 from warnings import warn
 
 import numpy as np
@@ -64,7 +64,10 @@ class LikelihoodBasedPosterior(NeuralPosterior):
         )
 
     def log_prob(
-        self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False,
+        self,
+        theta: Tensor,
+        x: Optional[Tensor] = None,
+        track_gradients: bool = False,
     ) -> Tensor:
         r"""
         Returns the log-probability of $p(x|\theta) \cdot p(\theta).$
@@ -215,6 +218,67 @@ class LikelihoodBasedPosterior(NeuralPosterior):
             mcmc_parameters,
         )
 
+    def map(
+        self,
+        x: Optional[Tensor] = None,
+        num_iter: int = 1000,
+        learning_rate: float = 1e-2,
+        init_method: Union[str, Tensor] = "posterior",
+        num_init_samples: int = 500,
+        num_to_optimize: int = 100,
+        save_best_every: int = 10,
+        show_progress_bars: bool = True,
+    ) -> Tensor:
+        """
+        Returns the maximum-a-posteriori estimate (MAP).
+
+        The method can be interrupted (Ctrl-C) when the user sees that the
+        log-probability converges. The best estimate will be saved in `self.map_`.
+
+        The MAP is obtained by running gradient ascent from a given number of starting
+        positions (samples from the posterior with the highest log-probability). After
+        the optimization is done, we select the parameter set that has the highest
+        log-probability after the optimization.
+
+        Warning: The default values used by this function are not well-tested. They
+        might require hand-tuning for the problem at hand.
+
+        Args:
+            x: Conditioning context for posterior $p(\theta|x)$. If not provided,
+                fall back onto `x` passed to `set_default_x()`.
+            num_iter: Number of optimization steps that the algorithm takes
+                to find the MAP.
+            learning_rate: Learning rate of the optimizer.
+            init_method: How to select the starting parameters for the optimization. If
+                it is a string, it can be either [`posterior`, `prior`], which samples
+                the respective distribution `num_init_samples` times. If it is a,
+                the tensor will be used as init locations.
+            num_init_samples: Draw this number of samples from the posterior and
+                evaluate the log-probability of all of them.
+            num_to_optimize: From the drawn `num_init_samples`, use the
+                `num_to_optimize` with highest log-probability as the initial points
+                for the optimization.
+            save_best_every: The best log-probability is computed, saved in the
+                `map`-attribute, and printed every `print_best_every`-th iteration.
+                Computing the best log-probability creates a significant overhead
+                (thus, the default is `10`.)
+            show_progress_bars: Whether or not to show a progressbar for sampling from
+                the posterior.
+
+        Returns:
+            The MAP estimate.
+        """
+        return super().map(
+            x=x,
+            num_iter=num_iter,
+            learning_rate=learning_rate,
+            init_method=init_method,
+            num_init_samples=num_init_samples,
+            num_to_optimize=num_to_optimize,
+            save_best_every=save_best_every,
+            show_progress_bars=show_progress_bars,
+        )
+
 
 class PotentialFunctionProvider:
     """
@@ -236,7 +300,11 @@ class PotentialFunctionProvider:
     """
 
     def __call__(
-        self, prior, likelihood_nn: nn.Module, x: Tensor, mcmc_method: str,
+        self,
+        prior,
+        likelihood_nn: nn.Module,
+        x: Tensor,
+        mcmc_method: str,
     ) -> Callable:
         r"""Return potential function for posterior $p(\theta|x)$.
 

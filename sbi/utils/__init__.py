@@ -16,10 +16,13 @@ from sbi.utils.restriction_estimator import RestrictedPrior, RestrictionEstimato
 from sbi.utils.sbiutils import (
     batched_mixture_mv,
     batched_mixture_vmv,
+    check_if_boxuniform,
     clamp_and_warn,
     del_entries,
+    expit,
     get_simulations_since_round,
     handle_invalid_x,
+    logit,
     mask_sims_from_prior,
     sample_posterior_within_prior,
     standardizing_net,

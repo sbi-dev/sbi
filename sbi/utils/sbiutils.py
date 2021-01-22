@@ -2,7 +2,7 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 import logging
-from typing import Any, Dict, List, Sequence, Tuple, Union
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 import torch
 from pyknos.nflows import transforms
@@ -10,6 +10,8 @@ from torch import Tensor, as_tensor
 from torch import nn as nn
 from torch import ones, zeros
 from tqdm.auto import tqdm
+
+from sbi.utils.torchutils import BoxUniform
 
 
 def x_shape_from_simulation(batch_x: Tensor) -> torch.Size:
@@ -371,3 +373,65 @@ def batched_mixture_mv(matrix: Tensor, vector: Tensor) -> Tensor:
         Product (matrix * vector) of shape (batch_dim, num_components, parameter_dim).
     """
     return torch.einsum("bcij,bcj -> bci", matrix, vector)
+
+
+def expit(theta_t: Tensor, lower_bound: Tensor, upper_bound: Tensor) -> Tensor:
+    """
+    Return the expit() of an input.
+
+    The `expit` transforms an unbounded input to the interval
+    `[lower_bound, upper_bound]`.
+
+    Args:
+        theta_t: Input to be transformed.
+        lower_bound: Lower bound of the transformation.
+        upper_bound: Upper bound of the transformation.
+
+    Returns: theta that is bounded between `lower_bound` and `upper_bound`.
+    """
+    range_ = upper_bound - lower_bound
+    return range_ / (1 + torch.exp(-theta_t)) + lower_bound
+
+
+def logit(theta: Tensor, lower_bound: Tensor, upper_bound: Tensor) -> Tensor:
+    """
+    Return the logit() of an input.
+
+    The `logit` maps the interval `[lower_bound, upper_bound]` to an unbounded space.
+
+    Args:
+        theta: Input to be transformed.
+        lower_bound: Lower bound of the transformation.
+        upper_bound: Upper bound of the transformation.
+
+    Returns: theta_t that is unbounded.
+    """
+    range_ = upper_bound - lower_bound
+    theta_01 = (theta - lower_bound) / range_
+
+    return torch.log(theta_01 / (1 - theta_01))
+
+
+def check_if_boxuniform(dist) -> Tuple[bool, Optional[BoxUniform]]:
+    """Returns whether the `dist` is `BoxUniform` as well as the `BoxUniform` itself.
+
+    When the user called `prepare_for_sbi`, the distribution will in fact be a
+    `PytorchReturnTypeWrapper`. Thus, we need additional checks.
+
+    Args:
+        dist: Distribution to be checked.
+
+    Returns:
+        Whether the `dist` is `BoxUniform` and the `BoxUniform` itself.
+    """
+    if isinstance(dist, BoxUniform):
+        is_boxuniform = True
+        box_dist = dist
+    elif hasattr(dist, "prior") and isinstance(dist.prior, BoxUniform):
+        is_boxuniform = True
+        box_dist = dist.prior
+    else:
+        is_boxuniform = False
+        box_dist = None
+
+    return is_boxuniform, box_dist
