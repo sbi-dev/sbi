@@ -4,15 +4,16 @@
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from math import ceil
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from warnings import warn
 
 import numpy as np
 import torch
 from pyro.infer.mcmc import HMC, NUTS
 from pyro.infer.mcmc.api import MCMC
-from torch import Tensor
+from torch import Tensor, float32
 from torch import multiprocessing as mp
-from torch import nn
+from torch import nn, optim
 
 from sbi import utils as utils
 from sbi.mcmc import (
@@ -25,6 +26,7 @@ from sbi.mcmc import (
 )
 from sbi.types import Array, Shape
 from sbi.user_input.user_input_checks import process_x
+from sbi.utils.sbiutils import check_if_boxuniform
 from sbi.utils.torchutils import (
     ScalarFloat,
     atleast_2d_float32_tensor,
@@ -180,7 +182,10 @@ class NeuralPosterior(ABC):
 
     @abstractmethod
     def log_prob(
-        self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False,
+        self,
+        theta: Tensor,
+        x: Optional[Tensor] = None,
+        track_gradients: bool = False,
     ) -> Tensor:
         """See child classes for docstring."""
         pass
@@ -208,7 +213,7 @@ class NeuralPosterior(ABC):
 
         Args:
             posterior: Posterior that the hyperparameters are copied from.
-        
+
         Returns: Posterior object with the same hyperparameters as the passed posterior.
             This makes the call chainable:
             `posterior = infer.build_posterior().copy_hyperparameters_from(proposal)`
@@ -232,7 +237,9 @@ class NeuralPosterior(ABC):
         return self
 
     def _prepare_theta_and_x_for_log_prob_(
-        self, theta: Tensor, x: Optional[Tensor] = None,
+        self,
+        theta: Tensor,
+        x: Optional[Tensor] = None,
     ) -> Tuple[Tensor, Tensor]:
         r"""Returns $\theta$ and $x$ in shape that can be used by posterior.log_prob().
 
@@ -582,6 +589,187 @@ class NeuralPosterior(ABC):
 
         return samples.reshape((*sample_shape, -1))
 
+    def map(
+        self,
+        x: Optional[Tensor] = None,
+        num_iter: int = 1000,
+        learning_rate: float = 0.1,
+        init_method: Union[str, Tensor] = "posterior",
+        num_init_samples: int = 1_000,
+        num_to_optimize: int = 100,
+        save_best_every: int = 10,
+        show_progress_bars: bool = True,
+        log_prob_kwargs: Dict = {},
+    ) -> Tensor:
+        """
+        Returns the maximum-a-posteriori estimate (MAP).
+
+        The method can be interrupted (Ctrl-C) when the user sees that the
+        log-probability converges. The best estimate will be saved in `self.map_`.
+
+        The MAP is obtained by running gradient ascent from a given number of starting
+        positions (samples from the posterior with the highest log-probability). After
+        the optimization is done, we select the parameter set that has the highest
+        log-probability after the optimization.
+
+        For developers: if the prior is a `BoxUniform`, we carry out the optimization
+        in unbounded space and transform the result back into bounded space.
+
+        Args:
+            x: Conditioning context for posterior $p(\theta|x)$. If not provided,
+                fall back onto `x` passed to `set_default_x()`.
+            num_iter: Number of optimization steps that the algorithm takes
+                to find the MAP.
+            learning_rate: Learning rate of the optimizer.
+            init_method: How to select the starting parameters for the optimization. If
+                it is a string, it can be either [`posterior`, `prior`], which samples
+                the respective distribution `num_init_samples` times. If it is a
+                tensor, the tensor will be used as init locations.
+            num_init_samples: Draw this number of samples from the posterior and
+                evaluate the log-probability of all of them.
+            num_to_optimize: From the drawn `num_init_samples`, use the
+                `num_to_optimize` with highest log-probability as the initial points
+                for the optimization.
+            save_best_every: The best log-probability is computed, saved in the
+                `map`-attribute, and printed every `save_best_every`-th iteration.
+                Computing the best log-probability creates a significant overhead
+                (thus, the default is `10`.)
+            show_progress_bars: Whether or not to show a progressbar for sampling from
+                the posterior.
+            log_prob_kwargs: Will be empty for SNLE and SNRE. Will contain
+                {'norm_posterior': True} for SNPE.
+
+        Returns:
+            The MAP estimate.
+        """
+
+        warn(
+            "This method for obtaining the MAP estimate was introduced recently "
+            "(sbi v0.15.0) and has not been tested extensively yet. You might have to "
+            "tune the hyperparameters, especially `num_iter` and `learning_rate`. If "
+            "you experience problems, please create an issue on Github: "
+            "https://github.com/mackelab/sbi/issues"
+        )
+
+        # If the prior is `BoxUniform`, define a transformation to optimize in
+        # unbounded space.
+        is_boxuniform, boxuniform = check_if_boxuniform(self._prior)
+        if is_boxuniform:
+
+            def tf_inv(theta_t):
+                return utils.expit(
+                    theta_t,
+                    torch.as_tensor(boxuniform.support.lower_bound, dtype=float32),
+                    torch.as_tensor(boxuniform.support.upper_bound, dtype=float32),
+                )
+
+            def tf(theta):
+                return utils.logit(
+                    theta,
+                    torch.as_tensor(boxuniform.support.lower_bound, dtype=float32),
+                    torch.as_tensor(boxuniform.support.upper_bound, dtype=float32),
+                )
+
+        else:
+
+            def tf_inv(theta_t):
+                return theta_t
+
+            def tf(theta):
+                return theta
+
+        if isinstance(init_method, str):
+            # Find initial position.
+            if init_method == "posterior":
+                inits = self.sample(
+                    (num_init_samples,), x=x, show_progress_bars=show_progress_bars
+                )
+            elif init_method == "prior":
+                inits = self._prior.sample((num_init_samples,))
+            elif isinstance(init_method, Tensor):
+                inits = init_method
+            else:
+                raise NameError(
+                    "`init_method` not specified. Use either `posterior` "
+                    "or `prior` or provide a tensor."
+                )
+        else:
+            inits = init_method
+
+        init_probs = self.log_prob(inits, x=x, **log_prob_kwargs)
+
+        # Pick the `num_to_optimize` best init locations.
+        sort_indices = torch.argsort(init_probs, dim=0)
+        sorted_inits = inits[sort_indices]
+        optimize_inits = sorted_inits[-num_to_optimize:]
+
+        # The `_overall` variables store data accross the iterations, whereas the
+        # `_iter` variables contain data exclusively extracted from the current
+        # iteration.
+        best_log_prob_iter = torch.max(init_probs)
+        best_theta_iter = sorted_inits[-1]
+        best_theta_overall = best_theta_iter.detach().clone()
+        best_log_prob_overall = best_log_prob_iter.detach().clone()
+
+        self.map_ = best_theta_overall
+
+        optimize_inits = tf(optimize_inits)
+        optimize_inits.requires_grad_(True)
+        optimizer = optim.Adam([optimize_inits], lr=learning_rate)
+
+        iter_ = 0
+
+        # Try-except block in case the user interrupts the program and wants to fall
+        # back on the last saved `.map_`. We want to avoid a long error-message here.
+        try:
+
+            while iter_ < num_iter:
+
+                optimizer.zero_grad()
+                probs = self.log_prob(
+                    tf_inv(optimize_inits), x=x, track_gradients=True, **log_prob_kwargs
+                ).squeeze()
+                loss = -probs.sum()
+                loss.backward()
+                optimizer.step()
+
+                with torch.no_grad():
+                    if iter_ % save_best_every == 0 or iter_ == num_iter - 1:
+                        # Evaluate the optimized locations and pick the best one.
+                        log_probs_of_optimized = self.log_prob(
+                            tf_inv(optimize_inits), x=x, **log_prob_kwargs
+                        )
+                        best_theta_iter = optimize_inits[
+                            torch.argmax(log_probs_of_optimized)
+                        ]
+                        best_log_prob_iter = self.log_prob(
+                            tf_inv(best_theta_iter), x=x, **log_prob_kwargs
+                        )
+                        if best_log_prob_iter > best_log_prob_overall:
+                            best_theta_overall = best_theta_iter.detach().clone()
+                            best_log_prob_overall = best_log_prob_iter.detach().clone()
+
+                    print(
+                        f"Optimizing MAP estimate. Iterations: "
+                        f"{iter_+1} / {num_iter}.    "
+                        f"Performance in iteration "
+                        f"{divmod(iter_+1, save_best_every)[0] * save_best_every}: "
+                        f"{best_log_prob_iter.item():.2f} (= unnormalized log-prob)",
+                        end="\r",
+                    )
+                    self.map_ = tf_inv(best_theta_overall)
+
+                iter_ += 1
+
+        except KeyboardInterrupt:
+            print(
+                f"Optimization was interrupted after {iter_} iterations. The last "
+                "estimate of the MAP can be accessed via the `posterior.map_` "
+                "attribute."
+            )
+
+        return tf_inv(best_theta_overall)
+
     def _build_mcmc_init_fn(
         self,
         prior: Any,
@@ -776,7 +964,13 @@ class ConditionalPotentialFunctionProvider:
         self.condition = ensure_theta_batched(condition)
         self.dims_to_sample = dims_to_sample
 
-    def __call__(self, prior, net: nn.Module, x: Tensor, mcmc_method: str,) -> Callable:
+    def __call__(
+        self,
+        prior,
+        net: nn.Module,
+        x: Tensor,
+        mcmc_method: str,
+    ) -> Callable:
         """Return potential function.
 
         Switch on numpy or pyro potential function based on `mcmc_method`.
@@ -844,7 +1038,9 @@ class RestrictedPriorForConditional:
     """
 
     def __init__(
-        self, full_prior: Any, dims_to_sample: List[int],
+        self,
+        full_prior: Any,
+        dims_to_sample: List[int],
     ):
         self.full_prior = full_prior
         self.dims_to_sample = dims_to_sample

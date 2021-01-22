@@ -37,7 +37,11 @@ def test_api_sre_on_linearGaussian(num_dim: int):
     prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
 
     simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior)
-    inference = SRE(prior, classifier="resnet", show_progress_bars=False,)
+    inference = SRE(
+        prior,
+        classifier="resnet",
+        show_progress_bars=False,
+    )
 
     theta, x = simulate_for_sbi(simulator, prior, 1000, simulation_batch_size=50)
     _ = inference.append_simulations(theta, x).train(max_num_epochs=5)
@@ -87,7 +91,11 @@ def test_c2st_sre_on_linearGaussian_different_dims(set_seed):
         )
 
     simulator, prior = prepare_for_sbi(simulator, prior)
-    inference = SRE(prior, classifier="resnet", show_progress_bars=False,)
+    inference = SRE(
+        prior,
+        classifier="resnet",
+        show_progress_bars=False,
+    )
 
     theta, x = simulate_for_sbi(simulator, prior, 5000, simulation_batch_size=50)
     _ = inference.append_simulations(theta, x).train()
@@ -109,7 +117,10 @@ def test_c2st_sre_on_linearGaussian_different_dims(set_seed):
     ),
 )
 def test_c2st_sre_on_linearGaussian(
-    num_dim: int, prior_str: str, method_str: str, set_seed,
+    num_dim: int,
+    prior_str: str,
+    method_str: str,
+    set_seed,
 ):
     """Test c2st accuracy of inference with SRE on linear Gaussian model.
 
@@ -144,7 +155,11 @@ def test_c2st_sre_on_linearGaussian(
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     simulator, prior = prepare_for_sbi(simulator, prior)
-    kwargs = dict(prior=prior, classifier="resnet", show_progress_bars=False,)
+    kwargs = dict(
+        prior=prior,
+        classifier="resnet",
+        show_progress_bars=False,
+    )
 
     inference = SRE(**kwargs) if method_str == "sre" else AALR(**kwargs)
 
@@ -157,6 +172,8 @@ def test_c2st_sre_on_linearGaussian(
 
     # Check performance based on c2st accuracy.
     check_c2st(samples, target_samples, alg=f"sre-{prior_str}-{method_str}")
+
+    map_ = posterior.map(num_init_samples=1_000, init_method="prior")
 
     # Checks for log_prob()
     if prior_str == "gaussian" and method_str == "aalr":
@@ -174,12 +191,17 @@ def test_c2st_sre_on_linearGaussian(
         assert (
             dkl < max_dkl
         ), f"KLd={dkl} is more than 2 stds above the average performance."
+
+        assert ((map_ - gt_posterior.mean) ** 2).sum() < 0.5
+
     if prior_str == "uniform":
         # Check whether the returned probability outside of the support is zero.
         posterior_prob = get_prob_outside_uniform_prior(posterior, num_dim)
         assert (
             posterior_prob == 0.0
         ), "The posterior probability outside of the prior support is not zero"
+
+        assert ((map_ - ones(num_dim)) ** 2).sum() < 0.5
 
 
 @pytest.mark.slow
@@ -209,7 +231,11 @@ def test_api_sre_sampling_methods(mcmc_method: str, prior_str: str, set_seed):
         prior = utils.BoxUniform(low=-1.0 * ones(num_dim), high=ones(num_dim))
 
     simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior)
-    inference = SRE(prior, classifier="resnet", show_progress_bars=False,)
+    inference = SRE(
+        prior,
+        classifier="resnet",
+        show_progress_bars=False,
+    )
 
     theta, x = simulate_for_sbi(simulator, prior, 200, simulation_batch_size=50)
     _ = inference.append_simulations(theta, x).train(max_num_epochs=5)
