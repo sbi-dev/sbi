@@ -3,6 +3,7 @@
 
 from typing import Any, Callable, Dict, List, Optional
 
+import cma
 import numpy as np
 import torch
 from torch import Tensor, log, nn
@@ -164,9 +165,8 @@ class DirectPosterior(NeuralPosterior):
 
         Args:
             theta: Parameters $\theta$.
-            x: Conditioning context for posterior $p(\theta|x)$. If not provided, fall
-                back onto an `x_o` if previously provided for multi-round training, or
-                to another default if set later for convenience, see `.set_default_x()`.
+            x: Conditioning context for posterior $p(\theta|x)$. If not provided,
+                fall back onto `x` passed to `set_default_x()`.
             norm_posterior: Whether to enforce a normalized posterior density.
                 Renormalization of the posterior is useful when some
                 probability falls out or leaks out of the prescribed prior support.
@@ -293,8 +293,7 @@ class DirectPosterior(NeuralPosterior):
                 sample_shape is multidimensional we simply draw `sample_shape.numel()`
                 samples and then reshape into the desired shape.
             x: Conditioning context for posterior $p(\theta|x)$. If not provided,
-                fall back onto `x_o` if previously provided for multiround training, or
-                to a set default (see `set_default_x()` method).
+                fall back onto `x` passed to `set_default_x()`.
             show_progress_bars: Whether to show sampling progress monitor.
             sample_with_mcmc: Optional parameter to override `self.sample_with_mcmc`.
             mcmc_method: Optional parameter to override `self.mcmc_method`.
@@ -389,8 +388,7 @@ class DirectPosterior(NeuralPosterior):
                 specified in `dims_to_sample` will be fixed to values given in
                 `condition`.
             x: Conditioning context for posterior $p(\theta|x)$. If not provided,
-                fall back onto `x_o` if previously provided for multiround training, or
-                to a set default (see `set_default_x()` method).
+                fall back onto `x` passed to `set_default_x()`.
             show_progress_bars: Whether to show sampling progress monitor.
             mcmc_method: Optional parameter to override `self.mcmc_method`.
             mcmc_parameters: Dictionary overriding the default parameters for MCMC.
@@ -416,6 +414,111 @@ class DirectPosterior(NeuralPosterior):
             mcmc_method,
             mcmc_parameters,
         )
+
+    def map_estimate(
+        self,
+        x: Optional[Tensor] = None,
+        num_init_samples: int = 10_000,
+        show_progress_bars: bool = False,
+    ) -> Tensor:
+        """
+        Returns the maximum-a-posteriori estimate (MAP).
+
+        The MAP is obtained by searching with a genetic algorithm.
+
+        Args:
+            x: Conditioning context for posterior $p(\theta|x)$. If not provided,
+                fall back onto `x` passed to `set_default_x()`.
+            num_init_samples: Draw this number of samples from the posterior, evaluate
+                the log-probability of all of them, and use the one with highest
+                log-probability as the initial point for the genetic algorithm.
+            show_progress_bars: Whether or not to show a progressbar for sampling from
+                the posterior.
+
+        Returns: The MAP estimate.
+        """
+
+        # Find initial position.
+        inits = self.sample((num_init_samples,), show_progress_bars=show_progress_bars)
+        init_probs = self.log_prob(inits, x=x, norm_posterior=False)
+        init = inits[torch.argmax(init_probs.squeeze())]
+
+        prior_std = self._prior.sample((10_000,)).std(dim=0)
+
+        def optimizer_loss(theta):
+            log_prob = self.log_prob(
+                torch.as_tensor(theta, dtype=torch.float32), x=x, norm_posterior=False,
+            ).squeeze()
+
+            if log_prob.item() > float("-inf"):
+                return (-log_prob).item()
+            else:
+                # `cma` keeps printing warnings if log-prob is -inf.
+                return torch.min(init_probs).item() - 1e5
+
+        # Optimize using genetic algorithm.
+        es = cma.CMAEvolutionStrategy(
+            init.numpy().tolist(),
+            0.1,
+            {"scaling_of_variables": prior_std, "verb_log": 0, "verb_disp": 0},
+        )
+        es.optimize(optimizer_loss)
+
+        return torch.as_tensor(es.best.x, dtype=torch.float32)
+
+    def mle_estimate(
+        self,
+        x: Optional[Tensor] = None,
+        num_init_samples: int = 10_000,
+        show_progress_bars: bool = False,
+    ) -> Tensor:
+        """
+        Returns the maximum-likelihood estimate (MLE) on the prior support.
+
+        The MLE is obtained by searching with a genetic algorithm.
+
+        Args:
+            x: Conditioning context for posterior $p(\theta|x)$. If not provided,
+                fall back onto `x` passed to `set_default_x()`.
+            num_init_samples: Draw this number of samples from the posterior, evaluate
+                the log-probability of all of them, and use the one with highest
+                log-probability as the initial point for the genetic algorithm.
+            show_progress_bars: Whether or not to show a progressbar for sampling from
+                the posterior.
+
+        Returns: The MLE estimate.
+        """
+
+        # Find initial position.
+        inits = self.sample((num_init_samples,), show_progress_bars=show_progress_bars)
+        init_probs = self.log_prob(
+            inits, x=x, norm_posterior=False
+        ) / self._prior.log_prob(inits)
+        init = inits[torch.argmax(init_probs.squeeze())]
+
+        prior_std = self._prior.sample((10_000,)).std(dim=0)
+
+        def optimizer_loss(theta):
+            theta_tensor = torch.as_tensor(theta, dtype=torch.float32)
+
+            if self._prior.log_prob(theta_tensor) > float("-inf"):
+                log_prob = (
+                    self.log_prob(theta_tensor, x=x, norm_posterior=False,)
+                    / self._prior.log_prob(theta_tensor).squeeze()
+                )
+                return (-log_prob).item()
+            else:
+                return torch.min(init_probs).item() - 1e5
+
+        # Optimize using genetic algorithm.
+        es = cma.CMAEvolutionStrategy(
+            init.numpy().tolist(),
+            0.001,
+            {"scaling_of_variables": prior_std, "verb_log": 0, "verb_disp": 0},
+        )
+        es.optimize(optimizer_loss)
+
+        return torch.as_tensor(es.best.x, dtype=torch.float32)
 
 
 class PotentialFunctionProvider:

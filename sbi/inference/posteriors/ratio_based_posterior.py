@@ -1,13 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    List,
-    Optional,
-)
+from typing import Any, Callable, Dict, List, Optional
 from warnings import warn
 
 import numpy as np
@@ -17,11 +11,7 @@ from torch import Tensor, nn
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.types import Shape
 from sbi.utils import del_entries
-from sbi.utils.torchutils import (
-    ScalarFloat,
-    ensure_theta_batched,
-    ensure_x_batched,
-)
+from sbi.utils.torchutils import ScalarFloat, ensure_theta_batched, ensure_x_batched
 
 
 class RatioBasedPosterior(NeuralPosterior):
@@ -83,9 +73,8 @@ class RatioBasedPosterior(NeuralPosterior):
 
         Args:
             theta: Parameters $\theta$.
-            x: Conditioning context for posterior $p(\theta|x)$. If not provided, fall
-                back onto an `x_o` if previously provided for multi-round training, or
-                to another default if set later for convenience, see `.set_default_x()`.
+            x: Conditioning context for posterior $p(\theta|x)$. If not provided,
+                fall back onto `x` passed to `set_default_x()`.
             track_gradients: Whether the returned tensor supports tracking gradients.
                 This can be helpful for e.g. sensitivity analysis, but increases memory
                 consumption.
@@ -141,8 +130,7 @@ class RatioBasedPosterior(NeuralPosterior):
                 sample_shape is multidimensional we simply draw `sample_shape.numel()`
                 samples and then reshape into the desired shape.
             x: Conditioning context for posterior $p(\theta|x)$. If not provided,
-                fall back onto `x_o` if previously provided for multiround training, or
-                to a set default (see `set_default_x()` method).
+                fall back onto `x` passed to `set_default_x()`.
             show_progress_bars: Whether to show sampling progress monitor.
             sample_with_mcmc: Optional parameter to override `self.sample_with_mcmc`.
             mcmc_method: Optional parameter to override `self.mcmc_method`.
@@ -214,8 +202,7 @@ class RatioBasedPosterior(NeuralPosterior):
                 specified in `dims_to_sample` will be fixed to values given in
                 `condition`.
             x: Conditioning context for posterior $p(\theta|x)$. If not provided,
-                fall back onto `x_o` if previously provided for multiround training, or
-                to a set default (see `set_default_x()` method).
+                fall back onto `x` passed to `set_default_x()`.
             show_progress_bars: Whether to show sampling progress monitor.
             mcmc_method: Optional parameter to override `self.mcmc_method`.
             mcmc_parameters: Dictionary overriding the default parameters for MCMC.
