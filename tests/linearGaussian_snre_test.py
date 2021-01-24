@@ -61,7 +61,7 @@ def test_c2st_sre_on_linearGaussian_different_dims(set_seed):
     discard_dims = theta_dim - x_dim
 
     x_o = ones(1, x_dim)
-    num_samples = 1000
+    num_samples = 130
 
     likelihood_shift = -1.0 * ones(
         x_dim
@@ -89,7 +89,7 @@ def test_c2st_sre_on_linearGaussian_different_dims(set_seed):
     simulator, prior = prepare_for_sbi(simulator, prior)
     inference = SRE(prior, classifier="resnet", show_progress_bars=False,)
 
-    theta, x = simulate_for_sbi(simulator, prior, 5000, simulation_batch_size=50)
+    theta, x = simulate_for_sbi(simulator, prior, 100, simulation_batch_size=50)
     _ = inference.append_simulations(theta, x).train()
     posterior = inference.build_posterior()
     samples = posterior.sample((num_samples,), x=x_o, mcmc_parameters={"thin": 3})
