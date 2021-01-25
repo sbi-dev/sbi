@@ -2,6 +2,7 @@
 
 ## Major changes
 - Active subspaces for sensitivity analysis (#394, [tutorial](https://www.mackelab.org/sbi/tutorial/09_sensitivity_analysis/))
+- Method to compute the maximum-a-posteriori estimate from the posterior (#412)
 
 ## API changes
 - `pairplot()`, `conditional_pairplot()`, and `conditional_corrcoeff()` should now be imported from `sbi.analysis` instead of `sbi.utils` (#394).
@@ -9,6 +10,7 @@
 
 ## Minor changes
 - Depend on new `joblib=1.0.0` and fix progress bar updates for multiprocessing (#421).
+- Fix for embedding nets with `SNRE` (thanks @adittmann, #425)
 
 
 # v0.14.3

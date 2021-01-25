@@ -18,6 +18,7 @@ from sbi.types import TensorboardSummaryWriter
 from sbi.utils import (
     batched_mixture_mv,
     batched_mixture_vmv,
+    check_if_boxuniform,
     clamp_and_warn,
     del_entries,
     repeat_rows,
@@ -163,7 +164,7 @@ class SNPE_C(PosteriorEstimator):
                     isinstance(proposal.net._distribution, mdn)
                     and isinstance(self._neural_net._distribution, mdn)
                     and (
-                        isinstance(self._prior, utils.BoxUniform)
+                        check_if_boxuniform(self._prior)[0]
                         or isinstance(self._prior, MultivariateNormal)
                     )
                 )

@@ -202,7 +202,9 @@ class NeuralPosterior(ABC):
         """See child classes for docstring."""
         pass
 
-    def copy_hyperparameters_from(self, posterior: "NeuralPosterior"):
+    def copy_hyperparameters_from(
+        self, posterior: "NeuralPosterior"
+    ) -> "NeuralPosterior":
         """
         Copies the hyperparameters from a given posterior to `self`.
 
@@ -214,7 +216,8 @@ class NeuralPosterior(ABC):
         Args:
             posterior: Posterior that the hyperparameters are copied from.
 
-        Returns: Posterior object with the same hyperparameters as the passed posterior.
+        Returns:
+            Posterior object with the same hyperparameters as the passed posterior.
             This makes the call chainable:
             `posterior = infer.build_posterior().copy_hyperparameters_from(proposal)`
         """
@@ -611,6 +614,9 @@ class NeuralPosterior(ABC):
         positions (samples from the posterior with the highest log-probability). After
         the optimization is done, we select the parameter set that has the highest
         log-probability after the optimization.
+
+        Warning: The default values used by this function are not well-tested. They
+        might require hand-tuning for the problem at hand.
 
         For developers: if the prior is a `BoxUniform`, we carry out the optimization
         in unbounded space and transform the result back into bounded space.
