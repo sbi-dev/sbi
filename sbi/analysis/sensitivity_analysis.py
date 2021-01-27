@@ -1,3 +1,6 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+
 import logging
 from copy import deepcopy
 from typing import Any, Callable, Optional, Tuple, Union
@@ -352,7 +355,7 @@ class ActiveSubspace:
 
         return converged
 
-    def find_active(
+    def find_directions(
         self,
         posterior_log_prob_as_property: bool = False,
         norm_gradients_to_prior: bool = True,
@@ -362,7 +365,7 @@ class ActiveSubspace:
         Return eigenvectors and values corresponding to directions of sensitivity.
 
         The directions of sensitivity are the directions along which a specific
-        property changes in the fastest way.
+        property changes in the fastest way. They will have the largest eigenvalues.
 
         This computes the matrix:
         $\mathbf{M} = \mathbb{E}_{p(\theta|x_o)}[\nabla_{\theta} f(\theta)^T \nabla_{\theta}

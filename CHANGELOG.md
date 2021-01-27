@@ -1,8 +1,7 @@
 # v0.15.0
 
-- `pairplot()`, `conditional_pairplot()`, and `conditional_corrcoeff()` should now 
-be imported from `sbi.analysis` instead of `sbi.utils` (#394).
-- Active subspaces for sensitivity analysis (#394)
+- Active subspaces for sensitivity analysis (#394, [tutorial](https://www.mackelab.org/sbi/tutorial/09_sensitivity_analysis/))
+- `pairplot()`, `conditional_pairplot()`, and `conditional_corrcoeff()` should now be imported from `sbi.analysis` instead of `sbi.utils` (#394).
 
 
 # v0.14.3

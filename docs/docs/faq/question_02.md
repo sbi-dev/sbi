@@ -4,9 +4,7 @@ Yes. By default, whenever a simulation returns at least one `NaN` or `inf`, it i
 completely excluded from the training data. In other words, the simulation is simply 
 discarded.
 
-In cases where a very large fraction of simulations return `NaN` or `inf`, discarding 
-many simulations can be wasteful. Hence, it can be 
-beneficial to manually substitute the 'invalid' values with a reasonable replacement. 
+In cases where a very large fraction of simulations return `NaN` or `inf`, discarding many simulations can be wasteful. There are two options to deal with this: Either, you use the `RestrictionEstimator` to learn regions in parameter space that do not produce `NaN` or `inf`, see [here](https://www.mackelab.org/sbi/tutorial/08_restriction_estimator/). Alternatively, you can manually substitute the 'invalid' values with a reasonable replacement. 
 I.e., at the end of your simulation code, you search for invalid entries and replace 
 them with a floating point number. Importantly, in order for neural network training 
 work well, the floating point number should still be in a reasonable range, i.e. maybe a
