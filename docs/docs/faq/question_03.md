@@ -35,9 +35,8 @@ def my_simulator(parameters):
 ### Alternative: parallelize yourself
 
 You can also write your own code to parallelize simulations with whatever 
-multiprocessing framework you prefer. You can then simulate your data outside of `sbi` 
-and pass the simulated data with the `provide_presimulated()` option described 
-[here](https://www.mackelab.org/sbi/tutorial/06_provide_presimulated/).
+multiprocessing framework you prefer. You can then simulate your data outside of `sbi` and pass the simulated data as shown in the 
+[flexible interface](https://www.mackelab.org/sbi/tutorial/02_flexible_interface/): 
 
 
 ### Some more background
