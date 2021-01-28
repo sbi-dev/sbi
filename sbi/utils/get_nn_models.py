@@ -56,8 +56,8 @@ def classifier_nn(
                 z_score_x,
                 z_score_theta,
                 hidden_features,
-                embedding_net_x,
                 embedding_net_theta,
+                embedding_net_x,
             ),
         )
     )

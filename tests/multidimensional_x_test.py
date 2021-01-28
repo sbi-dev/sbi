@@ -47,14 +47,10 @@ class CNNEmbedding(nn.Module):
         ),
         pytest.param(
             nn.Identity,
-            SNRE,
+            SNLE,
             marks=pytest.mark.xfail(reason="SNLE cannot handle multiD x."),
         ),
-        pytest.param(
-            CNNEmbedding,
-            SNLE,
-            marks=pytest.mark.xfail(reason="SNRE cannot handle multiD x."),
-        ),
+        pytest.param(CNNEmbedding, SNRE,),
         pytest.param(CNNEmbedding, SNPE),
     ),
 )
