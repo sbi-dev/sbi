@@ -105,7 +105,7 @@ class RatioBasedPosterior(NeuralPosterior):
         with torch.set_grad_enabled(track_gradients):
             # Send to device for evaluation, send to CPU for comparison with prior.
             log_ratio = (
-                self.net(torch.cat((theta.to(self._device), x.to(self._device)), dim=1))
+                self.net([theta.to(self._device), x.to(self._device)])
                 .reshape(-1)
                 .to("cpu")
             )
@@ -334,15 +334,9 @@ class PotentialFunctionProvider:
             num_batch, *(1 for _ in range(x_batched.ndim - 1))
         )
 
-        assert (
-            x_batched.ndim == 2
-        ), """X must not be multidimensional for ratio-based methods because it will be
-              concatenated with theta."""
         with torch.set_grad_enabled(False):
             log_ratio = (
-                self.classifier(torch.cat((theta.to(self.x.device), x_repeated), dim=1))
-                .reshape(-1)
-                .cpu()
+                self.classifier([theta.to(self.x.device), x_repeated]).reshape(-1).cpu()
             )
 
         # Notice opposite sign to pyro potential.
@@ -366,8 +360,6 @@ class PotentialFunctionProvider:
         theta = ensure_theta_batched(theta)
         x = ensure_x_batched(self.x)
 
-        log_ratio = self.classifier(
-            torch.cat((theta.to(x.device), x), dim=1).reshape(1, -1)
-        ).cpu()
+        log_ratio = self.classifier([theta.to(x.device), x]).cpu()
 
         return -(log_ratio + self.prior.log_prob(theta))

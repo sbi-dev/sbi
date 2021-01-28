@@ -18,12 +18,10 @@ class StandardizeInputs(nn.Module):
         self.dim_y = dim_y
 
     def forward(self, t):
+        assert type(t) is list
+        assert len(t) == 2
         out = torch.cat(
-            [
-                self.embedding_net_x(t[:, : self.dim_x]),
-                self.embedding_net_y(t[:, self.dim_x : self.dim_x + self.dim_y]),
-            ],
-            dim=1,
+            [self.embedding_net_x(t[0]), self.embedding_net_y(t[1]),], dim=1,
         )
         return out
 

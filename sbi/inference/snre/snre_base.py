@@ -200,10 +200,6 @@ class RatioEstimator(NeuralInference, ABC):
                 theta[train_indices], x[train_indices]
             )
             self._x_shape = x_shape_from_simulation(x)
-            assert len(self._x_shape) < 3, (
-                "For now, SNRE cannot handle multi-dimensional simulator output, see "
-                "issue #360."
-            )
 
         self._neural_net.to(self._device)
         optimizer = optim.Adam(list(self._neural_net.parameters()), lr=learning_rate,)
@@ -348,9 +344,7 @@ class RatioEstimator(NeuralInference, ABC):
             batch_size * num_atoms, -1
         )
 
-        theta_and_x = torch.cat((atomic_theta, repeated_x), dim=1)
-
-        return self._neural_net(theta_and_x)
+        return self._neural_net([atomic_theta, repeated_x])
 
     @abstractmethod
     def _loss(self, theta: Tensor, x: Tensor, num_atoms: int) -> Tensor:
