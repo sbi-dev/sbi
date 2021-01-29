@@ -24,7 +24,7 @@ AUTHOR = "Álvaro Tejero-Cantero, Jakob H. Macke, Jan-Matthis Lückmann, Conor M
 REQUIRES_PYTHON = ">=3.6.0"
 
 REQUIRED = [
-    "joblib",
+    "joblib>=1.0.0",
     "matplotlib",
     "numpy",
     "pillow",
