@@ -139,8 +139,9 @@ def pairplot(
     subset: List[int] = None,
     upper: Optional[str] = "hist",
     diag: Optional[str] = "hist",
-    fig_size: Tuple = (10, 10),
+    figsize: Tuple = (10, 10),
     labels: Optional[List[str]] = None,
+    ticks: Union[List, torch.Tensor] = [],
     points_colors: List[str] = plt.rcParams["axes.prop_cycle"].by_key()["color"],
     warn_about_deprecation: bool = True,
     **kwargs
@@ -162,8 +163,9 @@ def pairplot(
             if they exist, the 4th, 5th and so on).
         upper: Plotting style for upper diagonal, {hist, scatter, contour, cond, None}.
         diag: Plotting style for diagonal, {hist, cond, None}.
-        fig_size: Size of the entire figure.
+        figsize: Size of the entire figure.
         labels: List of strings specifying the names of the parameters.
+        ticks: Position of the ticks.
         points_colors: Colors of the `points`.
         warn_about_deprecation: With sbi v0.15.0, we depracated the import of this
             function from `sbi.utils`. Instead, it should be imported from
@@ -187,8 +189,17 @@ def pairplot(
     opts = _get_default_opts()
     # update the defaults dictionary by the current values of the variables (passed by
     # the user)
+
     opts = _update(opts, locals())
     opts = _update(opts, kwargs)
+
+    if "fig_size" in opts.keys():
+        warn(
+            "You passed an argument `fig_size`. Since sbi v0.15.0, the argument "
+            "should be called `figsize`. In future versions, `fig_size` will no longer "
+            "be supported."
+        )
+        opts["figsize"] = opts["fig_size"]
 
     # Prepare samples
     if type(samples) != list:
@@ -364,8 +375,9 @@ def conditional_pairplot(
     ] = None,
     subset: List[int] = None,
     resolution: int = 50,
-    fig_size: Tuple = (10, 10),
+    figsize: Tuple = (10, 10),
     labels: Optional[List[str]] = None,
+    ticks: Union[List, torch.Tensor] = [],
     points_colors: List[str] = plt.rcParams["axes.prop_cycle"].by_key()["color"],
     warn_about_deprecation: bool = True,
     **kwargs
@@ -396,8 +408,9 @@ def conditional_pairplot(
             plot only the 1st and 3rd dimension but will discard the 0th and 2nd (and,
             if they exist, the 4th, 5th and so on)
         resolution: Resolution of the grid at which we evaluate the `pdf`.
-        fig_size: Size of the entire figure.
+        figsize: Size of the entire figure.
         labels: List of strings specifying the names of the parameters.
+        ticks: Position of the ticks.
         points_colors: Colors of the `points`.
         warn_about_deprecation: With sbi v0.15.0, we depracated the import of this
             function from `sbi.utils`. Instead, it should be imported from
@@ -424,6 +437,14 @@ def conditional_pairplot(
     # the user)
     opts = _update(opts, locals())
     opts = _update(opts, kwargs)
+
+    if "fig_size" in opts.keys():
+        warn(
+            "You passed an argument `fig_size`. Since sbi v0.15.0, the argument "
+            "should be called `figsize`. In future versions, `fig_size` will no longer "
+            "be supported."
+        )
+        opts["figsize"] = opts["fig_size"]
 
     # Dimensions
     dim = condition.shape[-1]
@@ -504,7 +525,7 @@ def _pairplot_scaffold(diag_func, upper_func, dim, limits, points, opts):
         limits: Limits for each parameter.
         points: Additional points to be scatter-plotted.
         opts: Dictionary built by the functions that call `pairplot_scaffold`. Must
-            contain at least `labels`, `ticks`, `subset`, `fig_size`, `subplots`,
+            contain at least `labels`, `subset`, `figsize`, `subplots`,
             `fig_subplots_adjust`, `title`, `title_format`, ..
 
     Returns: figure and axis
@@ -550,7 +571,7 @@ def _pairplot_scaffold(diag_func, upper_func, dim, limits, points, opts):
             raise NotImplementedError
         rows = cols = len(subset)
 
-    fig, axes = plt.subplots(rows, cols, figsize=opts["fig_size"], **opts["subplots"])
+    fig, axes = plt.subplots(rows, cols, figsize=opts["figsize"], **opts["subplots"])
     # Cast to ndarray in case of 1D subplots.
     axes = np.array(axes).reshape(rows, cols)
 
@@ -707,7 +728,6 @@ def _get_default_opts():
         # colors
         "samples_colors": plt.rcParams["axes.prop_cycle"].by_key()["color"],
         # ticks
-        "ticks": [],
         "tickformatter": mpl.ticker.FormatStrFormatter("%g"),
         "tick_labels": None,
         # options for hist

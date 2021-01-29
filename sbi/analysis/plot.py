@@ -28,8 +28,9 @@ def pairplot(
     subset: List[int] = None,
     upper: Optional[str] = "hist",
     diag: Optional[str] = "hist",
-    fig_size: Tuple = (10, 10),
+    figsize: Tuple = (10, 10),
     labels: Optional[List[str]] = None,
+    ticks: Union[List, torch.Tensor] = [],
     points_colors: List[str] = plt.rcParams["axes.prop_cycle"].by_key()["color"],
     **kwargs
 ):
@@ -50,8 +51,9 @@ def pairplot(
             if they exist, the 4th, 5th and so on).
         upper: Plotting style for upper diagonal, {hist, scatter, contour, cond, None}.
         diag: Plotting style for diagonal, {hist, cond, None}.
-        fig_size: Size of the entire figure.
+        figsize: Size of the entire figure.
         labels: List of strings specifying the names of the parameters.
+        ticks: Position of the ticks.
         points_colors: Colors of the `points`.
         **kwargs: Additional arguments to adjust the plot, see the source code in
             `_get_default_opts()` in `sbi.utils.plot` for more details.
@@ -65,8 +67,9 @@ def pairplot(
         subset=subset,
         upper=upper,
         diag=diag,
-        fig_size=fig_size,
+        figsize=figsize,
         labels=labels,
+        ticks=ticks,
         points_colors=points_colors,
         warn_about_deprecation=False,
         **kwargs,
@@ -82,8 +85,9 @@ def conditional_pairplot(
     ] = None,
     subset: List[int] = None,
     resolution: int = 50,
-    fig_size: Tuple = (10, 10),
+    figsize: Tuple = (10, 10),
     labels: Optional[List[str]] = None,
+    ticks: Union[List, torch.Tensor] = [],
     points_colors: List[str] = plt.rcParams["axes.prop_cycle"].by_key()["color"],
     **kwargs
 ):
@@ -113,8 +117,9 @@ def conditional_pairplot(
             plot only the 1st and 3rd dimension but will discard the 0th and 2nd (and,
             if they exist, the 4th, 5th and so on)
         resolution: Resolution of the grid at which we evaluate the `pdf`.
-        fig_size: Size of the entire figure.
+        figsize: Size of the entire figure.
         labels: List of strings specifying the names of the parameters.
+        ticks: Position of the ticks.
         points_colors: Colors of the `points`.
         **kwargs: Additional arguments to adjust the plot, see the source code in
             `_get_default_opts()` in `sbi.utils.plot` for more details.
@@ -128,8 +133,9 @@ def conditional_pairplot(
         points=points,
         subset=subset,
         resolution=resolution,
-        fig_size=fig_size,
+        figsize=figsize,
         labels=labels,
+        ticks=ticks,
         points_colors=points_colors,
         warn_about_deprecation=False,
         **kwargs,
