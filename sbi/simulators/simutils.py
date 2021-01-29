@@ -8,6 +8,8 @@ import torch
 from torch import Tensor
 from tqdm.auto import tqdm
 from joblib import Parallel, delayed
+import contextlib
+import joblib
 
 
 def simulate_in_batches(
@@ -46,19 +48,19 @@ def simulate_in_batches(
 
         if num_workers > 1:
             # Parallelize the sequence of batches across workers.
-            # TODO: This usage of tqdm tracks the dispatching of jobs instead of the
-            # moment when they are done, resulting in waiting time at 100% in case the
-            # last jobs takes long. A potential solution can be found here: https://
-            # stackoverflow.com/a/61689175
-            simulation_outputs = Parallel(n_jobs=num_workers)(
-                delayed(simulator)(batch)
-                for batch in tqdm(
+            # We use the solution proposed here: https://stackoverflow.com/a/61689175
+            # to update the pbar only after the workers finished a task.
+            with tqdm_joblib(
+                tqdm(
                     batches,
                     disable=not show_progress_bars,
                     desc=f"Running {num_sims} simulations in {len(batches)} batches.",
                     total=len(batches),
                 )
-            )
+            ) as progress_bar:
+                simulation_outputs = Parallel(n_jobs=num_workers)(
+                    delayed(simulator)(batch) for batch in batches
+                )
         else:
             pbar = tqdm(
                 total=num_sims,
@@ -77,3 +79,28 @@ def simulate_in_batches(
         x = simulator(theta)
 
     return x
+
+
+@contextlib.contextmanager
+def tqdm_joblib(tqdm_object):
+    """Context manager to patch joblib to report into tqdm progress bar given as
+    argument
+
+    This wrapped context manager obtains the number of finished tasks from the tqdm
+    print function and uses it to update the pbar, as suggested in
+    https://stackoverflow.com/a/61689175. See #419, #421
+    """
+
+    def tqdm_print_progress(self):
+        if self.n_completed_tasks > tqdm_object.n:
+            n_completed = self.n_completed_tasks - tqdm_object.n
+            tqdm_object.update(n=n_completed)
+
+    original_print_progress = joblib.parallel.Parallel.print_progress
+    joblib.parallel.Parallel.print_progress = tqdm_print_progress
+
+    try:
+        yield tqdm_object
+    finally:
+        joblib.parallel.Parallel.print_progress = original_print_progress
+        tqdm_object.close()
