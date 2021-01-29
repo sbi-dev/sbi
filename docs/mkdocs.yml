@@ -14,7 +14,6 @@ nav:
         - Custom density estimators: tutorial/04_density_estimators.md
         - Learning summary statistics: tutorial/05_embedding_net.md
         - Conditional distributions: tutorial/07_conditional_distributions.md
-        - Sensitvitiy analysis: tutorial/09_sensitivity_analysis.md
       - Examples:
         - Hodgkin-Huxley example: examples/00_HH_simulator.md
   - Contribute: contribute.md

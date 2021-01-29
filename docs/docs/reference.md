@@ -112,8 +112,3 @@
     rendering:
       show_root_heading: true
       show_object_full_path: true
-
-::: sbi.analysis.ActiveSubspace
-    rendering:
-      show_root_heading: true
-      show_object_full_path: true
