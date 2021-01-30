@@ -29,6 +29,8 @@ def classifier_nn(
     This function will usually be used for SNRE. The returned function is to be passed
     to the inference class when using the flexible interface.
 
+    Note that in the view of the SNRE classifier we build below, x=theta and y=x.
+
     Args:
         model: The type of classifier that will be created. One of [`linear`, `mlp`,
             `resnet`].
@@ -53,8 +55,8 @@ def classifier_nn(
                 "embedding_net_y",
             ),
             (
-                z_score_x,
                 z_score_theta,
+                z_score_x,
                 hidden_features,
                 embedding_net_theta,
                 embedding_net_x,
