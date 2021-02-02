@@ -31,7 +31,7 @@ from sbi.utils.sbiutils import mask_sims_from_prior
 class PosteriorEstimator(NeuralInference, ABC):
     def __init__(
         self,
-        prior,
+        prior: Optional[Any] = None,
         density_estimator: Union[str, Callable] = "maf",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
@@ -111,6 +111,16 @@ class PosteriorEstimator(NeuralInference, ABC):
 
         validate_theta_and_x(theta, x)
         self._check_proposal(proposal)
+
+        if self._prior is None and proposal is not None:
+            raise ValueError(
+                "You had not passed a prior at initialization, but now you "
+                "passed a proposal. If you want to run multi-round SNPE, you have to "
+                "specify a prior (set the `.prior` argument or re-initialize the "
+                "object with a prior distribution). If the samples you passed to "
+                "`append_simulations()` were sampled from the prior, you can run "
+                "single-round inference with `append_simulations(..., proposal=None)`."
+            )
 
         if (
             proposal is None
