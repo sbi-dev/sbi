@@ -941,6 +941,31 @@ class NeuralPosterior(ABC):
 
         return desc
 
+    def __getstate__(self) -> Dict:
+        """
+        Returns the state of the object that is supposed to be pickled.
+
+        Returns:
+            Dictionary containing the state.
+        """
+        return self.__dict__
+
+    def __setstate__(self, state_dict: Dict):
+        """
+        Sets the state when being loaded from pickle.
+
+        Args:
+            state_dict: State to be restored.
+        """
+        if "_device" not in state_dict.keys():
+            state_dict["_device"] = "cpu"
+            warn(
+                "You had saved the posterior under an older version of `sbi`. To make "
+                "the loaded version comply with the version you are using right now, "
+                "we had to set `self._device = 'cpu'`"
+            )
+        self.__dict__ = state_dict
+
 
 class ConditionalPotentialFunctionProvider:
     """
