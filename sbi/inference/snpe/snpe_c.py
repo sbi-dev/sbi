@@ -28,7 +28,7 @@ from sbi.utils import (
 class SNPE_C(PosteriorEstimator):
     def __init__(
         self,
-        prior,
+        prior: Optional[Any] = None,
         density_estimator: Union[str, Callable] = "maf",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
