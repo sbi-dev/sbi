@@ -25,7 +25,7 @@ def kl_d_via_monte_carlo(
     q.
 
     Unlike torch.distributions.kl.kl_divergence(p, q), this function does not require p
-    and q to be `torch.Distribution` objects, but just to provide `sample()` and 
+    and q to be `torch.Distribution` objects, but just to provide `sample()` and
     `log_prob()` methods.
 
     For added flexibility, we squeeze the output of log_prob() and hence can handle
@@ -98,7 +98,9 @@ def get_prob_outside_uniform_prior(posterior: NeuralPosterior, num_dim: int) -> 
 
 
 def get_normalization_uniform_prior(
-    posterior: DirectPosterior, prior: Distribution, true_observation: Tensor,
+    posterior: DirectPosterior,
+    prior: Distribution,
+    true_observation: Tensor,
 ) -> Tuple[Tensor, Tensor, Tensor]:
     """
     Return the unnormalized posterior likelihood, the normalized posterior likelihood,

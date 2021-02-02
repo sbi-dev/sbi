@@ -25,7 +25,7 @@ from sbi.utils import (
     validate_theta_and_x,
     x_shape_from_simulation,
 )
-from sbi.utils.sbiutils import mask_sims_from_prior
+from sbi.utils.sbiutils import ImproperEmpirical, mask_sims_from_prior
 
 
 class PosteriorEstimator(NeuralInference, ABC):
@@ -112,16 +112,6 @@ class PosteriorEstimator(NeuralInference, ABC):
         validate_theta_and_x(theta, x)
         self._check_proposal(proposal)
 
-        if self._prior is None and proposal is not None:
-            raise ValueError(
-                "You had not passed a prior at initialization, but now you "
-                "passed a proposal. If you want to run multi-round SNPE, you have to "
-                "specify a prior (set the `.prior` argument or re-initialize the "
-                "object with a prior distribution). If the samples you passed to "
-                "`append_simulations()` were sampled from the prior, you can run "
-                "single-round inference with `append_simulations(..., proposal=None)`."
-            )
-
         if (
             proposal is None
             or proposal is self._prior
@@ -146,6 +136,20 @@ class PosteriorEstimator(NeuralInference, ABC):
         self._theta_roundwise.append(theta)
         self._x_roundwise.append(x)
         self._proposal_roundwise.append(proposal)
+
+        if self._prior is None or isinstance(self._prior, ImproperEmpirical):
+            if proposal is not None:
+                raise ValueError(
+                    "You had not passed a prior at initialization, but now you "
+                    "passed a proposal. If you want to run multi-round SNPE, you have "
+                    "to specify a prior (set the `.prior` argument or re-initialize "
+                    "the object with a prior distribution). If the samples you passed "
+                    "to `append_simulations()` were sampled from the prior, you can "
+                    "run single-round inference with "
+                    "`append_simulations(..., proposal=None)`."
+                )
+            theta_prior = self.get_simulations()[0]
+            self._prior = ImproperEmpirical(theta_prior, ones(theta_prior.shape[0]))
 
         return self
 
@@ -484,7 +488,10 @@ class PosteriorEstimator(NeuralInference, ABC):
                 )
         elif self._round > 0:
             raise ValueError(
-                "You did not specify a proposal (i.e. `proposal=None`). "
-                "However, previously, you had already specified a proposal. "
-                "This scenario is currently not allowed."
+                "A proposal was passed but no prior was passed at initialisation. When "
+                "running multi-round inference, a prior needs to be specified upon "
+                "initialisation. Potential fix: setting the `._prior` attribute or "
+                "re-initialisation. If the samples passed to `append_simulations()` "
+                "were sampled from the prior, single-round inference can be performed "
+                "with `append_simulations(..., proprosal=None)`."
             )

@@ -39,7 +39,11 @@ def test_handle_invalid_x(x_shape, set_seed):
 @pytest.mark.slow
 @pytest.mark.parametrize(
     ("method", "exclude_invalid_x", "percent_nans"),
-    ((SNPE_C, True, 0.05), (SNL, True, 0.05), (SRE, True, 0.05),),
+    (
+        (SNPE_C, True, 0.05),
+        (SNL, True, 0.05),
+        (SRE, True, 0.05),
+    ),
 )
 def test_inference_with_nan_simulator(
     method, exclude_invalid_x, percent_nans, set_seed
@@ -87,7 +91,7 @@ def test_inference_with_nan_simulator(
 
 
 @pytest.mark.slow
-def test_inference_with_rejection_estimator(set_seed):
+def test_inference_with_restriction_estimator(set_seed):
 
     # likelihood_mean will be likelihood_shift+theta
     num_dim = 3
@@ -121,7 +125,7 @@ def test_inference_with_rejection_estimator(set_seed):
     num_rounds = 2
 
     for r in range(num_rounds):
-        theta, x = simulate_for_sbi(simulator, proposals[-1], 550)
+        theta, x = simulate_for_sbi(simulator, proposals[-1], 1000)
         rejection_estimator.append_simulations(theta, x)
         if r < num_rounds - 1:
             _ = rejection_estimator.train()

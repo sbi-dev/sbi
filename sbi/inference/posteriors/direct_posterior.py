@@ -195,27 +195,22 @@ class DirectPosterior(NeuralPosterior):
                 theta.to(self._device), x.to(self._device)
             ).cpu()
 
-            if self._prior is not None:
+            # Force probability to be zero outside prior support.
+            is_prior_finite = torch.isfinite(self._prior.log_prob(theta))
 
-                # Force probability to be zero outside prior support.
-                is_prior_finite = torch.isfinite(self._prior.log_prob(theta))
+            masked_log_prob = torch.where(
+                is_prior_finite,
+                unnorm_log_prob,
+                torch.tensor(float("-inf"), dtype=torch.float32),
+            )
 
-                masked_log_prob = torch.where(
-                    is_prior_finite,
-                    unnorm_log_prob,
-                    torch.tensor(float("-inf"), dtype=torch.float32),
-                )
+            log_factor = (
+                log(self.leakage_correction(x=batched_first_of_batch(x)))
+                if norm_posterior
+                else 0
+            )
 
-                log_factor = (
-                    log(self.leakage_correction(x=batched_first_of_batch(x)))
-                    if norm_posterior
-                    else 0
-                )
-
-                return masked_log_prob - log_factor
-
-            else:
-                return unnorm_log_prob
+            return masked_log_prob - log_factor
 
     @torch.no_grad()
     def leakage_correction(
@@ -329,9 +324,6 @@ class DirectPosterior(NeuralPosterior):
         self.net.eval()
 
         if sample_with_mcmc:
-            if self._prior is None:
-                raise ValueError("`sample_with_mcmc` is not allowed when `prior=None`.")
-
             potential_fn_provider = PotentialFunctionProvider()
             samples = self._sample_posterior_mcmc(
                 num_samples=num_samples,

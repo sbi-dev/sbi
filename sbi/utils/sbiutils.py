@@ -6,12 +6,13 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 import torch
 from pyknos.nflows import transforms
+from pyro.distributions import Empirical
 from torch import Tensor, as_tensor
 from torch import nn as nn
 from torch import ones, zeros
 from tqdm.auto import tqdm
 
-from sbi.utils.torchutils import BoxUniform
+from sbi.utils.torchutils import BoxUniform, atleast_2d
 
 
 def x_shape_from_simulation(batch_x: Tensor) -> torch.Size:
@@ -113,7 +114,7 @@ def standardizing_net(batch_t: Tensor, min_std: float = 1e-7) -> nn.Module:
 @torch.no_grad()
 def sample_posterior_within_prior(
     posterior_nn: nn.Module,
-    prior: Optional[Any],
+    prior,
     x: Tensor,
     num_samples: int = 1,
     show_progress_bars: bool = False,
@@ -173,13 +174,7 @@ def sample_posterior_within_prior(
             .reshape(sampling_batch_size, -1)
             .cpu()  # Move to cpu to evaluate under prior.
         )
-
-        are_within_prior = (
-            torch.isfinite(prior.log_prob(candidates))
-            if prior is not None
-            else torch.ones(sampling_batch_size, dtype=torch.bool)
-        )
-
+        are_within_prior = torch.isfinite(prior.log_prob(candidates))
         samples = candidates[are_within_prior]
         accepted.append(samples)
 
@@ -441,3 +436,30 @@ def check_if_boxuniform(dist) -> Tuple[bool, Optional[BoxUniform]]:
         box_dist = None
 
     return is_boxuniform, box_dist
+
+
+class ImproperEmpirical(Empirical):
+    """
+    Wrapper around pyro's `Emprirical` distribution that returns constant `log_prob()`.
+
+    This class is used in SNPE when no prior is passed. Having a constant
+    log-probability will lead to no samples being rejected during rejection-sampling.
+
+    The default behavior of `pyro.distributions.Empirical` is that it returns `-inf`
+    for any value that does not **exactly** match one of the samples passed at
+    initialization. Thus, all posterior samples would be rejected for not fitting this
+    criterion.
+    """
+
+    def log_prob(self, value: Tensor) -> Tensor:
+        """
+        Return ones as a constant log-prob for each input.
+
+        Args:
+            value: The parameters at which to evaluate the log-probability.
+
+        Returns:
+            Tensor of as many ones as there were parameter sets.
+        """
+        value = atleast_2d(value)
+        return zeros(value.shape[0])
