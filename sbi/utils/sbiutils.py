@@ -113,7 +113,7 @@ def standardizing_net(batch_t: Tensor, min_std: float = 1e-7) -> nn.Module:
 @torch.no_grad()
 def sample_posterior_within_prior(
     posterior_nn: nn.Module,
-    prior,
+    prior: Optional[Any],
     x: Tensor,
     num_samples: int = 1,
     show_progress_bars: bool = False,
@@ -173,7 +173,13 @@ def sample_posterior_within_prior(
             .reshape(sampling_batch_size, -1)
             .cpu()  # Move to cpu to evaluate under prior.
         )
-        are_within_prior = torch.isfinite(prior.log_prob(candidates))
+
+        are_within_prior = (
+            torch.isfinite(prior.log_prob(candidates))
+            if prior is not None
+            else torch.ones(sampling_batch_size, dtype=torch.bool)
+        )
+
         samples = candidates[are_within_prior]
         accepted.append(samples)
 
