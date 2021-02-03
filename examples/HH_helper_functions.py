@@ -20,20 +20,20 @@ def syn_current(duration=120, dt=0.01, t_on=10, curr_level=5e-4, seed=None):
 def HHsimulator(V0, params, dt, t, I, seed=None):
     """Simulates the Hodgkin-Huxley model for a specified time duration and current
 
-        Parameters
-        ----------
-        V0 : float
-            Voltage at first time step
-        params : np.array, 1d of length dim_param
-            Parameter vector
-        dt : float
-            Timestep
-        t : array
-            Numpy array with the time steps
-        I : array
-            Numpy array with the input current
-        seed : int
-        """
+    Parameters
+    ----------
+    V0 : float
+        Voltage at first time step
+    params : np.array, 1d of length dim_param
+        Parameter vector
+    dt : float
+        Timestep
+    t : array
+        Numpy array with the time steps
+    I : array
+        Numpy array with the input current
+    seed : int
+    """
 
     gbar_Na = params[0, 0]  # mS/cm2
     gbar_Na.astype(float)
