@@ -7,3 +7,5 @@
 [When using multiple workers, I get a pickling error. Can I still use multiprocessing?](faq/question_03.md)
 
 [Can I use the GPU for training the density estimator?](faq/question_04.md)
+
+[How should I save and load objects in sbi?](faq/question_05.md)
