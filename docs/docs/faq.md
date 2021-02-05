@@ -9,3 +9,5 @@
 [Can I use the GPU for training the density estimator?](faq/question_04.md)
 
 [How should I save and load objects in `sbi`?](faq/question_05.md)
+
+[Can I stop neural network training and resume it later?](faq/question_06.md)

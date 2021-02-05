@@ -6,7 +6,7 @@
     rendering:
       show_root_heading: true
 
-::: sbi.user_input.user_input_checks.prepare_for_sbi
+::: sbi.utils.user_input_checks.prepare_for_sbi
     rendering:
       show_root_heading: true
       
