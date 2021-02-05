@@ -11,8 +11,37 @@ from torch import Tensor, as_tensor
 from torch import nn as nn
 from torch import ones, zeros
 from tqdm.auto import tqdm
+import warnings
 
 from sbi.utils.torchutils import BoxUniform, atleast_2d
+
+
+def warn_if_zscoring_changes_data(x: Tensor, duplicate_tolerance: float = 0.1) -> None:
+    """Raise warning if z-scoring would create duplicate data points.
+    
+    Args:
+        x: data
+        duplicate_tolerance: tolerated proportion of duplicates after z-scoring.
+    """
+
+    # Count unique xs.
+    num_unique = torch.unique(x, dim=0).numel()
+
+    # z-score.
+    zx = (x - x.mean(0)) / x.std(0)
+
+    # Count again and warn on too many new duplicates.
+    num_unique_z = torch.unique(zx, dim=0).numel()
+
+    if (1 - duplicate_tolerance) * num_unique_z < num_unique:
+        warnings.warn(
+            """Z-scoring these data will result in many data points being mapped on the
+            same z-scored value. This can occur due to numerical inaccuracies when the
+            data covers a large range of values. Consider setting z_score_x=False if
+            you still want to run the inference and beware that large variance in the
+            data can be problematic for the underlying NN.""",
+            UserWarning,
+        )
 
 
 def x_shape_from_simulation(batch_x: Tensor) -> torch.Size:
