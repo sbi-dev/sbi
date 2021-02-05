@@ -25,13 +25,13 @@ from sbi.mcmc import (
     sir,
 )
 from sbi.types import Array, Shape
-from sbi.user_input.user_input_checks import process_x
 from sbi.utils.sbiutils import check_if_boxuniform
 from sbi.utils.torchutils import (
     ScalarFloat,
     atleast_2d_float32_tensor,
     ensure_theta_batched,
 )
+from sbi.utils.user_input_checks import process_x
 
 
 class NeuralPosterior(ABC):

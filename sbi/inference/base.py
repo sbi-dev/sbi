@@ -15,7 +15,6 @@ from torch.utils.tensorboard import SummaryWriter
 import sbi.inference
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.simulators.simutils import simulate_in_batches
-from sbi.user_input.user_input_checks import prepare_for_sbi
 from sbi.utils import (
     get_log_root,
     handle_invalid_x,
@@ -24,6 +23,7 @@ from sbi.utils import (
 )
 from sbi.utils.sbiutils import get_simulations_since_round
 from sbi.utils.torchutils import process_device
+from sbi.utils.user_input_checks import prepare_for_sbi
 
 
 def infer(

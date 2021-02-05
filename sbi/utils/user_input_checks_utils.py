@@ -3,7 +3,7 @@
 
 
 import warnings
-from typing import Optional, Union, Sequence
+from typing import Optional, Sequence, Union
 
 import torch
 from scipy.stats._distn_infrastructure import rv_frozen
@@ -165,11 +165,13 @@ class MultipleIndependent(Distribution):
         ]
         - [
             Uniform(torch.zeros(1), torch.ones(1)),
-            Uniform(torch.ones(1), 2.0 * torch.ones(1))]    
+            Uniform(torch.ones(1), 2.0 * torch.ones(1))]
     """
 
     def __init__(
-        self, dists: Sequence[Distribution], validate_args=None,
+        self,
+        dists: Sequence[Distribution],
+        validate_args=None,
     ):
         self._check_distributions(dists)
 
@@ -256,7 +258,7 @@ class MultipleIndependent(Distribution):
     def _prepare_value(self, value) -> Tensor:
         """Return input value with fixed shape.
 
-        Raises: 
+        Raises:
             AssertionError: if value has more than 2 dimensions or invalid size in
                 2nd dimension.
         """

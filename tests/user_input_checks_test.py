@@ -25,20 +25,20 @@ from torch.distributions import Beta, Distribution, Gamma, MultivariateNormal, U
 
 from sbi.inference import SNPE_C, simulate_for_sbi
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
-from sbi.user_input.user_input_checks import (
+from sbi.utils.get_nn_models import posterior_nn
+from sbi.utils.torchutils import BoxUniform
+from sbi.utils.user_input_checks import (
     prepare_for_sbi,
     process_prior,
     process_simulator,
     process_x,
 )
-from sbi.user_input.user_input_checks_utils import (
+from sbi.utils.user_input_checks_utils import (
     CustomPytorchWrapper,
     MultipleIndependent,
     PytorchReturnTypeWrapper,
     ScipyPytorchWrapper,
 )
-from sbi.utils.get_nn_models import posterior_nn
-from sbi.utils.torchutils import BoxUniform
 
 
 class UserNumpyUniform:

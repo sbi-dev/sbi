@@ -6,9 +6,8 @@ from pyro.distributions.empirical import Empirical
 from torch import Tensor, ones
 from torch.distributions.distribution import Distribution
 
-import sbi.utils  # Do not delete this, see #388
 from sbi.inference.abc.abc_base import ABCBASE
-from sbi.user_input.user_input_checks import process_x
+from sbi.utils.user_input_checks import process_x
 
 
 class MCABC(ABCBASE):
