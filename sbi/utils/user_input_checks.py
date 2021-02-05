@@ -345,9 +345,7 @@ def check_prior_batch_behavior(prior) -> None:
 
 
 def process_simulator(
-    user_simulator: Callable,
-    prior,
-    is_numpy_simulator: bool,
+    user_simulator: Callable, prior, is_numpy_simulator: bool,
 ) -> Callable:
     """Return a simulator that meets the requirements for usage in sbi.
 
@@ -401,32 +399,29 @@ def ensure_batched_simulator(simulator: Callable, prior) -> Callable:
     is_batched_simulator = True
     try:
         batch_size = 2
-        simulator_batch_size, *_ = simulator(prior.sample((batch_size,))).shape
-
-        assert simulator_batch_size == batch_size
+        # The simulator must return a matching batch dimension and data.
+        output_shape = simulator(prior.sample((batch_size,))).shape
+        assert len(output_shape) > 1
+        assert output_shape[0] == batch_size
     except:
         is_batched_simulator = False
 
-    return simulator if is_batched_simulator else get_batch_dim_simulator(simulator)
+    return simulator if is_batched_simulator else get_batch_loop_simulator(simulator)
 
 
-def get_batch_dim_simulator(simulator: Callable) -> Callable:
+def get_batch_loop_simulator(simulator: Callable) -> Callable:
     """Return simulator wrapped with `map` to handle batches of parameters.
 
     Note: this batches the simulator only syntactically, there are no performance
     benefits as with true vectorization."""
 
-    def batch_dim_simulator(theta: Tensor) -> Tensor:
-        batch_shape, *_ = theta.shape
-        assert (
-            batch_shape == 1
-        ), f"This simulator can handle one single thetas, theta.shape={theta.shape}."
-        # Remove possible singleton dimensions in the user simulator.
-        simulation = simulator(theta.squeeze()).squeeze()
-        # Return with leading batch dimension.
-        return simulation.unsqueeze(0)
+    def batch_loop_simulator(theta: Tensor) -> Tensor:
+        """Return a batch of simulations by looping over a batch of parameters."""
+        assert theta.ndim > 1, "Theta must have a batch dimension."
+        xs = list(map(simulator, theta))
+        return torch.cat(xs, dim=0).reshape(theta.shape[0], -1)
 
-    return batch_dim_simulator
+    return batch_loop_simulator
 
 
 def process_x(x: Tensor, x_shape: torch.Size) -> Tensor:
@@ -454,10 +449,7 @@ def process_x(x: Tensor, x_shape: torch.Size) -> Tensor:
     return x
 
 
-def prepare_for_sbi(
-    simulator: Callable,
-    prior,
-) -> Tuple[Callable, Distribution]:
+def prepare_for_sbi(simulator: Callable, prior,) -> Tuple[Callable, Distribution]:
     """Prepare simulator, prior and for usage in sbi.
 
     One of the goals is to allow you to use sbi with inputs computed in numpy.
