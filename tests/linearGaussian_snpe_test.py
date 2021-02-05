@@ -133,7 +133,8 @@ def test_c2st_snpe_on_linearGaussian_different_dims(set_seed):
     """Test whether SNPE B/C infer well a simple example with available ground truth.
 
     This example has different number of parameters theta than number of x. Also
-    this implicitly tests simulation_batch_size=1.
+    this implicitly tests simulation_batch_size=1. It also impleictly tests whether the
+    prior can be `None` and whether we can stop and resume training.
 
     Args:
         set_seed: fixture for manual seeding
@@ -170,13 +171,15 @@ def test_c2st_snpe_on_linearGaussian_different_dims(set_seed):
 
     simulator, prior = prepare_for_sbi(simulator, prior)
     inference = SNPE_C(
-        prior,
+        prior=None,  # Test whether prior can be `None`.
         density_estimator="maf",
         show_progress_bars=False,
     )
 
     theta, x = simulate_for_sbi(simulator, prior, 2000, simulation_batch_size=1)  # type: ignore
-    _ = inference.append_simulations(theta, x).train()
+    inference = inference.append_simulations(theta, x)
+    _ = inference.train(max_num_epochs=10)  # Test whether we can stop and resume.
+    _ = inference.train(resume_training=True)
     posterior = inference.build_posterior()
     samples = posterior.sample((num_samples,), x=x_o)
 

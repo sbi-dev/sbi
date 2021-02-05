@@ -79,7 +79,10 @@ class LikelihoodEstimator(NeuralInference, ABC):
         self._summary.update({"mcmc_times": []})  # type: ignore
 
     def append_simulations(
-        self, theta: Tensor, x: Tensor, from_round: int = 0,
+        self,
+        theta: Tensor,
+        x: Tensor,
+        from_round: int = 0,
     ) -> "LikelihoodEstimator":
         r"""
         Store parameters and simulation outputs to use them for later training.
@@ -120,6 +123,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         max_num_epochs: Optional[int] = None,
         clip_max_norm: Optional[float] = 5.0,
         exclude_invalid_x: bool = True,
+        resume_training: bool = False,
         discard_prior_samples: bool = False,
         retrain_from_scratch_each_round: bool = False,
         show_train_summary: bool = False,
@@ -130,6 +134,10 @@ class LikelihoodEstimator(NeuralInference, ABC):
         Args:
             exclude_invalid_x: Whether to exclude simulation outputs `x=NaN` or `x=±∞`
                 during training. Expect errors, silent or explicit, when `False`.
+            resume_training: Can be used in case training time is limited, e.g. on a
+                cluster. If `True`, the split between train and validation set, the
+                optimizer, the number of epochs, and the best validation log-prob will
+                be restored from the last time `.train()` was called.
             discard_prior_samples: Whether to discard samples simulated in round 1, i.e.
                 from the prior. Training may be sped up by ignoring such less targeted
                 samples.
@@ -156,13 +164,15 @@ class LikelihoodEstimator(NeuralInference, ABC):
         num_examples = len(theta)
 
         # Select random train and validation splits from (theta, x) pairs.
-        permuted_indices = torch.randperm(num_examples)
         num_training_examples = int((1 - validation_fraction) * num_examples)
         num_validation_examples = num_examples - num_training_examples
-        train_indices, val_indices = (
-            permuted_indices[:num_training_examples],
-            permuted_indices[num_training_examples:],
-        )
+
+        if not resume_training:
+            permuted_indices = torch.randperm(num_examples)
+            self.train_indices, self.val_indices = (
+                permuted_indices[:num_training_examples],
+                permuted_indices[num_training_examples:],
+            )
 
         # Dataset is shared for training and validation loaders.
         dataset = data.TensorDataset(theta, x)
@@ -172,14 +182,14 @@ class LikelihoodEstimator(NeuralInference, ABC):
             dataset,
             batch_size=min(training_batch_size, num_training_examples),
             drop_last=True,
-            sampler=SubsetRandomSampler(train_indices),
+            sampler=SubsetRandomSampler(self.train_indices),
         )
         val_loader = data.DataLoader(
             dataset,
             batch_size=min(training_batch_size, num_validation_examples),
             shuffle=False,
             drop_last=False,
-            sampler=SubsetRandomSampler(val_indices),
+            sampler=SubsetRandomSampler(self.val_indices),
         )
 
         # First round or if retraining from scratch:
@@ -189,7 +199,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         # can `sample()` and `log_prob()`. The network is accessible via `.net`.
         if self._neural_net is None or retrain_from_scratch_each_round:
             self._neural_net = self._build_neural_net(
-                theta[train_indices], x[train_indices]
+                theta[self.train_indices], x[self.train_indices]
             )
             self._x_shape = x_shape_from_simulation(x)
             assert (
@@ -197,15 +207,21 @@ class LikelihoodEstimator(NeuralInference, ABC):
             ), "SNLE cannot handle multi-dimensional simulator output."
 
         self._neural_net.to(self._device)
-        optimizer = optim.Adam(list(self._neural_net.parameters()), lr=learning_rate,)
+        if not resume_training:
+            self.optimizer = optim.Adam(
+                list(self._neural_net.parameters()),
+                lr=learning_rate,
+            )
+            self.epoch, self._val_log_prob = 0, float("-Inf")
 
-        epoch, self._val_log_prob = 0, float("-Inf")
-        while epoch <= max_num_epochs and not self._converged(epoch, stop_after_epochs):
+        while self.epoch <= max_num_epochs and not self._converged(
+            self.epoch, stop_after_epochs
+        ):
 
             # Train for a single epoch.
             self._neural_net.train()
             for batch in train_loader:
-                optimizer.zero_grad()
+                self.optimizer.zero_grad()
                 theta_batch, x_batch = (
                     batch[0].to(self._device),
                     batch[1].to(self._device),
@@ -216,11 +232,12 @@ class LikelihoodEstimator(NeuralInference, ABC):
                 loss.backward()
                 if clip_max_norm is not None:
                     clip_grad_norm_(
-                        self._neural_net.parameters(), max_norm=clip_max_norm,
+                        self._neural_net.parameters(),
+                        max_norm=clip_max_norm,
                     )
-                optimizer.step()
+                self.optimizer.step()
 
-            epoch += 1
+            self.epoch += 1
 
             # Calculate validation performance.
             self._neural_net.eval()
@@ -238,17 +255,20 @@ class LikelihoodEstimator(NeuralInference, ABC):
             # Log validation log prob for every epoch.
             self._summary["validation_log_probs"].append(self._val_log_prob)
 
-            self._maybe_show_progress(self._show_progress_bars, epoch)
+            self._maybe_show_progress(self._show_progress_bars, self.epoch)
 
-        self._report_convergence_at_end(epoch, stop_after_epochs, max_num_epochs)
+        self._report_convergence_at_end(self.epoch, stop_after_epochs, max_num_epochs)
 
         # Update summary.
-        self._summary["epochs"].append(epoch)
+        self._summary["epochs"].append(self.epoch)
         self._summary["best_validation_log_probs"].append(self._best_val_log_prob)
 
         # Update TensorBoard and summary dict.
         self._summarize(
-            round_=self._round, x_o=None, theta_bank=theta, x_bank=x,
+            round_=self._round,
+            x_o=None,
+            theta_bank=theta,
+            x_bank=x,
         )
 
         # Update description for progress bar.

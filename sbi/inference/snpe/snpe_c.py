@@ -101,6 +101,7 @@ class SNPE_C(PosteriorEstimator):
         clip_max_norm: Optional[float] = 5.0,
         calibration_kernel: Optional[Callable] = None,
         exclude_invalid_x: bool = True,
+        resume_training: bool = False,
         discard_prior_samples: bool = False,
         use_combined_loss: bool = False,
         retrain_from_scratch_each_round: bool = False,
@@ -125,6 +126,10 @@ class SNPE_C(PosteriorEstimator):
                 simulations `x`. See Lueckmann, Gonçalves et al., NeurIPS 2017.
             exclude_invalid_x: Whether to exclude simulation outputs `x=NaN` or `x=±∞`
                 during training. Expect errors, silent or explicit, when `False`.
+            resume_training: Can be used in case training time is limited, e.g. on a
+                cluster. If `True`, the split between train and validation set, the
+                optimizer, the number of epochs, and the best validation log-prob will
+                be restored from the last time `.train()` was called.
             discard_prior_samples: Whether to discard samples simulated in round 1, i.e.
                 from the prior. Training may be sped up by ignoring such less targeted
                 samples.
