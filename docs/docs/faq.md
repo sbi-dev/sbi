@@ -8,4 +8,4 @@
 
 [Can I use the GPU for training the density estimator?](faq/question_04.md)
 
-[How should I save and load objects in sbi?](faq/question_05.md)
+[How should I save and load objects in `sbi`?](faq/question_05.md)
