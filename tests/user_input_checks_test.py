@@ -237,7 +237,7 @@ def test_prepare_sbi_problem(simulator: Callable, prior):
     simulator, prior = prepare_for_sbi(simulator, prior)
 
     # check batch sims and type
-    n_batch = 1
+    n_batch = 5
     assert simulator(prior.sample((n_batch,))).shape[0] == n_batch
     assert isinstance(simulator(prior.sample((1,))), Tensor)
     assert prior.sample().dtype == torch.float32
