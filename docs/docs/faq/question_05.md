@@ -12,6 +12,16 @@ with open("/path/to/my_posterior.pkl", "wb") as handle:
     pickle.dump(posterior, handle)
 ```
 
+Note: if you try to load a posterior that was saved under `sbi v0.14.x` or earlier under `sbi v0.15.0` or later, you have to add:
+```python
+import sys
+from sbi.utils import user_input_checks_utils
+
+sys.modules["sbi.user_input.user_input_checks_utils"] = user_input_checks_utils
+```
+to your script before loading the posterior.
+
+
 `NeuralInference` objects are not picklable. There are two workarounds:
 
 - Pickle with [`dill`](https://pypi.org/project/dill/) (has to be installed with `pip install dill` first)

@@ -13,7 +13,7 @@
 - Depend on new `joblib=1.0.0` and fix progress bar updates for multiprocessing (#421).
 - Fix for embedding nets with `SNRE` (thanks @adittmann, #425)
 - Is it now optional to pass a prior distribution when using SNPE (#426)
-- Support loading of posteriors saved after `sbi v0.13.0` under newer versions (#427, thanks @psteinb)
+- Support loading of posteriors saved after `sbi v0.15.0` (#427, thanks @psteinb)
 
 
 # v0.14.3
