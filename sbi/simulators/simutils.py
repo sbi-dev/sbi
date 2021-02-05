@@ -29,7 +29,8 @@ def simulate_in_batches(
         simulator: Simulator callable (a function or a class with `__call__`).
         theta: All parameters $\theta$ sampled from prior or posterior.
         sim_batch_size: Number of simulations per batch. Default is to simulate
-            the entire theta in a single batch.
+            the entire theta in a single batch. When using multiple workers, increasing
+            this batch size can further speed up simulations by reducing overhead.
         num_workers: Number of workers for multiprocessing.
         show_progress_bars: Whether to show a progress bar during simulation.
 
