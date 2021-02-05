@@ -12,12 +12,12 @@ from torch.utils.data.sampler import SubsetRandomSampler, WeightedRandomSampler
 from tqdm.auto import tqdm
 
 from sbi.types import Shape
-from sbi.user_input.user_input_checks import validate_theta_and_x
 from sbi.utils.sbiutils import (
     get_simulations_since_round,
     handle_invalid_x,
     standardizing_net,
 )
+from sbi.utils.user_input_checks import validate_theta_and_x
 
 
 def build_input_layer(
@@ -336,7 +336,10 @@ class RestrictionEstimator:
             self._first_round_validation_theta = theta[val_indices]
             self._first_round_validation_label = label[val_indices]
 
-        optimizer = optim.Adam(list(self._classifier.parameters()), lr=learning_rate,)
+        optimizer = optim.Adam(
+            list(self._classifier.parameters()),
+            lr=learning_rate,
+        )
         max_num_epochs = 2 ** 31 - 1 if max_num_epochs is None else max_num_epochs
 
         # Compute the fraction of good simulations in dataset.
@@ -366,7 +369,8 @@ class RestrictionEstimator:
                 loss.backward()
                 if clip_max_norm is not None:
                     clip_grad_norm_(
-                        self._classifier.parameters(), max_norm=clip_max_norm,
+                        self._classifier.parameters(),
+                        max_norm=clip_max_norm,
                     )
                 optimizer.step()
 

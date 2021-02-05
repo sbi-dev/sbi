@@ -1,12 +1,7 @@
-from typing import (
-    Callable,
-    Optional,
-    Union,
-    Tuple,
-)
+from typing import Callable, Optional, Tuple, Union
 
-import torch
 import numpy as np
+import torch
 from numpy import ndarray
 from pyro.distributions import Uniform
 from pyro.distributions.empirical import Empirical
@@ -14,7 +9,7 @@ from torch import Tensor, ones, tensor
 from torch.distributions import Distribution, Multinomial, MultivariateNormal
 
 from sbi.inference.abc.abc_base import ABCBASE
-from sbi.user_input.user_input_checks import process_x
+from sbi.utils.user_input_checks import process_x
 
 
 class SMCABC(ABCBASE):
@@ -134,7 +129,7 @@ class SMCABC(ABCBASE):
                 samples from the previous population when the budget is used up. If
                 False, the current population is discarded and the previous population
                 is returned.
-            return_summary: Whether to return a dictionary with all accepted particles, 
+            return_summary: Whether to return a dictionary with all accepted particles,
                 weights, etc. at the end.
             lra: Whether to run linear regression adjustment as in Beaumont et al. 2002
             lra_with_weights: Whether to run lra as weighted linear regression with SMC
@@ -269,7 +264,10 @@ class SMCABC(ABCBASE):
             return posterior
 
     def _set_xo_and_sample_initial_population(
-        self, x_o, num_particles: int, num_initial_pop: int,
+        self,
+        x_o,
+        num_particles: int,
+        num_initial_pop: int,
     ) -> Tuple[Tensor, float, Tensor]:
         """Return particles, epsilon and distances of initial population."""
 
@@ -341,7 +339,9 @@ class SMCABC(ABCBASE):
                 new_particles.append(particle_candidates[is_accepted])
                 new_log_weights.append(
                     self._calculate_new_log_weights(
-                        particle_candidates[is_accepted], particles, log_weights,
+                        particle_candidates[is_accepted],
+                        particles,
+                        log_weights,
                     )
                 )
                 new_distances.append(dists[is_accepted])
@@ -366,7 +366,9 @@ class SMCABC(ABCBASE):
                     # Recalculate weights with new particles.
                     new_log_weights = [
                         self._calculate_new_log_weights(
-                            torch.cat(new_particles), particles, log_weights,
+                            torch.cat(new_particles),
+                            particles,
+                            log_weights,
                         )
                     ]
                     new_distances.append(distances[:num_remaining])
@@ -434,7 +436,10 @@ class SMCABC(ABCBASE):
         return distances[qidx].item()
 
     def _calculate_new_log_weights(
-        self, new_particles: Tensor, old_particles: Tensor, old_log_weights: Tensor,
+        self,
+        new_particles: Tensor,
+        old_particles: Tensor,
+        old_log_weights: Tensor,
     ) -> Tensor:
         """Return new log weights following formulas in publications A,B anc C."""
 
@@ -561,7 +566,11 @@ class SMCABC(ABCBASE):
             raise ValueError(f"Kernel, '{self.kernel}' not supported.")
 
     def resample_if_ess_too_small(
-        self, particles: Tensor, log_weights: Tensor, ess_min: float, pop_idx: int,
+        self,
+        particles: Tensor,
+        log_weights: Tensor,
+        ess_min: float,
+        pop_idx: int,
     ) -> Tuple[Tensor, Tensor]:
         """Return resampled particles and uniform weights if effectice sampling size is
         too small.
@@ -622,7 +631,7 @@ class SMCABC(ABCBASE):
     ) -> Callable:
         """Return transform for semi-automatic summary statistics.
 
-        Runs an single round of rejection abc with fixed budget and accepts 
+        Runs an single round of rejection abc with fixed budget and accepts
         num_particles simulations to run the regression for sass.
 
         Sets self.x_o once the x_shape can be derived from simulations.
@@ -648,7 +657,9 @@ class SMCABC(ABCBASE):
 
         # get weighted samples
         samples = self.sample_from_population_with_weights(
-            particles, weights, num_samples=samples_per_dim * particles.shape[1],
+            particles,
+            weights,
+            num_samples=samples_per_dim * particles.shape[1],
         )
 
         # Variance spans the range of particles for every dimension.

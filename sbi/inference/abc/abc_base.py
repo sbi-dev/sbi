@@ -1,14 +1,14 @@
+import logging
 from abc import ABC
 from typing import Callable, Union
 
-import logging
 import numpy as np
 import torch
+from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import PolynomialFeatures
 from torch import Tensor
 
 from sbi.simulators.simutils import simulate_in_batches
-from sklearn.linear_model import LinearRegression
-from sklearn.preprocessing import PolynomialFeatures
 
 
 class ABCBASE(ABC):
@@ -147,7 +147,9 @@ class ABCBASE(ABC):
         for parameter_idx in range(theta.shape[1]):
             regression_model = LinearRegression(fit_intercept=True)
             regression_model.fit(
-                X=x, y=theta[:, parameter_idx], sample_weight=sample_weight,
+                X=x,
+                y=theta[:, parameter_idx],
+                sample_weight=sample_weight,
             )
             theta_adjusted[:, parameter_idx] += regression_model.predict(
                 observation.reshape(1, -1)
