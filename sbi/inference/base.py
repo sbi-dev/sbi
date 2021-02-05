@@ -21,6 +21,7 @@ from sbi.utils import (
     handle_invalid_x,
     warn_on_invalid_x,
     warn_on_invalid_x_for_snpec_leakage,
+    warn_if_zscoring_changes_data,
 )
 from sbi.utils.sbiutils import get_simulations_since_round
 from sbi.utils.torchutils import process_device
@@ -247,6 +248,8 @@ class NeuralInference(ABC):
 
         # Check for NaNs in simulations.
         is_valid_x, num_nans, num_infs = handle_invalid_x(x, exclude_invalid_x)
+        # Check for problematic z-scoring
+        warn_if_zscoring_changes_data(x)
         if warn_on_invalid:
             warn_on_invalid_x(num_nans, num_infs, exclude_invalid_x)
             warn_on_invalid_x_for_snpec_leakage(

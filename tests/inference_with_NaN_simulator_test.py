@@ -138,3 +138,19 @@ def test_inference_with_rejection_estimator(set_seed):
 
     # Compute the c2st and assert it is near chance level of 0.5.
     check_c2st(samples, target_samples, alg=f"{SNPE_C}")
+
+
+def test_z_scoring_warning():
+
+    # Create data with large variance.
+    num_dim = 2
+    theta = torch.ones(100, num_dim)
+    x = torch.rand(100, num_dim)
+    x[:50] += 1e7
+
+    # Make sure a warning is raised because z-scoring will map these data to duplicate
+    # data points.
+    with pytest.warns(UserWarning, match="Z-scoring these data will"):
+        SNPE_C(utils.BoxUniform(zeros(num_dim), ones(num_dim))).append_simulations(
+            theta, x
+        ).train(max_num_epochs=1)
