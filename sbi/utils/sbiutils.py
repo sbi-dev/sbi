@@ -2,6 +2,7 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 import logging
+import warnings
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 import torch
@@ -11,17 +12,16 @@ from torch import Tensor, as_tensor
 from torch import nn as nn
 from torch import ones, zeros
 from tqdm.auto import tqdm
-import warnings
 
 from sbi.utils.torchutils import BoxUniform, atleast_2d
 
 
 def warn_if_zscoring_changes_data(x: Tensor, duplicate_tolerance: float = 0.1) -> None:
     """Raise warning if z-scoring would create duplicate data points.
-    
+
     Args:
-        x: data
-        duplicate_tolerance: tolerated proportion of duplicates after z-scoring.
+        x: Simulation outputs.
+        duplicate_tolerance: Tolerated proportion of duplicates after z-scoring.
     """
 
     # Count unique xs.
@@ -33,13 +33,15 @@ def warn_if_zscoring_changes_data(x: Tensor, duplicate_tolerance: float = 0.1) -
     # Count again and warn on too many new duplicates.
     num_unique_z = torch.unique(zx, dim=0).numel()
 
-    if (1 - duplicate_tolerance) * num_unique_z < num_unique:
+    if num_unique_z < num_unique * (1 - duplicate_tolerance):
         warnings.warn(
-            """Z-scoring these data will result in many data points being mapped on the
-            same z-scored value. This can occur due to numerical inaccuracies when the
-            data covers a large range of values. Consider setting z_score_x=False if
-            you still want to run the inference and beware that large variance in the
-            data can be problematic for the underlying NN.""",
+            """Z-scoring these simulation outputs resulted in {num_unique_z} unique
+            datapoints. Before z-scoring, it had been {num_unique}. This can occur due
+            to numerical inaccuracies when the data covers a large range of values.
+            Consider either setting `z_score_x=False` (but beware that this can be
+            problematic for training the NN) or exclude outliers from your dataset.
+            Note: if you have already set `z_score_x=False`, this warning will still be
+            displayed, but you can ignore it.""",
             UserWarning,
         )
 
