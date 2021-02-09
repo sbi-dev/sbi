@@ -14,6 +14,7 @@
 - Fix for embedding nets with `SNRE` (thanks @adittmann, #425)
 - Is it now optional to pass a prior distribution when using SNPE (#426)
 - Support loading of posteriors saved after `sbi v0.15.0` (#427, thanks @psteinb)
+- Neural network training can be resumed (#431)
 
 
 # v0.14.3
