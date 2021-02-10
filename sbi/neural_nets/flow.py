@@ -7,7 +7,7 @@ from warnings import warn
 from pyknos.nflows import distributions as distributions_
 from pyknos.nflows import flows, transforms
 from pyknos.nflows.nn import nets
-from torch import Tensor, nn, relu, tanh
+from torch import Tensor, nn, relu, tanh, tensor, uint8
 
 from sbi.utils.sbiutils import standardizing_net, standardizing_transform
 from sbi.utils.torchutils import create_alternating_binary_mask
@@ -173,26 +173,101 @@ def build_nsf(
     y_numel = embedding_net(batch_y[:1]).numel()
 
     if x_numel == 1:
-        raise NotImplementedError
+
+        class ContextSplineMap(nn.Module):
+            """
+            Neural network from `context` to the spline parameters.
+
+            We cannot use the resnet as conditioner to learn each dimension conditioned
+            on the other dimensions (because there is only one). Instead, we learn the
+            spline parameters directly. In the case of conditinal density estimation,
+            we make the spline parameters conditional on the context. This is
+            implemented in this class.
+            """
+
+            def __init__(
+                self,
+                in_features: int,
+                out_features: int,
+                hidden_features: int,
+                context_features: int,
+            ):
+                """
+                Initialize neural network that learns to predict spline parameters.
+
+                Args:
+                    in_features: Unused since there is no `conditioner` in 1D.
+                    out_features: Number of spline parameters.
+                    hidden_features: Number of hidden units.
+                    context_features: Number of context features.
+                """
+                super().__init__()
+                # `self.hidden_features` is only defined such that nflows can infer
+                # a scaling factor for initializations.
+                self.hidden_features = hidden_features
+
+                # Use a non-linearity because otherwise, there will be a linear
+                # mapping from context features onto distribution parameters.
+                self.spline_predictor = nn.Sequential(
+                    nn.Linear(context_features, self.hidden_features),
+                    nn.ReLU(),
+                    nn.Linear(self.hidden_features, self.hidden_features),
+                    nn.ReLU(),
+                    nn.Linear(self.hidden_features, out_features),
+                )
+
+            def __call__(
+                self, inputs: Tensor, context: Tensor, *args, **kwargs
+            ) -> Tensor:
+                """
+                Return parameters of the spline given the context.
+
+                Args:
+                    inputs: Unused. It would usually be the other dimensions, but in
+                        1D, there are no other dimensions.
+                    context: Context features.
+
+                Returns:
+                    Spline parameters.
+                """
+                return self.spline_predictor(context)
+
+        mask_in_layer = lambda i: tensor([1], dtype=uint8)
+        conditioner = lambda in_features, out_features: ContextSplineMap(
+            in_features, out_features, hidden_features, context_features=y_numel
+        )
+        if num_transforms > 1:
+            warn(
+                f"You are using `num_transforms={num_transforms}`. When estimating a "
+                f"1D density, you will not get any performance increase by using "
+                f"multiple transforms with NSF. We recommend setting "
+                f"`num_transforms=1` for faster training (see also 'Change "
+                f"hyperparameters of density esitmators' here: "
+                f"https://www.mackelab.org/sbi/tutorial/04_density_estimators/)."
+            )
+
+    else:
+        mask_in_layer = lambda i: create_alternating_binary_mask(
+            features=x_numel, even=(i % 2 == 0)
+        )
+        conditioner = lambda in_features, out_features: nets.ResidualNet(
+            in_features=in_features,
+            out_features=out_features,
+            hidden_features=hidden_features,
+            context_features=y_numel,
+            num_blocks=2,
+            activation=relu,
+            dropout_probability=0.0,
+            use_batch_norm=False,
+        )
 
     transform = transforms.CompositeTransform(
         [
             transforms.CompositeTransform(
                 [
                     transforms.PiecewiseRationalQuadraticCouplingTransform(
-                        mask=create_alternating_binary_mask(
-                            features=x_numel, even=(i % 2 == 0)
-                        ),
-                        transform_net_create_fn=lambda in_features, out_features: nets.ResidualNet(
-                            in_features=in_features,
-                            out_features=out_features,
-                            hidden_features=hidden_features,
-                            context_features=y_numel,
-                            num_blocks=2,
-                            activation=relu,
-                            dropout_probability=0.0,
-                            use_batch_norm=False,
-                        ),
+                        mask=mask_in_layer(i),
+                        transform_net_create_fn=conditioner,
                         num_bins=10,
                         tails="linear",
                         tail_bound=3.0,
