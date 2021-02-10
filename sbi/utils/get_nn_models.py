@@ -87,6 +87,7 @@ def likelihood_nn(
     z_score_x: bool = True,
     hidden_features: int = 50,
     num_transforms: int = 5,
+    num_bins: int = 10,
     embedding_net: nn.Module = nn.Identity(),
     num_components: int = 10,
 ) -> Callable:
@@ -107,6 +108,8 @@ def likelihood_nn(
         num_transforms: Number of transforms when a flow is used. Only relevant if
             density estimator is a normalizing flow (i.e. currently either a `maf` or a
             `nsf`). Ignored if density estimator is a `mdn` or `made`.
+        num_bins: Number of bins used for the splines in `nsf`. Ignored if density
+            estimator not `nsf`.
         embedding_net: Optional embedding network for parameters $\theta$.
         num_components: Number of mixture components for a mixture of Gaussians.
             Ignored if density estimator is not an mdn.
@@ -119,6 +122,7 @@ def likelihood_nn(
                 "z_score_y",
                 "hidden_features",
                 "num_transforms",
+                "num_bins",
                 "embedding_net",
                 "num_components",
             ),
@@ -127,6 +131,7 @@ def likelihood_nn(
                 z_score_theta,
                 hidden_features,
                 num_transforms,
+                num_bins,
                 embedding_net,
                 num_components,
             ),
@@ -154,6 +159,7 @@ def posterior_nn(
     z_score_x: bool = True,
     hidden_features: int = 50,
     num_transforms: int = 5,
+    num_bins: int = 10,
     embedding_net: nn.Module = nn.Identity(),
     num_components: int = 10,
 ) -> Callable:
@@ -174,6 +180,8 @@ def posterior_nn(
         num_transforms: Number of transforms when a flow is used. Only relevant if
             density estimator is a normalizing flow (i.e. currently either a `maf` or a
             `nsf`). Ignored if density estimator is a `mdn` or `made`.
+        num_bins: Number of bins used for the splines in `nsf`. Ignored if density
+            estimator not `nsf`.
         embedding_net: Optional embedding network for simulation outputs $x$. This
             embedding net allows to learn features from potentially high-dimensional
             simulation outputs.
@@ -188,6 +196,7 @@ def posterior_nn(
                 "z_score_y",
                 "hidden_features",
                 "num_transforms",
+                "num_bins",
                 "embedding_net",
                 "num_components",
             ),
@@ -196,6 +205,7 @@ def posterior_nn(
                 z_score_x,
                 hidden_features,
                 num_transforms,
+                num_bins,
                 embedding_net,
                 num_components,
             ),

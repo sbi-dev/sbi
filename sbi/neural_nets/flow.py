@@ -149,6 +149,7 @@ def build_nsf(
     z_score_y: bool = True,
     hidden_features: int = 50,
     num_transforms: int = 5,
+    num_bins: int = 10,
     embedding_net: nn.Module = nn.Identity(),
     **kwargs,
 ) -> nn.Module:
@@ -161,6 +162,7 @@ def build_nsf(
         z_score_y: Whether to z-score ys passing into the network.
         hidden_features: Number of hidden features.
         num_transforms: Number of transforms.
+        num_bins: Number of bins used for the splines.
         embedding_net: Optional embedding network for y.
         kwargs: Additional arguments that are passed by the build function but are not
             relevant for maf and are therefore ignored.
