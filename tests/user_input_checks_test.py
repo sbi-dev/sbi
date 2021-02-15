@@ -435,3 +435,32 @@ def test_passing_custom_density_estimator(arg):
         density_estimator = arg
     prior = MultivariateNormal(torch.zeros(2), torch.eye(2))
     _ = SNPE_C(prior=prior, density_estimator=density_estimator)
+
+
+def test_validate_theta_and_x():
+
+    gpu_device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    cpu_device = torch.device('cpu')
+
+    theta = torch.ones((32,8), dtype=torch.float32).to(cpu_device)
+    x = torch.zeros((32,100), dtype=torch.float32).to(cpu_device)
+
+    #check assumptions in implementation
+    assert isinstance(theta, torch.Tensor)
+    assert theta.dtype == torch.float32
+    assert isinstance(theta, torch.FloatTensor)
+
+    # test on cpu
+    validate_theta_and_x(theta, x)
+
+    with pytest.raises as exc:
+        validate_theta_and_x(theta, x.to(torch.float64))
+
+    # test on gpu if available
+    theta = torch.ones((32,8), dtype=torch.float32).to(gpu_device)
+    x = torch.zeros((32,100), dtype=torch.float32).to(gpu_device)
+
+    validate_theta_and_x(theta, x)
+
+    with pytest.raises as exc:
+        validate_theta_and_x(theta, x.to(torch.float64))
