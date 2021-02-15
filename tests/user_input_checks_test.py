@@ -454,7 +454,7 @@ def test_validate_theta_and_x():
     # test on cpu
     validate_theta_and_x(theta, x)
 
-    with pytest.raises as exc:
+    with pytest.raises(AssertionError) as exc:
         validate_theta_and_x(theta, x.to(torch.float64))
 
     # test on gpu if available
@@ -463,5 +463,5 @@ def test_validate_theta_and_x():
 
     validate_theta_and_x(theta, x)
 
-    with pytest.raises as exc:
+    with pytest.raises(AssertionError) as exc:
         validate_theta_and_x(theta, x.to(torch.float64))
