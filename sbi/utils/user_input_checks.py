@@ -530,7 +530,7 @@ def check_estimator_arg(estimator: Union[str, Callable]) -> None:
     )
 
 
-def validate_theta_and_x(theta: Any, x: Any) -> bool:
+def validate_theta_and_x(theta: Any, x: Any) -> None:
     r"""
     Checks if the passed $(\theta, x)$ are valid.
 
@@ -560,7 +560,6 @@ def validate_theta_and_x(theta: Any, x: Any) -> bool:
     assert theta.dtype == float32, "Type of parameters must be float32."
     assert x.dtype == float32, "Type of simulator outputs must be float32."
 
-    return True
 
 def test_posterior_net_for_multi_d_x(net: nn.Module, theta: Tensor, x: Tensor) -> None:
     """Test log prob method of the net.
