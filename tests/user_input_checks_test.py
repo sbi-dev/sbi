@@ -463,6 +463,12 @@ def test_validate_theta_and_x():
     theta = torch.ones((32,8), dtype=torch.float32).to(gpu_if_present)
     x = torch.zeros((32,100), dtype=torch.float32).to(gpu_if_present)
 
+    # beware not to test for FloatTensor on the GPU
+    assert isinstance(theta, torch.Tensor)
+    assert theta.dtype == torch.float32
+    assert isinstance(theta, torch.FloatTensor)
+    assert otheta.dtype == torch.float32
+
     validate_theta_and_x(theta, x)
 
     with pytest.raises(AssertionError) as exc:
