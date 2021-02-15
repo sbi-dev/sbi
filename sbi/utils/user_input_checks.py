@@ -553,10 +553,8 @@ def validate_theta_and_x(theta: Any, x: Any) -> None:
 
     # I did not fuse these asserts with the `isinstance(x, Tensor)` asserts in order
     # to give more explicit errors.
-    assert isinstance(theta, torch.FloatTensor), "Type of parameters must be float32."
-    assert isinstance(
-        x, torch.FloatTensor
-    ), "Type of simulator outputs must be float32."
+    assert theta.dtype == torch.float32, "Type of parameters must be float32."
+    assert x.dtype == torch.float32, "Type of simulator outputs must be float32."
 
 
 def test_posterior_net_for_multi_d_x(net: nn.Module, theta: Tensor, x: Tensor) -> None:
