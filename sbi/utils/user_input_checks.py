@@ -539,6 +539,10 @@ def validate_theta_and_x(theta: Any, x: Any) -> bool:
     2) If they have the same batchsize.
     3) If they are of `dtype=float32`.
 
+    Raises:
+        AssertionError: If theta or x are not torch.Tensor-like,
+        do not yield the same batchsize and do not have dtype==float32.
+
     Args:
         theta: Parameters.
         x: Simulation outputs.
