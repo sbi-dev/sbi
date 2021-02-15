@@ -32,6 +32,7 @@ from sbi.utils.user_input_checks import (
     process_prior,
     process_simulator,
     process_x,
+    validate_theta_and_x
 )
 from sbi.utils.user_input_checks_utils import (
     CustomPytorchWrapper,
