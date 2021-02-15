@@ -530,12 +530,12 @@ def check_estimator_arg(estimator: Union[str, Callable]) -> None:
     )
 
 
-def validate_theta_and_x(theta: Any, x: Any) -> None:
+def validate_theta_and_x(theta: Any, x: Any) -> bool:
     r"""
     Checks if the passed $(\theta, x)$ are valid.
 
     Specifically, we check:
-    1) If they are tensors.
+    1) If they are (torch) tensors.
     2) If they have the same batchsize.
     3) If they are of `dtype=float32`.
 
@@ -543,8 +543,8 @@ def validate_theta_and_x(theta: Any, x: Any) -> None:
         theta: Parameters.
         x: Simulation outputs.
     """
-    assert isinstance(theta, Tensor), "Parameters theta must be a `Tensor`."
-    assert isinstance(x, Tensor), "Simulator output must be a `Tensor`."
+    assert isinstance(theta, Tensor), "Parameters theta must be a `torch.Tensor`."
+    assert isinstance(x, Tensor), "Simulator output must be a `torch.Tensor`."
 
     assert theta.shape[0] == x.shape[0], (
         f"Number of parameter sets (={theta.shape[0]} must match the number of "
@@ -553,9 +553,10 @@ def validate_theta_and_x(theta: Any, x: Any) -> None:
 
     # I did not fuse these asserts with the `isinstance(x, Tensor)` asserts in order
     # to give more explicit errors.
-    assert theta.dtype == torch.float32, "Type of parameters must be float32."
-    assert x.dtype == torch.float32, "Type of simulator outputs must be float32."
+    assert theta.dtype == float32, "Type of parameters must be float32."
+    assert x.dtype == float32, "Type of simulator outputs must be float32."
 
+    return True
 
 def test_posterior_net_for_multi_d_x(net: nn.Module, theta: Tensor, x: Tensor) -> None:
     """Test log prob method of the net.
