@@ -466,7 +466,7 @@ def test_validate_theta_and_x():
     # beware not to test for FloatTensor on the GPU
     assert isinstance(theta, torch.Tensor)
     assert theta.dtype == torch.float32
-    assert isinstance(theta, torch.FloatTensor)
+    assert not isinstance(theta, torch.FloatTensor)
     assert otheta.dtype == torch.float32
 
     validate_theta_and_x(theta, x)
