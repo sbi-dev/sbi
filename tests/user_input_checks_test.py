@@ -438,9 +438,8 @@ def test_passing_custom_density_estimator(arg):
     _ = SNPE_C(prior=prior, density_estimator=density_estimator)
 
 
-def test_validate_theta_and_x():
+def test_validate_theta_and_x_cpu():
 
-    gpu_if_present = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     cpu_device = torch.device('cpu')
 
     theta = torch.ones((32,8), dtype=torch.float32).to(cpu_device)
@@ -459,9 +458,11 @@ def test_validate_theta_and_x():
     with pytest.raises(AssertionError) as exc:
         validate_theta_and_x(theta, x.to(torch.float64))
 
-    # test on gpu if available
-    if not torch.cuda.is_available():
-        pytest.skip("no GPU found, so rest of this test does not apply")
+
+@pytest.mark.gpu
+def test_validate_theta_and_x_gpu():
+
+    gpu_if_present = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
     theta = torch.ones((32,8), dtype=torch.float32).to(gpu_if_present)
     x = torch.zeros((32,100), dtype=torch.float32).to(gpu_if_present)
@@ -470,7 +471,6 @@ def test_validate_theta_and_x():
     assert isinstance(theta, torch.Tensor)
     assert theta.dtype == torch.float32
     assert not isinstance(theta, torch.FloatTensor)
-    assert otheta.dtype == torch.float32
 
     validate_theta_and_x(theta, x)
 
