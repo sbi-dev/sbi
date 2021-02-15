@@ -440,16 +440,18 @@ def test_passing_custom_density_estimator(arg):
 
 def test_validate_theta_and_x():
 
-    gpu_device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    gpu_if_present = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     cpu_device = torch.device('cpu')
 
     theta = torch.ones((32,8), dtype=torch.float32).to(cpu_device)
     x = torch.zeros((32,100), dtype=torch.float32).to(cpu_device)
+    otheta = torch.FloatTensor((32,8)) #using an explicit type
 
     #check assumptions in implementation
     assert isinstance(theta, torch.Tensor)
     assert theta.dtype == torch.float32
     assert isinstance(theta, torch.FloatTensor)
+    assert otheta.dtype == torch.float32
 
     # test on cpu
     validate_theta_and_x(theta, x)
@@ -458,8 +460,8 @@ def test_validate_theta_and_x():
         validate_theta_and_x(theta, x.to(torch.float64))
 
     # test on gpu if available
-    theta = torch.ones((32,8), dtype=torch.float32).to(gpu_device)
-    x = torch.zeros((32,100), dtype=torch.float32).to(gpu_device)
+    theta = torch.ones((32,8), dtype=torch.float32).to(gpu_if_present)
+    x = torch.zeros((32,100), dtype=torch.float32).to(gpu_if_present)
 
     validate_theta_and_x(theta, x)
 
