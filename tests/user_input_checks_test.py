@@ -460,6 +460,9 @@ def test_validate_theta_and_x():
         validate_theta_and_x(theta, x.to(torch.float64))
 
     # test on gpu if available
+    if not torch.cuda.is_available():
+        pytest.skip("no GPU found, so rest of this test does not apply")
+
     theta = torch.ones((32,8), dtype=torch.float32).to(gpu_if_present)
     x = torch.zeros((32,100), dtype=torch.float32).to(gpu_if_present)
 
