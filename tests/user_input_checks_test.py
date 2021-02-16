@@ -472,9 +472,9 @@ def test_validate_theta_and_x_gpu():
     # A gpu based torch.tensor is NOT an instance of torch.FloatTensor,
     # but rather of torch.cuda.FloatTensor, still
     # tensor.dtype returns torch.float32.
-    assert isinstance(theta, torch.Tensor)
-    assert theta.dtype == torch.float32
-    assert not isinstance(theta, torch.FloatTensor)
+    assert isinstance(theta, torch.Tensor), "gpu based torch.tensor is not an instance of torch.Tensor"
+    assert theta.dtype == torch.float32, f"gpu based torch.tensor(dtype=torch.float32) yields unexpected dtype {theta.dtype}."
+    assert not isinstance(theta, torch.FloatTensor), "gpu based torch.tensor(dtype=torch.float32) is FloatTensor, even though it shouldn't be."
 
     validate_theta_and_x(theta, x)
 
