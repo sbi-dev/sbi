@@ -444,15 +444,12 @@ def test_validate_theta_and_x_cpu():
 
     theta = torch.ones((32,8), dtype=torch.float32).to(cpu_device)
     x = torch.zeros((32,100), dtype=torch.float32).to(cpu_device)
-    otheta = torch.FloatTensor((32,8)) #using an explicit type
+    plain_ft = torch.FloatTensor((32,8)) #using an explicit type
 
-    # Check assumptions in implementation:
-    # A cpu based torch.tensor is an instance of torch.FloatTensor,
-    # both of torch.FloatTensor and torch.tensor expose dtype==float32.
-    assert isinstance(theta, torch.Tensor), "theta must be torch.Tensor."
-    assert theta.dtype == torch.float32, "theta must be of type torch.float32"
-    assert isinstance(theta, torch.FloatTensor)
-    assert otheta.dtype == torch.float32
+    assert isinstance(theta, torch.Tensor), "cpu based torch.tensor is not an instance of torch.Tensor"
+    assert theta.dtype == torch.float32, f"cpu based torch.tensor(dtype=torch.float32) yields unexpected dtype {theta.dtype}."
+    assert isinstance(theta, torch.FloatTensor), "cpu based torch.tensor(dtype=torch.float32) is no FloatTensor."
+    assert plain_ft.dtype == torch.float32, "FloatTensor does not expose float32 dtype."
 
     # test on cpu
     validate_theta_and_x(theta, x)
