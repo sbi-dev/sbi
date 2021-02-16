@@ -535,16 +535,20 @@ def validate_theta_and_x(theta: Any, x: Any) -> None:
     Checks if the passed $(\theta, x)$ are valid.
 
     Specifically, we check:
-    1) If they are tensors.
+    1) If they are (torch) tensors.
     2) If they have the same batchsize.
     3) If they are of `dtype=float32`.
+
+    Raises:
+        AssertionError: If theta or x are not torch.Tensor-like,
+        do not yield the same batchsize and do not have dtype==float32.
 
     Args:
         theta: Parameters.
         x: Simulation outputs.
     """
-    assert isinstance(theta, Tensor), "Parameters theta must be a `Tensor`."
-    assert isinstance(x, Tensor), "Simulator output must be a `Tensor`."
+    assert isinstance(theta, Tensor), "Parameters theta must be a `torch.Tensor`."
+    assert isinstance(x, Tensor), "Simulator output must be a `torch.Tensor`."
 
     assert theta.shape[0] == x.shape[0], (
         f"Number of parameter sets (={theta.shape[0]} must match the number of "
@@ -553,10 +557,8 @@ def validate_theta_and_x(theta: Any, x: Any) -> None:
 
     # I did not fuse these asserts with the `isinstance(x, Tensor)` asserts in order
     # to give more explicit errors.
-    assert isinstance(theta, torch.FloatTensor), "Type of parameters must be float32."
-    assert isinstance(
-        x, torch.FloatTensor
-    ), "Type of simulator outputs must be float32."
+    assert theta.dtype == float32, "Type of parameters must be float32."
+    assert x.dtype == float32, "Type of simulator outputs must be float32."
 
 
 def test_posterior_net_for_multi_d_x(net: nn.Module, theta: Tensor, x: Tensor) -> None:
