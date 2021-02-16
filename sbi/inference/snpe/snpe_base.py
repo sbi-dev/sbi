@@ -4,6 +4,7 @@
 
 from abc import ABC, abstractmethod
 from copy import deepcopy
+import time
 from typing import Any, Callable, Dict, Optional, Union
 from warnings import warn
 
@@ -286,6 +287,7 @@ class PosteriorEstimator(NeuralInference, ABC):
             self.epoch, stop_after_epochs
         ):
 
+            epoch_start = time.time()
             # Train for a single epoch.
             self._neural_net.train()
             for batch in train_loader:
@@ -315,6 +317,7 @@ class PosteriorEstimator(NeuralInference, ABC):
                 self.optimizer.step()
 
             self.epoch += 1
+            self._summary["training_time_per_epoch_sec"].append(time.time() - epoch_start)
 
             # Calculate validation performance.
             self._neural_net.eval()
