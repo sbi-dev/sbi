@@ -446,7 +446,9 @@ def test_validate_theta_and_x_cpu():
     x = torch.zeros((32,100), dtype=torch.float32).to(cpu_device)
     otheta = torch.FloatTensor((32,8)) #using an explicit type
 
-    #check assumptions in implementation
+    # Check assumptions in implementation:
+    # A cpu based torch.tensor is an instance of torch.FloatTensor,
+    # both of torch.FloatTensor and torch.tensor expose dtype==float32.
     assert isinstance(theta, torch.Tensor)
     assert theta.dtype == torch.float32
     assert isinstance(theta, torch.FloatTensor)
@@ -467,7 +469,9 @@ def test_validate_theta_and_x_gpu():
     theta = torch.ones((32,8), dtype=torch.float32).to(gpu_if_present)
     x = torch.zeros((32,100), dtype=torch.float32).to(gpu_if_present)
 
-    # beware not to test for FloatTensor on the GPU
+    # A gpu based torch.tensor is NOT an instance of torch.FloatTensor,
+    # but rather of torch.cuda.FloatTensor, still
+    # tensor.dtype returns torch.float32.
     assert isinstance(theta, torch.Tensor)
     assert theta.dtype == torch.float32
     assert not isinstance(theta, torch.FloatTensor)
