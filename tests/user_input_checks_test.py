@@ -450,7 +450,7 @@ def test_validate_theta_and_x_cpu():
     # A cpu based torch.tensor is an instance of torch.FloatTensor,
     # both of torch.FloatTensor and torch.tensor expose dtype==float32.
     assert isinstance(theta, torch.Tensor), "theta must be torch.Tensor."
-    assert theta.dtype == torch.float32
+    assert theta.dtype == torch.float32, "theta must be of type torch.float32"
     assert isinstance(theta, torch.FloatTensor)
     assert otheta.dtype == torch.float32
 
