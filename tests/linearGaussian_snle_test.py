@@ -37,10 +37,7 @@ def test_api_snl_on_linearGaussian(num_dim: int, set_seed):
     prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
 
     simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior)
-    inference = SNL(
-        prior,
-        show_progress_bars=False,
-    )
+    inference = SNL(prior, show_progress_bars=False,)
 
     theta, x = simulate_for_sbi(simulator, prior, 1000, simulation_batch_size=50)
     _ = inference.append_simulations(theta, x).train(max_num_epochs=5)
@@ -65,6 +62,7 @@ def test_c2st_snl_on_linearGaussian_different_dims(set_seed):
 
     x_o = ones(1, x_dim)
     num_samples = 1000
+    num_simulations = 5000
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(x_dim)
@@ -88,12 +86,11 @@ def test_c2st_snl_on_linearGaussian_different_dims(set_seed):
     )
 
     simulator, prior = prepare_for_sbi(simulator, prior)
-    inference = SNL(
-        prior,
-        show_progress_bars=False,
-    )
+    inference = SNL(prior, show_progress_bars=False,)
 
-    theta, x = simulate_for_sbi(simulator, prior, 5000, simulation_batch_size=50)
+    theta, x = simulate_for_sbi(
+        simulator, prior, num_simulations, simulation_batch_size=50
+    )
     _ = inference.append_simulations(theta, x).train()
     posterior = inference.build_posterior()
     samples = posterior.sample((num_samples,), x=x_o, mcmc_parameters={"thin": 3})
@@ -138,10 +135,7 @@ def test_c2st_snl_on_linearGaussian(num_dim: int, prior_str: str, set_seed):
     simulator = lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     simulator, prior = prepare_for_sbi(simulator, prior)
-    inference = SNL(
-        prior,
-        show_progress_bars=False,
-    )
+    inference = SNL(prior, show_progress_bars=False,)
 
     theta, x = simulate_for_sbi(simulator, prior, 1000, simulation_batch_size=50)
     _ = inference.append_simulations(theta, x).train()
@@ -195,10 +189,7 @@ def test_c2st_multi_round_snl_on_linearGaussian(set_seed):
     simulator = lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     simulator, prior = prepare_for_sbi(simulator, prior)
-    inference = SNL(
-        prior,
-        show_progress_bars=False,
-    )
+    inference = SNL(prior, show_progress_bars=False,)
 
     theta, x = simulate_for_sbi(simulator, prior, 750, simulation_batch_size=50)
     _ = inference.append_simulations(theta, x).train()
@@ -218,11 +209,7 @@ def test_c2st_multi_round_snl_on_linearGaussian(set_seed):
 
 @pytest.mark.slow
 @pytest.mark.parametrize(
-    "mcmc_method, prior_str",
-    (
-        ("slice", "gaussian"),
-        ("slice", "uniform"),
-    ),
+    "mcmc_method, prior_str", (("slice", "gaussian"), ("slice", "uniform"),),
 )
 def test_api_snl_sampling_methods(mcmc_method: str, prior_str: str, set_seed):
     """Runs SNL on linear Gaussian and tests sampling from posterior via mcmc.
@@ -243,10 +230,7 @@ def test_api_snl_sampling_methods(mcmc_method: str, prior_str: str, set_seed):
         prior = utils.BoxUniform(-1.0 * ones(num_dim), ones(num_dim))
 
     simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior)
-    inference = SNL(
-        prior,
-        show_progress_bars=False,
-    )
+    inference = SNL(prior, show_progress_bars=False,)
 
     theta, x = simulate_for_sbi(simulator, prior, 200, simulation_batch_size=50)
     _ = inference.append_simulations(theta, x).train(max_num_epochs=5)

@@ -16,20 +16,21 @@ from sbi.simulators.linear_gaussian import (
 from tests.test_utils import check_c2st
 
 
-def test_mdn_with_snpe():
-    mdn_inference_with_different_methods(SNPE)
+def test_mdn_with_snpe(set_seed):
+    mdn_inference_with_different_methods(SNPE, set_seed)
 
 
 @pytest.mark.slow
-def test_mdn_with_snle():
-    mdn_inference_with_different_methods(SNLE)
+def test_mdn_with_snle(set_seed):
+    mdn_inference_with_different_methods(SNLE, set_seed)
 
 
-def mdn_inference_with_different_methods(method):
+def mdn_inference_with_different_methods(method, set_seed):
 
     num_dim = 2
     x_o = torch.tensor([[1.0, 0.0]])
     num_samples = 500
+    num_simulations = 2000
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(num_dim)
@@ -49,7 +50,7 @@ def mdn_inference_with_different_methods(method):
     simulator, prior = prepare_for_sbi(simulator, prior)
     inference = method(prior, density_estimator="mdn")
 
-    theta, x = simulate_for_sbi(simulator, prior, 1000)
+    theta, x = simulate_for_sbi(simulator, prior, num_simulations)
     _ = inference.append_simulations(theta, x).train(training_batch_size=50)
     posterior = inference.build_posterior().set_default_x(x_o)
 
