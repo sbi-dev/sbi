@@ -8,7 +8,7 @@ from torch import zeros, ones, eye
 from torch.distributions import MultivariateNormal
 from sbi.simulators import linear_gaussian
 from sbi import utils as utils
-from sbi.inference import SNPE, SNLE, SNRE, simulate_for_sbi
+from sbi.inference import SNPE, SNLE, SNRE_A, SNRE_B, simulate_for_sbi
 from sbi.utils.torchutils import process_device
 
 
@@ -22,8 +22,8 @@ from sbi.utils.torchutils import process_device
         (SNPE, "nsf"),
         (SNLE, "maf"),
         (SNLE, "nsf"),
-        (SNRE, "mlp"),
-        (SNRE, "resnet"),
+        (SNRE_A, "mlp"),
+        (SNRE_B, "resnet"),
     ],
 )
 @pytest.mark.parametrize("device", ("cpu", "cuda:0"))
@@ -57,7 +57,7 @@ def test_training_and_mcmc_on_device(method, model, device):
     elif method == SNLE:
         kwargs = dict(density_estimator=utils.likelihood_nn(model=model),)
         mcmc_kwargs = dict(mcmc_method="slice")
-    elif method == SNRE:
+    elif method in (SNRE_A, SNRE_B):
         kwargs = dict(classifier=utils.classifier_nn(model=model),)
         mcmc_kwargs = dict(mcmc_method="slice_np_vectorized",)
     else:
