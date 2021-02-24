@@ -122,7 +122,7 @@ class SNRE_A(RatioEstimator):
         # sampled from the marginals. The first element is sampled from the
         # joint p(theta, x) and is labelled 1. The second element is sampled
         # from the marginals p(theta)p(x) and is labelled 0. And so on.
-        labels = ones(2 * batch_size)  # two atoms
+        labels = ones(2 * batch_size, device=self._device)  # two atoms
         labels[1::2] = 0.0
 
         # Binary cross entropy to learn the likelihood (AALR-specific)
