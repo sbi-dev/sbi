@@ -7,9 +7,9 @@
 <meta content="width=device-width,initial-scale=1" name="viewport"/>
 <link href="https://mackelab.org/sbi/tutorial/03_multiround_inference/" rel="canonical"/>
 <link href="../../assets/images/favicon.png" rel="shortcut icon"/>
-<meta content="mkdocs-1.1.2, mkdocs-material-5.2.2" name="generator"/>
+<meta content="mkdocs-1.1.2, mkdocs-material-5.4.0" name="generator"/>
 <title>Multi-round inference - sbi</title>
-<link href="../../assets/stylesheets/main.a2408e81.min.css" rel="stylesheet"/>
+<link href="../../assets/stylesheets/main.fe0cca5b.min.css" rel="stylesheet"/>
 <link href="../../assets/stylesheets/palette.a46bcfb3.min.css" rel="stylesheet"/>
 <meta content="#3f51b5" name="theme-color"/>
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
@@ -322,7 +322,7 @@
 <svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75L3 17.25z"></path></svg>
 </a>
 <h1 id="multi-round-inference">Multi-round inference<a class="headerlink" href="#multi-round-inference" title="Permanent link">¶</a></h1>
-<p>In the previous tutorials, we have inferred the posterior using <strong>single-round inference</strong>. In <strong>single-round inference</strong>, we draw parameters from the prior, simulate the corresponding dat, and then train a neural network to obtain the posterior. However,  if one is interested in only one particular observation <code>x_o</code> sampling from the prior can be inefficient in the number of simulations because one is effectively learning a posterior estimate for all observations in the prior space. In this tutorial, we show how one can alleviate this issue by performing <strong>multi-round inference</strong> with <code>sbi</code>.  </p>
+<p>In the previous tutorials, we have inferred the posterior using <strong>single-round inference</strong>. In <strong>single-round inference</strong>, we draw parameters from the prior, simulate the corresponding data, and then train a neural network to obtain the posterior. However,  if one is interested in only one particular observation <code>x_o</code> sampling from the prior can be inefficient in the number of simulations because one is effectively learning a posterior estimate for all observations in the prior space. In this tutorial, we show how one can alleviate this issue by performing <strong>multi-round inference</strong> with <code>sbi</code>.  </p>
 <p><strong>Multi-round inference</strong> also starts by drawing parameters from the prior, simulating them, and training a neural network to estimate the posterior distribution. Afterwards, however, it continues inference in multiple rounds, focusing on a particular observation <code>x_o</code>. In each new round of inference, it draws samples from the obtained posterior distribution conditioned at <code>x_o</code> (instead of from the prior), simulates these, and trains the network again. This process can be repeated arbitrarily often to get increasingly good approximations to the true posterior distribution at <code>x_o</code>.</p>
 <p>Running multi-round inference can be more efficient in the number of simulations, but it will lead to the posterior no longer being amortized (i.e. it will be accurate only for a specific observation <code>x_o</code>, not for any <code>x</code>).</p>
 <p>Note, you can find the original version of this notebook at <a href="https://github.com/mackelab/sbi/blob/main/tutorials/03_multiround_inference.ipynb">https://github.com/mackelab/sbi/blob/main/tutorials/03_multiround_inference.ipynb</a> in the <code>sbi</code> repository.</p>
@@ -352,6 +352,7 @@
 <span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">SNPE</span><span class="p">,</span> <span class="n">prepare_for_sbi</span><span class="p">,</span> <span class="n">simulate_for_sbi</span>
 <span class="kn">from</span> <span class="nn">sbi.utils.get_nn_models</span> <span class="kn">import</span> <span class="n">posterior_nn</span>
 <span class="kn">from</span> <span class="nn">sbi</span> <span class="kn">import</span> <span class="n">utils</span> <span class="k">as</span> <span class="n">utils</span>
+<span class="kn">from</span> <span class="nn">sbi</span> <span class="kn">import</span> <span class="n">analysis</span> <span class="k">as</span> <span class="n">analysis</span>
 <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
 </code></pre></div>
 <div class="codehilite"><pre><span></span><code>&lt;torch._C.Generator at 0x7f094007e490&gt;
@@ -410,8 +411,8 @@ Neural network successfully converged after 41 epochs.
 <div class="highlight"><pre><span></span><code><span class="n">posterior_samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_o</span><span class="p">)</span>
 
 <span class="c1"># plot posterior samples</span>
-<span class="n">_</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">pairplot</span><span class="p">(</span><span class="n">posterior_samples</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">],[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">],[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">]],</span> 
-                   <span class="n">fig_size</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span><span class="mi">5</span><span class="p">))</span>
+<span class="n">_</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">pairplot</span><span class="p">(</span><span class="n">posterior_samples</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">],[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">],[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">]],</span> 
+                   <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span><span class="mi">5</span><span class="p">))</span>
 </code></pre></div>
 <div class="codehilite"><pre><span></span><code>HBox(children=(FloatProgress(value=0.0, description='Drawing 10000 posterior samples', max=10000.0, style=Prog…
 </code></pre></div>
@@ -478,13 +479,13 @@ It allows to .sample() and .log_prob() the posterior and wraps the output of the
 </footer>
 </div>
 <script src="../../assets/javascripts/vendor.d710d30a.min.js"></script>
-<script src="../../assets/javascripts/bundle.5f27aba8.min.js"></script><script id="__lang" type="application/json">{"clipboard.copy": "Copy to clipboard", "clipboard.copied": "Copied to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.result.placeholder": "Type to start searching", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents"}</script>
+<script src="../../assets/javascripts/bundle.b39636ac.min.js"></script><script id="__lang" type="application/json">{"clipboard.copy": "Copy to clipboard", "clipboard.copied": "Copied to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.result.placeholder": "Type to start searching", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents"}</script>
 <script>
         app = initialize({
           base: "../..",
           features: [],
           search: Object.assign({
-            worker: "../../assets/javascripts/worker/search.27c6a5e6.min.js"
+            worker: "../../assets/javascripts/worker/search.a68abb33.min.js"
           }, typeof search !== "undefined" && search)
         })
       </script>

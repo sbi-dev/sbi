@@ -5,10 +5,10 @@
 <head>
 <meta charset="utf-8"/>
 <meta content="width=device-width,initial-scale=1" name="viewport"/>
-<link href="https://mackelab.org/sbi/tutorial/04_density_estimators/" rel="canonical"/>
+<link href="https://mackelab.org/sbi/tutorial/03_flexible_interface/" rel="canonical"/>
 <link href="../../assets/images/favicon.png" rel="shortcut icon"/>
 <meta content="mkdocs-1.1.2, mkdocs-material-5.4.0" name="generator"/>
-<title>Custom density estimators - sbi</title>
+<title>The flexible interface - sbi</title>
 <link href="../../assets/stylesheets/main.fe0cca5b.min.css" rel="stylesheet"/>
 <link href="../../assets/stylesheets/palette.a46bcfb3.min.css" rel="stylesheet"/>
 <meta content="#3f51b5" name="theme-color"/>
@@ -22,7 +22,7 @@
 <input autocomplete="off" class="md-toggle" data-md-toggle="search" id="__search" type="checkbox"/>
 <label class="md-overlay" for="__drawer"></label>
 <div data-md-component="skip">
-<a class="md-skip" href="#customizing-the-density-estimator">
+<a class="md-skip" href="#the-flexible-interface">
           Skip to content
         </a>
 </div>
@@ -43,7 +43,7 @@
           </span>
 <span class="md-header-nav__topic md-ellipsis">
             
-              Custom density estimators
+              The flexible interface
             
           </span>
 </div>
@@ -122,8 +122,8 @@
       Installation
     </a>
 </li>
-<li class="md-nav__item md-nav__item--active md-nav__item--nested">
-<input checked="" class="md-nav__toggle md-toggle" data-md-toggle="nav-3" id="nav-3" type="checkbox"/>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" data-md-toggle="nav-3" id="nav-3" type="checkbox"/>
 <label class="md-nav__link" for="nav-3">
       Tutorials and Examples
       <span class="md-nav__icon md-icon">
@@ -167,8 +167,8 @@
 </ul>
 </nav>
 </li>
-<li class="md-nav__item md-nav__item--active md-nav__item--nested">
-<input checked="" class="md-nav__toggle md-toggle" data-md-toggle="nav-3-2" id="nav-3-2" type="checkbox"/>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" data-md-toggle="nav-3-2" id="nav-3-2" type="checkbox"/>
 <label class="md-nav__link" for="nav-3-2">
       Advanced
       <span class="md-nav__icon md-icon">
@@ -193,42 +193,10 @@
       Multi-round inference
     </a>
 </li>
-<li class="md-nav__item md-nav__item--active">
-<input class="md-nav__toggle md-toggle" data-md-toggle="toc" id="__toc" type="checkbox"/>
-<label class="md-nav__link md-nav__link--active" for="__toc">
-        Custom density estimators
-        <span class="md-nav__icon md-icon">
-<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 9h14V7H3v2m0 4h14v-2H3v2m0 4h14v-2H3v2m16 0h2v-2h-2v2m0-10v2h2V7h-2m0 6h2v-2h-2v2z"></path></svg>
-</span>
-</label>
-<a class="md-nav__link md-nav__link--active" href="./" title="Custom density estimators">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../04_density_estimators/" title="Custom density estimators">
       Custom density estimators
     </a>
-<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
-<label class="md-nav__title" for="__toc">
-<span class="md-nav__icon md-icon">
-<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12z"></path></svg>
-</span>
-      Table of contents
-    </label>
-<ul class="md-nav__list" data-md-scrollfix="">
-<li class="md-nav__item">
-<a class="md-nav__link" href="#changing-the-type-of-density-estimator">
-    Changing the type of density estimator
-  </a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="#changing-hyperparameters-of-density-estimators">
-    Changing hyperparameters of density estimators
-  </a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="#building-new-density-estimators-from-scratch">
-    Building new density estimators from scratch
-  </a>
-</li>
-</ul>
-</nav>
 </li>
 <li class="md-nav__item">
 <a class="md-nav__link" href="../05_embedding_net/" title="Learning summary statistics">
@@ -307,18 +275,13 @@
     </label>
 <ul class="md-nav__list" data-md-scrollfix="">
 <li class="md-nav__item">
-<a class="md-nav__link" href="#changing-the-type-of-density-estimator">
-    Changing the type of density estimator
+<a class="md-nav__link" href="#features">
+    Features
   </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="#changing-hyperparameters-of-density-estimators">
-    Changing hyperparameters of density estimators
-  </a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="#building-new-density-estimators-from-scratch">
-    Building new density estimators from scratch
+<a class="md-nav__link" href="#linear-gaussian-example">
+    Linear Gaussian example
   </a>
 </li>
 </ul>
@@ -328,65 +291,94 @@
 </div>
 <div class="md-content">
 <article class="md-content__inner md-typeset">
-<a class="md-content__button md-icon" href="http://github.com/mackelab/sbi/edit/master/docs/tutorial/04_density_estimators.md" title="Edit this page">
+<a class="md-content__button md-icon" href="http://github.com/mackelab/sbi/edit/master/docs/tutorial/03_flexible_interface.md" title="Edit this page">
 <svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75L3 17.25z"></path></svg>
 </a>
-<h1 id="customizing-the-density-estimator">Customizing the density estimator<a class="headerlink" href="#customizing-the-density-estimator" title="Permanent link">¶</a></h1>
-<p><code>sbi</code> allows to specify a custom density estimator for each of the implemented methods. For all options, check the API reference <a href="https://www.mackelab.org/sbi/reference/#models">here</a>.</p>
-<h2 id="changing-the-type-of-density-estimator">Changing the type of density estimator<a class="headerlink" href="#changing-the-type-of-density-estimator" title="Permanent link">¶</a></h2>
-<p>One option is to use one of set of preconfigured density estimators by passing a string in the <code>density_estimator</code> keyword argument to the inference object (<code>SNPE</code> or <code>SNLE</code>), e.g., “maf” to use a Masked Autoregressive Flow, of “nsf” to use a Neural Spline Flow with default hyperparameters.</p>
-<div class="highlight"><pre><span></span><code><span class="n">inference</span> <span class="o">=</span> <span class="n">SNPE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="s1">'maf'</span><span class="p">)</span>
-</code></pre></div>
-<p>In the case of <code>SNRE</code>, the argument is called <code>classifier</code>:</p>
-<div class="highlight"><pre><span></span><code><span class="n">inference</span> <span class="o">=</span> <span class="n">SNRE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">classifier</span><span class="o">=</span><span class="s1">'resnet'</span><span class="p">)</span>
-</code></pre></div>
-<h2 id="changing-hyperparameters-of-density-estimators">Changing hyperparameters of density estimators<a class="headerlink" href="#changing-hyperparameters-of-density-estimators" title="Permanent link">¶</a></h2>
-<p>Alternatively, you can use a set of utils functions to configure a density estimator yourself, e.g., use a MAF with hyperparameters chosen for your problem at hand.</p>
-<p>Here, because we want to use SN*P*E, we specifiy a neural network targeting the <em>posterior</em> (using the utils function <code>posterior_nn</code>). In this example, we will create a neural spline flow (<code>'nsf'</code>) with <code>60</code> hidden units and <code>3</code> transform layers:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.utils.get_nn_models</span> <span class="kn">import</span> <span class="n">posterior_nn</span>  <span class="c1"># For SNLE: likelihood_nn(). For SNRE: classifier_nn()</span>
+<h1 id="the-flexible-interface">The flexible interface<a class="headerlink" href="#the-flexible-interface" title="Permanent link">¶</a></h1>
+<p>In the previous tutorial, we have demonstrated how <code>sbi</code> can be used to run simulation-based inference with just a single line of code.</p>
+<p>In addition to this simple interface, <code>sbi</code> also provides a <strong>flexible interface</strong> which unlocks several additional features implemented in <code>sbi</code>.</p>
+<p>Note, you find the original version of this notebook at <a href="https://github.com/mackelab/sbi/blob/main/tutorial/03_flexible_interface.ipynb">https://github.com/mackelab/sbi/blob/main/tutorial/03_flexible_interface.ipynb</a> in the <code>sbi</code> repository.</p>
+<h2 id="features">Features<a class="headerlink" href="#features" title="Permanent link">¶</a></h2>
+<p>The flexible interface allows you to customize the following:</p>
+<ul>
+<li>performing sequential posterior estimation by using multiple rounds. This can decrease the number of simulations one has to run, but the inference procedure is no longer amortized.  </li>
+<li>specify your own density estimator, or change hyperparameters of existing ones (e.g. number of hidden units for <a href="https://arxiv.org/abs/1906.04032">NSF</a>).</li>
+<li>run simulations in batches, which can speed up simulations.</li>
+<li>when it makes sense, choose between different methods to sample from the posterior.</li>
+<li>use calibration kernels as proposed by <a href="https://arxiv.org/abs/1711.01861">Lueckmann, Goncalves et al. 2017</a>.</li>
+</ul>
+<h2 id="linear-gaussian-example">Linear Gaussian example<a class="headerlink" href="#linear-gaussian-example" title="Permanent link">¶</a></h2>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">torch</span>
 
-<span class="n">density_estimator_build_fun</span> <span class="o">=</span> <span class="n">posterior_nn</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s1">'nsf'</span><span class="p">,</span> <span class="n">hidden_features</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span> <span class="n">num_transforms</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
-<span class="n">inference</span> <span class="o">=</span> <span class="n">SNPE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="n">density_estimator_build_fun</span><span class="p">)</span>
+<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">SNPE</span><span class="p">,</span> <span class="n">prepare_for_sbi</span>
+<span class="kn">from</span> <span class="nn">sbi.utils.get_nn_models</span> <span class="kn">import</span> <span class="n">posterior_nn</span>
+<span class="kn">import</span> <span class="nn">sbi.utils</span> <span class="k">as</span> <span class="nn">utils</span>
 </code></pre></div>
-<p>It is also possible to pass an <code>embedding_net</code> to <code>posterior_nn()</code> which learn summary statistics from high-dimensional simulation outputs. You can find a more detailed tutorial on this <a href="https://www.mackelab.org/sbi/tutorial/05_embedding_net/">here</a>.</p>
-<h2 id="building-new-density-estimators-from-scratch">Building new density estimators from scratch<a class="headerlink" href="#building-new-density-estimators-from-scratch" title="Permanent link">¶</a></h2>
-<p>Finally, it is also possible to implement your own density estimator from scratch, e.g., including embedding nets to preprocess data, or to a density estimator architecture of your choice. </p>
-<p>For this, the <code>density_estimator</code> argument needs to be a function that takes <code>theta</code> and <code>x</code> batches as arguments to then construct the density estimator after the first set of simulations was generated. Our utils functions in <code>sbi/utils/get_nn_models.py</code> return such a function. </p>
+<p>We will show an example of how we can use the flexible interface to infer the posterior for an example with a Gaussian likelihood (same example as before). After importing the inference method we want, <code>SNPE</code>, a function to prepare the input <code>prepare_for_sbi</code> and a factory for density estimators <code>posterior_nn</code> above, we define the simulator and prior:</p>
+<div class="highlight"><pre><span></span><code><span class="n">num_dim</span> <span class="o">=</span> <span class="mi">3</span>
+<span class="n">prior</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">BoxUniform</span><span class="p">(</span><span class="n">low</span><span class="o">=-</span><span class="mi">2</span><span class="o">*</span><span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">num_dim</span><span class="p">),</span> 
+                         <span class="n">high</span><span class="o">=</span><span class="mi">2</span><span class="o">*</span><span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">num_dim</span><span class="p">))</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="k">def</span> <span class="nf">linear_gaussian</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">theta</span> <span class="o">+</span> <span class="mf">1.0</span> <span class="o">+</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn_like</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.1</span>
+</code></pre></div>
+<p>In the flexible interface, you have to ensure that your simulator and prior adhere the requirements of <code>sbi</code>. You can do so with the <code>prepare_for_sbi()</code> function.</p>
+<div class="highlight"><pre><span></span><code><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span> <span class="o">=</span> <span class="n">prepare_for_sbi</span><span class="p">(</span><span class="n">linear_gaussian</span><span class="p">,</span> <span class="n">prior</span><span class="p">)</span>
+</code></pre></div>
+<p>It is possible to specify a custom density estimator. One option is to use one of set of preconfigured density estimators by passing a string in the <code>density_estimator</code> keyword argument, e.g., “maf” to use a Masked Autoregressive Flow, of “nsf” to use a Neural Spline Flow with default hyperparameters. Alternatively, you can use a set of utils functions to configure a density estimator yourself, e.g., use a MAF with hyperparameters chosen for your problem at hand. Finally, it is also possible to implement your own density estimator from scratch, e.g., including embedding nets to preprocess data, or to a density estimator architecture of your choice. </p>
+<p>For the last two options the <code>density_estimator</code> argument needs to be a function that takes <code>theta</code> and <code>x</code> batches as arguments to then construct the density estimator after the first set of simulations was generated. Our utils functions in <code>sbi/utils/get_nn_models</code> return such a function. </p>
+<p>Here, because we want to use S*N*PE, we specifiy a neural network targeting the <em>posterior</em> (using the utils function <code>posterior_nn</code>). In this example, we will create a neural spline flow (<code>'nsf'</code>) with <code>60</code> hidden units and <code>3</code> transform layers:</p>
+<div class="highlight"><pre><span></span><code><span class="n">density_estimator_build_fun</span> <span class="o">=</span> <span class="n">posterior_nn</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s1">'nsf'</span><span class="p">,</span> <span class="n">hidden_features</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span> <span class="n">num_transforms</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+</code></pre></div>
+<p>We will use <code>SNPE</code> with a <code>simulation_batch_size=10</code>, i.e. <code>10</code> simulations will be passed to the simulator which will then handle the simulations in a vectorized way (note that your simulator has to support this in order to use this feature):</p>
+<div class="highlight"><pre><span></span><code><span class="n">inference</span> <span class="o">=</span> <span class="n">SNPE</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="n">density_estimator_build_fun</span><span class="p">,</span> 
+                 <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</code></pre></div>
+<p>And we can run inference. In this example, we will run inference over <code>2</code> rounds, potentially leading to a more focused posterior around the observation <code>x_o</code>.</p>
+<div class="highlight"><pre><span></span><code><span class="n">num_rounds</span> <span class="o">=</span> <span class="mi">2</span>
+<span class="n">x_o</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="p">,)</span>
+
+<span class="n">posteriors</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="n">proposal</span> <span class="o">=</span> <span class="kc">None</span>
+
+<span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_rounds</span><span class="p">):</span>
+    <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="p">(</span><span class="n">num_simulations</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">proposal</span><span class="o">=</span><span class="n">proposal</span><span class="p">)</span>
+    <span class="n">posteriors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">posterior</span><span class="p">)</span>
+    <span class="n">proposal</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">x_o</span><span class="p">)</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>Neural network successfully converged after 85 epochs.
+
+
+
+HBox(children=(FloatProgress(value=0.0, description='Drawing 500 posterior samples', max=500.0, style=Progress…
+
+
+
+Neural network successfully converged after 22 epochs.
+</code></pre></div>
+<p>Note that, for <code>num_rounds&gt;1</code>, the posterior is no longer amortized: it will give good results when sampled around <code>x=observation</code>, but possibly bad results for other <code>x</code>.</p>
+<p>Once we have obtained the posterior, we can <code>.sample()</code>, <code>.log_prob()</code>, or <code>.pairplot()</code> in the same way as for the easy interface.</p>
+<div class="highlight"><pre><span></span><code><span class="n">posterior_samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_o</span><span class="p">)</span>
+
+<span class="c1"># plot posterior samples</span>
+<span class="n">_</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">pairplot</span><span class="p">(</span><span class="n">posterior_samples</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">],[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">],[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">]],</span> 
+                   <span class="n">fig_size</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span><span class="mi">5</span><span class="p">))</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>HBox(children=(FloatProgress(value=0.0, description='Drawing 10000 posterior samples', max=10000.0, style=Prog…
+</code></pre></div>
+<p><img alt="png" src="../03_flexible_interface_files/03_flexible_interface_18_2.png"/></p>
+<p>We can always print the posterior to know how it was trained:</p>
+<div class="highlight"><pre><span></span><code><span class="nb">print</span><span class="p">(</span><span class="n">posterior</span><span class="p">)</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>Posterior conditional density p(θ|x) (multi-round). Evaluates and samples by default at x=[[0.0, 0.0, 0.0]].
+
+This neural posterior was obtained with a SNPE-class method using a flow.
+</code></pre></div>
 </article>
 </div>
 </div>
 </main>
 <footer class="md-footer">
-<div class="md-footer-nav">
-<nav aria-label="Footer" class="md-footer-nav__inner md-grid">
-<a class="md-footer-nav__link md-footer-nav__link--prev" href="../03_multiround_inference/" rel="prev" title="Multi-round inference">
-<div class="md-footer-nav__button md-icon">
-<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12z"></path></svg>
-</div>
-<div class="md-footer-nav__title">
-<div class="md-ellipsis">
-<span class="md-footer-nav__direction">
-                  Previous
-                </span>
-                Multi-round inference
-              </div>
-</div>
-</a>
-<a class="md-footer-nav__link md-footer-nav__link--next" href="../05_embedding_net/" rel="next" title="Learning summary statistics">
-<div class="md-footer-nav__title">
-<div class="md-ellipsis">
-<span class="md-footer-nav__direction">
-                  Next
-                </span>
-                Learning summary statistics
-              </div>
-</div>
-<div class="md-footer-nav__button md-icon">
-<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11H4z"></path></svg>
-</div>
-</a>
-</nav>
-</div>
 <div class="md-footer-meta md-typeset">
 <div class="md-footer-meta__inner md-grid">
 <div class="md-footer-copyright">

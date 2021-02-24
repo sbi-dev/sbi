@@ -7,9 +7,9 @@
 <meta content="width=device-width,initial-scale=1" name="viewport"/>
 <link href="https://mackelab.org/sbi/tutorial/05_embedding_net/" rel="canonical"/>
 <link href="../../assets/images/favicon.png" rel="shortcut icon"/>
-<meta content="mkdocs-1.1.2, mkdocs-material-5.2.2" name="generator"/>
+<meta content="mkdocs-1.1.2, mkdocs-material-5.4.0" name="generator"/>
 <title>Learning summary statistics - sbi</title>
-<link href="../../assets/stylesheets/main.a2408e81.min.css" rel="stylesheet"/>
+<link href="../../assets/stylesheets/main.fe0cca5b.min.css" rel="stylesheet"/>
 <link href="../../assets/stylesheets/palette.a46bcfb3.min.css" rel="stylesheet"/>
 <meta content="#3f51b5" name="theme-color"/>
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
@@ -355,6 +355,7 @@
 <span class="kn">import</span> <span class="nn">torch.nn</span> <span class="k">as</span> <span class="nn">nn</span> 
 <span class="kn">import</span> <span class="nn">torch.nn.functional</span> <span class="k">as</span> <span class="nn">F</span> 
 <span class="kn">from</span> <span class="nn">sbi</span> <span class="kn">import</span> <span class="n">utils</span>
+<span class="kn">from</span> <span class="nn">sbi</span> <span class="kn">import</span> <span class="n">analysis</span>
 <span class="kn">from</span> <span class="nn">sbi</span> <span class="kn">import</span> <span class="n">inference</span>
 <span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">SNPE</span><span class="p">,</span> <span class="n">simulate_for_sbi</span><span class="p">,</span> <span class="n">prepare_for_sbi</span>
 <span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
@@ -508,13 +509,13 @@
 </code></pre></div>
 <p>The figure below shows the statistics of the generated samples.</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># create the figure</span>
-<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">pairplot</span><span class="p">(</span><span class="n">samples</span><span class="p">,</span> 
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">pairplot</span><span class="p">(</span><span class="n">samples</span><span class="p">,</span> 
                              <span class="n">points</span><span class="o">=</span><span class="n">true_parameter</span><span class="p">,</span>
                              <span class="n">labels</span><span class="o">=</span><span class="p">[</span><span class="s1">'r'</span><span class="p">,</span> <span class="sa">r</span><span class="s1">'$\theta$'</span><span class="p">],</span> 
                              <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">]],</span>
                              <span class="n">points_colors</span><span class="o">=</span><span class="s1">'r'</span><span class="p">,</span>
                              <span class="n">points_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">'markersize'</span><span class="p">:</span> <span class="mi">6</span><span class="p">},</span>
-                             <span class="n">fig_size</span><span class="o">=</span><span class="p">[</span><span class="mf">7.5</span><span class="p">,</span> <span class="mf">6.4</span><span class="p">])</span>
+                             <span class="n">figsize</span><span class="o">=</span><span class="p">[</span><span class="mf">7.5</span><span class="p">,</span> <span class="mf">6.4</span><span class="p">])</span>
 </code></pre></div>
 </article>
 </div>
@@ -570,13 +571,13 @@
 </footer>
 </div>
 <script src="../../assets/javascripts/vendor.d710d30a.min.js"></script>
-<script src="../../assets/javascripts/bundle.5f27aba8.min.js"></script><script id="__lang" type="application/json">{"clipboard.copy": "Copy to clipboard", "clipboard.copied": "Copied to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.result.placeholder": "Type to start searching", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents"}</script>
+<script src="../../assets/javascripts/bundle.b39636ac.min.js"></script><script id="__lang" type="application/json">{"clipboard.copy": "Copy to clipboard", "clipboard.copied": "Copied to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.result.placeholder": "Type to start searching", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents"}</script>
 <script>
         app = initialize({
           base: "../..",
           features: [],
           search: Object.assign({
-            worker: "../../assets/javascripts/worker/search.27c6a5e6.min.js"
+            worker: "../../assets/javascripts/worker/search.a68abb33.min.js"
           }, typeof search !== "undefined" && search)
         })
       </script>

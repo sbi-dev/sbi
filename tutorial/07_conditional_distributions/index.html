@@ -7,9 +7,9 @@
 <meta content="width=device-width,initial-scale=1" name="viewport"/>
 <link href="https://mackelab.org/sbi/tutorial/07_conditional_distributions/" rel="canonical"/>
 <link href="../../assets/images/favicon.png" rel="shortcut icon"/>
-<meta content="mkdocs-1.1.2, mkdocs-material-5.2.2" name="generator"/>
+<meta content="mkdocs-1.1.2, mkdocs-material-5.4.0" name="generator"/>
 <title>Conditional distributions - sbi</title>
-<link href="../../assets/stylesheets/main.a2408e81.min.css" rel="stylesheet"/>
+<link href="../../assets/stylesheets/main.fe0cca5b.min.css" rel="stylesheet"/>
 <link href="../../assets/stylesheets/palette.a46bcfb3.min.css" rel="stylesheet"/>
 <meta content="#3f51b5" name="theme-color"/>
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
@@ -326,7 +326,7 @@
 <p>In this tutorial, we will show how one can use the posterior distribution to identify whether parameters can be variable or have to be finely tuned, and how we can use the posterior to find potential compensation mechanisms between model parameters. To investigate this, we will extract <strong>conditional distributions</strong> from the posterior inferred with <code>sbi</code>.</p>
 <p>Note, you can find the original version of this notebook at <a href="https://github.com/mackelab/sbi/blob/main/tutorials/07_conditional_distributions.ipynb">https://github.com/mackelab/sbi/blob/main/tutorials/07_conditional_distributions.ipynb</a> in the <code>sbi</code> repository.</p>
 <h2 id="main-syntax">Main syntax<a class="headerlink" href="#main-syntax" title="Permanent link">¶</a></h2>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.utils</span> <span class="kn">import</span> <span class="n">conditional_pairplot</span><span class="p">,</span> <span class="n">conditional_corrcoeff</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.analysis</span> <span class="kn">import</span> <span class="n">conditional_pairplot</span><span class="p">,</span> <span class="n">conditional_corrcoeff</span>
 
 <span class="c1"># Plot slices through posterior, i.e. conditionals.</span>
 <span class="n">_</span> <span class="o">=</span> <span class="n">conditional_pairplot</span><span class="p">(</span>
@@ -346,7 +346,7 @@
 <h2 id="analysing-variability-and-compensation-mechanisms-in-a-toy-example">Analysing variability and compensation mechanisms in a toy example<a class="headerlink" href="#analysing-variability-and-compensation-mechanisms-in-a-toy-example" title="Permanent link">¶</a></h2>
 <p>Below, we use a simple toy example to demonstrate the above described features. For an application of these features to a neuroscience problem, see figure 6 in <a href="https://arxiv.org/abs/1907.00770">Gonçalves, Lueckmann, Deistler et al., 2019</a>.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi</span> <span class="kn">import</span> <span class="n">utils</span> <span class="k">as</span> <span class="n">utils</span>
-<span class="kn">from</span> <span class="nn">sbi.utils</span> <span class="kn">import</span> <span class="n">pairplot</span><span class="p">,</span> <span class="n">conditional_pairplot</span><span class="p">,</span> <span class="n">conditional_corrcoeff</span>
+<span class="kn">from</span> <span class="nn">sbi.analysis</span> <span class="kn">import</span> <span class="n">pairplot</span><span class="p">,</span> <span class="n">conditional_pairplot</span><span class="p">,</span> <span class="n">conditional_corrcoeff</span>
 <span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
 
@@ -373,7 +373,7 @@
     <span class="n">limits</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([[</span><span class="o">-</span><span class="mf">2.</span><span class="p">,</span> <span class="mf">2.</span><span class="p">]]</span><span class="o">*</span><span class="mi">3</span><span class="p">),</span>
     <span class="n">upper</span><span class="o">=</span><span class="p">[</span><span class="s1">'kde'</span><span class="p">],</span>
     <span class="n">diag</span><span class="o">=</span><span class="p">[</span><span class="s1">'kde'</span><span class="p">],</span>
-    <span class="n">fig_size</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span><span class="mi">5</span><span class="p">)</span>
+    <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span><span class="mi">5</span><span class="p">)</span>
 <span class="p">)</span>
 </code></pre></div>
 <p><img alt="png" src="../07_conditional_distributions_files/07_conditional_distributions_11_0.png"/></p>
@@ -16421,7 +16421,7 @@ AAAAAAAAAAAAAAAtaWxzdAAAACWpdG9vAAAAHWRhdGEAAAABAAAAAExhdmY1OC4yMC4xMDA=
     <span class="n">density</span><span class="o">=</span><span class="n">posterior</span><span class="p">,</span>
     <span class="n">condition</span><span class="o">=</span><span class="n">condition</span><span class="p">,</span>
     <span class="n">limits</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([[</span><span class="o">-</span><span class="mf">2.</span><span class="p">,</span> <span class="mf">2.</span><span class="p">]]</span><span class="o">*</span><span class="mi">3</span><span class="p">),</span>
-    <span class="n">fig_size</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span><span class="mi">5</span><span class="p">)</span>
+    <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span><span class="mi">5</span><span class="p">)</span>
 <span class="p">)</span>
 </code></pre></div>
 <p><img alt="png" src="../07_conditional_distributions_files/07_conditional_distributions_20_0.png"/></p>
@@ -16492,13 +16492,13 @@ AAAAAAAAAAAAAAAtaWxzdAAAACWpdG9vAAAAHWRhdGEAAAABAAAAAExhdmY1OC4yMC4xMDA=
 </footer>
 </div>
 <script src="../../assets/javascripts/vendor.d710d30a.min.js"></script>
-<script src="../../assets/javascripts/bundle.5f27aba8.min.js"></script><script id="__lang" type="application/json">{"clipboard.copy": "Copy to clipboard", "clipboard.copied": "Copied to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.result.placeholder": "Type to start searching", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents"}</script>
+<script src="../../assets/javascripts/bundle.b39636ac.min.js"></script><script id="__lang" type="application/json">{"clipboard.copy": "Copy to clipboard", "clipboard.copied": "Copied to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.result.placeholder": "Type to start searching", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents"}</script>
 <script>
         app = initialize({
           base: "../..",
           features: [],
           search: Object.assign({
-            worker: "../../assets/javascripts/worker/search.27c6a5e6.min.js"
+            worker: "../../assets/javascripts/worker/search.a68abb33.min.js"
           }, typeof search !== "undefined" && search)
         })
       </script>
