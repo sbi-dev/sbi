@@ -11,11 +11,13 @@
 
 ## Minor changes
 - Depend on new `joblib=1.0.0` and fix progress bar updates for multiprocessing (#421).
-- Fix for embedding nets with `SNRE` (thanks @adittmann, #425)
-- Is it now optional to pass a prior distribution when using SNPE (#426)
-- Support loading of posteriors saved after `sbi v0.15.0` (#427, thanks @psteinb)
-- Neural network training can be resumed (#431)
-- Allow using NSF to estimate 1D distributions (#438)
+- Fix for embedding nets with `SNRE` (thanks @adittmann, #425).
+- Is it now optional to pass a prior distribution when using SNPE (#426).
+- Support loading of posteriors saved after `sbi v0.15.0` (#427, thanks @psteinb).
+- Neural network training can be resumed (#431).
+- Allow using NSF to estimate 1D distributions (#438).
+- Fix type checks in input checks (thanks @psteinb, #439).
+- Bugfix for GPU training with SNRE_A (thanks @glouppe, #442).
 
 
 # v0.14.3
