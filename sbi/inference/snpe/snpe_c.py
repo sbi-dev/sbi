@@ -6,6 +6,7 @@ from math import pi
 from typing import Any, Callable, Dict, Optional, Union
 
 import torch
+
 from pyknos.mdn.mdn import MultivariateGaussianMDN as mdn
 from pyknos.nflows.transforms import CompositeTransform
 from torch import Tensor, eye, ones
@@ -106,6 +107,7 @@ class SNPE_C(PosteriorEstimator):
         use_combined_loss: bool = False,
         retrain_from_scratch_each_round: bool = False,
         show_train_summary: bool = False,
+        dataloader_kwargs: Optional[Dict] = None,
     ) -> DirectPosterior:
         r"""
         Return density estimator that approximates the distribution $p(\theta|x)$.
@@ -141,6 +143,8 @@ class SNPE_C(PosteriorEstimator):
                 estimator for the posterior from scratch each round.
             show_train_summary: Whether to print the number of epochs and validation
                 loss and leakage after the training.
+            dataloader_kwargs: Any additional kwargs to be passed to the training and
+                validation dataloaders (like, e.g., a collate_fn)
 
         Returns:
             Density estimator that approximates the distribution $p(\theta|x)$.

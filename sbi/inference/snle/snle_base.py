@@ -7,6 +7,7 @@ from copy import deepcopy
 from typing import Any, Callable, Dict, NewType, Optional, Union
 
 import torch
+
 from torch import Tensor, optim
 from torch.nn.utils import clip_grad_norm_
 from torch.utils import data
@@ -127,6 +128,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         discard_prior_samples: bool = False,
         retrain_from_scratch_each_round: bool = False,
         show_train_summary: bool = False,
+        dataloader_kwargs: Optional[Dict] = None,
     ) -> LikelihoodBasedPosterior:
         r"""
         Train the density estimator to learn the distribution $p(x|\theta)$.
@@ -145,6 +147,8 @@ class LikelihoodEstimator(NeuralInference, ABC):
                 estimator for the posterior from scratch each round.
             show_train_summary: Whether to print the number of epochs and validation
                 loss after the training.
+            dataloader_kwargs: Any additional kwargs to be passed to the training and
+                validation dataloaders (like, e.g., a collate_fn)
 
         Returns:
             Density estimator that has learned the distribution $p(x|\theta)$.
@@ -178,19 +182,33 @@ class LikelihoodEstimator(NeuralInference, ABC):
         dataset = data.TensorDataset(theta, x)
 
         # Create neural net and validation loaders using a subset sampler.
-        train_loader = data.DataLoader(
-            dataset,
-            batch_size=min(training_batch_size, num_training_examples),
-            drop_last=True,
-            sampler=SubsetRandomSampler(self.train_indices),
+        # Intentionally use dicts to define the default dataloader args
+        # Then, use dataloader_kwargs to override (or add to) any of these defaults
+        # https://stackoverflow.com/questions/44784577/in-method-call-args-how-to-override-keyword-argument-of-unpacked-dict
+        train_loader_kwargs = {
+            "batch_size": min(training_batch_size, num_training_examples),
+            "drop_last": True,
+            "sampler": SubsetRandomSampler(self.train_indices),
+        }
+        train_loader_kwargs = (
+            dict(train_loader_kwargs, **dataloader_kwargs)
+            if dataloader_kwargs is not None
+            else train_loader_kwargs
         )
-        val_loader = data.DataLoader(
-            dataset,
-            batch_size=min(training_batch_size, num_validation_examples),
-            shuffle=False,
-            drop_last=False,
-            sampler=SubsetRandomSampler(self.val_indices),
+        val_loader_kwargs = {
+            "batch_size": min(training_batch_size, num_validation_examples),
+            "shuffle": False,
+            "drop_last": True,
+            "sampler": SubsetRandomSampler(self.val_indices),
+        }
+        val_loader_kwargs = (
+            dict(val_loader_kwargs, **dataloader_kwargs)
+            if dataloader_kwargs is not None
+            else val_loader_kwargs
         )
+        train_loader = data.DataLoader(dataset, **train_loader_kwargs)
+        val_loader = data.DataLoader(dataset, **val_loader_kwargs)
+
 
         # First round or if retraining from scratch:
         # Call the `self._build_neural_net` with the rounds' thetas and xs as

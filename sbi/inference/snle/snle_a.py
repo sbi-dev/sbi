@@ -68,6 +68,7 @@ class SNLE_A(LikelihoodEstimator):
         discard_prior_samples: bool = False,
         retrain_from_scratch_each_round: bool = False,
         show_train_summary: bool = False,
+        dataloader_kwargs: Optional[Dict] = None,
     ) -> NeuralPosterior:
         r"""
         Return density estimator that approximates the distribution $p(x|\theta)$.
@@ -96,6 +97,8 @@ class SNLE_A(LikelihoodEstimator):
                 estimator for the posterior from scratch each round.
             show_train_summary: Whether to print the number of epochs and validation
                 loss and leakage after the training.
+            dataloader_kwargs: Any additional kwargs to be passed to the training and
+                validation dataloaders (like, e.g., a collate_fn)
 
         Returns:
             Density estimator that approximates the distribution $p(x|\theta)$.
