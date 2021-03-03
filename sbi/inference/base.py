@@ -11,6 +11,7 @@ from warnings import warn
 import torch
 from torch import Tensor
 from torch.utils.tensorboard import SummaryWriter
+from torch.utils import data
 
 import sbi.inference
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
@@ -275,6 +276,59 @@ class NeuralInference(ABC):
     ) -> NeuralPosterior:
         raise NotImplementedError
 
+    def get_dataloaders(
+        self,
+        dataset: data.TensorDataset,
+        training_batch_size: int = 50,
+        validation_fraction: float = 0.1,
+        resume_training: bool = False,
+        dataloader_kwargs: Optional[dict] = None,
+    ) -> Tuple[data.DataLoader, data.DataLoader]:
+
+        # Get total number of training examples.
+        num_examples = len(dataset)
+
+        # Select random train and validation splits from (theta, x) pairs.
+        num_training_examples = int((1 - validation_fraction) * num_examples)
+        num_validation_examples = num_examples - num_training_examples
+
+        if not resume_training:
+            permuted_indices = torch.randperm(num_examples)
+            self.train_indices, self.val_indices = (
+                permuted_indices[:num_training_examples],
+                permuted_indices[num_training_examples:],
+            )
+
+        # Create neural net and validation loaders using a subset sampler.
+        # Intentionally use dicts to define the default dataloader args
+        # Then, use dataloader_kwargs to override (or add to) any of these defaults
+        # https://stackoverflow.com/questions/44784577/in-method-call-args-how-to-override-keyword-argument-of-unpacked-dict
+        train_loader_kwargs = {
+            "batch_size": min(training_batch_size, num_training_examples),
+            "drop_last": True,
+            "sampler": data.sampler.SubsetRandomSampler(self.train_indices),
+        }
+        train_loader_kwargs = (
+            dict(train_loader_kwargs, **dataloader_kwargs)
+            if dataloader_kwargs is not None
+            else train_loader_kwargs
+        )
+        val_loader_kwargs = {
+            "batch_size": min(training_batch_size, num_validation_examples),
+            "shuffle": False,
+            "drop_last": True,
+            "sampler": data.sampler.SubsetRandomSampler(self.val_indices),
+        }
+        val_loader_kwargs = (
+            dict(val_loader_kwargs, **dataloader_kwargs)
+            if dataloader_kwargs is not None
+            else val_loader_kwargs
+        )
+        train_loader = data.DataLoader(dataset, **train_loader_kwargs)
+        val_loader = data.DataLoader(dataset, **val_loader_kwargs)
+
+        return train_loader, val_loader
+
     def _converged(self, epoch: int, stop_after_epochs: int) -> bool:
         """Return whether the training converged yet and save best model state so far.
 
@@ -311,9 +365,7 @@ class NeuralInference(ABC):
 
         method = self.__class__.__name__
         logdir = Path(
-            get_log_root(),
-            method,
-            datetime.now().isoformat().replace(":", "_"),
+            get_log_root(), method, datetime.now().isoformat().replace(":", "_"),
         )
         return SummaryWriter(logdir)
 
@@ -374,11 +426,7 @@ class NeuralInference(ABC):
         assert torch.isfinite(quantity).all(), msg
 
     def _summarize(
-        self,
-        round_: int,
-        x_o: Union[Tensor, None],
-        theta_bank: Tensor,
-        x_bank: Tensor,
+        self, round_: int, x_o: Union[Tensor, None], theta_bank: Tensor, x_bank: Tensor,
     ) -> None:
         """Update the summary_writer with statistics for a given round.
 
@@ -393,12 +441,7 @@ class NeuralInference(ABC):
         # Median |x - x0| for most recent round.
         if x_o is not None:
             median_observation_distance = torch.median(
-                torch.sqrt(
-                    torch.sum(
-                        (x_bank - x_o.reshape(1, -1)) ** 2,
-                        dim=-1,
-                    )
-                )
+                torch.sqrt(torch.sum((x_bank - x_o.reshape(1, -1)) ** 2, dim=-1,))
             )
             self._summary["median_observation_distances"].append(
                 median_observation_distance.item()
@@ -481,11 +524,7 @@ def simulate_for_sbi(
     theta = proposal.sample((num_simulations,))
 
     x = simulate_in_batches(
-        simulator,
-        theta,
-        simulation_batch_size,
-        num_workers,
-        show_progress_bar,
+        simulator, theta, simulation_batch_size, num_workers, show_progress_bar,
     )
 
     return theta, x

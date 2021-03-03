@@ -80,10 +80,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         self._summary.update({"mcmc_times": []})  # type: ignore
 
     def append_simulations(
-        self,
-        theta: Tensor,
-        x: Tensor,
-        from_round: int = 0,
+        self, theta: Tensor, x: Tensor, from_round: int = 0,
     ) -> "LikelihoodEstimator":
         r"""
         Store parameters and simulation outputs to use them for later training.
@@ -156,59 +153,24 @@ class LikelihoodEstimator(NeuralInference, ABC):
 
         max_num_epochs = 2 ** 31 - 1 if max_num_epochs is None else max_num_epochs
 
-        # Load data from most recent round.
-        self._round = max(self._data_round_index)
-        theta, x, _ = self.get_simulations(self._round, exclude_invalid_x, False)
-
         # Starting index for the training set (1 = discard round-0 samples).
         start_idx = int(discard_prior_samples and self._round > 0)
-        theta, x, _ = self.get_simulations(start_idx, exclude_invalid_x)
-
-        # Get total number of training examples.
-        num_examples = len(theta)
-
-        # Select random train and validation splits from (theta, x) pairs.
-        num_training_examples = int((1 - validation_fraction) * num_examples)
-        num_validation_examples = num_examples - num_training_examples
-
-        if not resume_training:
-            permuted_indices = torch.randperm(num_examples)
-            self.train_indices, self.val_indices = (
-                permuted_indices[:num_training_examples],
-                permuted_indices[num_training_examples:],
-            )
+        # Load data from most recent round.
+        self._round = max(self._data_round_index)
+        theta, x, _ = self.get_simulations(
+            start_idx, exclude_invalid_x, warn_on_invalid=True
+        )
 
         # Dataset is shared for training and validation loaders.
         dataset = data.TensorDataset(theta, x)
 
-        # Create neural net and validation loaders using a subset sampler.
-        # Intentionally use dicts to define the default dataloader args
-        # Then, use dataloader_kwargs to override (or add to) any of these defaults
-        # https://stackoverflow.com/questions/44784577/in-method-call-args-how-to-override-keyword-argument-of-unpacked-dict
-        train_loader_kwargs = {
-            "batch_size": min(training_batch_size, num_training_examples),
-            "drop_last": True,
-            "sampler": SubsetRandomSampler(self.train_indices),
-        }
-        train_loader_kwargs = (
-            dict(train_loader_kwargs, **dataloader_kwargs)
-            if dataloader_kwargs is not None
-            else train_loader_kwargs
+        train_loader, val_loader = self.get_dataloaders(
+            dataset,
+            training_batch_size,
+            validation_fraction,
+            resume_training,
+            dataloader_kwargs=dataloader_kwargs,
         )
-        val_loader_kwargs = {
-            "batch_size": min(training_batch_size, num_validation_examples),
-            "shuffle": False,
-            "drop_last": True,
-            "sampler": SubsetRandomSampler(self.val_indices),
-        }
-        val_loader_kwargs = (
-            dict(val_loader_kwargs, **dataloader_kwargs)
-            if dataloader_kwargs is not None
-            else val_loader_kwargs
-        )
-        train_loader = data.DataLoader(dataset, **train_loader_kwargs)
-        val_loader = data.DataLoader(dataset, **val_loader_kwargs)
-
 
         # First round or if retraining from scratch:
         # Call the `self._build_neural_net` with the rounds' thetas and xs as
@@ -227,8 +189,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         self._neural_net.to(self._device)
         if not resume_training:
             self.optimizer = optim.Adam(
-                list(self._neural_net.parameters()),
-                lr=learning_rate,
+                list(self._neural_net.parameters()), lr=learning_rate,
             )
             self.epoch, self._val_log_prob = 0, float("-Inf")
 
@@ -250,8 +211,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
                 loss.backward()
                 if clip_max_norm is not None:
                     clip_grad_norm_(
-                        self._neural_net.parameters(),
-                        max_norm=clip_max_norm,
+                        self._neural_net.parameters(), max_norm=clip_max_norm,
                     )
                 self.optimizer.step()
 
@@ -269,7 +229,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
                     # Evaluate on x with theta as context.
                     log_prob = self._neural_net.log_prob(x_batch, context=theta_batch)
                     log_prob_sum += log_prob.sum().item()
-            self._val_log_prob = log_prob_sum / num_validation_examples
+            self._val_log_prob = log_prob_sum / len(val_loader)
             # Log validation log prob for every epoch.
             self._summary["validation_log_probs"].append(self._val_log_prob)
 
@@ -283,10 +243,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
 
         # Update TensorBoard and summary dict.
         self._summarize(
-            round_=self._round,
-            x_o=None,
-            theta_bank=theta,
-            x_bank=x,
+            round_=self._round, x_o=None, theta_bank=theta, x_bank=x,
         )
 
         # Update description for progress bar.
