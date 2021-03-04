@@ -6,7 +6,6 @@ from math import pi
 from typing import Any, Callable, Dict, Optional, Union
 
 import torch
-
 from pyknos.mdn.mdn import MultivariateGaussianMDN as mdn
 from pyknos.nflows.transforms import CompositeTransform
 from torch import Tensor, eye, ones

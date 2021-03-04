@@ -10,8 +10,8 @@ from warnings import warn
 
 import torch
 from torch import Tensor
-from torch.utils.tensorboard import SummaryWriter
 from torch.utils import data
+from torch.utils.tensorboard import SummaryWriter
 
 import sbi.inference
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
@@ -19,9 +19,9 @@ from sbi.simulators.simutils import simulate_in_batches
 from sbi.utils import (
     get_log_root,
     handle_invalid_x,
+    warn_if_zscoring_changes_data,
     warn_on_invalid_x,
     warn_on_invalid_x_for_snpec_leakage,
-    warn_if_zscoring_changes_data,
 )
 from sbi.utils.sbiutils import get_simulations_since_round
 from sbi.utils.torchutils import process_device

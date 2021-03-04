@@ -1,1 +1,1 @@
-from sbi.examples.minimal import simple, flexible
+from sbi.examples.minimal import flexible, simple

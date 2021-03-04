@@ -1,5 +1,5 @@
-import torch
 import pyro
+import torch
 
 from sbi.utils.pyroutils import get_transforms
 

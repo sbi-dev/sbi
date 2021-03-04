@@ -2,7 +2,7 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 
-from typing import Union, Tuple
+from typing import Tuple, Union
 
 import torch
 from torch import Tensor

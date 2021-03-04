@@ -6,11 +6,11 @@ from __future__ import annotations
 
 import numpy as np
 import torch
-from torch import distributions as distributions
 import torchtestcase
+from torch import distributions as distributions
+from torch import eye, ones, zeros
 
 from sbi.utils import torchutils
-from torch import zeros, ones, eye
 from tests.test_utils import kl_d_via_monte_carlo
 
 

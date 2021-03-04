@@ -1,7 +1,6 @@
 from typing import Any, Callable, Dict, Optional, Union
 
 import torch
-
 from torch import Tensor
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
