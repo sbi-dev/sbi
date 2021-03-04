@@ -3,10 +3,11 @@
 
 from __future__ import annotations
 
-import pytest
-import torch
 import time
 import warnings
+
+import pytest
+import torch
 
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
 from sbi.simulators.simutils import simulate_in_batches

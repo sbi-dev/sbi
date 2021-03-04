@@ -4,11 +4,12 @@
 from __future__ import annotations
 
 import pytest
-from torch import zeros, ones, eye
+from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
-from sbi.simulators import linear_gaussian
+
 from sbi import utils as utils
-from sbi.inference import SNPE, SNLE, SNRE_A, SNRE_B, simulate_for_sbi
+from sbi.inference import SNLE, SNPE, SNRE_A, SNRE_B, simulate_for_sbi
+from sbi.simulators import linear_gaussian
 from sbi.utils.torchutils import process_device
 
 

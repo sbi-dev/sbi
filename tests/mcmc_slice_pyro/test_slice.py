@@ -6,11 +6,11 @@ import os
 from collections import namedtuple
 
 import pyro
+import pytest
+import torch
 from pyro import distributions as dist
 from pyro import optim as optim
 from pyro import poutine as poutine
-import pytest
-import torch
 from pyro.contrib.conjugate.infer import (
     BetaBinomialPair,
     GammaPoissonPair,
@@ -19,7 +19,6 @@ from pyro.contrib.conjugate.infer import (
 )
 from pyro.infer import SVI, TraceEnum_ELBO
 from pyro.infer.autoguide import AutoDelta
-
 # from pyro.infer.mcmc.api import MCMC
 from pyro.util import ignore_jit_warnings
 

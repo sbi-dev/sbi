@@ -1,4 +1,5 @@
-from typing import Callable, Any
+from typing import Any, Callable
+
 from pyro import poutine as poutine
 from torch.distributions import biject_to
 

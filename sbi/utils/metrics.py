@@ -1,14 +1,13 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
+from typing import Optional
+
 import numpy as np
 import torch
-
-from typing import Optional
-from torch import Tensor
-
 from sklearn.model_selection import KFold, cross_val_score
 from sklearn.neural_network import MLPClassifier
+from torch import Tensor
 
 
 def c2st(

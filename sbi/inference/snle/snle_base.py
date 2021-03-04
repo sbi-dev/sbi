@@ -7,7 +7,6 @@ from copy import deepcopy
 from typing import Any, Callable, Dict, NewType, Optional, Union
 
 import torch
-
 from torch import Tensor, optim
 from torch.nn.utils import clip_grad_norm_
 from torch.utils import data

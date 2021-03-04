@@ -2,14 +2,14 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 
+import contextlib
 from typing import Callable
 
+import joblib
 import torch
+from joblib import Parallel, delayed
 from torch import Tensor
 from tqdm.auto import tqdm
-from joblib import Parallel, delayed
-import contextlib
-import joblib
 
 
 def simulate_in_batches(

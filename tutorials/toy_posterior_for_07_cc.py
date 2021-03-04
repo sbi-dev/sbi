@@ -1,6 +1,7 @@
 import torch
-from sbi import utils as utils
 from torch import Tensor
+
+from sbi import utils as utils
 
 
 class ExamplePosterior:
