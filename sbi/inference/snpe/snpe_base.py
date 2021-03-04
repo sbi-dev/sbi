@@ -196,8 +196,8 @@ class PosteriorEstimator(NeuralInference, ABC):
                 estimator for the posterior from scratch each round.
             show_train_summary: Whether to print the number of epochs and validation
                 loss after the training.
-           dataloader_kwargs: Any additional kwargs to be passed to the training and
-                validation dataloaders (like, e.g., a collate_fn)
+            dataloader_kwargs: Additional or updated kwargs to be passed to the training
+                and validation dataloaders (like, e.g., a collate_fn)
 
         Returns:
             Density estimator that approximates the distribution $p(\theta|x)$.
@@ -303,7 +303,10 @@ class PosteriorEstimator(NeuralInference, ABC):
                     )
                     log_prob_sum += batch_log_prob.sum().item()
 
-            self._val_log_prob = log_prob_sum / len(val_loader)
+            # Take mean over all validation samples.
+            self._val_log_prob = log_prob_sum / (
+                len(val_loader) * val_loader.batch_size
+            )
             # Log validation log prob for every epoch.
             self._summary["validation_log_probs"].append(self._val_log_prob)
 

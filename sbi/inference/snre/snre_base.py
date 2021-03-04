@@ -146,8 +146,8 @@ class RatioEstimator(NeuralInference, ABC):
                 samples.
             retrain_from_scratch_each_round: Whether to retrain the conditional density
                 estimator for the posterior from scratch each round.
-            dataloader_kwargs: Any additional kwargs to be passed to the training and
-                validation dataloaders (like, eg., a collate_fn)
+            dataloader_kwargs: Additional or updated kwargs to be passed to the training
+                and validation dataloaders (like, e.g., a collate_fn)
 
         Returns:
             Classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
@@ -223,16 +223,19 @@ class RatioEstimator(NeuralInference, ABC):
 
             # Calculate validation performance.
             self._neural_net.eval()
-            log_prob_sum = 0
+            loss_sum = 0
             with torch.no_grad():
                 for batch in val_loader:
                     theta_batch, x_batch = (
                         batch[0].to(self._device),
                         batch[1].to(self._device),
                     )
-                    log_prob = self._loss(theta_batch, x_batch, num_atoms)
-                    log_prob_sum -= log_prob.sum().item()
-                self._val_log_prob = log_prob_sum / len(val_loader)
+                    loss = self._loss(theta_batch, x_batch, num_atoms)
+                    loss_sum -= loss.sum().item()
+                # Take mean over all validation samples.
+                self._val_log_prob = loss_sum / (
+                    len(val_loader) * val_loader.batch_size
+                )
                 # Log validation log prob for every epoch.
                 self._summary["validation_log_probs"].append(self._val_log_prob)
 
