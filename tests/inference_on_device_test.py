@@ -52,14 +52,25 @@ def test_training_and_mcmc_on_device(method, model, device):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     if method == SNPE:
-        kwargs = dict(density_estimator=utils.posterior_nn(model=model),)
-        mcmc_kwargs = dict(sample_with_mcmc=True, mcmc_method="slice_np",)
+        kwargs = dict(
+            density_estimator=utils.posterior_nn(model=model),
+        )
+        mcmc_kwargs = dict(
+            sample_with_mcmc=True,
+            mcmc_method="slice_np",
+        )
     elif method == SNLE:
-        kwargs = dict(density_estimator=utils.likelihood_nn(model=model),)
+        kwargs = dict(
+            density_estimator=utils.likelihood_nn(model=model),
+        )
         mcmc_kwargs = dict(mcmc_method="slice")
     elif method in (SNRE_A, SNRE_B):
-        kwargs = dict(classifier=utils.classifier_nn(model=model),)
-        mcmc_kwargs = dict(mcmc_method="slice_np_vectorized",)
+        kwargs = dict(
+            classifier=utils.classifier_nn(model=model),
+        )
+        mcmc_kwargs = dict(
+            mcmc_method="slice_np_vectorized",
+        )
     else:
         raise ValueError()
 
@@ -69,9 +80,10 @@ def test_training_and_mcmc_on_device(method, model, device):
 
     # Test for two rounds.
     for r in range(2):
-        theta, x, = simulate_for_sbi(
-            simulator, proposal=prior, num_simulations=num_simulations
-        )
+        (
+            theta,
+            x,
+        ) = simulate_for_sbi(simulator, proposal=prior, num_simulations=num_simulations)
         _ = inferer.append_simulations(theta, x).train(
             training_batch_size=100, max_num_epochs=max_num_epochs
         )

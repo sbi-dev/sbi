@@ -22,7 +22,11 @@ class StandardizeInputs(nn.Module):
             type(inputs) is list and len(inputs) == 2
         ), """Inputs to (s)nre classifier must be a list containing raw theta and x."""
         out = torch.cat(
-            [self.embedding_net_x(inputs[0]), self.embedding_net_y(inputs[1]),], dim=1,
+            [
+                self.embedding_net_x(inputs[0]),
+                self.embedding_net_y(inputs[1]),
+            ],
+            dim=1,
         )
         return out
 

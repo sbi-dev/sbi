@@ -10,12 +10,12 @@ def get_transforms(model: Callable, *model_args: Any, **model_kwargs: Any):
         model: Pyro model
         model_args: Arguments passed to model
         model_args: Keyword arguments passed to model
-    
+
     Example:
         ```python
         def prior():
             return pyro.sample("theta", pyro.distributions.Uniform(0., 1.))
-            
+
         transform_to_unbounded = get_transforms(prior)["theta"]
         ```
     """

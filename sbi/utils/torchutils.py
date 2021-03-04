@@ -205,7 +205,10 @@ def gaussian_kde_log_eval(samples, query):
 
 class BoxUniform(Independent):
     def __init__(
-        self, low: ScalarFloat, high: ScalarFloat, reinterpreted_batch_ndims: int = 1,
+        self,
+        low: ScalarFloat,
+        high: ScalarFloat,
+        reinterpreted_batch_ndims: int = 1,
     ):
         """Multidimensional uniform distribution defined on a box.
 

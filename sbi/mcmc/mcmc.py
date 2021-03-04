@@ -54,7 +54,7 @@ class MCMC(BaseMCMC):
         Switch to `True` for debugging purposes.
     :param dict transforms: dictionary that specifies a transform for a sample site
         with constrained support to unconstrained space.
-    :param int available_cpu: Number of available CPUs, defaults to `mp.cpu_count()-1`. 
+    :param int available_cpu: Number of available CPUs, defaults to `mp.cpu_count()-1`.
         Setting it to 1 disables multiprocessing.
     """
 
