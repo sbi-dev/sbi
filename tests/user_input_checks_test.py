@@ -32,7 +32,7 @@ from sbi.utils.user_input_checks import (
     process_prior,
     process_simulator,
     process_x,
-    validate_theta_and_x
+    validate_theta_and_x,
 )
 from sbi.utils.user_input_checks_utils import (
     CustomPytorchWrapper,
@@ -90,7 +90,10 @@ def matrix_simulator(theta):
 @pytest.mark.parametrize(
     "wrapper, prior",
     (
-        (CustomPytorchWrapper, UserNumpyUniform(zeros(3), ones(3), return_numpy=True),),
+        (
+            CustomPytorchWrapper,
+            UserNumpyUniform(zeros(3), ones(3), return_numpy=True),
+        ),
         (ScipyPytorchWrapper, multivariate_normal()),
         (ScipyPytorchWrapper, uniform()),
         (ScipyPytorchWrapper, beta(a=1, b=1)),
@@ -140,7 +143,8 @@ def test_reinterpreted_batch_dim_prior():
             Uniform(zeros((1, 3)), ones((1, 3))), marks=pytest.mark.xfail
         ),  # batch shape > 1.
         pytest.param(
-            MultivariateNormal(zeros(3, 3), eye(3)), marks=pytest.mark.xfail,
+            MultivariateNormal(zeros(3, 3), eye(3)),
+            marks=pytest.mark.xfail,
         ),  # batch shape > 1.
         pytest.param(
             Uniform(zeros(3), ones(3)), marks=pytest.mark.xfail
@@ -168,7 +172,11 @@ def test_process_prior(prior):
 
 
 @pytest.mark.parametrize(
-    "x, x_shape", ((ones(3), torch.Size([1, 3])), (ones(1, 3), torch.Size([1, 3])),),
+    "x, x_shape",
+    (
+        (ones(3), torch.Size([1, 3])),
+        (ones(1, 3), torch.Size([1, 3])),
+    ),
 )
 def test_process_x(x, x_shape):
     process_x(x, x_shape)
@@ -181,7 +189,10 @@ def test_process_x(x, x_shape):
         (diagonal_linear_gaussian, BoxUniform(zeros(2), ones(2))),
         (numpy_linear_gaussian, UserNumpyUniform(zeros(2), ones(2), True)),
         (linear_gaussian_no_batch, BoxUniform(zeros(2), ones(2))),
-        pytest.param(list_simulator, BoxUniform(zeros(2), ones(2)),),
+        pytest.param(
+            list_simulator,
+            BoxUniform(zeros(2), ones(2)),
+        ),
     ),
 )
 def test_process_simulator(simulator: Callable, prior: Distribution):
@@ -201,7 +212,10 @@ def test_process_simulator(simulator: Callable, prior: Distribution):
 @pytest.mark.parametrize(
     "simulator, prior",
     (
-        (linear_gaussian_no_batch, BoxUniform(zeros(3), ones(3)),),
+        (
+            linear_gaussian_no_batch,
+            BoxUniform(zeros(3), ones(3)),
+        ),
         (
             numpy_linear_gaussian,
             UserNumpyUniform(zeros(3), ones(3), return_numpy=True),
@@ -223,7 +237,10 @@ def test_process_simulator(simulator: Callable, prior: Distribution):
                 MultivariateNormal(zeros(2), eye(2)),
             ],
         ),
-        pytest.param(list_simulator, BoxUniform(zeros(3), ones(3)),),
+        pytest.param(
+            list_simulator,
+            BoxUniform(zeros(3), ones(3)),
+        ),
     ),
 )
 def test_prepare_sbi_problem(simulator: Callable, prior):
@@ -279,7 +296,11 @@ def test_inference_with_user_sbi_problems(user_simulator: Callable, user_prior):
     """
 
     simulator, prior = prepare_for_sbi(user_simulator, user_prior)
-    inference = SNPE_C(prior, density_estimator="maf", show_progress_bars=False,)
+    inference = SNPE_C(
+        prior,
+        density_estimator="maf",
+        show_progress_bars=False,
+    )
 
     # Run inference.
     theta, x = simulate_for_sbi(simulator, prior, 100)
@@ -440,15 +461,21 @@ def test_passing_custom_density_estimator(arg):
 
 def test_validate_theta_and_x_cpu():
 
-    cpu_device = torch.device('cpu')
+    cpu_device = torch.device("cpu")
 
-    theta = torch.ones((32,8), dtype=torch.float32).to(cpu_device)
-    x = torch.zeros((32,100), dtype=torch.float32).to(cpu_device)
-    plain_ft = torch.FloatTensor((32,8)) #using an explicit type
+    theta = torch.ones((32, 8), dtype=torch.float32).to(cpu_device)
+    x = torch.zeros((32, 100), dtype=torch.float32).to(cpu_device)
+    plain_ft = torch.FloatTensor((32, 8))  # using an explicit type
 
-    assert isinstance(theta, torch.Tensor), "cpu based torch.tensor is not an instance of torch.Tensor"
-    assert theta.dtype == torch.float32, f"cpu based torch.tensor(dtype=torch.float32) yields unexpected dtype {theta.dtype}."
-    assert isinstance(theta, torch.FloatTensor), "cpu based torch.tensor(dtype=torch.float32) is no FloatTensor."
+    assert isinstance(
+        theta, torch.Tensor
+    ), "cpu based torch.tensor is not an instance of torch.Tensor"
+    assert (
+        theta.dtype == torch.float32
+    ), f"cpu based torch.tensor(dtype=torch.float32) yields unexpected dtype {theta.dtype}."
+    assert isinstance(
+        theta, torch.FloatTensor
+    ), "cpu based torch.tensor(dtype=torch.float32) is no FloatTensor."
     assert plain_ft.dtype == torch.float32, "FloatTensor does not expose float32 dtype."
 
     # test on cpu
@@ -461,14 +488,20 @@ def test_validate_theta_and_x_cpu():
 @pytest.mark.gpu
 def test_validate_theta_and_x_gpu():
 
-    gpu_if_present = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    gpu_if_present = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    theta = torch.ones((32,8), dtype=torch.float32).to(gpu_if_present)
-    x = torch.zeros((32,100), dtype=torch.float32).to(gpu_if_present)
+    theta = torch.ones((32, 8), dtype=torch.float32).to(gpu_if_present)
+    x = torch.zeros((32, 100), dtype=torch.float32).to(gpu_if_present)
 
-    assert isinstance(theta, torch.Tensor), "gpu based torch.tensor is not an instance of torch.Tensor"
-    assert theta.dtype == torch.float32, f"gpu based torch.tensor(dtype=torch.float32) yields unexpected dtype {theta.dtype}."
-    assert not isinstance(theta, torch.FloatTensor), "gpu based torch.tensor(dtype=torch.float32) is FloatTensor, even though it shouldn't be."
+    assert isinstance(
+        theta, torch.Tensor
+    ), "gpu based torch.tensor is not an instance of torch.Tensor"
+    assert (
+        theta.dtype == torch.float32
+    ), f"gpu based torch.tensor(dtype=torch.float32) yields unexpected dtype {theta.dtype}."
+    assert not isinstance(
+        theta, torch.FloatTensor
+    ), "gpu based torch.tensor(dtype=torch.float32) is FloatTensor, even though it shouldn't be."
 
     validate_theta_and_x(theta, x)
 

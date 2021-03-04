@@ -13,12 +13,16 @@ from sbi.utils.user_input_checks import prepare_for_sbi
 
 
 @pytest.mark.parametrize(
-    "num_sims", (0, 100, 1000),
+    "num_sims",
+    (0, 100, 1000),
 )
 @pytest.mark.parametrize("batch_size", (1, 100, 1000))
 @pytest.mark.parametrize("simulator", (diagonal_linear_gaussian, lambda _: ones(2)))
 def test_simulate_in_batches(
-    num_sims, batch_size, simulator, prior=BoxUniform(zeros(5), ones(5)),
+    num_sims,
+    batch_size,
+    simulator,
+    prior=BoxUniform(zeros(5), ones(5)),
 ):
     """Test combinations of num_sims and simulation_batch_size. """
 

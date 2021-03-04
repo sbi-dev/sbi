@@ -50,7 +50,10 @@ class CNNEmbedding(nn.Module):
             SNLE,
             marks=pytest.mark.xfail(reason="SNLE cannot handle multiD x."),
         ),
-        pytest.param(CNNEmbedding, SNRE,),
+        pytest.param(
+            CNNEmbedding,
+            SNRE,
+        ),
         pytest.param(CNNEmbedding, SNPE),
     ),
 )
@@ -68,13 +71,19 @@ def test_inference_with_2d_x(embedding, method):
     x_o = simulator(theta_o)
 
     if method == SNPE:
-        net_provider = utils.posterior_nn(model="mdn", embedding_net=embedding(),)
+        net_provider = utils.posterior_nn(
+            model="mdn",
+            embedding_net=embedding(),
+        )
         sample_kwargs = {"sample_with_mcmc": True}
     elif method == SNLE:
         net_provider = utils.likelihood_nn(model="mdn", embedding_net=embedding())
         sample_kwargs = {}
     else:
-        net_provider = utils.classifier_nn(model="mlp", embedding_net_x=embedding(),)
+        net_provider = utils.classifier_nn(
+            model="mlp",
+            embedding_net_x=embedding(),
+        )
         sample_kwargs = {}
 
     inference = method(prior, net_provider, show_progress_bars=False)

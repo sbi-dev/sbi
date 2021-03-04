@@ -71,7 +71,7 @@ class SliceSampler(MCMCSampler):
         self, n_samples: int, logger=sys.stdout, show_info: bool = False, rng=np.random
     ):
         """
-        Return samples using slice sampling. 
+        Return samples using slice sampling.
 
         Args:
             n_samples: number of samples

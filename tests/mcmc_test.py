@@ -74,7 +74,12 @@ def test_c2st_slice_np_vectorized_on_Gaussian(num_dim: int, set_seed):
 
     sampler = SliceSamplerVectorized(
         log_prob_fn=lp_f,
-        init_params=np.zeros((num_chains, num_dim,)).astype(np.float32),
+        init_params=np.zeros(
+            (
+                num_chains,
+                num_dim,
+            )
+        ).astype(np.float32),
         num_chains=num_chains,
     )
     samples = sampler.run(warmup + int(num_samples / num_chains))

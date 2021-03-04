@@ -345,7 +345,9 @@ def check_prior_batch_behavior(prior) -> None:
 
 
 def process_simulator(
-    user_simulator: Callable, prior, is_numpy_simulator: bool,
+    user_simulator: Callable,
+    prior,
+    is_numpy_simulator: bool,
 ) -> Callable:
     """Return a simulator that meets the requirements for usage in sbi.
 
@@ -449,7 +451,10 @@ def process_x(x: Tensor, x_shape: torch.Size) -> Tensor:
     return x
 
 
-def prepare_for_sbi(simulator: Callable, prior,) -> Tuple[Callable, Distribution]:
+def prepare_for_sbi(
+    simulator: Callable,
+    prior,
+) -> Tuple[Callable, Distribution]:
     """Prepare simulator, prior and for usage in sbi.
 
     One of the goals is to allow you to use sbi with inputs computed in numpy.
