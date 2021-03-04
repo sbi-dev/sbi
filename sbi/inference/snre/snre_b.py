@@ -97,8 +97,8 @@ class SNRE_B(RatioEstimator):
                 estimator for the posterior from scratch each round.
             show_train_summary: Whether to print the number of epochs and validation
                 loss and leakage after the training.
-            dataloader_kwargs: Any additional kwargs to be passed to the training and
-                validation dataloaders (like, e.g., a collate_fn)
+            dataloader_kwargs: Additional or updated kwargs to be passed to the training
+                and validation dataloaders (like, e.g., a collate_fn)
 
         Returns:
             Classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.

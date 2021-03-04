@@ -143,8 +143,8 @@ class SNPE_C(PosteriorEstimator):
                 estimator for the posterior from scratch each round.
             show_train_summary: Whether to print the number of epochs and validation
                 loss and leakage after the training.
-            dataloader_kwargs: Any additional kwargs to be passed to the training and
-                validation dataloaders (like, e.g., a collate_fn)
+            dataloader_kwargs: Additional or updated kwargs to be passed to the training
+                and validation dataloaders (like, e.g., a collate_fn)
 
         Returns:
             Density estimator that approximates the distribution $p(\theta|x)$.
@@ -254,8 +254,7 @@ class SNPE_C(PosteriorEstimator):
 
             if isinstance(self._prior, MultivariateNormal):
                 self._maybe_z_scored_prior = MultivariateNormal(
-                    almost_zero_mean,
-                    torch.diag(almost_one_std),
+                    almost_zero_mean, torch.diag(almost_one_std),
                 )
             else:
                 range_ = torch.sqrt(almost_one_std * 3.0)
@@ -368,10 +367,7 @@ class SNPE_C(PosteriorEstimator):
         return log_prob_proposal_posterior
 
     def _log_prob_proposal_posterior_mog(
-        self,
-        theta: Tensor,
-        x: Tensor,
-        proposal: DirectPosterior,
+        self, theta: Tensor, x: Tensor, proposal: DirectPosterior,
     ) -> Tensor:
         """
         Return log-probability of the proposal posterior for MoG proposal.
@@ -419,21 +415,11 @@ class SNPE_C(PosteriorEstimator):
 
         # Compute the MoG parameters of the proposal posterior.
         logits_pp, m_pp, prec_pp, cov_pp = self._automatic_posterior_transformation(
-            norm_logits_p,
-            m_p,
-            prec_p,
-            norm_logits_d,
-            m_d,
-            prec_d,
+            norm_logits_p, m_p, prec_p, norm_logits_d, m_d, prec_d,
         )
 
         # Compute the log_prob of theta under the product.
-        log_prob_proposal_posterior = _mog_log_prob(
-            theta,
-            logits_pp,
-            m_pp,
-            prec_pp,
-        )
+        log_prob_proposal_posterior = _mog_log_prob(theta, logits_pp, m_pp, prec_pp,)
         self._assert_all_finite(log_prob_proposal_posterior, "proposal posterior eval")
 
         return log_prob_proposal_posterior
@@ -487,11 +473,7 @@ class SNPE_C(PosteriorEstimator):
         )
 
         means_pp = self._means_proposal_posterior(
-            covariances_pp,
-            means_p,
-            precisions_p,
-            means_d,
-            precisions_d,
+            covariances_pp, means_p, precisions_p, means_d, precisions_d,
         )
 
         logits_pp = self._logits_proposal_posterior(
@@ -509,9 +491,7 @@ class SNPE_C(PosteriorEstimator):
         return logits_pp, means_pp, precisions_pp, covariances_pp
 
     def _precisions_proposal_posterior(
-        self,
-        precisions_p: Tensor,
-        precisions_d: Tensor,
+        self, precisions_p: Tensor, precisions_d: Tensor,
     ):
         """
         Return the precisions and covariances of the proposal posterior.
@@ -659,10 +639,7 @@ class SNPE_C(PosteriorEstimator):
 
 
 def _mog_log_prob(
-    theta: Tensor,
-    logits_pp: Tensor,
-    means_pp: Tensor,
-    precisions_pp: Tensor,
+    theta: Tensor, logits_pp: Tensor, means_pp: Tensor, precisions_pp: Tensor,
 ) -> Tensor:
     r"""
     Returns the log-probability of parameter sets $\theta$ under a mixture of Gaussians.

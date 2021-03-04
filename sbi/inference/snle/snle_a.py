@@ -97,8 +97,8 @@ class SNLE_A(LikelihoodEstimator):
                 estimator for the posterior from scratch each round.
             show_train_summary: Whether to print the number of epochs and validation
                 loss and leakage after the training.
-            dataloader_kwargs: Any additional kwargs to be passed to the training and
-                validation dataloaders (like, e.g., a collate_fn)
+            dataloader_kwargs: Additional or updated kwargs to be passed to the training
+                and validation dataloaders (like, e.g., a collate_fn)
 
         Returns:
             Density estimator that approximates the distribution $p(x|\theta)$.

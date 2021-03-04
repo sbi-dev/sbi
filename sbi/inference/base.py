@@ -284,6 +284,20 @@ class NeuralInference(ABC):
         resume_training: bool = False,
         dataloader_kwargs: Optional[dict] = None,
     ) -> Tuple[data.DataLoader, data.DataLoader]:
+        """Return dataloaders for training and validation.
+
+        Args:
+            dataset: holding all theta and x, optionally masks.
+            training_batch_size: training arg of inference methods.
+            resume_training: Whether the current call is resuming training so that no
+                new training and validation indices into the dataset have to be created.
+            dataloader_kwargs: Additional or updated kwargs to be passed to the training
+                and validation dataloaders (like, e.g., a collate_fn)
+
+        Returns:
+            Tuple of dataloaders for training and validation.
+
+        """
 
         # Get total number of training examples.
         num_examples = len(dataset)
@@ -299,7 +313,7 @@ class NeuralInference(ABC):
                 permuted_indices[num_training_examples:],
             )
 
-        # Create neural net and validation loaders using a subset sampler.
+        # Create training and validation loaders using a subset sampler.
         # Intentionally use dicts to define the default dataloader args
         # Then, use dataloader_kwargs to override (or add to) any of these defaults
         # https://stackoverflow.com/questions/44784577/in-method-call-args-how-to-override-keyword-argument-of-unpacked-dict
