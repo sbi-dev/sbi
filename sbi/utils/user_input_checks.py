@@ -136,6 +136,10 @@ def process_pytorch_prior(prior: Distribution) -> Tuple[Distribution, int, bool]
         prior_returns_numpy: False.
     """
 
+    # Turn off validation of input arguments to allow `log_prob()` on samples outside
+    # of the support.
+    prior.set_default_validate_args(False)
+
     # Reject unwrapped scalar priors.
     # This will reject Uniform priors with dimension larger than 1.
     if prior.sample().ndim == 0:
@@ -154,7 +158,9 @@ def process_pytorch_prior(prior: Distribution) -> Tuple[Distribution, int, bool]
     check_prior_batch_dims(prior)
 
     if not prior.sample().dtype == float32:
-        prior = PytorchReturnTypeWrapper(prior, return_type=float32)
+        prior = PytorchReturnTypeWrapper(
+            prior, return_type=float32, validate_args=False
+        )
 
     # This will fail for float64 priors.
     check_prior_return_type(prior)

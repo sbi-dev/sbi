@@ -233,6 +233,7 @@ class BoxUniform(Independent):
             Uniform(
                 low=torch.as_tensor(low, dtype=torch.float32),
                 high=torch.as_tensor(high, dtype=torch.float32),
+                validate_args=False,
             ),
             reinterpreted_batch_ndims,
         )

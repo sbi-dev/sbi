@@ -665,15 +665,23 @@ class NeuralPosterior(ABC):
             def tf_inv(theta_t):
                 return utils.expit(
                     theta_t,
-                    torch.as_tensor(boxuniform.support.lower_bound, dtype=float32),
-                    torch.as_tensor(boxuniform.support.upper_bound, dtype=float32),
+                    torch.as_tensor(
+                        boxuniform.support.base_constraint.lower_bound, dtype=float32
+                    ),
+                    torch.as_tensor(
+                        boxuniform.support.base_constraint.upper_bound, dtype=float32
+                    ),
                 )
 
             def tf(theta):
                 return utils.logit(
                     theta,
-                    torch.as_tensor(boxuniform.support.lower_bound, dtype=float32),
-                    torch.as_tensor(boxuniform.support.upper_bound, dtype=float32),
+                    torch.as_tensor(
+                        boxuniform.support.base_constraint.lower_bound, dtype=float32
+                    ),
+                    torch.as_tensor(
+                        boxuniform.support.base_constraint.upper_bound, dtype=float32
+                    ),
                 )
 
         else:
