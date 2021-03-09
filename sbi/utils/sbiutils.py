@@ -205,7 +205,7 @@ def sample_posterior_within_prior(
             .reshape(sampling_batch_size, -1)
             .cpu()  # Move to cpu to evaluate under prior.
         )
-        are_within_prior = torch.isfinite(prior.log_prob(candidates))
+        are_within_prior = within_support(prior, candidates)
         samples = candidates[are_within_prior]
         accepted.append(samples)
 
@@ -467,6 +467,41 @@ def check_if_boxuniform(dist) -> Tuple[bool, Optional[BoxUniform]]:
         box_dist = None
 
     return is_boxuniform, box_dist
+
+
+def within_support(distribution: Any, samples: Tensor) -> Tensor:
+    """
+    Return whether the samples are within the support or not.
+
+    If first checks whether the `distribution` has a `support` attribute (as is the
+    case for `torch.distribution`). If it does not, it evaluates the log-probabilty and
+    returns whether it is finite or not (this hanldes e.g. `NeuralPosterior`). Only
+    checking whether the log-probabilty is not `-inf` will not work because, as of
+    torch v1.8.0, a `torch.distribution` will throw an error at `log_prob()` when the
+    sample is out of the support (see #451). In `prepare_for_sbi()`, we set 
+    `validate_args=False`. Thish would take care of this, but requires running 
+    `prepare_for_sbi()` and otherwise throws a cryptic error.
+
+    Args:
+        distribution: Distribution under which to evaluate the `samples`.
+        samples: Samples at which to evaluate.
+
+    Returns:
+        Tensor of bools indicating whether each sample was within the support.
+    """
+    if hasattr(distribution, "support"):
+        sample_check = distribution.support.check(samples)
+
+        # Before torch v1.7.0, `support.check()` returned bools for every element. From
+        # v1.8.0 on, it directly considers all dimensions of a sample. E.g., for a 
+        # single sample in 3D, v1.7.0 would return [[True, True, True]] and v1.8.0 
+        # would return [True].
+        if sample_check.ndim > 1:
+            return torch.all(distribution.support.check(samples), axis=1)
+        else:
+            return distribution.support.check(samples)
+    else:
+        return torch.isfinite(distribution.log_prob(samples))
 
 
 class ImproperEmpirical(Empirical):
