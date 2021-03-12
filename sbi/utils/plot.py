@@ -473,6 +473,7 @@ def conditional_pairplot(
             resolution=resolution,
             eps_margins1=eps_margins[row],
             eps_margins2=eps_margins[row],
+            warn_about_deprecation=False,
         ).numpy()
         h = plt.plot(
             np.linspace(
@@ -494,6 +495,7 @@ def conditional_pairplot(
             resolution=resolution,
             eps_margins1=eps_margins[row],
             eps_margins2=eps_margins[col],
+            warn_about_deprecation=False,
         ).numpy()
         h = plt.imshow(
             p_image.T,
