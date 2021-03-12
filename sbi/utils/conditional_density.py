@@ -157,6 +157,7 @@ def conditional_corrcoeff(
                             dim1=dim1,
                             dim2=dim2,
                             resolution=resolution,
+                            warn_about_deprecation=False,
                         ),
                         limits[[dim1, dim2]],
                     )
