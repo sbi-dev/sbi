@@ -20,6 +20,7 @@ def eval_conditional_density(
     resolution: int = 50,
     eps_margins1: Union[Tensor, float] = 1e-32,
     eps_margins2: Union[Tensor, float] = 1e-32,
+    return_raw_log_prob: bool = False,
     warn_about_deprecation: bool = True,
 ) -> Tensor:
     r"""
@@ -45,6 +46,9 @@ def eval_conditional_density(
         eps_margins2: We will evaluate the posterior along `dim2` at
             `limits[0]+eps_margins` until `limits[1]-eps_margins`. This avoids
             evaluations potentially exactly at the prior bounds.
+        return_raw_log_prob: If `True`, return the log-probability evaluated on the·
+            grid. If `False`, return the probability, scaled down by the maximum value·
+            on the grid for numerical stability (i.e. exp(log_prob - max_log_prob)).
         warn_about_deprecation: With sbi v0.15.0, we depracated the import of this
             function from `sbi.utils`. Instead, it should be imported from
             `sbi.analysis`.
@@ -88,8 +92,11 @@ def eval_conditional_density(
         log_probs_on_grid = density.log_prob(repeated_condition)
         log_probs_on_grid = torch.reshape(log_probs_on_grid, (resolution, resolution))
 
-    # Subtract maximum for numerical stability.
-    return torch.exp(log_probs_on_grid - torch.max(log_probs_on_grid))
+    if return_raw_log_prob:
+        return log_probs_on_grid
+    else:
+        # Subtract maximum for numerical stability 
+        return torch.exp(log_probs_on_grid - torch.max(log_probs_on_grid))
 
 
 def conditional_corrcoeff(
