@@ -158,6 +158,10 @@ class DirectPosterior(NeuralPosterior):
         x: Optional[Tensor] = None,
         norm_posterior: bool = True,
         track_gradients: bool = False,
+        num_rejection_samples: int = 10_000,
+        force_update: bool = False,
+        show_progress_bars: bool = True,
+        rejection_sampling_batch_size: int = 10_000,
     ) -> Tensor:
         r"""
         Returns the log-probability of the posterior $p(\theta|x).$
@@ -176,6 +180,12 @@ class DirectPosterior(NeuralPosterior):
             track_gradients: Whether the returned tensor supports tracking gradients.
                 This can be helpful for e.g. sensitivity analysis, but increases memory
                 consumption.
+            num_rejection_samples: Number of samples used to estimate correction factor.
+            force_update: Whether to force a reevaluation of the leakage correction even
+                if the context `x` is the same as `self.default_x`. This is useful to
+                enforce a new leakage estimate for rounds after the first (2, 3,..).
+            show_progress_bars: Whether to show a progress bar during sampling.
+            rejection_sampling_batch_size: Batch size for rejection sampling.
 
         Returns:
             `(len(θ),)`-shaped log posterior probability $\log p(\theta|x)$ for θ in the
@@ -205,7 +215,15 @@ class DirectPosterior(NeuralPosterior):
             )
 
             log_factor = (
-                log(self.leakage_correction(x=batched_first_of_batch(x)))
+                log(
+                    self.leakage_correction(
+                        x=batched_first_of_batch(x),
+                        num_rejection_samples=num_rejection_samples,
+                        force_update=force_update,
+                        show_progress_bars=show_progress_bars,
+                        rejection_sampling_batch_size=rejection_sampling_batch_size,
+                    )
+                )
                 if norm_posterior
                 else 0
             )
