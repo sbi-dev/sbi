@@ -181,6 +181,7 @@ class DirectPosterior(NeuralPosterior):
                 default values of `leakage_correction()`. Possible options are:
                 `num_rejection_samples`, `force_update`, `show_progress_bars`, and
                 `rejection_sampling_batch_size`.
+                These parameters only have an effect if `norm_posterior=True`.
 
         Returns:
             `(len(θ),)`-shaped log posterior probability $\log p(\theta|x)$ for θ in the
