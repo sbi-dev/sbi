@@ -1,3 +1,10 @@
+# v0.15.1
+
+- add option to pass `torch.data.DataLoader` kwargs to all inference methods (thanks @narendramukherjee, #445)
+- fix bug due to release of `torch` `v1.8.0` (#451)
+- expose `leakage_correction` parameters for `log_prob` correction in unnormalized 
+  posteriors (thanks @famura, #454)
+
 # v0.15.0
 
 ## Major changes
