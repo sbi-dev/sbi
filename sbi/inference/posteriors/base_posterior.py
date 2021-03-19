@@ -763,14 +763,15 @@ class NeuralPosterior(ABC):
                             best_theta_overall = best_theta_iter.detach().clone()
                             best_log_prob_overall = best_log_prob_iter.detach().clone()
 
-                    print(
-                        f"Optimizing MAP estimate. Iterations: "
-                        f"{iter_+1} / {num_iter}.    "
-                        f"Performance in iteration "
-                        f"{divmod(iter_+1, save_best_every)[0] * save_best_every}: "
-                        f"{best_log_prob_iter.item():.2f} (= unnormalized log-prob)",
-                        end="\r",
-                    )
+                    if show_progress_bars:
+                        print(
+                            f"Optimizing MAP estimate. Iterations: "
+                            f"{iter_+1} / {num_iter}.    "
+                            f"Performance in iteration "
+                            f"{divmod(iter_+1, save_best_every)[0] * save_best_every}: "
+                            f"{best_log_prob_iter.item():.2f} (= unnormalized log-prob)",
+                            end="\r",
+                        )
                     self.map_ = tf_inv(best_theta_overall)
 
                 iter_ += 1
