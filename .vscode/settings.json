@@ -53,7 +53,7 @@
     //
     "python.linting.enabled": true,
     "python.linting.lintOnSave": true,
-    "python.linting.flake8Enabled": true,
+    "python.linting.flake8Enabled": false,
     "python.linting.args": [
         "--settings-path=${workspaceFolder}/setup.cfg"
     ],
@@ -72,5 +72,7 @@
     "autoDocstring.customTemplatePath": ".vscode/autodocstring.template",
     //
     // Signal that we are using shared workspace settings in .vscode
-    "window.title": "sbi.vscode:: ${dirty}${activeEditorShort}${separator}${rootName}${separator}${appName}"
+    "window.title": "sbi.vscode:: ${dirty}${activeEditorShort}${separator}${rootName}${separator}${appName}",
+    "python.linting.pylintEnabled": false,
+    "python.linting.banditEnabled": true
 }
