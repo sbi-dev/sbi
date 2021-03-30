@@ -18,6 +18,7 @@ def eval_conditional_density(
     resolution: int = 50,
     eps_margins1: Union[Tensor, float] = 1e-32,
     eps_margins2: Union[Tensor, float] = 1e-32,
+    return_raw_log_prob: bool = False,
 ) -> Tensor:
     r"""
     Return the unnormalized conditional along `dim1, dim2` given parameters `condition`.
@@ -42,6 +43,9 @@ def eval_conditional_density(
         eps_margins2: We will evaluate the posterior along `dim2` at
             `limits[0]+eps_margins` until `limits[1]-eps_margins`. This avoids
             evaluations potentially exactly at the prior bounds.
+	return_raw_log_prob: If `True`, return the log-probability evaluated on the·
+            grid. If `False`, return the probability, scaled down by the maximum value·
+            on the grid for numerical stability (i.e. exp(log_prob - max_log_prob)).
 
     Returns: Conditional probabilities. If `dim1 == dim2`, this will have shape
         (resolution). If `dim1 != dim2`, it will have shape (resolution, resolution).
@@ -55,6 +59,7 @@ def eval_conditional_density(
         resolution=resolution,
         eps_margins1=eps_margins1,
         eps_margins2=eps_margins2,
+        return_raw_log_prob=return_raw_log_prob,
         warn_about_deprecation=False,
     )
 
