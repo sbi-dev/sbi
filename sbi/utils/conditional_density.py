@@ -334,11 +334,11 @@ class MDNPosterior(DirectPosterior):
     Density Network. Samples from Multivariate Gaussians directly, using
     torch.distributions.multivariate_normal.MultivariateNormal
     rather than going through the MDN.
-    Replaces sample and log_prob functions of the DirectPosterior.
+    Replaces `.sample()` and `.log_prob() methods of the `DirectPosterior`.
 
     Args:
-        MDN_Posterior: DirectPosterior instance, i.e. output of
-            inference.build_posterior(density_estimator),
+        MDN_Posterior: `DirectPosterior` instance, i.e. output of
+            `inference.build_posterior(density_estimator)`,
             that was trained using a MDN.
 
     Attributes:
@@ -423,8 +423,6 @@ class MDNPosterior(DirectPosterior):
         """Extracts the Mixture of Gaussians (MoG) parameters
         from the MDN at either the default x or input x.
 
-        Adpated from code courtesy of @ybernaerts.
-
         Args:
             x: x at which to evaluate the MDN in order
                 to extract the MoG parameters.
@@ -456,8 +454,6 @@ class MDNPosterior(DirectPosterior):
     def log_prob(self, X: Tensor, individual=False) -> Tensor:
         """Evaluates the Mixture of Gaussian (MoG)
         probability density function at a value x.
-
-        Adpated from code courtesy of @ybernaerts.
 
         Args:
             X: Values at which to evaluate the MoG pdf.
@@ -567,15 +563,15 @@ class MDNPosterior(DirectPosterior):
 
 
 class ConditionalMDNPosterior(MDNPosterior):
-    """Wrapperclass for DirectPosterior objects that were trained using
+    """Wrapperclass for `DirectPosterior` objects that were trained using
     a Mixture Density Network (MDN) and have been conditionalised.
-    Replaces sample, sample_conditional, sample_with_mcmc and log_prob
-    functions. Enables the evaluation and sampling of the conditional
+    Replaces `.sample()`, `.sample_conditional()`, `.sample_with_mcmc()` and `.log_prob()`
+    methods. Enables the evaluation and sampling of the conditional
     distribution at any arbitrary condition and point.
 
     Args:
-        MDN_Posterior: DirectPosterior instance, i.e. output of
-            inference.build_posterior(density_estimator),
+        MDN_Posterior: `DirectPosterior` instance, i.e. output of
+            `inference.build_posterior(density_estimator)`,
             that was trained with a MDN.
         condition: A vector that holds the conditioned vector. Entries that contain
             NaNs are not set and become inputs to the resulting distribution,
@@ -597,8 +593,6 @@ class ConditionalMDNPosterior(MDNPosterior):
 
     def __conditionalise(self, condition: Tensor):
         """Finds the conditional distribution p(X|Y) for a GMM.
-
-        Adpated from code courtesy of @ybernaerts.
 
         Args:
             condition: An array of inputs. Inputs set to NaN are not set, and become inputs to
@@ -671,7 +665,7 @@ class ConditionalMDNPosterior(MDNPosterior):
         self.mc = new_mc
 
     def sample_with_mcmc(self):
-        """Dummy function to overwrite the existing sample_with_mcmc method."""
+        """Dummy function to overwrite the existing `.sample_with_mcmc()` method."""
 
         raise DeprecationWarning(
             "MCMC sampling is not yet supported for the conditional MDN."
