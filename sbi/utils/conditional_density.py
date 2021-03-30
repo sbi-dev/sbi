@@ -517,7 +517,7 @@ class MDNPosterior(DirectPosterior):
                 # resample until all samples are within the prior support
                 while num_not_supported > 0:
                     # resample
-                    std_normal_sample = torch.randn(D,(int(num_not_supported))
+                    std_normal_sample = torch.randn(D,(int(num_not_supported)))
                     redrawn_samples = self.m[k] + torch.mm(chol_factor, std_normal_sample).T
 
                     # reevaluate support
