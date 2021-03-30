@@ -325,7 +325,7 @@ def _normalize_probs(probs: Tensor, limits: Tensor) -> Tensor:
     """
     limits_diff = torch.prod(limits[:, 1] - limits[:, 0])
     return probs * probs.numel() / limits_diff / torch.sum(probs)
-    
+
 
 class MDNPosterior(DirectPosterior):
     """Wrapper around MDN based DirectPosterior instances.
@@ -502,12 +502,12 @@ class MDNPosterior(DirectPosterior):
         f2 = sel_idx[:, None] < cs_mc
         idxs = f1[:, :-1] * f2[:, 1:]
         ksamples = torch.sum(idxs, axis=0)
+
         for k, samplesize in enumerate(ksamples):
             # draw initial samples
-            multivar_normal = torch.distributions.multivariate_normal.MultivariateNormal(
-                self.m[k], self.S[k]
-            )
-            drawn_samples = multivar_normal.sample((samplesize,))
+            chol_factor = torch.cholesky(self.S[k])
+            std_normal_sample = torch.randn(D,samplesize)
+            drawn_samples = self.m[k] + torch.mm(chol_factor, std_normal_sample).T
 
             # check if samples are within the support and how many are not
             supported = self.check_support(drawn_samples)
@@ -517,10 +517,8 @@ class MDNPosterior(DirectPosterior):
                 # resample until all samples are within the prior support
                 while num_not_supported > 0:
                     # resample
-                    multivar_normal = torch.distributions.multivariate_normal.MultivariateNormal(
-                        self.m[k], self.S[k]
-                    )
-                    redrawn_samples = multivar_normal.sample((int(num_not_supported),))
+                    std_normal_sample = torch.randn(D,(int(num_not_supported))
+                    redrawn_samples = self.m[k] + torch.mm(chol_factor, std_normal_sample).T
 
                     # reevaluate support
                     supported = self.check_support(redrawn_samples)
