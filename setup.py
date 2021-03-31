@@ -28,7 +28,7 @@ REQUIRED = [
     "matplotlib",
     "numpy",
     "pillow",
-    "pyknos>=0.14.0",
+    "pyknos>=0.14.1",
     "pyro-ppl>=1.3.1",
     "scikit-learn",
     "scipy",
