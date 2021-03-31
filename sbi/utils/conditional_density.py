@@ -15,6 +15,8 @@ from copy import deepcopy
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from tqdm.auto import tqdm
 
+from pyknos.mdn.mdn import MultivariateGaussianMDN as mdn
+
 def eval_conditional_density(
     density: Any,
     condition: Tensor,
@@ -357,15 +359,54 @@ class MDNPosterior(DirectPosterior):
             self.__dict__ = deepcopy(MDN_Posterior).__dict__
 
             # MoG parameters
-            self.S = None
-            self.m = None
-            self.mc = None
+            self.precs = None
+            self.means = None
+            self.logits = None
+            self.sumlogdiag = None
             self.support = self._prior.support
 
-            self.extract_mixture_components()
+            self.extract_and_transform_mog()
 
         else:
             raise AttributeError("Posterior does not contain a MDN.")
+            
+    def extract_and_transform_mog(
+        self, context: Tensor = None
+    ) -> Tuple[Tensor, Tensor, Tensor]:
+        """Extracts the Mixture of Gaussians (MoG) parameters
+        from the MDN at either the default x or input x.
+
+        Args:
+            x: x at which to evaluate the MDN in order
+                to extract the MoG parameters.
+        """
+
+        # extract and rescale means, mixture componenets and covariances
+        nn = self.net
+        dist = nn._distribution
+
+        if context == None:
+            encoded_x = nn._embedding_net(self.default_x)
+        else:
+            encoded_x = nn._embedding_net(torch.tensor(context, dtype=torch.float32))
+
+        logits, m, prec, sumlogdiag, _ = dist.get_mixture_components(encoded_x)
+        norm_logits = logits - torch.logsumexp(logits, dim=-1, keepdim=True)
+
+        scale = nn._transform._transforms[0]._scale
+        shift = nn._transform._transforms[0]._shift
+
+        means_transformed = ((m - shift) / scale).detach()
+        
+        A = scale * torch.eye(means_transformed.shape[2])
+        precision_factors_transformed = torch.cholesky(A@prec@A)
+        
+        self.logits = norm_logits.detach()
+        self.means = means_transformed.detach()
+        self.precs = precision_factors_transformed.detach()
+        self.sumlogdiag = torch.sum(torch.log(torch.diagonal(self.precs, dim1=2, dim2=3)),dim=2).detach()
+        
+        return norm_logits, means_transformed, precision_factors_transformed, sumlogdiag
 
     @staticmethod
     def mulnormpdf(X: Tensor, mu: Tensor, cov: Tensor) -> Tensor:
@@ -396,61 +437,6 @@ class MDNPosterior(DirectPosterior):
         )
         return K * torch.exp(ex)
 
-    def check_support(self, X: Tensor) -> bool:
-        """Takes a set of points X with X.shape[0] being the number of points
-        and X.shape[1] the dimensionality of the points and checks, each point
-        for its prior support.
-
-        Args:
-            X: Contains a set of multidimensional points to check
-                against the prior support of the posterior object.
-
-        Returns:
-            within_support: Boolean array representing, whether a sample is within the
-                prior support or not.
-        """
-
-        lbound = self.support.lower_bound
-        ubound = self.support.upper_bound
-
-        within_support = torch.logical_and(lbound < X, X < ubound)
-
-        return torch.all(within_support, dim=1)
-
-    def extract_mixture_components(
-        self, x: Tensor = None
-    ) -> Tuple[Tensor, Tensor, Tensor]:
-        """Extracts the Mixture of Gaussians (MoG) parameters
-        from the MDN at either the default x or input x.
-
-        Args:
-            x: x at which to evaluate the MDN in order
-                to extract the MoG parameters.
-        """
-        if x == None:
-            encoded_x = self.net._embedding_net(self.default_x)
-        else:
-            encoded_x = self.net._embedding_net(torch.tensor(x, dtype=torch.float32))
-        dist = self.net._distribution
-        logits, m, prec, *_ = dist.get_mixture_components(encoded_x)
-        norm_logits = logits - torch.logsumexp(logits, dim=-1, keepdim=True)
-
-        scale = self.net._transform._transforms[0]._scale
-        shift = self.net._transform._transforms[0]._shift
-
-        self.mc = torch.exp(norm_logits).detach()
-        self.m = ((m - shift) / scale).detach()[0]
-
-        L = torch.cholesky(
-            prec[0].detach() + torch.eye(self.m.shape[1]) * 1e-6
-        )  # sometimes matrices are not pos semi def. dirty fix.
-        C = torch.inverse(L)
-        self.S = C.transpose(2, 1) @ C
-        A_inv = torch.inverse(scale * torch.eye(self.S.shape[1]))
-        self.S = A_inv @ self.S @ A_inv.T
-
-        return self.mc, self.m, self.S
-
     def log_prob(self, X: Tensor, individual=False) -> Tensor:
         """Evaluates the Mixture of Gaussian (MoG)
         probability density function at a value x.
@@ -462,15 +448,13 @@ class MDNPosterior(DirectPosterior):
         Returns:
             log_prob: Log probabilities at values specified by X.
         """
+        prec = self.precs@self.precs.transpose(3,2)
 
-        pdf = torch.zeros((X.shape[0], self.m.shape[0]))
-        for i in range(self.m.shape[0]):
-            pdf[:, i] = self.mulnormpdf(X, self.m[i], self.S[i]) * self.mc[0, i]
-        if individual:
-            return torch.log(pdf)
-        else:
-            log_factor = torch.log(self.leakage_correction(x=self.default_x))
-            return torch.log(torch.sum(pdf, axis=1)) - log_factor
+        self.net.eval() # leakage correction requires eval mode
+        log_factor = torch.log(self.leakage_correction(x=self.default_x))
+        
+        log_prob = mdn.log_prob_mog(X,self.logits, self.means, prec, self.sumlogdiag) # only works for single samples
+        return log_prob - log_factor
 
     def sample(self, sample_shape: Tuple[int, int]) -> Tensor:
         """Draw samples from a Mixture of Gaussians (MoG)
@@ -483,58 +467,16 @@ class MDNPosterior(DirectPosterior):
             X: A matrix with samples rows, and input dimension columns.
         """
 
-        K, D = self.m.shape  # Determine dimensionality
-
+        _, K, D = self.means.shape  # Determine dimensionality
+        
+        # add sample posterior from prior (rejection sampling)
         num_samples = torch.Size(sample_shape).numel()
-        pbar = tqdm(
-            total=num_samples,
-            desc=f"Drawing {num_samples} posterior samples",
-        )
 
-        # Cluster selection
-        cs_mc = torch.cumsum(self.mc, 1)
-        cs_mc = torch.hstack((torch.tensor([[0]]), cs_mc))
-        sel_idx = torch.rand(num_samples)
+        samples = mdn.sample_mog(num_samples, self.logits, self.means, self.precs)
+        
+        return samples.reshape((*sample_shape, -1))
 
-        # Draw samples
-        res = torch.zeros((num_samples, D))
-        f1 = sel_idx[:, None] >= cs_mc
-        f2 = sel_idx[:, None] < cs_mc
-        idxs = f1[:, :-1] * f2[:, 1:]
-        ksamples = torch.sum(idxs, axis=0)
-
-        for k, samplesize in enumerate(ksamples):
-            # draw initial samples
-            chol_factor = torch.cholesky(self.S[k])
-            std_normal_sample = torch.randn(D,samplesize)
-            drawn_samples = self.m[k] + torch.mm(chol_factor, std_normal_sample).T
-
-            # check if samples are within the support and how many are not
-            supported = self.check_support(drawn_samples)
-            num_not_supported = torch.count_nonzero(~supported)
-            drawn_samples_in_support = drawn_samples[supported]
-            if num_not_supported > 0:
-                # resample until all samples are within the prior support
-                while num_not_supported > 0:
-                    # resample
-                    std_normal_sample = torch.randn(D,(int(num_not_supported)))
-                    redrawn_samples = self.m[k] + torch.mm(chol_factor, std_normal_sample).T
-
-                    # reevaluate support
-                    supported = self.check_support(redrawn_samples)
-                    num_not_supported = torch.count_nonzero(~supported)
-                    redrawn_samples_in_support = redrawn_samples[supported]
-                    # append the samples
-                    drawn_samples_in_support = torch.vstack(
-                        [drawn_samples_in_support, redrawn_samples_in_support]
-                    )
-
-                    pbar.update(int(sum(ksamples[: k + 1]) - num_not_supported))
-            res[idxs[:, k], :] = drawn_samples_in_support
-        pbar.close()
-        return res.reshape((*sample_shape, -1))
-
-    def conditionalise(self, condition: Tensor) -> ConditionalMDNPosterior:
+    def conditionalise(self, condition: Tensor): # -> ConditionalMDNPosterior:
         """Instantiates a new conditional distribution, which can be evaluated
         and sampled from.
 
@@ -544,7 +486,7 @@ class MDNPosterior(DirectPosterior):
         """
         return ConditionalMDNPosterior(self, condition)
 
-    def sample_from_conditional(
+    def sample_conditional(
         self, condition: Tensor, sample_shape: Tuple[int, int]
     ) -> Tensor:
         """Conditionalises the distribution on the provided condition
@@ -601,7 +543,7 @@ class ConditionalMDNPosterior(MDNPosterior):
         """
 
         # revert to the old GMM parameters first
-        self.extract_mixture_components()
+        self.extract_and_transform_mog()
         self.support = self._prior.support
 
         pop = self.condition.isnan().reshape(-1)
@@ -629,38 +571,47 @@ class ConditionalMDNPosterior(MDNPosterior):
         new_idx = torch.cat(
             (not_set_idx, set_idx)
         )  # indices with not set parameters first and then set parameters
-        y = condition[0, set_idx]
+        y = condition[0, set_idx].reshape(1,-1)
+        
+        k = self.means.shape[1]
+        d_new = not_set_idx.shape[0]
+        
         # New centroids and covar matrices
-        new_cen = []
-        new_ccovs = []
+        new_cen = torch.zeros(1,k,d_new)
+        new_ccovs = torch.zeros(1,k,d_new,d_new)
         # Appendix A in C. E. Rasmussen & C. K. I. Williams, Gaussian Processes
         # for Machine Learning, the MIT Press, 2006
-        fk = []
-        for i in range(self.m.shape[0]):
+        fk = torch.zeros(1,k)
+        prec = self.precs@self.precs.transpose(3,2)
+        covs = torch.inverse(prec)
+        mcs = torch.exp(self.logits)
+        
+        for i in range(self.means.shape[1]):
             # Make a new co-variance matrix with correct ordering
-            new_ccov = deepcopy(self.S[i])
-            new_ccov = new_ccov[:, new_idx]
-            new_ccov = new_ccov[new_idx, :]
-            ux = self.m[i, not_set_idx]
-            uy = self.m[i, set_idx]
-            A = new_ccov[0 : len(not_set_idx), 0 : len(not_set_idx)]
-            B = new_ccov[len(not_set_idx) :, len(not_set_idx) :]
-            # B = B + 1e-10*torch.eye(B.shape[0]) # prevents B from becoming singular
-            C = new_ccov[0 : len(not_set_idx), len(not_set_idx) :]
-            cen = ux + C @ torch.inverse(B) @ (y - uy)
-            cov = A - C @ torch.inverse(B) @ C.transpose(1, 0)
-            new_cen.append(cen)
-            new_ccovs.append(cov)
-            fk.append(self.mulnormpdf(y, uy, B))  # Used for normalizing the mc
+            new_ccov = covs[:,i].clone()
+            new_ccov = new_ccov[:,:, new_idx]
+            new_ccov = new_ccov[:,new_idx, :]
+            ux = self.means[:,i, not_set_idx]
+            uy = self.means[:,i, set_idx]
+            A = new_ccov[:,0 : len(not_set_idx), 0 : len(not_set_idx)]
+            B = new_ccov[:,len(not_set_idx) :, len(not_set_idx) :]
+            C = new_ccov[:,0 : len(not_set_idx), len(not_set_idx) :]
+            cen = ux + (C @ torch.inverse(B) @ (y - uy).T).transpose(2,1)
+            cov = A - C @ torch.inverse(B) @ C.transpose(2, 1)
+            new_cen[:,i] = cen
+            new_ccovs[:,i] = cov
+            #torch.distributions.MultivariateNormal()
+            fk[:,i] = self.mulnormpdf(y[0], uy[0], B[0])  # Used for normalizing the mc
         # Normalize the mixing coef: p(X|Y) = p(Y,X) / p(Y) using the marginal dist.
-        fk = torch.tensor(fk)
-        new_mc = self.mc * fk
-        new_mc = new_mc / torch.sum(new_mc)
+        new_mcs = mcs * fk
+        new_mcs = new_mcs / torch.sum(new_mcs)
 
         # set new GMM parameters
-        self.m = torch.stack(new_cen)
-        self.S = torch.stack(new_ccovs)
-        self.mc = new_mc
+        self.means = new_cen
+        self.precs = torch.cholesky(torch.inverse(new_ccovs))
+        self.logits = torch.log(new_mcs)
+        self.sumlogdiag = torch.sum(torch.log(torch.diagonal(self.precs, dim1=2, dim2=3)),dim=2)
+        
 
     def sample_with_mcmc(self):
         """Dummy function to overwrite the existing `.sample_with_mcmc()` method."""
@@ -670,7 +621,7 @@ class ConditionalMDNPosterior(MDNPosterior):
         )
 
     def sample_conditional(
-        self, n_samples: Tuple[int, int], condition: Tensor = None
+        self, sample_shape: Tuple[int, int], condition: Tensor = None
     ) -> Tensor:
         """Samples from the condtional distribution. If a condition
         is provided, a new conditional distribution will be calculated.
@@ -688,5 +639,5 @@ class ConditionalMDNPosterior(MDNPosterior):
 
         if condition != None:
             self.__conditionalise(condition)
-        samples = self.sample(n_samples)
+        samples = self.sample(sample_shape)
         return samples
