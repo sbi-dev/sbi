@@ -401,41 +401,15 @@ class MDNPosterior(DirectPosterior):
         A = scale * torch.eye(means_transformed.shape[2])
         precision_factors_transformed = torch.cholesky(A@prec@A)
         
+        #prec = precision_factors_transformed@precision_factors_transformed.transpose(3,2)
+        #covs = torch.inverse(prec)
+        
         self.logits = norm_logits.detach()
         self.means = means_transformed.detach()
         self.precs = precision_factors_transformed.detach()
         self.sumlogdiag = torch.sum(torch.log(torch.diagonal(self.precs, dim1=2, dim2=3)),dim=2).detach()
         
         return norm_logits, means_transformed, precision_factors_transformed, sumlogdiag
-
-    @staticmethod
-    def mulnormpdf(X: Tensor, mu: Tensor, cov: Tensor) -> Tensor:
-        """Evaluates the PDF for the multivariate Guassian distribution.
-
-        Args:
-            X: torch.tensor with inputs/entries row-wise. Can also be a 1-d array if only a
-                single point is evaluated.
-            mu: torch.tensor with center/mean, 1d array.
-            cov: 2d torch.tensor with covariance matrix.
-
-        Returns:
-            prob: Probabilities for entries in `X`.
-        """
-
-        # Evaluate pdf at points or point:
-        if X.ndim == 1:
-            X = torch.atleast_2d(X)
-        sigma = torch.atleast_2d(cov)  # So we also can use it for 1-d distributions
-
-        N = mu.shape[0]
-        ex1 = torch.inverse(sigma) @ (X - mu).T
-        ex = -0.5 * (X - mu).T * ex1
-        if ex.ndim == 2:
-            ex = torch.sum(ex, axis=0)
-        K = 1 / torch.sqrt(
-            torch.pow(2 * torch.tensor(3.14159265), N) * torch.det(sigma)
-        )
-        return K * torch.exp(ex)
 
     def log_prob(self, X: Tensor, individual=False) -> Tensor:
         """Evaluates the Mixture of Gaussian (MoG)
@@ -448,12 +422,13 @@ class MDNPosterior(DirectPosterior):
         Returns:
             log_prob: Log probabilities at values specified by X.
         """
+        batch_size = X.shape[0]
         prec = self.precs@self.precs.transpose(3,2)
 
         self.net.eval() # leakage correction requires eval mode
         log_factor = torch.log(self.leakage_correction(x=self.default_x))
         
-        log_prob = mdn.log_prob_mog(X,self.logits, self.means, prec, self.sumlogdiag) # only works for single samples
+        log_prob = mdn.log_prob_mog(X, self.logits.repeat(batch_size,1,1), self.means.repeat(batch_size,1,1), prec.repeat(batch_size,1,1,1), self.sumlogdiag.repeat(batch_size,1)) # only works for single samples
         return log_prob - log_factor
 
     def sample(self, sample_shape: Tuple[int, int]) -> Tensor:
@@ -464,7 +439,7 @@ class MDNPosterior(DirectPosterior):
             sample_shape: The number of samples to draw from the MoG distribution.
 
         Returns:
-            X: A matrix with samples rows, and input dimension columns.
+            X: A matrix with samples2 tensor([0.0002]) rows, and input dimension columns.
         """
 
         _, K, D = self.means.shape  # Determine dimensionality
@@ -573,7 +548,7 @@ class ConditionalMDNPosterior(MDNPosterior):
         )  # indices with not set parameters first and then set parameters
         y = condition[0, set_idx].reshape(1,-1)
         
-        k = self.means.shape[1]
+        k, D = self.means.shape[1:]
         d_new = not_set_idx.shape[0]
         
         # New centroids and covar matrices
@@ -600,8 +575,11 @@ class ConditionalMDNPosterior(MDNPosterior):
             cov = A - C @ torch.inverse(B) @ C.transpose(2, 1)
             new_cen[:,i] = cen
             new_ccovs[:,i] = cov
-            #torch.distributions.MultivariateNormal()
-            fk[:,i] = self.mulnormpdf(y[0], uy[0], B[0])  # Used for normalizing the mc
+            prec_B = torch.inverse(B)
+            precf = torch.cholesky(prec_B)
+            sumlogdiag = torch.sum(precf.diagonal()).reshape(1,-1)
+            log_prob = mdn.log_prob_mog(y, torch.tensor([[0.0]]), uy.view(1,1,-1), prec_B, sumlogdiag)
+            fk[:,i] = torch.exp(log_prob)  # Used for normalizing the mc
         # Normalize the mixing coef: p(X|Y) = p(Y,X) / p(Y) using the marginal dist.
         new_mcs = mcs * fk
         new_mcs = new_mcs / torch.sum(new_mcs)
