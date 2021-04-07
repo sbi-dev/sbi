@@ -10,47 +10,65 @@ from sbi.types import Shape
 from sbi.utils import del_entries
 from sbi.utils.torchutils import ScalarFloat, ensure_theta_batched, ensure_x_batched
 
+from sbi.vi.pyro_flows import build_flow
+from sbi.vi import (
+    build_q,
+    ElboOptimizer,
+    RenjeyDivergenceOptimizer,
+    TailAdaptivefDivergenceOptimizer,
+)
+
 import pyro
 from pyro import distributions as dist
 from pyro.distributions import transforms
 from pyro.nn import AutoRegressiveNN
+
+from tqdm import tqdm
 
 
 class VariationalPosterior(NeuralPosterior):
     r"""Posterior $p(\theta|x)$ with `log_prob()` and `sample()` methods, obtained with
     SNLE.<br/><br/>
     SNLE trains a neural network to approximate the likelihood $p(x|\theta)$. The
-    `SNLE_Posterior` class performs variational inference to approximate posterior q(\theta|x) \approx p(\theta|x).
-    Where $q$ is a inverse autoregressive normalizing flow. 
+    `SNLE_Posterior` class performs variational inference to approximate posterior $q(\theta|x) \approx p(\theta|x)$.
+    Where $q$ is a distribution of a specific variational family e.g. a Normalizing flow. 
     """
 
     def __init__(
         self,
         method_family: str,
         neural_net: nn.Module,
-        x_shape: torch.Size,
         prior,
-        flow: str = "spline_autoregressive",
+        x_shape: torch.Size,
+        flow_paras: dict = {},
         device: str = "cpu",
     ):
-        r"""
+        """
         Args:
             method_family: One of snpe, snl, snre_a or snre_b.
             neural_net: A classifier for SNRE, a density estimator for SNPE and SNL.
             prior: Prior distribution with `.log_prob()` and `.sample()`.
+            x_shape: Shape of a single simulator output.
             flow: Flow used for variational family one of: [iaf, planar, radial,
             affine_coupling, spline, spline_autoregressive, spline_coupling]
             device: Training device, e.g., cpu or cuda:0.
         """
-        kwargs = del_entries(locals(), entries=("self", "__class__", "flow"))
-        super().__init__(**kwargs)
+        kwargs1 = del_entries(
+            locals(), entries=("self", "__class__", "flow", "mof", "flow_paras")
+        )
+
+        super().__init__(**kwargs1)
         self._purpose = f"Variational Posterior approximation"
-        self.q = build_flow(self._prior, type=flow)
+        self._flow_paras = flow_paras
+        self._optimizer = None
+        self._summary = dict()
+
+        self.q = build_q(self._prior.event_shape, self._prior.support, **flow_paras)
 
     def log_prob(
         self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False,
     ) -> Tensor:
-        r"""
+        """
         Returns the log-probability of $q(\theta|x).$
 
         This corresponds to an normalized variational posterior log-probability.
@@ -81,7 +99,7 @@ class VariationalPosterior(NeuralPosterior):
         x: Optional[Tensor] = None,
         track_gradients: bool = False,
     ) -> Tensor:
-        r"""
+        """
         Return samples from variational posterior distribution $q(\theta|x)$.
 
         Args:
@@ -108,100 +126,75 @@ class VariationalPosterior(NeuralPosterior):
     def train(
         self,
         x_obs=None,
-        steps=1501,
-        lr=1e-3,
-        elbo_particels=64,
-        exp_decay=0.9999,
-        clip_value=1.0,
+        loss: str = "elbo",
+        n_particles: Optional[int] = 128,
+        learning_rate: float = 1e-2,
+        min_num_iters: Optional[int] = 100,
+        max_num_iters: Optional[int] = 1000,
+        clip_max_norm: Optional[float] = 5.0,
+        retrain_from_scratch: bool = False,
+        **kwargs,
     ):
-        modules = nn.ModuleList(
-            [t for t in self.q.transforms[0].parts if isinstance(t, nn.Module)]
-        )
-        modules.train()
+
+        if retrain_from_scratch:
+            self.q = build_q(
+                self._prior.event_shape, self._prior.support, **self._flow_paras
+            )
+
         if x_obs is None:
             x_obs = self.default_x
-        self.set_default_x(x_obs)
-        obs = x_obs[torch.randint(x_obs.size(0), (elbo_particels,))]
-        optimizer = torch.optim.Adam(modules.parameters(), lr)
-        scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, exp_decay)
-        for step in range(steps):
-            optimizer.zero_grad()
-            samples = self.q.rsample((elbo_particels,))
-            log_q = self.q.log_prob(samples)
-            log_ll = self.net.log_prob(obs, context=samples)
-            log_prior = self._prior.log_prob(samples)
-            loss = (
-                log_q[torch.isfinite(log_q)].mean()
-                - log_ll[torch.isfinite(log_ll)].mean()
-                - log_prior[torch.isfinite(log_prior)].mean()
+
+        # Choose correct optimizer
+        if loss.lower() == "elbo":
+            opt_kwargs = self.__optimizer_args(ElboOptimizer, kwargs)
+            optimizer = ElboOptimizer(
+                self,
+                n_particles=n_particles,
+                lr=learning_rate,
+                clip_value=clip_max_norm,
+                **opt_kwargs,
             )
-            loss.backward()
-            nn.utils.clip_grad_value_(modules.parameters(), clip_value)
-            optimizer.step()
-            scheduler.step()
-            self.q.clear_cache()
-            if step % 100 == 0:
-                print("Elbo:", loss.detach())
-        modules.eval()
+        elif loss.lower() in ["renjey_divergence", "alpha_divergence"]:
+            opt_kwargs = self.__optimizer_args(RenjeyDivergenceOptimizer, kwargs)
+            optimizer = RenjeyDivergenceOptimizer(
+                self,
+                n_particles=n_particles,
+                lr=learning_rate,
+                clip_value=clip_max_norm,
+                **opt_kwargs,
+            )
+        elif loss.lower() in ["tail_adaptive_fdivergence"]:
+            opt_kwargs = self.__optimizer_args(TailAdaptivefDivergenceOptimizer, kwargs)
+            optimizer = TailAdaptivefDivergenceOptimizer(
+                self,
+                n_particles=n_particles,
+                lr=learning_rate,
+                clip_value=clip_max_norm,
+                **opt_kwargs,
+            )
+        self._optimizer = optimizer
 
+        iters = tqdm(range(max_num_iters))
+        loss = []
+        eps = 1e-3 
+        # TODO rewrite convergence check
+        shift = int(min_num_iters / 2)
+        for i in iters:
+            l = optimizer.step(x_obs).numpy()
+            loss.append(l)
+            iters.set_description("Loss: " + str(np.round(l, 2)))
+            if i > min_num_iters and i % 10 == 0:
+                previous_mean = np.mean(loss[i - 2 * shift : i - shift])
+                current_mean = np.mean(loss[i - shift : i])
+                if abs(previous_mean - current_mean) < eps:
+                    print(f"\nConverged with loss {np.round(l, 2)}")
+                    break
+        self._summary = loss
+        # TODO evaluation
 
-def link_to_support(support):
-    if isinstance(support.base_constraint, torch.distributions.constraints.interval):
-        lb = support.base_constraint.lower_bound
-        ub = support.base_constraint.upper_bound
-        interval_len = torch.abs(ub - lb)
-        support_transform = transforms.ComposeTransform(
-            [
-                transforms.SigmoidTransform(),
-                torch.distributions.transforms.AffineTransform(lb, interval_len),
-            ]
+    def __optimizer_args(self, optimizer, kwargs):
+        opt_args = optimizer.__init__.__code__.co_varnames
+        opt_kwargs = dict(
+            [(key, val) for key, val in kwargs.items() if key in opt_args]
         )
-    else:
-        raise NotImplementedError("Not implemented")
-    return support_transform
-
-
-def build_flow(
-    prior,
-    num_flows=10,
-    type="spline_autoregressive",
-    link_support=True,
-    batch_norm=False,
-    permute=False,
-    **kwargs,
-):
-    dim = prior.shape()[0]
-    support = prior.support
-    base_dist = pyro.distributions.Normal(torch.zeros(dim), torch.ones(dim))
-    flows = []
-    for i in range(num_flows):
-        flows.append(flow_block(dim, type, **kwargs))
-        if batch_norm:
-            flows.append(transforms.batchnorm(dim))
-        if permute:
-            flows.append(transforms.permute(dim))
-        if link_support and i == num_flows - 1:
-            flows.append(link_to_support(support))
-    t = transforms.ComposeTransform(flows).with_cache()
-    dist = pyro.distributions.TransformedDistribution(base_dist, [t])
-    return dist
-
-
-def flow_block(dim, type, **kwargs):
-    if type.lower() == "iaf":
-        flow = transforms.affine_autoregressive(dim, **kwargs)
-    elif type.lower() == "planar":
-        flow = transforms.planar(dim, **kwargs)
-    elif type.lower() == "radial":
-        flow = transforms.radial(dim, **kwargs)
-    elif type.lower() == "affine_coupling":
-        flow = transforms.affine_coupling(dim, **kwargs)
-    elif type.lower() == "spline":
-        flow = transforms.spline(dim, **kwargs)
-    elif type.lower() == "spline_autoregressive":
-        flow = transforms.spline_autoregressive(dim, **kwargs)
-    elif type.lower() == "spline_coupling":
-        flow = transforms.spline_coupling(dim, **kwargs)
-    else:
-        raise NotImplementedError()
-    return flow
+        return opt_kwargs

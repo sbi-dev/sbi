@@ -109,7 +109,7 @@ class SNLE_B(LikelihoodEstimator):
         return super().train(**kwargs)
 
     def build_posterior(
-        self, density_estimator: Optional[TorchModule] = None,
+        self, density_estimator: Optional[TorchModule] = None, **kwargs
     ) -> VariationalPosterior:
 
         if density_estimator is None:
@@ -126,6 +126,7 @@ class SNLE_B(LikelihoodEstimator):
             prior=self._prior,
             x_shape=self._x_shape,
             device=device,
+            flow_paras= kwargs
         )
 
         self._posterior._num_trained_rounds = self._round + 1
