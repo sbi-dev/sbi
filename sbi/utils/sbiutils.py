@@ -478,29 +478,33 @@ def within_support(distribution: Any, samples: Tensor) -> Tensor:
     returns whether it is finite or not (this hanldes e.g. `NeuralPosterior`). Only
     checking whether the log-probabilty is not `-inf` will not work because, as of
     torch v1.8.0, a `torch.distribution` will throw an error at `log_prob()` when the
-    sample is out of the support (see #451). In `prepare_for_sbi()`, we set 
-    `validate_args=False`. Thish would take care of this, but requires running 
+    sample is out of the support (see #451). In `prepare_for_sbi()`, we set
+    `validate_args=False`. This would take care of this, but requires running
     `prepare_for_sbi()` and otherwise throws a cryptic error.
 
     Args:
-        distribution: Distribution under which to evaluate the `samples`.
+        distribution: Distribution under which to evaluate the `samples`, e.g., a
+            PyTorch distribution or NeuralPosterior.
         samples: Samples at which to evaluate.
 
     Returns:
         Tensor of bools indicating whether each sample was within the support.
     """
-    if hasattr(distribution, "support"):
+    # Try to check using the support property, use log prob method otherwise.
+    try:
         sample_check = distribution.support.check(samples)
 
-        # Before torch v1.7.0, `support.check()` returned bools for every element. From
-        # v1.8.0 on, it directly considers all dimensions of a sample. E.g., for a 
-        # single sample in 3D, v1.7.0 would return [[True, True, True]] and v1.8.0 
-        # would return [True].
+        # Before torch v1.7.0, `support.check()` returned bools for every element.
+        # From v1.8.0 on, it directly considers all dimensions of a sample. E.g.,
+        # for a single sample in 3D, v1.7.0 would return [[True, True, True]] and
+        # v1.8.0 would return [True].
         if sample_check.ndim > 1:
             return torch.all(distribution.support.check(samples), axis=1)
         else:
             return distribution.support.check(samples)
-    else:
+    # Falling back to log prob method of either the NeuralPosterior's net, or of a
+    # custom wrapper distribution's.
+    except (NotImplementedError, AttributeError):
         return torch.isfinite(distribution.log_prob(samples))
 
 
