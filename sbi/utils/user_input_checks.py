@@ -19,6 +19,7 @@ from sbi.utils.user_input_checks_utils import (
     PytorchReturnTypeWrapper,
     ScipyPytorchWrapper,
 )
+from sbi.utils.sbiutils import within_support
 
 
 def process_prior(prior) -> Tuple[Distribution, int, bool]:
@@ -350,10 +351,23 @@ def check_prior_batch_behavior(prior) -> None:
     ), "prior.log_prob must return as many log probs as samples."
 
 
+def check_prior_support(prior):
+    """Check whether prior allows to check for support.
+
+    This either uses the PyTorch support property, or the custom prior .logprob method
+    """
+
+    try:
+        within_support(prior, prior.sample())
+    except NotImplementedError:
+        raise NotImplementedError(
+            """The prior must implement the support property or allow to call
+            .log_prob() outside of support."""
+        )
+
+
 def process_simulator(
-    user_simulator: Callable,
-    prior,
-    is_numpy_simulator: bool,
+    user_simulator: Callable, prior, is_numpy_simulator: bool,
 ) -> Callable:
     """Return a simulator that meets the requirements for usage in sbi.
 
@@ -457,10 +471,7 @@ def process_x(x: Tensor, x_shape: torch.Size) -> Tensor:
     return x
 
 
-def prepare_for_sbi(
-    simulator: Callable,
-    prior,
-) -> Tuple[Callable, Distribution]:
+def prepare_for_sbi(simulator: Callable, prior,) -> Tuple[Callable, Distribution]:
     """Prepare simulator, prior and for usage in sbi.
 
     One of the goals is to allow you to use sbi with inputs computed in numpy.
@@ -502,6 +513,7 @@ def check_sbi_inputs(simulator: Callable, prior: Distribution) -> None:
         prior: prior (Distribution like)
         x_shape: Shape of single simulation output $x$.
     """
+    check_prior_support(prior)
     num_prior_samples = 1
     theta = prior.sample((num_prior_samples,))
     theta_batch_shape, *_ = theta.shape

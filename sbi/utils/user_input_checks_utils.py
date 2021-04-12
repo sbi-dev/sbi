@@ -318,6 +318,9 @@ class MultipleIndependentConstraints(Constraint):
     def check(self, value: Tensor) -> Tensor:
         """Returns a byte tensor of ``sample_shape + batch_shape`` indicating
         whether each event in value satisfies its corresponding constraint."""
+
+        if value.ndim < 2:
+            value = value.unsqueeze(0)
         result = torch.zeros((value.shape[0], len(self.constraints)))
         dim_idx = 0
         # For each constraint, select the corresponding values according to its
