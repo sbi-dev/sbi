@@ -69,7 +69,8 @@ class CustomPytorchWrapper(Distribution):
                 ** 2
             )
             warnings.warn(
-                "Prior is lacking variance attribute, estimating prior variance from samples...",
+                """Prior is lacking variance attribute, estimating prior variance from
+                samples...""",
                 UserWarning,
             )
 
@@ -152,6 +153,10 @@ class PytorchReturnTypeWrapper(Distribution):
     @property
     def variance(self):
         return torch.as_tensor(self.prior.variance, dtype=self.return_type)
+
+    @property
+    def support(self):
+        return self.prior.support
 
 
 class MultipleIndependent(Distribution):
