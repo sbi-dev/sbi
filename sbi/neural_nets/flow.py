@@ -270,7 +270,7 @@ def build_nsf(
                     transforms.PiecewiseRationalQuadraticCouplingTransform(
                         mask=mask_in_layer(i),
                         transform_net_create_fn=conditioner,
-                        num_bins=10,
+                        num_bins=num_bins,
                         tails="linear",
                         tail_bound=3.0,
                         apply_unconditional_transform=False,
