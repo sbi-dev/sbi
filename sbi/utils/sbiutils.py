@@ -499,9 +499,9 @@ def within_support(distribution: Any, samples: Tensor) -> Tensor:
         # for a single sample in 3D, v1.7.0 would return [[True, True, True]] and
         # v1.8.0 would return [True].
         if sample_check.ndim > 1:
-            return torch.all(distribution.support.check(samples), axis=1)
+            return torch.all(sample_check, axis=1)
         else:
-            return distribution.support.check(samples)
+            return sample_check
     # Falling back to log prob method of either the NeuralPosterior's net, or of a
     # custom wrapper distribution's.
     except (NotImplementedError, AttributeError):
