@@ -11,9 +11,11 @@ from pyro.distributions import Empirical
 from torch import Tensor, as_tensor
 from torch import nn as nn
 from torch import ones, zeros
+from torch.distributions import Independent
+from torch.distributions.distribution import Distribution
 from tqdm.auto import tqdm
 
-from sbi.utils.torchutils import BoxUniform, atleast_2d
+from sbi.utils.torchutils import atleast_2d
 
 
 def warn_if_zscoring_changes_data(x: Tensor, duplicate_tolerance: float = 0.1) -> None:
@@ -444,29 +446,41 @@ def logit(theta: Tensor, lower_bound: Tensor, upper_bound: Tensor) -> Tensor:
     return torch.log(theta_01 / (1 - theta_01))
 
 
-def check_if_boxuniform(dist) -> Tuple[bool, Optional[BoxUniform]]:
-    """Returns whether the `dist` is `BoxUniform` as well as the `BoxUniform` itself.
+def check_dist_class(
+    dist, class_to_check: Union[Distribution, Sequence[Distribution]]
+) -> Tuple[bool, Optional[Distribution]]:
+    """Returns whether the `dist` is instance of `class_to_check`.
 
-    When the user called `prepare_for_sbi`, the distribution will in fact be a
+    The dist can be hidden in an Independent distribution, a Boxuniform or in a wrapper.
+    E.g., when the user called `prepare_for_sbi`, the distribution will in fact be a
     `PytorchReturnTypeWrapper`. Thus, we need additional checks.
 
     Args:
         dist: Distribution to be checked.
 
     Returns:
-        Whether the `dist` is `BoxUniform` and the `BoxUniform` itself.
+        Whether the `dist` is `Uniform` and the `Uniform` itself.
     """
-    if isinstance(dist, BoxUniform):
-        is_boxuniform = True
-        box_dist = dist
-    elif hasattr(dist, "prior") and isinstance(dist.prior, BoxUniform):
-        is_boxuniform = True
-        box_dist = dist.prior
-    else:
-        is_boxuniform = False
-        box_dist = None
 
-    return is_boxuniform, box_dist
+    # Direct check.
+    if isinstance(dist, class_to_check):
+        return True, dist
+    # Reveal prior dist wrapped by user input checks or BoxUniform / Independent.
+    else:
+        if hasattr(dist, "prior"):
+            dist = dist.prior
+        if isinstance(dist, Independent):
+            dist = dist.base_dist
+
+        # Check dist.
+        if isinstance(dist, class_to_check):
+            is_instance = True
+            return_dist = dist
+        else:
+            is_instance = False
+            return_dist = None
+
+        return is_instance, return_dist
 
 
 def within_support(distribution: Any, samples: Tensor) -> Tensor:
