@@ -25,8 +25,9 @@ from sbi.mcmc import (
     sir,
 )
 from sbi.types import Array, Shape
-from sbi.utils.sbiutils import check_if_boxuniform
+from sbi.utils.sbiutils import check_dist_class
 from sbi.utils.torchutils import (
+    BoxUniform,
     ScalarFloat,
     atleast_2d_float32_tensor,
     ensure_theta_batched,
@@ -182,10 +183,7 @@ class NeuralPosterior(ABC):
 
     @abstractmethod
     def log_prob(
-        self,
-        theta: Tensor,
-        x: Optional[Tensor] = None,
-        track_gradients: bool = False,
+        self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False,
     ) -> Tensor:
         """See child classes for docstring."""
         pass
@@ -240,9 +238,7 @@ class NeuralPosterior(ABC):
         return self
 
     def _prepare_theta_and_x_for_log_prob_(
-        self,
-        theta: Tensor,
-        x: Optional[Tensor] = None,
+        self, theta: Tensor, x: Optional[Tensor] = None,
     ) -> Tuple[Tensor, Tensor]:
         r"""Returns $\theta$ and $x$ in shape that can be used by posterior.log_prob().
 
@@ -659,7 +655,7 @@ class NeuralPosterior(ABC):
 
         # If the prior is `BoxUniform`, define a transformation to optimize in
         # unbounded space.
-        is_boxuniform, boxuniform = check_if_boxuniform(self._prior)
+        is_boxuniform, boxuniform = check_dist_class(self._prior, BoxUniform)
         if is_boxuniform:
 
             def tf_inv(theta_t):
@@ -765,11 +761,10 @@ class NeuralPosterior(ABC):
 
                     if show_progress_bars:
                         print(
-                            f"Optimizing MAP estimate. Iterations: "
-                            f"{iter_+1} / {num_iter}.    "
-                            f"Performance in iteration "
-                            f"{divmod(iter_+1, save_best_every)[0] * save_best_every}: "
-                            f"{best_log_prob_iter.item():.2f} (= unnormalized log-prob)",
+                            f"""Optimizing MAP estimate. Iterations: {iter_+1} /
+                            {num_iter}. Performance in iteration
+                            {divmod(iter_+1, save_best_every)[0] * save_best_every}:
+                            {best_log_prob_iter.item():.2f} (= unnormalized log-prob""",
                             end="\r",
                         )
                     self.map_ = tf_inv(best_theta_overall)
@@ -1004,13 +999,7 @@ class ConditionalPotentialFunctionProvider:
         self.condition = ensure_theta_batched(condition)
         self.dims_to_sample = dims_to_sample
 
-    def __call__(
-        self,
-        prior,
-        net: nn.Module,
-        x: Tensor,
-        mcmc_method: str,
-    ) -> Callable:
+    def __call__(self, prior, net: nn.Module, x: Tensor, mcmc_method: str,) -> Callable:
         """Return potential function.
 
         Switch on numpy or pyro potential function based on `mcmc_method`.
@@ -1078,9 +1067,7 @@ class RestrictedPriorForConditional:
     """
 
     def __init__(
-        self,
-        full_prior: Any,
-        dims_to_sample: List[int],
+        self, full_prior: Any, dims_to_sample: List[int],
     ):
         self.full_prior = full_prior
         self.dims_to_sample = dims_to_sample

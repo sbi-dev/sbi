@@ -9,7 +9,7 @@ import torch
 from pyknos.mdn.mdn import MultivariateGaussianMDN as mdn
 from pyknos.nflows.transforms import CompositeTransform
 from torch import Tensor, eye, ones
-from torch.distributions import MultivariateNormal
+from torch.distributions import MultivariateNormal, Uniform
 
 from sbi import utils as utils
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
@@ -18,7 +18,7 @@ from sbi.types import TensorboardSummaryWriter
 from sbi.utils import (
     batched_mixture_mv,
     batched_mixture_vmv,
-    check_if_boxuniform,
+    check_dist_class,
     clamp_and_warn,
     del_entries,
     repeat_rows,
@@ -171,10 +171,9 @@ class SNPE_C(PosteriorEstimator):
                 self.use_non_atomic_loss = (
                     isinstance(proposal.net._distribution, mdn)
                     and isinstance(self._neural_net._distribution, mdn)
-                    and (
-                        check_if_boxuniform(self._prior)[0]
-                        or isinstance(self._prior, MultivariateNormal)
-                    )
+                    and check_dist_class(
+                        self._prior, class_to_check=(Uniform, MultivariateNormal)
+                    )[0]
                 )
             else:
                 self.use_non_atomic_loss = False
@@ -253,8 +252,7 @@ class SNPE_C(PosteriorEstimator):
 
             if isinstance(self._prior, MultivariateNormal):
                 self._maybe_z_scored_prior = MultivariateNormal(
-                    almost_zero_mean,
-                    torch.diag(almost_one_std),
+                    almost_zero_mean, torch.diag(almost_one_std),
                 )
             else:
                 range_ = torch.sqrt(almost_one_std * 3.0)
@@ -367,10 +365,7 @@ class SNPE_C(PosteriorEstimator):
         return log_prob_proposal_posterior
 
     def _log_prob_proposal_posterior_mog(
-        self,
-        theta: Tensor,
-        x: Tensor,
-        proposal: DirectPosterior,
+        self, theta: Tensor, x: Tensor, proposal: DirectPosterior
     ) -> Tensor:
         """
         Return log-probability of the proposal posterior for MoG proposal.
@@ -418,21 +413,11 @@ class SNPE_C(PosteriorEstimator):
 
         # Compute the MoG parameters of the proposal posterior.
         logits_pp, m_pp, prec_pp, cov_pp = self._automatic_posterior_transformation(
-            norm_logits_p,
-            m_p,
-            prec_p,
-            norm_logits_d,
-            m_d,
-            prec_d,
+            norm_logits_p, m_p, prec_p, norm_logits_d, m_d, prec_d
         )
 
         # Compute the log_prob of theta under the product.
-        log_prob_proposal_posterior = _mog_log_prob(
-            theta,
-            logits_pp,
-            m_pp,
-            prec_pp,
-        )
+        log_prob_proposal_posterior = _mog_log_prob(theta, logits_pp, m_pp, prec_pp)
         self._assert_all_finite(log_prob_proposal_posterior, "proposal posterior eval")
 
         return log_prob_proposal_posterior
@@ -486,11 +471,7 @@ class SNPE_C(PosteriorEstimator):
         )
 
         means_pp = self._means_proposal_posterior(
-            covariances_pp,
-            means_p,
-            precisions_p,
-            means_d,
-            precisions_d,
+            covariances_pp, means_p, precisions_p, means_d, precisions_d,
         )
 
         logits_pp = self._logits_proposal_posterior(
@@ -508,9 +489,7 @@ class SNPE_C(PosteriorEstimator):
         return logits_pp, means_pp, precisions_pp, covariances_pp
 
     def _precisions_proposal_posterior(
-        self,
-        precisions_p: Tensor,
-        precisions_d: Tensor,
+        self, precisions_p: Tensor, precisions_d: Tensor,
     ):
         """
         Return the precisions and covariances of the proposal posterior.
@@ -658,10 +637,7 @@ class SNPE_C(PosteriorEstimator):
 
 
 def _mog_log_prob(
-    theta: Tensor,
-    logits_pp: Tensor,
-    means_pp: Tensor,
-    precisions_pp: Tensor,
+    theta: Tensor, logits_pp: Tensor, means_pp: Tensor, precisions_pp: Tensor,
 ) -> Tensor:
     r"""
     Returns the log-probability of parameter sets $\theta$ under a mixture of Gaussians.
