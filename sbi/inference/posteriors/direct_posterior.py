@@ -509,11 +509,7 @@ class PotentialFunctionProvider:
     """
 
     def __call__(
-        self,
-        prior,
-        posterior_nn: nn.Module,
-        x: Tensor,
-        mcmc_method: str,
+        self, prior, posterior_nn: nn.Module, x: Tensor, mcmc_method: str,
     ) -> Callable:
         """Return potential function.
 
@@ -549,8 +545,7 @@ class PotentialFunctionProvider:
 
         with torch.set_grad_enabled(False):
             target_log_prob = self.posterior_nn.log_prob(
-                inputs=theta.to(self.x.device),
-                context=x_repeated,
+                inputs=theta.to(self.x.device), context=x_repeated,
             )
             is_within_prior = torch.isfinite(self.prior.log_prob(theta))
             target_log_prob[~is_within_prior] = -float("Inf")
