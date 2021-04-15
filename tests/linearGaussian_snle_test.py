@@ -161,7 +161,7 @@ def test_c2st_snl_on_linearGaussian(num_dim: int, prior_str: str, set_seed):
     # TODO: density is not normalized, so KLd does not make sense.
     if prior_str == "uniform":
         # Check whether the returned probability outside of the support is zero.
-        posterior_prob = get_prob_outside_uniform_prior(posterior, num_dim)
+        posterior_prob = get_prob_outside_uniform_prior(posterior, prior, num_dim)
         assert (
             posterior_prob == 0.0
         ), "The posterior probability outside of the prior support is not zero"
