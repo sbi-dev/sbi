@@ -72,6 +72,5 @@
     "autoDocstring.customTemplatePath": ".vscode/autodocstring.template",
     //
     // Signal that we are using shared workspace settings in .vscode
-    "window.title": "sbi.vscode:: ${dirty}${activeEditorShort}${separator}${rootName}${separator}${appName}",
-    "python.pythonPath": "/home/jnsbck/Applications/anaconda3/envs/sbi_env/bin/python"
+    "window.title": "sbi.vscode:: ${dirty}${activeEditorShort}${separator}${rootName}${separator}${appName}"
 }
