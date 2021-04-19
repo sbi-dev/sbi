@@ -161,6 +161,8 @@ class NeuralInference(ABC):
             epochs=[],
             best_validation_log_probs=[],
             validation_log_probs=[],
+            train_log_probs=[],
+            epoch_durations_sec=[]
         )
 
     def __call__(self, unused_args):
@@ -491,6 +493,8 @@ class NeuralInference(ABC):
             global_step=round_ + 1,
         )
 
+
+
         # Add validation log prob for every epoch.
         # Offset with all previous epochs.
         offset = torch.tensor(self._summary["epochs"][:-1], dtype=int).sum().item()
@@ -498,6 +502,20 @@ class NeuralInference(ABC):
             self._summary_writer.add_scalar(
                 tag="validation_log_probs_across_rounds",
                 scalar_value=vlp,
+                global_step=offset + i,
+            )
+
+        for i, tlp in enumerate(self._summary["train_log_probs"][offset:]):
+            self._summary_writer.add_scalar(
+                tag="train_log_probs_across_rounds",
+                scalar_value=tlp,
+                global_step=offset + i,
+            )
+
+        for i, eds in enumerate(self._summary["epoch_durations_sec"][offset:]):
+            self._summary_writer.add_scalar(
+                tag="epoch_durations_sec_across_rounds",
+                scalar_value=eds,
                 global_step=offset + i,
             )
 
