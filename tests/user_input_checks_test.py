@@ -490,3 +490,55 @@ def test_validate_theta_and_x_gpu():
 
     with pytest.raises(AssertionError) as exc:
         validate_theta_and_x(theta, x.to(torch.float64))
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize(
+    "user_simulator, user_prior",
+    (
+        (
+            diagonal_linear_gaussian,
+            BoxUniform(zeros(3, dtype=torch.float64), ones(3, dtype=torch.float64)),
+        ),
+        (linear_gaussian_no_batch, BoxUniform(zeros(3), ones(3))),
+        (
+            numpy_linear_gaussian,
+            UserNumpyUniform(zeros(3), ones(3), return_numpy=True),
+        ),
+        (diagonal_linear_gaussian, BoxUniform(zeros(3), ones(3))),
+        (linear_gaussian_no_batch, BoxUniform(zeros(3), ones(3))),
+        (list_simulator, BoxUniform(-ones(3), ones(3))),
+        (
+            numpy_linear_gaussian,
+            UserNumpyUniform(zeros(3), ones(3), return_numpy=True),
+        ),
+        (
+            diagonal_linear_gaussian,
+            (
+                Gamma(ones(1), ones(1)),
+                Beta(ones(1), ones(1)),
+                MultivariateNormal(zeros(2), eye(2)),
+            ),
+        ),
+    ),
+)
+def test_user_simulator_train_gpu(user_simulator: Callable, user_prior):
+
+    gpu_if_present = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+    simulator, prior = prepare_for_sbi(user_simulator, user_prior)
+    inference = SNPE_C(prior, density_estimator="maf", show_progress_bars=False,
+                       device=gpu_if_present)
+
+    # Run inference.
+    theta, x = simulate_for_sbi(simulator, prior, 100)
+    theta, x = theta.to(gpu_if_present), x.to(gpu_if_present)
+    inference = inference.append_simulations(theta, x)
+
+    _ = inference.train(max_num_epochs=2)
+
+    #check for default device for inference object
+    weights_device = next(inference._neural_net.parameters()).device
+    assert gpu_if_present == weights_device
+
+    _ = inference.build_posterior()
