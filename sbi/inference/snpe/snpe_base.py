@@ -311,13 +311,18 @@ class PosteriorEstimator(NeuralInference, ABC):
                 self.optimizer.step()
 
             self.epoch += 1
+            self._summary["epoch_durations_sec"].append(time.time() - e_start)
+
+            log_prob_sum /= len(train_loader) * train_loader.batch_size
+            self._summary["train_log_probs"].append(log_prob_sum)
 
 
             log_prob_sum /= len(train_loader) * train_loader.batch_size
             self._summary["train_log_probs"].append(log_prob_sum)
 
             # Calculate validation performance.
-            self._neural_net.eval()
+            self._neural_net.eval() #<--- this is not required as the validation is
+            # performed under no_grad context manager
             log_prob_sum = 0
 
             with torch.no_grad():
