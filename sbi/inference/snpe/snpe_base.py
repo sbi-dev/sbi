@@ -314,10 +314,13 @@ class PosteriorEstimator(NeuralInference, ABC):
 
             log_prob_sum /= len(train_loader) * train_loader.batch_size
             self._summary["train_log_probs"].append(log_prob_sum)
+<<<<<<< HEAD
 
 
             log_prob_sum /= len(train_loader) * train_loader.batch_size
             self._summary["train_log_probs"].append(log_prob_sum)
+=======
+>>>>>>> a6a0a71 (more scalars to monitor training of snpe classes)
 
             # Calculate validation performance.
             self._neural_net.eval() #<--- this is not required as the validation is
