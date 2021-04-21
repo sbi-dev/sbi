@@ -493,7 +493,7 @@ def test_validate_theta_and_x_gpu():
 
 
 @pytest.mark.gpu
-def test_train_posterior_on_gpu():
+def test_train_with_different_data_and_training_device(data_device, training_device):
 
     assert torch.cuda.is_available(), "gpu geared test has no GPU available"
 
