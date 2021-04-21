@@ -509,7 +509,7 @@ def test_train_with_different_data_and_training_device(data_device, training_dev
     inference = SNPE_C(prior,
                        density_estimator="maf",
                        show_progress_bars=False,
-                       device=gpu_if_present)
+                       device=training_device
 
     # Run inference.
     theta, x = simulate_for_sbi(simulator, prior, 100)
