@@ -493,9 +493,10 @@ def test_validate_theta_and_x_gpu():
 
 
 @pytest.mark.gpu
-@pytest.mark.parameterize("data_device", ("cpu", "cuda:0"))
-@pytest.mark.parameterize("training_device", ("cpu", "cuda:0"))
-def test_train_with_different_data_and_training_device(data_device, training_device):
+@pytest.mark.parametrize("data_device", ("cpu", "cuda:0"))
+@pytest.mark.parametrize("training_device", ("cpu", "cuda:0"))
+def test_train_with_different_data_and_training_device(data_device,
+                                                       training_device):
 
     assert torch.cuda.is_available(), "gpu geared test has no GPU available"
 
@@ -509,7 +510,7 @@ def test_train_with_different_data_and_training_device(data_device, training_dev
     inference = SNPE_C(prior,
                        density_estimator="maf",
                        show_progress_bars=False,
-                       device=training_device
+                       device=training_device)
 
     # Run inference.
     theta, x = simulate_for_sbi(simulator, prior, 100)
@@ -520,6 +521,6 @@ def test_train_with_different_data_and_training_device(data_device, training_dev
 
     #check for default device for inference object
     weights_device = next(inference._neural_net.parameters()).device
-    assert training_device == weights_device
+    assert torch.device(training_device) == weights_device
 
     _ = inference.build_posterior()
