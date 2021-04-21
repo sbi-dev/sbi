@@ -513,7 +513,7 @@ def test_train_with_different_data_and_training_device(data_device, training_dev
 
     # Run inference.
     theta, x = simulate_for_sbi(simulator, prior, 100)
-    theta, x = theta.to(gpu_if_present), x.to(gpu_if_present)
+    theta, x = theta.to(data_device), x.to(data_device)
     inference = inference.append_simulations(theta, x)
 
     _ = inference.train(max_num_epochs=2)
