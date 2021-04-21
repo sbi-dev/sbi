@@ -520,6 +520,6 @@ def test_train_with_different_data_and_training_device(data_device, training_dev
 
     #check for default device for inference object
     weights_device = next(inference._neural_net.parameters()).device
-    assert gpu_if_present == weights_device
+    assert training_device == weights_device
 
     _ = inference.build_posterior()
