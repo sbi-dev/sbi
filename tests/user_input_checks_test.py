@@ -500,7 +500,6 @@ def test_train_with_different_data_and_training_device(data_device, training_dev
     assert torch.cuda.is_available(), "gpu geared test has no GPU available"
 
     num_dim = 2
-    gpu_if_present = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     # simulator, prior = prepare_for_sbi(user_simulator, user_prior)
     prior_ = MultivariateNormal(loc=torch.zeros(num_dim),
