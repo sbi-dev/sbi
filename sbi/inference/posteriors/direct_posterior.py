@@ -426,7 +426,9 @@ class DirectPosterior(NeuralPosterior):
 
         support = self._prior.support
 
-        mask = torch.zeros(means.shape[-1], dtype=bool)
+        n_mixtures, n_dims = means.shape[1:]
+
+        mask = torch.zeros(n_dims, dtype=bool)
         mask[dims] = True
 
         # check whether the condition is within the prior bounds
@@ -437,16 +439,14 @@ class DirectPosterior(NeuralPosterior):
             cond_ubound = support.upper_bound[~mask]
             cond_lbound = support.lower_bound[~mask]
             within_support = torch.logical_and(
-                cond_lbound <= condition[:, ~mask], condition[:, ~mask] <= cond_ubound
+                cond_lbound <= condition[:, ~mask], cond_ubound >= condition[:, ~mask]
             )
             if ~torch.all(within_support):
                 raise ValueError(
                     "The chosen condition is not within the prior support."
                 )
+
         y = condition[:, ~mask]
-
-        n_components = means.shape[1]
-
         mu_x = means[:, :, mask]
         mu_y = means[:, :, ~mask]
 
@@ -463,13 +463,13 @@ class DirectPosterior(NeuralPosterior):
         precs_xy = precs_xy[:, :, :, ~mask]
 
         means = mu_x - (
-            torch.inverse(precs_xx) @ precs_xy @ (y - mu_y).view(1, n_components, -1, 1)
-        ).view(1, n_components, -1)
+            torch.inverse(precs_xx) @ precs_xy @ (y - mu_y).view(1, n_mixtures, -1, 1)
+        ).view(1, n_mixtures, -1)
 
         diags = torch.diagonal(precfs_yy, dim1=2, dim2=3)
         sumlogdiag_yy = torch.sum(torch.log(diags), dim=2)
         log_prob = mdn.log_prob_mog(
-            y, torch.tensor([[0.0]]), mu_y, precs_yy, sumlogdiag_yy
+            y, torch.zeros((1, 1)), mu_y, precs_yy, sumlogdiag_yy
         )
 
         # Normalize the mixing coef: p(X|Y) = p(Y,X) / p(Y) using the marginal dist.
