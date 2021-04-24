@@ -389,23 +389,22 @@ class DirectPosterior(NeuralPosterior):
         else:
             encoded_x = nn._embedding_net(context)
 
-        logits, m, prec, sumlogdiag, _ = dist.get_mixture_components(encoded_x)
+        logits, means, _, sumlogdiag, precfs = dist.get_mixture_components(encoded_x)
         norm_logits = logits - torch.logsumexp(logits, dim=-1, keepdim=True)
 
         scale = nn._transform._transforms[0]._scale
         shift = nn._transform._transforms[0]._shift
 
-        means_transformed = (m - shift) / scale
+        means_transformed = (means - shift) / scale
 
         A = scale * torch.eye(means_transformed.shape[2])
-        precision_factors_transformed = torch.cholesky(A @ prec @ A)
+        precfs_transformed = A @ precfs
 
         sumlogdiag = torch.sum(
-            torch.log(torch.diagonal(precision_factors_transformed, dim1=2, dim2=3)),
-            dim=2,
+            torch.log(torch.diagonal(precfs_transformed, dim1=2, dim2=3)), dim=2,
         )
 
-        return norm_logits, means_transformed, precision_factors_transformed, sumlogdiag
+        return norm_logits, means_transformed, precfs_transformed, sumlogdiag
 
     def condition_mog(
         self,
@@ -444,50 +443,44 @@ class DirectPosterior(NeuralPosterior):
                 raise ValueError(
                     "The chosen condition is not within the prior support."
                 )
+        y = condition[:, ~mask]
 
-        y = condition[0, ~mask].reshape(1, -1)
-
-        k, D = means.shape[1:]
-
-        prec = precfs @ precfs.transpose(3, 2)
-        covs = torch.inverse(prec)
-        mcs = torch.exp(logits)
+        n_components = means.shape[1]
 
         mu_x = means[:, :, mask]
         mu_y = means[:, :, ~mask]
 
-        S_xx = covs[:, :, mask]
-        S_xx = S_xx[:, :, :, mask]
+        precfs_xx = precfs[:, :, mask]
+        precfs_xx = precfs_xx[:, :, :, mask]
+        precs_xx = precfs_xx.transpose(3, 2) @ precfs_xx
 
-        S_yy = covs[:, :, ~mask]
-        S_yy = S_yy[:, :, :, ~mask]
+        precfs_yy = precfs[:, :, ~mask]
+        precfs_yy = precfs_yy[:, :, :, ~mask]
+        precs_yy = precfs_yy.transpose(3, 2) @ precfs_yy
 
-        S_xy = covs[:, :, mask]
-        S_xy = S_xy[:, :, :, ~mask]
+        precs = precfs.transpose(3, 2) @ precfs
+        precs_xy = precs[:, :, mask]
+        precs_xy = precs_xy[:, :, :, ~mask]
 
-        means = mu_x + (
-            (S_xy @ torch.inverse(S_yy) @ (y - mu_y).view(1, k, -1, 1)).transpose(3, 2)
-        ).view(1, k, -1)
-        cov = S_xx - S_xy @ torch.inverse(S_yy) @ S_xy.transpose(3, 2)
+        means = mu_x - (
+            torch.inverse(precs_xx) @ precs_xy @ (y - mu_y).view(1, n_components, -1, 1)
+        ).view(1, n_components, -1)
 
-        prec_yy = torch.inverse(S_yy)
-        precf_yy = torch.cholesky(prec_yy)
-
-        sumlogdiag = torch.sum(
-            torch.log(torch.diagonal(precf_yy, dim1=2, dim2=3)), dim=2
+        diags = torch.diagonal(precfs_yy, dim1=2, dim2=3)
+        sumlogdiag_yy = torch.sum(torch.log(diags), dim=2)
+        log_prob = mdn.log_prob_mog(
+            y, torch.tensor([[0.0]]), mu_y, precs_yy, sumlogdiag_yy
         )
-        log_prob = mdn.log_prob_mog(y, torch.tensor([[0.0]]), mu_y, prec_yy, sumlogdiag)
-        fk = torch.exp(log_prob)  # Used for normalizing the mc
 
         # Normalize the mixing coef: p(X|Y) = p(Y,X) / p(Y) using the marginal dist.
-        new_mcs = mcs * fk
+        new_mcs = torch.exp(logits + log_prob)
         new_mcs = new_mcs / new_mcs.sum()
-
-        precfs = torch.cholesky(torch.inverse(cov))
         logits = torch.log(new_mcs)
-        sumlogdiag = torch.sum(torch.log(torch.diagonal(precfs, dim1=2, dim2=3)), dim=2)
 
-        return logits, means, precfs, sumlogdiag
+        sumlogdiag = torch.sum(
+            torch.log(torch.diagonal(precfs_xx, dim1=2, dim2=3)), dim=2
+        )
+        return logits, means, precfs_xx, sumlogdiag
 
     def sample_conditional(
         self,
@@ -538,8 +531,8 @@ class DirectPosterior(NeuralPosterior):
         if type(self.net._distribution) is mdn:
             num_samples = torch.Size(sample_shape).numel()
 
-            logits, means, precfs, sumlogdiag = self.extract_and_transform_mog(x)
-            logits, means, precfs, sumlogdiag = self.condition_mog(
+            logits, means, precfs, _ = self.extract_and_transform_mog(x)
+            logits, means, precfs, _ = self.condition_mog(
                 condition, dims_to_sample, logits, means, precfs
             )
             print(
@@ -592,7 +585,7 @@ class DirectPosterior(NeuralPosterior):
             )
 
             batch_size, dim = theta.shape
-            prec = precfs @ precfs.transpose(3, 2)
+            prec = precfs.transpose(3, 2) @ precfs
 
             self.net.eval()  # leakage correction requires eval mode
 
