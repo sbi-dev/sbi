@@ -58,4 +58,8 @@ def gpdfit(x, sorted=True, eps=1e-8, return_quadrature=False):
 
 
 
-def 
+def gpd_pdf(x, mu,sigma, k):
+    if not k == 0:
+        return 1/sigma*(1-k*(x-mu)/sigma)**(1/k-1)
+    else:
+        return 1/sigma*np.exp((x-mu)/sigma)

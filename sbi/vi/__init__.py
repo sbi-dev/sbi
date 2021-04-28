@@ -3,4 +3,4 @@ from sbi.vi.divergence_optimizers import (
     RenjeyDivergenceOptimizer,
     TailAdaptivefDivergenceOptimizer,
 )
-from sbi.vi.pyro_flows import build_flow, build_mof, build_q
+from sbi.vi import build_q

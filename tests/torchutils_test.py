@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import numpy as np
 import torch
-import torchtestcase
+import torchtestcase # This is not in the dependencies...
 from torch import distributions as distributions
 from torch import eye, ones, zeros
 

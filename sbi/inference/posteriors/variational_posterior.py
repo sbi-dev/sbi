@@ -3,25 +3,21 @@ from warnings import warn
 
 import numpy as np
 import torch
+from torch.distributions import Distribution
 from torch import Tensor, nn
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
-from sbi.types import Shape
+from sbi.types import Shape, Array
 from sbi.utils import del_entries
-from sbi.utils.torchutils import ScalarFloat, ensure_theta_batched, ensure_x_batched
-
-from sbi.vi.pyro_flows import build_flow
-from sbi.vi import (
-    build_q,
-    ElboOptimizer,
-    RenjeyDivergenceOptimizer,
-    TailAdaptivefDivergenceOptimizer,
+from sbi.utils.torchutils import (
+    ScalarFloat,
+    ensure_theta_batched,
+    ensure_x_batched,
+    atleast_2d_float32_tensor,
 )
 
-import pyro
-from pyro import distributions as dist
-from pyro.distributions import transforms
-from pyro.nn import AutoRegressiveNN
+from sbi.vi.build_q import build_q, build_optimizer
+from sbi.vi.divergence_optimizers import DivergenceOptimizer
 
 from tqdm import tqdm
 
@@ -31,17 +27,17 @@ class VariationalPosterior(NeuralPosterior):
     SNLE.<br/><br/>
     SNLE trains a neural network to approximate the likelihood $p(x|\theta)$. The
     `SNLE_Posterior` class performs variational inference to approximate posterior $q(\theta|x) \approx p(\theta|x)$.
-    Where $q$ is a distribution of a specific variational family e.g. a Normalizing flow. 
+    Where $q$ is a distribution of a specific variational family e.g. a Normalizing flow.
     """
 
     def __init__(
         self,
         method_family: str,
         neural_net: nn.Module,
-        prior,
+        prior: Distribution,
         x_shape: torch.Size,
-        flow_paras: dict = {},
         device: str = "cpu",
+        flow_paras: dict = {},
     ):
         """
         Args:
@@ -53,17 +49,81 @@ class VariationalPosterior(NeuralPosterior):
             affine_coupling, spline, spline_autoregressive, spline_coupling]
             device: Training device, e.g., cpu or cuda:0.
         """
-        kwargs1 = del_entries(
-            locals(), entries=("self", "__class__", "flow", "mof", "flow_paras")
-        )
+        kwargs = del_entries(locals(), entries=("self", "__class__", "flow_paras"))
 
-        super().__init__(**kwargs1)
+        super().__init__(**kwargs)
         self._purpose = f"Variational Posterior approximation"
         self._flow_paras = flow_paras
-        self._optimizer = None
-        self._summary = dict()
 
-        self.q = build_q(self._prior.event_shape, self._prior.support, **flow_paras)
+        self._q = build_q(self._prior.event_shape, self._prior.support, **flow_paras)
+        self._optimizer = build_optimizer(self, "elbo")
+        self._loss = "elbo"
+
+    @property
+    def q(self):
+        """Variational distributon that will be learned"""
+        return self._q
+
+    @q.setter
+    def q(self, q: Distribution) -> None:
+        """See `set_default_x`."""
+        self._set_q(q)
+
+    @property
+    def optimizer(self):
+        """ Divergence optimizer for variational inference"""
+        return self._optimizer
+
+    @optimizer.setter
+    def optimizer(self, optimizer: DivergenceOptimizer) -> None:
+        """See `set_default_x`."""
+        if not isinstance(optimizer, DivergenceOptimizer):
+            raise ValueError(
+                "This class relies on a DivergenceOptimizer which minimize some divergence."
+            )
+        self._optimier = optimizer
+
+    def _set_q(self, q: Distribution) -> None:
+        """ Sets the distributions and checks some important properties. """
+        if not isinstance(q, Distribution):
+            raise ValueError(
+                "We only support PyTorch distributions, please wrap your distributions as one!"
+            )
+        if not hasattr(q, "parameters"):
+            warn(
+                "Your distributions has no parameters, you can give the parameters manually to train but may consider to 'parameterize' the distribution"
+            )
+        self._q = q
+
+    def predictive(self, x: Tensor, method: str = "naive", num_samples: int = 10000):
+        """ Estimates the predictive distributions log prob """
+        return self.expectation(
+            lambda theta: self.net.log_prob(x.repeat(num_samples, 1), context=theta),
+            method=method,
+            num_samples=num_samples,
+        )
+
+    def predictive_sample(self, shape: torch.Size()):
+        thetas = self.sample(shape)
+        xs = self.net.sample(context=thetas)
+        return xs
+
+    def expectation(self, f: Callable, method: str = "naive", num_samples: int = 10000):
+        """Computes the expectation with respect to the posterior E_q[f(X)]
+
+        Args:
+        f: Function for which we will compute the expectation
+        method: Method either naive (just using the variatioanl posterior), is
+        (importance sampling) or psis (pareto smoothed importance sampling).
+        """
+        if method == "naive":
+            return f(self.sample((num_samples,))).mean()
+        elif method == "is":
+            print("TODO implemented")
+        elif method == "psis":
+            print("TODO implement")
+        else:
+            raise NotImplementedError("We only have the methods naive, is and psis.")
 
     def log_prob(
         self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False,
@@ -86,12 +146,15 @@ class VariationalPosterior(NeuralPosterior):
 
         """
 
-        if self.default_x != x:
-            self.set_default_x(x)
-            self.train()
+        theta = ensure_theta_batched(torch.as_tensor(theta))
+
+        # Select and check x to condition on..
+        x = atleast_2d_float32_tensor(self._x_else_default_x(x))
+        self._ensure_single_x(x)
+        self._ensure_x_consistent_with_default_x(x)
 
         with torch.set_grad_enabled(track_gradients):
-            return self.q.log_prob(theta.to(self._device))
+            return self._q.log_prob(theta.to(self._device))
 
     def sample(
         self,
@@ -114,87 +177,82 @@ class VariationalPosterior(NeuralPosterior):
         Returns:
             Samples from posterior.
         """
-        if self.default_x is None:
-            self.set_default_x(x.to(self._device))
-            self.train()
+
+        # Select and check x to condition on..
+        x = atleast_2d_float32_tensor(self._x_else_default_x(x))
+        self._ensure_single_x(x)
+        self._ensure_x_consistent_with_default_x(x)
 
         if track_gradients:
-            return self.q.rsample(sample_shape)
+            return self._q.rsample(sample_shape)
         else:
-            return self.q.sample(sample_shape)
+            return self._q.sample(sample_shape)
 
     def train(
         self,
-        x_obs=None,
+        x: Optional[Array] = None,
         loss: str = "elbo",
         n_particles: Optional[int] = 128,
         learning_rate: float = 1e-2,
         min_num_iters: Optional[int] = 100,
         max_num_iters: Optional[int] = 1000,
-        clip_max_norm: Optional[float] = 5.0,
+        clip_value: Optional[float] = 5.0,
         retrain_from_scratch: bool = False,
+        resume_training: bool = False,
+        show_progress_bar: bool = True,
         **kwargs,
     ):
 
+        # Init q and the optimizer if necessary
         if retrain_from_scratch:
-            self.q = build_q(
+            self._q = build_q(
                 self._prior.event_shape, self._prior.support, **self._flow_paras
             )
-
-        if x_obs is None:
-            x_obs = self.default_x
-
-        # Choose correct optimizer
-        if loss.lower() == "elbo":
-            opt_kwargs = self.__optimizer_args(ElboOptimizer, kwargs)
-            optimizer = ElboOptimizer(
-                self,
-                n_particles=n_particles,
-                lr=learning_rate,
-                clip_value=clip_max_norm,
-                **opt_kwargs,
+            self._optimizer = build_optimizer(
+                self, loss, lr=learning_rate, clip_value=clip_value, **kwargs
             )
-        elif loss.lower() in ["renjey_divergence", "alpha_divergence"]:
-            opt_kwargs = self.__optimizer_args(RenjeyDivergenceOptimizer, kwargs)
-            optimizer = RenjeyDivergenceOptimizer(
-                self,
-                n_particles=n_particles,
-                lr=learning_rate,
-                clip_value=clip_max_norm,
-                **opt_kwargs,
-            )
-        elif loss.lower() in ["tail_adaptive_fdivergence"]:
-            opt_kwargs = self.__optimizer_args(TailAdaptivefDivergenceOptimizer, kwargs)
-            optimizer = TailAdaptivefDivergenceOptimizer(
-                self,
-                n_particles=n_particles,
-                lr=learning_rate,
-                clip_value=clip_max_norm,
-                **opt_kwargs,
-            )
-        self._optimizer = optimizer
 
-        iters = tqdm(range(max_num_iters))
-        loss = []
-        eps = 1e-3 
-        # TODO rewrite convergence check
-        shift = int(min_num_iters / 2)
+        if resume_training or self._loss != loss or self._optimizer._loss_name != loss:
+            self._optimizer = build_optimizer(
+                self, loss, lr=learning_rate, clip_value=clip_value, **kwargs
+            )
+            self._loss = loss
+
+        # Check context
+        if x is None:
+            x = atleast_2d_float32_tensor(self._x_else_default_x(x)).to(self._device)
+        else:
+            x = atleast_2d_float32_tensor(self._x_else_default_x(x)).to(self._device)
+
+            self._ensure_single_x(x)
+            self._ensure_x_consistent_with_default_x(x)
+            self.set_default_x(x)
+
+        # Optimize
+        self._optimizer.update(locals())
+        optimizer = self._optimizer
+        if show_progress_bar:
+            iters = tqdm(range(max_num_iters))
+        else:
+            iters = range(max_num_iters)
+
         for i in iters:
-            l = optimizer.step(x_obs).numpy()
-            loss.append(l)
-            iters.set_description("Loss: " + str(np.round(l, 2)))
-            if i > min_num_iters and i % 10 == 0:
-                previous_mean = np.mean(loss[i - 2 * shift : i - shift])
-                current_mean = np.mean(loss[i - shift : i])
-                if abs(previous_mean - current_mean) < eps:
-                    print(f"\nConverged with loss {np.round(l, 2)}")
+            l = optimizer.step(x).cpu().numpy()
+            if show_progress_bar and i % 10 == 0:
+                iters.set_description("Loss: " + str(np.round(l, 2)))
+            if i > min_num_iters:
+                if optimizer.converged() and show_progress_bar:
+                    print(f"Converged with loss: {np.round(l, 2)}")
                     break
-        self._summary = loss
-        # TODO evaluation
-
-    def __optimizer_args(self, optimizer, kwargs):
-        opt_args = optimizer.__init__.__code__.co_varnames
-        opt_kwargs = dict(
-            [(key, val) for key, val in kwargs.items() if key in opt_args]
-        )
-        return opt_kwargs
+        k = round(float(optimizer.evaluate(x)), 3)
+        if k > 1:
+            warn(
+                "The quality of the variational posterior seems to be bad, increase the training iterations or consider a different model!"
+            )
+        else:
+            if show_progress_bar:
+                print(
+                    f"Quality Score: {k} (smaller values are good, should be below 1, mode collapse may still occured.)"
+                )
+        self._summary = optimizer.summary
+        self._summary["Quality score"] = k
