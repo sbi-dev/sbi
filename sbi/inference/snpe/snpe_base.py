@@ -2,6 +2,7 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 
+import logging
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from typing import Any, Callable, Dict, Optional, Union
@@ -37,7 +38,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
         show_progress_bars: bool = True,
-        **unused_args
+        **unused_args,
     ):
         """Base class for Sequential Neural Posterior Estimation methods.
 
@@ -109,7 +110,7 @@ class PosteriorEstimator(NeuralInference, ABC):
             NeuralInference object (returned so that this function is chainable).
         """
 
-        validate_theta_and_x(theta, x)
+        theta, x = validate_theta_and_x(theta, x, training_device=self._device)
         self._check_proposal(proposal)
 
         if (
@@ -252,6 +253,13 @@ class PosteriorEstimator(NeuralInference, ABC):
             self._neural_net = self._build_neural_net(
                 theta[self.train_indices], x[self.train_indices]
             )
+            # If data on training device already move net as well.
+            if (
+                not self._device == "cpu"
+                and f"{x.device.type}:{x.device.index}" == self._device
+            ):
+                self._neural_net.to(self._device)
+
             test_posterior_net_for_multi_d_x(self._neural_net, theta, x)
             self._x_shape = x_shape_from_simulation(x)
 

@@ -2,6 +2,7 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 
+import logging
 import warnings
 from typing import Any, Callable, Optional, Sequence, Tuple, Union, cast
 
@@ -367,7 +368,9 @@ def check_prior_support(prior):
 
 
 def process_simulator(
-    user_simulator: Callable, prior, is_numpy_simulator: bool,
+    user_simulator: Callable,
+    prior,
+    is_numpy_simulator: bool,
 ) -> Callable:
     """Return a simulator that meets the requirements for usage in sbi.
 
@@ -471,7 +474,10 @@ def process_x(x: Tensor, x_shape: torch.Size) -> Tensor:
     return x
 
 
-def prepare_for_sbi(simulator: Callable, prior,) -> Tuple[Callable, Distribution]:
+def prepare_for_sbi(
+    simulator: Callable,
+    prior,
+) -> Tuple[Callable, Distribution]:
     """Prepare simulator, prior and for usage in sbi.
 
     One of the goals is to allow you to use sbi with inputs computed in numpy.
@@ -553,7 +559,9 @@ def check_estimator_arg(estimator: Union[str, Callable]) -> None:
     )
 
 
-def validate_theta_and_x(theta: Any, x: Any) -> None:
+def validate_theta_and_x(
+    theta: Any, x: Any, training_device: str = "cpu"
+) -> Tuple[Tensor, Tensor]:
     r"""
     Checks if the passed $(\theta, x)$ are valid.
 
@@ -569,6 +577,7 @@ def validate_theta_and_x(theta: Any, x: Any) -> None:
     Args:
         theta: Parameters.
         x: Simulation outputs.
+        training_device: Training device for net.
     """
     assert isinstance(theta, Tensor), "Parameters theta must be a `torch.Tensor`."
     assert isinstance(x, Tensor), "Simulator output must be a `torch.Tensor`."
@@ -582,6 +591,17 @@ def validate_theta_and_x(theta: Any, x: Any) -> None:
     # to give more explicit errors.
     assert theta.dtype == float32, "Type of parameters must be float32."
     assert x.dtype == float32, "Type of simulator outputs must be float32."
+
+    simulations_device = f"{x.device.type}:{x.device.index}"
+    if not simulations_device == "cpu" and training_device == "cpu":
+        logging.warning(
+            """Simulations are on {self.simulations_device} but training device is
+            set to {training_device}, moving data to device to {training_device}."""
+        )
+        x = x.to(training_device)
+        theta = theta.to(training_device)
+
+    return theta, x
 
 
 def test_posterior_net_for_multi_d_x(net: nn.Module, theta: Tensor, x: Tensor) -> None:
