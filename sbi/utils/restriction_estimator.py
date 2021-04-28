@@ -202,7 +202,7 @@ class RestrictionEstimator:
             `RestrictionEstimator` object (returned so that this function is chainable).
         """
 
-        validate_theta_and_x(theta, x)
+        theta, x = validate_theta_and_x(theta, x, training_device=self._device)
 
         if self._valid_or_invalid_criterion == "nan":
             label, _, _ = handle_invalid_x(x)
