@@ -560,7 +560,7 @@ def check_estimator_arg(estimator: Union[str, Callable]) -> None:
 
 
 def validate_theta_and_x(
-    theta: Any, x: Any, training_device: str
+    theta: Any, x: Any, training_device: str = "cpu"
 ) -> Tuple[Tensor, Tensor]:
     r"""
     Checks if the passed $(\theta, x)$ are valid.
