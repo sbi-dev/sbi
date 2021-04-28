@@ -384,6 +384,10 @@ def test_independent_joint_shapes_and_samples(dists):
     assert (true_samples == samples).all()
     assert (true_log_probs == log_probs).all()
 
+    # Check support attribute.
+    within_support = joint.support.check(true_samples)
+    assert within_support.all()
+
 
 def test_invalid_inputs():
 
@@ -507,3 +511,36 @@ def test_validate_theta_and_x_gpu():
 
     with pytest.raises(AssertionError) as exc:
         validate_theta_and_x(theta, x.to(torch.float64))
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize("data_device", ("cpu", "cuda:0"))
+@pytest.mark.parametrize("training_device", ("cpu", "cuda:0"))
+def test_train_with_different_data_and_training_device(data_device, training_device):
+
+    assert torch.cuda.is_available(), "gpu geared test has no GPU available"
+
+    num_dim = 2
+
+    # simulator, prior = prepare_for_sbi(user_simulator, user_prior)
+    prior_ = MultivariateNormal(
+        loc=torch.zeros(num_dim), covariance_matrix=torch.eye(num_dim)
+    )
+    simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior_)
+
+    inference = SNPE_C(
+        prior, density_estimator="maf", show_progress_bars=False, device=training_device
+    )
+
+    # Run inference.
+    theta, x = simulate_for_sbi(simulator, prior, 100)
+    theta, x = theta.to(data_device), x.to(data_device)
+    inference = inference.append_simulations(theta, x)
+
+    _ = inference.train(max_num_epochs=2)
+
+    # Check for default device for inference object
+    weights_device = next(inference._neural_net.parameters()).device
+    assert torch.device(training_device) == weights_device
+
+    _ = inference.build_posterior()

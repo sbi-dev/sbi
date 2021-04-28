@@ -48,6 +48,7 @@ def test_c2st_snpe_on_linearGaussian(
 
     x_o = zeros(1, num_dim)
     num_samples = 1000
+    num_simulations = 2500
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(num_dim)
@@ -76,7 +77,9 @@ def test_c2st_snpe_on_linearGaussian(
         show_progress_bars=False,
     )
 
-    theta, x = simulate_for_sbi(simulator, prior, 2000, simulation_batch_size=1000)
+    theta, x = simulate_for_sbi(
+        simulator, prior, num_simulations, simulation_batch_size=1000
+    )
     _ = inference.append_simulations(theta, x).train(training_batch_size=100)
     posterior = inference.build_posterior().set_default_x(x_o)
     samples = posterior.sample((num_samples,))
@@ -103,7 +106,7 @@ def test_c2st_snpe_on_linearGaussian(
 
     elif prior_str == "uniform":
         # Check whether the returned probability outside of the support is zero.
-        posterior_prob = get_prob_outside_uniform_prior(posterior, num_dim)
+        posterior_prob = get_prob_outside_uniform_prior(posterior, prior, num_dim)
         assert (
             posterior_prob == 0.0
         ), "The posterior probability outside of the prior support is not zero"

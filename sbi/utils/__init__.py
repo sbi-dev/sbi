@@ -10,7 +10,7 @@ from sbi.utils.restriction_estimator import RestrictedPrior, RestrictionEstimato
 from sbi.utils.sbiutils import (
     batched_mixture_mv,
     batched_mixture_vmv,
-    check_if_boxuniform,
+    check_dist_class,
     clamp_and_warn,
     del_entries,
     expit,

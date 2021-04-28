@@ -11,9 +11,11 @@ from pyro.distributions import Empirical
 from torch import Tensor, as_tensor
 from torch import nn as nn
 from torch import ones, zeros
+from torch.distributions import Independent
+from torch.distributions.distribution import Distribution
 from tqdm.auto import tqdm
 
-from sbi.utils.torchutils import BoxUniform, atleast_2d
+from sbi.utils.torchutils import atleast_2d
 
 
 def warn_if_zscoring_changes_data(x: Tensor, duplicate_tolerance: float = 0.1) -> None:
@@ -444,29 +446,41 @@ def logit(theta: Tensor, lower_bound: Tensor, upper_bound: Tensor) -> Tensor:
     return torch.log(theta_01 / (1 - theta_01))
 
 
-def check_if_boxuniform(dist) -> Tuple[bool, Optional[BoxUniform]]:
-    """Returns whether the `dist` is `BoxUniform` as well as the `BoxUniform` itself.
+def check_dist_class(
+    dist, class_to_check: Union[Distribution, Sequence[Distribution]]
+) -> Tuple[bool, Optional[Distribution]]:
+    """Returns whether the `dist` is instance of `class_to_check`.
 
-    When the user called `prepare_for_sbi`, the distribution will in fact be a
+    The dist can be hidden in an Independent distribution, a Boxuniform or in a wrapper.
+    E.g., when the user called `prepare_for_sbi`, the distribution will in fact be a
     `PytorchReturnTypeWrapper`. Thus, we need additional checks.
 
     Args:
         dist: Distribution to be checked.
 
     Returns:
-        Whether the `dist` is `BoxUniform` and the `BoxUniform` itself.
+        Whether the `dist` is `Uniform` and the `Uniform` itself.
     """
-    if isinstance(dist, BoxUniform):
-        is_boxuniform = True
-        box_dist = dist
-    elif hasattr(dist, "prior") and isinstance(dist.prior, BoxUniform):
-        is_boxuniform = True
-        box_dist = dist.prior
-    else:
-        is_boxuniform = False
-        box_dist = None
 
-    return is_boxuniform, box_dist
+    # Direct check.
+    if isinstance(dist, class_to_check):
+        return True, dist
+    # Reveal prior dist wrapped by user input checks or BoxUniform / Independent.
+    else:
+        if hasattr(dist, "prior"):
+            dist = dist.prior
+        if isinstance(dist, Independent):
+            dist = dist.base_dist
+
+        # Check dist.
+        if isinstance(dist, class_to_check):
+            is_instance = True
+            return_dist = dist
+        else:
+            is_instance = False
+            return_dist = None
+
+        return is_instance, return_dist
 
 
 def within_support(distribution: Any, samples: Tensor) -> Tensor:
@@ -478,29 +492,33 @@ def within_support(distribution: Any, samples: Tensor) -> Tensor:
     returns whether it is finite or not (this hanldes e.g. `NeuralPosterior`). Only
     checking whether the log-probabilty is not `-inf` will not work because, as of
     torch v1.8.0, a `torch.distribution` will throw an error at `log_prob()` when the
-    sample is out of the support (see #451). In `prepare_for_sbi()`, we set 
-    `validate_args=False`. Thish would take care of this, but requires running 
+    sample is out of the support (see #451). In `prepare_for_sbi()`, we set
+    `validate_args=False`. This would take care of this, but requires running
     `prepare_for_sbi()` and otherwise throws a cryptic error.
 
     Args:
-        distribution: Distribution under which to evaluate the `samples`.
+        distribution: Distribution under which to evaluate the `samples`, e.g., a
+            PyTorch distribution or NeuralPosterior.
         samples: Samples at which to evaluate.
 
     Returns:
         Tensor of bools indicating whether each sample was within the support.
     """
-    if hasattr(distribution, "support"):
+    # Try to check using the support property, use log prob method otherwise.
+    try:
         sample_check = distribution.support.check(samples)
 
-        # Before torch v1.7.0, `support.check()` returned bools for every element. From
-        # v1.8.0 on, it directly considers all dimensions of a sample. E.g., for a 
-        # single sample in 3D, v1.7.0 would return [[True, True, True]] and v1.8.0 
-        # would return [True].
+        # Before torch v1.7.0, `support.check()` returned bools for every element.
+        # From v1.8.0 on, it directly considers all dimensions of a sample. E.g.,
+        # for a single sample in 3D, v1.7.0 would return [[True, True, True]] and
+        # v1.8.0 would return [True].
         if sample_check.ndim > 1:
-            return torch.all(distribution.support.check(samples), axis=1)
+            return torch.all(sample_check, axis=1)
         else:
-            return distribution.support.check(samples)
-    else:
+            return sample_check
+    # Falling back to log prob method of either the NeuralPosterior's net, or of a
+    # custom wrapper distribution's.
+    except (NotImplementedError, AttributeError):
         return torch.isfinite(distribution.log_prob(samples))
 
 

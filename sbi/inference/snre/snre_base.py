@@ -6,7 +6,6 @@ import torch
 from torch import Tensor, eye, ones, optim
 from torch.nn.utils import clip_grad_norm_
 from torch.utils import data
-from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 
 from sbi import utils as utils
@@ -107,7 +106,7 @@ class RatioEstimator(NeuralInference, ABC):
             NeuralInference object (returned so that this function is chainable).
         """
 
-        validate_theta_and_x(theta, x)
+        theta, x = validate_theta_and_x(theta, x, training_device=self._device)
 
         self._theta_roundwise.append(theta)
         self._x_roundwise.append(x)

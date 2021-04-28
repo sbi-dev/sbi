@@ -10,7 +10,7 @@ from torch import Tensor, log, nn
 from sbi import utils as utils
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.types import ScalarFloat, Shape
-from sbi.utils import del_entries
+from sbi.utils import del_entries, within_support
 from sbi.utils.torchutils import (
     batched_first_of_batch,
     ensure_theta_batched,
@@ -202,10 +202,10 @@ class DirectPosterior(NeuralPosterior):
             ).cpu()
 
             # Force probability to be zero outside prior support.
-            is_prior_finite = torch.isfinite(self._prior.log_prob(theta))
+            in_prior_support = within_support(self._prior, theta)
 
             masked_log_prob = torch.where(
-                is_prior_finite,
+                in_prior_support,
                 unnorm_log_prob,
                 torch.tensor(float("-inf"), dtype=torch.float32),
             )
@@ -552,8 +552,8 @@ class PotentialFunctionProvider:
                 inputs=theta.to(self.x.device),
                 context=x_repeated,
             )
-            is_within_prior = torch.isfinite(self.prior.log_prob(theta))
-            target_log_prob[~is_within_prior] = -float("Inf")
+            in_prior_support = within_support(self.prior, theta)
+            target_log_prob[~in_prior_support] = -float("Inf")
 
         return target_log_prob
 
@@ -574,8 +574,11 @@ class PotentialFunctionProvider:
         log_prob_posterior = -self.posterior_nn.log_prob(
             inputs=theta.to(self.x.device), context=self.x
         ).cpu()
-        log_prob_prior = self.prior.log_prob(theta)
 
-        within_prior = torch.isfinite(log_prob_prior)
+        in_prior_support = within_support(self.prior, theta)
 
-        return torch.where(within_prior, log_prob_posterior, log_prob_prior)
+        return torch.where(
+            in_prior_support,
+            log_prob_posterior,
+            float("-inf") * torch.ones_like(log_prob_posterior),
+        )

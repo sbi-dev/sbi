@@ -4,13 +4,12 @@
 
 from abc import ABC
 from copy import deepcopy
-from typing import Any, Callable, Dict, NewType, Optional, Union
+from typing import Any, Callable, Dict, Optional, Union
 
 import torch
 from torch import Tensor, optim
 from torch.nn.utils import clip_grad_norm_
 from torch.utils import data
-from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 
 from sbi import utils as utils
@@ -19,7 +18,6 @@ from sbi.inference.posteriors.likelihood_based_posterior import LikelihoodBasedP
 from sbi.types import TorchModule
 from sbi.utils import (
     check_estimator_arg,
-    test_posterior_net_for_multi_d_x,
     validate_theta_and_x,
     x_shape_from_simulation,
 )
@@ -105,7 +103,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
             NeuralInference object (returned so that this function is chainable).
         """
 
-        validate_theta_and_x(theta, x)
+        theta, x = validate_theta_and_x(theta, x, training_device=self._device)
 
         self._theta_roundwise.append(theta)
         self._x_roundwise.append(x)

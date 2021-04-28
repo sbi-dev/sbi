@@ -60,7 +60,7 @@ The methods then proceed by
    these parameters,
 2. learning the (probabilistic) association between data (or
    data features) and underlying parameters, i.e. to learn statistical inference from
-   simulated data. They way in which this association is learned differs between the
+   simulated data. The way in which this association is learned differs between the
    above methods, but all use deep neural networks.
 3. This learned neural network is then applied to empirical data to derive the full
    space of parameters consistent with the data and the prior, i.e. the posterior
