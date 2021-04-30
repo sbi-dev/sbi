@@ -235,10 +235,10 @@ class SNPE_A(PosteriorEstimator):
             # Extract the MoGFlow_SNPE_A from the DirectPosterior.
             density_estimator.set_proposal(proposal.net)
         else:
-            try:
-                density_estimator.set_proposal(proposal)
-            except Exception:
-                raise ValueError("")
+            raise TypeError(
+                "So far, only MultivariateNormal, BoxUniform, and DirectPosterior are"
+                "supported for the `proposal` arg in SNPE_A.build_posterior()."
+            )
 
         self._posterior = DirectPosterior(
             method_family="snpe",
