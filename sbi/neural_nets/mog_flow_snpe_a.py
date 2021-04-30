@@ -178,12 +178,12 @@ class MoGFlow_SNPE_A(flows.Flow):
         if embedded_context is not None:
             # Merge the context dimension with sample dimension in order to
             # apply the transform.
-            noise = torchutils.merge_leading_dims(theta, num_dims=2)
+            theta = torchutils.merge_leading_dims(theta, num_dims=2)
             embedded_context = torchutils.repeat_rows(
                 embedded_context, num_reps=num_samples
             )
 
-        theta, _ = self._transform.inverse(noise, context=embedded_context)
+        theta, _ = self._transform.inverse(theta, context=embedded_context)
 
         if embedded_context is not None:
             # Split the context dimension from sample dimension.
