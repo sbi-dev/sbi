@@ -168,6 +168,8 @@ class RestrictionEstimator:
         self._prior = prior
         self._classifier = None
 
+        self._device = "cpu"  # TODO hot fix to prevent the tests from crashing
+
         if isinstance(model, str):
             build_nn = build_classifier(
                 model,
