@@ -46,12 +46,10 @@ class MoGFlow_SNPE_A(flows.Flow):
                 Add a diagonal with the smallest eigenvalue in every entry in case
                 the precision matrix becomes ill-conditioned.
         """
-        # Construct flow
+        # Construct the flow.
         super().__init__(transform, distribution, embedding_net)
 
-        self.logits_pp, self.m_pp, self.prec_pp = None, None, None
         self._proposal = None
-        self.default_x = None
         self._allow_precision_correction = allow_precision_correction
 
     @property
@@ -159,11 +157,6 @@ class MoGFlow_SNPE_A(flows.Flow):
         # Compute the precision factors which represent the upper triangular matrix
         # of the cholesky decomposition of the prec_pp.
         prec_factors_pp = torch.cholesky(prec_pp, upper=True)
-
-        # Only add the default_x if it is a single value and not a batch of data.
-        if x.shape[0] == 1:
-            self.default_x = x
-        self.logits_pp, self.m_pp, self.prec_pp = logits_pp, m_pp, prec_pp
 
         assert logits_pp.ndim == 2
         assert m_pp.ndim == 3
