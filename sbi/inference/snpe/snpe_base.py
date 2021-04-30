@@ -312,7 +312,7 @@ class PosteriorEstimator(NeuralInference, ABC):
             self.epoch += 1
             self._summary["epoch_durations_sec"].append(time.time() - e_start)
 
-            train_log_prob_sum /= len(train_loader) * train_loader.batch_size
+            train_log_prob_sum /= int(theta.shape[0] * (1.0-validation_fraction))
             self._summary["train_log_probs"].append(train_log_prob_sum)
 
             # Calculate validation performance.
