@@ -279,7 +279,7 @@ class PosteriorEstimator(NeuralInference, ABC):
             # Train for a single epoch.
             self._neural_net.train()
             train_log_prob_sum = 0
-            e_start = time.time()
+            epoch_start_time = time.time()
             for batch in train_loader:
                 self.optimizer.zero_grad()
                 # Get batches on current device.
@@ -310,7 +310,7 @@ class PosteriorEstimator(NeuralInference, ABC):
                 self.optimizer.step()
 
             self.epoch += 1
-            self._summary["epoch_durations_sec"].append(time.time() - e_start)
+            self._summary["epoch_durations_sec"].append(time.time() - epoch_start_time)
 
             train_log_prob_sum /= int(theta.shape[0] * (1.0-validation_fraction))
             self._summary["train_log_probs"].append(train_log_prob_sum)
@@ -342,7 +342,7 @@ class PosteriorEstimator(NeuralInference, ABC):
             )
             # Log validation log prob for every epoch.
             self._summary["validation_log_probs"].append(self._val_log_prob)
-            self._summary["epoch_durations_sec"].append(time.time() - e_start)
+            self._summary["epoch_durations_sec"].append(time.time() - epoch_start_time)
 
             self._maybe_show_progress(self._show_progress_bars, self.epoch)
 
