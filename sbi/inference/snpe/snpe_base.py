@@ -310,7 +310,6 @@ class PosteriorEstimator(NeuralInference, ABC):
                 self.optimizer.step()
 
             self.epoch += 1
-            self._summary["epoch_durations_sec"].append(time.time() - epoch_start_time)
 
             train_log_prob_sum /= int(theta.shape[0] * (1.0-validation_fraction))
             self._summary["train_log_probs"].append(train_log_prob_sum)
