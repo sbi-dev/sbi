@@ -12,7 +12,7 @@ from torch.distributions import MultivariateNormal
 
 from sbi import analysis as analysis
 from sbi import utils as utils
-from sbi.inference import SNPE_B, SNPE_C, prepare_for_sbi, simulate_for_sbi
+from sbi.inference import SNPE_A, SNPE_B, SNPE_C, prepare_for_sbi, simulate_for_sbi
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     samples_true_posterior_linear_gaussian_mvn_prior_different_dims,
@@ -276,6 +276,7 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str, set_seed):
 
 # Testing rejection and mcmc sampling methods.
 @pytest.mark.slow
+@pytest.mark.parametrize("snpe_method", [SNPE_A, SNPE_C])
 @pytest.mark.parametrize(
     "sample_with_mcmc, mcmc_method, prior_str",
     (
@@ -287,7 +288,7 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str, set_seed):
     ),
 )
 def test_api_snpe_c_posterior_correction(
-    sample_with_mcmc, mcmc_method, prior_str, set_seed
+    snpe_method, sample_with_mcmc, mcmc_method, prior_str, set_seed
 ):
     """Test that leakage correction applied to sampling works, with both MCMC and
     rejection.
@@ -314,9 +315,8 @@ def test_api_snpe_c_posterior_correction(
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     simulator, prior = prepare_for_sbi(simulator, prior)
-    inference = SNPE_C(
+    inference = snpe_method(
         prior,
-        density_estimator="maf",
         simulation_batch_size=50,
         sample_with_mcmc=sample_with_mcmc,
         mcmc_method=mcmc_method,
@@ -325,7 +325,11 @@ def test_api_snpe_c_posterior_correction(
 
     theta, x = simulate_for_sbi(simulator, prior, 1000)
     _ = inference.append_simulations(theta, x).train(max_num_epochs=5)
-    posterior = inference.build_posterior()
+
+    if snpe_method == SNPE_A:
+        posterior = inference.build_posterior(proposal=prior)
+    else:
+        posterior = inference.build_posterior()
     posterior = posterior.set_sample_with_mcmc(sample_with_mcmc).set_mcmc_method(
         mcmc_method
     )
@@ -338,7 +342,8 @@ def test_api_snpe_c_posterior_correction(
 
 
 @pytest.mark.slow
-def test_sample_conditional(set_seed):
+@pytest.mark.parametrize("snpe_method", [SNPE_A, SNPE_C])
+def test_sample_conditional(snpe_method, set_seed):
     """
     Test whether sampling from the conditional gives the same results as evaluating.
 
@@ -366,10 +371,13 @@ def test_sample_conditional(set_seed):
         else:
             return linear_gaussian(theta, -likelihood_shift, likelihood_cov)
 
-    net = utils.posterior_nn("maf", hidden_features=20)
+    if snpe_method == SNPE_A:
+        net = utils.posterior_nn("mdn_snpe_a", num_components=5, hidden_features=20)
+    else:
+        net = utils.posterior_nn("maf", hidden_features=20)
 
     simulator, prior = prepare_for_sbi(simulator, prior)
-    inference = SNPE_C(
+    inference = snpe_method(
         prior,
         density_estimator=net,
         show_progress_bars=False,
@@ -378,7 +386,11 @@ def test_sample_conditional(set_seed):
     # We need a pretty big dataset to properly model the bimodality.
     theta, x = simulate_for_sbi(simulator, prior, 10000)
     _ = inference.append_simulations(theta, x).train(max_num_epochs=50)
-    posterior = inference.build_posterior().set_default_x(x_o)
+
+    if snpe_method == SNPE_A:
+        posterior = inference.build_posterior(proposal=prior).set_default_x(x_o)
+    else:
+        posterior = inference.build_posterior().set_default_x(x_o)
     samples = posterior.sample((50,))
 
     # Evaluate the conditional density be drawing samples and smoothing with a Gaussian
@@ -432,7 +444,8 @@ def test_sample_conditional(set_seed):
     assert max_err < 0.0025
 
 
-def example_posterior():
+@pytest.mark.parametrize("snpe_method", [SNPE_A, SNPE_C])
+def test_example_posterior(snpe_method):
     """Return an inferred `NeuralPosterior` for interactive examination."""
     num_dim = 2
     x_o = zeros(1, num_dim)
@@ -449,7 +462,7 @@ def example_posterior():
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     simulator, prior = prepare_for_sbi(simulator, prior)
-    inference = SNPE_C(
+    inference = snpe_method(
         prior,
         show_progress_bars=False,
     )
@@ -457,4 +470,9 @@ def example_posterior():
         simulator, prior, 1000, simulation_batch_size=10, num_workers=6
     )
     _ = inference.append_simulations(theta, x).train()
-    return inference.build_posterior().set_default_x(x_o)
+
+    if snpe_method == SNPE_A:
+        posterior = inference.build_posterior(proposal=prior).set_default_x(x_o)
+    else:
+        posterior = inference.build_posterior().set_default_x(x_o)
+    assert posterior is not None

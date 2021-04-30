@@ -7,20 +7,24 @@ import pytest
 from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
-from sbi.inference import SNPE_C, prepare_for_sbi, simulate_for_sbi
+from sbi.inference import SNPE_A, SNPE_C, prepare_for_sbi, simulate_for_sbi
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
 
 
-def test_log_prob_with_different_x():
+@pytest.mark.parametrize("snpe_method", [SNPE_A, SNPE_C])
+def test_log_prob_with_different_x(snpe_method: type):
 
     num_dim = 2
 
     prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
     simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior)
-    inference = SNPE_C(prior)
+    inference = snpe_method(prior)
     theta, x = simulate_for_sbi(simulator, prior, 1000)
     _ = inference.append_simulations(theta, x).train()
-    posterior = inference.build_posterior()
+    if snpe_method == SNPE_A:
+        posterior = inference.build_posterior(proposal=prior)
+    else:
+        posterior = inference.build_posterior()
 
     _ = posterior.sample((10,), x=ones(1, num_dim))
     theta = posterior.sample((10,), ones(1, num_dim))

@@ -13,6 +13,7 @@ from sbi.neural_nets.classifier import (
 )
 from sbi.neural_nets.flow import build_made, build_maf, build_nsf
 from sbi.neural_nets.mdn import build_mdn
+from sbi.neural_nets.mdn_snpe_a import build_mdn_snpe_a
 
 
 def classifier_nn(
@@ -212,16 +213,34 @@ def posterior_nn(
         )
     )
 
-    def build_fn(batch_theta, batch_x):
-        if model == "mdn":
-            return build_mdn(batch_x=batch_theta, batch_y=batch_x, **kwargs)
-        if model == "made":
-            return build_made(batch_x=batch_theta, batch_y=batch_x, **kwargs)
-        if model == "maf":
-            return build_maf(batch_x=batch_theta, batch_y=batch_x, **kwargs)
-        elif model == "nsf":
-            return build_nsf(batch_x=batch_theta, batch_y=batch_x, **kwargs)
-        else:
-            raise NotImplementedError
+    if model == "mdn_snpe_a":
+        kwargs.pop("num_components")
+
+        def build_fn(batch_theta, batch_x, num_components):
+            # Extract the number of components from the kwargs, such that
+            # they are exposed as a kwargs, offering the possibility to later
+            # override this kwarg with functools.partial. This is necessary
+            # in order to make sure that the MDN in SNPE-A only has one
+            # component when running the Algorithm 1 part.
+            return build_mdn_snpe_a(
+                batch_x=batch_theta,
+                batch_y=batch_x,
+                num_components=num_components,
+                **kwargs
+            )
+
+    else:
+
+        def build_fn(batch_theta, batch_x):
+            if model == "mdn":
+                return build_mdn(batch_x=batch_theta, batch_y=batch_x, **kwargs)
+            elif model == "made":
+                return build_made(batch_x=batch_theta, batch_y=batch_x, **kwargs)
+            elif model == "maf":
+                return build_maf(batch_x=batch_theta, batch_y=batch_x, **kwargs)
+            elif model == "nsf":
+                return build_nsf(batch_x=batch_theta, batch_y=batch_x, **kwargs)
+            else:
+                raise NotImplementedError
 
     return build_fn
