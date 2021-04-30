@@ -8,6 +8,7 @@ import torch
 from torch import Tensor
 from torch.utils.tensorboard import SummaryWriter
 
+import sbi.utils as utils
 from sbi.inference.snpe.snpe_base import PosteriorEstimator
 
 
@@ -77,15 +78,15 @@ class SNPE_B(PosteriorEstimator):
         # Evaluate posterior.
         log_prob_posterior = self._posterior.net.log_prob(theta, x)
         log_prob_posterior = log_prob_posterior.reshape(batch_size)
-        self._assert_all_finite(log_prob_posterior, "posterior eval")
+        utils.assert_all_finite(log_prob_posterior, "posterior eval")
 
         # Evaluate prior.
         log_prob_prior = self._prior.log_prob(theta).reshape(batch_size)
-        self._assert_all_finite(log_prob_prior, "prior eval.")
+        utils.assert_all_finite(log_prob_prior, "prior eval.")
 
         # Evaluate proposal.
         log_prob_proposal = self._model_bank[-1].net.log_prob(theta, x)
-        self._assert_all_finite(log_prob_proposal, "proposal posterior eval")
+        utils.assert_all_finite(log_prob_proposal, "proposal posterior eval")
 
         # Compute log prob with importance weights.
         log_prob = torch.exp(log_prob_prior - log_prob_proposal) * log_prob_posterior

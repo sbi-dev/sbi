@@ -434,13 +434,6 @@ class NeuralInference(ABC):
                 "but network has not yet fully converged. Consider increasing it."
             )
 
-    @staticmethod
-    def _assert_all_finite(quantity: Tensor, description: str = "tensor") -> None:
-        """Raise if tensor quantity contains any NaN or Inf element."""
-
-        msg = f"NaN/Inf present in {description}."
-        assert torch.isfinite(quantity).all(), msg
-
     def _summarize(
         self,
         round_: int,
