@@ -20,8 +20,8 @@ from sbi.types import TensorboardSummaryWriter, TorchModule
 class SNPE_A(PosteriorEstimator):
     def __init__(
         self,
-        num_components: int,
-        num_rounds: int,
+        num_components: int = 10,
+        num_rounds: int = 1,
         prior: Optional[Any] = None,
         density_estimator: Union[str, Callable] = "mdn",
         device: str = "cpu",
@@ -39,9 +39,14 @@ class SNPE_A(PosteriorEstimator):
             https://arxiv.org/abs/1605.06376.
 
         Args:
-            num_components: Number of components. This number is overwritten to 1 for Algorithm 1.
+            num_components:
+                Number of components of the mixture of Gaussians. This number is set to 1 before
+                running Algorithm 1, and then later set to the specified value before running
+                Algorithm 2.
             num_rounds: Total number of training rounds. For all but the last round, Algorithm 1
                 from [1] is executed. For last round, Algorithm 2 from [1] is executed once.
+                By default, `num_rounds` is set to 1, i.e. only Algorithm 2 is executed once
+                without training the proposal prior using Algorithm 1.
             prior: A probability distribution that expresses prior knowledge about the
                 parameters, e.g. which ranges are meaningful for them. Any
                 object with `.log_prob()`and `.sample()` (for example, a PyTorch
