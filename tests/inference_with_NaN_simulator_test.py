@@ -6,7 +6,7 @@ import torch
 from torch import eye, ones, zeros
 
 from sbi import utils as utils
-from sbi.inference import SNL, SNPE_C, SRE, prepare_for_sbi, simulate_for_sbi
+from sbi.inference import SNL, SNPE_A, SNPE_C, SRE, prepare_for_sbi, simulate_for_sbi
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     samples_true_posterior_linear_gaussian_uniform_prior,
@@ -36,7 +36,8 @@ def test_handle_invalid_x(x_shape, set_seed):
     assert torch.isfinite(x[x_is_valid]).all()
 
 
-def test_z_scoring_warning():
+@pytest.mark.parametrize("snpe_method", [SNPE_A, SNPE_C])
+def test_z_scoring_warning(snpe_method: type):
 
     # Create data with large variance.
     num_dim = 2
@@ -47,7 +48,7 @@ def test_z_scoring_warning():
     # Make sure a warning is raised because z-scoring will map these data to duplicate
     # data points.
     with pytest.warns(UserWarning, match="Z-scoring these simulation outputs"):
-        SNPE_C(utils.BoxUniform(zeros(num_dim), ones(num_dim))).append_simulations(
+        snpe_method(utils.BoxUniform(zeros(num_dim), ones(num_dim))).append_simulations(
             theta, x
         ).train(max_num_epochs=1)
 
@@ -56,13 +57,14 @@ def test_z_scoring_warning():
 @pytest.mark.parametrize(
     ("method", "exclude_invalid_x", "percent_nans"),
     (
+        (SNPE_A, True, 0.05),
         (SNPE_C, True, 0.05),
         (SNL, True, 0.05),
         (SRE, True, 0.05),
     ),
 )
 def test_inference_with_nan_simulator(
-    method, exclude_invalid_x, percent_nans, set_seed
+    method: type, exclude_invalid_x: bool, percent_nans: float, set_seed
 ):
 
     # likelihood_mean will be likelihood_shift+theta
@@ -98,7 +100,11 @@ def test_inference_with_nan_simulator(
     _ = inference.append_simulations(theta, x).train(
         exclude_invalid_x=exclude_invalid_x
     )
-    posterior = inference.build_posterior().set_default_x(x_o)
+
+    if method == SNPE_A:
+        posterior = inference.build_posterior(proposal=prior).set_default_x(x_o)
+    else:
+        posterior = inference.build_posterior().set_default_x(x_o)
 
     samples = posterior.sample((num_samples,))
 
@@ -107,7 +113,8 @@ def test_inference_with_nan_simulator(
 
 
 @pytest.mark.slow
-def test_inference_with_restriction_estimator(set_seed):
+@pytest.mark.parametrize("snpe_method", [SNPE_A, SNPE_C])
+def test_inference_with_restriction_estimator(snpe_method: type, set_seed):
 
     # likelihood_mean will be likelihood_shift+theta
     num_dim = 3
@@ -149,9 +156,14 @@ def test_inference_with_restriction_estimator(set_seed):
     all_theta, all_x, _ = rejection_estimator.get_simulations()
 
     # Any method can be used in combination with the `RejectionEstimator`.
-    inference = SNPE_C(prior=prior)
+    inference = snpe_method(prior=prior)
     _ = inference.append_simulations(all_theta, all_x).train()
-    posterior = inference.build_posterior().set_default_x(x_o)
+
+    # Build posterior.
+    if snpe_method == SNPE_A:
+        posterior = inference.build_posterior(proposal=prior).set_default_x(x_o)
+    else:
+        posterior = inference.build_posterior().set_default_x(x_o)
 
     samples = posterior.sample((num_samples,))
 
