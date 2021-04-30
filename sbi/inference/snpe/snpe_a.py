@@ -20,14 +20,15 @@ from sbi.types import TensorboardSummaryWriter, TorchModule
 class SNPE_A(PosteriorEstimator):
     def __init__(
         self,
+        prior: Optional[Any] = None,
+        density_estimator: Union[str, Callable] = "mdn_snpe_a",
         num_components: int = 10,
         num_rounds: int = 1,
-        prior: Optional[Any] = None,
-        density_estimator: Union[str, Callable] = "mdn",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[TensorboardSummaryWriter] = None,
         show_progress_bars: bool = True,
+        **unused_args,
     ):
         r"""SNPE-A [1].
 
@@ -39,14 +40,6 @@ class SNPE_A(PosteriorEstimator):
             https://arxiv.org/abs/1605.06376.
 
         Args:
-            num_components:
-                Number of components of the mixture of Gaussians. This number is set to 1 before
-                running Algorithm 1, and then later set to the specified value before running
-                Algorithm 2.
-            num_rounds: Total number of training rounds. For all but the last round, Algorithm 1
-                from [1] is executed. For last round, Algorithm 2 from [1] is executed once.
-                By default, `num_rounds` is set to 1, i.e. only Algorithm 2 is executed once
-                without training the proposal prior using Algorithm 1.
             prior: A probability distribution that expresses prior knowledge about the
                 parameters, e.g. which ranges are meaningful for them. Any
                 object with `.log_prob()`and `.sample()` (for example, a PyTorch
@@ -59,12 +52,23 @@ class SNPE_A(PosteriorEstimator):
                 needs to return a PyTorch `nn.Module` implementing the density
                 estimator. The density estimator needs to provide the methods
                 `.log_prob` and `.sample()`.
+            num_components:
+                Number of components of the mixture of Gaussians. This number is set to 1 before
+                running Algorithm 1, and then later set to the specified value before running
+                Algorithm 2.
+            num_rounds: Total number of training rounds. For all but the last round, Algorithm 1
+                from [1] is executed. For last round, Algorithm 2 from [1] is executed once.
+                By default, `num_rounds` is set to 1, i.e. only Algorithm 2 is executed once
+                without training the proposal prior using Algorithm 1.
             device: torch device on which to compute, e.g. gpu, cpu.
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
             summary_writer: A tensorboard `SummaryWriter` to control, among others, log
                 file location (default is `<current working directory>/logs`.)
             show_progress_bars: Whether to show a progressbar during training.
+            unused_args: Absorbs additional arguments. No entries will be used. If it
+                is not empty, we warn. In future versions, when the new interface of
+                0.14.0 is more mature, we will remove this argument.
         """
 
         self._num_rounds = num_rounds
@@ -76,7 +80,7 @@ class SNPE_A(PosteriorEstimator):
         # continue. It's sneaky because we are using the object (self) as a namespace
         # to pass arguments between functions, and that's implicit state management.
         kwargs = utils.del_entries(
-            locals(), entries=("self", "__class__", "num_rounds", "num_components")
+            locals(), entries=("self", "__class__", "unused_args", "num_rounds", "num_components")
         )
         super().__init__(**kwargs)
 
@@ -227,9 +231,14 @@ class SNPE_A(PosteriorEstimator):
         # This also evokes the z-scoring correction is necessary.
         if isinstance(proposal, (MultivariateNormal, utils.BoxUniform)):
             density_estimator.set_proposal(proposal)
-        else:
+        elif isinstance(proposal, DirectPosterior):
             # Extract the MoGFlow_SNPE_A from the DirectPosterior.
             density_estimator.set_proposal(proposal.net)
+        else:
+            try:
+                density_estimator.set_proposal(proposal)
+            except Exception:
+                raise ValueError("")
 
         self._posterior = DirectPosterior(
             method_family="snpe",

@@ -53,7 +53,7 @@ if __name__ == "__main__":
     observation_trace = run_HH_model(true_params)
     observation_summary_statistics = calculate_summary_statistics(observation_trace)
     method = "SNPE_A"
-    num_rounds = 3
+    num_rounds = 1
     num_components = 4
     # TODO test MVN prior
     prior_min = [0.5, 1e-4]
@@ -71,7 +71,7 @@ if __name__ == "__main__":
         density_estimator = posterior_nn(
             model=density_estimator, num_components=num_components
         )
-        snpe = SNPE_A(num_components, num_rounds, prior, density_estimator)
+        snpe = SNPE_A(prior, density_estimator, num_components, num_rounds)
 
     else:
         density_estimator = "maf"
