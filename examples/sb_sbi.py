@@ -53,9 +53,8 @@ if __name__ == "__main__":
     observation_trace = run_HH_model(true_params)
     observation_summary_statistics = calculate_summary_statistics(observation_trace)
     method = "SNPE_A"
-    num_rounds = 1
+    num_rounds = 2
     num_components = 4
-    # TODO test MVN prior
     prior_min = [0.5, 1e-4]
     prior_max = [80.0, 15.0]
     prior = utils.torchutils.BoxUniform(
@@ -92,7 +91,7 @@ if __name__ == "__main__":
             simulator=simulator,
             proposal=proposal,
             num_simulations=num_sim,
-            num_workers=20,
+            num_workers=24,
         )
         snpe.append_simulations(thetas, data_sim, proposal)
 
