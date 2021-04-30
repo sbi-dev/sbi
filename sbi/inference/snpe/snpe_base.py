@@ -278,7 +278,7 @@ class PosteriorEstimator(NeuralInference, ABC):
 
             # Train for a single epoch.
             self._neural_net.train()
-            log_prob_sum = 0
+            train_log_prob_sum = 0
             e_start = time.time()
             for batch in train_loader:
                 self.optimizer.zero_grad()
@@ -299,7 +299,7 @@ class PosteriorEstimator(NeuralInference, ABC):
                     )
                 )
 
-                log_prob_sum += batch_loss.sum().item()
+                train_log_prob_sum += batch_loss.sum().item()
 
                 batch_loss.backward()
                 if clip_max_norm is not None:
@@ -312,19 +312,11 @@ class PosteriorEstimator(NeuralInference, ABC):
             self.epoch += 1
             self._summary["epoch_durations_sec"].append(time.time() - e_start)
 
-            log_prob_sum /= len(train_loader) * train_loader.batch_size
-            self._summary["train_log_probs"].append(log_prob_sum)
-<<<<<<< HEAD
-
-
-            log_prob_sum /= len(train_loader) * train_loader.batch_size
-            self._summary["train_log_probs"].append(log_prob_sum)
-=======
->>>>>>> a6a0a71 (more scalars to monitor training of snpe classes)
+            train_log_prob_sum /= len(train_loader) * train_loader.batch_size
+            self._summary["train_log_probs"].append(train_log_prob_sum)
 
             # Calculate validation performance.
-            self._neural_net.eval() #<--- this is not required as the validation is
-            # performed under no_grad context manager
+            self._neural_net.eval()
             log_prob_sum = 0
 
             with torch.no_grad():
