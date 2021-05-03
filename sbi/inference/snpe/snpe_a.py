@@ -14,6 +14,7 @@ from torch.distributions import MultivariateNormal
 import sbi.utils as utils
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.inference.snpe.snpe_base import PosteriorEstimator
+from sbi.neural_nets.mdn_wrapper_snpe_a import MDNWrapper_SNPE_A
 from sbi.types import TensorboardSummaryWriter, TorchModule
 
 
@@ -32,9 +33,6 @@ class SNPE_A(PosteriorEstimator):
     ):
         r"""SNPE-A [1].
 
-        https://github.com/mackelab/sbi/blob/main/sbi/inference/snpe/snpe_c.py
-        https://github.com/mackelab/sbi/blob/main/sbi/neural_nets/mdn.py
-
         [1] _Fast epsilon-free Inference of Simulation Models with Bayesian Conditional
             Density Estimation_, Papamakarios et al., NeurIPS 2016,
             https://arxiv.org/abs/1605.06376.
@@ -44,18 +42,24 @@ class SNPE_A(PosteriorEstimator):
                 parameters, e.g. which ranges are meaningful for them. Any
                 object with `.log_prob()`and `.sample()` (for example, a PyTorch
                 distribution) can be used.
-            density_estimator: If it is a string, use a pre-configured network of the
-                provided type (one of nsf, maf, mdn, made). Alternatively, a function
+            density_estimator: If it is a string (only "mdn_snpe_a" is valid), use a
+                pre-configured mixture of densities network. Alternatively, a function
                 that builds a custom neural network can be provided. The function will
                 be called with the first batch of simulations (theta, x), which can
                 thus be used for shape inference and potentially for z-scoring. It
                 needs to return a PyTorch `nn.Module` implementing the density
                 estimator. The density estimator needs to provide the methods
                 `.log_prob` and `.sample()`.
+                Note that until the last round only a single (multivariate) Gaussian
+                component is used for training (see Algorithm 1 in [1]). In the last
+                round, this component is replicated `num_components` times, its parameters
+                are perturbed with a very small noise, and then the last training round
+                is done with the expanded Gaussian mixture as estimator for the
+                proposal posterior.
             num_components:
-                Number of components of the mixture of Gaussians. This number is set to 1 before
-                running Algorithm 1, and then later set to the specified value before running
-                Algorithm 2.
+                Number of components of the mixture of Gaussians. This number is set to
+                1 before running Algorithm 1, and then later set to the specified value
+                before running Algorithm 2.
             num_rounds: Total number of training rounds. For all but the last round, Algorithm 1
                 from [1] is executed. For last round, Algorithm 2 from [1] is executed once.
                 By default, `num_rounds` is set to 1, i.e. only Algorithm 2 is executed once
@@ -71,8 +75,14 @@ class SNPE_A(PosteriorEstimator):
                 0.14.0 is more mature, we will remove this argument.
         """
 
+        # Catch invalid inputs.
+        if not ((density_estimator == "mdn_snpe_a") or callable(density_estimator)):
+            raise TypeError(
+                "The `density_estimator` passed to SNPE_A needs to be a "
+                "callable or the string 'mdn_snpe_a'!"
+            )
+
         self._num_rounds = num_rounds
-        # TODO How to extract the number of components from density_estimator if that is a callable?
         self._num_components = num_components
 
         # WARNING: sneaky trick ahead. We proxy the parent's `train` here,
@@ -80,7 +90,14 @@ class SNPE_A(PosteriorEstimator):
         # continue. It's sneaky because we are using the object (self) as a namespace
         # to pass arguments between functions, and that's implicit state management.
         kwargs = utils.del_entries(
-            locals(), entries=("self", "__class__", "unused_args", "num_rounds", "num_components")
+            locals(),
+            entries=(
+                "self",
+                "__class__",
+                "unused_args",
+                "num_rounds",
+                "num_components",
+            ),
         )
         super().__init__(**kwargs)
 
@@ -100,7 +117,9 @@ class SNPE_A(PosteriorEstimator):
         dataloader_kwargs: Optional[Dict] = None,
     ) -> DirectPosterior:
         r"""
-        Return density estimator that approximates the distribution $p(\theta|x)$.
+        Return density estimator that approximates the proposal posterior's
+        distribution $\tilde{p}(\theta|x)$.
+
         Args:
             training_batch_size: Training batch size.
             learning_rate: Learning rate for Adam optimizer.
@@ -170,7 +189,9 @@ class SNPE_A(PosteriorEstimator):
 
     def build_posterior(
         self,
-        proposal: Union[MultivariateNormal, utils.BoxUniform, DirectPosterior],
+        proposal: Optional[
+            Union[MultivariateNormal, utils.BoxUniform, DirectPosterior]
+        ] = None,
         density_estimator: Optional[TorchModule] = None,
         rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
         sample_with_mcmc: bool = False,
@@ -180,7 +201,7 @@ class SNPE_A(PosteriorEstimator):
         r"""
         Build posterior from the neural density estimator.
 
-        For SNPE, the posterior distribution that is returned here implements the TODO
+        For SNPE, the posterior distribution that is returned here implements the
         following functionality over the raw neural density estimator:
 
         - correct the calculation of the log probability such that it compensates for
@@ -189,8 +210,14 @@ class SNPE_A(PosteriorEstimator):
         - alternatively, if leakage is very high (which can happen for multi-round
             SNPE), sample from the posterior with MCMC.
 
+        The DirectPosterior class assumes that the density estimator approximates the posterior.
+        In SNPE-A, the density estimator is an approximation of the proposal posterior. Hence, importance reweigthing
+        is needed during evaluation.
+
         Args:
-            proposal: The distribution that the parameters $\theta$ were sampled from.
+            proposal: The proposal prior obtained from the from maximum-likelihood training.
+                If None, the posterior of the previous previous round is used. In the first round
+                the prior is used as a proposal.
             density_estimator: The density estimator that the posterior is based on.
                 If `None`, use the latest neural density estimator that was trained.
             rejection_sampling_parameters: Dictionary overriding the default parameters
@@ -229,20 +256,30 @@ class SNPE_A(PosteriorEstimator):
 
         # Set proposal of the density estimator.
         # This also evokes the z-scoring correction is necessary.
-        if isinstance(proposal, (MultivariateNormal, utils.BoxUniform)):
-            density_estimator.set_proposal(proposal)
+        if proposal is None:
+            if self._model_bank:
+                proposal = self._model_bank[-1].net
+            else:
+                proposal = self._prior
+        elif isinstance(proposal, (MultivariateNormal, utils.BoxUniform)):
+            pass
         elif isinstance(proposal, DirectPosterior):
-            # Extract the MoGFlow_SNPE_A from the DirectPosterior.
-            density_estimator.set_proposal(proposal.net)
+            # Extract the MDNWrapper_SNPE_A from the DirectPosterior.
+            proposal = proposal.net
         else:
             raise TypeError(
                 "So far, only MultivariateNormal, BoxUniform, and DirectPosterior are"
                 "supported for the `proposal` arg in SNPE_A.build_posterior()."
             )
 
+        # Create the MDNWrapper_SNPE_A
+        wrapped_density_estimator = MDNWrapper_SNPE_A(
+            flow=density_estimator, proposal=proposal
+        )
+
         self._posterior = DirectPosterior(
             method_family="snpe",
-            neural_net=density_estimator,
+            neural_net=wrapped_density_estimator,
             prior=self._prior,
             x_shape=self._x_shape,
             rejection_sampling_parameters=rejection_sampling_parameters,
@@ -266,13 +303,8 @@ class SNPE_A(PosteriorEstimator):
         """
         Return the log-probability of the proposal posterior.
 
-        .. note::
-            For SNPE-A this is the same as `self._neural_net.log_prob(theta, x)` in
-            `_loss()` to be found in `snpe_base.py`.
-
-        If the proposal is a MoG, the density estimator is a MoG, and the prior is
-        either Gaussian or uniform, we use non-atomic loss. Else, use atomic loss (which
-        suffers from leakage).
+        For SNPE-A this is the same as `self._neural_net.log_prob(theta, x)` in
+        `_loss()` to be found in `snpe_base.py`.
 
         Args:
             theta: Batch of parameters θ.
@@ -293,7 +325,8 @@ class SNPE_A(PosteriorEstimator):
         symmetry such that the gradients in the subsequent training are not
         all identical.
 
-        :param eps: Standard deviation for the random perturbation.
+        Args:
+            eps: Standard deviation for the random perturbation.
         """
         assert isinstance(self._neural_net._distribution, MultivariateGaussianMDN)
 

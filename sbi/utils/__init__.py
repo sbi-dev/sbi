@@ -2,7 +2,6 @@
 from sbi.utils.conditional_density import (
     conditional_corrcoeff,
     eval_conditional_density,
-    mog_log_prob,
 )
 from sbi.utils.get_nn_models import classifier_nn, likelihood_nn, posterior_nn
 from sbi.utils.io import get_data_root, get_log_root, get_project_root
@@ -19,6 +18,7 @@ from sbi.utils.sbiutils import (
     handle_invalid_x,
     logit,
     mask_sims_from_prior,
+    mog_log_prob,
     sample_posterior_within_prior,
     standardizing_net,
     standardizing_transform,

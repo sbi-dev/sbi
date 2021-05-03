@@ -288,7 +288,7 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str, set_seed):
     ),
 )
 def test_api_snpe_c_posterior_correction(
-    snpe_method, sample_with_mcmc, mcmc_method, prior_str, set_seed
+    snpe_method: type, sample_with_mcmc, mcmc_method, prior_str, set_seed
 ):
     """Test that leakage correction applied to sampling works, with both MCMC and
     rejection.
@@ -342,8 +342,10 @@ def test_api_snpe_c_posterior_correction(
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("snpe_method", [SNPE_A, SNPE_C])
-def test_sample_conditional(snpe_method, set_seed):
+@pytest.mark.parametrize(
+    "snpe_method, num_rounds", [(SNPE_A, 2), (SNPE_A, 5), (SNPE_C, None)]
+)
+def test_sample_conditional(snpe_method: type, num_rounds: int, set_seed):
     """
     Test whether sampling from the conditional gives the same results as evaluating.
 
@@ -373,14 +375,17 @@ def test_sample_conditional(snpe_method, set_seed):
 
     if snpe_method == SNPE_A:
         net = utils.posterior_nn("mdn_snpe_a", num_components=5, hidden_features=20)
+        extra_kwargs = dict(num_rounds=num_rounds)
     else:
         net = utils.posterior_nn("maf", hidden_features=20)
+        extra_kwargs = dict()
 
     simulator, prior = prepare_for_sbi(simulator, prior)
     inference = snpe_method(
         prior,
         density_estimator=net,
         show_progress_bars=False,
+        **extra_kwargs,
     )
 
     # We need a pretty big dataset to properly model the bimodality.
@@ -444,8 +449,10 @@ def test_sample_conditional(snpe_method, set_seed):
     assert max_err < 0.0025
 
 
-@pytest.mark.parametrize("snpe_method", [SNPE_A, SNPE_C])
-def test_example_posterior(snpe_method):
+@pytest.mark.parametrize(
+    "snpe_method, num_rounds", [(SNPE_A, 2), (SNPE_A, 10), (SNPE_C, None)]
+)
+def test_example_posterior(snpe_method: type, num_rounds: int):
     """Return an inferred `NeuralPosterior` for interactive examination."""
     num_dim = 2
     x_o = zeros(1, num_dim)
@@ -461,11 +468,13 @@ def test_example_posterior(snpe_method):
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
+    if snpe_method == SNPE_A:
+        extra_kwargs = dict(num_rounds=num_rounds)
+    else:
+        extra_kwargs = dict()
+
     simulator, prior = prepare_for_sbi(simulator, prior)
-    inference = snpe_method(
-        prior,
-        show_progress_bars=False,
-    )
+    inference = snpe_method(prior, show_progress_bars=False, **extra_kwargs)
     theta, x = simulate_for_sbi(
         simulator, prior, 1000, simulation_batch_size=10, num_workers=6
     )

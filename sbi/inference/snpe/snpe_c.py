@@ -2,7 +2,6 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 
-from math import pi
 from typing import Any, Callable, Dict, Optional, Union
 
 import torch
@@ -252,7 +251,7 @@ class SNPE_C(PosteriorEstimator):
 
             if isinstance(self._prior, MultivariateNormal):
                 self._maybe_z_scored_prior = MultivariateNormal(
-                    almost_zero_mean, torch.diag(almost_one_std),
+                    almost_zero_mean, torch.diag(almost_one_std)
                 )
             else:
                 range_ = torch.sqrt(almost_one_std * 3.0)
@@ -417,7 +416,9 @@ class SNPE_C(PosteriorEstimator):
         )
 
         # Compute the log_prob of theta under the product.
-        log_prob_proposal_posterior = utils.mog_log_prob(theta, logits_pp, m_pp, prec_pp)
+        log_prob_proposal_posterior = utils.mog_log_prob(
+            theta, logits_pp, m_pp, prec_pp
+        )
         utils.assert_all_finite(log_prob_proposal_posterior, "proposal posterior eval")
 
         return log_prob_proposal_posterior
@@ -471,7 +472,7 @@ class SNPE_C(PosteriorEstimator):
         )
 
         means_pp = self._means_proposal_posterior(
-            covariances_pp, means_p, precisions_p, means_d, precisions_d,
+            covariances_pp, means_p, precisions_p, means_d, precisions_d
         )
 
         logits_pp = self._logits_proposal_posterior(
@@ -489,7 +490,7 @@ class SNPE_C(PosteriorEstimator):
         return logits_pp, means_pp, precisions_pp, covariances_pp
 
     def _precisions_proposal_posterior(
-        self, precisions_p: Tensor, precisions_d: Tensor,
+        self, precisions_p: Tensor, precisions_d: Tensor
     ):
         """
         Return the precisions and covariances of the proposal posterior.
