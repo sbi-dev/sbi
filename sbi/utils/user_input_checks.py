@@ -595,7 +595,7 @@ def validate_theta_and_x(
     simulations_device = f"{x.device.type}:{x.device.index}"
     if not simulations_device == "cpu" and training_device == "cpu":
         logging.warning(
-            """Simulations are on {self.simulations_device} but training device is
+            f"""Simulations are on {simulations_device} but training device is
             set to {training_device}, moving data to device to {training_device}."""
         )
         x = x.to(training_device)
