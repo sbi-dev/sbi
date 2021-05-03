@@ -51,9 +51,9 @@ class SNPE_A(PosteriorEstimator):
                 `.log_prob` and `.sample()`.
 
             num_components:
-                Number of components of the mixture of Gaussians. This number is set to 1 before
-                running Algorithm 1, and then later set to the specified value before running
-                Algorithm 2.
+                Number of components of the mixture of Gaussians. This number is set to
+                1 before running Algorithm 1, and then later set to the specified value
+                before running Algorithm 2.
             num_rounds: Total number of training rounds. For all but the last round, Algorithm 1
                 from [1] is executed. For last round, Algorithm 2 from [1] is executed once.
                 By default, `num_rounds` is set to 1, i.e. only Algorithm 2 is executed once
@@ -69,8 +69,19 @@ class SNPE_A(PosteriorEstimator):
                 0.14.0 is more mature, we will remove this argument.
         """
 
+        # Catch invalid inputs.
+        if not isinstance(prior, (utils.BoxUniform, MultivariateNormal)):
+            raise TypeError(
+                "Only priors of type BoxUniform and MultivariateNormal "
+                "are supported for SNPE_A!"
+            )
+        if not ((density_estimator == "mdn_snpe_a") or callable(density_estimator)):
+            raise TypeError(
+                "The `density_estimator` passed to SNPE_A needs to be a "
+                "callable or the string 'mdn_snpe_a'!"
+            )
+
         self._num_rounds = num_rounds
-        # TODO How to extract the number of components from density_estimator if that is a callable?
         self._num_components = num_components
 
         # WARNING: sneaky trick ahead. We proxy the parent's `train` here,
@@ -78,7 +89,14 @@ class SNPE_A(PosteriorEstimator):
         # continue. It's sneaky because we are using the object (self) as a namespace
         # to pass arguments between functions, and that's implicit state management.
         kwargs = utils.del_entries(
-            locals(), entries=("self", "__class__", "unused_args", "num_rounds", "num_components")
+            locals(),
+            entries=(
+                "self",
+                "__class__",
+                "unused_args",
+                "num_rounds",
+                "num_components",
+            ),
         )
         super().__init__(**kwargs)
 
