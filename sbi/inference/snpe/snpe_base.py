@@ -1,7 +1,6 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
-
-
+import time
 import logging
 from abc import ABC, abstractmethod
 from copy import deepcopy
@@ -279,6 +278,8 @@ class PosteriorEstimator(NeuralInference, ABC):
 
             # Train for a single epoch.
             self._neural_net.train()
+            train_log_prob_sum = 0
+            epoch_start_time = time.time()
             for batch in train_loader:
                 self.optimizer.zero_grad()
                 # Get batches on current device.
@@ -297,6 +298,9 @@ class PosteriorEstimator(NeuralInference, ABC):
                         calibration_kernel,
                     )
                 )
+
+                train_log_prob_sum += batch_loss.sum().item()
+
                 batch_loss.backward()
                 if clip_max_norm is not None:
                     clip_grad_norm_(
@@ -307,9 +311,13 @@ class PosteriorEstimator(NeuralInference, ABC):
 
             self.epoch += 1
 
+            train_log_prob_sum /= int(theta.shape[0] * (1.0-validation_fraction))
+            self._summary["train_log_probs"].append(train_log_prob_sum)
+
             # Calculate validation performance.
             self._neural_net.eval()
             log_prob_sum = 0
+
             with torch.no_grad():
                 for batch in val_loader:
                     theta_batch, x_batch, masks_batch = (
@@ -333,6 +341,7 @@ class PosteriorEstimator(NeuralInference, ABC):
             )
             # Log validation log prob for every epoch.
             self._summary["validation_log_probs"].append(self._val_log_prob)
+            self._summary["epoch_durations_sec"].append(time.time() - epoch_start_time)
 
             self._maybe_show_progress(self._show_progress_bars, self.epoch)
 
