@@ -116,7 +116,8 @@ class SNPE_A(PosteriorEstimator):
         dataloader_kwargs: Optional[Dict] = None,
     ) -> DirectPosterior:
         r"""
-        Return density estimator that approximates the distribution $p(\theta|x)$.
+        Return density estimator that approximates the proposal posterior's
+        distribution $\tilde{p}(\theta|x)$.
 
         Args:
             training_batch_size: Training batch size.
