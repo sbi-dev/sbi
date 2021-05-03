@@ -16,7 +16,7 @@ import sbi.utils.sbiutils
 from sbi.utils import torchutils
 
 
-class MoGFlow_SNPE_A(flows.Flow):
+class MoGWrapper_SNPE_A(flows.Flow):
     """
     A wrapper for nflow's `Flow` class to enable a different log prob calculation
     sampling strategy for training and testing, tailored to SNPE-A [1]
@@ -56,12 +56,12 @@ class MoGFlow_SNPE_A(flows.Flow):
     @property
     def proposal(
         self,
-    ) -> Union["utils.BoxUniform", MultivariateNormal, "MoGFlow_SNPE_A"]:
+    ) -> Union["utils.BoxUniform", MultivariateNormal, "MoGWrapper_SNPE_A"]:
         """Get the proposal of the previous round."""
         return self._proposal
 
     def set_proposal(
-        self, proposal: Union["utils.BoxUniform", MultivariateNormal, "MoGFlow_SNPE_A"]
+        self, proposal: Union["utils.BoxUniform", MultivariateNormal, "MoGWrapper_SNPE_A"]
     ):
         """Set the proposal of the previous round."""
         self._proposal = proposal
@@ -71,7 +71,7 @@ class MoGFlow_SNPE_A(flows.Flow):
 
     def _get_first_prior_from_proposal(
         self,
-    ) -> Union["utils.BoxUniform", MultivariateNormal, "MoGFlow_SNPE_A"]:
+    ) -> Union["utils.BoxUniform", MultivariateNormal, "MoGWrapper_SNPE_A"]:
         """Iterate a possible chain of proposals."""
         curr_prior = self._proposal
 
@@ -88,7 +88,7 @@ class MoGFlow_SNPE_A(flows.Flow):
         if self._proposal is None:
             # Use Flow.lob_prob() if there has been no previous proposal memorized
             # in this instance. This is the case if we are in the training
-            # loop, i.e. this MoGFlow_SNPE_A instance is not an attribute of a
+            # loop, i.e. this MoGWrapper_SNPE_A instance is not an attribute of a
             # DirectPosterior instance.
             return super().log_prob(inputs, context)  # q_phi from eq (3) in [1]
 
@@ -123,7 +123,7 @@ class MoGFlow_SNPE_A(flows.Flow):
         if self._proposal is None:
             # Use Flow.sample() if there has been no previous proposal memorized
             # in this instance. This is the case if we are in the training
-            # loop, i.e. this MoGFlow_SNPE_A instance is not an attribute of a
+            # loop, i.e. this MoGWrapper_SNPE_A instance is not an attribute of a
             # DirectPosterior instance.
             return super().sample(num_samples, context, batch_size)
 
@@ -285,7 +285,7 @@ class MoGFlow_SNPE_A(flows.Flow):
             precisions_d,
         )
 
-        logits_post = MoGFlow_SNPE_A._logits_posterior(
+        logits_post = MoGWrapper_SNPE_A._logits_posterior(
             means_post,
             precisions_post,
             covariances_post,
@@ -301,7 +301,7 @@ class MoGFlow_SNPE_A(flows.Flow):
 
     def _set_state_for_mog_proposal(self) -> None:
         """
-        Set state variables of the MoGFlow_SNPE_A instance evevy time `set_proposal()`
+        Set state variables of the MoGWrapper_SNPE_A instance evevy time `set_proposal()`
         is called, i.e. every time a posterior is build using `SNPE_A.build_posterior()`.
 
         This function is almost identical to `SNPE_C._set_state_for_mog_proposal()`.
@@ -453,7 +453,7 @@ class MoGFlow_SNPE_A(flows.Flow):
                             "The precision matrix of a posterior is not positive definite! "
                             "This is a known issue for SNPE-A. Either try a different parameter "
                             "setting or pass `allow_precision_correction=True` when constructing "
-                            "the `MoGFlow_SNPE_A` density estimator."
+                            "the `MoGWrapper_SNPE_A` density estimator."
                         )
 
         covariances_p = torch.inverse(precisions_p)

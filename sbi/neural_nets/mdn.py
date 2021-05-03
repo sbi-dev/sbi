@@ -7,7 +7,7 @@ from pyknos.nflows import flows, transforms
 from torch import Tensor, nn
 
 import sbi.utils as utils
-from sbi.neural_nets.mog_flow_snpe_a import MoGFlow_SNPE_A
+from sbi.neural_nets.mog_wrapper_snpe_a import MoGWrapper_SNPE_A
 
 
 def build_mdn(
@@ -127,6 +127,6 @@ def build_mdn_snpe_a(
         custom_initialization=True,
     )
 
-    neural_net = MoGFlow_SNPE_A(transform, distribution, embedding_net)
+    neural_net = MoGWrapper_SNPE_A(transform, distribution, embedding_net)
 
     return neural_net
