@@ -12,8 +12,7 @@ from sbi.neural_nets.classifier import (
     build_resnet_classifier,
 )
 from sbi.neural_nets.flow import build_made, build_maf, build_nsf
-from sbi.neural_nets.mdn import build_mdn
-from sbi.neural_nets.mdn_snpe_a import build_mdn_snpe_a
+from sbi.neural_nets.mdn import build_mdn, build_mdn_snpe_a
 
 
 def classifier_nn(

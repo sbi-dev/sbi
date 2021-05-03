@@ -12,6 +12,7 @@ from torch import Tensor
 from torch.distributions import MultivariateNormal
 
 import sbi.utils as utils
+import sbi.utils.sbiutils
 from sbi.utils import torchutils
 
 
@@ -107,7 +108,7 @@ class MoGFlow_SNPE_A(flows.Flow):
             theta = self._maybe_z_score_theta(inputs)
 
             # Compute the log_prob of theta under the product.
-            log_prob_proposal_posterior = utils.mog_log_prob(
+            log_prob_proposal_posterior = sbi.utils.sbiutils.mog_log_prob(
                 theta,
                 logits_pp,
                 m_pp,

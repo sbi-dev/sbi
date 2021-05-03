@@ -32,9 +32,6 @@ class SNPE_A(PosteriorEstimator):
     ):
         r"""SNPE-A [1].
 
-        https://github.com/mackelab/sbi/blob/main/sbi/inference/snpe/snpe_c.py
-        https://github.com/mackelab/sbi/blob/main/sbi/neural_nets/mdn.py
-
         [1] _Fast epsilon-free Inference of Simulation Models with Bayesian Conditional
             Density Estimation_, Papamakarios et al., NeurIPS 2016,
             https://arxiv.org/abs/1605.06376.
@@ -44,14 +41,15 @@ class SNPE_A(PosteriorEstimator):
                 parameters, e.g. which ranges are meaningful for them. Any
                 object with `.log_prob()`and `.sample()` (for example, a PyTorch
                 distribution) can be used.
-            density_estimator: If it is a string, use a pre-configured network of the
-                provided type (one of nsf, maf, mdn, made). Alternatively, a function
+            density_estimator: If it is a string (only "mdn_snpe_a" is valid), use a
+                pre-configured mixture of densities network. Alternatively, a function
                 that builds a custom neural network can be provided. The function will
                 be called with the first batch of simulations (theta, x), which can
                 thus be used for shape inference and potentially for z-scoring. It
                 needs to return a PyTorch `nn.Module` implementing the density
                 estimator. The density estimator needs to provide the methods
                 `.log_prob` and `.sample()`.
+
             num_components:
                 Number of components of the mixture of Gaussians. This number is set to 1 before
                 running Algorithm 1, and then later set to the specified value before running
@@ -101,6 +99,7 @@ class SNPE_A(PosteriorEstimator):
     ) -> DirectPosterior:
         r"""
         Return density estimator that approximates the distribution $p(\theta|x)$.
+
         Args:
             training_batch_size: Training batch size.
             learning_rate: Learning rate for Adam optimizer.
@@ -266,13 +265,8 @@ class SNPE_A(PosteriorEstimator):
         """
         Return the log-probability of the proposal posterior.
 
-        .. note::
-            For SNPE-A this is the same as `self._neural_net.log_prob(theta, x)` in
-            `_loss()` to be found in `snpe_base.py`.
-
-        If the proposal is a MoG, the density estimator is a MoG, and the prior is
-        either Gaussian or uniform, we use non-atomic loss. Else, use atomic loss (which
-        suffers from leakage).
+        For SNPE-A this is the same as `self._neural_net.log_prob(theta, x)` in
+        `_loss()` to be found in `snpe_base.py`.
 
         Args:
             theta: Batch of parameters θ.
@@ -293,7 +287,8 @@ class SNPE_A(PosteriorEstimator):
         symmetry such that the gradients in the subsequent training are not
         all identical.
 
-        :param eps: Standard deviation for the random perturbation.
+        Args:
+            eps: Standard deviation for the random perturbation.
         """
         assert isinstance(self._neural_net._distribution, MultivariateGaussianMDN)
 

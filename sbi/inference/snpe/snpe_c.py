@@ -2,7 +2,6 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 
-from math import pi
 from typing import Any, Callable, Dict, Optional, Union
 
 import torch
@@ -11,6 +10,7 @@ from pyknos.nflows.transforms import CompositeTransform
 from torch import Tensor, eye, ones
 from torch.distributions import MultivariateNormal, Uniform
 
+import sbi.utils.sbiutils
 from sbi import utils as utils
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.inference.snpe.snpe_base import PosteriorEstimator
@@ -417,7 +417,7 @@ class SNPE_C(PosteriorEstimator):
         )
 
         # Compute the log_prob of theta under the product.
-        log_prob_proposal_posterior = utils.mog_log_prob(theta, logits_pp, m_pp, prec_pp)
+        log_prob_proposal_posterior = sbi.utils.sbiutils.mog_log_prob(theta, logits_pp, m_pp, prec_pp)
         utils.assert_all_finite(log_prob_proposal_posterior, "proposal posterior eval")
 
         return log_prob_proposal_posterior
