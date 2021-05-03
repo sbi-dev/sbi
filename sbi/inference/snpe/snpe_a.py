@@ -70,11 +70,6 @@ class SNPE_A(PosteriorEstimator):
         """
 
         # Catch invalid inputs.
-        if not isinstance(prior, (utils.BoxUniform, MultivariateNormal)):
-            raise TypeError(
-                "Only priors of type BoxUniform and MultivariateNormal "
-                "are supported for SNPE_A!"
-            )
         if not ((density_estimator == "mdn_snpe_a") or callable(density_estimator)):
             raise TypeError(
                 "The `density_estimator` passed to SNPE_A needs to be a "
