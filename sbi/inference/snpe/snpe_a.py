@@ -169,7 +169,7 @@ class SNPE_A(PosteriorEstimator):
 
     def build_posterior(
         self,
-        proposal: Union[MultivariateNormal, utils.BoxUniform, DirectPosterior],
+        proposal: Union[None, MultivariateNormal, utils.BoxUniform, DirectPosterior] = None,
         density_estimator: Optional[TorchModule] = None,
         rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
         sample_with_mcmc: bool = False,
@@ -179,7 +179,7 @@ class SNPE_A(PosteriorEstimator):
         r"""
         Build posterior from the neural density estimator.
 
-        For SNPE, the posterior distribution that is returned here implements the TODO
+        For SNPE, the posterior distribution that is returned here implements the
         following functionality over the raw neural density estimator:
 
         - correct the calculation of the log probability such that it compensates for
@@ -189,7 +189,10 @@ class SNPE_A(PosteriorEstimator):
             SNPE), sample from the posterior with MCMC.
 
         Args:
-            proposal: The distribution that the parameters $\theta$ were sampled from.
+            proposal: The proposal prior distribution of the previous round.
+                As the density estimator approximates the proposal posterior,
+                the proposal prior is used for importance reweighting.
+                This allows sampling from the desired posterior during evaluation.
             density_estimator: The density estimator that the posterior is based on.
                 If `None`, use the latest neural density estimator that was trained.
             rejection_sampling_parameters: Dictionary overriding the default parameters
@@ -228,7 +231,12 @@ class SNPE_A(PosteriorEstimator):
 
         # Set proposal of the density estimator.
         # This also evokes the z-scoring correction is necessary.
-        if isinstance(proposal, (MultivariateNormal, utils.BoxUniform)):
+        if proposal is None:
+            if self._model_bank:
+                density_estimator.set_proposal(self._model_bank[-1].net)
+            else:
+                density_estimator.set_proposal(self._prior)
+        elif isinstance(proposal, (MultivariateNormal, utils.BoxUniform)):
             density_estimator.set_proposal(proposal)
         elif isinstance(proposal, DirectPosterior):
             # Extract the MoGFlow_SNPE_A from the DirectPosterior.
