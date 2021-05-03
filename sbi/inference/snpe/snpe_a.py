@@ -187,7 +187,9 @@ class SNPE_A(PosteriorEstimator):
 
     def build_posterior(
         self,
-        proposal: Union[None, MultivariateNormal, utils.BoxUniform, DirectPosterior] = None,
+        proposal: Optional[
+            Union[MultivariateNormal, utils.BoxUniform, DirectPosterior]
+        ] = None,
         density_estimator: Optional[TorchModule] = None,
         rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
         sample_with_mcmc: bool = False,
