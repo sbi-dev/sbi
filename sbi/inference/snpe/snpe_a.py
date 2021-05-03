@@ -203,11 +203,14 @@ class SNPE_A(PosteriorEstimator):
         - alternatively, if leakage is very high (which can happen for multi-round
             SNPE), sample from the posterior with MCMC.
 
+        The DirectPosterior class assumes that the density estimator approximates the posterior.
+        In SNPE-A, the density estimator is an approximation of the proposal posterior. Hence, importance reweigthing
+        is needed during evaluation.
+
         Args:
-            proposal: The proposal prior distribution of the previous round.
-                As the density estimator approximates the proposal posterior,
-                the proposal prior is used for importance reweighting.
-                This allows sampling from the desired posterior during evaluation.
+            proposal: The proposal prior obtained from the from maximum-likelihood training.
+                If None, the posterior of the previous previous round is used. In the first round
+                the prior is used as a proposal.
             density_estimator: The density estimator that the posterior is based on.
                 If `None`, use the latest neural density estimator that was trained.
             rejection_sampling_parameters: Dictionary overriding the default parameters
