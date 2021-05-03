@@ -49,7 +49,12 @@ class SNPE_A(PosteriorEstimator):
                 needs to return a PyTorch `nn.Module` implementing the density
                 estimator. The density estimator needs to provide the methods
                 `.log_prob` and `.sample()`.
-
+                Note that until the last round only a single (multivariate) Gaussian
+                component is used for training (see Algorithm 1 in [1]). In the last
+                round, this component is replicated `num_components` times, its parameters
+                are perturbed with a very small noise, and then the last training round
+                is done with the expanded Gaussian mixture as estimator for the
+                proposal posterior.
             num_components:
                 Number of components of the mixture of Gaussians. This number is set to
                 1 before running Algorithm 1, and then later set to the specified value
