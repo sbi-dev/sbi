@@ -61,7 +61,8 @@ class MoGWrapper_SNPE_A(flows.Flow):
         return self._proposal
 
     def set_proposal(
-        self, proposal: Union["utils.BoxUniform", MultivariateNormal, "MoGWrapper_SNPE_A"]
+        self,
+        proposal: Union["utils.BoxUniform", MultivariateNormal, "MoGWrapper_SNPE_A"],
     ):
         """Set the proposal of the previous round."""
         self._proposal = proposal

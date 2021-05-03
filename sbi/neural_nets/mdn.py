@@ -18,7 +18,7 @@ def build_mdn(
     hidden_features: int = 50,
     num_components: int = 10,
     embedding_net: nn.Module = nn.Identity(),
-    **kwargs
+    **kwargs,
 ) -> nn.Module:
     """Builds MDN p(x|y).
 
