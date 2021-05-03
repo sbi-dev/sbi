@@ -5,6 +5,7 @@ from typing import Union
 from warnings import warn
 
 import torch
+import torch.nn as nn
 from pyknos.mdn.mdn import MultivariateGaussianMDN
 from pyknos.nflows import flows
 from pyknos.nflows.transforms import CompositeTransform
@@ -16,10 +17,12 @@ import sbi.utils.sbiutils
 from sbi.utils import torchutils
 
 
-class MoGWrapper_SNPE_A(flows.Flow):
+class MDNWrapper_SNPE_A(nn.Module):
     """
-    A wrapper for nflow's `Flow` class to enable a different log prob calculation
-    sampling strategy for training and testing, tailored to SNPE-A [1]
+    A wrapper containing a `flows.Flow` class to enable a different log prob calculation
+    sampling strategy for training and testing, tailored to SNPE-A [1].
+    This class inherits from `nn.Module` since the constructor of `DirectPosterior`
+    expects the argument `neural_net` to be a `nn.Module`.
 
     [1] _Fast epsilon-free Inference of Simulation Models with Bayesian Conditional
         Density Estimation_, Papamakarios et al., NeurIPS 2016,
@@ -30,39 +33,40 @@ class MoGWrapper_SNPE_A(flows.Flow):
 
     def __init__(
         self,
-        transform,
-        distribution,
-        embedding_net=None,
+        flow: flows.Flow,
+        proposal: Union["utils.BoxUniform", MultivariateNormal, "MDNWrapper_SNPE_A"],
         allow_precision_correction: bool = False,
     ):
         """Constructor.
 
         Args:
-            transform: A `Transform` object, it transforms data into noise.
-            distribution: A `Distribution` object, the base distribution of the flow that
-                generates the noise.
-            embedding_net: A `nn.Module` which has trainable parameters to encode the
-                context (condition). It is trained jointly with the flow.
+            flow: The trained normalizing flow, passed when building the posterior.
+            proposal: The proposal distribution.
             allow_precision_correction:
                 Add a diagonal with the smallest eigenvalue in every entry in case
                 the precision matrix becomes ill-conditioned.
         """
-        # Construct the flow.
-        super().__init__(transform, distribution, embedding_net)
+        # Call nn.Module's constructor.
+        super().__init__()
 
-        self._proposal = None
+        self._neural_net = flow
         self._allow_precision_correction = allow_precision_correction
+
+        # Set the proposal.
+        self._proposal = proposal
+        # Take care of z-scoring, pre-compute and store prior terms.
+        self._set_state_for_mog_proposal()
 
     @property
     def proposal(
         self,
-    ) -> Union["utils.BoxUniform", MultivariateNormal, "MoGWrapper_SNPE_A"]:
+    ) -> Union["utils.BoxUniform", MultivariateNormal, "MDNWrapper_SNPE_A"]:
         """Get the proposal of the previous round."""
         return self._proposal
 
     def set_proposal(
         self,
-        proposal: Union["utils.BoxUniform", MultivariateNormal, "MoGWrapper_SNPE_A"],
+        proposal: Union["utils.BoxUniform", MultivariateNormal, "MDNWrapper_SNPE_A"],
     ):
         """Set the proposal of the previous round."""
         self._proposal = proposal
@@ -72,7 +76,7 @@ class MoGWrapper_SNPE_A(flows.Flow):
 
     def _get_first_prior_from_proposal(
         self,
-    ) -> Union["utils.BoxUniform", MultivariateNormal, "MoGWrapper_SNPE_A"]:
+    ) -> Union["utils.BoxUniform", MultivariateNormal, "MDNWrapper_SNPE_A"]:
         """Iterate a possible chain of proposals."""
         curr_prior = self._proposal
 
@@ -89,13 +93,15 @@ class MoGWrapper_SNPE_A(flows.Flow):
         if self._proposal is None:
             # Use Flow.lob_prob() if there has been no previous proposal memorized
             # in this instance. This is the case if we are in the training
-            # loop, i.e. this MoGWrapper_SNPE_A instance is not an attribute of a
+            # loop, i.e. this MDNWrapper_SNPE_A instance is not an attribute of a
             # DirectPosterior instance.
-            return super().log_prob(inputs, context)  # q_phi from eq (3) in [1]
+            return self._neural_net.log_prob(
+                inputs, context
+            )  # q_phi from eq (3) in [1]
 
         elif isinstance(self._proposal, (utils.BoxUniform, MultivariateNormal)):
             # No importance re-weighting is needed if the proposal prior is the prior
-            return super().log_prob(inputs, context)
+            return self._neural_net.log_prob(inputs, context)
 
         else:
             # When we want to compute the approx. posterior, a proposal prior \tilde{p}
@@ -124,14 +130,14 @@ class MoGWrapper_SNPE_A(flows.Flow):
         if self._proposal is None:
             # Use Flow.sample() if there has been no previous proposal memorized
             # in this instance. This is the case if we are in the training
-            # loop, i.e. this MoGWrapper_SNPE_A instance is not an attribute of a
+            # loop, i.e. this MDNWrapper_SNPE_A instance is not an attribute of a
             # DirectPosterior instance.
-            return super().sample(num_samples, context, batch_size)
+            return self._neural_net.sample(num_samples, context, batch_size)
 
         else:
             # No importance re-weighting is needed if the proposal prior is the prior
             if isinstance(self._proposal, (utils.BoxUniform, MultivariateNormal)):
-                return super().sample(num_samples, context, batch_size)
+                return self._neural_net.sample(num_samples, context, batch_size)
 
             # When we want to sample from the approx. posterior, a proposal prior \tilde{p}
             # has already been observed. To analytically calculate the log-prob of the
@@ -176,7 +182,7 @@ class MoGWrapper_SNPE_A(flows.Flow):
             num_samples, logits_pp, m_pp, prec_factors_pp
         )
 
-        embedded_context = self._embedding_net(x)
+        embedded_context = self._neural_net._embedding_net(x)
         if embedded_context is not None:
             # Merge the context dimension with sample dimension in order to
             # apply the transform.
@@ -185,7 +191,7 @@ class MoGWrapper_SNPE_A(flows.Flow):
                 embedded_context, num_reps=num_samples
             )
 
-        theta, _ = self._transform.inverse(theta, context=embedded_context)
+        theta, _ = self._neural_net._transform.inverse(theta, context=embedded_context)
 
         if embedded_context is not None:
             # Split the context dimension from sample dimension.
@@ -206,8 +212,8 @@ class MoGWrapper_SNPE_A(flows.Flow):
         """
 
         # Evaluate the density estimator.
-        encoded_x = self._embedding_net(x)
-        dist = self._distribution  # defined to avoid black formatting.
+        encoded_x = self._neural_net._embedding_net(x)
+        dist = self._neural_net._distribution  # defined to avoid black formatting.
         logits_d, m_d, prec_d, _, _ = dist.get_mixture_components(encoded_x)
         norm_logits_d = logits_d - torch.logsumexp(logits_d, dim=-1, keepdim=True)
 
@@ -286,7 +292,7 @@ class MoGWrapper_SNPE_A(flows.Flow):
             precisions_d,
         )
 
-        logits_post = MoGWrapper_SNPE_A._logits_posterior(
+        logits_post = MDNWrapper_SNPE_A._logits_posterior(
             means_post,
             precisions_post,
             covariances_post,
@@ -302,7 +308,7 @@ class MoGWrapper_SNPE_A(flows.Flow):
 
     def _set_state_for_mog_proposal(self) -> None:
         """
-        Set state variables of the MoGWrapper_SNPE_A instance evevy time `set_proposal()`
+        Set state variables of the MDNWrapper_SNPE_A instance evevy time `set_proposal()`
         is called, i.e. every time a posterior is build using `SNPE_A.build_posterior()`.
 
         This function is almost identical to `SNPE_C._set_state_for_mog_proposal()`.
@@ -316,7 +322,7 @@ class MoGWrapper_SNPE_A(flows.Flow):
             training step if the prior is Gaussian.
         """
 
-        self.z_score_theta = isinstance(self._transform, CompositeTransform)
+        self.z_score_theta = isinstance(self._neural_net._transform, CompositeTransform)
 
         self._set_maybe_z_scored_prior()
 
@@ -350,8 +356,8 @@ class MoGWrapper_SNPE_A(flows.Flow):
         prior = self._get_first_prior_from_proposal()
 
         if self.z_score_theta:
-            scale = self._transform._transforms[0]._scale
-            shift = self._transform._transforms[0]._shift
+            scale = self._neural_net._transform._transforms[0]._scale
+            shift = self._neural_net._transform._transforms[0]._shift
 
             # Following the definition of the linear transform in
             # `standardizing_transform` in `sbiutils.py`:
@@ -385,7 +391,7 @@ class MoGWrapper_SNPE_A(flows.Flow):
         """Return potentially standardized theta if z-scoring was requested."""
 
         if self.z_score_theta:
-            theta, _ = self._transform(theta)
+            theta, _ = self._neural_net._transform(theta)
 
         return theta
 
@@ -454,7 +460,7 @@ class MoGWrapper_SNPE_A(flows.Flow):
                             "The precision matrix of a posterior is not positive definite! "
                             "This is a known issue for SNPE-A. Either try a different parameter "
                             "setting or pass `allow_precision_correction=True` when constructing "
-                            "the `MoGWrapper_SNPE_A` density estimator."
+                            "the `MDNWrapper_SNPE_A` density estimator."
                         )
 
         covariances_p = torch.inverse(precisions_p)

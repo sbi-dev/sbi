@@ -12,7 +12,7 @@ from sbi.neural_nets.classifier import (
     build_resnet_classifier,
 )
 from sbi.neural_nets.flow import build_made, build_maf, build_nsf
-from sbi.neural_nets.mdn import build_mdn, build_mdn_snpe_a
+from sbi.neural_nets.mdn import build_mdn
 
 
 def classifier_nn(
@@ -221,7 +221,7 @@ def posterior_nn(
             # override this kwarg with functools.partial. This is necessary
             # in order to make sure that the MDN in SNPE-A only has one
             # component when running the Algorithm 1 part.
-            return build_mdn_snpe_a(
+            return build_mdn(
                 batch_x=batch_theta,
                 batch_y=batch_x,
                 num_components=num_components,

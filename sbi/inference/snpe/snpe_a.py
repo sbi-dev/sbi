@@ -14,6 +14,7 @@ from torch.distributions import MultivariateNormal
 import sbi.utils as utils
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.inference.snpe.snpe_base import PosteriorEstimator
+from sbi.neural_nets.mdn_wrapper_snpe_a import MDNWrapper_SNPE_A
 from sbi.types import TensorboardSummaryWriter, TorchModule
 
 
@@ -257,23 +258,28 @@ class SNPE_A(PosteriorEstimator):
         # This also evokes the z-scoring correction is necessary.
         if proposal is None:
             if self._model_bank:
-                density_estimator.set_proposal(self._model_bank[-1].net)
+                proposal = self._model_bank[-1].net
             else:
-                density_estimator.set_proposal(self._prior)
+                proposal = self._prior
         elif isinstance(proposal, (MultivariateNormal, utils.BoxUniform)):
-            density_estimator.set_proposal(proposal)
+            pass
         elif isinstance(proposal, DirectPosterior):
-            # Extract the MoGFlow_SNPE_A from the DirectPosterior.
-            density_estimator.set_proposal(proposal.net)
+            # Extract the MDNWrapper_SNPE_A from the DirectPosterior.
+            proposal = proposal.net
         else:
             raise TypeError(
                 "So far, only MultivariateNormal, BoxUniform, and DirectPosterior are"
                 "supported for the `proposal` arg in SNPE_A.build_posterior()."
             )
 
+        # Create the MDNWrapper_SNPE_A
+        wrapped_density_estimator = MDNWrapper_SNPE_A(
+            flow=density_estimator, proposal=proposal
+        )
+
         self._posterior = DirectPosterior(
             method_family="snpe",
-            neural_net=density_estimator,
+            neural_net=wrapped_density_estimator,
             prior=self._prior,
             x_shape=self._x_shape,
             rejection_sampling_parameters=rejection_sampling_parameters,
