@@ -122,8 +122,8 @@ class SNPE_A(PosteriorEstimator):
             https://arxiv.org/abs/1605.06376.
 
         Args:
-            final_round: Whether we are in the last round of training or not. For all 
-                but the last round, Algorithm 1 from [1] is executed. For last round, 
+            final_round: Whether we are in the last round of training or not. For all
+                but the last round, Algorithm 1 from [1] is executed. For last round,
                 Algorithm 2 from [1] is executed once.
             training_batch_size: Training batch size.
             learning_rate: Learning rate for Adam optimizer.
@@ -180,9 +180,9 @@ class SNPE_A(PosteriorEstimator):
                 warnings.warn(
                     f"Running SNPE-A for more than the specified number of rounds "
                     f"{self._num_rounds} implies running Algorithm 2 from [1] multiple "
-                    f"times, which can lead to numerical issues. Moreover, the number of "
-                    f"components in the mixture of Gaussian increases with every round "
-                    f"after {self._num_rounds}.",
+                    f"times, which can lead to numerical issues. Moreover, the number "
+                    f"of components in the mixture of Gaussian increases with every "
+                    f"round after {self._num_rounds}.",
                     UserWarning,
                 )
         else:
@@ -219,14 +219,15 @@ class SNPE_A(PosteriorEstimator):
         - alternatively, if leakage is very high (which can happen for multi-round
             SNPE), sample from the posterior with MCMC.
 
-        The DirectPosterior class assumes that the density estimator approximates the posterior.
-        In SNPE-A, the density estimator is an approximation of the proposal posterior. Hence, importance reweigthing
-        is needed during evaluation.
+        The DirectPosterior class assumes that the density estimator approximates the
+        posterior.
+        In SNPE-A, the density estimator is an approximation of the proposal posterior.
+        Hence, importance reweigthing is needed during evaluation.
 
         Args:
-            proposal: The proposal prior obtained from the from maximum-likelihood training.
-                If None, the posterior of the previous previous round is used. In the first round
-                the prior is used as a proposal.
+            proposal: The proposal prior that had been used for maximum-likelihood
+                training. If None, the posterior of the previous previous round is
+                used. In the first round the prior is used as a proposal.
             density_estimator: The density estimator that the posterior is based on.
                 If `None`, use the latest neural density estimator that was trained.
             rejection_sampling_parameters: Dictionary overriding the default parameters
@@ -452,7 +453,7 @@ class SNPE_A_MDN(nn.Module):
             theta = self._maybe_z_score_theta(inputs)
 
             # Compute the log_prob of theta under the product.
-            log_prob_proposal_posterior = sbi.utils.sbiutils.mog_log_prob(
+            log_prob_proposal_posterior = utils.sbiutils.mog_log_prob(
                 theta, logits_pp, m_pp, prec_pp,
             )
             utils.assert_all_finite(
@@ -473,9 +474,9 @@ class SNPE_A_MDN(nn.Module):
             if isinstance(self._proposal, (utils.BoxUniform, MultivariateNormal)):
                 return self._neural_net.sample(num_samples, context, batch_size)
 
-            # When we want to sample from the approx. posterior, a proposal prior \tilde{p}
-            # has already been observed. To analytically calculate the log-prob of the
-            # Gaussian, we first need to compute the mixture components.
+            # When we want to sample from the approx. posterior, a proposal prior
+            # \tilde{p} has already been observed. To analytically calculate the
+            # log-prob of the Gaussian, we first need to compute the mixture components.
             return self._sample_approx_posterior_mog(num_samples, context, batch_size)
 
     def _sample_approx_posterior_mog(
@@ -587,15 +588,6 @@ class SNPE_A_MDN(nn.Module):
         This function implements Appendix C from [1], and is highly similar to
         `SNPE_C._automatic_posterior_transformation()`.
 
-        We have to build L*K components. How do we do this?
-        Example: proposal has two components, density estimator has three components.
-        Let's call the two components of the proposal i,j and the three components
-        of the density estimator x,y,z. We have to multiply every component of the
-        proposal with every component of the density estimator. So, what we do is:
-        1) for the proposal, build: i,i,i,j,j,j. Done with torch.repeat_interleave()
-        2) for the density estimator, build: x,y,z,x,y,z. Done with torch.repeat()
-        3) Multiply them with simple matrix operations.
-
         Args:
             logits_pprior: Component weight of each Gaussian of the proposal prior.
             means_pprior: Mean of each Gaussian of the proposal prior.
@@ -634,7 +626,8 @@ class SNPE_A_MDN(nn.Module):
     def _set_state_for_mog_proposal(self) -> None:
         """
         Set state variables of the SNPE_A_MDN instance evevy time `set_proposal()`
-        is called, i.e. every time a posterior is build using `SNPE_A.build_posterior()`.
+        is called, i.e. every time a posterior is build using
+        `SNPE_A.build_posterior()`.
 
         This function is almost identical to `SNPE_C._set_state_for_mog_proposal()`.
 
@@ -773,7 +766,7 @@ class SNPE_A_MDN(nn.Module):
                         precisions_p[idx_batch, idx_comp] = pp - torch.eye(
                             pp.shape[0]
                         ) * (min(eig_pp) - 1e-6)
-                        warn(
+                        warnings.warn(
                             "The precision matrix of a posterior has not been positive "
                             "definite at least once. Added diagonal entries with the "
                             "smallest eigenvalue to 1e-6."
@@ -782,9 +775,10 @@ class SNPE_A_MDN(nn.Module):
                     else:
                         # Fail when encountering an ill-conditioned precision matrix.
                         raise AssertionError(
-                            "The precision matrix of a posterior is not positive definite! "
-                            "This is a known issue for SNPE-A. Either try a different parameter "
-                            "setting or pass `allow_precision_correction=True` when constructing "
+                            "The precision matrix of a posterior is not positive "
+                            "definite! This is a known issue for SNPE-A. Either try a "
+                            "different parameter setting or pass"
+                            "`allow_precision_correction=True` when constructing "
                             "the `SNPE_A_MDN` density estimator."
                         )
 
@@ -909,10 +903,10 @@ class SNPE_A_MDN(nn.Module):
         )
 
         # Extend proposal and density estimator exponents to get LK terms.
-        exponent_prior_rep = exponent_pprior.repeat_interleave(num_comps_d, dim=1)
+        exponent_pprior_rep = exponent_pprior.repeat_interleave(num_comps_d, dim=1)
         exponent_d_rep = exponent_d.repeat(1, num_comps_pprior)
         exponent = -0.5 * (
-            exponent_prior_rep - exponent_d_rep - exponent_post  # eq (26) in [1]
+            exponent_d_rep - exponent_pprior_rep - exponent_post  # eq (26) in [1]
         )
 
         logits_post = logit_factors + log_sqrt_det_ratio + exponent
