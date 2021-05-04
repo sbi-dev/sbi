@@ -118,6 +118,7 @@ class SNPE_A(PosteriorEstimator):
         retrain_from_scratch_each_round: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
+        component_perturbation: float = 1e-2,
     ) -> DirectPosterior:
         r"""
         Return density estimator that approximates the proposal posterior $\tilde{p}(\theta|x)$.
@@ -152,16 +153,26 @@ class SNPE_A(PosteriorEstimator):
                 optimizer, the number of epochs, and the best validation log-prob will
                 be restored from the last time `.train()` was called.
             retrain_from_scratch_each_round: Whether to retrain the conditional density
-                estimator for the posterior from scratch each round.
+                estimator for the posterior from scratch each round. Not supported for 
+                SNPE-A.
             show_train_summary: Whether to print the number of epochs and validation
                 loss and leakage after the training.
             dataloader_kwargs: Additional or updated kwargs to be passed to the training
                 and validation dataloaders (like, e.g., a collate_fn)
+            component_perturbation: The standard deviation applied to all weights and
+                biases when, in the last round, the Mixture of Gaussians is build from
+                a single Gaussian.
         Returns:
             Density estimator that approximates the distribution $p(\theta|x)$.
         """
+
+        assert (
+            not retrain_from_scratch_each_round
+        ), "Retraining from scratch is not supported in SNPE-A yet. The reason for this is that, if we reininitialized the density estimator, the z-scoring would change, which would break the posthoc correction. This is a pure implementation issue."
+
         kwargs = utils.del_entries(
-            locals(), entries=("self", "__class__", "final_round")
+            locals(),
+            entries=("self", "__class__", "final_round", "component_perturbation"),
         )
 
         # SNPE-A always discards the prior samples.
@@ -183,7 +194,7 @@ class SNPE_A(PosteriorEstimator):
                 )
 
                 # Extend the MDN to the originally desired number of components.
-                self._expand_mog()
+                self._expand_mog(eps=component_perturbation)
             else:
                 warnings.warn(
                     f"Running SNPE-A for more than the specified number of rounds "
@@ -342,7 +353,7 @@ class SNPE_A(PosteriorEstimator):
         """
         return self._neural_net.log_prob(theta, x)
 
-    def _expand_mog(self, eps: float = 1e-5):
+    def _expand_mog(self, eps: float = 1e-2):
         """
         Replicate a singe Gaussian trained with Algorithm 1 before continuing
         with Algorithm 2. The weights and biases of the associated MDN layers
@@ -462,7 +473,7 @@ class SNPE_A_MDN(nn.Module):
             # Gaussian, we first need to compute the mixture components.
 
             # Compute the mixture components of the proposal posterior.
-            logits_pp, m_pp, prec_pp = self._get_mixture_components(context)
+            logits_pp, m_pp, prec_pp = self._posthoc_correction(context)
 
             # z-score theta if it z-scoring had been requested.
             theta = self._maybe_z_score_theta(inputs)
@@ -510,26 +521,26 @@ class SNPE_A_MDN(nn.Module):
         """
 
         # Compute the mixture components of the proposal posterior.
-        logits_pp, m_pp, prec_pp = self._get_mixture_components(x)
+        logits_p, m_p, prec_p = self._posthoc_correction(x)
 
         # Compute the precision factors which represent the upper triangular matrix
         # of the cholesky decomposition of the prec_pp.
-        prec_factors_pp = torch.cholesky(prec_pp, upper=True)
+        prec_factors_pp = torch.cholesky(prec_p, upper=True)
 
-        assert logits_pp.ndim == 2
-        assert m_pp.ndim == 3
-        assert prec_pp.ndim == 4
+        assert logits_p.ndim == 2
+        assert m_p.ndim == 3
+        assert prec_p.ndim == 4
         assert prec_factors_pp.ndim == 4
 
         # Replicate to use batched sampling from pyknos.
         if batch_size is not None and batch_size > 1:
-            logits_pp = logits_pp.repeat(batch_size, 1)
-            m_pp = m_pp.repeat(batch_size, 1, 1)
+            logits_p = logits_p.repeat(batch_size, 1)
+            m_p = m_p.repeat(batch_size, 1, 1)
             prec_factors_pp = prec_factors_pp.repeat(batch_size, 1, 1, 1)
 
         # Get (optionally z-scored) MoG samples.
         theta = MultivariateGaussianMDN.sample_mog(
-            num_samples, logits_pp, m_pp, prec_factors_pp
+            num_samples, logits_p, m_p, prec_factors_pp
         )
 
         embedded_context = self._neural_net._embedding_net(x)
@@ -549,7 +560,7 @@ class SNPE_A_MDN(nn.Module):
 
         return theta
 
-    def _get_mixture_components(self, x: Tensor):
+    def _posthoc_correction(self, x: Tensor):
         """
         Compute the mixture components of the posterior given the current density
         estimator and the proposal.
@@ -570,16 +581,14 @@ class SNPE_A_MDN(nn.Module):
         if isinstance(self._proposal, (utils.BoxUniform, MultivariateNormal)):
             # Uniform prior is uninformative.
             return norm_logits_d, m_d, prec_d
-
         else:
-            # Recursive ask for the mixture components until the prior is yielded.
-            logits_p, m_p, prec_p = self._proposal._get_mixture_components(x)
+            logits_pp, m_pp, prec_pp = self._proposal._posthoc_correction(x)
 
-        # Compute the MoG parameters of the proposal posterior.
-        logits_pp, m_pp, prec_pp, cov_pp = self._proposal_posterior_transformation(
-            logits_p, m_p, prec_p, norm_logits_d, m_d, prec_d,
+        # Compute the MoG parameters of the posterior.
+        logits_p, m_p, prec_p, cov_p = self._proposal_posterior_transformation(
+            logits_pp, m_pp, prec_pp, norm_logits_d, m_d, prec_d,
         )
-        return logits_pp, m_pp, prec_pp
+        return logits_p, m_p, prec_p
 
     def _proposal_posterior_transformation(
         self,
