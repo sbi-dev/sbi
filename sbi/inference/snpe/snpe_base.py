@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
-import time
 import logging
+import time
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from typing import Any, Callable, Dict, Optional, Union
@@ -84,10 +84,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         self._summary.update({"rejection_sampling_acceptance_rates": []})  # type:ignore
 
     def append_simulations(
-        self,
-        theta: Tensor,
-        x: Tensor,
-        proposal: Optional[Any] = None,
+        self, theta: Tensor, x: Tensor, proposal: Optional[Any] = None,
     ) -> "PosteriorEstimator":
         r"""
         Store parameters and simulation outputs to use them for later training.
@@ -214,8 +211,11 @@ class PosteriorEstimator(NeuralInference, ABC):
         # Starting index for the training set (1 = discard round-0 samples).
         start_idx = int(discard_prior_samples and self._round > 0)
 
-        # For non-atomic loss, we can not reuse samples from prev. rounds as of now.
-        if self.use_non_atomic_loss:
+        # For non-atomic loss, we can not reuse samples from previous rounds as of now.
+        # SNPE-A can, by construction of the algorithm, only use samples from the last
+        # round. SNPE-A is the only algorithm that has an attribute `_ran_final_round`,
+        # so this is how we check for whether or not we are using SNPE-A.
+        if self.use_non_atomic_loss or hasattr(self, "_ran_final_round"):
             start_idx = self._round
 
         theta, x, prior_masks = self.get_simulations(
@@ -223,11 +223,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         )
 
         # Dataset is shared for training and validation loaders.
-        dataset = data.TensorDataset(
-            theta,
-            x,
-            prior_masks,
-        )
+        dataset = data.TensorDataset(theta, x, prior_masks,)
 
         # Set the proposal to the last proposal that was passed by the user. For
         # atomic SNPE, it does not matter what the proposal is. For non-atomic
@@ -267,8 +263,7 @@ class PosteriorEstimator(NeuralInference, ABC):
 
         if not resume_training:
             self.optimizer = optim.Adam(
-                list(self._neural_net.parameters()),
-                lr=learning_rate,
+                list(self._neural_net.parameters()), lr=learning_rate,
             )
             self.epoch, self._val_log_prob = 0, float("-Inf")
 
@@ -291,11 +286,7 @@ class PosteriorEstimator(NeuralInference, ABC):
 
                 batch_loss = torch.mean(
                     self._loss(
-                        theta_batch,
-                        x_batch,
-                        masks_batch,
-                        proposal,
-                        calibration_kernel,
+                        theta_batch, x_batch, masks_batch, proposal, calibration_kernel,
                     )
                 )
 
@@ -304,14 +295,13 @@ class PosteriorEstimator(NeuralInference, ABC):
                 batch_loss.backward()
                 if clip_max_norm is not None:
                     clip_grad_norm_(
-                        self._neural_net.parameters(),
-                        max_norm=clip_max_norm,
+                        self._neural_net.parameters(), max_norm=clip_max_norm,
                     )
                 self.optimizer.step()
 
             self.epoch += 1
 
-            train_log_prob_sum /= int(theta.shape[0] * (1.0-validation_fraction))
+            train_log_prob_sum /= int(theta.shape[0] * (1.0 - validation_fraction))
             self._summary["train_log_probs"].append(train_log_prob_sum)
 
             # Calculate validation performance.
@@ -327,11 +317,7 @@ class PosteriorEstimator(NeuralInference, ABC):
                     )
                     # Take negative loss here to get validation log_prob.
                     batch_log_prob = -self._loss(
-                        theta_batch,
-                        x_batch,
-                        masks_batch,
-                        proposal,
-                        calibration_kernel,
+                        theta_batch, x_batch, masks_batch, proposal, calibration_kernel,
                     )
                     log_prob_sum += batch_log_prob.sum().item()
 
@@ -353,10 +339,7 @@ class PosteriorEstimator(NeuralInference, ABC):
 
         # Update tensorboard and summary dict.
         self._summarize(
-            round_=self._round,
-            x_o=None,
-            theta_bank=theta,
-            x_bank=x,
+            round_=self._round, x_o=None, theta_bank=theta, x_bank=x,
         )
 
         # Update description for progress bar.

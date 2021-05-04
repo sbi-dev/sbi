@@ -39,6 +39,13 @@ class SNPE_A(PosteriorEstimator):
             Density Estimation_, Papamakarios et al., NeurIPS 2016,
             https://arxiv.org/abs/1605.06376.
 
+        This class implements SNPE-A. This algorithm trains across multiple rounds with
+        a maximum-likelihood-loss. This will make training converge to the proposal
+        posterior instead of the true posterior. To correct for this, SNPE-A applies a
+        post-hoc correction after training. This correction has to be performed
+        analytically. Thus, SNPE-A is limited to Gaussian distributions for all but the
+        last round. In the last round, SNPE-A can use a Mixture of Gaussians.
+
         Args:
             prior: A probability distribution that expresses prior knowledge about the
                 parameters, e.g. which ranges are meaningful for them. Any
@@ -51,13 +58,12 @@ class SNPE_A(PosteriorEstimator):
                 thus be used for shape inference and potentially for z-scoring. It
                 needs to return a PyTorch `nn.Module` implementing the density
                 estimator. The density estimator needs to provide the methods
-                `.log_prob` and `.sample()`.
-                Note that until the last round only a single (multivariate) Gaussian
-                component is used for training (see Algorithm 1 in [1]). In the last
-                round, this component is replicated `num_components` times, its
-                parameters are perturbed with a very small noise, and then the last
-                training round is done with the expanded Gaussian mixture as estimator
-                for the proposal posterior.
+                `.log_prob` and `.sample()`. Note that until the last round only a
+                single (multivariate) Gaussian component is used for training (see
+                Algorithm 1 in [1]). In the last round, this component is replicated
+                `num_components` times, its parameters are perturbed with a very small
+                noise, and then the last training round is done with the expanded
+                Gaussian mixture as estimator for the proposal posterior.
             num_components:
                 Number of components of the mixture of Gaussians. This number is set to
                 1 before running Algorithm 1, and then later set to the specified value
@@ -114,12 +120,14 @@ class SNPE_A(PosteriorEstimator):
         dataloader_kwargs: Optional[Dict] = None,
     ) -> DirectPosterior:
         r"""
-        Return density estimator that approximates the proposal posterior's
-        distribution $\tilde{p}(\theta|x)$.
+        Return density estimator that approximates the proposal posterior $\tilde{p}(\theta|x)$.
 
         [1] _Fast epsilon-free Inference of Simulation Models with Bayesian Conditional
             Density Estimation_, Papamakarios et al., NeurIPS 2016,
             https://arxiv.org/abs/1605.06376.
+
+        Training is performed with maximum likelihood on samples from the latest round,
+        which leads the algorithm to converge to the proposal posterior.
 
         Args:
             final_round: Whether we are in the last round of training or not. For all
@@ -163,7 +171,7 @@ class SNPE_A(PosteriorEstimator):
 
         if final_round:
             # In case there is will only be one round, train with Algorithm 2 from [1].
-            if self._round == 1:
+            if self._round == 0:
                 self._build_neural_net = partial(
                     self._build_neural_net, num_components=self._num_components
                 )
@@ -206,12 +214,16 @@ class SNPE_A(PosteriorEstimator):
         sample_with_mcmc: bool = False,
         mcmc_method: str = "slice_np",
         mcmc_parameters: Optional[Dict[str, Any]] = None,
+        allow_precision_correction: bool = False,
     ) -> DirectPosterior:
         r"""
         Build posterior from the neural density estimator.
 
-        For SNPE, the posterior distribution that is returned here implements the
-        following functionality over the raw neural density estimator:
+        This class instantiates a `SNPE_A_MDN` object, which applies the
+        posthoc-correction required in SNPE-A.
+
+        In addition, the resulting posterior distribution that is returned here
+        implements the following functionality over the raw `SNPE_A_MDN` object:
 
         - correct the calculation of the log probability such that it compensates for
             the leakage.
@@ -221,8 +233,6 @@ class SNPE_A(PosteriorEstimator):
 
         The DirectPosterior class assumes that the density estimator approximates the
         posterior.
-        In SNPE-A, the density estimator is an approximation of the proposal posterior.
-        Hence, importance reweigthing is needed during evaluation.
 
         Args:
             proposal: The proposal prior that had been used for maximum-likelihood
@@ -249,6 +259,9 @@ class SNPE_A(PosteriorEstimator):
                 draw init locations from prior, whereas `sir` will use
                 Sequential-Importance-Resampling using `init_strategy_num_candidates`
                 to find init locations.
+            allow_precision_correction: Whether to add a diagonal with the smallest
+                eigenvalue in every entry in case the precision matrix becomes
+                ill-conditioned.
 
         Returns:
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods.
@@ -284,7 +297,9 @@ class SNPE_A(PosteriorEstimator):
 
         # Create the SNPE_A_MDN
         wrapped_density_estimator = SNPE_A_MDN(
-            flow=density_estimator, proposal=proposal
+            flow=density_estimator,
+            proposal=proposal,
+            allow_precision_correction=allow_precision_correction,
         )
 
         self._posterior = DirectPosterior(
@@ -727,7 +742,7 @@ class SNPE_A_MDN(nn.Module):
             precisions_pprior: Precision matrices of the proposal prior.
             precisions_d: Precision matrices of the density estimator.
 
-        Returns: (Precisions, Covariances) of the MoG posterior. L*K terms.
+        Returns: (Precisions, Covariances) of the MoG posterior.
         """
 
         num_comps_p = precisions_pprior.shape[1]
@@ -778,8 +793,8 @@ class SNPE_A_MDN(nn.Module):
                             "The precision matrix of a posterior is not positive "
                             "definite! This is a known issue for SNPE-A. Either try a "
                             "different parameter setting or pass"
-                            "`allow_precision_correction=True` when constructing "
-                            "the `SNPE_A_MDN` density estimator."
+                            "`allow_precision_correction=True` when calling "
+                            "`build_posterior()`."
                         )
 
         covariances_p = torch.inverse(precisions_p)
@@ -806,7 +821,7 @@ class SNPE_A_MDN(nn.Module):
             means_d: Means of the density estimator.
             precisions_d: Precision matrices of the density estimator.
 
-        Returns: Means of the MoG posterior. L*K terms.
+        Returns: Means of the MoG posterior.
         """
 
         num_comps_pprior = precisions_pprior.shape[1]
@@ -862,7 +877,7 @@ class SNPE_A_MDN(nn.Module):
             means_d: Means of the density estimator.
             precisions_d: Precision matrices of the density estimator.
 
-        Returns: Component weights of the proposal posterior. L*K terms.
+        Returns: Component weights of the proposal posterior.
         """
 
         num_comps_pprior = precisions_pprior.shape[1]

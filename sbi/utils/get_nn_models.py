@@ -213,6 +213,12 @@ def posterior_nn(
     )
 
     if model == "mdn_snpe_a":
+        if num_components != 10:
+            raise ValueError(
+                "You set `num_components`. For SNPE-A, this has to be done at "
+                "instantiation of the inference object, i.e. "
+                "`inference = SNPE_A(..., num_components=20)`"
+            )
         kwargs.pop("num_components")
 
         def build_fn(batch_theta, batch_x, num_components):
