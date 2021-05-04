@@ -6,7 +6,8 @@ import torch
 from torch import Tensor, ones, zeros
 from torch.distributions import MultivariateNormal
 
-from sbi.inference import SNPE
+from sbi.inference import SNPE, SNPE_A
+from sbi.inference.snpe.snpe_a import SNPE_A_MDN
 from sbi.utils import (
     BoxUniform,
     conditional_corrcoeff,
@@ -197,15 +198,21 @@ def test_average_cond_coeff_matrix():
     assert (torch.abs(gt_matrix - cond_mat) < 1e-3).all()
 
 
-def test_apt_transform(plot_results: bool = False):
+@pytest.mark.parametrize("alg", ("snpe_a", "snpe_c"))
+def test_gaussian_transforms(alg: str, plot_results: bool = False):
     """
     Tests whether the the product between proposal and posterior is computed correctly.
 
-    This initializes two MoGs with two components each. It then evaluates their product
-    by simply multiplying the probabilities of the two. The result is compared to the
-    product of two MoGs as implemented in APT.
+    For SNPE-C, this initializes two MoGs with two components each. It then evaluates
+    their product by simply multiplying the probabilities of the two. The result is
+    compared to the product of two MoGs as implemented in APT.
+
+    For SNPE-A, it initializes a MoG with two compontents and one Gaussian (with one
+    component). It then devices the MoG by the Gaussian and compares it to the
+    transformation in SNPE-A.
 
     Args:
+        alg: String indicating whether to test snpe-a or snpe-c.
         plot_results: Whether to plot the products of the distributions.
     """
 
@@ -235,9 +242,14 @@ def test_apt_transform(plot_results: bool = False):
     covs1 = torch.stack([0.5 * torch.eye(2), torch.eye(2)])
     weights1 = torch.tensor([0.3, 0.7])
 
-    means2 = torch.tensor([[2.0, -2.2], [-2.0, 1.9]])
-    covs2 = torch.stack([0.6 * torch.eye(2), 0.9 * torch.eye(2)])
-    weights2 = torch.tensor([0.6, 0.4])
+    if alg == "snpe_c":
+        means2 = torch.tensor([[2.0, -2.2], [-2.0, 1.9]])
+        covs2 = torch.stack([0.6 * torch.eye(2), 0.9 * torch.eye(2)])
+        weights2 = torch.tensor([0.6, 0.4])
+    elif alg == "snpe_a":
+        means2 = torch.tensor([[-0.2, -0.4]])
+        covs2 = torch.stack([3.5 * torch.eye(2)])
+        weights2 = torch.tensor([1.0])
 
     mog1 = MoG(means1, covs1, weights1)
     mog2 = MoG(means2, covs2, weights2)
@@ -249,29 +261,62 @@ def test_apt_transform(plot_results: bool = False):
     probs2_raw = mog2.log_prob(theta_grid_flat.T)
     probs2 = torch.reshape(probs2_raw, (100, 100))
 
-    probs_mult = probs1 * probs2
+    if alg == "snpe_c":
+        probs_mult = probs1 * probs2
 
-    # Set up a SNPE object in order to use the `_automatic_posterior_transformation()`.
-    prior = BoxUniform(-5 * ones(2), 5 * ones(2))
-    density_estimator = posterior_nn("mdn", z_score_theta=False, z_score_x=False)
-    inference = SNPE(prior=prior, density_estimator=density_estimator)
-    theta_ = torch.rand(100, 2)
-    x_ = torch.rand(100, 2)
-    _ = inference.append_simulations(theta_, x_).train(max_num_epochs=1)
-    inference._set_state_for_mog_proposal()
+        # Set up a SNPE object in order to use the
+        # `_automatic_posterior_transformation()`.
+        prior = BoxUniform(-5 * ones(2), 5 * ones(2))
+        density_estimator = posterior_nn("mdn", z_score_theta=False, z_score_x=False)
+        inference = SNPE(prior=prior, density_estimator=density_estimator)
+        theta_ = torch.rand(100, 2)
+        x_ = torch.rand(100, 2)
+        _ = inference.append_simulations(theta_, x_).train(max_num_epochs=1)
+        inference._set_state_for_mog_proposal()
 
-    precs1 = torch.inverse(covs1)
-    precs2 = torch.inverse(covs2)
+        precs1 = torch.inverse(covs1)
+        precs2 = torch.inverse(covs2)
 
-    # `.unsqueeze(0)` is needed because the method requires a batch dimension.
-    logits_pp, means_pp, _, covs_pp = inference._automatic_posterior_transformation(
-        torch.log(weights1.unsqueeze(0)),
-        means1.unsqueeze(0),
-        precs1.unsqueeze(0),
-        torch.log(weights2.unsqueeze(0)),
-        means2.unsqueeze(0),
-        precs2.unsqueeze(0),
-    )
+        # `.unsqueeze(0)` is needed because the method requires a batch dimension.
+        logits_pp, means_pp, _, covs_pp = inference._automatic_posterior_transformation(
+            torch.log(weights1.unsqueeze(0)),
+            means1.unsqueeze(0),
+            precs1.unsqueeze(0),
+            torch.log(weights2.unsqueeze(0)),
+            means2.unsqueeze(0),
+            precs2.unsqueeze(0),
+        )
+
+    elif alg == "snpe_a":
+        probs_mult = probs1 / probs2
+
+        prior = BoxUniform(-5 * ones(2), 5 * ones(2))
+
+        inference = SNPE_A(prior=prior)
+        theta_ = torch.rand(100, 2)
+        x_ = torch.rand(100, 2)
+        density_estimator = inference.append_simulations(theta_, x_).train(
+            max_num_epochs=1
+        )
+        wrapped_density_estimator = SNPE_A_MDN(flow=density_estimator, proposal=prior)
+
+        precs1 = torch.inverse(covs1)
+        precs2 = torch.inverse(covs2)
+
+        # `.unsqueeze(0)` is needed because the method requires a batch dimension.
+        (
+            logits_pp,
+            means_pp,
+            _,
+            covs_pp,
+        ) = wrapped_density_estimator._proposal_posterior_transformation(
+            torch.log(weights2.unsqueeze(0)),
+            means2.unsqueeze(0),
+            precs2.unsqueeze(0),
+            torch.log(weights1.unsqueeze(0)),
+            means1.unsqueeze(0),
+            precs1.unsqueeze(0),
+        )
 
     # Normalize weights.
     logits_pp_norm = logits_pp - torch.logsumexp(logits_pp, dim=-1, keepdim=True)
@@ -297,11 +342,13 @@ def test_apt_transform(plot_results: bool = False):
         ax[0].set_title("p_1")
         ax[1].imshow(probs2, extent=[-bound, bound, -bound, bound])
         ax[1].set_title("p_2")
-
         ax[2].imshow(probs_mult, extent=[-bound, bound, -bound, bound])
-        ax[2].set_title("p_1 * p_2")
-
         ax[3].imshow(probs_apt, extent=[-bound, bound, -bound, bound])
-        ax[3].set_title("APT")
+        if alg == "snpe_c":
+            ax[2].set_title("p_1 * p_2")
+            ax[3].set_title("APT")
+        elif alg == "snpe_a":
+            ax[2].set_title("p_1 / p_2")
+            ax[3].set_title("SNPE-A")
 
         plt.show()
