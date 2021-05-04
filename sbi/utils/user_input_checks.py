@@ -13,6 +13,7 @@ from scipy.stats._multivariate import multi_rv_frozen
 from torch import Tensor, float32, nn
 from torch.distributions import Distribution, Uniform
 
+from sbi.utils.sbiutils import within_support
 from sbi.utils.torchutils import BoxUniform, atleast_2d
 from sbi.utils.user_input_checks_utils import (
     CustomPytorchWrapper,
@@ -20,7 +21,6 @@ from sbi.utils.user_input_checks_utils import (
     PytorchReturnTypeWrapper,
     ScipyPytorchWrapper,
 )
-from sbi.utils.sbiutils import within_support
 
 
 def process_prior(prior) -> Tuple[Distribution, int, bool]:
@@ -368,9 +368,7 @@ def check_prior_support(prior):
 
 
 def process_simulator(
-    user_simulator: Callable,
-    prior,
-    is_numpy_simulator: bool,
+    user_simulator: Callable, prior, is_numpy_simulator: bool,
 ) -> Callable:
     """Return a simulator that meets the requirements for usage in sbi.
 
@@ -474,10 +472,7 @@ def process_x(x: Tensor, x_shape: torch.Size) -> Tensor:
     return x
 
 
-def prepare_for_sbi(
-    simulator: Callable,
-    prior,
-) -> Tuple[Callable, Distribution]:
+def prepare_for_sbi(simulator: Callable, prior,) -> Tuple[Callable, Distribution]:
     """Prepare simulator, prior and for usage in sbi.
 
     One of the goals is to allow you to use sbi with inputs computed in numpy.
@@ -593,7 +588,7 @@ def validate_theta_and_x(
     assert x.dtype == float32, "Type of simulator outputs must be float32."
 
     simulations_device = f"{x.device.type}:{x.device.index}"
-    if not simulations_device == "cpu" and training_device == "cpu":
+    if "cpu" not in simulations_device and "cpu" in training_device:
         logging.warning(
             f"""Simulations are on {simulations_device} but training device is
             set to {training_device}, moving data to device to {training_device}."""
