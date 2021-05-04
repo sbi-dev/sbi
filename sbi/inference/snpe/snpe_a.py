@@ -75,6 +75,11 @@ class SNPE_A(PosteriorEstimator):
                 0.14.0 is more mature, we will remove this argument.
         """
 
+        warnings.warn(
+            "SNPE-A has been added to `sbi` recently and its API is still subject to "
+            "changes. See PR #478 on Github for updates."
+        )
+
         # Catch invalid inputs.
         if not ((density_estimator == "mdn_snpe_a") or callable(density_estimator)):
             raise TypeError(
