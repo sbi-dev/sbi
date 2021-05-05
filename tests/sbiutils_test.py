@@ -198,8 +198,8 @@ def test_average_cond_coeff_matrix():
     assert (torch.abs(gt_matrix - cond_mat) < 1e-3).all()
 
 
-@pytest.mark.parametrize("alg", ("snpe_a", "snpe_c"))
-def test_gaussian_transforms(alg: str, plot_results: bool = False):
+@pytest.mark.parametrize("snpe_method", ("snpe_a", "snpe_c"))
+def test_gaussian_transforms(snpe_method: str, plot_results: bool = False):
     """
     Tests whether the the product between proposal and posterior is computed correctly.
 
@@ -212,7 +212,7 @@ def test_gaussian_transforms(alg: str, plot_results: bool = False):
     transformation in SNPE-A.
 
     Args:
-        alg: String indicating whether to test snpe-a or snpe-c.
+        snpe_method: String indicating whether to test snpe-a or snpe-c.
         plot_results: Whether to plot the products of the distributions.
     """
 
@@ -242,11 +242,11 @@ def test_gaussian_transforms(alg: str, plot_results: bool = False):
     covs1 = torch.stack([0.5 * torch.eye(2), torch.eye(2)])
     weights1 = torch.tensor([0.3, 0.7])
 
-    if alg == "snpe_c":
+    if snpe_method == "snpe_c":
         means2 = torch.tensor([[2.0, -2.2], [-2.0, 1.9]])
         covs2 = torch.stack([0.6 * torch.eye(2), 0.9 * torch.eye(2)])
         weights2 = torch.tensor([0.6, 0.4])
-    elif alg == "snpe_a":
+    elif snpe_method == "snpe_a":
         means2 = torch.tensor([[-0.2, -0.4]])
         covs2 = torch.stack([3.5 * torch.eye(2)])
         weights2 = torch.tensor([1.0])
@@ -261,7 +261,7 @@ def test_gaussian_transforms(alg: str, plot_results: bool = False):
     probs2_raw = mog2.log_prob(theta_grid_flat.T)
     probs2 = torch.reshape(probs2_raw, (100, 100))
 
-    if alg == "snpe_c":
+    if snpe_method == "snpe_c":
         probs_mult = probs1 * probs2
 
         # Set up a SNPE object in order to use the
@@ -287,7 +287,7 @@ def test_gaussian_transforms(alg: str, plot_results: bool = False):
             precs2.unsqueeze(0),
         )
 
-    elif alg == "snpe_a":
+    elif snpe_method == "snpe_a":
         probs_mult = probs1 / probs2
 
         prior = BoxUniform(-5 * ones(2), 5 * ones(2))
@@ -346,10 +346,10 @@ def test_gaussian_transforms(alg: str, plot_results: bool = False):
         ax[1].set_title("p_2")
         ax[2].imshow(probs_mult, extent=[-bound, bound, -bound, bound])
         ax[3].imshow(probs_apt, extent=[-bound, bound, -bound, bound])
-        if alg == "snpe_c":
+        if snpe_method == "snpe_c":
             ax[2].set_title("p_1 * p_2")
             ax[3].set_title("APT")
-        elif alg == "snpe_a":
+        elif snpe_method == "snpe_a":
             ax[2].set_title("p_1 / p_2")
             ax[3].set_title("SNPE-A")
 
