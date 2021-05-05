@@ -91,10 +91,7 @@ def matrix_simulator(theta):
 @pytest.mark.parametrize(
     "wrapper, prior",
     (
-        (
-            CustomPytorchWrapper,
-            UserNumpyUniform(zeros(3), ones(3), return_numpy=True),
-        ),
+        (CustomPytorchWrapper, UserNumpyUniform(zeros(3), ones(3), return_numpy=True),),
         (ScipyPytorchWrapper, multivariate_normal()),
         (ScipyPytorchWrapper, uniform()),
         (ScipyPytorchWrapper, beta(a=1, b=1)),
@@ -144,8 +141,7 @@ def test_reinterpreted_batch_dim_prior():
             Uniform(zeros((1, 3)), ones((1, 3))), marks=pytest.mark.xfail
         ),  # batch shape > 1.
         pytest.param(
-            MultivariateNormal(zeros(3, 3), eye(3)),
-            marks=pytest.mark.xfail,
+            MultivariateNormal(zeros(3, 3), eye(3)), marks=pytest.mark.xfail,
         ),  # batch shape > 1.
         pytest.param(
             Uniform(zeros(3), ones(3)), marks=pytest.mark.xfail
@@ -173,11 +169,7 @@ def test_process_prior(prior):
 
 
 @pytest.mark.parametrize(
-    "x, x_shape",
-    (
-        (ones(3), torch.Size([1, 3])),
-        (ones(1, 3), torch.Size([1, 3])),
-    ),
+    "x, x_shape", ((ones(3), torch.Size([1, 3])), (ones(1, 3), torch.Size([1, 3])),),
 )
 def test_process_x(x, x_shape):
     process_x(x, x_shape)
@@ -190,10 +182,7 @@ def test_process_x(x, x_shape):
         (diagonal_linear_gaussian, BoxUniform(zeros(2), ones(2))),
         (numpy_linear_gaussian, UserNumpyUniform(zeros(2), ones(2), True)),
         (linear_gaussian_no_batch, BoxUniform(zeros(2), ones(2))),
-        pytest.param(
-            list_simulator,
-            BoxUniform(zeros(2), ones(2)),
-        ),
+        pytest.param(list_simulator, BoxUniform(zeros(2), ones(2)),),
     ),
 )
 def test_process_simulator(simulator: Callable, prior: Distribution):
@@ -213,10 +202,7 @@ def test_process_simulator(simulator: Callable, prior: Distribution):
 @pytest.mark.parametrize(
     "simulator, prior",
     (
-        (
-            linear_gaussian_no_batch,
-            BoxUniform(zeros(3), ones(3)),
-        ),
+        (linear_gaussian_no_batch, BoxUniform(zeros(3), ones(3)),),
         (
             numpy_linear_gaussian,
             UserNumpyUniform(zeros(3), ones(3), return_numpy=True),
@@ -238,10 +224,7 @@ def test_process_simulator(simulator: Callable, prior: Distribution):
                 MultivariateNormal(zeros(2), eye(2)),
             ],
         ),
-        pytest.param(
-            list_simulator,
-            BoxUniform(zeros(3), ones(3)),
-        ),
+        pytest.param(list_simulator, BoxUniform(zeros(3), ones(3)),),
     ),
 )
 def test_prepare_sbi_problem(simulator: Callable, prior):
@@ -313,11 +296,11 @@ def test_inference_with_user_sbi_problems(
     # Build posterior.
     if snpe_method == SNPE_A:
         if not isinstance(prior, (MultivariateNormal, BoxUniform, DirectPosterior)):
-            with pytest.raises(TypeError):
+            with pytest.raises(AssertionError):
                 # SNPE-A does not support priors yet.
-                _ = inference.build_posterior(proposal=prior)
+                _ = inference.build_posterior()
         else:
-            _ = inference.build_posterior(proposal=prior)
+            _ = inference.build_posterior()
     else:
         _ = inference.build_posterior()
 
@@ -563,7 +546,4 @@ def test_train_with_different_data_and_training_device(
     weights_device = next(inference._neural_net.parameters()).device
     assert torch.device(training_device) == weights_device
 
-    if snpe_method == SNPE_A:
-        _ = inference.build_posterior(proposal=prior)
-    else:
-        _ = inference.build_posterior()
+    _ = inference.build_posterior()

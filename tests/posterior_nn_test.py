@@ -21,10 +21,7 @@ def test_log_prob_with_different_x(snpe_method: type):
     inference = snpe_method(prior)
     theta, x = simulate_for_sbi(simulator, prior, 1000)
     _ = inference.append_simulations(theta, x).train()
-    if snpe_method == SNPE_A:
-        posterior = inference.build_posterior(proposal=prior)
-    else:
-        posterior = inference.build_posterior()
+    posterior = inference.build_posterior()
 
     _ = posterior.sample((10,), x=ones(1, num_dim))
     theta = posterior.sample((10,), ones(1, num_dim))

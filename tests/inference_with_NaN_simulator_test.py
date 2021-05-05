@@ -56,12 +56,7 @@ def test_z_scoring_warning(snpe_method: type):
 @pytest.mark.slow
 @pytest.mark.parametrize(
     ("method", "exclude_invalid_x", "percent_nans"),
-    (
-        (SNPE_A, True, 0.05),
-        (SNPE_C, True, 0.05),
-        (SNL, True, 0.05),
-        (SRE, True, 0.05),
-    ),
+    ((SNPE_C, True, 0.05), (SNL, True, 0.05), (SRE, True, 0.05),),
 )
 def test_inference_with_nan_simulator(
     method: type, exclude_invalid_x: bool, percent_nans: float, set_seed
@@ -101,10 +96,7 @@ def test_inference_with_nan_simulator(
         exclude_invalid_x=exclude_invalid_x
     )
 
-    if method == SNPE_A:
-        posterior = inference.build_posterior(proposal=prior).set_default_x(x_o)
-    else:
-        posterior = inference.build_posterior().set_default_x(x_o)
+    posterior = inference.build_posterior().set_default_x(x_o)
 
     samples = posterior.sample((num_samples,))
 
@@ -113,8 +105,7 @@ def test_inference_with_nan_simulator(
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("snpe_method", [SNPE_A, SNPE_C])
-def test_inference_with_restriction_estimator(snpe_method: type, set_seed):
+def test_inference_with_restriction_estimator(set_seed):
 
     # likelihood_mean will be likelihood_shift+theta
     num_dim = 3
@@ -156,14 +147,11 @@ def test_inference_with_restriction_estimator(snpe_method: type, set_seed):
     all_theta, all_x, _ = rejection_estimator.get_simulations()
 
     # Any method can be used in combination with the `RejectionEstimator`.
-    inference = snpe_method(prior=prior)
+    inference = SNPE_C(prior=prior)
     _ = inference.append_simulations(all_theta, all_x).train()
 
     # Build posterior.
-    if snpe_method == SNPE_A:
-        posterior = inference.build_posterior(proposal=prior).set_default_x(x_o)
-    else:
-        posterior = inference.build_posterior().set_default_x(x_o)
+    posterior = inference.build_posterior().set_default_x(x_o)
 
     samples = posterior.sample((num_samples,))
 
