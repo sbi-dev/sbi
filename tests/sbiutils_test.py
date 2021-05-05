@@ -298,7 +298,9 @@ def test_gaussian_transforms(alg: str, plot_results: bool = False):
         density_estimator = inference.append_simulations(theta_, x_).train(
             max_num_epochs=1
         )
-        wrapped_density_estimator = SNPE_A_MDN(flow=density_estimator, proposal=prior)
+        wrapped_density_estimator = SNPE_A_MDN(
+            flow=density_estimator, proposal=prior, prior=prior
+        )
 
         precs1 = torch.inverse(covs1)
         precs2 = torch.inverse(covs2)

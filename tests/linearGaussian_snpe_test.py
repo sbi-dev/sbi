@@ -27,18 +27,12 @@ from tests.test_utils import (
 )
 
 
+@pytest.mark.parametrize("snpe_method", [SNPE_A, SNPE_C])
 @pytest.mark.parametrize(
-    "num_dim, prior_str",
-    (
-        (2, "gaussian"),
-        (2, "uniform"),
-        (1, "gaussian"),
-    ),
+    "num_dim, prior_str", ((2, "gaussian"), (2, "uniform"), (1, "gaussian"),),
 )
 def test_c2st_snpe_on_linearGaussian(
-    num_dim: int,
-    prior_str: str,
-    set_seed,
+    snpe_method: type, num_dim: int, prior_str: str, set_seed,
 ):
     """Test whether SNPE C infers well a simple example with available ground truth.
 
@@ -72,10 +66,7 @@ def test_c2st_snpe_on_linearGaussian(
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     simulator, prior = prepare_for_sbi(simulator, prior)
-    inference = SNPE_C(
-        prior,
-        show_progress_bars=False,
-    )
+    inference = snpe_method(prior, show_progress_bars=False,)
 
     theta, x = simulate_for_sbi(
         simulator, prior, num_simulations, simulation_batch_size=1000
@@ -198,12 +189,12 @@ def test_c2st_snpe_on_linearGaussian_different_dims(set_seed):
         pytest.param(
             "snpe_b",
             marks=pytest.mark.xfail(
-                raises=NotImplementedError,
-                reason="""SNPE-B not implemented""",
+                raises=NotImplementedError, reason="""SNPE-B not implemented""",
             ),
         ),
         "snpe_c",
         "snpe_c_non_atomic",
+        "snpe_a",
     ),
 )
 def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str, set_seed):
@@ -236,6 +227,8 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str, set_seed):
     if method_str == "snpe_c_non_atomic":
         density_estimator = utils.posterior_nn("mdn", num_components=5)
         method_str = "snpe_c"
+    elif method_str == "snpe_a":
+        density_estimator = "mdn_snpe_a"
     else:
         density_estimator = "maf"
 
@@ -267,6 +260,21 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str, set_seed):
         )
         _ = inference.append_simulations(theta, x, proposal=posterior1).train()
         posterior = inference.build_posterior().set_default_x(x_o)
+    elif method_str == "snpe_a":
+        inference = SNPE_A(**creation_args)
+        proposal = prior
+        final_round = False
+        num_rounds = 3
+        for r in range(num_rounds):
+            if r == 2:
+                final_round = True
+            theta, x = simulate_for_sbi(
+                simulator, proposal, 500, simulation_batch_size=50
+            )
+            inference = inference.append_simulations(theta, x, proposal=proposal)
+            _ = inference.train(max_num_epochs=200, final_round=final_round)
+            posterior = inference.build_posterior().set_default_x(x_o)
+            proposal = posterior
 
     samples = posterior.sample((num_samples,))
 
@@ -326,10 +334,7 @@ def test_api_snpe_c_posterior_correction(
     theta, x = simulate_for_sbi(simulator, prior, 1000)
     _ = inference.append_simulations(theta, x).train(max_num_epochs=5)
 
-    if snpe_method == SNPE_A:
-        posterior = inference.build_posterior(proposal=prior)
-    else:
-        posterior = inference.build_posterior()
+    posterior = inference.build_posterior()
     posterior = posterior.set_sample_with_mcmc(sample_with_mcmc).set_mcmc_method(
         mcmc_method
     )
@@ -342,10 +347,8 @@ def test_api_snpe_c_posterior_correction(
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize(
-    "snpe_method, num_rounds", [(SNPE_A, 2), (SNPE_A, 5), (SNPE_C, None)]
-)
-def test_sample_conditional(snpe_method: type, num_rounds: int, set_seed):
+@pytest.mark.parametrize("snpe_method", [SNPE_A, SNPE_C])
+def test_sample_conditional(snpe_method: type, set_seed):
     """
     Test whether sampling from the conditional gives the same results as evaluating.
 
@@ -374,28 +377,18 @@ def test_sample_conditional(snpe_method: type, num_rounds: int, set_seed):
             return linear_gaussian(theta, -likelihood_shift, likelihood_cov)
 
     if snpe_method == SNPE_A:
-        net = utils.posterior_nn("mdn_snpe_a", num_components=5, hidden_features=20)
-        extra_kwargs = dict(num_rounds=num_rounds)
+        net = utils.posterior_nn("mdn_snpe_a", hidden_features=20)
     else:
         net = utils.posterior_nn("maf", hidden_features=20)
-        extra_kwargs = dict()
 
     simulator, prior = prepare_for_sbi(simulator, prior)
-    inference = snpe_method(
-        prior,
-        density_estimator=net,
-        show_progress_bars=False,
-        **extra_kwargs,
-    )
+    inference = snpe_method(prior, density_estimator=net, show_progress_bars=False,)
 
     # We need a pretty big dataset to properly model the bimodality.
     theta, x = simulate_for_sbi(simulator, prior, 10000)
     _ = inference.append_simulations(theta, x).train(max_num_epochs=50)
 
-    if snpe_method == SNPE_A:
-        posterior = inference.build_posterior(proposal=prior).set_default_x(x_o)
-    else:
-        posterior = inference.build_posterior().set_default_x(x_o)
+    posterior = inference.build_posterior().set_default_x(x_o)
     samples = posterior.sample((50,))
 
     # Evaluate the conditional density be drawing samples and smoothing with a Gaussian
@@ -416,16 +409,8 @@ def test_sample_conditional(snpe_method: type, num_rounds: int, set_seed):
     density = gaussian_kde(cond_samples.numpy().T, bw_method="scott")
 
     X, Y = np.meshgrid(
-        np.linspace(
-            limits[0][0],
-            limits[0][1],
-            50,
-        ),
-        np.linspace(
-            limits[1][0],
-            limits[1][1],
-            50,
-        ),
+        np.linspace(limits[0][0], limits[0][1], 50,),
+        np.linspace(limits[1][0], limits[1][1], 50,),
     )
     positions = np.vstack([X.ravel(), Y.ravel()])
     sample_kde_grid = np.reshape(density(positions).T, X.shape)
@@ -449,10 +434,8 @@ def test_sample_conditional(snpe_method: type, num_rounds: int, set_seed):
     assert max_err < 0.0025
 
 
-@pytest.mark.parametrize(
-    "snpe_method, num_rounds", [(SNPE_A, 2), (SNPE_A, 10), (SNPE_C, None)]
-)
-def test_example_posterior(snpe_method: type, num_rounds: int):
+@pytest.mark.parametrize("snpe_method", [SNPE_A, SNPE_C])
+def test_example_posterior(snpe_method: type):
     """Return an inferred `NeuralPosterior` for interactive examination."""
     num_dim = 2
     x_o = zeros(1, num_dim)
@@ -469,7 +452,7 @@ def test_example_posterior(snpe_method: type, num_rounds: int):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     if snpe_method == SNPE_A:
-        extra_kwargs = dict(num_rounds=num_rounds)
+        extra_kwargs = dict(final_round=True)
     else:
         extra_kwargs = dict()
 
@@ -480,8 +463,5 @@ def test_example_posterior(snpe_method: type, num_rounds: int):
     )
     _ = inference.append_simulations(theta, x).train()
 
-    if snpe_method == SNPE_A:
-        posterior = inference.build_posterior(proposal=prior).set_default_x(x_o)
-    else:
-        posterior = inference.build_posterior().set_default_x(x_o)
+    posterior = inference.build_posterior().set_default_x(x_o)
     assert posterior is not None
