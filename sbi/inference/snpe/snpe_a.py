@@ -39,8 +39,8 @@ class SNPE_A(PosteriorEstimator):
             Density Estimation_, Papamakarios et al., NeurIPS 2016,
             https://arxiv.org/abs/1605.06376.
 
-        This class implements SNPE-A. This algorithm trains across multiple rounds with
-        a maximum-likelihood-loss. This will make training converge to the proposal
+        This class implements SNPE-A. SNPE-A trains across multiple rounds with a
+        maximum-likelihood-loss. This will make training converge to the proposal
         posterior instead of the true posterior. To correct for this, SNPE-A applies a
         post-hoc correction after training. This correction has to be performed
         analytically. Thus, SNPE-A is limited to Gaussian distributions for all but the
@@ -64,10 +64,9 @@ class SNPE_A(PosteriorEstimator):
                 `num_components` times, its parameters are perturbed with a very small
                 noise, and then the last training round is done with the expanded
                 Gaussian mixture as estimator for the proposal posterior.
-            num_components:
-                Number of components of the mixture of Gaussians. This number is set to
-                1 before running Algorithm 1, and then later set to the specified value
-                before running Algorithm 2.
+            num_components: Number of components of the mixture of Gaussians in the
+                last round. This overrides the `num_components` value passed to
+                `posterior_nn()`.
             device: torch device on which to compute, e.g. gpu, cpu.
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
@@ -79,11 +78,6 @@ class SNPE_A(PosteriorEstimator):
                 0.14.0 is more mature, we will remove this argument.
         """
 
-        warnings.warn(
-            "SNPE-A has been added to `sbi` recently and its API is still subject to "
-            "changes. See PR #478 on Github for updates."
-        )
-
         # Catch invalid inputs.
         if not ((density_estimator == "mdn_snpe_a") or callable(density_estimator)):
             raise TypeError(
@@ -91,6 +85,7 @@ class SNPE_A(PosteriorEstimator):
                 "callable or the string 'mdn_snpe_a'!"
             )
 
+        # `num_components` will be used to replicate the Gaussian in the last round.
         self._num_components = num_components
         self._ran_final_round = False
 
@@ -118,7 +113,7 @@ class SNPE_A(PosteriorEstimator):
         retrain_from_scratch_each_round: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
-        component_perturbation: float = 1e-2,
+        component_perturbation: float = 1e-5,
     ) -> DirectPosterior:
         r"""
         Return density estimator that approximates the proposal posterior $\tilde{p}(\theta|x)$.
@@ -132,8 +127,8 @@ class SNPE_A(PosteriorEstimator):
 
         Args:
             final_round: Whether we are in the last round of training or not. For all
-                but the last round, Algorithm 1 from [1] is executed. For last round,
-                Algorithm 2 from [1] is executed once.
+                but the last round, Algorithm 1 from [1] is executed. In last the
+                round, Algorithm 2 from [1] is executed once.
             training_batch_size: Training batch size.
             learning_rate: Learning rate for Adam optimizer.
             validation_fraction: The fraction of data to use for validation.
@@ -181,14 +176,17 @@ class SNPE_A(PosteriorEstimator):
         self._round = max(self._data_round_index)
 
         if final_round:
-            # In case there is will only be one round, train with Algorithm 2 from [1].
+            # If there is (will be) only one round, train with Algorithm 2 from [1].
             if self._round == 0:
                 self._build_neural_net = partial(
                     self._build_neural_net, num_components=self._num_components
                 )
             # Run Algorithm 2 from [1].
             elif not self._ran_final_round:
-                # Now switch to the specified number of components.
+                # Now switch to the specified number of components. This method will
+                # only be used if `retrain_from_scratch_each_round=True`. Otherwise,
+                # the MDN will be built from replicating the single-component net for
+                # `num_component` times (via `_expand_mog()`).
                 self._build_neural_net = partial(
                     self._build_neural_net, num_components=self._num_components
                 )
@@ -197,11 +195,10 @@ class SNPE_A(PosteriorEstimator):
                 self._expand_mog(eps=component_perturbation)
             else:
                 warnings.warn(
-                    f"Running SNPE-A for more than the specified number of rounds "
-                    f"{self._num_rounds} implies running Algorithm 2 from [1] multiple "
-                    f"times, which can lead to numerical issues. Moreover, the number "
-                    f"of components in the mixture of Gaussian increases with every "
-                    f"round after {self._num_rounds}.",
+                    f"You have already run SNPE-A with `final_round=True`. Running it"
+                    f"again with this setting will not allow computing the posthoc"
+                    f"correction applied in SNPE-A. Thus, you will get an error when "
+                    f"calling `.build_posterior()` after training.",
                     UserWarning,
                 )
         else:
@@ -227,8 +224,8 @@ class SNPE_A(PosteriorEstimator):
         This class instantiates a `SNPE_A_MDN` object, which applies the
         posthoc-correction required in SNPE-A.
 
-        In addition, the resulting posterior distribution that is returned here
-        implements the following functionality over the raw `SNPE_A_MDN` object:
+        In addition, the returned `DirectPosterior` object implements the following
+        functionality over the raw `SNPE_A_MDN` object:
 
         - correct the calculation of the log probability such that it compensates for
             the leakage.
@@ -240,9 +237,6 @@ class SNPE_A(PosteriorEstimator):
         posterior.
 
         Args:
-            proposal: The proposal prior that had been used for maximum-likelihood
-                training. If None, the posterior of the previous previous round is
-                used. In the first round the prior is used as a proposal.
             density_estimator: The density estimator that the posterior is based on.
                 If `None`, use the latest neural density estimator that was trained.
             rejection_sampling_parameters: Dictionary overriding the default parameters
@@ -269,7 +263,7 @@ class SNPE_A(PosteriorEstimator):
             device = next(density_estimator.parameters()).device
 
         # Set proposal of the density estimator.
-        # This also evokes the z-scoring correction is necessary.
+        # This also evokes the z-scoring correction if necessary.
         if (
             self._proposal_roundwise[-1] is self._prior
             or self._proposal_roundwise[-1] is None
@@ -330,7 +324,7 @@ class SNPE_A(PosteriorEstimator):
         """
         return self._neural_net.log_prob(theta, x)
 
-    def _expand_mog(self, eps: float = 1e-2):
+    def _expand_mog(self, eps: float = 1e-5):
         """
         Replicate a singe Gaussian trained with Algorithm 1 before continuing
         with Algorithm 2. The weights and biases of the associated MDN layers
@@ -391,9 +385,9 @@ class SNPE_A_MDN(nn.Module):
         Args:
             flow: The trained normalizing flow, passed when building the posterior.
             proposal: The proposal distribution.
-            allow_precision_correction:
-                Add a diagonal with the smallest eigenvalue in every entry in case
-                the precision matrix becomes ill-conditioned.
+            prior: The prior distribution.
+            allow_precision_correction: Add a diagonal with the smallest eigenvalue in
+                every entry in case the precision matrix becomes ill-conditioned.
         """
         # Call nn.Module's constructor.
         super().__init__()
@@ -540,9 +534,9 @@ class SNPE_A_MDN(nn.Module):
 
     def _proposal_posterior_transformation(
         self,
-        logits_pprior: Tensor,
-        means_pprior: Tensor,
-        precisions_pprior: Tensor,
+        logits_pp: Tensor,
+        means_pp: Tensor,
+        precisions_pp: Tensor,
         logits_d: Tensor,
         means_d: Tensor,
         precisions_d: Tensor,
@@ -550,7 +544,7 @@ class SNPE_A_MDN(nn.Module):
         r"""
         Transforms the proposal posterior (the MDN) into the posterior.
 
-        The proposal posterior is:
+        The approximate posterior is:
         $p(\theta|x) = 1/Z * q(\theta|x) * p(\theta) / prop(\theta)$
         In words: posterior = proposal posterior estimate * prior / proposal.
 
@@ -561,33 +555,32 @@ class SNPE_A_MDN(nn.Module):
         `SNPE_C._automatic_posterior_transformation()`.
 
         Args:
-            logits_pprior: Component weight of each Gaussian of the proposal prior.
-            means_pprior: Mean of each Gaussian of the proposal prior.
-            precisions_pprior: Precision matrix of each Gaussian of the proposal prior.
+            logits_pp: Component weight of each Gaussian of the proposal prior.
+            means_pp: Mean of each Gaussian of the proposal prior.
+            precisions_pp: Precision matrix of each Gaussian of the proposal prior.
             logits_d: Component weight for each Gaussian of the density estimator.
             means_d: Mean of each Gaussian of the density estimator.
             precisions_d: Precision matrix of each Gaussian of the density estimator.
 
         Returns: (Component weight, mean, precision matrix, covariance matrix) of each
-            Gaussian of the proposal posterior. Has L*K terms (proposal has L terms,
-            density estimator has K terms).
+            Gaussian of the approximate posterior.
         """
 
         precisions_post, covariances_post = self._precisions_posterior(
-            precisions_pprior, precisions_d
+            precisions_pp, precisions_d
         )
 
         means_post = self._means_posterior(
-            covariances_post, means_pprior, precisions_pprior, means_d, precisions_d,
+            covariances_post, means_pp, precisions_pp, means_d, precisions_d,
         )
 
         logits_post = SNPE_A_MDN._logits_posterior(
             means_post,
             precisions_post,
             covariances_post,
-            logits_pprior,
-            means_pprior,
-            precisions_pprior,
+            logits_pp,
+            means_pp,
+            precisions_pp,
             logits_d,
             means_d,
             precisions_d,
@@ -683,7 +676,7 @@ class SNPE_A_MDN(nn.Module):
 
         return theta
 
-    def _precisions_posterior(self, precisions_pprior: Tensor, precisions_d: Tensor):
+    def _precisions_posterior(self, precisions_pp: Tensor, precisions_d: Tensor):
         r"""
         Return the precisions and covariances of the MoG posterior.
 
@@ -694,17 +687,17 @@ class SNPE_A_MDN(nn.Module):
         (see eq (23) in Appendix C of [1])
 
         Args:
-            precisions_pprior: Precision matrices of the proposal prior.
+            precisions_pp: Precision matrices of the proposal prior.
             precisions_d: Precision matrices of the density estimator.
 
         Returns: (Precisions, Covariances) of the MoG posterior.
         """
 
-        num_comps_p = precisions_pprior.shape[1]
+        num_comps_p = precisions_pp.shape[1]
         num_comps_d = precisions_d.shape[1]
 
         # Check if precision matrices are positive definite.
-        for batches in precisions_pprior:
+        for batches in precisions_pp:
             for pprior in batches:
                 eig_pprior = torch.symeig(pprior, eigenvectors=False).eigenvalues
                 assert (
@@ -719,10 +712,10 @@ class SNPE_A_MDN(nn.Module):
                     eig_d > 0
                 ).all(), "The precision matrix of the density estimator is not positive definite!"
 
-        precisions_pprior_rep = precisions_pprior.repeat_interleave(num_comps_d, dim=1)
+        precisions_pp_rep = precisions_pp.repeat_interleave(num_comps_d, dim=1)
         precisions_d_rep = precisions_d.repeat(1, num_comps_p, 1, 1)
 
-        precisions_p = precisions_d_rep - precisions_pprior_rep
+        precisions_p = precisions_d_rep - precisions_pp_rep
         if isinstance(self._maybe_z_scored_prior, MultivariateNormal):
             precisions_p += self._maybe_z_scored_prior.precision_matrix
 
@@ -757,9 +750,9 @@ class SNPE_A_MDN(nn.Module):
 
     def _means_posterior(
         self,
-        covariances_post: Tensor,
-        means_pprior: Tensor,
-        precisions_pprior: Tensor,
+        covariances_p: Tensor,
+        means_pp: Tensor,
+        precisions_pp: Tensor,
         means_d: Tensor,
         precisions_d: Tensor,
     ):
@@ -771,33 +764,31 @@ class SNPE_A_MDN(nn.Module):
 
         Args:
             covariances_post: Covariance matrices of the MoG posterior.
-            means_pprior: Means of the proposal prior.
-            precisions_pprior: Precision matrices of the proposal prior.
+            means_pp: Means of the proposal prior.
+            precisions_pp: Precision matrices of the proposal prior.
             means_d: Means of the density estimator.
             precisions_d: Precision matrices of the density estimator.
 
         Returns: Means of the MoG posterior.
         """
 
-        num_comps_pprior = precisions_pprior.shape[1]
+        num_comps_pp = precisions_pp.shape[1]
         num_comps_d = precisions_d.shape[1]
 
         # Compute the products P_k * m_k and P_0 * m_0.
-        prec_m_prod_pprior = utils.batched_mixture_mv(precisions_pprior, means_pprior)
+        prec_m_prod_pp = utils.batched_mixture_mv(precisions_pp, means_pp)
         prec_m_prod_d = utils.batched_mixture_mv(precisions_d, means_d)
 
         # Repeat them to allow for matrix operations: same trick as for the precisions.
-        prec_m_prod_pprior_rep = prec_m_prod_pprior.repeat_interleave(
-            num_comps_d, dim=1
-        )
-        prec_m_prod_d_rep = prec_m_prod_d.repeat(1, num_comps_pprior, 1)
+        prec_m_prod_pp_rep = prec_m_prod_pp.repeat_interleave(num_comps_d, dim=1)
+        prec_m_prod_d_rep = prec_m_prod_d.repeat(1, num_comps_pp, 1)
 
         # Compute the means P_k^prime * (P_k * m_k - P_0 * m_0).
-        summed_cov_m_prod_rep = prec_m_prod_d_rep - prec_m_prod_pprior_rep
+        summed_cov_m_prod_rep = prec_m_prod_d_rep - prec_m_prod_pp_rep
         if isinstance(self._maybe_z_scored_prior, MultivariateNormal):
             summed_cov_m_prod_rep += self.prec_m_prod_prior
 
-        means_p = utils.batched_mixture_mv(covariances_post, summed_cov_m_prod_rep)
+        means_p = utils.batched_mixture_mv(covariances_p, summed_cov_m_prod_rep)
         return means_p
 
     @staticmethod
@@ -805,9 +796,9 @@ class SNPE_A_MDN(nn.Module):
         means_post: Tensor,
         precisions_post: Tensor,
         covariances_post: Tensor,
-        logits_pprior: Tensor,
-        means_pprior: Tensor,
-        precisions_pprior: Tensor,
+        logits_pp: Tensor,
+        means_pp: Tensor,
+        precisions_pp: Tensor,
         logits_d: Tensor,
         means_d: Tensor,
         precisions_d: Tensor,
@@ -825,9 +816,9 @@ class SNPE_A_MDN(nn.Module):
             means_post: Means of the posterior.
             precisions_post: Precision matrices of the posterior.
             covariances_post: Covariance matrices of the posterior.
-            logits_pprior: Component weights (i.e. logits) of the proposal prior.
-            means_pprior: Means of the proposal prior.
-            precisions_pprior: Precision matrices of the proposal prior.
+            logits_pp: Component weights (i.e. logits) of the proposal prior.
+            means_pp: Means of the proposal prior.
+            precisions_pp: Precision matrices of the proposal prior.
             logits_d: Component weights (i.e. logits) of the density estimator.
             means_d: Means of the density estimator.
             precisions_d: Precision matrices of the density estimator.
@@ -835,35 +826,35 @@ class SNPE_A_MDN(nn.Module):
         Returns: Component weights of the proposal posterior.
         """
 
-        num_comps_pprior = precisions_pprior.shape[1]
+        num_comps_pp = precisions_pp.shape[1]
         num_comps_d = precisions_d.shape[1]
 
         # Compute the ratio of the logits similar to eq (10) in Appendix A.1 of [2]
-        logits_pprior_rep = logits_pprior.repeat_interleave(num_comps_d, dim=1)
-        logits_d_rep = logits_d.repeat(1, num_comps_pprior)
-        logit_factors = logits_d_rep - logits_pprior_rep
+        logits_pp_rep = logits_pp.repeat_interleave(num_comps_d, dim=1)
+        logits_d_rep = logits_d.repeat(1, num_comps_pp)
+        logit_factors = logits_d_rep - logits_pp_rep
 
         # Compute the log-determinants
         logdet_covariances_post = torch.logdet(covariances_post)
-        logdet_covariances_pprior = -torch.logdet(precisions_pprior)
+        logdet_covariances_pp = -torch.logdet(precisions_pp)
         logdet_covariances_d = -torch.logdet(precisions_d)
 
         # Repeat the proposal and density estimator terms such that there are LK terms.
         # Same trick as has been used above.
-        logdet_covariances_pprior_rep = logdet_covariances_pprior.repeat_interleave(
+        logdet_covariances_pp_rep = logdet_covariances_pp.repeat_interleave(
             num_comps_d, dim=1
         )
-        logdet_covariances_d_rep = logdet_covariances_d.repeat(1, num_comps_pprior)
+        logdet_covariances_d_rep = logdet_covariances_d.repeat(1, num_comps_pp)
 
         log_sqrt_det_ratio = 0.5 * (  # similar to eq (14) in Appendix A.1 of [2]
             logdet_covariances_post
-            + logdet_covariances_pprior_rep
+            + logdet_covariances_pp_rep
             - logdet_covariances_d_rep
         )
 
         # Compute for proposal, density estimator, and proposal posterior:
-        exponent_pprior = utils.batched_mixture_vmv(
-            precisions_pprior, means_pprior  # m_0 in eq (26) in Appendix C of [1]
+        exponent_pp = utils.batched_mixture_vmv(
+            precisions_pp, means_pp  # m_0 in eq (26) in Appendix C of [1]
         )
         exponent_d = utils.batched_mixture_vmv(
             precisions_d, means_d  # m_k in eq (26) in Appendix C of [1]
@@ -873,10 +864,10 @@ class SNPE_A_MDN(nn.Module):
         )
 
         # Extend proposal and density estimator exponents to get LK terms.
-        exponent_pprior_rep = exponent_pprior.repeat_interleave(num_comps_d, dim=1)
-        exponent_d_rep = exponent_d.repeat(1, num_comps_pprior)
+        exponent_pp_rep = exponent_pp.repeat_interleave(num_comps_d, dim=1)
+        exponent_d_rep = exponent_d.repeat(1, num_comps_pp)
         exponent = -0.5 * (
-            exponent_d_rep - exponent_pprior_rep - exponent_post  # eq (26) in [1]
+            exponent_d_rep - exponent_pp_rep - exponent_post  # eq (26) in [1]
         )
 
         logits_post = logit_factors + log_sqrt_det_ratio + exponent
