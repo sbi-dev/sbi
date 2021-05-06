@@ -26,7 +26,7 @@ dependencies:
   - pillow
   - pip
   - pip:
-    - "pyknos>=0.14.1"
+    - "pyknos>=0.14.2"
     - "pyro-ppl>=1.3.1"
     - -e ".[dev]"
   - "python >= 3.6.0"
