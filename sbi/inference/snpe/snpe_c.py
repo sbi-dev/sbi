@@ -2,7 +2,6 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 
-from math import pi
 from typing import Any, Callable, Dict, Optional, Union
 
 import torch
@@ -252,7 +251,7 @@ class SNPE_C(PosteriorEstimator):
 
             if isinstance(self._prior, MultivariateNormal):
                 self._maybe_z_scored_prior = MultivariateNormal(
-                    almost_zero_mean, torch.diag(almost_one_std),
+                    almost_zero_mean, torch.diag(almost_one_std)
                 )
             else:
                 range_ = torch.sqrt(almost_one_std * 3.0)
@@ -337,13 +336,13 @@ class SNPE_C(PosteriorEstimator):
 
         # Evaluate large batch giving (batch_size * num_atoms) log prob posterior evals.
         log_prob_posterior = self._neural_net.log_prob(atomic_theta, repeated_x)
-        self._assert_all_finite(log_prob_posterior, "posterior eval")
+        utils.assert_all_finite(log_prob_posterior, "posterior eval")
         log_prob_posterior = log_prob_posterior.reshape(batch_size, num_atoms)
 
         # Get (batch_size * num_atoms) log prob prior evals.
         log_prob_prior = self._prior.log_prob(atomic_theta)
         log_prob_prior = log_prob_prior.reshape(batch_size, num_atoms)
-        self._assert_all_finite(log_prob_prior, "prior eval")
+        utils.assert_all_finite(log_prob_prior, "prior eval")
 
         # Compute unnormalized proposal posterior.
         unnormalized_log_prob = log_prob_posterior - log_prob_prior
@@ -352,7 +351,7 @@ class SNPE_C(PosteriorEstimator):
         log_prob_proposal_posterior = unnormalized_log_prob[:, 0] - torch.logsumexp(
             unnormalized_log_prob, dim=-1
         )
-        self._assert_all_finite(log_prob_proposal_posterior, "proposal posterior eval")
+        utils.assert_all_finite(log_prob_proposal_posterior, "proposal posterior eval")
 
         # XXX This evaluates the posterior on _all_ prior samples
         if self._use_combined_loss:
@@ -417,8 +416,10 @@ class SNPE_C(PosteriorEstimator):
         )
 
         # Compute the log_prob of theta under the product.
-        log_prob_proposal_posterior = _mog_log_prob(theta, logits_pp, m_pp, prec_pp)
-        self._assert_all_finite(log_prob_proposal_posterior, "proposal posterior eval")
+        log_prob_proposal_posterior = utils.mog_log_prob(
+            theta, logits_pp, m_pp, prec_pp
+        )
+        utils.assert_all_finite(log_prob_proposal_posterior, "proposal posterior eval")
 
         return log_prob_proposal_posterior
 
@@ -471,7 +472,7 @@ class SNPE_C(PosteriorEstimator):
         )
 
         means_pp = self._means_proposal_posterior(
-            covariances_pp, means_p, precisions_p, means_d, precisions_d,
+            covariances_pp, means_p, precisions_p, means_d, precisions_d
         )
 
         logits_pp = self._logits_proposal_posterior(
@@ -489,7 +490,7 @@ class SNPE_C(PosteriorEstimator):
         return logits_pp, means_pp, precisions_pp, covariances_pp
 
     def _precisions_proposal_posterior(
-        self, precisions_p: Tensor, precisions_d: Tensor,
+        self, precisions_p: Tensor, precisions_d: Tensor
     ):
         """
         Return the precisions and covariances of the proposal posterior.
@@ -634,42 +635,3 @@ class SNPE_C(PosteriorEstimator):
             theta, _ = self._neural_net._transform(theta)
 
         return theta
-
-
-def _mog_log_prob(
-    theta: Tensor, logits_pp: Tensor, means_pp: Tensor, precisions_pp: Tensor,
-) -> Tensor:
-    r"""
-    Returns the log-probability of parameter sets $\theta$ under a mixture of Gaussians.
-
-    Note that the mixture can have different logits, means, covariances for any theta in
-    the batch. This is because these values were computed from a batch of $x$ (and the
-    $x$ in the batch are not the same).
-
-    This code is similar to the code of mdn.py in pyknos, but it does not use
-    log(det(Cov)) = -2*sum(log(diag(L))), L being Cholesky of Precision. Instead, it
-    just computes log(det(Cov)). Also, it uses the above-defined helper
-    `_batched_vmv()`.
-
-    Args:
-        theta: Parameters at which to evaluate the mixture.
-        logits_pp: (Unnormalized) mixture components.
-        means_pp: Means of all mixture components. Shape
-            (batch_dim, num_components, theta_dim).
-        precisions_pp: Precisions of all mixtures. Shape
-            (batch_dim, num_components, theta_dim, theta_dim).
-
-    Returns: The log-probability.
-    """
-
-    _, _, output_dim = means_pp.size()
-    theta = theta.view(-1, 1, output_dim)
-
-    # Split up evaluation into parts.
-    weights = logits_pp - torch.logsumexp(logits_pp, dim=-1, keepdim=True)
-    constant = -(output_dim / 2.0) * torch.log(torch.tensor([2 * pi]))
-    log_det = 0.5 * torch.log(torch.det(precisions_pp))
-    theta_minus_mean = theta.expand_as(means_pp) - means_pp
-    exponent = -0.5 * batched_mixture_vmv(precisions_pp, theta_minus_mean)
-
-    return torch.logsumexp(weights + constant + log_det + exponent, dim=-1)

@@ -212,16 +212,40 @@ def posterior_nn(
         )
     )
 
-    def build_fn(batch_theta, batch_x):
-        if model == "mdn":
-            return build_mdn(batch_x=batch_theta, batch_y=batch_x, **kwargs)
-        if model == "made":
-            return build_made(batch_x=batch_theta, batch_y=batch_x, **kwargs)
-        if model == "maf":
-            return build_maf(batch_x=batch_theta, batch_y=batch_x, **kwargs)
-        elif model == "nsf":
-            return build_nsf(batch_x=batch_theta, batch_y=batch_x, **kwargs)
-        else:
-            raise NotImplementedError
+    if model == "mdn_snpe_a":
+        if num_components != 10:
+            raise ValueError(
+                "You set `num_components`. For SNPE-A, this has to be done at "
+                "instantiation of the inference object, i.e. "
+                "`inference = SNPE_A(..., num_components=20)`"
+            )
+        kwargs.pop("num_components")
+
+        def build_fn(batch_theta, batch_x, num_components):
+            # Extract the number of components from the kwargs, such that
+            # they are exposed as a kwargs, offering the possibility to later
+            # override this kwarg with functools.partial. This is necessary
+            # in order to make sure that the MDN in SNPE-A only has one
+            # component when running the Algorithm 1 part.
+            return build_mdn(
+                batch_x=batch_theta,
+                batch_y=batch_x,
+                num_components=num_components,
+                **kwargs
+            )
+
+    else:
+
+        def build_fn(batch_theta, batch_x):
+            if model == "mdn":
+                return build_mdn(batch_x=batch_theta, batch_y=batch_x, **kwargs)
+            elif model == "made":
+                return build_made(batch_x=batch_theta, batch_y=batch_x, **kwargs)
+            elif model == "maf":
+                return build_maf(batch_x=batch_theta, batch_y=batch_x, **kwargs)
+            elif model == "nsf":
+                return build_nsf(batch_x=batch_theta, batch_y=batch_x, **kwargs)
+            else:
+                raise NotImplementedError
 
     return build_fn

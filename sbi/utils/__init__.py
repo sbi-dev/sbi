@@ -18,6 +18,7 @@ from sbi.utils.sbiutils import (
     handle_invalid_x,
     logit,
     mask_sims_from_prior,
+    mog_log_prob,
     sample_posterior_within_prior,
     standardizing_net,
     standardizing_transform,
@@ -29,6 +30,7 @@ from sbi.utils.sbiutils import (
 )
 from sbi.utils.torchutils import (
     BoxUniform,
+    assert_all_finite,
     cbrt,
     create_alternating_binary_mask,
     create_mid_split_binary_mask,

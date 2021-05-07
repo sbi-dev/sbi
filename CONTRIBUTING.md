@@ -49,7 +49,7 @@ run black manually from the console using `black .` in the top directory of the
 repository, which will format all files.
 
 **[isort](https://github.com/timothycrosley/isort)**: Used to consistently order
-imports. You can run isort manually from the console using `isort -y` in the top
+imports. You can run isort manually from the console using `isort` in the top
 directory.
 
 

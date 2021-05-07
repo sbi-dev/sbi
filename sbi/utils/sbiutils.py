@@ -3,6 +3,7 @@
 
 import logging
 import warnings
+from math import pi
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 import torch
@@ -15,6 +16,7 @@ from torch.distributions import Independent
 from torch.distributions.distribution import Distribution
 from tqdm.auto import tqdm
 
+from sbi import utils as utils
 from sbi.utils.torchutils import atleast_2d
 
 
@@ -547,3 +549,45 @@ class ImproperEmpirical(Empirical):
         """
         value = atleast_2d(value)
         return zeros(value.shape[0])
+
+
+def mog_log_prob(
+    theta: Tensor,
+    logits_pp: Tensor,
+    means_pp: Tensor,
+    precisions_pp: Tensor,
+) -> Tensor:
+    r"""
+    Returns the log-probability of parameter sets $\theta$ under a mixture of Gaussians.
+
+    Note that the mixture can have different logits, means, covariances for any theta in
+    the batch. This is because these values were computed from a batch of $x$ (and the
+    $x$ in the batch are not the same).
+
+    This code is similar to the code of mdn.py in pyknos, but it does not use
+    log(det(Cov)) = -2*sum(log(diag(L))), L being Cholesky of Precision. Instead, it
+    just computes log(det(Cov)). Also, it uses the above-defined helper
+    `_batched_vmv()`.
+
+    Args:
+        theta: Parameters at which to evaluate the mixture.
+        logits_pp: (Unnormalized) mixture components.
+        means_pp: Means of all mixture components. Shape
+            (batch_dim, num_components, theta_dim).
+        precisions_pp: Precisions of all mixtures. Shape
+            (batch_dim, num_components, theta_dim, theta_dim).
+
+    Returns: The log-probability.
+    """
+
+    _, _, output_dim = means_pp.size()
+    theta = theta.view(-1, 1, output_dim)
+
+    # Split up evaluation into parts.
+    weights = logits_pp - torch.logsumexp(logits_pp, dim=-1, keepdim=True)
+    constant = -(output_dim / 2.0) * torch.log(torch.tensor([2 * pi]))
+    log_det = 0.5 * torch.log(torch.det(precisions_pp))
+    theta_minus_mean = theta.expand_as(means_pp) - means_pp
+    exponent = -0.5 * utils.batched_mixture_vmv(precisions_pp, theta_minus_mean)
+
+    return torch.logsumexp(weights + constant + log_det + exponent, dim=-1)

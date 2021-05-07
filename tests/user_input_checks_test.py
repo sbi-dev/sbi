@@ -23,7 +23,8 @@ from scipy.stats import beta, multivariate_normal, uniform
 from torch import Tensor, eye, nn, ones, zeros
 from torch.distributions import Beta, Distribution, Gamma, MultivariateNormal, Uniform
 
-from sbi.inference import SNPE_C, simulate_for_sbi
+from sbi.inference import SNPE_A, SNPE_C, simulate_for_sbi
+from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
 from sbi.utils.get_nn_models import posterior_nn
 from sbi.utils.torchutils import BoxUniform
@@ -261,6 +262,7 @@ def test_prepare_sbi_problem(simulator: Callable, prior):
     assert prior.sample().dtype == torch.float32
 
 
+@pytest.mark.parametrize("snpe_method", [SNPE_A, SNPE_C])
 @pytest.mark.parametrize(
     "user_simulator, user_prior",
     (
@@ -290,22 +292,34 @@ def test_prepare_sbi_problem(simulator: Callable, prior):
         ),
     ),
 )
-def test_inference_with_user_sbi_problems(user_simulator: Callable, user_prior):
+def test_inference_with_user_sbi_problems(
+    snpe_method: type, user_simulator: Callable, user_prior
+):
     """
     Test inference with combinations of user defined simulators, priors and x_os.
     """
 
     simulator, prior = prepare_for_sbi(user_simulator, user_prior)
-    inference = SNPE_C(
+    inference = snpe_method(
         prior,
-        density_estimator="maf",
+        density_estimator="mdn_snpe_a" if snpe_method == SNPE_A else "maf",
         show_progress_bars=False,
     )
 
     # Run inference.
     theta, x = simulate_for_sbi(simulator, prior, 100)
     _ = inference.append_simulations(theta, x).train(max_num_epochs=2)
-    _ = inference.build_posterior()
+
+    # Build posterior.
+    if snpe_method == SNPE_A:
+        if not isinstance(prior, (MultivariateNormal, BoxUniform, DirectPosterior)):
+            with pytest.raises(AssertionError):
+                # SNPE-A does not support priors yet.
+                _ = inference.build_posterior()
+        else:
+            _ = inference.build_posterior()
+    else:
+        _ = inference.build_posterior()
 
 
 @pytest.mark.parametrize(
@@ -514,9 +528,12 @@ def test_validate_theta_and_x_gpu():
 
 
 @pytest.mark.gpu
+@pytest.mark.parametrize("snpe_method", [SNPE_A, SNPE_C])
 @pytest.mark.parametrize("data_device", ("cpu", "cuda:0"))
 @pytest.mark.parametrize("training_device", ("cpu", "cuda:0"))
-def test_train_with_different_data_and_training_device(data_device, training_device):
+def test_train_with_different_data_and_training_device(
+    snpe_method: type, data_device, training_device
+):
 
     assert torch.cuda.is_available(), "gpu geared test has no GPU available"
 
@@ -528,8 +545,11 @@ def test_train_with_different_data_and_training_device(data_device, training_dev
     )
     simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior_)
 
-    inference = SNPE_C(
-        prior, density_estimator="maf", show_progress_bars=False, device=training_device
+    inference = snpe_method(
+        prior,
+        density_estimator="mdn_snpe_a" if snpe_method == SNPE_A else "maf",
+        show_progress_bars=False,
+        device=training_device,
     )
 
     # Run inference.
