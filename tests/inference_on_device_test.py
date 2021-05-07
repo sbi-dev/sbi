@@ -99,7 +99,8 @@ def test_training_and_mcmc_on_device(method, model, data_device, training_device
     # Check for default device for inference object
     weights_device = next(inferer._neural_net.parameters()).device
     assert torch.device(training_device) == weights_device
-    proposals[-1].sample(sample_shape=(num_samples,), x=x_o, **mcmc_kwargs)
+    samples = proposals[-1].sample(sample_shape=(num_samples,), x=x_o, **mcmc_kwargs)
+    proposals[-1].log_prob(samples)
 
 
 @pytest.mark.gpu
