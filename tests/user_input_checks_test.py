@@ -465,55 +465,41 @@ def test_passing_custom_density_estimator(arg):
     _ = SNPE_C(prior=prior, density_estimator=density_estimator)
 
 
-# TODO: merge the following two tests with parametrize.
-def test_validate_theta_and_x_cpu():
+@pytest.mark.parametrize("device", ("cpu", "cuda:0"))
+def test_validate_theta_and_x_device(device):
 
-    cpu_device = torch.device("cpu")
+    # Skip GPU test if not available.
+    if device == "cuda:0" and not torch.cuda.is_available():
+        pass
+    else:
+        theta = torch.ones((2, 2), dtype=torch.float32).to(device)
+        x = torch.zeros((2, 10), dtype=torch.float32).to(device)
 
-    theta = torch.ones((32, 8), dtype=torch.float32).to(cpu_device)
-    x = torch.zeros((32, 100), dtype=torch.float32).to(cpu_device)
-    plain_ft = torch.FloatTensor((32, 8))  # using an explicit type
+        assert isinstance(
+            theta, torch.Tensor
+        ), f"{device} based torch.tensor is not an instance of torch.Tensor"
+        assert theta.dtype == torch.float32, (
+            f"{device} based torch.tensor(dtype=torch.float32) yields unexpected dtype"
+            f"{theta.dtype}."
+        )
+        if device == "cuda:0":
+            assert not isinstance(
+                theta, torch.FloatTensor
+            ), f"""{device} based torch.tensor(dtype=torch.float32) must not be 
+            FloatTensor."""
+        else:
+            assert isinstance(
+                theta, torch.FloatTensor
+            ), f"{device} based torch.tensor(dtype=torch.float32) must be FloatTensor."
+        validate_theta_and_x(theta, x)
 
-    assert isinstance(
-        theta, torch.Tensor
-    ), "cpu based torch.tensor is not an instance of torch.Tensor"
-    assert (
-        theta.dtype == torch.float32
-    ), f"cpu based torch.tensor(dtype=torch.float32) yields unexpected dtype {theta.dtype}."
-    assert isinstance(
-        theta, torch.FloatTensor
-    ), "cpu based torch.tensor(dtype=torch.float32) is no FloatTensor."
-    assert plain_ft.dtype == torch.float32, "FloatTensor does not expose float32 dtype."
+        with pytest.raises(AssertionError) as _:
+            validate_theta_and_x(theta, x.to(torch.float64))
 
-    # test on cpu
-    validate_theta_and_x(theta, x)
-
-    with pytest.raises(AssertionError) as exc:
-        validate_theta_and_x(theta, x.to(torch.float64))
-
-
-@pytest.mark.gpu
-def test_validate_theta_and_x_gpu():
-
-    gpu_if_present = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
-    theta = torch.ones((32, 8), dtype=torch.float32).to(gpu_if_present)
-    x = torch.zeros((32, 100), dtype=torch.float32).to(gpu_if_present)
-
-    assert isinstance(
-        theta, torch.Tensor
-    ), "gpu based torch.tensor is not an instance of torch.Tensor"
-    assert (
-        theta.dtype == torch.float32
-    ), f"gpu based torch.tensor(dtype=torch.float32) yields unexpected dtype {theta.dtype}."
-    assert not isinstance(
-        theta, torch.FloatTensor
-    ), "gpu based torch.tensor(dtype=torch.float32) is FloatTensor, even though it shouldn't be."
-
-    validate_theta_and_x(theta, x)
-
-    with pytest.raises(AssertionError) as exc:
-        validate_theta_and_x(theta, x.to(torch.float64))
+        plain_ft = torch.FloatTensor((32, 8))
+        assert (
+            plain_ft.dtype == torch.float32
+        ), "FloatTensor does not expose float32 dtype."
 
 
 @pytest.mark.gpu

@@ -8,6 +8,8 @@ import torch
 from torch import Tensor
 from torch.distributions import Independent, MultivariateNormal, Uniform
 
+from sbi.utils.torchutils import atleast_2d
+
 
 def diagonal_linear_gaussian(theta: Tensor, std=1.0) -> Tensor:
     """
@@ -86,10 +88,15 @@ def true_posterior_linear_gaussian_mvn_prior(
     # For computing the posterior we need the likelihood as a function of theta. Hence:
     # (x-(s+theta))^2 = (theta-(-s+x))^2
     # We see that the mean is -s+x = x-s
-    likelihood_mean = x_o - likelihood_shift
+
+    # Take into account iid trials
+    x_o = atleast_2d(x_o)
+    num_trials, *_ = x_o.shape
+    x_o_mean = x_o.mean(0)
+    likelihood_mean = x_o_mean - likelihood_shift
 
     product_mean, product_cov = multiply_gaussian_pdfs(
-        likelihood_mean, likelihood_cov, prior_mean, prior_cov
+        likelihood_mean, 1 / num_trials * likelihood_cov, prior_mean, prior_cov
     )
 
     posterior_dist = MultivariateNormal(product_mean, product_cov)
@@ -170,10 +177,15 @@ def samples_true_posterior_linear_gaussian_uniform_prior(
     # For computing the posterior we need the likelihood as a function of theta. Hence:
     # (x-(s+theta))^2 = (theta-(-s+x))^2
     # We see that the mean is -s+x = x-s
-    likelihood_mean = x_o - likelihood_shift
+
+    # Take into account iid trials
+    x_o = atleast_2d(x_o)
+    num_trials, *_ = x_o.shape
+    x_o_mean = x_o.mean(0)
+    likelihood_mean = x_o_mean - likelihood_shift
 
     posterior = MultivariateNormal(
-        loc=likelihood_mean, covariance_matrix=likelihood_cov
+        loc=likelihood_mean, covariance_matrix=1 / num_trials * likelihood_cov
     )
 
     # generate samples from ND Gaussian truncated by prior support
