@@ -137,10 +137,10 @@ def standardizing_net(batch_t: Tensor, min_std: float = 1e-7) -> nn.Module:
     else:
         t_std = 1
         logging.warning(
-            f"""Using a one-dimensional batch will instantiate a Standardize transform 
-            with (mean, std) parameters which are not representative of the data. We allow
-            this behavior because you might be loading a pre-trained. If this is not the case, 
-            please be sure to use a larger batch."""
+            """Using a one-dimensional batch will instantiate a Standardize transform
+            with (mean, std) parameters which are not representative of the data. We
+            allow this behavior because you might be loading a pre-trained. If this is
+            not the case, please be sure to use a larger batch."""
         )
 
     return Standardize(t_mean, t_std)
@@ -310,20 +310,17 @@ def warn_on_invalid_x(num_nans: int, num_infs: int, exclude_invalid_x: bool) -> 
             )
 
 
-def warn_on_invalid_x(num_nans: int, num_infs: int, exclude_invalid_x: bool) -> None:
-    """Warn if there are NaNs or Infs. Warning text depends on `exclude_invalid_x`."""
+def warn_on_iid_x(num_trials):
+    """Warn if more than one x was passed."""
 
-    if num_nans + num_infs > 0:
-        if exclude_invalid_x:
-            logging.warning(
-                f"Found {num_nans} NaN simulations and {num_infs} Inf simulations. "
-                "They will be excluded from training."
-            )
-        else:
-            logging.warning(
-                f"Found {num_nans} NaN simulations and {num_infs} Inf simulations. "
-                "Training might fail. Consider setting `exclude_invalid_x=True`."
-            )
+    if num_trials > 1:
+        warnings.warn(
+            f"A batch of {num_trials} x was passed."
+            + """It will be interpreted as a batch of independent and identically
+            distributed data X={x1, ..., xn}, i.e., data generated based on the
+            same underlying (unkown) parameter. The resulting posterior will be with
+            respect to entire batch, i.e,. $p(\theta | X)$."""
+        )
 
 
 def warn_on_invalid_x_for_snpec_leakage(
@@ -334,14 +331,16 @@ def warn_on_invalid_x_for_snpec_leakage(
     if num_nans + num_infs > 0 and exclude_invalid_x:
         if algorithm == "SNPE_C" and round_ > 0:
             logging.warning(
-                f"When invalid simulations are excluded, multi-round SNPE-C"
-                f" can `leak` into the regions where parameters led to"
-                f" invalid simulations. This can lead to poor results."
+                "When invalid simulations are excluded, multi-round SNPE-C"
+                " can `leak` into the regions where parameters led to"
+                " invalid simulations. This can lead to poor results."
             )
 
 
 def get_simulations_since_round(
-    data: List, data_round_indices: List, starting_round_index: int
+    data: List,
+    data_round_indices: List,
+    starting_round_index: int,
 ) -> Tensor:
     """
     Returns tensor with all data coming from a round >= `starting_round`.

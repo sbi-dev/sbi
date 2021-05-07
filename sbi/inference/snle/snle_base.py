@@ -16,11 +16,7 @@ from sbi import utils as utils
 from sbi.inference import NeuralInference
 from sbi.inference.posteriors.likelihood_based_posterior import LikelihoodBasedPosterior
 from sbi.types import TorchModule
-from sbi.utils import (
-    check_estimator_arg,
-    validate_theta_and_x,
-    x_shape_from_simulation,
-)
+from sbi.utils import check_estimator_arg, validate_theta_and_x, x_shape_from_simulation
 from sbi.utils.sbiutils import mask_sims_from_prior
 
 

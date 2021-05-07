@@ -62,7 +62,10 @@ class RatioBasedPosterior(NeuralPosterior):
         super().__init__(**kwargs)
 
     def log_prob(
-        self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False,
+        self,
+        theta: Tensor,
+        x: Optional[Tensor] = None,
+        track_gradients: bool = False,
     ) -> Tensor:
         r"""
         Returns the log-probability of $p(x|\theta) \cdot p(\theta).$
@@ -91,12 +94,11 @@ class RatioBasedPosterior(NeuralPosterior):
 
         self._warn_log_prob_snre()
 
+        # TODO: possible to generalize this across iid x trials like in SNLE?
         with torch.set_grad_enabled(track_gradients):
             # Send to device for evaluation, send to CPU for comparison with prior.
             log_ratio = (
-                self.net([theta.to(self._device), x.to(self._device)])
-                .reshape(-1)
-                .to("cpu")
+                self.net([theta.to(self._device), x.to(self._device)]).reshape(-1).cpu()
             )
             return log_ratio + self._prior.log_prob(theta)
 
@@ -342,7 +344,11 @@ class PotentialFunctionProvider:
     """
 
     def __call__(
-        self, prior, classifier: nn.Module, x: Tensor, mcmc_method: str,
+        self,
+        prior,
+        classifier: nn.Module,
+        x: Tensor,
+        mcmc_method: str,
     ) -> Callable:
         r"""Return potential function for posterior $p(\theta|x)$.
 

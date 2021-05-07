@@ -3,18 +3,7 @@
 
 from __future__ import annotations
 
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    List,
-    Optional,
-    Sequence,
-    Tuple,
-    TypeVar,
-    Union,
-    cast,
-)
+from typing import Callable
 
 import pytest
 import torch
@@ -26,7 +15,6 @@ from torch.distributions import Beta, Distribution, Gamma, MultivariateNormal, U
 from sbi.inference import SNPE_A, SNPE_C, simulate_for_sbi
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
-from sbi.utils.get_nn_models import posterior_nn
 from sbi.utils.torchutils import BoxUniform
 from sbi.utils.user_input_checks import (
     prepare_for_sbi,
@@ -477,6 +465,7 @@ def test_passing_custom_density_estimator(arg):
     _ = SNPE_C(prior=prior, density_estimator=density_estimator)
 
 
+# TODO: merge the following two tests with parametrize.
 def test_validate_theta_and_x_cpu():
 
     cpu_device = torch.device("cpu")

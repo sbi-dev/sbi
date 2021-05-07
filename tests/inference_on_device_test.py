@@ -9,14 +9,7 @@ from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
 from sbi import utils as utils
-from sbi.inference import (
-    SNLE,
-    SNPE_A,
-    SNPE_C,
-    SNRE_A,
-    SNRE_B,
-    simulate_for_sbi,
-)
+from sbi.inference import SNLE, SNPE_A, SNPE_C, SNRE_A, SNRE_B, simulate_for_sbi
 from sbi.simulators import linear_gaussian
 from sbi.utils.torchutils import process_device
 
