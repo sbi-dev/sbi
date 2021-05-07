@@ -262,18 +262,6 @@ def check_for_possibly_batched_x_shape(x_shape):
         pass
 
 
-def check_for_possibly_batched_observations(x_o: Tensor):
-    """Raise `ValueError` if dimensionality of data doesn't match requirements.
-
-    sbi does not support multiple observations yet. For 2D observed data the leading
-    dimension will be interpreted as batch dimension and a ValueError will be raised if
-    the batch dimension is larger than 1.
-    Multidimensional observations e.g., images, are allowed when they are passed with an
-    additional leading batch dimension of size 1.
-    """
-    check_for_possibly_batched_x_shape(x_o.shape)
-
-
 def check_prior_attributes(prior) -> None:
     """Check for prior methods sample(sample_shape) .log_prob(value) methods.
 
@@ -368,7 +356,9 @@ def check_prior_support(prior):
 
 
 def process_simulator(
-    user_simulator: Callable, prior, is_numpy_simulator: bool,
+    user_simulator: Callable,
+    prior,
+    is_numpy_simulator: bool,
 ) -> Callable:
     """Return a simulator that meets the requirements for usage in sbi.
 
@@ -461,8 +451,8 @@ def process_x(x: Tensor, x_shape: torch.Size) -> Tensor:
 
     x = torch.as_tensor(atleast_2d(x), dtype=float32)
 
-    check_for_possibly_batched_observations(x)
     input_x_shape = x.shape
+    check_for_possibly_batched_x_shape(input_x_shape)
 
     assert input_x_shape == x_shape, (
         f"Observed data shape ({input_x_shape}) must match "
@@ -472,7 +462,22 @@ def process_x(x: Tensor, x_shape: torch.Size) -> Tensor:
     return x
 
 
-def prepare_for_sbi(simulator: Callable, prior,) -> Tuple[Callable, Distribution]:
+def process_xiid(x: Tensor, x_shape: torch.Size) -> Tensor:
+
+    x = torch.as_tensor(atleast_2d(x), dtype=float32)
+
+    input_x_shape = x.shape
+
+    # Number of trials can change for every x, but single trial x shape must match.
+    assert input_x_shape[1:] == x_shape[1:], (
+        f"Observed data shape ({input_x_shape[1:]}) must match "
+        f"the shape of simulated data x ({x_shape[1:]})."
+    )
+
+    return x
+
+
+def prepare_for_sbi(simulator: Callable, prior) -> Tuple[Callable, Distribution]:
     """Prepare simulator, prior and for usage in sbi.
 
     One of the goals is to allow you to use sbi with inputs computed in numpy.

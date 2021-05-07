@@ -11,7 +11,7 @@ from torch import Tensor, nn
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.types import Shape
 from sbi.utils import del_entries
-from sbi.utils.torchutils import ScalarFloat, ensure_theta_batched, ensure_x_batched
+from sbi.utils.torchutils import ScalarFloat, atleast_2d, ensure_theta_batched
 
 
 class LikelihoodBasedPosterior(NeuralPosterior):
@@ -39,7 +39,8 @@ class LikelihoodBasedPosterior(NeuralPosterior):
             method_family: One of snpe, snl, snre_a or snre_b.
             neural_net: A classifier for SNRE, a density estimator for SNPE and SNL.
             prior: Prior distribution with `.log_prob()` and `.sample()`.
-            x_shape: Shape of a single simulator output.
+            x_shape: Shape of the observed data. Can contain multiple IID trials in the
+                first dimension.
             mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`,
                 `hmc`, `nuts`. Currently defaults to `slice_np` for a custom numpy
                 implementation of slice sampling; select `hmc`, `nuts` or `slice` for
@@ -59,12 +60,15 @@ class LikelihoodBasedPosterior(NeuralPosterior):
         super().__init__(**kwargs)
 
         self._purpose = (
-            f"It provides MCMC to .sample() from the posterior and "
-            f"can evaluate the _unnormalized_ posterior density with .log_prob()."
+            "It provides MCMC to .sample() from the posterior and "
+            "can evaluate the _unnormalized_ posterior density with .log_prob()."
         )
 
     def log_prob(
-        self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False,
+        self,
+        theta: Tensor,
+        x: Optional[Tensor] = None,
+        track_gradients: bool = False,
     ) -> Tensor:
         r"""
         Returns the log-probability of $p(x|\theta) \cdot p(\theta).$
@@ -92,12 +96,18 @@ class LikelihoodBasedPosterior(NeuralPosterior):
         warn(
             "The log probability from SNL is only correct up to a normalizing constant."
         )
-
         with torch.set_grad_enabled(track_gradients):
+            log_likelihood_across_trials = torch.zeros(
+                theta.shape[0], device=self._device
+            )
+            theta_on_device = theta.to(self._device)
+            # Pass repeated x for every trial, take log prob sum across trials.
+            for x_trial in x.to(self._device):
+                log_likelihood_across_trials += self.net.log_prob(
+                    x_trial, theta_on_device
+                )
             # Evaluate on device, move to cpu for comparison with prior.
-            return self.net.log_prob(
-                x.to(self._device), theta.to(self._device)
-            ).cpu() + self._prior.log_prob(theta)
+            return log_likelihood_across_trials.cpu() + self._prior.log_prob(theta)
 
     def sample(
         self,
@@ -297,7 +307,11 @@ class PotentialFunctionProvider:
     """
 
     def __call__(
-        self, prior, likelihood_nn: nn.Module, x: Tensor, mcmc_method: str,
+        self,
+        prior,
+        likelihood_nn: nn.Module,
+        x: Tensor,
+        mcmc_method: str,
     ) -> Callable:
         r"""Return potential function for posterior $p(\theta|x)$.
 
@@ -306,7 +320,8 @@ class PotentialFunctionProvider:
         Args:
             prior: Prior distribution that can be evaluated.
             likelihood_nn: Neural likelihood estimator that can be evaluated.
-            x: Conditioning variable for posterior $p(\theta|x)$.
+            x: Conditioning variable for posterior $p(\theta|x)$. Can be a batch of iid
+                x.
             mcmc_method: One of `slice_np`, `slice`, `hmc` or `nuts`.
 
         Returns:
@@ -321,6 +336,26 @@ class PotentialFunctionProvider:
         else:
             return self.np_potential
 
+    def get_log_likelihoods(self, theta: Tensor) -> Tensor:
+
+        theta = ensure_theta_batched(theta)
+        # Repeat x for each trial to match theta batch.
+        x = NeuralPosterior._match_x_with_theta_batch_shape(
+            atleast_2d(self.x), theta, allow_iid_x=True
+        )
+
+        # Evaluate on device, move to cpu for comparison with prior.
+        with torch.set_grad_enabled(False):
+            theta_on_xdevice = theta.to(x.device)
+            # Pass repeated x for every trial, take log prob sum across trials.
+            log_likelihood_across_trials = torch.zeros(theta.shape[0], device=x.device)
+
+            for x_trial in x:
+                log_likelihood_across_trials += self.likelihood_nn.log_prob(
+                    x_trial, theta_on_xdevice
+                )
+        return log_likelihood_across_trials
+
     def np_potential(self, theta: np.array) -> ScalarFloat:
         r"""Return posterior log prob. of theta $p(\theta|x)$"
 
@@ -331,18 +366,9 @@ class PotentialFunctionProvider:
             Posterior log probability of the theta, $-\infty$ if impossible under prior.
         """
         theta = torch.as_tensor(theta, dtype=torch.float32)
-        theta = ensure_theta_batched(theta)
-        num_batch = theta.shape[0]
-        x = ensure_x_batched(self.x).repeat(num_batch, 1)
-
-        with torch.set_grad_enabled(False):
-            # Evaluate on device, move back to cpu for comparison with prior.
-            log_likelihood = self.likelihood_nn.log_prob(
-                inputs=x, context=theta.to(x.device)
-            ).cpu()
 
         # Notice opposite sign to pyro potential.
-        return log_likelihood + self.prior.log_prob(theta)
+        return self.get_log_likelihoods(theta).cpu() + self.prior.log_prob(theta)
 
     def pyro_potential(self, theta: Dict[str, Tensor]) -> Tensor:
         r"""Return posterior log probability of parameters $p(\theta|x)$.
@@ -358,9 +384,4 @@ class PotentialFunctionProvider:
 
         theta = next(iter(theta.values()))
 
-        # Evaluate on device, move back to cpu for comparison with prior.
-        log_likelihood = self.likelihood_nn.log_prob(
-            inputs=self.x.reshape(1, -1), context=theta.reshape(1, -1).to(self.x.device)
-        ).cpu()
-
-        return -(log_likelihood + self.prior.log_prob(theta))
+        return -(self.get_log_likelihoods(theta).cpu() + self.prior.log_prob(theta))

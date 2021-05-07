@@ -25,14 +25,18 @@ from sbi.mcmc import (
     sir,
 )
 from sbi.types import Array, Shape
-from sbi.utils.sbiutils import check_dist_class
+from sbi.utils.sbiutils import check_dist_class, warn_on_iid_x
 from sbi.utils.torchutils import (
     BoxUniform,
     ScalarFloat,
     atleast_2d_float32_tensor,
     ensure_theta_batched,
 )
-from sbi.utils.user_input_checks import process_x
+from sbi.utils.user_input_checks import (
+    check_for_possibly_batched_x_shape,
+    process_x,
+    process_xiid,
+)
 
 
 class NeuralPosterior(ABC):
@@ -59,7 +63,8 @@ class NeuralPosterior(ABC):
             method_family: One of snpe, snl, snre_a or snre_b.
             neural_net: A classifier for SNRE, a density estimator for SNPE and SNL.
             prior: Prior distribution with `.log_prob()` and `.sample()`.
-            x_shape: Shape of a single simulator output.
+            x_shape: Shape of the simulator data. A batch dimension larger than one is
+                allowed for SNLE and will be interpreted as multiple iid data points.
             mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`,
                 `hmc`, `nuts`. Currently defaults to `slice_np` for a custom numpy
                 implementation of slice sampling; select `hmc`, `nuts` or `slice` for
@@ -77,7 +82,7 @@ class NeuralPosterior(ABC):
         if method_family in ("snpe", "snle", "snre_a", "snre_b"):
             self._method_family = method_family
         else:
-            raise ValueError("Method family unsupported.")
+            raise ValueError(f"Method family '{method_family}' unsupported.")
 
         self.net = neural_net
 
@@ -91,6 +96,19 @@ class NeuralPosterior(ABC):
         self._x = None
         self._x_shape = x_shape
         self._device = device
+        # Methods capable of handling iid xo.
+        self._iid_methods = ["snle"]
+        self._allow_iid_x = method_family in self._iid_methods
+
+        # TODO: remove once checked.
+        assert len(x_shape) > 1, "x_shape needs batch dim."
+
+        # Only SNLE allows multiple iid trials in xo.
+        if not self._allow_iid_x:
+            check_for_possibly_batched_x_shape(self._x_shape)
+
+        self._num_iid_trials = self._x_shape[0]
+        warn_on_iid_x(self._num_iid_trials)
 
     @property
     def default_x(self) -> Optional[Tensor]:
@@ -122,7 +140,11 @@ class NeuralPosterior(ABC):
         Returns:
             `NeuralPosterior` that will use a default `x` when not explicitly passed.
         """
-        processed_x = process_x(x, self._x_shape)
+        if self._allow_iid_x:
+            processed_x = process_xiid(x, self._x_shape)
+            self._num_iid_trials = processed_x.shape[0]
+        else:
+            processed_x = process_x(x, self._x_shape)
         self._x = processed_x
 
         return self
@@ -245,6 +267,8 @@ class NeuralPosterior(ABC):
         Checks shapes of $\theta$ and $x$ and then repeats $x$ as often as there were
         batch elements in $\theta$.
 
+        Moves $\theta$ and $x$ to the device of the neural net.
+
         Args:
             theta: Parameters $\theta$.
             x: Conditioning context for posterior $p(\theta|x)$. If not provided, fall
@@ -260,13 +284,16 @@ class NeuralPosterior(ABC):
 
         # Select and check x to condition on.
         x = atleast_2d_float32_tensor(self._x_else_default_x(x))
-        self._ensure_single_x(x)
+        if not self._allow_iid_x:
+            self._ensure_single_x(x)
         self._ensure_x_consistent_with_default_x(x)
 
         # Repeat `x` in case of evaluation on multiple `theta`. This is needed below in
         # when calling nflows in order to have matching shapes of theta and context x
         # at neural network evaluation time.
-        x = self._match_x_with_theta_batch_shape(x, theta)
+        x = self._match_x_with_theta_batch_shape(
+            x, theta, allow_iid_x=self._allow_iid_x
+        )
 
         return theta, x
 
@@ -303,7 +330,8 @@ class NeuralPosterior(ABC):
         """
 
         x = atleast_2d_float32_tensor(self._x_else_default_x(x))
-        self._ensure_single_x(x)
+        if not self._allow_iid_x:
+            self._ensure_single_x(x)
         self._ensure_x_consistent_with_default_x(x)
         num_samples = torch.Size(sample_shape).numel()
 
@@ -313,9 +341,7 @@ class NeuralPosterior(ABC):
         )
 
         # Move x to current device.
-        x = x.to(self._device)
-
-        return x, num_samples, mcmc_method, mcmc_parameters
+        return x.to(self._device), num_samples, mcmc_method, mcmc_parameters
 
     def _sample_posterior_mcmc(
         self,
@@ -837,7 +863,8 @@ class NeuralPosterior(ABC):
 
     @staticmethod
     def _ensure_single_x(x: Tensor) -> None:
-        """Raise a ValueError if multiple (a batch of) xs are passed."""
+        """Raise a ValueError if multiple (a batch of) xs are passed and not supported
+        by current method family."""
 
         inferred_batch_size, *_ = x.shape
 
@@ -846,10 +873,11 @@ class NeuralPosterior(ABC):
             raise ValueError(
                 """The `x` passed to condition the posterior for evaluation or sampling
                 has an inferred batch shape larger than one. This is not supported in
-                sbi for reasons depending on the scenario:
+                some sbi methods for reasons depending on the scenario:
 
                     - in case you want to evaluate or sample conditioned on several xs
-                    e.g., (p(theta | [x1, x2, x3])), this is not supported yet in sbi.
+                    e.g., (p(theta | [x1, x2, x3])), this is not supported yet except
+                    when using likelihood based SNLE.
 
                     - in case you trained with a single round to do amortized inference
                     and now you want to evaluate or sample a given theta conditioned on
@@ -867,29 +895,53 @@ class NeuralPosterior(ABC):
             )
 
     @staticmethod
-    def _match_x_with_theta_batch_shape(x: Tensor, theta: Tensor) -> Tensor:
+    def _match_x_with_theta_batch_shape(
+        x: Tensor, theta: Tensor, allow_iid_x: bool = False
+    ) -> Tensor:
         """Return `x` with batch shape matched to that of `theta`.
+
+        x is expanded in the second dimension and repeated in that dimensions
+        theta-batch times. If `allow_iid_x` is True, the first dimension of x remains
+        the x-batch dimension containing potentially more than one iid trials.
+
+        The batch dimension of x is moved to the first dimension because in inference
+        methods that allow iid x, one typically loops over iid xs to calculated
+        likelihoods across trials.
 
         This is needed in nflows in order to have matching shapes of theta and context
         `x` when evaluating the neural network.
+
+        Args:
+            x: data
+            theta: parameters
+            allow_iid_x: Whether x is allowed to have batch size larger than one, i.e.,
+                to contain a batch of iid data.
+
+        Returns:
+            x: with shape (theta_batch_size, x_shape) if allow_iid_x False, and shape
+                (x_batch_size, theta_batch_size, x_shape) otherwise.
         """
 
         # Theta and x are ensured to have a batch dim, get the shape.
         theta_batch_size, *_ = theta.shape
         x_batch_size, *x_shape = x.shape
 
-        assert x_batch_size == 1, "Batch size 1 should be enforced by caller."
-        if theta_batch_size > x_batch_size:
-            x_matched = x.expand(theta_batch_size, *x_shape)
+        if not allow_iid_x:
+            assert x_batch_size == 1, "x-batch size 1 should be enforced by caller."
+        # Add singleton dimension for theta repetitions.
+        x_matched = x.reshape(x_batch_size, 1, *x_shape)
+        if theta_batch_size > 1:
+            x_matched = x_matched.expand(x_batch_size, theta_batch_size, *x_shape)
 
             # Double check.
-            x_matched_batch_size, *x_matched_shape = x_matched.shape
-            assert x_matched_batch_size == theta_batch_size
+            x_matched_batch_size, x_matched_repeated, *x_matched_shape = x_matched.shape
+            assert x_matched_repeated == theta_batch_size
+            assert x_matched_batch_size == x_batch_size
             assert x_matched_shape == x_shape
-        else:
-            x_matched = x
 
-        return x_matched
+        # If x is not batched, squeeze first x-batch dimension to obtain shape
+        # (theta_batch, x_shape)
+        return x_matched if allow_iid_x else x_matched.squeeze(0)
 
     def _get_net_name(self) -> str:
         """
