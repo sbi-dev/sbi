@@ -11,7 +11,12 @@ from torch import Tensor, nn
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.types import Shape
 from sbi.utils import del_entries
-from sbi.utils.torchutils import ScalarFloat, ensure_theta_batched, ensure_x_batched
+from sbi.utils.torchutils import (
+    ScalarFloat,
+    atleast_2d,
+    ensure_theta_batched,
+    ensure_x_batched,
+)
 
 
 class RatioBasedPosterior(NeuralPosterior):
@@ -91,16 +96,16 @@ class RatioBasedPosterior(NeuralPosterior):
         self.net.eval()
 
         theta, x = self._prepare_theta_and_x_for_log_prob_(theta, x)
+        theta_repeated, x_repeated = self._match_theta_and_x_batch_shapes(theta, x)
 
         self._warn_log_prob_snre()
 
-        # TODO: possible to generalize this across iid x trials like in SNLE?
         with torch.set_grad_enabled(track_gradients):
             # Send to device for evaluation, send to CPU for comparison with prior.
-            log_ratio = (
-                self.net([theta.to(self._device), x.to(self._device)]).reshape(-1).cpu()
-            )
-            return log_ratio + self._prior.log_prob(theta)
+            log_ratio = self.net(
+                [theta_repeated.to(self._device), x_repeated.to(self._device)]
+            ).reshape(-1)
+            return log_ratio.cpu() + self._prior.log_prob(theta)
 
     def _warn_log_prob_snre(self) -> None:
         if self._method_family == "snre_a":
@@ -367,7 +372,8 @@ class PotentialFunctionProvider:
 
         self.classifier = classifier
         self.prior = prior
-        self.x = x
+        self.device = next(classifier.parameters()).device
+        self.x = atleast_2d(x).to(self.device)
 
         if mcmc_method in ("slice", "hmc", "nuts"):
             return self.pyro_potential
@@ -394,7 +400,7 @@ class PotentialFunctionProvider:
 
         with torch.set_grad_enabled(False):
             log_ratio = (
-                self.classifier([theta.to(self.x.device), x_repeated]).reshape(-1).cpu()
+                self.classifier([theta.to(self.device), x_repeated]).reshape(-1).cpu()
             )
 
         # Notice opposite sign to pyro potential.
@@ -418,6 +424,6 @@ class PotentialFunctionProvider:
         theta = ensure_theta_batched(theta)
         x = ensure_x_batched(self.x)
 
-        log_ratio = self.classifier([theta.to(x.device), x]).cpu()
+        log_ratio = self.classifier([theta.to(self.device), x]).cpu()
 
         return -(log_ratio + self.prior.log_prob(theta))
