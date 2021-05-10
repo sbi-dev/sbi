@@ -93,21 +93,19 @@ class LikelihoodBasedPosterior(NeuralPosterior):
 
         theta, x = self._prepare_theta_and_x_for_log_prob_(theta, x)
 
+        # Calculate likelihood over trials and in one batch.
         warn(
             "The log probability from SNL is only correct up to a normalizing constant."
         )
-        with torch.set_grad_enabled(track_gradients):
-            log_likelihood_across_trials = torch.zeros(
-                theta.shape[0], device=self._device
-            )
-            theta_on_device = theta.to(self._device)
-            # Pass repeated x for every trial, take log prob sum across trials.
-            for x_trial in x.to(self._device):
-                log_likelihood_across_trials += self.net.log_prob(
-                    x_trial, theta_on_device
-                )
-            # Evaluate on device, move to cpu for comparison with prior.
-            return log_likelihood_across_trials.cpu() + self._prior.log_prob(theta)
+        log_likelihood_trial_sum = self._log_likelihoods_over_trials(
+            x=x.to(self._device),
+            theta=theta.to(self._device),
+            net=self.net,
+            track_gradients=track_gradients,
+        )
+
+        # Move to cpu for comparison with prior.
+        return log_likelihood_trial_sum.cpu() + self._prior.log_prob(theta)
 
     def sample(
         self,
@@ -286,6 +284,55 @@ class LikelihoodBasedPosterior(NeuralPosterior):
             show_progress_bars=show_progress_bars,
         )
 
+    @staticmethod
+    def _log_likelihoods_over_trials(
+        x: Tensor,
+        theta: Tensor,
+        net: nn.Module,
+        track_gradients: bool = False,
+    ) -> Tensor:
+        r"""Return log likelihoods summed over iid trials of `x`.
+
+        Note: `x` can be a batch with batch size larger 1. Batches in `x` are assumed
+        to be iid trials, i.e., data generated based on the same paramters /
+        experimental conditions.
+
+        Repeats `x` and $\theta$ to cover all their combinations of batch entries.
+
+        Args:
+            x: batch of iid data.
+            theta: batch of parameters
+            net: neural net with .log_prob()
+            track_gradients: Whether to track gradients.
+
+        Returns:
+            log_likelihood_trial_sum: log likelihood for each parameter, summed over all
+                batch entries (iid trials) in `x`.
+        """
+
+        # Repeat `x` in case of evaluation on multiple `theta`. This is needed below in
+        # when calling nflows in order to have matching shapes of theta and context x
+        # at neural network evaluation time.
+        theta_repeated, x_repeated = NeuralPosterior._match_theta_and_x_batch_shapes(
+            theta=theta, x=atleast_2d(x)
+        )
+        assert (
+            x_repeated.shape[0] == theta_repeated.shape[0]
+        ), "x and theta must match in batch shape."
+        assert (
+            next(net.parameters()).device == x.device and x.device == theta.device
+        ), f"device mismatch: net, x, theta: {net.device}, {x.decive}, {theta.device}."
+
+        # Calculate likelihood in one batch.
+        with torch.set_grad_enabled(track_gradients):
+            log_likelihood_trial_batch = net.log_prob(x_repeated, theta_repeated)
+            # Reshape to (x-trials x parameters), sum over trial-log likelihoods.
+            log_likelihood_trial_sum = log_likelihood_trial_batch.reshape(
+                x.shape[0], -1
+            ).sum(0)
+
+        return log_likelihood_trial_sum
+
 
 class PotentialFunctionProvider:
     """
@@ -329,32 +376,25 @@ class PotentialFunctionProvider:
         """
         self.likelihood_nn = likelihood_nn
         self.prior = prior
-        self.x = x
+        self.device = next(likelihood_nn.parameters()).device
+        self.x = atleast_2d(x).to(self.device)
 
         if mcmc_method in ("slice", "hmc", "nuts"):
             return self.pyro_potential
         else:
             return self.np_potential
 
-    def get_log_likelihoods(self, theta: Tensor) -> Tensor:
+    def log_likelihood(self, theta: Tensor) -> Tensor:
+        """Return log likelihood of fixed data given a batch of parameters."""
 
-        theta = ensure_theta_batched(theta)
-        # Repeat x for each trial to match theta batch.
-        x = NeuralPosterior._match_x_with_theta_batch_shape(
-            atleast_2d(self.x), theta, allow_iid_x=True
+        log_likelihoods = LikelihoodBasedPosterior._log_likelihoods_over_trials(
+            x=self.x,
+            theta=ensure_theta_batched(theta).to(self.device),
+            net=self.likelihood_nn,
+            track_gradients=False,
         )
 
-        # Evaluate on device, move to cpu for comparison with prior.
-        with torch.set_grad_enabled(False):
-            theta_on_xdevice = theta.to(x.device)
-            # Pass repeated x for every trial, take log prob sum across trials.
-            log_likelihood_across_trials = torch.zeros(theta.shape[0], device=x.device)
-
-            for x_trial in x:
-                log_likelihood_across_trials += self.likelihood_nn.log_prob(
-                    x_trial, theta_on_xdevice
-                )
-        return log_likelihood_across_trials
+        return log_likelihoods
 
     def np_potential(self, theta: np.array) -> ScalarFloat:
         r"""Return posterior log prob. of theta $p(\theta|x)$"
@@ -368,7 +408,7 @@ class PotentialFunctionProvider:
         theta = torch.as_tensor(theta, dtype=torch.float32)
 
         # Notice opposite sign to pyro potential.
-        return self.get_log_likelihoods(theta).cpu() + self.prior.log_prob(theta)
+        return self.log_likelihood(theta).cpu() + self.prior.log_prob(theta)
 
     def pyro_potential(self, theta: Dict[str, Tensor]) -> Tensor:
         r"""Return posterior log probability of parameters $p(\theta|x)$.
@@ -384,4 +424,4 @@ class PotentialFunctionProvider:
 
         theta = next(iter(theta.values()))
 
-        return -(self.get_log_likelihoods(theta).cpu() + self.prior.log_prob(theta))
+        return -(self.log_likelihood(theta).cpu() + self.prior.log_prob(theta))

@@ -12,9 +12,9 @@ from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.types import ScalarFloat, Shape
 from sbi.utils import del_entries, within_support
 from sbi.utils.torchutils import (
+    atleast_2d,
     batched_first_of_batch,
     ensure_theta_batched,
-    ensure_x_batched,
 )
 
 
@@ -193,12 +193,13 @@ class DirectPosterior(NeuralPosterior):
         self.net.eval()
 
         theta, x = self._prepare_theta_and_x_for_log_prob_(theta, x)
+        theta_repeated, x_repeated = self._match_theta_and_x_batch_shapes(theta, x)
 
         with torch.set_grad_enabled(track_gradients):
 
             # Evaluate on device, move back to cpu for comparison with prior.
             unnorm_log_prob = self.net.log_prob(
-                theta.to(self._device), x.to(self._device)
+                theta_repeated.to(self._device), x_repeated.to(self._device)
             ).cpu()
 
             # Force probability to be zero outside prior support.
@@ -521,7 +522,8 @@ class PotentialFunctionProvider:
         """
         self.posterior_nn = posterior_nn
         self.prior = prior
-        self.x = x
+        self.device = next(posterior_nn.parameters()).device
+        self.x = atleast_2d(x).to(self.device)
 
         if mcmc_method in ("slice", "hmc", "nuts"):
             return self.pyro_potential
@@ -541,15 +543,12 @@ class PotentialFunctionProvider:
         theta = ensure_theta_batched(theta)
         num_batch = theta.shape[0]
 
-        x_batched = ensure_x_batched(self.x)
         # Repeat x over batch dim to match theta batch, accounting for multi-D x.
-        x_repeated = x_batched.repeat(
-            num_batch, *(1 for _ in range(x_batched.ndim - 1))
-        )
+        x_repeated = self.x.repeat(num_batch, *(1 for _ in range(self.x.ndim - 1)))
 
         with torch.set_grad_enabled(False):
             target_log_prob = self.posterior_nn.log_prob(
-                inputs=theta.to(self.x.device),
+                inputs=theta.to(self.device),
                 context=x_repeated,
             )
             in_prior_support = within_support(self.prior, theta)
@@ -572,7 +571,7 @@ class PotentialFunctionProvider:
         # Notice opposite sign to numpy.
         # Move theta to device for evaluation.
         log_prob_posterior = -self.posterior_nn.log_prob(
-            inputs=theta.to(self.x.device), context=self.x
+            inputs=theta.to(self.device), context=self.x
         ).cpu()
 
         in_prior_support = within_support(self.prior, theta)

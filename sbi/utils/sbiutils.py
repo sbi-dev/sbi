@@ -316,8 +316,8 @@ def warn_on_iid_x(num_trials):
     if num_trials > 1:
         warnings.warn(
             f"A batch of {num_trials} x was passed."
-            + """It will be interpreted as a batch of independent and identically
-            distributed data X={x1, ..., xn}, i.e., data generated based on the
+            + r"""It will be interpreted as a batch of independent and identically
+            distributed data $X=\{x_1, \ldots, x_n\}$, i.e., data generated based on the
             same underlying (unkown) parameter. The resulting posterior will be with
             respect to entire batch, i.e,. $p(\theta | X)$."""
         )

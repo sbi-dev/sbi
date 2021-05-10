@@ -205,7 +205,7 @@ class NeuralPosterior(ABC):
 
     @abstractmethod
     def log_prob(
-        self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False,
+        self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False
     ) -> Tensor:
         """See child classes for docstring."""
         pass
@@ -260,7 +260,7 @@ class NeuralPosterior(ABC):
         return self
 
     def _prepare_theta_and_x_for_log_prob_(
-        self, theta: Tensor, x: Optional[Tensor] = None,
+        self, theta: Tensor, x: Optional[Tensor] = None
     ) -> Tuple[Tensor, Tensor]:
         r"""Returns $\theta$ and $x$ in shape that can be used by posterior.log_prob().
 
@@ -287,13 +287,6 @@ class NeuralPosterior(ABC):
         if not self._allow_iid_x:
             self._ensure_single_x(x)
         self._ensure_x_consistent_with_default_x(x)
-
-        # Repeat `x` in case of evaluation on multiple `theta`. This is needed below in
-        # when calling nflows in order to have matching shapes of theta and context x
-        # at neural network evaluation time.
-        x = self._match_x_with_theta_batch_shape(
-            x, theta, allow_iid_x=self._allow_iid_x
-        )
 
         return theta, x
 
@@ -863,8 +856,7 @@ class NeuralPosterior(ABC):
 
     @staticmethod
     def _ensure_single_x(x: Tensor) -> None:
-        """Raise a ValueError if multiple (a batch of) xs are passed and not supported
-        by current method family."""
+        """Raise a ValueError if multiple (a batch of) xs are passed."""
 
         inferred_batch_size, *_ = x.shape
 
@@ -895,53 +887,46 @@ class NeuralPosterior(ABC):
             )
 
     @staticmethod
-    def _match_x_with_theta_batch_shape(
-        x: Tensor, theta: Tensor, allow_iid_x: bool = False
-    ) -> Tensor:
-        """Return `x` with batch shape matched to that of `theta`.
+    def _match_theta_and_x_batch_shapes(
+        theta: Tensor, x: Tensor
+    ) -> Tuple[Tensor, Tensor]:
+        r"""Return $\theta$ and `x` with batch shape matched to each other.
 
-        x is expanded in the second dimension and repeated in that dimensions
-        theta-batch times. If `allow_iid_x` is True, the first dimension of x remains
-        the x-batch dimension containing potentially more than one iid trials.
-
-        The batch dimension of x is moved to the first dimension because in inference
-        methods that allow iid x, one typically loops over iid xs to calculated
-        likelihoods across trials.
+        When `x` is just a single observation it is repeated for all entries in the
+        batch of $\theta$s. When there is a batch of multiple `x`, i.e., iid `x`, then
+        individual `x` are repeated in the pattern AABBCC and individual $\theta$ are
+        repeated in the pattern ABCABC to cover all combinations.
 
         This is needed in nflows in order to have matching shapes of theta and context
         `x` when evaluating the neural network.
 
         Args:
-            x: data
-            theta: parameters
-            allow_iid_x: Whether x is allowed to have batch size larger than one, i.e.,
-                to contain a batch of iid data.
+            x: (a batch of iid) data
+            theta: a batch of parameters
 
         Returns:
-            x: with shape (theta_batch_size, x_shape) if allow_iid_x False, and shape
-                (x_batch_size, theta_batch_size, x_shape) otherwise.
+            theta: with shape (theta_batch_size * x_batch_size, *theta_shape)
+            x: with shape (theta_batch_size * x_batch_size, *x_shape)
         """
 
         # Theta and x are ensured to have a batch dim, get the shape.
-        theta_batch_size, *_ = theta.shape
+        theta_batch_size, *theta_shape = theta.shape
         x_batch_size, *x_shape = x.shape
 
-        if not allow_iid_x:
-            assert x_batch_size == 1, "x-batch size 1 should be enforced by caller."
-        # Add singleton dimension for theta repetitions.
-        x_matched = x.reshape(x_batch_size, 1, *x_shape)
-        if theta_batch_size > 1:
-            x_matched = x_matched.expand(x_batch_size, theta_batch_size, *x_shape)
+        # Repeat iid trials as AABBCC.
+        x_repeated = x.repeat_interleave(theta_batch_size, dim=0)
+        # Repeat theta as ABCABC.
+        theta_repeated = theta.repeat(x_batch_size, 1)
 
-            # Double check.
-            x_matched_batch_size, x_matched_repeated, *x_matched_shape = x_matched.shape
-            assert x_matched_repeated == theta_batch_size
-            assert x_matched_batch_size == x_batch_size
-            assert x_matched_shape == x_shape
+        # Double check: batch size for log prob evaluation must match.
+        assert x_repeated.shape == torch.Size(
+            [theta_batch_size * x_batch_size, *x_shape]
+        )
+        assert theta_repeated.shape == torch.Size(
+            [theta_batch_size * x_batch_size, *theta_shape]
+        )
 
-        # If x is not batched, squeeze first x-batch dimension to obtain shape
-        # (theta_batch, x_shape)
-        return x_matched if allow_iid_x else x_matched.squeeze(0)
+        return theta_repeated, x_repeated
 
     def _get_net_name(self) -> str:
         """
@@ -1051,7 +1036,7 @@ class ConditionalPotentialFunctionProvider:
         self.condition = ensure_theta_batched(condition)
         self.dims_to_sample = dims_to_sample
 
-    def __call__(self, prior, net: nn.Module, x: Tensor, mcmc_method: str,) -> Callable:
+    def __call__(self, prior, net: nn.Module, x: Tensor, mcmc_method: str) -> Callable:
         """Return potential function.
 
         Switch on numpy or pyro potential function based on `mcmc_method`.
@@ -1118,9 +1103,7 @@ class RestrictedPriorForConditional:
     this class.
     """
 
-    def __init__(
-        self, full_prior: Any, dims_to_sample: List[int],
-    ):
+    def __init__(self, full_prior: Any, dims_to_sample: List[int]):
         self.full_prior = full_prior
         self.dims_to_sample = dims_to_sample
 

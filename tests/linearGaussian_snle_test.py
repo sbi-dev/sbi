@@ -158,10 +158,12 @@ def test_c2st_snl_on_linearGaussian_different_dims_and_trials(
                 prior=prior,
                 num_samples=num_samples,
             )
-        posterior = inference.build_posterior().set_default_x(x_o)
+        posterior = inference.build_posterior(
+            mcmc_method="slice_np_vectorized"
+        ).set_default_x(x_o)
 
         samples = posterior.sample(
-            sample_shape=(num_samples,), mcmc_parameters={"thin": 3}
+            sample_shape=(num_samples,), mcmc_parameters={"thin": 3, "num_chains": 2}
         )
 
         # Check performance based on c2st accuracy.
