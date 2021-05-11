@@ -11,12 +11,7 @@ from torch import Tensor, nn
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.types import Shape
 from sbi.utils import del_entries
-from sbi.utils.torchutils import (
-    ScalarFloat,
-    atleast_2d,
-    ensure_theta_batched,
-    ensure_x_batched,
-)
+from sbi.utils.torchutils import ScalarFloat, atleast_2d, ensure_theta_batched
 
 
 class RatioBasedPosterior(NeuralPosterior):
@@ -69,8 +64,7 @@ class RatioBasedPosterior(NeuralPosterior):
     def log_prob(
         self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False
     ) -> Tensor:
-        r"""
-        Returns the log-probability of $p(x|\theta) \cdot p(\theta).$
+        r"""Returns the log-probability of $p(x|\theta) \cdot p(\theta).$
 
         This corresponds to an **unnormalized** posterior log-probability. Only for
         single-round SNRE_A / AALR, the returned log-probability will correspond to the
@@ -93,16 +87,15 @@ class RatioBasedPosterior(NeuralPosterior):
         self.net.eval()
 
         theta, x = self._prepare_theta_and_x_for_log_prob_(theta, x)
-        theta_repeated, x_repeated = self._match_theta_and_x_batch_shapes(theta, x)
 
         self._warn_log_prob_snre()
 
-        with torch.set_grad_enabled(track_gradients):
-            # Send to device for evaluation, send to CPU for comparison with prior.
-            log_ratio = self.net(
-                [theta_repeated.to(self._device), x_repeated.to(self._device)]
-            ).reshape(-1)
-            return log_ratio.cpu() + self._prior.log_prob(theta)
+        # Sum log ratios over x batch of iid trials.
+        log_ratio = self._log_ratios_over_trials(
+            x, theta, self.net, track_gradients=track_gradients
+        )
+
+        return log_ratio.cpu() + self._prior.log_prob(theta)
 
     def _warn_log_prob_snre(self) -> None:
         if self._method_family == "snre_a":
@@ -325,6 +318,50 @@ class RatioBasedPosterior(NeuralPosterior):
             f"can evaluate the {normalized_or_not}posterior density with .log_prob()."
         )
 
+    @staticmethod
+    def _log_ratios_over_trials(
+        x: Tensor,
+        theta: Tensor,
+        net: nn.Module,
+        track_gradients: bool = False,
+    ) -> Tensor:
+        r"""Return log ratios summed over iid trials of `x`.
+
+        Note: `x` can be a batch with batch size larger 1. Batches in x are assumed to
+        be iid trials, i.e., data generated based on the same paramters / experimental
+        conditions.
+
+        Repeats `x` and $\theta$ to cover all their combinations of batch entries.
+
+        Args:
+            x: batch of iid data.
+            theta: batch of parameters
+            net: neural net representing the classifier to approximate the ratio.
+            track_gradients: Whether to track gradients.
+
+        Returns:
+            log_ratio_trial_sum: log ratio for each parameter, summed over all
+                batch entries (iid trials) in `x`.
+        """
+
+        theta_repeated, x_repeated = NeuralPosterior._match_theta_and_x_batch_shapes(
+            theta=theta, x=atleast_2d(x)
+        )
+        assert (
+            x_repeated.shape[0] == theta_repeated.shape[0]
+        ), "x and theta must match in batch shape."
+        assert (
+            next(net.parameters()).device == x.device and x.device == theta.device
+        ), f"device mismatch: net, x, theta: {net.device}, {x.decive}, {theta.device}."
+
+        # Calculate ratios in one batch.
+        with torch.set_grad_enabled(track_gradients):
+            log_ratio_trial_batch = net([theta_repeated, x_repeated])
+            # Reshape to (x-trials x parameters), sum over trial-log likelihoods.
+            log_ratio_trial_sum = log_ratio_trial_batch.reshape(x.shape[0], -1).sum(0)
+
+        return log_ratio_trial_sum
+
 
 class PotentialFunctionProvider:
     """
@@ -380,6 +417,8 @@ class PotentialFunctionProvider:
     def np_potential(self, theta: np.array) -> ScalarFloat:
         """Return potential for Numpy slice sampler."
 
+        For numpy MCMC samplers this is the unnormalized posterior log prob.
+
         Args:
             theta: Parameters $\theta$, batch dimension 1.
 
@@ -388,23 +427,18 @@ class PotentialFunctionProvider:
         """
         theta = torch.as_tensor(theta, dtype=torch.float32)
         theta = ensure_theta_batched(theta)
-        num_batch = theta.shape[0]
-        x_batched = ensure_x_batched(self.x)
-        # Repeat x over batch dim to match theta batch, accounting for multi-D x.
-        x_repeated = x_batched.repeat(
-            num_batch, *(1 for _ in range(x_batched.ndim - 1))
+
+        log_ratio = RatioBasedPosterior._log_ratios_over_trials(
+            self.x, theta, self.classifier, track_gradients=False
         )
 
-        with torch.set_grad_enabled(False):
-            log_ratio = (
-                self.classifier([theta.to(self.device), x_repeated]).reshape(-1).cpu()
-            )
-
         # Notice opposite sign to pyro potential.
-        return log_ratio + self.prior.log_prob(theta)
+        return log_ratio.cpu() + self.prior.log_prob(theta)
 
     def pyro_potential(self, theta: Dict[str, Tensor]) -> Tensor:
         r"""Return potential for Pyro sampler.
+
+        Note: for Pyro this is the negative unnormalized posterior log prob.
 
         Args:
             theta: Parameters $\theta$. The tensor's shape will be
@@ -419,8 +453,9 @@ class PotentialFunctionProvider:
 
         # Theta and x should have shape (1, dim).
         theta = ensure_theta_batched(theta)
-        x = ensure_x_batched(self.x)
 
-        log_ratio = self.classifier([theta.to(self.device), x]).cpu()
+        log_ratio = RatioBasedPosterior._log_ratios_over_trials(
+            self.x, theta, self.classifier, track_gradients=False
+        )
 
-        return -(log_ratio + self.prior.log_prob(theta))
+        return -(log_ratio.cpu() + self.prior.log_prob(theta))
