@@ -39,8 +39,12 @@ class LikelihoodBasedPosterior(NeuralPosterior):
             method_family: One of snpe, snl, snre_a or snre_b.
             neural_net: A classifier for SNRE, a density estimator for SNPE and SNL.
             prior: Prior distribution with `.log_prob()` and `.sample()`.
-            x_shape: Shape of the observed data. Can contain multiple IID trials in the
-                first dimension.
+            x_shape: Shape of the simulated data. It can differ from the
+                observed data the posterior is conditioned on later in the batch
+                dimension. If it differs, the additional entries are interpreted as
+                independent and identically distributed data / trials. I.e., the data is
+                assumed to be generated based on the same (unknown) model parameters or
+                experimental condations.
             mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`,
                 `hmc`, `nuts`. Currently defaults to `slice_np` for a custom numpy
                 implementation of slice sampling; select `hmc`, `nuts` or `slice` for
