@@ -279,11 +279,9 @@ class NeuralPosterior(ABC):
         self,
         x: Tensor,
         sample_shape: Optional[Tensor],
-        mcmc_method: Optional[str],
-        mcmc_parameters: Optional[Dict[str, Any]],
-    ) -> Tuple[Tensor, int, str, Dict[str, Any]]:
+    ) -> Tuple[Tensor, int]:
         r"""
-        Return checked and (potentially default) values to sample from the posterior.
+        Return checked and correctly shaped values for `x` and `sample_shape`.
 
         Args:
             sample_shape: Desired shape of samples that are drawn from posterior. If
@@ -292,6 +290,27 @@ class NeuralPosterior(ABC):
             x: Conditioning context for posterior $p(\theta|x)$. If not provided,
                 fall back onto `x_o` if previously provided for multiround training, or
                 to a set default (see `set_default_x()` method).
+
+        Returns: Single (potentially default) $x$ with batch dimension; an integer
+            number of samples
+        """
+
+        x = atleast_2d_float32_tensor(self._x_else_default_x(x))
+        if not self._allow_iid_x:
+            self._ensure_single_x(x)
+        self._ensure_x_consistent_with_default_x(x)
+        num_samples = torch.Size(sample_shape).numel()
+
+        # Move x to current device.
+        return x.to(self._device), num_samples
+
+    def _potentially_replace_mcmc_parameters(
+        self, mcmc_method: Optional[str], mcmc_parameters: Optional[Dict[str, Any]]
+    ) -> Tuple[str, Dict[str, Any]]:
+        """
+        Return potentially default values to sample from the posterior with MCMC.
+
+        Args:
             mcmc_method: Optional parameter to override `self.mcmc_method`.
             mcmc_parameters: Dictionary overriding the default parameters for MCMC.
                 The following parameters are supported: `thin` to set the thinning
@@ -302,24 +321,35 @@ class NeuralPosterior(ABC):
                 Importance-Resampling using `init_strategy_num_candidates` to find init
                 locations.
 
-        Returns: Single (potentially default) $x$ with batch dimension; an integer
-            number of samples; a (potentially default) mcmc method; and (potentially
+        Returns: A (potentially default) mcmc method and (potentially
             default) mcmc parameters.
         """
-
-        x = atleast_2d_float32_tensor(self._x_else_default_x(x))
-        if not self._allow_iid_x:
-            self._ensure_single_x(x)
-        self._ensure_x_consistent_with_default_x(x)
-        num_samples = torch.Size(sample_shape).numel()
-
         mcmc_method = mcmc_method if mcmc_method is not None else self.mcmc_method
         mcmc_parameters = (
             mcmc_parameters if mcmc_parameters is not None else self.mcmc_parameters
         )
+        return mcmc_method, mcmc_parameters
 
-        # Move x to current device.
-        return x.to(self._device), num_samples, mcmc_method, mcmc_parameters
+    def _potentially_replace_rejection_parameters(
+        self, rejection_parameters: Optional[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """
+        Return potentially default values to rejection sample the posterior.
+
+        Args:
+            rejection_parameters: Dictionary overriding the default parameters for
+                rejection sampling. The following parameters are supported: `m` as
+                multiplier to the maximum ratio between potential function and the
+                proposal. `proposal`, as the proposal distribtution.
+
+        Returns: Potentially default rejection sampling parameters.
+        """
+        rejection_parameters = (
+            rejection_parameters
+            if rejection_parameters is not None
+            else self.rejection_parameters
+        )
+        return rejection_parameters
 
     def _sample_posterior_mcmc(
         self,
