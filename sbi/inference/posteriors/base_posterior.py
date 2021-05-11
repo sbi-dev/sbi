@@ -93,7 +93,7 @@ class NeuralPosterior(ABC):
         self._x_shape = x_shape
         self._device = device
         # Methods capable of handling iid xo.
-        self._iid_methods = ["snle"]
+        self._iid_methods = ["snle", "snre_a", "snre_b"]
         self._allow_iid_x = method_family in self._iid_methods
 
         if not self._allow_iid_x:
