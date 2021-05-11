@@ -25,18 +25,14 @@ from sbi.mcmc import (
     sir,
 )
 from sbi.types import Array, Shape
-from sbi.utils.sbiutils import check_dist_class, warn_on_iid_x
+from sbi.utils.sbiutils import check_dist_class
 from sbi.utils.torchutils import (
     BoxUniform,
     ScalarFloat,
     atleast_2d_float32_tensor,
     ensure_theta_batched,
 )
-from sbi.utils.user_input_checks import (
-    check_for_possibly_batched_x_shape,
-    process_x,
-    process_xiid,
-)
+from sbi.utils.user_input_checks import check_for_possibly_batched_x_shape, process_x
 
 
 class NeuralPosterior(ABC):
@@ -63,8 +59,7 @@ class NeuralPosterior(ABC):
             method_family: One of snpe, snl, snre_a or snre_b.
             neural_net: A classifier for SNRE, a density estimator for SNPE and SNL.
             prior: Prior distribution with `.log_prob()` and `.sample()`.
-            x_shape: Shape of the simulator data. A batch dimension larger than one is
-                allowed for SNLE and will be interpreted as multiple iid data points.
+            x_shape: Shape of the simulator data.
             mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`,
                 `hmc`, `nuts`. Currently defaults to `slice_np` for a custom numpy
                 implementation of slice sampling; select `hmc`, `nuts` or `slice` for
@@ -94,21 +89,15 @@ class NeuralPosterior(ABC):
         self._num_trained_rounds = 0
         self._prior = prior
         self._x = None
+        self._num_iid_trials = None
         self._x_shape = x_shape
         self._device = device
         # Methods capable of handling iid xo.
         self._iid_methods = ["snle"]
         self._allow_iid_x = method_family in self._iid_methods
 
-        # TODO: remove once checked.
-        assert len(x_shape) > 1, "x_shape needs batch dim."
-
-        # Only SNLE allows multiple iid trials in xo.
         if not self._allow_iid_x:
             check_for_possibly_batched_x_shape(self._x_shape)
-
-        self._num_iid_trials = self._x_shape[0]
-        warn_on_iid_x(self._num_iid_trials)
 
     @property
     def default_x(self) -> Optional[Tensor]:
@@ -140,12 +129,8 @@ class NeuralPosterior(ABC):
         Returns:
             `NeuralPosterior` that will use a default `x` when not explicitly passed.
         """
-        if self._allow_iid_x:
-            processed_x = process_xiid(x, self._x_shape)
-            self._num_iid_trials = processed_x.shape[0]
-        else:
-            processed_x = process_x(x, self._x_shape)
-        self._x = processed_x
+        self._x = process_x(x, self._x_shape, allow_iid_x=self._allow_iid_x)
+        self._num_iid_trials = self._x.shape[0]
 
         return self
 
