@@ -147,4 +147,4 @@ def check_c2st(x: Tensor, y: Tensor, alg: str, tol: float = 0.1) -> None:
 
     assert (
         (0.5 - tol) <= score <= (0.5 + tol)
-    ), f"c2st={score:.2f} is too far from the desired near-chance performance."
+    ), f"{alg}'s c2st={score:.2f} is too far from the desired near-chance performance."

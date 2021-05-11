@@ -1,6 +1,5 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
-import logging
 import time
 from abc import ABC, abstractmethod
 from copy import deepcopy
@@ -11,7 +10,6 @@ import torch
 from torch import Tensor, ones, optim
 from torch.nn.utils import clip_grad_norm_
 from torch.utils import data
-from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 
 from sbi import utils as utils
