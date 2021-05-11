@@ -167,9 +167,10 @@ class SNPE_A(PosteriorEstimator):
             Density estimator that approximates the distribution $p(\theta|x)$.
         """
 
-        assert (
-            not retrain_from_scratch_each_round
-        ), "Retraining from scratch is not supported in SNPE-A yet. The reason for this is that, if we reininitialized the density estimator, the z-scoring would change, which would break the posthoc correction. This is a pure implementation issue."
+        assert not retrain_from_scratch_each_round, """Retraining from scratch is not supported in SNPE-A yet. The reason for
+        this is that, if we reininitialized the density estimator, the z-scoring would
+        change, which would break the posthoc correction. This is a pure implementation
+        issue."""
 
         kwargs = utils.del_entries(
             locals(),
@@ -729,7 +730,8 @@ class SNPE_A_MDN(nn.Module):
                 eig_d = torch.symeig(d, eigenvectors=False).eigenvalues
                 assert (
                     eig_d > 0
-                ).all(), "The precision matrix of the density estimator is not positive definite!"
+                ).all(), """The precision matrix of the density estimator is not
+                positive definite!"""
 
         precisions_pp_rep = precisions_pp.repeat_interleave(num_comps_d, dim=1)
         precisions_d_rep = precisions_d.repeat(1, num_comps_p, 1, 1)
@@ -825,7 +827,8 @@ class SNPE_A_MDN(nn.Module):
         r"""
         Return the component weights (i.e. logits) of the MoG posterior.
 
-        $\alpha_k^\prime = \frac{ \alpha_k exp(-0.5 c_k) }{ \sum{j} \alpha_j exp(-0.5 c_j) } $
+        $\alpha_k^\prime = \frac{ \alpha_k exp(-0.5 c_k) }{ \sum{j} \alpha_j exp(-0.5
+        c_j) } $
         with
         $c_k = logdet(S_k) - logdet(S_0) - logdet(S_k^\prime) +
              + m_k^T P_k m_k - m_0^T P_0 m_0 - m_k^\prime^T P_k^\prime m_k^\prime$

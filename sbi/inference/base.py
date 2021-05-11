@@ -162,7 +162,7 @@ class NeuralInference(ABC):
             best_validation_log_probs=[],
             validation_log_probs=[],
             train_log_probs=[],
-            epoch_durations_sec=[]
+            epoch_durations_sec=[],
         )
 
     def __call__(self, unused_args):
@@ -485,8 +485,6 @@ class NeuralInference(ABC):
             scalar_value=self._summary["best_validation_log_probs"][-1],
             global_step=round_ + 1,
         )
-
-
 
         # Add validation log prob for every epoch.
         # Offset with all previous epochs.
