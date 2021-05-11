@@ -67,10 +67,7 @@ class RatioBasedPosterior(NeuralPosterior):
         super().__init__(**kwargs)
 
     def log_prob(
-        self,
-        theta: Tensor,
-        x: Optional[Tensor] = None,
-        track_gradients: bool = False,
+        self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False
     ) -> Tensor:
         r"""
         Returns the log-probability of $p(x|\theta) \cdot p(\theta).$

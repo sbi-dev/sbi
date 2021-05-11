@@ -24,7 +24,7 @@ def test_simulate_in_batches(
     simulator,
     prior=BoxUniform(zeros(5), ones(5)),
 ):
-    """Test combinations of num_sims and simulation_batch_size. """
+    """Test combinations of num_sims and simulation_batch_size."""
 
     simulator, prior = prepare_for_sbi(simulator, prior)
     theta = prior.sample((num_sims,))
