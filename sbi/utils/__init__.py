@@ -11,6 +11,7 @@ from sbi.utils.sbiutils import (
     batched_mixture_mv,
     batched_mixture_vmv,
     check_dist_class,
+    check_warn_and_setstate,
     clamp_and_warn,
     del_entries,
     expit,

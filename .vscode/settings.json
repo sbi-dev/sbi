@@ -73,4 +73,5 @@
     //
     // Signal that we are using shared workspace settings in .vscode
     "window.title": "sbi.vscode:: ${dirty}${activeEditorShort}${separator}${rootName}${separator}${appName}",
+    "python.pythonPath": "/home/michael/anaconda3/envs/sbi/bin/python",
 }

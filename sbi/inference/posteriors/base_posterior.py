@@ -25,7 +25,7 @@ from sbi.mcmc import (
     sir,
 )
 from sbi.types import Array, Shape
-from sbi.utils.sbiutils import check_dist_class
+from sbi.utils.sbiutils import check_dist_class, check_warn_and_setstate
 from sbi.utils.torchutils import (
     BoxUniform,
     ScalarFloat,
@@ -980,16 +980,48 @@ class NeuralPosterior(ABC):
         """
         Sets the state when being loaded from pickle.
 
+        For developers: for any new attribute added to `NeuralPosterior`, we have to
+        add an entry here using `check_warn_and_setstate()`.
+
         Args:
             state_dict: State to be restored.
         """
-        if "_device" not in state_dict.keys():
-            state_dict["_device"] = "cpu"
-            warn(
+
+        # In the beginning, the warning message is empty.
+        warning_msg = ""
+
+        state_dict, warning_msg = check_warn_and_setstate(
+            state_dict, "_device", "cpu", warning_msg
+        )
+
+        if state_dict["_x"] is not None:
+            state_dict, warning_msg = check_warn_and_setstate(
+                state_dict, "_num_iid_trials", state_dict["_x"].shape[0], warning_msg
+            )
+        else:
+            state_dict, warning_msg = check_warn_and_setstate(
+                state_dict, "_num_iid_trials", None, warning_msg
+            )
+
+        state_dict, warning_msg = check_warn_and_setstate(
+            state_dict, "_iid_methods", ["snle", "snre_a", "snre_b"], warning_msg
+        )
+
+        state_dict, warning_msg = check_warn_and_setstate(
+            state_dict,
+            "_allow_iid_x",
+            state_dict["_method_family"] in state_dict["_iid_methods"],
+            warning_msg,
+        )
+
+        if warning_msg:
+            warning_description = (
                 "You had saved the posterior under an older version of `sbi`. To make "
                 "the loaded version comply with the version you are using right now, "
-                "we had to set `self._device = 'cpu'`"
+                "we had to set the following attributes:"
             )
+            warn(warning_description + warning_msg)
+
         self.__dict__ = state_dict
 
 

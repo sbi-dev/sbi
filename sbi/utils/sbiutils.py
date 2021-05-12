@@ -337,6 +337,39 @@ def warn_on_invalid_x_for_snpec_leakage(
             )
 
 
+def check_warn_and_setstate(
+    state_dict: Dict, key_name: str, replacement_value: Any, warning_msg: str = ""
+) -> Tuple[Dict, str]:
+    """
+    Check if `key_name` is in `state_dict` and add it if not.
+
+    If the key already existed in the `state_dict`, the dictionary remains
+    unaltered. This function also appends to a warning string.
+
+    For developers: The reason that this method only appends to a warning string
+    instead of warning directly is that the user might get multiple very similar
+    warnings if multiple attributes had to be replaced. Thus, we start off with an
+    emtpy string and keep appending all missing attributes. Then, in the end,
+    all attributes are displayed along with a full description of the warning.
+
+    Args:
+        attribute_name: The name of the attribute to check.
+        state_dict: The dictionary to search (and write to if the key does not yet
+            exist).
+        replacement_value: The value to be written to the `state_dict`.
+        warning_msg: String to which the warning message should be appended to.
+
+    Returns:
+        A dictionary which contains the key `attribute_name` and a string with an
+        appended warning message.
+    """
+
+    if key_name not in state_dict.keys():
+        state_dict[key_name] = replacement_value
+        warning_msg += " `self." + key_name + f" = {str(replacement_value)}`"
+    return state_dict, warning_msg
+
+
 def get_simulations_since_round(
     data: List,
     data_round_indices: List,
