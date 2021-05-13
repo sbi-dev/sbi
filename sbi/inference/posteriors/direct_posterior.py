@@ -6,7 +6,7 @@ from typing import Any, Callable, Dict, List, Optional, Union, Tuple
 import numpy as np
 import torch
 from torch import Tensor, log, nn
-import warnings
+from warnings import warn
 
 from sbi import utils as utils
 from pyknos.mdn.mdn import MultivariateGaussianMDN as mdn
@@ -426,7 +426,7 @@ class DirectPosterior(NeuralPosterior):
             )
 
             # Currently difficult to integrate `sample_posterior_within_prior`
-            warnings.warn(
+            warn(
                 "Sampling MoG analytically. Some of the samples might not be within the prior support!"
             )
             samples = mdn.sample_mog(num_samples, logits, means, precfs)
@@ -490,7 +490,7 @@ class DirectPosterior(NeuralPosterior):
             # Implementing leakage correction is difficult for conditioned MDNs,
             # because samples from self i.e. the full posterior are used rather
             # then from the new, conditioned posterior.
-            warnings.warn("Probabilities are not adjusted for leakage.")
+            warn("Probabilities are not adjusted for leakage.")
 
             log_prob = mdn.log_prob_mog(
                 theta,
@@ -591,7 +591,7 @@ class PotentialFunctionProvider:
     """
 
     def __call__(
-        self, prior, posterior_nn: nn.Module, x: Tensor, mcmc_method: str,
+        self, prior, posterior_nn: nn.Module, x: Tensor, mcmc_method: str
     ) -> Callable:
         """Return potential function.
 
@@ -627,7 +627,7 @@ class PotentialFunctionProvider:
 
         with torch.set_grad_enabled(False):
             target_log_prob = self.posterior_nn.log_prob(
-                inputs=theta.to(self.x.device), context=x_repeated,
+                inputs=theta.to(self.x.device), context=x_repeated
             )
             is_within_prior = torch.isfinite(self.prior.log_prob(theta))
             target_log_prob[~is_within_prior] = -float("Inf")

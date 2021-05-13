@@ -10,7 +10,7 @@ import torch
 from torch import Tensor
 
 from sbi.utils.torchutils import ensure_theta_batched
-from sbi.inference.posteriors.direct_posterior import DirectPosterior
+from sbi.utils.torchutils import BoxUniform
 
 
 def eval_conditional_density(
@@ -368,7 +368,7 @@ def extract_and_transform_mog(
     precfs_transformed = A @ precfs
 
     sumlogdiag = torch.sum(
-        torch.log(torch.diagonal(precfs_transformed, dim1=2, dim2=3)), dim=2,
+        torch.log(torch.diagonal(precfs_transformed, dim1=2, dim2=3)), dim=2
     )
 
     return norm_logits, means_transformed, precfs_transformed, sumlogdiag
@@ -418,10 +418,7 @@ def condition_mog(
     mask[dims] = True
 
     # check whether the condition is within the prior bounds
-    if (
-        type(prior) is torch.distributions.uniform.Uniform
-        or type(prior) is utils.torchutils.BoxUniform
-    ):
+    if type(prior) is torch.distributions.uniform.Uniform or type(prior) is BoxUniform:
         cond_ubound = support.upper_bound[~mask]
         cond_lbound = support.lower_bound[~mask]
         within_support = torch.logical_and(
