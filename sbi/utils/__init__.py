@@ -2,6 +2,8 @@
 from sbi.utils.conditional_density import (
     conditional_corrcoeff,
     eval_conditional_density,
+    extract_and_transform_mog,
+    condition_mog,
 )
 from sbi.utils.get_nn_models import classifier_nn, likelihood_nn, posterior_nn
 from sbi.utils.io import get_data_root, get_log_root, get_project_root

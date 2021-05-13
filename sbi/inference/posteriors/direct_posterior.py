@@ -6,6 +6,7 @@ from typing import Any, Callable, Dict, List, Optional, Union, Tuple
 import numpy as np
 import torch
 from torch import Tensor, log, nn
+import warnings
 
 from sbi import utils as utils
 from pyknos.mdn.mdn import MultivariateGaussianMDN as mdn
@@ -17,6 +18,7 @@ from sbi.utils.torchutils import (
     ensure_theta_batched,
     ensure_x_batched,
 )
+from sbi.utils.conditional_density import extract_and_transform_mog, condition_mog
 
 
 class DirectPosterior(NeuralPosterior):
@@ -369,119 +371,6 @@ class DirectPosterior(NeuralPosterior):
 
         return samples.reshape((*sample_shape, -1))
 
-    def extract_and_transform_mog(
-        self, context: Tensor = None
-    ) -> Tuple[Tensor, Tensor, Tensor]:
-        """Extracts the Mixture of Gaussians (MoG) parameters
-        from the MDN at either the default x or input x.
-
-        Args:
-            x: x at which to evaluate the MDN in order
-                to extract the MoG parameters.
-        """
-
-        # extract and rescale means, mixture componenets and covariances
-        nn = self.net
-        dist = nn._distribution
-
-        if context == None:
-            encoded_x = nn._embedding_net(self.default_x)
-        else:
-            encoded_x = nn._embedding_net(context)
-
-        logits, means, _, sumlogdiag, precfs = dist.get_mixture_components(encoded_x)
-        norm_logits = logits - torch.logsumexp(logits, dim=-1, keepdim=True)
-
-        scale = nn._transform._transforms[0]._scale
-        shift = nn._transform._transforms[0]._shift
-
-        means_transformed = (means - shift) / scale
-
-        A = scale * torch.eye(means_transformed.shape[2])
-        precfs_transformed = A @ precfs
-
-        sumlogdiag = torch.sum(
-            torch.log(torch.diagonal(precfs_transformed, dim1=2, dim2=3)), dim=2,
-        )
-
-        return norm_logits, means_transformed, precfs_transformed, sumlogdiag
-
-    def condition_mog(
-        self,
-        condition: Tensor,
-        dims: List[int],
-        logits: Tensor,
-        means: Tensor,
-        precfs: Tensor,
-    ):
-        """Finds the conditional distribution p(X|Y) for a GMM.
-
-        Args:
-            condition: An array of inputs. Inputs set to NaN are not set, and become inputs to
-                the resulting distribution. Order is preserved.
-
-        Raises:
-            ValueError: The chosen condition is not within the prior support.
-        """
-
-        support = self._prior.support
-
-        n_mixtures, n_dims = means.shape[1:]
-
-        mask = torch.zeros(n_dims, dtype=bool)
-        mask[dims] = True
-
-        # check whether the condition is within the prior bounds
-        if (
-            type(self._prior) is torch.distributions.uniform.Uniform
-            or type(self._prior) is utils.torchutils.BoxUniform
-        ):
-            cond_ubound = support.upper_bound[~mask]
-            cond_lbound = support.lower_bound[~mask]
-            within_support = torch.logical_and(
-                cond_lbound <= condition[:, ~mask], cond_ubound >= condition[:, ~mask]
-            )
-            if ~torch.all(within_support):
-                raise ValueError(
-                    "The chosen condition is not within the prior support."
-                )
-
-        y = condition[:, ~mask]
-        mu_x = means[:, :, mask]
-        mu_y = means[:, :, ~mask]
-
-        precfs_xx = precfs[:, :, mask]
-        precfs_xx = precfs_xx[:, :, :, mask]
-        precs_xx = precfs_xx.transpose(3, 2) @ precfs_xx
-
-        precfs_yy = precfs[:, :, ~mask]
-        precfs_yy = precfs_yy[:, :, :, ~mask]
-        precs_yy = precfs_yy.transpose(3, 2) @ precfs_yy
-
-        precs = precfs.transpose(3, 2) @ precfs
-        precs_xy = precs[:, :, mask]
-        precs_xy = precs_xy[:, :, :, ~mask]
-
-        means = mu_x - (
-            torch.inverse(precs_xx) @ precs_xy @ (y - mu_y).view(1, n_mixtures, -1, 1)
-        ).view(1, n_mixtures, -1)
-
-        diags = torch.diagonal(precfs_yy, dim1=2, dim2=3)
-        sumlogdiag_yy = torch.sum(torch.log(diags), dim=2)
-        log_prob = mdn.log_prob_mog(
-            y, torch.zeros((1, 1)), mu_y, precs_yy, sumlogdiag_yy
-        )
-
-        # Normalize the mixing coef: p(X|Y) = p(Y,X) / p(Y) using the marginal dist.
-        new_mcs = torch.exp(logits + log_prob)
-        new_mcs = new_mcs / new_mcs.sum()
-        logits = torch.log(new_mcs)
-
-        sumlogdiag = torch.sum(
-            torch.log(torch.diagonal(precfs_xx, dim1=2, dim2=3)), dim=2
-        )
-        return logits, means, precfs_xx, sumlogdiag
-
     def sample_conditional(
         self,
         sample_shape: Shape,
@@ -531,12 +420,14 @@ class DirectPosterior(NeuralPosterior):
         if type(self.net._distribution) is mdn:
             num_samples = torch.Size(sample_shape).numel()
 
-            logits, means, precfs, _ = self.extract_and_transform_mog(x)
-            logits, means, precfs, _ = self.condition_mog(
-                condition, dims_to_sample, logits, means, precfs
+            logits, means, precfs, _ = extract_and_transform_mog(self, x)
+            logits, means, precfs, _ = condition_mog(
+                self._prior, condition, dims_to_sample, logits, means, precfs
             )
-            print(
-                "Warning: Sampling MoG analytically. Some of the samples might not be within the prior support!"
+
+            # Currently difficult to integrate `sample_posterior_within_prior`
+            warnings.warn(
+                "Sampling MoG analytically. Some of the samples might not be within the prior support!"
             )
             samples = mdn.sample_mog(num_samples, logits, means, precfs)
             return samples.detach().reshape((*sample_shape, -1))
@@ -560,8 +451,10 @@ class DirectPosterior(NeuralPosterior):
         dims_to_evaluate: List[int],
         x: Optional[Tensor] = None,
     ) -> Tensor:
-        """Evaluates the Mixture of Gaussian (MoG)
-        probability density function at a value x.
+        """Evaluates the conditional posterior probability of a MDN at a context x for a value theta given a condition.
+
+        This function only works for MDN based posteriors, becuase evaluation is done analytically. For all other density estimators a `NotImplementedError` will be
+        raised! 
 
         Args:
             theta: Parameters $\theta$.
@@ -575,9 +468,11 @@ class DirectPosterior(NeuralPosterior):
                 fall back onto `x` passed to `set_default_x()`.
 
         Returns:
-            log_prob: `(len(θ),)`-shaped log posterior probability $\log p(\theta|x
-                for θ in the support of the prior, -∞ (corresponding to 0 probability) outside.
+            log_prob: `(len(θ),)`-shaped normalized (!) log posterior probability 
+                $\log p(\theta|x) for θ in the support of the prior, -∞ (corresponding 
+                to 0 probability) outside.
         """
+
         if type(self.net._distribution) == mdn:
             logits, means, precfs, sumlogdiag = self.extract_and_transform_mog(x)
             logits, means, precfs, sumlogdiag = self.condition_mog(
@@ -592,7 +487,11 @@ class DirectPosterior(NeuralPosterior):
             if dim != len(dims_to_evaluate):
                 X = X[:, dims_to_evaluate]
 
-            print("Warning: Probabilities are not adjusted for leakage.")
+            # Implementing leakage correction is difficult for conditioned MDNs,
+            # because samples from self i.e. the full posterior are used rather
+            # then from the new, conditioned posterior.
+            warnings.warn("Probabilities are not adjusted for leakage.")
+
             log_prob = mdn.log_prob_mog(
                 theta,
                 logits.repeat(batch_size, 1),

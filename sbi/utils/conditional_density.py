@@ -2,6 +2,7 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 
+from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from typing import Any, Callable, List, Optional, Tuple, Union
 from warnings import warn
 
@@ -9,6 +10,7 @@ import torch
 from torch import Tensor
 
 from sbi.utils.torchutils import ensure_theta_batched
+from sbi.inference.posteriors.direct_posterior import DirectPosterior
 
 
 def eval_conditional_density(
@@ -321,3 +323,141 @@ def _normalize_probs(probs: Tensor, limits: Tensor) -> Tensor:
     """
     limits_diff = torch.prod(limits[:, 1] - limits[:, 0])
     return probs * probs.numel() / limits_diff / torch.sum(probs)
+
+
+def extract_and_transform_mog(
+    posterior: DirectPosterior, context: Tensor = None
+) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
+    """Extracts the Mixture of Gaussians (MoG) parameters
+    from an MDN based DirectPosterior at either the default x or input x.
+
+    Args:
+        posterior: DirectPosterior instance.
+        context: Conditioning context for posterior $p(\theta|x)$. If not provided,
+            fall back onto `x` passed to `set_default_x()`.
+    
+    Returns:
+        norm_logits: Normalised log weights of the underyling MoG. 
+            (batch_size, n_mixtures)
+        means_transformed: Recentred and rescaled means of the underlying MoG
+            (batch_size, n_mixtures, n_dims)
+        precfs_transformed: Rescaled precision factors of the underlying MoG. 
+            (batch_size, n_mixtures, n_dims, n_dims)
+        sumlogdiag: Sum of the log of the diagonal of the precision factors
+            of the new conditional distribution. (batch_size, n_mixtures)
+    """
+
+    # extract and rescale means, mixture componenets and covariances
+    nn = posterior.net
+    dist = posterior_net._distribution
+
+    if context == None:
+        encoded_x = nn._embedding_net(posterior.default_x)
+    else:
+        encoded_x = nn._embedding_net(context)
+
+    logits, means, _, sumlogdiag, precfs = dist.get_mixture_components(encoded_x)
+    norm_logits = logits - torch.logsumexp(logits, dim=-1, keepdim=True)
+
+    scale = nn._transform._transforms[0]._scale
+    shift = nn._transform._transforms[0]._shift
+
+    means_transformed = (means - shift) / scale
+
+    A = scale * torch.eye(means_transformed.shape[2])
+    precfs_transformed = A @ precfs
+
+    sumlogdiag = torch.sum(
+        torch.log(torch.diagonal(precfs_transformed, dim1=2, dim2=3)), dim=2,
+    )
+
+    return norm_logits, means_transformed, precfs_transformed, sumlogdiag
+
+
+def condition_mog(
+    prior: "Prior",
+    condition: Tensor,
+    dims: List[int],
+    logits: Tensor,
+    means: Tensor,
+    precfs: Tensor,
+) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
+    """Finds the conditional distribution p(X|Y) for a GMM.
+
+    Args:
+        prior: Prior Distribution. Used to check if condition within support.
+        condition: Parameter set that all dimensions not specified in
+            `dims_to_sample` will be fixed to. Should contain dim_theta elements,
+            i.e. it could e.g. be a sample from the posterior distribution.
+            The entries at all `dims_to_sample` will be ignored.
+        dims_to_sample: Which dimensions to sample from. The dimensions not
+            specified in `dims_to_sample` will be fixed to values given in
+            `condition`.
+        logits: Log weights of the MoG. (batch_size, n_mixtures)
+        means: Means of the MoG. (batch_size, n_mixtures, n_dims)
+        precfs: Precision factors of the MoG. 
+            (batch_size, n_mixtures, n_dims, n_dims)
+
+    Raises:
+        ValueError: The chosen condition is not within the prior support.
+
+    Returns:
+        logits:  Log weights of the conditioned MoG. (batch_size, n_mixtures)
+        means: Means of the conditioned MoG. (batch_size, n_mixtures, n_dims)
+        precfs_xx: Precision factors of the MoG. 
+            (batch_size, n_mixtures, n_dims, n_dims)
+        sumlogdiag: Sum of the log of the diagonal of the precision factors
+            of the new conditional distribution. (batch_size, n_mixtures)
+    """
+
+    support = prior.support
+
+    n_mixtures, n_dims = means.shape[1:]
+
+    mask = torch.zeros(n_dims, dtype=bool)
+    mask[dims] = True
+
+    # check whether the condition is within the prior bounds
+    if (
+        type(prior) is torch.distributions.uniform.Uniform
+        or type(prior) is utils.torchutils.BoxUniform
+    ):
+        cond_ubound = support.upper_bound[~mask]
+        cond_lbound = support.lower_bound[~mask]
+        within_support = torch.logical_and(
+            cond_lbound <= condition[:, ~mask], cond_ubound >= condition[:, ~mask]
+        )
+        if ~torch.all(within_support):
+            raise ValueError("The chosen condition is not within the prior support.")
+
+    y = condition[:, ~mask]
+    mu_x = means[:, :, mask]
+    mu_y = means[:, :, ~mask]
+
+    precfs_xx = precfs[:, :, mask]
+    precfs_xx = precfs_xx[:, :, :, mask]
+    precs_xx = precfs_xx.transpose(3, 2) @ precfs_xx
+
+    precfs_yy = precfs[:, :, ~mask]
+    precfs_yy = precfs_yy[:, :, :, ~mask]
+    precs_yy = precfs_yy.transpose(3, 2) @ precfs_yy
+
+    precs = precfs.transpose(3, 2) @ precfs
+    precs_xy = precs[:, :, mask]
+    precs_xy = precs_xy[:, :, :, ~mask]
+
+    means = mu_x - (
+        torch.inverse(precs_xx) @ precs_xy @ (y - mu_y).view(1, n_mixtures, -1, 1)
+    ).view(1, n_mixtures, -1)
+
+    diags = torch.diagonal(precfs_yy, dim1=2, dim2=3)
+    sumlogdiag_yy = torch.sum(torch.log(diags), dim=2)
+    log_prob = mdn.log_prob_mog(y, torch.zeros((1, 1)), mu_y, precs_yy, sumlogdiag_yy)
+
+    # Normalize the mixing coef: p(X|Y) = p(Y,X) / p(Y) using the marginal dist.
+    new_mcs = torch.exp(logits + log_prob)
+    new_mcs = new_mcs / new_mcs.sum()
+    logits = torch.log(new_mcs)
+
+    sumlogdiag = torch.sum(torch.log(torch.diagonal(precfs_xx, dim1=2, dim2=3)), dim=2)
+    return logits, means, precfs_xx, sumlogdiag
