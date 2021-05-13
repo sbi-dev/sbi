@@ -474,9 +474,9 @@ class DirectPosterior(NeuralPosterior):
         """
 
         if type(self.net._distribution) == mdn:
-            logits, means, precfs, sumlogdiag = self.extract_and_transform_mog(x)
-            logits, means, precfs, sumlogdiag = self.condition_mog(
-                condition, dims_to_evaluate, logits, means, precfs
+            logits, means, precfs, sumlogdiag = extract_and_transform_mog(self, x)
+            logits, means, precfs, sumlogdiag = condition_mog(
+                self._prior, condition, dims_to_evaluate, logits, means, precfs
             )
 
             batch_size, dim = theta.shape
