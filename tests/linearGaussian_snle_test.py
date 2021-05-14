@@ -238,10 +238,11 @@ def test_c2st_multi_round_snl_on_linearGaussian(num_trials: int, set_seed):
     check_c2st(samples, target_samples, alg="multi-round-snl")
 
 
+# TODO: add test for rejection sampling.
 @pytest.mark.slow
+@pytest.mark.parametrize("prior_str", ("gaussian", "uniform"))
 @pytest.mark.parametrize(
-    "mcmc_method, prior_str",
-    (("slice", "gaussian"), ("slice", "uniform")),
+    "mcmc_method", ("slice_np", "slice_np_vectorized", "slice", "nuts", "hmc")
 )
 def test_api_snl_sampling_methods(mcmc_method: str, prior_str: str, set_seed):
     """Runs SNL on linear Gaussian and tests sampling from posterior via mcmc.
@@ -254,7 +255,12 @@ def test_api_snl_sampling_methods(mcmc_method: str, prior_str: str, set_seed):
 
     num_dim = 2
     num_samples = 10
-    x_o = zeros((1, num_dim))
+    num_trials = 2
+    # HMC with uniform prior needs good likelihood.
+    num_simulations = 10000 if mcmc_method == "hmc" else 1000
+    x_o = zeros((num_trials, num_dim))
+    # Test for multiple chains is cheap when vectorized.
+    num_chains = 3 if mcmc_method == "slice_np_vectorized" else 1
 
     if prior_str == "gaussian":
         prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
@@ -264,8 +270,14 @@ def test_api_snl_sampling_methods(mcmc_method: str, prior_str: str, set_seed):
     simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior)
     inference = SNL(prior, show_progress_bars=False)
 
-    theta, x = simulate_for_sbi(simulator, prior, 200, simulation_batch_size=50)
+    theta, x = simulate_for_sbi(
+        simulator, prior, num_simulations, simulation_batch_size=50
+    )
     _ = inference.append_simulations(theta, x).train(max_num_epochs=5)
     posterior = inference.build_posterior(mcmc_method=mcmc_method).set_default_x(x_o)
 
-    posterior.sample(sample_shape=(num_samples,), x=x_o, mcmc_parameters={"thin": 3})
+    posterior.sample(
+        sample_shape=(num_samples,),
+        x=x_o,
+        mcmc_parameters={"thin": 3, "num_chains": num_chains},
+    )
