@@ -170,6 +170,7 @@ class LikelihoodBasedPosterior(NeuralPosterior):
 
         potential_fn_provider = PotentialFunctionProvider()
         if sample_with == "mcmc":
+
             mcmc_method, mcmc_parameters = self._potentially_replace_mcmc_parameters(
                 mcmc_method, mcmc_parameters
             )
@@ -200,7 +201,7 @@ class LikelihoodBasedPosterior(NeuralPosterior):
             samples = rejection_sample(
                 num_samples=num_samples,
                 potential_fn=potential_fn_provider(
-                    self._prior, self.net, x, "slice_np"
+                    self._prior, self.net, x, "rejection"
                 ),
                 **rejection_sampling_parameters,
             )
@@ -402,7 +403,11 @@ class PotentialFunctionProvider:
     """
 
     def __call__(
-        self, prior, likelihood_nn: nn.Module, x: Tensor, mcmc_method: str
+        self,
+        prior,
+        likelihood_nn: nn.Module,
+        x: Tensor,
+        method: str,
     ) -> Callable:
         r"""Return potential function for posterior $p(\theta|x)$.
 
@@ -423,12 +428,16 @@ class PotentialFunctionProvider:
         self.device = next(likelihood_nn.parameters()).device
         self.x = atleast_2d(x).to(self.device)
 
-        if mcmc_method == "slice":
+        if method == "slice":
             return partial(self.pyro_potential, track_gradients=False)
-        elif mcmc_method in ("hmc", "nuts"):
+        elif method in ("hmc", "nuts"):
             return partial(self.pyro_potential, track_gradients=True)
-        else:
+        elif "slice_np" in method:
             return self.np_potential
+        elif method == "rejection":
+            return self.rejection_potential
+        else:
+            NotImplementedError
 
     def log_likelihood(self, theta: Tensor, track_gradients: bool = False) -> Tensor:
         """Return log likelihood of fixed data given a batch of parameters."""
@@ -441,6 +450,24 @@ class PotentialFunctionProvider:
         )
 
         return log_likelihoods
+
+    def rejection_potential(self, theta: np.array) -> ScalarFloat:
+        r"""Return posterior log prob. of theta $p(\theta|x)$"
+
+        The only difference to the `np_potential` is that it tracks the gradients.
+
+        Args:
+            theta: Parameters $\theta$, batch dimension 1.
+
+        Returns:
+            Posterior log probability of the theta, $-\infty$ if impossible under prior.
+        """
+        theta = torch.as_tensor(theta, dtype=torch.float32)
+
+        # Notice opposite sign to pyro potential.
+        return self.log_likelihood(
+            theta, track_gradients=True
+        ).cpu() + self.prior.log_prob(theta)
 
     def np_potential(self, theta: np.array) -> ScalarFloat:
         r"""Return posterior log prob. of theta $p(\theta|x)$"
