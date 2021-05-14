@@ -146,17 +146,15 @@ def standardizing_net(batch_t: Tensor, min_std: float = 1e-7) -> nn.Module:
     return Standardize(t_mean, t_std)
 
 
-@torch.no_grad()
-def sample_posterior_within_prior(
-    posterior_nn: nn.Module,
-    prior,
-    x: Tensor,
+def rejection_sample_raw(
+    potential_fn: nn.Module,
+    proposal,
     num_samples: int = 1,
     show_progress_bars: bool = False,
     warn_acceptance: float = 0.01,
     sample_for_correction_factor: bool = False,
     max_sampling_batch_size: int = 10_000,
-) -> Tuple[Tensor, Tensor]:
+):
     r"""Return samples from a posterior $p(\theta|x)$ only within the prior support.
 
     This is relevant for snpe methods and flows for which the posterior tends to have
@@ -170,7 +168,6 @@ def sample_posterior_within_prior(
     Args:
         posterior_nn: Neural net representing the posterior.
         prior: Distribution-like object that evaluates probabilities with `log_prob`.
-        x: Conditioning variable $x$ for the posterior $p(\theta|x)$.
         num_samples: Desired number of samples.
         show_progress_bars: Whether to show a progressbar during sampling.
         warn_acceptance: A minimum acceptance rate under which to warn about slowness.
@@ -185,8 +182,6 @@ def sample_posterior_within_prior(
     Returns:
         Accepted samples and acceptance rate as scalar Tensor.
     """
-
-    assert not posterior_nn.training, "Posterior nn must be in eval mode for sampling."
 
     # Progress bar can be skipped, e.g. when sampling after each round just for logging.
     pbar = tqdm(
@@ -205,12 +200,19 @@ def sample_posterior_within_prior(
 
         # Sample and reject.
         candidates = (
-            posterior_nn.sample(sampling_batch_size, context=x)
+            proposal.sample(sampling_batch_size)
             .reshape(sampling_batch_size, -1)
             .cpu()  # Move to cpu to evaluate under prior.
         )
-        are_within_prior = within_support(prior, candidates)
-        samples = candidates[are_within_prior]
+        # are_within_prior = within_support(prior, candidates)
+        # samples = candidates[are_within_prior]
+
+        target_proposal_ratio = torch.exp(
+            potential_fn(candidates) - proposal.log_prob(candidates)
+        )
+        uniform_rand = torch.rand(target_proposal_ratio.shape)
+        samples = candidates[target_proposal_ratio > uniform_rand]
+
         accepted.append(samples)
 
         # Update.
@@ -444,15 +446,15 @@ def batched_mixture_mv(matrix: Tensor, vector: Tensor) -> Tensor:
 
 
 def optimize_potential_fn(
-    potential_fn: Callable, 
-    inits: Tensor, 
-    dist_specifying_bounds: Optional[Any] = None, 
-    num_iter: int = 1_000, 
-    num_to_optimize: int = 100, 
+    potential_fn: Callable,
+    inits: Tensor,
+    dist_specifying_bounds: Optional[Any] = None,
+    num_iter: int = 1_000,
+    num_to_optimize: int = 100,
     learning_rate: float = 0.01,
     save_best_every: int = 10,
     show_progress_bars: bool = False,
-    interruption_note: str = ""
+    interruption_note: str = "",
 ) -> Tuple[Tensor, Tensor]:
     """
     Returns the location of the maximum of a `potential_fn`.
@@ -460,8 +462,8 @@ def optimize_potential_fn(
     The method can be interrupted (Ctrl-C) when the user sees that the
     log-probability converges. The best estimate will be returned.
 
-    The location of the maximum is obtained by running gradient ascent from given 
-    number of starting positions. After the optimization is done, we select the 
+    The location of the maximum is obtained by running gradient ascent from given
+    number of starting positions. After the optimization is done, we select the
     parameter set that has the highest `potential_fn` value after the optimization.
 
     Warning: The default values used by this function are not well-tested. They
@@ -485,9 +487,9 @@ def optimize_potential_fn(
             `map`-attribute, and printed every `save_best_every`-th iteration.
             Computing the best log-probability creates a significant overhead
             (thus, the default is `10`.)
-        show_progress_bars: Whether or not to show a progressbar for the 
+        show_progress_bars: Whether or not to show a progressbar for the
             optimization.
-        interrruption_note: The message printed when the user interrupts the 
+        interrruption_note: The message printed when the user interrupts the
             optimization.
 
     Returns:
@@ -572,15 +574,11 @@ def optimize_potential_fn(
             with torch.no_grad():
                 if iter_ % save_best_every == 0 or iter_ == num_iter - 1:
                     # Evaluate the optimized locations and pick the best one.
-                    log_probs_of_optimized = potential_fn(
-                        tf_inv(optimize_inits)
-                    )
+                    log_probs_of_optimized = potential_fn(tf_inv(optimize_inits))
                     best_theta_iter = optimize_inits[
                         torch.argmax(log_probs_of_optimized)
                     ]
-                    best_log_prob_iter = potential_fn(
-                        tf_inv(best_theta_iter)
-                    )
+                    best_log_prob_iter = potential_fn(tf_inv(best_theta_iter))
                     if best_log_prob_iter > best_log_prob_overall:
                         best_theta_overall = best_theta_iter.detach().clone()
                         best_log_prob_overall = best_log_prob_iter.detach().clone()
@@ -641,6 +639,7 @@ def logit(theta: Tensor, lower_bound: Tensor, upper_bound: Tensor) -> Tensor:
     theta_01 = (theta - lower_bound) / range_
 
     return torch.log(theta_01 / (1 - theta_01))
+
 
 def check_dist_class(
     dist, class_to_check: Union[Distribution, Sequence[Distribution]]
