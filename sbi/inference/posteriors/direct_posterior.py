@@ -465,6 +465,52 @@ class DirectPosterior(NeuralPosterior):
             log_prob_kwargs={"norm_posterior": False},
         )
 
+    @torch.no_grad()
+    def sample_posterior_within_prior(
+        self,
+        posterior_nn: nn.Module,
+        prior,
+        x: Tensor,
+        num_samples: int = 1,
+        show_progress_bars: bool = False,
+        warn_acceptance: float = 0.01,
+        sample_for_correction_factor: bool = False,
+        max_sampling_batch_size: int = 10_000,
+    ) -> Tuple[Tensor, Tensor]:
+
+        assert (
+            not posterior_nn.training
+        ), "Posterior nn must be in eval mode for sampling."
+
+        def potential_fn(theta):
+            are_within_prior = within_support(prior, theta)
+            probs = posterior_nn.log_prob(theta, context=x)
+            probs[~are_within_prior] = float("-inf")
+            return probs
+
+        class Proposal:
+            def __init__(self, posterior_nn: Any):
+                self.posterior_nn = posterior_nn
+
+            def sample(self, sample_shape, **kwargs):
+                return self.posterior_nn.sample(sample_shape.numel(), **kwargs)
+
+            def log_prob(self, theta, **kwargs):
+                return self.posterior_nn.log_prob(theta, context=x)
+
+        proposal = Proposal(posterior_nn)
+
+        samples = rejection_sample_raw(
+            potential_fn=potential_fn,
+            proposal=proposal,
+            num_samples=num_samples,
+            show_progress_bars=show_progress_bars,
+            warn_acceptance=warn_acceptance,
+            sample_for_correction_factor=sample_for_correction_factor,
+            max_sampling_batch_size=max_sampling_batch_size,
+        )
+        return samples
+
 
 class PotentialFunctionProvider:
     """

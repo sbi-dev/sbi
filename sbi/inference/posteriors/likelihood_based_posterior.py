@@ -152,8 +152,8 @@ class LikelihoodBasedPosterior(NeuralPosterior):
                 will draw init locations from prior, whereas `sir` will use Sequential-
                 Importance-Resampling using `init_strategy_num_candidates` to find init
                 locations.
-            rejection_sampling_parameters: Dictionary overriding the default parameters for
-                rejection sampling. The following parameters are supported:
+            rejection_sampling_parameters: Dictionary overriding the default parameters
+                for rejection sampling. The following parameters are supported:
                 `proposal`, as the proposal distribtution. `num_samples_to_find_max`
                 as the number of samples that are used to find the maximum of the
                 `potential_fn / proposal` ratio. `m` as multiplier to that ratio.
@@ -198,7 +198,7 @@ class LikelihoodBasedPosterior(NeuralPosterior):
             if "proposal" not in rejection_sampling_parameters:
                 rejection_sampling_parameters["proposal"] = self._prior
 
-            samples = rejection_sample(
+            samples = self._sample_posterior_rejection(
                 num_samples=num_samples,
                 potential_fn=potential_fn_provider(
                     self._prior, self.net, x, "rejection"
@@ -381,6 +381,95 @@ class LikelihoodBasedPosterior(NeuralPosterior):
             ).sum(0)
 
         return log_likelihood_trial_sum
+
+    def _sample_posterior_rejection(
+        self,
+        num_samples: torch.Size,
+        potential_fn: Any,
+        proposal: Any,
+        num_samples_to_find_max: int = 10_000,
+        m: float = 1.2,
+        sampling_batch_size: int = 10_000,
+    ):
+        r"""
+        Return samples from a distribution via rejection sampling.
+
+        This function is used in any case by SNLE and SNRE, but can also be used by SNPE
+        in order to deal with strong leakage. Depending on the inference method, a
+        different potential function for the rejection sampler is required.
+
+        Args:
+            num_samples: Desired number of samples.
+            potential_fn: Potential function used for rejection sampling.
+            proposal: Proposal distribution for rejection sampling.
+            num_samples_to_find_max: Number of samples that are used to find the maximum
+                of the `potential_fn / proposal` ratio.
+            m: Multiplier to the maximum ratio between potential function and the
+                proposal. A higher value will ensure that the samples are indeed from
+                the posterior, but will increase the rejection ratio and thus
+                computation time.
+            sampling_batch_size: Batchsize of samples being drawn from
+                the proposal at every iteration.
+
+        Returns:
+            Tensor of shape (num_samples, shape_of_single_theta).
+        """
+
+        find_max = proposal.sample((num_samples_to_find_max,))
+
+        # Define a potential as the ratio between target distribution and proposal.
+        def potential_over_proposal(theta):
+            return torch.squeeze(potential_fn(theta)) - proposal.log_prob(theta)
+
+        # Search for the maximum of the ratio.
+        _, max_log_ratio = optimize_potential_fn(
+            potential_fn=potential_over_proposal,
+            inits=find_max,
+            dist_specifying_bounds=proposal,
+            num_iter=100,
+            learning_rate=0.01,
+            num_to_optimize=max(1, int(num_samples_to_find_max / 10)),
+            show_progress_bars=False,
+        )
+
+        if m < 1.0:
+            warn("A value of m < 1.0 will lead to systematically wrong results.")
+
+        class ScaledProposal:
+            def __init__(self, proposal: Any, max_log_ratio: float, log_m: float):
+                self.proposal = proposal
+                self.max_log_ratio = max_log_ratio
+                self.log_m = log_m
+
+            def sample(self, sample_shape, **kwargs):
+                return self.proposal.sample((sample_shape,), **kwargs)
+
+            def log_prob(self, theta, **kwargs):
+                return self.proposal.log_prob(theta) + self.max_log_ratio + self.log_m
+
+        scaled_proposal = ScaledProposal(
+            proposal, max_log_ratio, torch.log(torch.as_tensor(m))
+        )
+
+        samples, _ = rejection_sample_raw(
+            potential_fn, scaled_proposal, num_samples=num_samples
+        )
+        return samples
+
+        num_accepted = 0
+        all_ = []
+        while num_accepted < num_samples:
+            candidates = proposal.sample((sampling_batch_size,))
+            probs = potential_fn(candidates)
+            target_log_probs = potential_fn(candidates)
+            proposal_log_probs = proposal.log_prob(candidates) + max_ratio
+            target_proposal_ratio = exp(target_log_probs - proposal_log_probs)
+            acceptance = rand(target_proposal_ratio.shape)
+            accepted = candidates[target_proposal_ratio > acceptance]
+            num_accepted += accepted.shape[0]
+            all_.append(accepted)
+        samples = torch.cat(all_)[:num_samples]
+        return samples
 
 
 class PotentialFunctionProvider:
