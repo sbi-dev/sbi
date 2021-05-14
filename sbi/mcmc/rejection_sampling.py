@@ -1,4 +1,5 @@
 from typing import Any
+from warnings import warn
 
 import torch
 from torch import Tensor, exp, log, rand
@@ -11,7 +12,7 @@ def rejection_sample(
         potential_fn: Any,
         proposal: Any,
         num_samples_to_find_max: int = 10_000,
-        m: float = 2.0,
+        m: float = 1.2,
         sampling_batch_size: int = 10_000
     ):
         r"""
@@ -40,18 +41,24 @@ def rejection_sample(
 
         find_max = proposal.sample((num_samples_to_find_max,))
 
+        # Define a potential as the ratio between target distribution and proposal.
         def potential_over_proposal(theta):
-            return torch.squeeze(potential_fn(find_max)) - proposal.log_prob(find_max)
+            return torch.squeeze(potential_fn(theta)) - proposal.log_prob(theta)
 
+        # Search for the maximum of the ratio.
         _, max_ratio = optimize_potential_fn(
             potential_fn=potential_over_proposal, 
             inits=find_max, 
             dist_specifying_bounds=proposal,
             num_iter=100,
             learning_rate=0.01,
-            num_to_optimize=min(1, int(num_samples_to_find_max / 10)), 
+            num_to_optimize=max(1, int(num_samples_to_find_max / 10)), 
             show_progress_bars=False,
         )
+
+        if m < 1.0:
+            warn("A value of m < 1.0 will lead to systematically wrong results.")
+        max_ratio += torch.log(torch.as_tensor(m))
 
         num_accepted = 0
         all_ = []
