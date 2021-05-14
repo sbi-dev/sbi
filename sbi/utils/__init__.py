@@ -20,6 +20,7 @@ from sbi.utils.sbiutils import (
     logit,
     mask_sims_from_prior,
     mog_log_prob,
+    optimize_potential_fn,
     sample_posterior_within_prior,
     standardizing_net,
     standardizing_transform,
