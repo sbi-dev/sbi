@@ -119,9 +119,10 @@ class RatioBasedPosterior(NeuralPosterior):
         sample_shape: Shape = torch.Size(),
         x: Optional[Tensor] = None,
         show_progress_bars: bool = True,
-        sample_with_mcmc: Optional[bool] = None,
+        sample_with: str = "mcmc",
         mcmc_method: Optional[str] = None,
         mcmc_parameters: Optional[Dict[str, Any]] = None,
+        rejection_parameters: Optional[Dict[str, Any]] = None,
     ) -> Tensor:
         r"""
         Return samples from posterior distribution $p(\theta|x)$ with MCMC.
@@ -133,7 +134,8 @@ class RatioBasedPosterior(NeuralPosterior):
             x: Conditioning context for posterior $p(\theta|x)$. If not provided,
                 fall back onto `x` passed to `set_default_x()`.
             show_progress_bars: Whether to show sampling progress monitor.
-            sample_with_mcmc: Optional parameter to override `self.sample_with_mcmc`.
+            sample_with: Method to use for sampling from the posterior. Must be in
+                [`mcmc` | `rejection` | `vi`].
             mcmc_method: Optional parameter to override `self.mcmc_method`.
             mcmc_parameters: Dictionary overriding the default parameters for MCMC.
                 The following parameters are supported: `thin` to set the thinning
@@ -143,30 +145,45 @@ class RatioBasedPosterior(NeuralPosterior):
                 will draw init locations from prior, whereas `sir` will use Sequential-
                 Importance-Resampling using `init_strategy_num_candidates` to find init
                 locations.
+            rejection_parameters: Dictionary overriding the default parameters for 
+                rejection sampling. The following parameters are supported: `m` as 
+                multiplier to the maximum ratio between potential function and the 
+                proposal. `proposal`, as the proposal distribtution.
 
         Returns:
             Samples from posterior.
         """
 
-        x, num_samples, mcmc_method, mcmc_parameters = self._prepare_for_sample(
-            x, sample_shape, mcmc_method, mcmc_parameters
-        )
-
         self.net.eval()
 
         potential_fn_provider = PotentialFunctionProvider()
-        samples = self._sample_posterior_mcmc(
-            num_samples=num_samples,
-            potential_fn=potential_fn_provider(self._prior, self.net, x, mcmc_method),
-            init_fn=self._build_mcmc_init_fn(
-                self._prior,
-                potential_fn_provider(self._prior, self.net, x, "slice_np"),
+        if sample_with == "mcmc":
+            x, num_samples, mcmc_method, mcmc_parameters = self._prepare_for_sample(
+                x, sample_shape, mcmc_method, mcmc_parameters
+            )
+            samples = self._sample_posterior_mcmc(
+                num_samples=num_samples,
+                potential_fn=potential_fn_provider(self._prior, self.net, x, mcmc_method),
+                init_fn=self._build_mcmc_init_fn(
+                    self._prior,
+                    potential_fn_provider(self._prior, self.net, x, "slice_np"),
+                    **mcmc_parameters,
+                ),
+                mcmc_method=mcmc_method,
+                show_progress_bars=show_progress_bars,
                 **mcmc_parameters,
-            ),
-            mcmc_method=mcmc_method,
-            show_progress_bars=show_progress_bars,
-            **mcmc_parameters,
-        )
+            )
+        elif sample_with == "rejection":
+            samples = rejection_sample(
+                num_samples=num_samples, 
+                potential_fn=potential_fn_provider(
+                    self._prior, self.net, x, "slice_np"
+                ),
+                proposal=self._prior,
+                m=1.0,
+            )
+        else:
+            raise NameError("The only implemented sampling methods are `mcmc` and `rejection`.")
 
         self.net.train(True)
 

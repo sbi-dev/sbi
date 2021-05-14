@@ -3,6 +3,7 @@
 
 from functools import partial
 from typing import Any, Callable, Dict, List, Optional, Union
+from warnings import warn
 
 import numpy as np
 import torch
@@ -97,13 +98,17 @@ class DirectPosterior(NeuralPosterior):
     @property
     def sample_with_mcmc(self) -> bool:
         """
+        Deprecated, will be removed.
         Return `True` if NeuralPosterior instance should use MCMC in `.sample()`.
         """
+        warn("Deprecated")
         return self._sample_with_mcmc
 
     @sample_with_mcmc.setter
     def sample_with_mcmc(self, value: bool) -> None:
         """See `set_sample_with_mcmc`."""
+        warn("Deprecated")
+        # XXX call `.sample_with("mcmc")`
         self.set_sample_with_mcmc(value)
 
     def set_sample_with_mcmc(self, use_mcmc: bool) -> "NeuralPosterior":
@@ -119,38 +124,8 @@ class DirectPosterior(NeuralPosterior):
             ValueError: on attempt to turn off MCMC sampling for family of methods that
                 do not support rejection sampling.
         """
+        warn("Deprecated")
         self._sample_with_mcmc = use_mcmc
-        return self
-
-    @property
-    def rejection_sampling_parameters(self) -> dict:
-        """Returns rejection sampling parameter."""
-        if self._rejection_sampling_parameters is None:
-            return {}
-        else:
-            return self._rejection_sampling_parameters
-
-    @rejection_sampling_parameters.setter
-    def rejection_sampling_parameters(self, parameters: Dict[str, Any]) -> None:
-        """See `set_rejection_sampling_parameters`."""
-        self.set_rejection_sampling_parameters(parameters)
-
-    def set_rejection_sampling_parameters(
-        self, parameters: Dict[str, Any]
-    ) -> "NeuralPosterior":
-        """Sets parameters for rejection sampling and returns `NeuralPosterior`.
-
-        Args:
-            parameters: Dictonary overriding the default parameters
-                for rejection sampling. The following parameters are supported:
-                `max_sampling_batch_size` to the set the batch size for drawing new
-                samples from the candidate distribution, e.g., the posterior. Larger
-                batch size speeds up sampling.
-
-        Returns:
-            `NeuralPosterior for chainable calls.
-        """
-        self._rejection_sampling_parameters = parameters
         return self
 
     def log_prob(

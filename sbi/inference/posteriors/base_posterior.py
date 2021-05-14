@@ -54,8 +54,10 @@ class NeuralPosterior(ABC):
         neural_net: nn.Module,
         prior,
         x_shape: torch.Size,
+        sample_with: str,
         mcmc_method: str = "slice_np",
         mcmc_parameters: Optional[Dict[str, Any]] = None,
+        rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
         device: str = "cpu",
     ):
         """
@@ -64,6 +66,8 @@ class NeuralPosterior(ABC):
             neural_net: A classifier for SNRE, a density estimator for SNPE and SNL.
             prior: Prior distribution with `.log_prob()` and `.sample()`.
             x_shape: Shape of the simulator data.
+            sample_with: Method to use for sampling from the posterior. Must be in
+                [`mcmc` | `rejection`].
             mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`,
                 `hmc`, `nuts`. Currently defaults to `slice_np` for a custom numpy
                 implementation of slice sampling; select `hmc`, `nuts` or `slice` for
@@ -76,6 +80,13 @@ class NeuralPosterior(ABC):
                 will draw init locations from prior, whereas `sir` will use Sequential-
                 Importance-Resampling. Init strategies may have their own keywords
                 which can also be set from `mcmc_parameters`.
+            rejection_sampling_parameters: Dictionary overriding the default parameters for
+                rejection sampling. The following parameters are supported: 
+                `proposal`, as the proposal distribtution. `num_samples_to_find_max` 
+                as the number of samples that are used to find the maximum of the 
+                `potential_fn / proposal` ratio. `m` as multiplier to that ratio. 
+                `sampling_batch_size` as the batchsize of samples being drawn from 
+                the proposal at every iteration.
             device: Training device, e.g., cpu or cuda.
         """
         if method_family in ("snpe", "snle", "snre_a", "snre_b"):
@@ -87,6 +98,8 @@ class NeuralPosterior(ABC):
 
         self.set_mcmc_method(mcmc_method)
         self.set_mcmc_parameters(mcmc_parameters)
+        self.set_sample_with(sample_with)
+        self.set_rejection_sampling_parameters(rejection_sampling_parameters)
 
         self._leakage_density_correction_factor = None  # Correction factor for SNPE.
         self._mcmc_init_params = None
@@ -136,6 +149,34 @@ class NeuralPosterior(ABC):
         self._x = process_x(x, self._x_shape, allow_iid_x=self._allow_iid_x)
         self._num_iid_trials = self._x.shape[0]
 
+        return self
+
+    @property
+    def sample_with(self) -> bool:
+        """
+        Return `True` if NeuralPosterior instance should use MCMC in `.sample()`.
+        """
+        return self._sample_with
+
+    @sample_with.setter
+    def sample_with(self, value: str) -> None:
+        """See `set_sample_with`."""
+        self.set_sample_with(value)
+
+    def set_sample_with(self, sample_with: str) -> "NeuralPosterior":
+        """Turns MCMC sampling on or off and returns `NeuralPosterior`.
+
+        Args:
+            sample_with: The method to sample with.
+
+        Returns:
+            `NeuralPosterior` for chainable calls.
+
+        Raises:
+            ValueError: on attempt to turn off MCMC sampling for family of methods that
+                do not support rejection sampling.
+        """
+        self._sample_with = sample_with
         return self
 
     @property
@@ -190,6 +231,37 @@ class NeuralPosterior(ABC):
             `NeuralPosterior` for chainable calls.
         """
         self._mcmc_parameters = parameters
+        return self
+
+    @property
+    def rejection_sampling_parameters(self) -> dict:
+        """Returns rejection sampling parameter."""
+        if self._rejection_sampling_parameters is None:
+            return {}
+        else:
+            return self._rejection_sampling_parameters
+
+    @rejection_sampling_parameters.setter
+    def rejection_sampling_parameters(self, parameters: Dict[str, Any]) -> None:
+        """See `set_rejection_sampling_parameters`."""
+        self.set_rejection_sampling_parameters(parameters)
+
+    def set_rejection_sampling_parameters(
+        self, parameters: Dict[str, Any]
+    ) -> "NeuralPosterior":
+        """Sets parameters for rejection sampling and returns `NeuralPosterior`.
+
+        Args:
+            parameters: Dictonary overriding the default parameters
+                for rejection sampling. The following parameters are supported:
+                `max_sampling_batch_size` to the set the batch size for drawing new
+                samples from the candidate distribution, e.g., the posterior. Larger
+                batch size speeds up sampling.
+
+        Returns:
+            `NeuralPosterior for chainable calls.
+        """
+        self._rejection_sampling_parameters = parameters
         return self
 
     @abstractmethod
@@ -335,25 +407,27 @@ class NeuralPosterior(ABC):
         return mcmc_method, mcmc_parameters
 
     def _potentially_replace_rejection_parameters(
-        self, rejection_parameters: Optional[Dict[str, Any]]
+        self, rejection_sampling_parameters: Optional[Dict[str, Any]]
     ) -> Dict[str, Any]:
         """
         Return potentially default values to rejection sample the posterior.
 
         Args:
-            rejection_parameters: Dictionary overriding the default parameters for
-                rejection sampling. The following parameters are supported: `m` as
-                multiplier to the maximum ratio between potential function and the
-                proposal. `proposal`, as the proposal distribtution.
+            rejection_sampling_parameters: Dictionary overriding the default 
+                parameters for rejection sampling. The following parameters are 
+                supported: `m` as multiplier to the maximum ratio between 
+                potential function and the proposal. `proposal`, as the proposal 
+                distribtution.
 
         Returns: Potentially default rejection sampling parameters.
         """
-        rejection_parameters = (
-            rejection_parameters
-            if rejection_parameters is not None
-            else self.rejection_parameters
+        rejection_sampling_parameters = (
+            rejection_sampling_parameters
+            if rejection_sampling_parameters is not None
+            else self.rejection_sampling_parameters
         )
-        return rejection_parameters
+
+        return rejection_sampling_parameters
 
     def _sample_posterior_mcmc(
         self,
