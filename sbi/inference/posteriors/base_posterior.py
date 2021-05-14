@@ -25,7 +25,11 @@ from sbi.mcmc import (
     sir,
 )
 from sbi.types import Array, Shape
-from sbi.utils.sbiutils import check_dist_class, check_warn_and_setstate
+from sbi.utils.sbiutils import (
+    check_dist_class,
+    check_warn_and_setstate,
+    optimize_potential_fn,
+)
 from sbi.utils.torchutils import (
     BoxUniform,
     ScalarFloat,
@@ -687,41 +691,6 @@ class NeuralPosterior(ABC):
             "https://github.com/mackelab/sbi/issues"
         )
 
-        # If the prior is `BoxUniform`, define a transformation to optimize in
-        # unbounded space.
-        is_boxuniform, boxuniform = check_dist_class(self._prior, BoxUniform)
-        if is_boxuniform:
-
-            def tf_inv(theta_t):
-                return utils.expit(
-                    theta_t,
-                    torch.as_tensor(
-                        boxuniform.support.base_constraint.lower_bound, dtype=float32
-                    ),
-                    torch.as_tensor(
-                        boxuniform.support.base_constraint.upper_bound, dtype=float32
-                    ),
-                )
-
-            def tf(theta):
-                return utils.logit(
-                    theta,
-                    torch.as_tensor(
-                        boxuniform.support.base_constraint.lower_bound, dtype=float32
-                    ),
-                    torch.as_tensor(
-                        boxuniform.support.base_constraint.upper_bound, dtype=float32
-                    ),
-                )
-
-        else:
-
-            def tf_inv(theta_t):
-                return theta_t
-
-            def tf(theta):
-                return theta
-
         if isinstance(init_method, str):
             # Find initial position.
             if init_method == "posterior":
@@ -740,79 +709,24 @@ class NeuralPosterior(ABC):
         else:
             inits = init_method
 
-        init_probs = self.log_prob(inits, x=x, **log_prob_kwargs)
+        def potential_fn(theta):
+            return self.log_prob(theta, x=x, track_gradients=True, **log_prob_kwargs)
 
-        # Pick the `num_to_optimize` best init locations.
-        sort_indices = torch.argsort(init_probs, dim=0)
-        sorted_inits = inits[sort_indices]
-        optimize_inits = sorted_inits[-num_to_optimize:]
+        interruption_note = "The last estimate of the MAP can be accessed via the `posterior.map_` attribute."
 
-        # The `_overall` variables store data accross the iterations, whereas the
-        # `_iter` variables contain data exclusively extracted from the current
-        # iteration.
-        best_log_prob_iter = torch.max(init_probs)
-        best_theta_iter = sorted_inits[-1]
-        best_theta_overall = best_theta_iter.detach().clone()
-        best_log_prob_overall = best_log_prob_iter.detach().clone()
+        self.map_, _ = optimize_potential_fn(
+            potential_fn=potential_fn,
+            inits=inits,
+            dist_specifying_bounds=self._prior,
+            num_iter=num_iter,
+            learning_rate=learning_rate,
+            num_to_optimize=num_to_optimize,
+            save_best_every=save_best_every,
+            show_progress_bars=show_progress_bars,
+            interruption_note=interruption_note,
+        )
 
-        self.map_ = best_theta_overall
-
-        optimize_inits = tf(optimize_inits)
-        optimize_inits.requires_grad_(True)
-        optimizer = optim.Adam([optimize_inits], lr=learning_rate)
-
-        iter_ = 0
-
-        # Try-except block in case the user interrupts the program and wants to fall
-        # back on the last saved `.map_`. We want to avoid a long error-message here.
-        try:
-
-            while iter_ < num_iter:
-
-                optimizer.zero_grad()
-                probs = self.log_prob(
-                    tf_inv(optimize_inits), x=x, track_gradients=True, **log_prob_kwargs
-                ).squeeze()
-                loss = -probs.sum()
-                loss.backward()
-                optimizer.step()
-
-                with torch.no_grad():
-                    if iter_ % save_best_every == 0 or iter_ == num_iter - 1:
-                        # Evaluate the optimized locations and pick the best one.
-                        log_probs_of_optimized = self.log_prob(
-                            tf_inv(optimize_inits), x=x, **log_prob_kwargs
-                        )
-                        best_theta_iter = optimize_inits[
-                            torch.argmax(log_probs_of_optimized)
-                        ]
-                        best_log_prob_iter = self.log_prob(
-                            tf_inv(best_theta_iter), x=x, **log_prob_kwargs
-                        )
-                        if best_log_prob_iter > best_log_prob_overall:
-                            best_theta_overall = best_theta_iter.detach().clone()
-                            best_log_prob_overall = best_log_prob_iter.detach().clone()
-
-                    if show_progress_bars:
-                        print(
-                            f"""Optimizing MAP estimate. Iterations: {iter_+1} /
-                            {num_iter}. Performance in iteration
-                            {divmod(iter_+1, save_best_every)[0] * save_best_every}:
-                            {best_log_prob_iter.item():.2f} (= unnormalized log-prob""",
-                            end="\r",
-                        )
-                    self.map_ = tf_inv(best_theta_overall)
-
-                iter_ += 1
-
-        except KeyboardInterrupt:
-            print(
-                f"Optimization was interrupted after {iter_} iterations. The last "
-                "estimate of the MAP can be accessed via the `posterior.map_` "
-                "attribute."
-            )
-
-        return tf_inv(best_theta_overall)
+        return self.map_
 
     def _build_mcmc_init_fn(
         self,
