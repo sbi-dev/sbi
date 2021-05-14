@@ -3,6 +3,8 @@ from typing import Any
 import torch
 from torch import Tensor, exp, log, rand
 
+from sbi.utils import optimize_potential_fn
+
 
 def rejection_sample(
         num_samples: torch.Size,
@@ -35,9 +37,21 @@ def rejection_sample(
         Returns:
             Tensor of shape (num_samples, shape_of_single_theta).
         """
+
         find_max = proposal.sample((num_samples_to_find_max,))
-        target_log_probs = torch.squeeze(potential_fn(find_max))
-        max_ratio = max(target_log_probs - proposal.log_prob(find_max))
+
+        def potential_over_proposal(theta):
+            return torch.squeeze(potential_fn(find_max)) - proposal.log_prob(find_max)
+
+        _, max_ratio = optimize_potential_fn(
+            potential_fn=potential_over_proposal, 
+            inits=find_max, 
+            dist_specifying_bounds=proposal,
+            num_iter=100,
+            learning_rate=0.01,
+            num_to_optimize=min(1, int(num_samples_to_find_max / 10)), 
+            show_progress_bars=False,
+        )
 
         num_accepted = 0
         all_ = []

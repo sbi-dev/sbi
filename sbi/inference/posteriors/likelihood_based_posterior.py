@@ -32,8 +32,10 @@ class LikelihoodBasedPosterior(NeuralPosterior):
         neural_net: nn.Module,
         prior,
         x_shape: torch.Size,
+        sample_with: str = "mcmc",
         mcmc_method: str = "slice_np",
         mcmc_parameters: Optional[Dict[str, Any]] = None,
+        rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
         device: str = "cpu",
     ):
         """
@@ -47,6 +49,8 @@ class LikelihoodBasedPosterior(NeuralPosterior):
                 independent and identically distributed data / trials. I.e., the data is
                 assumed to be generated based on the same (unknown) model parameters or
                 experimental condations.
+            sample_with: Method to use for sampling from the posterior. Must be in
+                [`mcmc` | `rejection`].
             mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`,
                 `hmc`, `nuts`. Currently defaults to `slice_np` for a custom numpy
                 implementation of slice sampling; select `hmc`, `nuts` or `slice` for
@@ -59,6 +63,13 @@ class LikelihoodBasedPosterior(NeuralPosterior):
                 will draw init locations from prior, whereas `sir` will use Sequential-
                 Importance-Resampling using `init_strategy_num_candidates` to find init
                 locations.
+            rejection_sampling_parameters: Dictionary overriding the default parameters for
+                rejection sampling. The following parameters are supported:
+                `proposal`, as the proposal distribtution. `num_samples_to_find_max`
+                as the number of samples that are used to find the maximum of the
+                `potential_fn / proposal` ratio. `m` as multiplier to that ratio.
+                `sampling_batch_size` as the batchsize of samples being drawn from
+                the proposal at every iteration.
             device: Training device, e.g., cpu or cuda:0.
         """
 
@@ -118,7 +129,7 @@ class LikelihoodBasedPosterior(NeuralPosterior):
         sample_with: str = "mcmc",
         mcmc_method: Optional[str] = None,
         mcmc_parameters: Optional[Dict[str, Any]] = None,
-        rejection_parameters: Optional[Dict[str, Any]] = None,
+        rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
     ) -> Tensor:
         r"""
         Return samples from posterior distribution $p(\theta|x)$ with MCMC.
@@ -141,12 +152,12 @@ class LikelihoodBasedPosterior(NeuralPosterior):
                 will draw init locations from prior, whereas `sir` will use Sequential-
                 Importance-Resampling using `init_strategy_num_candidates` to find init
                 locations.
-            rejection_parameters: Dictionary overriding the default parameters for
-                rejection sampling. The following parameters are supported: 
-                `proposal`, as the proposal distribtution. `num_samples_to_find_max` 
-                as the number of samples that are used to find the maximum of the 
-                `potential_fn / proposal` ratio. `m` as multiplier to that ratio. 
-                `sampling_batch_size` as the batchsize of samples being drawn from 
+            rejection_sampling_parameters: Dictionary overriding the default parameters for
+                rejection sampling. The following parameters are supported:
+                `proposal`, as the proposal distribtution. `num_samples_to_find_max`
+                as the number of samples that are used to find the maximum of the
+                `potential_fn / proposal` ratio. `m` as multiplier to that ratio.
+                `sampling_batch_size` as the batchsize of samples being drawn from
                 the proposal at every iteration.
 
         Returns:
@@ -178,16 +189,20 @@ class LikelihoodBasedPosterior(NeuralPosterior):
                 **mcmc_parameters,
             )
         elif sample_with == "rejection":
-            rejection_parameters = self._potentially_replace_rejection_parameters(
-                rejection_parameters
+            rejection_sampling_parameters = (
+                self._potentially_replace_rejection_parameters(
+                    rejection_sampling_parameters
+                )
             )
+            if "proposal" not in rejection_sampling_parameters:
+                rejection_sampling_parameters["proposal"] = self._prior
 
             samples = rejection_sample(
                 num_samples=num_samples,
                 potential_fn=potential_fn_provider(
                     self._prior, self.net, x, "slice_np"
                 ),
-                **rejection_parameters
+                **rejection_sampling_parameters,
             )
         else:
             raise NameError(
@@ -439,7 +454,9 @@ class PotentialFunctionProvider:
         theta = torch.as_tensor(theta, dtype=torch.float32)
 
         # Notice opposite sign to pyro potential.
-        return self.log_likelihood(theta).cpu() + self.prior.log_prob(theta)
+        return self.log_likelihood(
+            theta, track_gradients=False
+        ).cpu() + self.prior.log_prob(theta)
 
     def pyro_potential(
         self, theta: Dict[str, Tensor], track_gradients: bool = False
