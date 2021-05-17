@@ -228,16 +228,12 @@ def test_c2st_sre_variants_on_linearGaussian(
 
 
 @pytest.mark.slow
+@pytest.mark.parametrize("prior_str", ("gaussian", "uniform"))
 @pytest.mark.parametrize(
-    "mcmc_method, prior_str",
-    (
-        ("slice_np", "gaussian"),
-        ("slice_np", "uniform"),
-        ("slice", "gaussian"),
-        ("slice", "uniform"),
-    ),
+    "sampling_method",
+    ("slice_np", "slice_np_vectorized", "slice", "nuts", "hmc", "rejection"),
 )
-def test_api_sre_sampling_methods(mcmc_method: str, prior_str: str, set_seed):
+def test_api_sre_sampling_methods(sampling_method: str, prior_str: str, set_seed):
     """Test leakage correction both for MCMC and rejection sampling.
 
     Args:
@@ -245,23 +241,37 @@ def test_api_sre_sampling_methods(mcmc_method: str, prior_str: str, set_seed):
         prior_str: one of "gaussian" or "uniform"
         set_seed: fixture for manual seeding
     """
-
     num_dim = 2
-    x_o = zeros(num_dim)
+    num_samples = 10
+    num_trials = 2
+    # HMC with uniform prior needs good likelihood.
+    num_simulations = 10000 if sampling_method == "hmc" else 1000
+    x_o = zeros((num_trials, num_dim))
+    # Test for multiple chains is cheap when vectorized.
+    num_chains = 3 if sampling_method == "slice_np_vectorized" else 1
+    if sampling_method == "rejection":
+        sample_with = "rejection"
+    else:
+        sample_with = "mcmc"
+
     if prior_str == "gaussian":
         prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
     else:
-        prior = utils.BoxUniform(low=-1.0 * ones(num_dim), high=ones(num_dim))
+        prior = utils.BoxUniform(-1.0 * ones(num_dim), ones(num_dim))
 
     simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior)
-    inference = SNRE_B(
-        prior,
-        classifier="resnet",
-        show_progress_bars=False,
+    inference = SNRE_B(prior, classifier="resnet", show_progress_bars=False)
+
+    theta, x = simulate_for_sbi(
+        simulator, prior, num_simulations, simulation_batch_size=50
     )
-
-    theta, x = simulate_for_sbi(simulator, prior, 200, simulation_batch_size=50)
     _ = inference.append_simulations(theta, x).train(max_num_epochs=5)
-    posterior = inference.build_posterior(mcmc_method=mcmc_method)
+    posterior = inference.build_posterior(
+        sample_with=sample_with, mcmc_method=sampling_method
+    ).set_default_x(x_o)
 
-    posterior.sample(sample_shape=(10,), x=x_o)
+    posterior.sample(
+        sample_shape=(num_samples,),
+        x=x_o,
+        mcmc_parameters={"thin": 3, "num_chains": num_chains},
+    )

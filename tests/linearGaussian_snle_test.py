@@ -238,13 +238,13 @@ def test_c2st_multi_round_snl_on_linearGaussian(num_trials: int, set_seed):
     check_c2st(samples, target_samples, alg="multi-round-snl")
 
 
-# TODO: add test for rejection sampling.
 @pytest.mark.slow
 @pytest.mark.parametrize("prior_str", ("gaussian", "uniform"))
 @pytest.mark.parametrize(
-    "mcmc_method", ("slice_np", "slice_np_vectorized", "slice", "nuts", "hmc")
+    "sampling_method",
+    ("slice_np", "slice_np_vectorized", "slice", "nuts", "hmc", "rejection"),
 )
-def test_api_snl_sampling_methods(mcmc_method: str, prior_str: str, set_seed):
+def test_api_snl_sampling_methods(sampling_method: str, prior_str: str, set_seed):
     """Runs SNL on linear Gaussian and tests sampling from posterior via mcmc.
 
     Args:
@@ -257,10 +257,14 @@ def test_api_snl_sampling_methods(mcmc_method: str, prior_str: str, set_seed):
     num_samples = 10
     num_trials = 2
     # HMC with uniform prior needs good likelihood.
-    num_simulations = 10000 if mcmc_method == "hmc" else 1000
+    num_simulations = 10000 if sampling_method == "hmc" else 1000
     x_o = zeros((num_trials, num_dim))
     # Test for multiple chains is cheap when vectorized.
-    num_chains = 3 if mcmc_method == "slice_np_vectorized" else 1
+    num_chains = 3 if sampling_method == "slice_np_vectorized" else 1
+    if sampling_method == "rejection":
+        sample_with = "rejection"
+    else:
+        sample_with = "mcmc"
 
     if prior_str == "gaussian":
         prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
@@ -274,7 +278,9 @@ def test_api_snl_sampling_methods(mcmc_method: str, prior_str: str, set_seed):
         simulator, prior, num_simulations, simulation_batch_size=50
     )
     _ = inference.append_simulations(theta, x).train(max_num_epochs=5)
-    posterior = inference.build_posterior(mcmc_method=mcmc_method).set_default_x(x_o)
+    posterior = inference.build_posterior(
+        sample_with=sample_with, mcmc_method=sampling_method
+    ).set_default_x(x_o)
 
     posterior.sample(
         sample_shape=(num_samples,),

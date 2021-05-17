@@ -12,7 +12,7 @@ from torch import Tensor, log, nn
 from sbi import utils as utils
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.types import ScalarFloat, Shape
-from sbi.utils import del_entries, within_support
+from sbi.utils import del_entries, rejection_sample, within_support
 from sbi.utils.torchutils import (
     atleast_2d,
     batched_first_of_batch,
@@ -42,10 +42,10 @@ class DirectPosterior(NeuralPosterior):
         neural_net: nn.Module,
         prior,
         x_shape: torch.Size,
-        rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
-        sample_with_mcmc: bool = True,
+        sample_with: str = "rejection",
         mcmc_method: str = "slice_np",
         mcmc_parameters: Optional[Dict[str, Any]] = None,
+        rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
         device: str = "cpu",
     ):
         """
@@ -54,14 +54,10 @@ class DirectPosterior(NeuralPosterior):
             neural_net: A classifier for SNRE, a density estimator for SNPE and SNL.
             prior: Prior distribution with `.log_prob()` and `.sample()`.
             x_shape: Shape of a single simulator output.
-            rejection_sampling_parameters: Dictonary overriding the default parameters
-                for rejection sampling. The following parameters are supported:
-                `max_sampling_batch_size` to set the batch size for drawing new
-                samples from the candidate distribution, e.g., the posterior. Larger
-                batch size speeds up sampling.
-            sample_with_mcmc: Whether to sample with MCMC. Will always be `True` for SRE
-                and SNL, but can also be set to `True` for SNPE if MCMC is preferred to
-                deal with leakage over rejection sampling.
+            sample_with: Method to use for sampling from the posterior. Must be one of
+                [`mcmc` | `rejection`]. With default parameters, `rejection` samples
+                from the posterior estimated by the neural net and rejects only if the
+                samples are outside of the prior support.
             mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`,
                 `hmc`, `nuts`. Currently defaults to `slice_np` for a custom numpy
                 implementation of slice sampling; select `hmc`, `nuts` or `slice` for
@@ -74,45 +70,51 @@ class DirectPosterior(NeuralPosterior):
                 will draw init locations from prior, whereas `sir` will use Sequential-
                 Importance-Resampling using `init_strategy_num_candidates` to find init
                 locations.
+            rejection_sampling_parameters: Dictionary overriding the default parameters
+                for rejection sampling. The following parameters are supported:
+                `proposal` as the proposal distribtution (default is the trained
+                neural net). `max_sampling_batch_size` as the batchsize of samples
+                being drawn from the proposal at every iteration.
+                `num_samples_to_find_max` as the number of samples that are used to
+                find the maximum of the `potential_fn / proposal` ratio.
+                `num_iter_to_find_max` as the number of gradient ascent iterations to
+                find the maximum of that ratio. `m` as multiplier to that ratio.
             device: Training device, e.g., cpu or cuda:0
         """
 
         kwargs = del_entries(
             locals(),
-            entries=(
-                "self",
-                "__class__",
-                "sample_with_mcmc",
-                "rejection_sampling_parameters",
-            ),
+            entries=("self", "__class__"),
         )
         super().__init__(**kwargs)
 
-        self.set_sample_with_mcmc(sample_with_mcmc)
-        self.set_rejection_sampling_parameters(rejection_sampling_parameters)
         self._purpose = (
             "It allows to .sample() and .log_prob() the posterior and wraps the "
             "output of the .net to avoid leakage into regions with 0 prior probability."
         )
 
     @property
-    def sample_with_mcmc(self) -> bool:
+    def _sample_with_mcmc(self) -> bool:
         """
-        Deprecated, will be removed.
+        Deprecated, will be removed in future versions of `sbi`.
+
         Return `True` if NeuralPosterior instance should use MCMC in `.sample()`.
         """
-        warn("Deprecated")
         return self._sample_with_mcmc
 
-    @sample_with_mcmc.setter
-    def sample_with_mcmc(self, value: bool) -> None:
-        """See `set_sample_with_mcmc`."""
-        warn("Deprecated")
-        # XXX call `.sample_with("mcmc")`
-        self.set_sample_with_mcmc(value)
+    @_sample_with_mcmc.setter
+    def _sample_with_mcmc(self, value: bool) -> None:
+        """
+        Deprecated, will be removed in future versions of `sbi`.
 
-    def set_sample_with_mcmc(self, use_mcmc: bool) -> "NeuralPosterior":
-        """Turns MCMC sampling on or off and returns `NeuralPosterior`.
+        See `set_sample_with_mcmc`."""
+        self._set_sample_with_mcmc(value)
+
+    def _set_sample_with_mcmc(self, use_mcmc: bool) -> "NeuralPosterior":
+        """
+        Deprecated, will be removed in future versions of `sbi`.
+
+        Turns MCMC sampling on or off and returns `NeuralPosterior`.
 
         Args:
             use_mcmc: Flag to set whether or not MCMC sampling is used.
@@ -124,7 +126,15 @@ class DirectPosterior(NeuralPosterior):
             ValueError: on attempt to turn off MCMC sampling for family of methods that
                 do not support rejection sampling.
         """
-        warn("Deprecated")
+        warn(
+            f"You set `sample_with_mcmc={use_mcmc}`. This is deprecated "
+            "since `sbi v0.17.0` and will lead to an error in future versions. "
+            "Please use `sample_with='mcmc'` instead."
+        )
+        if use_mcmc:
+            self.set_sample_with("mcmc")
+        else:
+            self.set_sample_with("rejection")
         self._sample_with_mcmc = use_mcmc
         return self
 
@@ -162,7 +172,6 @@ class DirectPosterior(NeuralPosterior):
         Returns:
             `(len(θ),)`-shaped log posterior probability $\log p(\theta|x)$ for θ in the
             support of the prior, -∞ (corresponding to 0 probability) outside.
-
         """
 
         # TODO Train exited here, entered after sampling?
@@ -234,12 +243,13 @@ class DirectPosterior(NeuralPosterior):
         """
 
         def acceptance_at(x: Tensor) -> Tensor:
-            return utils.sample_posterior_within_prior(
-                self.net,
-                self._prior,
-                x.to(self._device),
-                num_rejection_samples,
-                show_progress_bars,
+
+            return utils.rejection_sample_posterior_within_prior(
+                posterior_nn=self.net,
+                prior=self._prior,
+                x=x.to(self._device),
+                num_samples=num_rejection_samples,
+                show_progress_bars=show_progress_bars,
                 sample_for_correction_factor=True,
                 max_sampling_batch_size=rejection_sampling_batch_size,
             )[1]
@@ -263,10 +273,11 @@ class DirectPosterior(NeuralPosterior):
         sample_shape: Shape = torch.Size(),
         x: Optional[Tensor] = None,
         show_progress_bars: bool = True,
-        sample_with_mcmc: Optional[bool] = None,
+        sample_with: Optional[str] = None,
         mcmc_method: Optional[str] = None,
         mcmc_parameters: Optional[Dict[str, Any]] = None,
         rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
+        sample_with_mcmc: Optional[bool] = None,
     ) -> Tensor:
         r"""
         Return samples from posterior distribution $p(\theta|x)$.
@@ -283,7 +294,10 @@ class DirectPosterior(NeuralPosterior):
             x: Conditioning context for posterior $p(\theta|x)$. If not provided,
                 fall back onto `x` passed to `set_default_x()`.
             show_progress_bars: Whether to show sampling progress monitor.
-            sample_with_mcmc: Optional parameter to override `self.sample_with_mcmc`.
+            sample_with: Method to use for sampling from the posterior. Must be one of
+                [`mcmc` | `rejection`]. With default parameters, `rejection` samples
+                from the posterior estimated by the neural net and rejects only if the
+                samples are outside of the prior support.
             mcmc_method: Optional parameter to override `self.mcmc_method`.
             mcmc_parameters: Dictionary overriding the default parameters for MCMC.
                 The following parameters are supported: `thin` to set the thinning
@@ -295,25 +309,40 @@ class DirectPosterior(NeuralPosterior):
                 locations.
             rejection_sampling_parameters: Dictionary overriding the default parameters
                 for rejection sampling. The following parameters are supported:
-                `max_sampling_batch_size` to set the batch size for drawing new
-                samples from the candidate distribution, e.g., the posterior. Larger
-                batch size speeds up sampling.
+                `proposal` as the proposal distribtution (default is the trained
+                neural net). `max_sampling_batch_size` as the batchsize of samples
+                being drawn from the proposal at every iteration.
+                `num_samples_to_find_max` as the number of samples that are used to
+                find the maximum of the `potential_fn / proposal` ratio.
+                `num_iter_to_find_max` as the number of gradient ascent iterations to
+                find the maximum of that ratio. `m` as multiplier to that ratio.
+            sample_with_mcmc: Deprecated since `sbi v0.17.0`. Use `sample_with=mcmc`
+                instead.
+
         Returns:
             Samples from posterior.
         """
 
-        x, num_samples, mcmc_method, mcmc_parameters = self._prepare_for_sample(
-            x, sample_shape, mcmc_method, mcmc_parameters
-        )
-
-        sample_with_mcmc = (
-            sample_with_mcmc if sample_with_mcmc is not None else self.sample_with_mcmc
-        )
+        if sample_with_mcmc is not None:
+            warn(
+                f"You set `sample_with_mcmc={sample_with_mcmc}`. This is deprecated "
+                "since `sbi v0.17.0` and will lead to an error in future versions. "
+                "Please use `sample_with='mcmc'` instead."
+            )
+            if sample_with_mcmc:
+                sample_with = "mcmc"
 
         self.net.eval()
 
-        if sample_with_mcmc:
-            potential_fn_provider = PotentialFunctionProvider()
+        sample_with = sample_with if sample_with is not None else self._sample_with
+
+        x, num_samples = self._prepare_for_sample(x, sample_shape)
+
+        potential_fn_provider = PotentialFunctionProvider()
+        if sample_with == "mcmc":
+            mcmc_method, mcmc_parameters = self._potentially_replace_mcmc_parameters(
+                mcmc_method, mcmc_parameters
+            )
             samples = self._sample_posterior_mcmc(
                 num_samples=num_samples,
                 potential_fn=potential_fn_provider(
@@ -328,17 +357,42 @@ class DirectPosterior(NeuralPosterior):
                 show_progress_bars=show_progress_bars,
                 **mcmc_parameters,
             )
+        elif sample_with == "rejection":
+            rejection_sampling_parameters = (
+                self._potentially_replace_rejection_parameters(
+                    rejection_sampling_parameters
+                )
+            )
+            if "proposal" not in rejection_sampling_parameters:
+                assert (
+                    not self.net.training
+                ), "Posterior nn must be in eval mode for sampling."
+
+                # If the user does not explictly pass a `proposal`, we sample from the
+                # neural net estimating the posterior and reject only those samples
+                # that are outside of the prior support. This can be considered as
+                # rejection sampling with a very good proposal.
+                samples = utils.rejection_sample_posterior_within_prior(
+                    posterior_nn=self.net,
+                    prior=self._prior,
+                    x=x.to(self._device),
+                    num_samples=num_samples,
+                    show_progress_bars=show_progress_bars,
+                    sample_for_correction_factor=True,
+                    **rejection_sampling_parameters,
+                )[0]
+            else:
+                samples, _ = rejection_sample(
+                    potential_fn=potential_fn_provider(
+                        self._prior, self.net, x, "rejection"
+                    ),
+                    num_samples=num_samples,
+                    show_progress_bars=show_progress_bars,
+                    **rejection_sampling_parameters,
+                )
         else:
-            # Rejection sampling.
-            samples, _ = utils.sample_posterior_within_prior(
-                self.net,
-                self._prior,
-                x,
-                num_samples=num_samples,
-                show_progress_bars=show_progress_bars,
-                **rejection_sampling_parameters
-                if (rejection_sampling_parameters is not None)
-                else self.rejection_sampling_parameters,
+            raise NameError(
+                "The only implemented sampling methods are `mcmc` and `rejection`."
             )
 
         self.net.train(True)
@@ -351,9 +405,11 @@ class DirectPosterior(NeuralPosterior):
         condition: Tensor,
         dims_to_sample: List[int],
         x: Optional[Tensor] = None,
+        sample_with: str = "mcmc",
         show_progress_bars: bool = True,
         mcmc_method: Optional[str] = None,
         mcmc_parameters: Optional[Dict[str, Any]] = None,
+        rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
     ) -> Tensor:
         r"""
         Return samples from conditional posterior $p(\theta_i|\theta_j, x)$.
@@ -377,6 +433,9 @@ class DirectPosterior(NeuralPosterior):
                 `condition`.
             x: Conditioning context for posterior $p(\theta|x)$. If not provided,
                 fall back onto `x` passed to `set_default_x()`.
+            sample_with: Method to use for sampling from the posterior. Must be one of
+                [`mcmc` | `rejection`]. In this method, the value of
+                `self.sample_with` will be ignored.
             show_progress_bars: Whether to show sampling progress monitor.
             mcmc_method: Optional parameter to override `self.mcmc_method`.
             mcmc_parameters: Dictionary overriding the default parameters for MCMC.
@@ -387,6 +446,15 @@ class DirectPosterior(NeuralPosterior):
                 will draw init locations from prior, whereas `sir` will use Sequential-
                 Importance-Resampling using `init_strategy_num_candidates` to find init
                 locations.
+            rejection_sampling_parameters: Dictionary overriding the default parameters
+                for rejection sampling. The following parameters are supported:
+                `proposal` as the proposal distribtution (default is the prior).
+                `max_sampling_batch_size` as the batchsize of samples being drawn from
+                the proposal at every iteration. `num_samples_to_find_max` as the
+                number of samples that are used to find the maximum of the
+                `potential_fn / proposal` ratio. `num_iter_to_find_max` as the number
+                of gradient ascent iterations to find the maximum of that ratio. `m` as
+                multiplier to that ratio.
 
         Returns:
             Samples from conditional posterior.
@@ -398,9 +466,11 @@ class DirectPosterior(NeuralPosterior):
             condition,
             dims_to_sample,
             x,
+            sample_with,
             show_progress_bars,
             mcmc_method,
             mcmc_parameters,
+            rejection_sampling_parameters,
         )
 
     def map(
@@ -465,52 +535,6 @@ class DirectPosterior(NeuralPosterior):
             log_prob_kwargs={"norm_posterior": False},
         )
 
-    @torch.no_grad()
-    def sample_posterior_within_prior(
-        self,
-        posterior_nn: nn.Module,
-        prior,
-        x: Tensor,
-        num_samples: int = 1,
-        show_progress_bars: bool = False,
-        warn_acceptance: float = 0.01,
-        sample_for_correction_factor: bool = False,
-        max_sampling_batch_size: int = 10_000,
-    ) -> Tuple[Tensor, Tensor]:
-
-        assert (
-            not posterior_nn.training
-        ), "Posterior nn must be in eval mode for sampling."
-
-        def potential_fn(theta):
-            are_within_prior = within_support(prior, theta)
-            probs = posterior_nn.log_prob(theta, context=x)
-            probs[~are_within_prior] = float("-inf")
-            return probs
-
-        class Proposal:
-            def __init__(self, posterior_nn: Any):
-                self.posterior_nn = posterior_nn
-
-            def sample(self, sample_shape, **kwargs):
-                return self.posterior_nn.sample(sample_shape.numel(), **kwargs)
-
-            def log_prob(self, theta, **kwargs):
-                return self.posterior_nn.log_prob(theta, context=x)
-
-        proposal = Proposal(posterior_nn)
-
-        samples = rejection_sample_raw(
-            potential_fn=potential_fn,
-            proposal=proposal,
-            num_samples=num_samples,
-            show_progress_bars=show_progress_bars,
-            warn_acceptance=warn_acceptance,
-            sample_for_correction_factor=sample_for_correction_factor,
-            max_sampling_batch_size=max_sampling_batch_size,
-        )
-        return samples
-
 
 class PotentialFunctionProvider:
     """
@@ -536,25 +560,31 @@ class PotentialFunctionProvider:
         prior,
         posterior_nn: nn.Module,
         x: Tensor,
-        mcmc_method: str,
+        method: str,
     ) -> Callable:
         """Return potential function.
 
-        Switch on numpy or pyro potential function based on `mcmc_method`.
+        Switch on numpy or pyro potential function based on `method`.
         """
         self.posterior_nn = posterior_nn
         self.prior = prior
         self.device = next(posterior_nn.parameters()).device
         self.x = atleast_2d(x).to(self.device)
 
-        if mcmc_method == "slice":
+        if method == "slice":
             return partial(self.pyro_potential, track_gradients=False)
-        elif mcmc_method in ("hmc", "nuts"):
+        elif method in ("hmc", "nuts"):
             return partial(self.pyro_potential, track_gradients=True)
+        elif "slice_np" in method:
+            return partial(self.posterior_potential, track_gradients=False)
+        elif method == "rejection":
+            return partial(self.posterior_potential, track_gradients=True)
         else:
-            return self.np_potential
+            NotImplementedError
 
-    def np_potential(self, theta: np.ndarray) -> ScalarFloat:
+    def posterior_potential(
+        self, theta: np.ndarray, track_gradients: bool = False
+    ) -> ScalarFloat:
         r"""Return posterior theta log prob. $p(\theta|x)$, $-\infty$ if outside prior."
 
         Args:
@@ -570,7 +600,7 @@ class PotentialFunctionProvider:
         # Repeat x over batch dim to match theta batch, accounting for multi-D x.
         x_repeated = self.x.repeat(num_batch, *(1 for _ in range(self.x.ndim - 1)))
 
-        with torch.set_grad_enabled(False):
+        with torch.set_grad_enabled(track_gradients):
             target_log_prob = self.posterior_nn.log_prob(
                 inputs=theta.to(self.device),
                 context=x_repeated,
@@ -595,7 +625,7 @@ class PotentialFunctionProvider:
         theta = next(iter(theta.values()))
 
         with torch.set_grad_enabled(track_gradients):
-            # Notice opposite sign to numpy.
+            # Notice opposite sign to `posterior_potential`.
             # Move theta to device for evaluation.
             log_prob_posterior = -self.posterior_nn.log_prob(
                 inputs=theta.to(self.device),

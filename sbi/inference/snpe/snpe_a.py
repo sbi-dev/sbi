@@ -298,8 +298,8 @@ class SNPE_A(PosteriorEstimator):
             neural_net=wrapped_density_estimator,
             prior=self._prior,
             x_shape=self._x_shape,
+            sample_with="rejection",
             rejection_sampling_parameters=rejection_sampling_parameters,
-            sample_with_mcmc=False,
             device=device,
         )
 

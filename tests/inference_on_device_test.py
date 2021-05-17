@@ -60,7 +60,7 @@ def test_training_and_mcmc_on_device(method, model, data_device, training_device
         )
         mcmc_kwargs = (
             dict(
-                sample_with_mcmc=True,
+                sample_with="mcmc",
                 mcmc_method="slice_np",
             )
             if method == SNPE_C
@@ -70,12 +70,13 @@ def test_training_and_mcmc_on_device(method, model, data_device, training_device
         kwargs = dict(
             density_estimator=utils.likelihood_nn(model=model),
         )
-        mcmc_kwargs = dict(mcmc_method="slice")
+        mcmc_kwargs = dict(sample_with="mcmc", mcmc_method="slice")
     elif method in (SNRE_A, SNRE_B):
         kwargs = dict(
             classifier=utils.classifier_nn(model=model),
         )
         mcmc_kwargs = dict(
+            sample_with="mcmc",
             mcmc_method="slice_np_vectorized",
         )
     else:
