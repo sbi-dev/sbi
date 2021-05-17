@@ -276,7 +276,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         Args:
             density_estimator: The density estimator that the posterior is based on.
                 If `None`, use the latest neural density estimator that was trained.
-            sample_with: Method to use for sampling from the posterior. Must be in
+            sample_with: Method to use for sampling from the posterior. Must be one of
                 [`mcmc` | `rejection`].
             mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`,
                 `hmc`, `nuts`. Currently defaults to `slice_np` for a custom numpy
@@ -290,13 +290,15 @@ class LikelihoodEstimator(NeuralInference, ABC):
                 draw init locations from prior, whereas `sir` will use
                 Sequential-Importance-Resampling using `init_strategy_num_candidates`
                 to find init locations.
-            rejection_sampling_parameters: Dictionary overriding the default parameters for
-                rejection sampling. The following parameters are supported: 
-                `proposal`, as the proposal distribtution. `num_samples_to_find_max` 
-                as the number of samples that are used to find the maximum of the 
-                `potential_fn / proposal` ratio. `m` as multiplier to that ratio. 
-                `sampling_batch_size` as the batchsize of samples being drawn from 
-                the proposal at every iteration.
+            rejection_sampling_parameters: Dictionary overriding the default parameters
+                for rejection sampling. The following parameters are supported:
+                `proposal` as the proposal distribtution (default is the prior).
+                `max_sampling_batch_size` as the batchsize of samples being drawn from
+                the proposal at every iteration. `num_samples_to_find_max` as the
+                number of samples that are used to find the maximum of the
+                `potential_fn / proposal` ratio. `num_iter_to_find_max` as the number
+                of gradient ascent iterations to find the maximum of that ratio. `m` as
+                multiplier to that ratio.
 
         Returns:
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods

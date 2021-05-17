@@ -10,9 +10,8 @@ import torch
 from torch import Tensor, nn
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
-from sbi.mcmc import rejection_sample
 from sbi.types import Shape
-from sbi.utils import del_entries
+from sbi.utils import del_entries, optimize_potential_fn, rejection_sample
 from sbi.utils.torchutils import ScalarFloat, atleast_2d, ensure_theta_batched
 
 
@@ -49,7 +48,7 @@ class LikelihoodBasedPosterior(NeuralPosterior):
                 independent and identically distributed data / trials. I.e., the data is
                 assumed to be generated based on the same (unknown) model parameters or
                 experimental condations.
-            sample_with: Method to use for sampling from the posterior. Must be in
+            sample_with: Method to use for sampling from the posterior. Must be one of
                 [`mcmc` | `rejection`].
             mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`,
                 `hmc`, `nuts`. Currently defaults to `slice_np` for a custom numpy
@@ -63,13 +62,15 @@ class LikelihoodBasedPosterior(NeuralPosterior):
                 will draw init locations from prior, whereas `sir` will use Sequential-
                 Importance-Resampling using `init_strategy_num_candidates` to find init
                 locations.
-            rejection_sampling_parameters: Dictionary overriding the default parameters for
-                rejection sampling. The following parameters are supported:
-                `proposal`, as the proposal distribtution. `num_samples_to_find_max`
-                as the number of samples that are used to find the maximum of the
-                `potential_fn / proposal` ratio. `m` as multiplier to that ratio.
-                `sampling_batch_size` as the batchsize of samples being drawn from
-                the proposal at every iteration.
+            rejection_sampling_parameters: Dictionary overriding the default parameters
+                for rejection sampling. The following parameters are supported:
+                `proposal` as the proposal distribtution (default is the prior).
+                `max_sampling_batch_size` as the batchsize of samples being drawn from
+                the proposal at every iteration. `num_samples_to_find_max` as the
+                number of samples that are used to find the maximum of the
+                `potential_fn / proposal` ratio. `num_iter_to_find_max` as the number
+                of gradient ascent iterations to find the maximum of that ratio. `m` as
+                multiplier to that ratio.
             device: Training device, e.g., cpu or cuda:0.
         """
 
@@ -126,7 +127,7 @@ class LikelihoodBasedPosterior(NeuralPosterior):
         sample_shape: Shape = torch.Size(),
         x: Optional[Tensor] = None,
         show_progress_bars: bool = True,
-        sample_with: str = "mcmc",
+        sample_with: Optional[str] = None,
         mcmc_method: Optional[str] = None,
         mcmc_parameters: Optional[Dict[str, Any]] = None,
         rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
@@ -141,7 +142,7 @@ class LikelihoodBasedPosterior(NeuralPosterior):
             x: Conditioning context for posterior $p(\theta|x)$. If not provided,
                 fall back onto `x` passed to `set_default_x()`.
             show_progress_bars: Whether to show sampling progress monitor.
-            sample_with: Method to use for sampling from the posterior. Must be in
+            sample_with: Method to use for sampling from the posterior. Must be one of
                 [`mcmc` | `rejection`].
             mcmc_method: Optional parameter to override `self.mcmc_method`.
             mcmc_parameters: Dictionary overriding the default parameters for MCMC.
@@ -154,11 +155,13 @@ class LikelihoodBasedPosterior(NeuralPosterior):
                 locations.
             rejection_sampling_parameters: Dictionary overriding the default parameters
                 for rejection sampling. The following parameters are supported:
-                `proposal`, as the proposal distribtution. `num_samples_to_find_max`
-                as the number of samples that are used to find the maximum of the
-                `potential_fn / proposal` ratio. `m` as multiplier to that ratio.
-                `sampling_batch_size` as the batchsize of samples being drawn from
-                the proposal at every iteration.
+                `proposal` as the proposal distribtution (default is the prior).
+                `max_sampling_batch_size` as the batchsize of samples being drawn from
+                the proposal at every iteration. `num_samples_to_find_max` as the
+                number of samples that are used to find the maximum of the
+                `potential_fn / proposal` ratio. `num_iter_to_find_max` as the number
+                of gradient ascent iterations to find the maximum of that ratio. `m` as
+                multiplier to that ratio.
 
         Returns:
             Samples from posterior.
@@ -166,6 +169,7 @@ class LikelihoodBasedPosterior(NeuralPosterior):
 
         self.net.eval()
 
+        sample_with = sample_with if sample_with is not None else self._sample_with
         x, num_samples = self._prepare_for_sample(x, sample_shape)
 
         potential_fn_provider = PotentialFunctionProvider()
@@ -198,11 +202,11 @@ class LikelihoodBasedPosterior(NeuralPosterior):
             if "proposal" not in rejection_sampling_parameters:
                 rejection_sampling_parameters["proposal"] = self._prior
 
-            samples = self._sample_posterior_rejection(
-                num_samples=num_samples,
+            samples, _ = rejection_sample(
                 potential_fn=potential_fn_provider(
                     self._prior, self.net, x, "rejection"
                 ),
+                num_samples=num_samples,
                 **rejection_sampling_parameters,
             )
         else:
@@ -220,9 +224,11 @@ class LikelihoodBasedPosterior(NeuralPosterior):
         condition: Tensor,
         dims_to_sample: List[int],
         x: Optional[Tensor] = None,
+        sample_with: str = "mcmc",
         show_progress_bars: bool = True,
         mcmc_method: Optional[str] = None,
         mcmc_parameters: Optional[Dict[str, Any]] = None,
+        rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
     ) -> Tensor:
         r"""
         Return samples from conditional posterior $p(\theta_i|\theta_j, x)$.
@@ -246,6 +252,9 @@ class LikelihoodBasedPosterior(NeuralPosterior):
                 `condition`.
             x: Conditioning context for posterior $p(\theta|x)$. If not provided,
                 fall back onto `x` passed to `set_default_x()`.
+            sample_with: Method to use for sampling from the posterior. Must be one of
+                [`mcmc` | `rejection`]. In this method, the value of
+                `self._sample_with` will be ignored.
             show_progress_bars: Whether to show sampling progress monitor.
             mcmc_method: Optional parameter to override `self.mcmc_method`.
             mcmc_parameters: Dictionary overriding the default parameters for MCMC.
@@ -256,6 +265,15 @@ class LikelihoodBasedPosterior(NeuralPosterior):
                 will draw init locations from prior, whereas `sir` will use Sequential-
                 Importance-Resampling using `init_strategy_num_candidates` to find init
                 locations.
+            rejection_sampling_parameters: Dictionary overriding the default parameters
+                for rejection sampling. The following parameters are supported:
+                `proposal` as the proposal distribtution (default is the prior).
+                `max_sampling_batch_size` as the batchsize of samples being drawn from
+                the proposal at every iteration. `num_samples_to_find_max` as the
+                number of samples that are used to find the maximum of the
+                `potential_fn / proposal` ratio. `num_iter_to_find_max` as the number
+                of gradient ascent iterations to find the maximum of that ratio. `m` as
+                multiplier to that ratio.
 
         Returns:
             Samples from conditional posterior.
@@ -267,9 +285,11 @@ class LikelihoodBasedPosterior(NeuralPosterior):
             condition,
             dims_to_sample,
             x,
+            sample_with,
             show_progress_bars,
             mcmc_method,
             mcmc_parameters,
+            rejection_sampling_parameters,
         )
 
     def map(
@@ -382,95 +402,6 @@ class LikelihoodBasedPosterior(NeuralPosterior):
 
         return log_likelihood_trial_sum
 
-    def _sample_posterior_rejection(
-        self,
-        num_samples: torch.Size,
-        potential_fn: Any,
-        proposal: Any,
-        num_samples_to_find_max: int = 10_000,
-        m: float = 1.2,
-        sampling_batch_size: int = 10_000,
-    ):
-        r"""
-        Return samples from a distribution via rejection sampling.
-
-        This function is used in any case by SNLE and SNRE, but can also be used by SNPE
-        in order to deal with strong leakage. Depending on the inference method, a
-        different potential function for the rejection sampler is required.
-
-        Args:
-            num_samples: Desired number of samples.
-            potential_fn: Potential function used for rejection sampling.
-            proposal: Proposal distribution for rejection sampling.
-            num_samples_to_find_max: Number of samples that are used to find the maximum
-                of the `potential_fn / proposal` ratio.
-            m: Multiplier to the maximum ratio between potential function and the
-                proposal. A higher value will ensure that the samples are indeed from
-                the posterior, but will increase the rejection ratio and thus
-                computation time.
-            sampling_batch_size: Batchsize of samples being drawn from
-                the proposal at every iteration.
-
-        Returns:
-            Tensor of shape (num_samples, shape_of_single_theta).
-        """
-
-        find_max = proposal.sample((num_samples_to_find_max,))
-
-        # Define a potential as the ratio between target distribution and proposal.
-        def potential_over_proposal(theta):
-            return torch.squeeze(potential_fn(theta)) - proposal.log_prob(theta)
-
-        # Search for the maximum of the ratio.
-        _, max_log_ratio = optimize_potential_fn(
-            potential_fn=potential_over_proposal,
-            inits=find_max,
-            dist_specifying_bounds=proposal,
-            num_iter=100,
-            learning_rate=0.01,
-            num_to_optimize=max(1, int(num_samples_to_find_max / 10)),
-            show_progress_bars=False,
-        )
-
-        if m < 1.0:
-            warn("A value of m < 1.0 will lead to systematically wrong results.")
-
-        class ScaledProposal:
-            def __init__(self, proposal: Any, max_log_ratio: float, log_m: float):
-                self.proposal = proposal
-                self.max_log_ratio = max_log_ratio
-                self.log_m = log_m
-
-            def sample(self, sample_shape, **kwargs):
-                return self.proposal.sample((sample_shape,), **kwargs)
-
-            def log_prob(self, theta, **kwargs):
-                return self.proposal.log_prob(theta) + self.max_log_ratio + self.log_m
-
-        scaled_proposal = ScaledProposal(
-            proposal, max_log_ratio, torch.log(torch.as_tensor(m))
-        )
-
-        samples, _ = rejection_sample_raw(
-            potential_fn, scaled_proposal, num_samples=num_samples
-        )
-        return samples
-
-        num_accepted = 0
-        all_ = []
-        while num_accepted < num_samples:
-            candidates = proposal.sample((sampling_batch_size,))
-            probs = potential_fn(candidates)
-            target_log_probs = potential_fn(candidates)
-            proposal_log_probs = proposal.log_prob(candidates) + max_ratio
-            target_proposal_ratio = exp(target_log_probs - proposal_log_probs)
-            acceptance = rand(target_proposal_ratio.shape)
-            accepted = candidates[target_proposal_ratio > acceptance]
-            num_accepted += accepted.shape[0]
-            all_.append(accepted)
-        samples = torch.cat(all_)[:num_samples]
-        return samples
-
 
 class PotentialFunctionProvider:
     """
@@ -500,14 +431,14 @@ class PotentialFunctionProvider:
     ) -> Callable:
         r"""Return potential function for posterior $p(\theta|x)$.
 
-        Switch on numpy or pyro potential function based on mcmc_method.
+        Switch on numpy or pyro potential function based on `method`.
 
         Args:
             prior: Prior distribution that can be evaluated.
             likelihood_nn: Neural likelihood estimator that can be evaluated.
             x: Conditioning variable for posterior $p(\theta|x)$. Can be a batch of iid
                 x.
-            mcmc_method: One of `slice_np`, `slice`, `hmc` or `nuts`.
+            method: One of `slice_np`, `slice`, `hmc` or `nuts`, `rejection`.
 
         Returns:
             Potential function for sampler.
@@ -522,9 +453,9 @@ class PotentialFunctionProvider:
         elif method in ("hmc", "nuts"):
             return partial(self.pyro_potential, track_gradients=True)
         elif "slice_np" in method:
-            return self.np_potential
+            return partial(self.posterior_potential, track_gradients=False)
         elif method == "rejection":
-            return self.rejection_potential
+            return partial(self.posterior_potential, track_gradients=True)
         else:
             NotImplementedError
 
@@ -540,25 +471,9 @@ class PotentialFunctionProvider:
 
         return log_likelihoods
 
-    def rejection_potential(self, theta: np.array) -> ScalarFloat:
-        r"""Return posterior log prob. of theta $p(\theta|x)$"
-
-        The only difference to the `np_potential` is that it tracks the gradients.
-
-        Args:
-            theta: Parameters $\theta$, batch dimension 1.
-
-        Returns:
-            Posterior log probability of the theta, $-\infty$ if impossible under prior.
-        """
-        theta = torch.as_tensor(theta, dtype=torch.float32)
-
-        # Notice opposite sign to pyro potential.
-        return self.log_likelihood(
-            theta, track_gradients=True
-        ).cpu() + self.prior.log_prob(theta)
-
-    def np_potential(self, theta: np.array) -> ScalarFloat:
+    def posterior_potential(
+        self, theta: np.array, track_gradients: bool = False
+    ) -> ScalarFloat:
         r"""Return posterior log prob. of theta $p(\theta|x)$"
 
         Args:
@@ -571,7 +486,7 @@ class PotentialFunctionProvider:
 
         # Notice opposite sign to pyro potential.
         return self.log_likelihood(
-            theta, track_gradients=False
+            theta, track_gradients=track_gradients
         ).cpu() + self.prior.log_prob(theta)
 
     def pyro_potential(

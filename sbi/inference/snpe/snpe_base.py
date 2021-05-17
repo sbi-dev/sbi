@@ -347,10 +347,11 @@ class PosteriorEstimator(NeuralInference, ABC):
     def build_posterior(
         self,
         density_estimator: Optional[TorchModule] = None,
-        rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
-        sample_with_mcmc: bool = False,
+        sample_with: str = "rejection",
         mcmc_method: str = "slice_np",
         mcmc_parameters: Optional[Dict[str, Any]] = None,
+        rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
+        sample_with_mcmc: Optional[bool] = None,
     ) -> DirectPosterior:
         r"""
         Build posterior from the neural density estimator.
@@ -367,13 +368,10 @@ class PosteriorEstimator(NeuralInference, ABC):
         Args:
             density_estimator: The density estimator that the posterior is based on.
                 If `None`, use the latest neural density estimator that was trained.
-            rejection_sampling_parameters: Dictionary overriding the default parameters
-                for rejection sampling. The following parameters are supported:
-                `max_sampling_batch_size` to set the batch size for drawing new
-                samples from the candidate distribution, e.g., the posterior. Larger
-                batch size speeds up sampling.
-            sample_with_mcmc: Whether to sample with MCMC. MCMC can be used to deal
-                with high leakage.
+            sample_with: Method to use for sampling from the posterior. Must be one of
+                [`rejection` | `mcmc`]. With default parameters, `rejection` samples
+                from the posterior estimated by the neural net and rejects only if the
+                samples are outside of the prior support.
             mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`,
                 `hmc`, `nuts`. Currently defaults to `slice_np` for a custom numpy
                 implementation of slice sampling; select `hmc`, `nuts` or `slice` for
@@ -386,10 +384,29 @@ class PosteriorEstimator(NeuralInference, ABC):
                 draw init locations from prior, whereas `sir` will use
                 Sequential-Importance-Resampling using `init_strategy_num_candidates`
                 to find init locations.
+            rejection_sampling_parameters: Dictionary overriding the default parameters
+                for rejection sampling. The following parameters are supported:
+                `proposal` as the proposal distribtution (default is the trained
+                neural net). `max_sampling_batch_size` as the batchsize of samples
+                being drawn from the proposal at every iteration.
+                `num_samples_to_find_max` as the number of samples that are used to
+                find the maximum of the `potential_fn / proposal` ratio.
+                `num_iter_to_find_max` as the number of gradient ascent iterations to
+                find the maximum of that ratio. `m` as multiplier to that ratio.
+            sample_with_mcmc: Deprecated since `sbi v0.16.0`. Use `sample_with=mcmc`
+                instead.
 
         Returns:
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods.
         """
+        if sample_with_mcmc is not None:
+            warn(
+                f"You set `sample_with_mcmc={sample_with_mcmc}`. This is deprecated "
+                "since `sbi v0.17.0` and will lead to an error in future versions. "
+                "Please use `sample_with='mcmc'` instead."
+            )
+            if sample_with_mcmc:
+                sample_with = "mcmc"
 
         if density_estimator is None:
             density_estimator = self._neural_net
@@ -404,10 +421,10 @@ class PosteriorEstimator(NeuralInference, ABC):
             neural_net=density_estimator,
             prior=self._prior,
             x_shape=self._x_shape,
-            rejection_sampling_parameters=rejection_sampling_parameters,
-            sample_with_mcmc=sample_with_mcmc,
+            sample_with=sample_with,
             mcmc_method=mcmc_method,
             mcmc_parameters=mcmc_parameters,
+            rejection_sampling_parameters=rejection_sampling_parameters,
             device=device,
         )
 

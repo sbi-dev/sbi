@@ -290,17 +290,17 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str, set_seed):
 @pytest.mark.slow
 @pytest.mark.parametrize("snpe_method", [SNPE_A, SNPE_C])
 @pytest.mark.parametrize(
-    "sample_with_mcmc, mcmc_method, prior_str",
+    "sample_with, mcmc_method, prior_str",
     (
-        (True, "slice_np", "gaussian"),
-        (True, "slice", "gaussian"),
+        ("mcmc", "slice_np", "gaussian"),
+        ("mcmc", "slice", "gaussian"),
         # XXX (True, "slice", "uniform"),
         # XXX takes very long. fix when refactoring pyro sampling
-        (False, "rejection", "uniform"),
+        ("rejection", "rejection", "uniform"),
     ),
 )
 def test_api_snpe_c_posterior_correction(
-    snpe_method: type, sample_with_mcmc, mcmc_method, prior_str, set_seed
+    snpe_method: type, sample_with, mcmc_method, prior_str, set_seed
 ):
     """Test that leakage correction applied to sampling works, with both MCMC and
     rejection.
@@ -329,7 +329,7 @@ def test_api_snpe_c_posterior_correction(
     inference = snpe_method(
         prior,
         simulation_batch_size=50,
-        sample_with_mcmc=sample_with_mcmc,
+        sample_with=sample_with,
         mcmc_method=mcmc_method,
         show_progress_bars=False,
     )
@@ -338,9 +338,7 @@ def test_api_snpe_c_posterior_correction(
     _ = inference.append_simulations(theta, x).train(max_num_epochs=5)
 
     posterior = inference.build_posterior()
-    posterior = posterior.set_sample_with_mcmc(sample_with_mcmc).set_mcmc_method(
-        mcmc_method
-    )
+    posterior = posterior.set_sample_with(sample_with).set_mcmc_method(mcmc_method)
 
     # Posterior should be corrected for leakage even if num_rounds just 1.
     samples = posterior.sample((10,), x=x_o)
