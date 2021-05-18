@@ -92,7 +92,10 @@ class RatioBasedPosterior(NeuralPosterior):
 
         # Sum log ratios over x batch of iid trials.
         log_ratio = self._log_ratios_over_trials(
-            x, theta, self.net, track_gradients=track_gradients
+            x.to(self._device),
+            theta.to(self._device),
+            self.net,
+            track_gradients=track_gradients,
         )
 
         return log_ratio.cpu() + self._prior.log_prob(theta)
@@ -352,7 +355,7 @@ class RatioBasedPosterior(NeuralPosterior):
         ), "x and theta must match in batch shape."
         assert (
             next(net.parameters()).device == x.device and x.device == theta.device
-        ), f"device mismatch: net, x, theta: {net.device}, {x.decive}, {theta.device}."
+        ), f"device mismatch: net, x, theta: {next(net.parameters()).device}, {x.device}, {theta.device}."
 
         # Calculate ratios in one batch.
         with torch.set_grad_enabled(track_gradients):
@@ -429,7 +432,7 @@ class PotentialFunctionProvider:
         theta = ensure_theta_batched(theta)
 
         log_ratio = RatioBasedPosterior._log_ratios_over_trials(
-            self.x, theta, self.classifier, track_gradients=False
+            self.x, theta.to(self.device), self.classifier, track_gradients=False
         )
 
         # Notice opposite sign to pyro potential.
@@ -455,7 +458,7 @@ class PotentialFunctionProvider:
         theta = ensure_theta_batched(theta)
 
         log_ratio = RatioBasedPosterior._log_ratios_over_trials(
-            self.x, theta, self.classifier, track_gradients=False
+            self.x, theta.to(self.device), self.classifier, track_gradients=False
         )
 
         return -(log_ratio.cpu() + self.prior.log_prob(theta))

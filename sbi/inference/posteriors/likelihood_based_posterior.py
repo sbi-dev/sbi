@@ -322,7 +322,7 @@ class LikelihoodBasedPosterior(NeuralPosterior):
         ), "x and theta must match in batch shape."
         assert (
             next(net.parameters()).device == x.device and x.device == theta.device
-        ), f"device mismatch: net, x, theta: {net.device}, {x.decive}, {theta.device}."
+        ), f"device mismatch: net, x, theta: {next(net.parameters()).device}, {x.decive}, {theta.device}."
 
         # Calculate likelihood in one batch.
         with torch.set_grad_enabled(track_gradients):
