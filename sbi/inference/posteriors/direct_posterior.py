@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
+from functools import partial
 from typing import Any, Callable, Dict, List, Optional, Union
 
 import numpy as np
@@ -525,8 +526,10 @@ class PotentialFunctionProvider:
         self.device = next(posterior_nn.parameters()).device
         self.x = atleast_2d(x).to(self.device)
 
-        if mcmc_method in ("slice", "hmc", "nuts"):
-            return self.pyro_potential
+        if mcmc_method == "slice":
+            return partial(self.pyro_potential, track_gradients=False)
+        elif mcmc_method in ("hmc", "nuts"):
+            return partial(self.pyro_potential, track_gradients=True)
         else:
             return self.np_potential
 
@@ -556,7 +559,9 @@ class PotentialFunctionProvider:
 
         return target_log_prob
 
-    def pyro_potential(self, theta: Dict[str, Tensor]) -> Tensor:
+    def pyro_potential(
+        self, theta: Dict[str, Tensor], track_gradients: bool = False
+    ) -> Tensor:
         r"""Return posterior log prob. of theta $p(\theta|x)$, -inf where outside prior.
 
         Args:
@@ -568,11 +573,13 @@ class PotentialFunctionProvider:
 
         theta = next(iter(theta.values()))
 
-        # Notice opposite sign to numpy.
-        # Move theta to device for evaluation.
-        log_prob_posterior = -self.posterior_nn.log_prob(
-            inputs=theta.to(self.device), context=self.x
-        ).cpu()
+        with torch.set_grad_enabled(track_gradients):
+            # Notice opposite sign to numpy.
+            # Move theta to device for evaluation.
+            log_prob_posterior = -self.posterior_nn.log_prob(
+                inputs=theta.to(self.device),
+                context=self.x,
+            ).cpu()
 
         in_prior_support = within_support(self.prior, theta)
 
