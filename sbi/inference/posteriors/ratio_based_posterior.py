@@ -458,7 +458,7 @@ class PotentialFunctionProvider:
         theta = ensure_theta_batched(theta)
 
         log_ratio = RatioBasedPosterior._log_ratios_over_trials(
-            self.x, theta.to(self._device), self.classifier, track_gradients=False
+            self.x, theta.to(self._device), self.classifier, track_gradients=True
         )
 
         return -(log_ratio.cpu() + self.prior.log_prob(theta))
