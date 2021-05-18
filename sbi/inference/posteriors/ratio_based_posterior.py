@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
+from functools import partial
 from typing import Any, Callable, Dict, List, Optional, Union
 from warnings import warn
 
@@ -412,8 +413,10 @@ class PotentialFunctionProvider:
         self.device = next(classifier.parameters()).device
         self.x = atleast_2d(x).to(self.device)
 
-        if mcmc_method in ("slice", "hmc", "nuts"):
-            return self.pyro_potential
+        if mcmc_method == "slice":
+            return partial(self.pyro_potential, track_gradients=False)
+        elif mcmc_method in ("hmc", "nuts"):
+            return partial(self.pyro_potential, track_gradients=True)
         else:
             return self.np_potential
 
@@ -438,7 +441,9 @@ class PotentialFunctionProvider:
         # Notice opposite sign to pyro potential.
         return log_ratio.cpu() + self.prior.log_prob(theta)
 
-    def pyro_potential(self, theta: Dict[str, Tensor]) -> Tensor:
+    def pyro_potential(
+        self, theta: Dict[str, Tensor], track_gradients: bool = False
+    ) -> Tensor:
         r"""Return potential for Pyro sampler.
 
         Note: for Pyro this is the negative unnormalized posterior log prob.
@@ -458,7 +463,10 @@ class PotentialFunctionProvider:
         theta = ensure_theta_batched(theta)
 
         log_ratio = RatioBasedPosterior._log_ratios_over_trials(
-            self.x, theta.to(self.device), self.classifier, track_gradients=False
+            self.x,
+            theta.to(self.device),
+            self.classifier,
+            track_gradients=track_gradients,
         )
 
         return -(log_ratio.cpu() + self.prior.log_prob(theta))

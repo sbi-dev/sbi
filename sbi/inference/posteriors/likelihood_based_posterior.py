@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
+from functools import partial
 from typing import Any, Callable, Dict, List, Optional, Union
 from warnings import warn
 
@@ -376,19 +377,21 @@ class PotentialFunctionProvider:
         self.device = next(likelihood_nn.parameters()).device
         self.x = atleast_2d(x).to(self.device)
 
-        if mcmc_method in ("slice", "hmc", "nuts"):
-            return self.pyro_potential
+        if mcmc_method == "slice":
+            return partial(self.pyro_potential, track_gradients=False)
+        elif mcmc_method in ("hmc", "nuts"):
+            return partial(self.pyro_potential, track_gradients=True)
         else:
             return self.np_potential
 
-    def log_likelihood(self, theta: Tensor) -> Tensor:
+    def log_likelihood(self, theta: Tensor, track_gradients: bool = False) -> Tensor:
         """Return log likelihood of fixed data given a batch of parameters."""
 
         log_likelihoods = LikelihoodBasedPosterior._log_likelihoods_over_trials(
             x=self.x,
             theta=ensure_theta_batched(theta).to(self.device),
             net=self.likelihood_nn,
-            track_gradients=False,
+            track_gradients=track_gradients,
         )
 
         return log_likelihoods
@@ -407,7 +410,9 @@ class PotentialFunctionProvider:
         # Notice opposite sign to pyro potential.
         return self.log_likelihood(theta).cpu() + self.prior.log_prob(theta)
 
-    def pyro_potential(self, theta: Dict[str, Tensor]) -> Tensor:
+    def pyro_potential(
+        self, theta: Dict[str, Tensor], track_gradients: bool = False
+    ) -> Tensor:
         r"""Return posterior log probability of parameters $p(\theta|x)$.
 
          Args:
@@ -421,4 +426,7 @@ class PotentialFunctionProvider:
 
         theta = next(iter(theta.values()))
 
-        return -(self.log_likelihood(theta).cpu() + self.prior.log_prob(theta))
+        return -(
+            self.log_likelihood(theta, track_gradients=track_gradients).cpu()
+            + self.prior.log_prob(theta)
+        )
