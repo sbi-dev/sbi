@@ -7,10 +7,10 @@
 <meta content="width=device-width,initial-scale=1" name="viewport"/>
 <link href="https://mackelab.org/sbi/reference/" rel="canonical"/>
 <link href="../assets/images/favicon.png" rel="shortcut icon"/>
-<meta content="mkdocs-1.1.2, mkdocs-material-5.4.0" name="generator"/>
+<meta content="mkdocs-1.1.2, mkdocs-material-5.5.3" name="generator"/>
 <title>API Reference - sbi</title>
-<link href="../assets/stylesheets/main.fe0cca5b.min.css" rel="stylesheet"/>
-<link href="../assets/stylesheets/palette.a46bcfb3.min.css" rel="stylesheet"/>
+<link href="../assets/stylesheets/main.947af8d5.min.css" rel="stylesheet"/>
+<link href="../assets/stylesheets/palette.7f672a1f.min.css" rel="stylesheet"/>
 <meta content="#3f51b5" name="theme-color"/>
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
 <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,400i,700%7CRoboto+Mono&amp;display=fallback" rel="stylesheet"/>
@@ -636,8 +636,7 @@ runtime, but a better posterior estimate.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>30
-31
+<pre><span></span>31
 32
 33
 34
@@ -687,7 +686,8 @@ runtime, but a better posterior estimate.</p>
 78
 79
 80
-81</pre>
+81
+82</pre>
 </div>
 </td>
 <td class="code">
@@ -823,27 +823,7 @@ sbi.utils.user_input_checks.prepare_for_sbi<span class="p">(</span><span class="
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>452
-453
-454
-455
-456
-457
-458
-459
-460
-461
-462
-463
-464
-465
-466
-467
-468
-469
-470
-471
-472
+<pre><span></span>472
 473
 474
 475
@@ -854,12 +834,32 @@ sbi.utils.user_input_checks.prepare_for_sbi<span class="p">(</span><span class="
 480
 481
 482
-483</pre>
+483
+484
+485
+486
+487
+488
+489
+490
+491
+492
+493
+494
+495
+496
+497
+498
+499
+500
+501
+502
+503</pre>
 </div>
 </td>
 <td class="code">
 <div class="highlight">
-<pre><span></span><code><span class="k">def</span> <span class="nf">prepare_for_sbi</span><span class="p">(</span><span class="n">simulator</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">prior</span><span class="p">,)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Callable</span><span class="p">,</span> <span class="n">Distribution</span><span class="p">]:</span>
+<pre><span></span><code><span class="k">def</span> <span class="nf">prepare_for_sbi</span><span class="p">(</span><span class="n">simulator</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">prior</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Callable</span><span class="p">,</span> <span class="n">Distribution</span><span class="p">]:</span>
     <span class="sd">"""Prepare simulator, prior and for usage in sbi.</span>
 
 <span class="sd">    One of the goals is to allow you to use sbi with inputs computed in numpy.</span>
@@ -988,55 +988,55 @@ proposal.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>443
-444
-445
-446
-447
-448
-449
-450
-451
-452
-453
-454
-455
-456
-457
-458
-459
-460
-461
-462
-463
-464
-465
-466
-467
-468
-469
-470
-471
-472
-473
-474
-475
-476
-477
-478
-479
-480
-481
-482
-483
-484
-485
-486
-487
-488
-489
-490
-491</pre>
+<pre><span></span>520
+521
+522
+523
+524
+525
+526
+527
+528
+529
+530
+531
+532
+533
+534
+535
+536
+537
+538
+539
+540
+541
+542
+543
+544
+545
+546
+547
+548
+549
+550
+551
+552
+553
+554
+555
+556
+557
+558
+559
+560
+561
+562
+563
+564
+565
+566
+567
+568</pre>
 </div>
 </td>
 <td class="code">
@@ -1227,7 +1227,8 @@ is not empty, we warn. In future versions, when the new interface of
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>29
+<pre><span></span>28
+29
 30
 31
 32
@@ -1288,8 +1289,7 @@ is not empty, we warn. In future versions, when the new interface of
 87
 88
 89
-90
-91</pre>
+90</pre>
 </div>
 </td>
 <td class="code">
@@ -1441,7 +1441,9 @@ Pass <code>None</code> if the parameters were sampled from the prior. If not
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span> 86
+<pre><span></span> 84
+ 85
+ 86
  87
  88
  89
@@ -1504,21 +1506,13 @@ Pass <code>None</code> if the parameters were sampled from the prior. If not
 146
 147
 148
-149
-150
-151
-152
-153
-154</pre>
+149</pre>
 </div>
 </td>
 <td class="code">
 <div class="highlight">
 <pre><span></span><code><span class="k">def</span> <span class="nf">append_simulations</span><span class="p">(</span>
-    <span class="bp">self</span><span class="p">,</span>
-    <span class="n">theta</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
-    <span class="n">x</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
-    <span class="n">proposal</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="bp">self</span><span class="p">,</span> <span class="n">theta</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">proposal</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"PosteriorEstimator"</span><span class="p">:</span>
     <span class="sa">r</span><span class="sd">"""</span>
 <span class="sd">    Store parameters and simulation outputs to use them for later training.</span>
@@ -1540,7 +1534,7 @@ Pass <code>None</code> if the parameters were sampled from the prior. If not
 <span class="sd">        NeuralInference object (returned so that this function is chainable).</span>
 <span class="sd">    """</span>
 
-    <span class="n">validate_theta_and_x</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
+    <span class="n">theta</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="n">validate_theta_and_x</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">training_device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_check_proposal</span><span class="p">(</span><span class="n">proposal</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="p">(</span>
@@ -1702,7 +1696,25 @@ to find init locations.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>365
+<pre><span></span>347
+348
+349
+350
+351
+352
+353
+354
+355
+356
+357
+358
+359
+360
+361
+362
+363
+364
+365
 366
 367
 368
@@ -1757,25 +1769,7 @@ to find init locations.</p>
 417
 418
 419
-420
-421
-422
-423
-424
-425
-426
-427
-428
-429
-430
-431
-432
-433
-434
-435
-436
-437
-438</pre>
+420</pre>
 </div>
 </td>
 <td class="code">
@@ -1863,6 +1857,230 @@ to find init locations.</p>
 </div>
 </div>
 <div class="doc doc-object doc-method">
+<h4 class="doc doc-heading" data-toc-label="get_dataloaders()" id="sbi.inference.snpe.snpe_c.SNPE_C.get_dataloaders">
+<code class="highlight language-python">
+get_dataloaders<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dataset</span><span class="p">,</span> <span class="n">training_batch_size</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">validation_fraction</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">resume_training</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">dataloader_kwargs</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> </code>
+<span class="doc doc-properties">
+<small class="doc doc-property doc-property-inherited"><code>inherited</code></small>
+</span>
+</h4>
+<div class="doc doc-contents">
+<p>Return dataloaders for training and validation.</p>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>dataset</code></td>
+<td><code>TensorDataset</code></td>
+<td>
+<p>holding all theta and x, optionally masks.</p>
+</td>
+<td><em>required</em></td>
+</tr>
+<tr>
+<td><code>training_batch_size</code></td>
+<td><code>int</code></td>
+<td>
+<p>training arg of inference methods.</p>
+</td>
+<td><code>50</code></td>
+</tr>
+<tr>
+<td><code>resume_training</code></td>
+<td><code>bool</code></td>
+<td>
+<p>Whether the current call is resuming training so that no
+new training and validation indices into the dataset have to be created.</p>
+</td>
+<td><code>False</code></td>
+</tr>
+<tr>
+<td><code>dataloader_kwargs</code></td>
+<td><code>Optional[dict]</code></td>
+<td>
+<p>Additional or updated kwargs to be passed to the training
+and validation dataloaders (like, e.g., a collate_fn)</p>
+</td>
+<td><code>None</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Tuple[torch.utils.data.dataloader.DataLoader, torch.utils.data.dataloader.DataLoader]</code></td>
+<td>
+<p>Tuple of dataloaders for training and validation.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<details class="quote">
+<summary>Source code in <code>sbi/inference/snpe/snpe_c.py</code></summary>
+<table class="highlighttable">
+<tr>
+<td class="linenos">
+<div class="linenodiv">
+<pre><span></span>281
+282
+283
+284
+285
+286
+287
+288
+289
+290
+291
+292
+293
+294
+295
+296
+297
+298
+299
+300
+301
+302
+303
+304
+305
+306
+307
+308
+309
+310
+311
+312
+313
+314
+315
+316
+317
+318
+319
+320
+321
+322
+323
+324
+325
+326
+327
+328
+329
+330
+331
+332
+333
+334
+335
+336
+337
+338
+339
+340
+341
+342
+343
+344
+345
+346</pre>
+</div>
+</td>
+<td class="code">
+<div class="highlight">
+<pre><span></span><code><span class="k">def</span> <span class="nf">get_dataloaders</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span>
+    <span class="n">dataset</span><span class="p">:</span> <span class="n">data</span><span class="o">.</span><span class="n">TensorDataset</span><span class="p">,</span>
+    <span class="n">training_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">50</span><span class="p">,</span>
+    <span class="n">validation_fraction</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.1</span><span class="p">,</span>
+    <span class="n">resume_training</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">dataloader_kwargs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">data</span><span class="o">.</span><span class="n">DataLoader</span><span class="p">,</span> <span class="n">data</span><span class="o">.</span><span class="n">DataLoader</span><span class="p">]:</span>
+    <span class="sd">"""Return dataloaders for training and validation.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        dataset: holding all theta and x, optionally masks.</span>
+<span class="sd">        training_batch_size: training arg of inference methods.</span>
+<span class="sd">        resume_training: Whether the current call is resuming training so that no</span>
+<span class="sd">            new training and validation indices into the dataset have to be created.</span>
+<span class="sd">        dataloader_kwargs: Additional or updated kwargs to be passed to the training</span>
+<span class="sd">            and validation dataloaders (like, e.g., a collate_fn)</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Tuple of dataloaders for training and validation.</span>
+
+<span class="sd">    """</span>
+
+    <span class="c1"># Get total number of training examples.</span>
+    <span class="n">num_examples</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">dataset</span><span class="p">)</span>
+
+    <span class="c1"># Select random train and validation splits from (theta, x) pairs.</span>
+    <span class="n">num_training_examples</span> <span class="o">=</span> <span class="nb">int</span><span class="p">((</span><span class="mi">1</span> <span class="o">-</span> <span class="n">validation_fraction</span><span class="p">)</span> <span class="o">*</span> <span class="n">num_examples</span><span class="p">)</span>
+    <span class="n">num_validation_examples</span> <span class="o">=</span> <span class="n">num_examples</span> <span class="o">-</span> <span class="n">num_training_examples</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">resume_training</span><span class="p">:</span>
+        <span class="n">permuted_indices</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randperm</span><span class="p">(</span><span class="n">num_examples</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">train_indices</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">val_indices</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">permuted_indices</span><span class="p">[:</span><span class="n">num_training_examples</span><span class="p">],</span>
+            <span class="n">permuted_indices</span><span class="p">[</span><span class="n">num_training_examples</span><span class="p">:],</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Create training and validation loaders using a subset sampler.</span>
+    <span class="c1"># Intentionally use dicts to define the default dataloader args</span>
+    <span class="c1"># Then, use dataloader_kwargs to override (or add to) any of these defaults</span>
+    <span class="c1"># https://stackoverflow.com/questions/44784577/in-method-call-args-how-to-override-keyword-argument-of-unpacked-dict</span>
+    <span class="n">train_loader_kwargs</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"batch_size"</span><span class="p">:</span> <span class="nb">min</span><span class="p">(</span><span class="n">training_batch_size</span><span class="p">,</span> <span class="n">num_training_examples</span><span class="p">),</span>
+        <span class="s2">"drop_last"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="s2">"sampler"</span><span class="p">:</span> <span class="n">data</span><span class="o">.</span><span class="n">sampler</span><span class="o">.</span><span class="n">SubsetRandomSampler</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">train_indices</span><span class="p">),</span>
+    <span class="p">}</span>
+    <span class="n">train_loader_kwargs</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="nb">dict</span><span class="p">(</span><span class="n">train_loader_kwargs</span><span class="p">,</span> <span class="o">**</span><span class="n">dataloader_kwargs</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">dataloader_kwargs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="k">else</span> <span class="n">train_loader_kwargs</span>
+    <span class="p">)</span>
+    <span class="n">val_loader_kwargs</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"batch_size"</span><span class="p">:</span> <span class="nb">min</span><span class="p">(</span><span class="n">training_batch_size</span><span class="p">,</span> <span class="n">num_validation_examples</span><span class="p">),</span>
+        <span class="s2">"shuffle"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="s2">"drop_last"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="s2">"sampler"</span><span class="p">:</span> <span class="n">data</span><span class="o">.</span><span class="n">sampler</span><span class="o">.</span><span class="n">SubsetRandomSampler</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">val_indices</span><span class="p">),</span>
+    <span class="p">}</span>
+    <span class="n">val_loader_kwargs</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="nb">dict</span><span class="p">(</span><span class="n">val_loader_kwargs</span><span class="p">,</span> <span class="o">**</span><span class="n">dataloader_kwargs</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">dataloader_kwargs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="k">else</span> <span class="n">val_loader_kwargs</span>
+    <span class="p">)</span>
+    <span class="n">train_loader</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">DataLoader</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="o">**</span><span class="n">train_loader_kwargs</span><span class="p">)</span>
+    <span class="n">val_loader</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">DataLoader</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="o">**</span><span class="n">val_loader_kwargs</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">train_loader</span><span class="p">,</span> <span class="n">val_loader</span>
+</code></pre>
+</div>
+</td>
+</tr>
+</table>
+</details>
+</div>
+</div>
+<div class="doc doc-object doc-method">
 <h4 class="doc doc-heading" data-toc-label="get_simulations()" id="sbi.inference.snpe.snpe_c.SNPE_C.get_simulations">
 <code class="highlight language-python">
 get_simulations<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">starting_round</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">exclude_invalid_x</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">warn_on_invalid</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> </code>
@@ -1920,10 +2138,7 @@ found.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>217
-218
-219
-220
+<pre><span></span>220
 221
 222
 223
@@ -1962,7 +2177,10 @@ found.</p>
 256
 257
 258
-259</pre>
+259
+260
+261
+262</pre>
 </div>
 </td>
 <td class="code">
@@ -2080,10 +2298,7 @@ that the data came from the first round, i.e. the prior.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>183
-184
-185
-186
+<pre><span></span>186
 187
 188
 189
@@ -2112,7 +2327,10 @@ that the data came from the first round, i.e. the prior.</p>
 212
 213
 214
-215</pre>
+215
+216
+217
+218</pre>
 </div>
 </td>
 <td class="code">
@@ -2161,7 +2379,7 @@ that the data came from the first round, i.e. the prior.</p>
 <div class="doc doc-object doc-method">
 <h4 class="doc doc-heading" data-toc-label="train()" id="sbi.inference.snpe.snpe_c.SNPE_C.train">
 <code class="highlight language-python">
-train<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">num_atoms</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">training_batch_size</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.0005</span><span class="p">,</span> <span class="n">validation_fraction</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">stop_after_epochs</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">max_num_epochs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">clip_max_norm</span><span class="o">=</span><span class="mf">5.0</span><span class="p">,</span> <span class="n">calibration_kernel</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">exclude_invalid_x</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">resume_training</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">discard_prior_samples</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">use_combined_loss</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">retrain_from_scratch_each_round</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">show_train_summary</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> </code>
+train<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">num_atoms</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">training_batch_size</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.0005</span><span class="p">,</span> <span class="n">validation_fraction</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">stop_after_epochs</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">max_num_epochs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">clip_max_norm</span><span class="o">=</span><span class="mf">5.0</span><span class="p">,</span> <span class="n">calibration_kernel</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">exclude_invalid_x</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">resume_training</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">discard_prior_samples</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">use_combined_loss</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">retrain_from_scratch_each_round</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">show_train_summary</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">dataloader_kwargs</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> </code>
 </h4>
 <div class="doc doc-contents">
 <p>Return density estimator that approximates the distribution <span><span class="MathJax_Preview">p(\theta|x)</span><script type="math/tex">p(\theta|x)</script></span>.</p>
@@ -2304,6 +2522,15 @@ loss and leakage after the training.</p>
 </td>
 <td><code>False</code></td>
 </tr>
+<tr>
+<td><code>dataloader_kwargs</code></td>
+<td><code>Optional[Dict]</code></td>
+<td>
+<p>Additional or updated kwargs to be passed to the training
+and validation dataloaders (like, e.g., a collate_fn)</p>
+</td>
+<td><code>None</code></td>
+</tr>
 </tbody>
 </table>
 <p><strong>Returns:</strong></p>
@@ -2329,7 +2556,8 @@ loss and leakage after the training.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span> 93
+<pre><span></span> 92
+ 93
  94
  95
  96
@@ -2422,7 +2650,8 @@ loss and leakage after the training.</p>
 183
 184
 185
-186</pre>
+186
+187</pre>
 </div>
 </td>
 <td class="code">
@@ -2443,6 +2672,7 @@ loss and leakage after the training.</p>
     <span class="n">use_combined_loss</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">retrain_from_scratch_each_round</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">show_train_summary</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">dataloader_kwargs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DirectPosterior</span><span class="p">:</span>
     <span class="sa">r</span><span class="sd">"""</span>
 <span class="sd">    Return density estimator that approximates the distribution $p(\theta|x)$.</span>
@@ -2478,6 +2708,8 @@ loss and leakage after the training.</p>
 <span class="sd">            estimator for the posterior from scratch each round.</span>
 <span class="sd">        show_train_summary: Whether to print the number of epochs and validation</span>
 <span class="sd">            loss and leakage after the training.</span>
+<span class="sd">        dataloader_kwargs: Additional or updated kwargs to be passed to the training</span>
+<span class="sd">            and validation dataloaders (like, e.g., a collate_fn)</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        Density estimator that approximates the distribution $p(\theta|x)$.</span>
@@ -2505,16 +2737,15 @@ loss and leakage after the training.</p>
             <span class="bp">self</span><span class="o">.</span><span class="n">use_non_atomic_loss</span> <span class="o">=</span> <span class="p">(</span>
                 <span class="nb">isinstance</span><span class="p">(</span><span class="n">proposal</span><span class="o">.</span><span class="n">net</span><span class="o">.</span><span class="n">_distribution</span><span class="p">,</span> <span class="n">mdn</span><span class="p">)</span>
                 <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span><span class="o">.</span><span class="n">_distribution</span><span class="p">,</span> <span class="n">mdn</span><span class="p">)</span>
-                <span class="ow">and</span> <span class="p">(</span>
-                    <span class="n">check_if_boxuniform</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_prior</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
-                    <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_prior</span><span class="p">,</span> <span class="n">MultivariateNormal</span><span class="p">)</span>
-                <span class="p">)</span>
+                <span class="ow">and</span> <span class="n">check_dist_class</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_prior</span><span class="p">,</span> <span class="n">class_to_check</span><span class="o">=</span><span class="p">(</span><span class="n">Uniform</span><span class="p">,</span> <span class="n">MultivariateNormal</span><span class="p">)</span>
+                <span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
             <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">use_non_atomic_loss</span> <span class="o">=</span> <span class="kc">False</span>
 
         <span class="n">algorithm</span> <span class="o">=</span> <span class="s2">"non-atomic"</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">use_non_atomic_loss</span> <span class="k">else</span> <span class="s2">"atomic"</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Using SNPE-C with </span><span class="si">{</span><span class="n">algorithm</span><span class="si">}</span><span class="s2"> loss"</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Using SNPE-C with </span><span class="si">{algorithm}</span><span class="s2"> loss"</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">use_non_atomic_loss</span><span class="p">:</span>
             <span class="c1"># Take care of z-scoring, pre-compute and store prior terms.</span>
@@ -2816,7 +3047,13 @@ use these indices to find which training data stemmed from the prior.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span> 81
+<pre><span></span> 75
+ 76
+ 77
+ 78
+ 79
+ 80
+ 81
  82
  83
  84
@@ -2844,13 +3081,7 @@ use these indices to find which training data stemmed from the prior.</p>
 106
 107
 108
-109
-110
-111
-112
-113
-114
-115</pre>
+109</pre>
 </div>
 </td>
 <td class="code">
@@ -2882,7 +3113,7 @@ use these indices to find which training data stemmed from the prior.</p>
 <span class="sd">        NeuralInference object (returned so that this function is chainable).</span>
 <span class="sd">    """</span>
 
-    <span class="n">validate_theta_and_x</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
+    <span class="n">theta</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="n">validate_theta_and_x</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">training_device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">)</span>
 
     <span class="bp">self</span><span class="o">.</span><span class="n">_theta_roundwise</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_x_roundwise</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
@@ -2985,7 +3216,28 @@ to find init locations.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>280
+<pre><span></span>259
+260
+261
+262
+263
+264
+265
+266
+267
+268
+269
+270
+271
+272
+273
+274
+275
+276
+277
+278
+279
+280
 281
 282
 283
@@ -3024,28 +3276,7 @@ to find init locations.</p>
 316
 317
 318
-319
-320
-321
-322
-323
-324
-325
-326
-327
-328
-329
-330
-331
-332
-333
-334
-335
-336
-337
-338
-339
-340</pre>
+319</pre>
 </div>
 </td>
 <td class="code">
@@ -3120,6 +3351,230 @@ to find init locations.</p>
 </div>
 </div>
 <div class="doc doc-object doc-method">
+<h4 class="doc doc-heading" data-toc-label="get_dataloaders()" id="sbi.inference.snle.snle_a.SNLE_A.get_dataloaders">
+<code class="highlight language-python">
+get_dataloaders<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dataset</span><span class="p">,</span> <span class="n">training_batch_size</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">validation_fraction</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">resume_training</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">dataloader_kwargs</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> </code>
+<span class="doc doc-properties">
+<small class="doc doc-property doc-property-inherited"><code>inherited</code></small>
+</span>
+</h4>
+<div class="doc doc-contents">
+<p>Return dataloaders for training and validation.</p>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>dataset</code></td>
+<td><code>TensorDataset</code></td>
+<td>
+<p>holding all theta and x, optionally masks.</p>
+</td>
+<td><em>required</em></td>
+</tr>
+<tr>
+<td><code>training_batch_size</code></td>
+<td><code>int</code></td>
+<td>
+<p>training arg of inference methods.</p>
+</td>
+<td><code>50</code></td>
+</tr>
+<tr>
+<td><code>resume_training</code></td>
+<td><code>bool</code></td>
+<td>
+<p>Whether the current call is resuming training so that no
+new training and validation indices into the dataset have to be created.</p>
+</td>
+<td><code>False</code></td>
+</tr>
+<tr>
+<td><code>dataloader_kwargs</code></td>
+<td><code>Optional[dict]</code></td>
+<td>
+<p>Additional or updated kwargs to be passed to the training
+and validation dataloaders (like, e.g., a collate_fn)</p>
+</td>
+<td><code>None</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Tuple[torch.utils.data.dataloader.DataLoader, torch.utils.data.dataloader.DataLoader]</code></td>
+<td>
+<p>Tuple of dataloaders for training and validation.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<details class="quote">
+<summary>Source code in <code>sbi/inference/snle/snle_a.py</code></summary>
+<table class="highlighttable">
+<tr>
+<td class="linenos">
+<div class="linenodiv">
+<pre><span></span>281
+282
+283
+284
+285
+286
+287
+288
+289
+290
+291
+292
+293
+294
+295
+296
+297
+298
+299
+300
+301
+302
+303
+304
+305
+306
+307
+308
+309
+310
+311
+312
+313
+314
+315
+316
+317
+318
+319
+320
+321
+322
+323
+324
+325
+326
+327
+328
+329
+330
+331
+332
+333
+334
+335
+336
+337
+338
+339
+340
+341
+342
+343
+344
+345
+346</pre>
+</div>
+</td>
+<td class="code">
+<div class="highlight">
+<pre><span></span><code><span class="k">def</span> <span class="nf">get_dataloaders</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span>
+    <span class="n">dataset</span><span class="p">:</span> <span class="n">data</span><span class="o">.</span><span class="n">TensorDataset</span><span class="p">,</span>
+    <span class="n">training_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">50</span><span class="p">,</span>
+    <span class="n">validation_fraction</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.1</span><span class="p">,</span>
+    <span class="n">resume_training</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">dataloader_kwargs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">data</span><span class="o">.</span><span class="n">DataLoader</span><span class="p">,</span> <span class="n">data</span><span class="o">.</span><span class="n">DataLoader</span><span class="p">]:</span>
+    <span class="sd">"""Return dataloaders for training and validation.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        dataset: holding all theta and x, optionally masks.</span>
+<span class="sd">        training_batch_size: training arg of inference methods.</span>
+<span class="sd">        resume_training: Whether the current call is resuming training so that no</span>
+<span class="sd">            new training and validation indices into the dataset have to be created.</span>
+<span class="sd">        dataloader_kwargs: Additional or updated kwargs to be passed to the training</span>
+<span class="sd">            and validation dataloaders (like, e.g., a collate_fn)</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Tuple of dataloaders for training and validation.</span>
+
+<span class="sd">    """</span>
+
+    <span class="c1"># Get total number of training examples.</span>
+    <span class="n">num_examples</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">dataset</span><span class="p">)</span>
+
+    <span class="c1"># Select random train and validation splits from (theta, x) pairs.</span>
+    <span class="n">num_training_examples</span> <span class="o">=</span> <span class="nb">int</span><span class="p">((</span><span class="mi">1</span> <span class="o">-</span> <span class="n">validation_fraction</span><span class="p">)</span> <span class="o">*</span> <span class="n">num_examples</span><span class="p">)</span>
+    <span class="n">num_validation_examples</span> <span class="o">=</span> <span class="n">num_examples</span> <span class="o">-</span> <span class="n">num_training_examples</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">resume_training</span><span class="p">:</span>
+        <span class="n">permuted_indices</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randperm</span><span class="p">(</span><span class="n">num_examples</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">train_indices</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">val_indices</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">permuted_indices</span><span class="p">[:</span><span class="n">num_training_examples</span><span class="p">],</span>
+            <span class="n">permuted_indices</span><span class="p">[</span><span class="n">num_training_examples</span><span class="p">:],</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Create training and validation loaders using a subset sampler.</span>
+    <span class="c1"># Intentionally use dicts to define the default dataloader args</span>
+    <span class="c1"># Then, use dataloader_kwargs to override (or add to) any of these defaults</span>
+    <span class="c1"># https://stackoverflow.com/questions/44784577/in-method-call-args-how-to-override-keyword-argument-of-unpacked-dict</span>
+    <span class="n">train_loader_kwargs</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"batch_size"</span><span class="p">:</span> <span class="nb">min</span><span class="p">(</span><span class="n">training_batch_size</span><span class="p">,</span> <span class="n">num_training_examples</span><span class="p">),</span>
+        <span class="s2">"drop_last"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="s2">"sampler"</span><span class="p">:</span> <span class="n">data</span><span class="o">.</span><span class="n">sampler</span><span class="o">.</span><span class="n">SubsetRandomSampler</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">train_indices</span><span class="p">),</span>
+    <span class="p">}</span>
+    <span class="n">train_loader_kwargs</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="nb">dict</span><span class="p">(</span><span class="n">train_loader_kwargs</span><span class="p">,</span> <span class="o">**</span><span class="n">dataloader_kwargs</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">dataloader_kwargs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="k">else</span> <span class="n">train_loader_kwargs</span>
+    <span class="p">)</span>
+    <span class="n">val_loader_kwargs</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"batch_size"</span><span class="p">:</span> <span class="nb">min</span><span class="p">(</span><span class="n">training_batch_size</span><span class="p">,</span> <span class="n">num_validation_examples</span><span class="p">),</span>
+        <span class="s2">"shuffle"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="s2">"drop_last"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="s2">"sampler"</span><span class="p">:</span> <span class="n">data</span><span class="o">.</span><span class="n">sampler</span><span class="o">.</span><span class="n">SubsetRandomSampler</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">val_indices</span><span class="p">),</span>
+    <span class="p">}</span>
+    <span class="n">val_loader_kwargs</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="nb">dict</span><span class="p">(</span><span class="n">val_loader_kwargs</span><span class="p">,</span> <span class="o">**</span><span class="n">dataloader_kwargs</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">dataloader_kwargs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="k">else</span> <span class="n">val_loader_kwargs</span>
+    <span class="p">)</span>
+    <span class="n">train_loader</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">DataLoader</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="o">**</span><span class="n">train_loader_kwargs</span><span class="p">)</span>
+    <span class="n">val_loader</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">DataLoader</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="o">**</span><span class="n">val_loader_kwargs</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">train_loader</span><span class="p">,</span> <span class="n">val_loader</span>
+</code></pre>
+</div>
+</td>
+</tr>
+</table>
+</details>
+</div>
+</div>
+<div class="doc doc-object doc-method">
 <h4 class="doc doc-heading" data-toc-label="get_simulations()" id="sbi.inference.snle.snle_a.SNLE_A.get_simulations">
 <code class="highlight language-python">
 get_simulations<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">starting_round</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">exclude_invalid_x</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">warn_on_invalid</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> </code>
@@ -3177,10 +3632,7 @@ found.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>217
-218
-219
-220
+<pre><span></span>220
 221
 222
 223
@@ -3219,7 +3671,10 @@ found.</p>
 256
 257
 258
-259</pre>
+259
+260
+261
+262</pre>
 </div>
 </td>
 <td class="code">
@@ -3337,10 +3792,7 @@ that the data came from the first round, i.e. the prior.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>183
-184
-185
-186
+<pre><span></span>186
 187
 188
 189
@@ -3369,7 +3821,10 @@ that the data came from the first round, i.e. the prior.</p>
 212
 213
 214
-215</pre>
+215
+216
+217
+218</pre>
 </div>
 </td>
 <td class="code">
@@ -3418,7 +3873,7 @@ that the data came from the first round, i.e. the prior.</p>
 <div class="doc doc-object doc-method">
 <h4 class="doc doc-heading" data-toc-label="train()" id="sbi.inference.snle.snle_a.SNLE_A.train">
 <code class="highlight language-python">
-train<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">training_batch_size</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.0005</span><span class="p">,</span> <span class="n">validation_fraction</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">stop_after_epochs</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">max_num_epochs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">clip_max_norm</span><span class="o">=</span><span class="mf">5.0</span><span class="p">,</span> <span class="n">exclude_invalid_x</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">resume_training</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">discard_prior_samples</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">retrain_from_scratch_each_round</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">show_train_summary</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> </code>
+train<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">training_batch_size</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.0005</span><span class="p">,</span> <span class="n">validation_fraction</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">stop_after_epochs</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">max_num_epochs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">clip_max_norm</span><span class="o">=</span><span class="mf">5.0</span><span class="p">,</span> <span class="n">exclude_invalid_x</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">resume_training</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">discard_prior_samples</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">retrain_from_scratch_each_round</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">show_train_summary</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">dataloader_kwargs</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> </code>
 </h4>
 <div class="doc doc-contents">
 <p>Return density estimator that approximates the distribution <span><span class="MathJax_Preview">p(x|\theta)</span><script type="math/tex">p(x|\theta)</script></span>.</p>
@@ -3533,6 +3988,15 @@ loss and leakage after the training.</p>
 </td>
 <td><code>False</code></td>
 </tr>
+<tr>
+<td><code>dataloader_kwargs</code></td>
+<td><code>Optional[Dict]</code></td>
+<td>
+<p>Additional or updated kwargs to be passed to the training
+and validation dataloaders (like, e.g., a collate_fn)</p>
+</td>
+<td><code>None</code></td>
+</tr>
 </tbody>
 </table>
 <p><strong>Returns:</strong></p>
@@ -3604,7 +4068,10 @@ loss and leakage after the training.</p>
 101
 102
 103
-104</pre>
+104
+105
+106
+107</pre>
 </div>
 </td>
 <td class="code">
@@ -3622,6 +4089,7 @@ loss and leakage after the training.</p>
     <span class="n">discard_prior_samples</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">retrain_from_scratch_each_round</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">show_train_summary</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">dataloader_kwargs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NeuralPosterior</span><span class="p">:</span>
     <span class="sa">r</span><span class="sd">"""</span>
 <span class="sd">    Return density estimator that approximates the distribution $p(x|\theta)$.</span>
@@ -3650,6 +4118,8 @@ loss and leakage after the training.</p>
 <span class="sd">            estimator for the posterior from scratch each round.</span>
 <span class="sd">        show_train_summary: Whether to print the number of epochs and validation</span>
 <span class="sd">            loss and leakage after the training.</span>
+<span class="sd">        dataloader_kwargs: Additional or updated kwargs to be passed to the training</span>
+<span class="sd">            and validation dataloaders (like, e.g., a collate_fn)</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        Density estimator that approximates the distribution $p(x|\theta)$.</span>
@@ -3945,7 +4415,8 @@ use these indices to find which training data stemmed from the prior.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span> 84
+<pre><span></span> 83
+ 84
  85
  86
  87
@@ -3977,8 +4448,7 @@ use these indices to find which training data stemmed from the prior.</p>
 113
 114
 115
-116
-117</pre>
+116</pre>
 </div>
 </td>
 <td class="code">
@@ -4009,7 +4479,7 @@ use these indices to find which training data stemmed from the prior.</p>
 <span class="sd">        NeuralInference object (returned so that this function is chainable).</span>
 <span class="sd">    """</span>
 
-    <span class="n">validate_theta_and_x</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
+    <span class="n">theta</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="n">validate_theta_and_x</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">training_device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">)</span>
 
     <span class="bp">self</span><span class="o">.</span><span class="n">_theta_roundwise</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_x_roundwise</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
@@ -4115,7 +4585,23 @@ to find init locations.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>283
+<pre><span></span>267
+268
+269
+270
+271
+272
+273
+274
+275
+276
+277
+278
+279
+280
+281
+282
+283
 284
 285
 286
@@ -4162,23 +4648,7 @@ to find init locations.</p>
 327
 328
 329
-330
-331
-332
-333
-334
-335
-336
-337
-338
-339
-340
-341
-342
-343
-344
-345
-346</pre>
+330</pre>
 </div>
 </td>
 <td class="code">
@@ -4256,6 +4726,230 @@ to find init locations.</p>
 </div>
 </div>
 <div class="doc doc-object doc-method">
+<h4 class="doc doc-heading" data-toc-label="get_dataloaders()" id="sbi.inference.snre.snre_a.SNRE_A.get_dataloaders">
+<code class="highlight language-python">
+get_dataloaders<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dataset</span><span class="p">,</span> <span class="n">training_batch_size</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">validation_fraction</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">resume_training</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">dataloader_kwargs</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> </code>
+<span class="doc doc-properties">
+<small class="doc doc-property doc-property-inherited"><code>inherited</code></small>
+</span>
+</h4>
+<div class="doc doc-contents">
+<p>Return dataloaders for training and validation.</p>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>dataset</code></td>
+<td><code>TensorDataset</code></td>
+<td>
+<p>holding all theta and x, optionally masks.</p>
+</td>
+<td><em>required</em></td>
+</tr>
+<tr>
+<td><code>training_batch_size</code></td>
+<td><code>int</code></td>
+<td>
+<p>training arg of inference methods.</p>
+</td>
+<td><code>50</code></td>
+</tr>
+<tr>
+<td><code>resume_training</code></td>
+<td><code>bool</code></td>
+<td>
+<p>Whether the current call is resuming training so that no
+new training and validation indices into the dataset have to be created.</p>
+</td>
+<td><code>False</code></td>
+</tr>
+<tr>
+<td><code>dataloader_kwargs</code></td>
+<td><code>Optional[dict]</code></td>
+<td>
+<p>Additional or updated kwargs to be passed to the training
+and validation dataloaders (like, e.g., a collate_fn)</p>
+</td>
+<td><code>None</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Tuple[torch.utils.data.dataloader.DataLoader, torch.utils.data.dataloader.DataLoader]</code></td>
+<td>
+<p>Tuple of dataloaders for training and validation.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<details class="quote">
+<summary>Source code in <code>sbi/inference/snre/snre_a.py</code></summary>
+<table class="highlighttable">
+<tr>
+<td class="linenos">
+<div class="linenodiv">
+<pre><span></span>281
+282
+283
+284
+285
+286
+287
+288
+289
+290
+291
+292
+293
+294
+295
+296
+297
+298
+299
+300
+301
+302
+303
+304
+305
+306
+307
+308
+309
+310
+311
+312
+313
+314
+315
+316
+317
+318
+319
+320
+321
+322
+323
+324
+325
+326
+327
+328
+329
+330
+331
+332
+333
+334
+335
+336
+337
+338
+339
+340
+341
+342
+343
+344
+345
+346</pre>
+</div>
+</td>
+<td class="code">
+<div class="highlight">
+<pre><span></span><code><span class="k">def</span> <span class="nf">get_dataloaders</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span>
+    <span class="n">dataset</span><span class="p">:</span> <span class="n">data</span><span class="o">.</span><span class="n">TensorDataset</span><span class="p">,</span>
+    <span class="n">training_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">50</span><span class="p">,</span>
+    <span class="n">validation_fraction</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.1</span><span class="p">,</span>
+    <span class="n">resume_training</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">dataloader_kwargs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">data</span><span class="o">.</span><span class="n">DataLoader</span><span class="p">,</span> <span class="n">data</span><span class="o">.</span><span class="n">DataLoader</span><span class="p">]:</span>
+    <span class="sd">"""Return dataloaders for training and validation.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        dataset: holding all theta and x, optionally masks.</span>
+<span class="sd">        training_batch_size: training arg of inference methods.</span>
+<span class="sd">        resume_training: Whether the current call is resuming training so that no</span>
+<span class="sd">            new training and validation indices into the dataset have to be created.</span>
+<span class="sd">        dataloader_kwargs: Additional or updated kwargs to be passed to the training</span>
+<span class="sd">            and validation dataloaders (like, e.g., a collate_fn)</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Tuple of dataloaders for training and validation.</span>
+
+<span class="sd">    """</span>
+
+    <span class="c1"># Get total number of training examples.</span>
+    <span class="n">num_examples</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">dataset</span><span class="p">)</span>
+
+    <span class="c1"># Select random train and validation splits from (theta, x) pairs.</span>
+    <span class="n">num_training_examples</span> <span class="o">=</span> <span class="nb">int</span><span class="p">((</span><span class="mi">1</span> <span class="o">-</span> <span class="n">validation_fraction</span><span class="p">)</span> <span class="o">*</span> <span class="n">num_examples</span><span class="p">)</span>
+    <span class="n">num_validation_examples</span> <span class="o">=</span> <span class="n">num_examples</span> <span class="o">-</span> <span class="n">num_training_examples</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">resume_training</span><span class="p">:</span>
+        <span class="n">permuted_indices</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randperm</span><span class="p">(</span><span class="n">num_examples</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">train_indices</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">val_indices</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">permuted_indices</span><span class="p">[:</span><span class="n">num_training_examples</span><span class="p">],</span>
+            <span class="n">permuted_indices</span><span class="p">[</span><span class="n">num_training_examples</span><span class="p">:],</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Create training and validation loaders using a subset sampler.</span>
+    <span class="c1"># Intentionally use dicts to define the default dataloader args</span>
+    <span class="c1"># Then, use dataloader_kwargs to override (or add to) any of these defaults</span>
+    <span class="c1"># https://stackoverflow.com/questions/44784577/in-method-call-args-how-to-override-keyword-argument-of-unpacked-dict</span>
+    <span class="n">train_loader_kwargs</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"batch_size"</span><span class="p">:</span> <span class="nb">min</span><span class="p">(</span><span class="n">training_batch_size</span><span class="p">,</span> <span class="n">num_training_examples</span><span class="p">),</span>
+        <span class="s2">"drop_last"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="s2">"sampler"</span><span class="p">:</span> <span class="n">data</span><span class="o">.</span><span class="n">sampler</span><span class="o">.</span><span class="n">SubsetRandomSampler</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">train_indices</span><span class="p">),</span>
+    <span class="p">}</span>
+    <span class="n">train_loader_kwargs</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="nb">dict</span><span class="p">(</span><span class="n">train_loader_kwargs</span><span class="p">,</span> <span class="o">**</span><span class="n">dataloader_kwargs</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">dataloader_kwargs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="k">else</span> <span class="n">train_loader_kwargs</span>
+    <span class="p">)</span>
+    <span class="n">val_loader_kwargs</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"batch_size"</span><span class="p">:</span> <span class="nb">min</span><span class="p">(</span><span class="n">training_batch_size</span><span class="p">,</span> <span class="n">num_validation_examples</span><span class="p">),</span>
+        <span class="s2">"shuffle"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="s2">"drop_last"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="s2">"sampler"</span><span class="p">:</span> <span class="n">data</span><span class="o">.</span><span class="n">sampler</span><span class="o">.</span><span class="n">SubsetRandomSampler</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">val_indices</span><span class="p">),</span>
+    <span class="p">}</span>
+    <span class="n">val_loader_kwargs</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="nb">dict</span><span class="p">(</span><span class="n">val_loader_kwargs</span><span class="p">,</span> <span class="o">**</span><span class="n">dataloader_kwargs</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">dataloader_kwargs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="k">else</span> <span class="n">val_loader_kwargs</span>
+    <span class="p">)</span>
+    <span class="n">train_loader</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">DataLoader</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="o">**</span><span class="n">train_loader_kwargs</span><span class="p">)</span>
+    <span class="n">val_loader</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">DataLoader</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="o">**</span><span class="n">val_loader_kwargs</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">train_loader</span><span class="p">,</span> <span class="n">val_loader</span>
+</code></pre>
+</div>
+</td>
+</tr>
+</table>
+</details>
+</div>
+</div>
+<div class="doc doc-object doc-method">
 <h4 class="doc doc-heading" data-toc-label="get_simulations()" id="sbi.inference.snre.snre_a.SNRE_A.get_simulations">
 <code class="highlight language-python">
 get_simulations<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">starting_round</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">exclude_invalid_x</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">warn_on_invalid</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> </code>
@@ -4313,10 +5007,7 @@ found.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>217
-218
-219
-220
+<pre><span></span>220
 221
 222
 223
@@ -4355,7 +5046,10 @@ found.</p>
 256
 257
 258
-259</pre>
+259
+260
+261
+262</pre>
 </div>
 </td>
 <td class="code">
@@ -4473,10 +5167,7 @@ that the data came from the first round, i.e. the prior.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>183
-184
-185
-186
+<pre><span></span>186
 187
 188
 189
@@ -4505,7 +5196,10 @@ that the data came from the first round, i.e. the prior.</p>
 212
 213
 214
-215</pre>
+215
+216
+217
+218</pre>
 </div>
 </td>
 <td class="code">
@@ -4554,7 +5248,7 @@ that the data came from the first round, i.e. the prior.</p>
 <div class="doc doc-object doc-method">
 <h4 class="doc doc-heading" data-toc-label="train()" id="sbi.inference.snre.snre_a.SNRE_A.train">
 <code class="highlight language-python">
-train<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">training_batch_size</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.0005</span><span class="p">,</span> <span class="n">validation_fraction</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">stop_after_epochs</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">max_num_epochs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">clip_max_norm</span><span class="o">=</span><span class="mf">5.0</span><span class="p">,</span> <span class="n">exclude_invalid_x</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">resume_training</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">discard_prior_samples</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">retrain_from_scratch_each_round</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">show_train_summary</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> </code>
+train<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">training_batch_size</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.0005</span><span class="p">,</span> <span class="n">validation_fraction</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">stop_after_epochs</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">max_num_epochs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">clip_max_norm</span><span class="o">=</span><span class="mf">5.0</span><span class="p">,</span> <span class="n">exclude_invalid_x</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">resume_training</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">discard_prior_samples</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">retrain_from_scratch_each_round</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">show_train_summary</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">dataloader_kwargs</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> </code>
 </h4>
 <div class="doc doc-contents">
 <p>Return classifier that approximates the ratio <span><span class="MathJax_Preview">p(\theta,x)/p(\theta)p(x)</span><script type="math/tex">p(\theta,x)/p(\theta)p(x)</script></span>.</p>
@@ -4669,6 +5363,15 @@ loss and leakage after the training.</p>
 </td>
 <td><code>False</code></td>
 </tr>
+<tr>
+<td><code>dataloader_kwargs</code></td>
+<td><code>Optional[Dict]</code></td>
+<td>
+<p>Additional or updated kwargs to be passed to the training
+and validation dataloaders (like, e.g., a collate_fn)</p>
+</td>
+<td><code>None</code></td>
+</tr>
 </tbody>
 </table>
 <p><strong>Returns:</strong></p>
@@ -4743,7 +5446,10 @@ loss and leakage after the training.</p>
 101
 102
 103
-104</pre>
+104
+105
+106
+107</pre>
 </div>
 </td>
 <td class="code">
@@ -4761,6 +5467,7 @@ loss and leakage after the training.</p>
     <span class="n">discard_prior_samples</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">retrain_from_scratch_each_round</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">show_train_summary</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">dataloader_kwargs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NeuralPosterior</span><span class="p">:</span>
     <span class="sa">r</span><span class="sd">"""</span>
 <span class="sd">    Return classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.</span>
@@ -4789,6 +5496,8 @@ loss and leakage after the training.</p>
 <span class="sd">            estimator for the posterior from scratch each round.</span>
 <span class="sd">        show_train_summary: Whether to print the number of epochs and validation</span>
 <span class="sd">            loss and leakage after the training.</span>
+<span class="sd">        dataloader_kwargs: Additional or updated kwargs to be passed to the training</span>
+<span class="sd">            and validation dataloaders (like, e.g., a collate_fn)</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        Classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.</span>
@@ -5087,7 +5796,8 @@ use these indices to find which training data stemmed from the prior.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span> 84
+<pre><span></span> 83
+ 84
  85
  86
  87
@@ -5119,8 +5829,7 @@ use these indices to find which training data stemmed from the prior.</p>
 113
 114
 115
-116
-117</pre>
+116</pre>
 </div>
 </td>
 <td class="code">
@@ -5151,7 +5860,7 @@ use these indices to find which training data stemmed from the prior.</p>
 <span class="sd">        NeuralInference object (returned so that this function is chainable).</span>
 <span class="sd">    """</span>
 
-    <span class="n">validate_theta_and_x</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
+    <span class="n">theta</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="n">validate_theta_and_x</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">training_device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">)</span>
 
     <span class="bp">self</span><span class="o">.</span><span class="n">_theta_roundwise</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_x_roundwise</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
@@ -5257,7 +5966,23 @@ to find init locations.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>283
+<pre><span></span>267
+268
+269
+270
+271
+272
+273
+274
+275
+276
+277
+278
+279
+280
+281
+282
+283
 284
 285
 286
@@ -5304,23 +6029,7 @@ to find init locations.</p>
 327
 328
 329
-330
-331
-332
-333
-334
-335
-336
-337
-338
-339
-340
-341
-342
-343
-344
-345
-346</pre>
+330</pre>
 </div>
 </td>
 <td class="code">
@@ -5398,6 +6107,230 @@ to find init locations.</p>
 </div>
 </div>
 <div class="doc doc-object doc-method">
+<h4 class="doc doc-heading" data-toc-label="get_dataloaders()" id="sbi.inference.snre.snre_b.SNRE_B.get_dataloaders">
+<code class="highlight language-python">
+get_dataloaders<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dataset</span><span class="p">,</span> <span class="n">training_batch_size</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">validation_fraction</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">resume_training</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">dataloader_kwargs</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> </code>
+<span class="doc doc-properties">
+<small class="doc doc-property doc-property-inherited"><code>inherited</code></small>
+</span>
+</h4>
+<div class="doc doc-contents">
+<p>Return dataloaders for training and validation.</p>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>dataset</code></td>
+<td><code>TensorDataset</code></td>
+<td>
+<p>holding all theta and x, optionally masks.</p>
+</td>
+<td><em>required</em></td>
+</tr>
+<tr>
+<td><code>training_batch_size</code></td>
+<td><code>int</code></td>
+<td>
+<p>training arg of inference methods.</p>
+</td>
+<td><code>50</code></td>
+</tr>
+<tr>
+<td><code>resume_training</code></td>
+<td><code>bool</code></td>
+<td>
+<p>Whether the current call is resuming training so that no
+new training and validation indices into the dataset have to be created.</p>
+</td>
+<td><code>False</code></td>
+</tr>
+<tr>
+<td><code>dataloader_kwargs</code></td>
+<td><code>Optional[dict]</code></td>
+<td>
+<p>Additional or updated kwargs to be passed to the training
+and validation dataloaders (like, e.g., a collate_fn)</p>
+</td>
+<td><code>None</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Tuple[torch.utils.data.dataloader.DataLoader, torch.utils.data.dataloader.DataLoader]</code></td>
+<td>
+<p>Tuple of dataloaders for training and validation.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<details class="quote">
+<summary>Source code in <code>sbi/inference/snre/snre_b.py</code></summary>
+<table class="highlighttable">
+<tr>
+<td class="linenos">
+<div class="linenodiv">
+<pre><span></span>281
+282
+283
+284
+285
+286
+287
+288
+289
+290
+291
+292
+293
+294
+295
+296
+297
+298
+299
+300
+301
+302
+303
+304
+305
+306
+307
+308
+309
+310
+311
+312
+313
+314
+315
+316
+317
+318
+319
+320
+321
+322
+323
+324
+325
+326
+327
+328
+329
+330
+331
+332
+333
+334
+335
+336
+337
+338
+339
+340
+341
+342
+343
+344
+345
+346</pre>
+</div>
+</td>
+<td class="code">
+<div class="highlight">
+<pre><span></span><code><span class="k">def</span> <span class="nf">get_dataloaders</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span>
+    <span class="n">dataset</span><span class="p">:</span> <span class="n">data</span><span class="o">.</span><span class="n">TensorDataset</span><span class="p">,</span>
+    <span class="n">training_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">50</span><span class="p">,</span>
+    <span class="n">validation_fraction</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.1</span><span class="p">,</span>
+    <span class="n">resume_training</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">dataloader_kwargs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">data</span><span class="o">.</span><span class="n">DataLoader</span><span class="p">,</span> <span class="n">data</span><span class="o">.</span><span class="n">DataLoader</span><span class="p">]:</span>
+    <span class="sd">"""Return dataloaders for training and validation.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        dataset: holding all theta and x, optionally masks.</span>
+<span class="sd">        training_batch_size: training arg of inference methods.</span>
+<span class="sd">        resume_training: Whether the current call is resuming training so that no</span>
+<span class="sd">            new training and validation indices into the dataset have to be created.</span>
+<span class="sd">        dataloader_kwargs: Additional or updated kwargs to be passed to the training</span>
+<span class="sd">            and validation dataloaders (like, e.g., a collate_fn)</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Tuple of dataloaders for training and validation.</span>
+
+<span class="sd">    """</span>
+
+    <span class="c1"># Get total number of training examples.</span>
+    <span class="n">num_examples</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">dataset</span><span class="p">)</span>
+
+    <span class="c1"># Select random train and validation splits from (theta, x) pairs.</span>
+    <span class="n">num_training_examples</span> <span class="o">=</span> <span class="nb">int</span><span class="p">((</span><span class="mi">1</span> <span class="o">-</span> <span class="n">validation_fraction</span><span class="p">)</span> <span class="o">*</span> <span class="n">num_examples</span><span class="p">)</span>
+    <span class="n">num_validation_examples</span> <span class="o">=</span> <span class="n">num_examples</span> <span class="o">-</span> <span class="n">num_training_examples</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">resume_training</span><span class="p">:</span>
+        <span class="n">permuted_indices</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randperm</span><span class="p">(</span><span class="n">num_examples</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">train_indices</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">val_indices</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">permuted_indices</span><span class="p">[:</span><span class="n">num_training_examples</span><span class="p">],</span>
+            <span class="n">permuted_indices</span><span class="p">[</span><span class="n">num_training_examples</span><span class="p">:],</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Create training and validation loaders using a subset sampler.</span>
+    <span class="c1"># Intentionally use dicts to define the default dataloader args</span>
+    <span class="c1"># Then, use dataloader_kwargs to override (or add to) any of these defaults</span>
+    <span class="c1"># https://stackoverflow.com/questions/44784577/in-method-call-args-how-to-override-keyword-argument-of-unpacked-dict</span>
+    <span class="n">train_loader_kwargs</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"batch_size"</span><span class="p">:</span> <span class="nb">min</span><span class="p">(</span><span class="n">training_batch_size</span><span class="p">,</span> <span class="n">num_training_examples</span><span class="p">),</span>
+        <span class="s2">"drop_last"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="s2">"sampler"</span><span class="p">:</span> <span class="n">data</span><span class="o">.</span><span class="n">sampler</span><span class="o">.</span><span class="n">SubsetRandomSampler</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">train_indices</span><span class="p">),</span>
+    <span class="p">}</span>
+    <span class="n">train_loader_kwargs</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="nb">dict</span><span class="p">(</span><span class="n">train_loader_kwargs</span><span class="p">,</span> <span class="o">**</span><span class="n">dataloader_kwargs</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">dataloader_kwargs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="k">else</span> <span class="n">train_loader_kwargs</span>
+    <span class="p">)</span>
+    <span class="n">val_loader_kwargs</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"batch_size"</span><span class="p">:</span> <span class="nb">min</span><span class="p">(</span><span class="n">training_batch_size</span><span class="p">,</span> <span class="n">num_validation_examples</span><span class="p">),</span>
+        <span class="s2">"shuffle"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="s2">"drop_last"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="s2">"sampler"</span><span class="p">:</span> <span class="n">data</span><span class="o">.</span><span class="n">sampler</span><span class="o">.</span><span class="n">SubsetRandomSampler</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">val_indices</span><span class="p">),</span>
+    <span class="p">}</span>
+    <span class="n">val_loader_kwargs</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="nb">dict</span><span class="p">(</span><span class="n">val_loader_kwargs</span><span class="p">,</span> <span class="o">**</span><span class="n">dataloader_kwargs</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">dataloader_kwargs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="k">else</span> <span class="n">val_loader_kwargs</span>
+    <span class="p">)</span>
+    <span class="n">train_loader</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">DataLoader</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="o">**</span><span class="n">train_loader_kwargs</span><span class="p">)</span>
+    <span class="n">val_loader</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">DataLoader</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="o">**</span><span class="n">val_loader_kwargs</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">train_loader</span><span class="p">,</span> <span class="n">val_loader</span>
+</code></pre>
+</div>
+</td>
+</tr>
+</table>
+</details>
+</div>
+</div>
+<div class="doc doc-object doc-method">
 <h4 class="doc doc-heading" data-toc-label="get_simulations()" id="sbi.inference.snre.snre_b.SNRE_B.get_simulations">
 <code class="highlight language-python">
 get_simulations<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">starting_round</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">exclude_invalid_x</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">warn_on_invalid</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> </code>
@@ -5455,10 +6388,7 @@ found.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>217
-218
-219
-220
+<pre><span></span>220
 221
 222
 223
@@ -5497,7 +6427,10 @@ found.</p>
 256
 257
 258
-259</pre>
+259
+260
+261
+262</pre>
 </div>
 </td>
 <td class="code">
@@ -5615,10 +6548,7 @@ that the data came from the first round, i.e. the prior.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>183
-184
-185
-186
+<pre><span></span>186
 187
 188
 189
@@ -5647,7 +6577,10 @@ that the data came from the first round, i.e. the prior.</p>
 212
 213
 214
-215</pre>
+215
+216
+217
+218</pre>
 </div>
 </td>
 <td class="code">
@@ -5696,7 +6629,7 @@ that the data came from the first round, i.e. the prior.</p>
 <div class="doc doc-object doc-method">
 <h4 class="doc doc-heading" data-toc-label="train()" id="sbi.inference.snre.snre_b.SNRE_B.train">
 <code class="highlight language-python">
-train<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">num_atoms</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">training_batch_size</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.0005</span><span class="p">,</span> <span class="n">validation_fraction</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">stop_after_epochs</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">max_num_epochs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">clip_max_norm</span><span class="o">=</span><span class="mf">5.0</span><span class="p">,</span> <span class="n">exclude_invalid_x</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">resume_training</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">discard_prior_samples</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">retrain_from_scratch_each_round</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">show_train_summary</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> </code>
+train<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">num_atoms</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">training_batch_size</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.0005</span><span class="p">,</span> <span class="n">validation_fraction</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">stop_after_epochs</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">max_num_epochs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">clip_max_norm</span><span class="o">=</span><span class="mf">5.0</span><span class="p">,</span> <span class="n">exclude_invalid_x</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">resume_training</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">discard_prior_samples</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">retrain_from_scratch_each_round</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">show_train_summary</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">dataloader_kwargs</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> </code>
 </h4>
 <div class="doc doc-contents">
 <p>Return classifier that approximates the ratio <span><span class="MathJax_Preview">p(\theta,x)/p(\theta)p(x)</span><script type="math/tex">p(\theta,x)/p(\theta)p(x)</script></span>.</p>
@@ -5819,6 +6752,15 @@ loss and leakage after the training.</p>
 </td>
 <td><code>False</code></td>
 </tr>
+<tr>
+<td><code>dataloader_kwargs</code></td>
+<td><code>Optional[Dict]</code></td>
+<td>
+<p>Additional or updated kwargs to be passed to the training
+and validation dataloaders (like, e.g., a collate_fn)</p>
+</td>
+<td><code>None</code></td>
+</tr>
 </tbody>
 </table>
 <p><strong>Returns:</strong></p>
@@ -5892,7 +6834,10 @@ loss and leakage after the training.</p>
 100
 101
 102
-103</pre>
+103
+104
+105
+106</pre>
 </div>
 </td>
 <td class="code">
@@ -5911,6 +6856,7 @@ loss and leakage after the training.</p>
     <span class="n">discard_prior_samples</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">retrain_from_scratch_each_round</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">show_train_summary</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">dataloader_kwargs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NeuralPosterior</span><span class="p">:</span>
     <span class="sa">r</span><span class="sd">"""</span>
 <span class="sd">    Return classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.</span>
@@ -5940,6 +6886,8 @@ loss and leakage after the training.</p>
 <span class="sd">            estimator for the posterior from scratch each round.</span>
 <span class="sd">        show_train_summary: Whether to print the number of epochs and validation</span>
 <span class="sd">            loss and leakage after the training.</span>
+<span class="sd">        dataloader_kwargs: Additional or updated kwargs to be passed to the training</span>
+<span class="sd">            and validation dataloaders (like, e.g., a collate_fn)</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        Classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.</span>
@@ -6261,7 +7209,7 @@ distances: Tensor of distances of the selected parameters.</p>
     <span class="k">if</span> <span class="n">sass</span><span class="p">:</span>
         <span class="n">num_pilot_simulations</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">sass_fraction</span> <span class="o">*</span> <span class="n">num_simulations</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">"Running SASS with </span><span class="si">{</span><span class="n">num_pilot_simulations</span><span class="si">}</span><span class="s2"> pilot samples."</span>
+            <span class="sa">f</span><span class="s2">"Running SASS with </span><span class="si">{num_pilot_simulations}</span><span class="s2"> pilot samples."</span>
         <span class="p">)</span>
         <span class="n">num_simulations</span> <span class="o">-=</span> <span class="n">num_pilot_simulations</span>
 
@@ -6291,7 +7239,7 @@ distances: Tensor of distances of the selected parameters.</p>
     <span class="k">if</span> <span class="n">eps</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">is_accepted</span> <span class="o">=</span> <span class="n">distances</span> <span class="o">&lt;</span> <span class="n">eps</span>
         <span class="n">num_accepted</span> <span class="o">=</span> <span class="n">is_accepted</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
-        <span class="k">assert</span> <span class="n">num_accepted</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"No parameters accepted, eps=</span><span class="si">{</span><span class="n">eps</span><span class="si">}</span><span class="s2"> too small"</span>
+        <span class="k">assert</span> <span class="n">num_accepted</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"No parameters accepted, eps=</span><span class="si">{eps}</span><span class="s2"> too small"</span>
 
         <span class="n">theta_accepted</span> <span class="o">=</span> <span class="n">theta</span><span class="p">[</span><span class="n">is_accepted</span><span class="p">]</span>
         <span class="n">distances_accepted</span> <span class="o">=</span> <span class="n">distances</span><span class="p">[</span><span class="n">is_accepted</span><span class="p">]</span>
@@ -7217,7 +8165,7 @@ summary (optional): A dictionary containing particles, weights, epsilons
     <span class="k">if</span> <span class="n">sass</span><span class="p">:</span>
         <span class="n">num_pilot_simulations</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">sass_fraction</span> <span class="o">*</span> <span class="n">num_simulations</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">"Running SASS with </span><span class="si">{</span><span class="n">num_pilot_simulations</span><span class="si">}</span><span class="s2"> pilot samples."</span>
+            <span class="sa">f</span><span class="s2">"Running SASS with </span><span class="si">{num_pilot_simulations}</span><span class="s2"> pilot samples."</span>
         <span class="p">)</span>
         <span class="n">sass_transform</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">run_sass_set_xo</span><span class="p">(</span>
             <span class="n">num_particles</span><span class="p">,</span> <span class="n">num_pilot_simulations</span><span class="p">,</span> <span class="n">x_o</span><span class="p">,</span> <span class="n">lra</span><span class="p">,</span> <span class="n">sass_expansion_degree</span>
@@ -7239,8 +8187,8 @@ summary (optional): A dictionary containing particles, weights, epsilons
 
     <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
         <span class="p">(</span>
-            <span class="sa">f</span><span class="s2">"population=</span><span class="si">{</span><span class="n">pop_idx</span><span class="si">}</span><span class="s2">, eps=</span><span class="si">{</span><span class="n">epsilon</span><span class="si">}</span><span class="s2">, ess=</span><span class="si">{</span><span class="mf">1.0</span><span class="si">}</span><span class="s2">, "</span>
-            <span class="sa">f</span><span class="s2">"num_sims=</span><span class="si">{</span><span class="n">num_initial_pop</span><span class="si">}</span><span class="s2">"</span>
+            <span class="sa">f</span><span class="s2">"population=</span><span class="si">{pop_idx}</span><span class="s2">, eps=</span><span class="si">{epsilon}</span><span class="s2">, ess=</span><span class="si">{1.0}</span><span class="s2">, "</span>
+            <span class="sa">f</span><span class="s2">"num_sims=</span><span class="si">{num_initial_pop}</span><span class="s2">"</span>
         <span class="p">)</span>
     <span class="p">)</span>
 
@@ -7286,8 +8234,8 @@ summary (optional): A dictionary containing particles, weights, epsilons
 
         <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
             <span class="p">(</span>
-                <span class="sa">f</span><span class="s2">"population=</span><span class="si">{</span><span class="n">pop_idx</span><span class="si">}</span><span class="s2"> done: eps=</span><span class="si">{</span><span class="n">epsilon</span><span class="si">:</span><span class="s2">.6f</span><span class="si">}</span><span class="s2">,"</span>
-                <span class="sa">f</span><span class="s2">" num_sims=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">simulation_counter</span><span class="si">}</span><span class="s2">."</span>
+                <span class="sa">f</span><span class="s2">"population=</span><span class="si">{pop_idx}</span><span class="s2"> done: eps=</span><span class="si">{epsilon:.6f}</span><span class="s2">,"</span>
+                <span class="sa">f</span><span class="s2">" num_sims=</span><span class="si">{self.simulation_counter}</span><span class="s2">."</span>
             <span class="p">)</span>
         <span class="p">)</span>
 
@@ -7590,12 +8538,12 @@ sampling.</p>
     <span class="n">kernels</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"gaussian"</span><span class="p">,</span> <span class="s2">"uniform"</span><span class="p">)</span>
     <span class="k">assert</span> <span class="p">(</span>
         <span class="n">kernel</span> <span class="ow">in</span> <span class="n">kernels</span>
-    <span class="p">),</span> <span class="sa">f</span><span class="s2">"Kernel '</span><span class="si">{</span><span class="n">kernel</span><span class="si">}</span><span class="s2">' not supported. Choose one from </span><span class="si">{</span><span class="n">kernels</span><span class="si">}</span><span class="s2">."</span>
+    <span class="p">),</span> <span class="sa">f</span><span class="s2">"Kernel '</span><span class="si">{kernel}</span><span class="s2">' not supported. Choose one from </span><span class="si">{kernels}</span><span class="s2">."</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">kernel</span> <span class="o">=</span> <span class="n">kernel</span>
 
     <span class="n">algorithm_variants</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"A"</span><span class="p">,</span> <span class="s2">"B"</span><span class="p">,</span> <span class="s2">"C"</span><span class="p">)</span>
     <span class="k">assert</span> <span class="n">algorithm_variant</span> <span class="ow">in</span> <span class="n">algorithm_variants</span><span class="p">,</span> <span class="p">(</span>
-        <span class="sa">f</span><span class="s2">"SMCABC variant '</span><span class="si">{</span><span class="n">algorithm_variant</span><span class="si">}</span><span class="s2">' not supported, choose one from"</span>
+        <span class="sa">f</span><span class="s2">"SMCABC variant '</span><span class="si">{algorithm_variant}</span><span class="s2">' not supported, choose one from"</span>
         <span class="s2">" </span><span class="si">{algorithm_variants}</span><span class="s2">."</span>
     <span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">algorithm_variant</span> <span class="o">=</span> <span class="n">algorithm_variant</span>
@@ -7751,7 +8699,7 @@ get_new_kernel<span class="p">(</span><span class="bp">self</span><span class="p
         <span class="c1"># parameter dimension.</span>
         <span class="k">return</span> <span class="n">Uniform</span><span class="p">(</span><span class="n">low</span><span class="o">=</span><span class="n">low</span><span class="p">,</span> <span class="n">high</span><span class="o">=</span><span class="n">high</span><span class="p">)</span><span class="o">.</span><span class="n">to_event</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Kernel, '</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">kernel</span><span class="si">}</span><span class="s2">' not supported."</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Kernel, '</span><span class="si">{self.kernel}</span><span class="s2">' not supported."</span><span class="p">)</span>
 </code></pre>
 </div>
 </td>
@@ -7979,7 +8927,7 @@ too small.</p>
     <span class="n">ess</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">/</span> <span class="n">torch</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="mf">2.0</span> <span class="o">*</span> <span class="n">log_weights</span><span class="p">),</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">))</span> <span class="o">/</span> <span class="n">num_particles</span>
     <span class="c1"># Resampling of weights for low ESS only for Sisson et al. 2007.</span>
     <span class="k">if</span> <span class="n">ess</span> <span class="o">&lt;</span> <span class="n">ess_min</span><span class="p">:</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">"ESS=</span><span class="si">{</span><span class="n">ess</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> too low, resampling pop </span><span class="si">{</span><span class="n">pop_idx</span><span class="si">}</span><span class="s2">..."</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">"ESS=</span><span class="si">{ess:.2f}</span><span class="s2"> too low, resampling pop </span><span class="si">{pop_idx}</span><span class="s2">..."</span><span class="p">)</span>
         <span class="c1"># First resample, then set to uniform weights as in Sisson et al. 2007.</span>
         <span class="n">particles</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_from_population_with_weights</span><span class="p">(</span>
             <span class="n">particles</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">log_weights</span><span class="p">),</span> <span class="n">num_samples</span><span class="o">=</span><span class="n">num_particles</span>
@@ -8316,27 +9264,27 @@ sample_from_population_with_weights<span class="p">(</span><span class="n">parti
 <a class="headerlink" href="#sbi.inference.posteriors.direct_posterior.DirectPosterior" title="Permanent link">¶</a></h3>
 <div class="doc doc-contents first">
 <p>Posterior <span><span class="MathJax_Preview">p(\theta|x)</span><script type="math/tex">p(\theta|x)</script></span> with <code>log_prob()</code> and <code>sample()</code> methods, obtained with
-    SNPE.<br/>
+SNPE.<br/>
 <br/>
 
-    SNPE trains a neural network to directly approximate the posterior distribution.
-    However, for bounded priors, the neural network can have leakage: it puts non-zero
-    mass in regions where the prior is zero. The <code>DirectPosterior</code> class wraps the
-    trained network to deal with these cases.<br/>
+SNPE trains a neural network to directly approximate the posterior distribution.
+However, for bounded priors, the neural network can have leakage: it puts non-zero
+mass in regions where the prior is zero. The <code>DirectPosterior</code> class wraps the
+trained network to deal with these cases.<br/>
 <br/>
 
-    Specifically, this class offers the following functionality:<br/>
+Specifically, this class offers the following functionality:<br/>
 
-    - correct the calculation of the log probability such that it compensates for the
-      leakage.<br/>
+- correct the calculation of the log probability such that it compensates for the
+  leakage.<br/>
 
-    - reject samples that lie outside of the prior bounds.<br/>
+- reject samples that lie outside of the prior bounds.<br/>
 
-    - alternatively, if leakage is very high (which can happen for multi-round SNPE),
-      sample from the posterior with MCMC.<br/>
+- alternatively, if leakage is very high (which can happen for multi-round SNPE),
+  sample from the posterior with MCMC.<br/>
 <br/>
 
-    The neural network itself can be accessed via the <code>.net</code> attribute.</p>
+The neural network itself can be accessed via the <code>.net</code> attribute.</p>
 <div class="doc doc-children">
 <div class="doc doc-object doc-attribute">
 <h4 class="doc doc-heading" data-toc-label="default_x" id="sbi.inference.posteriors.direct_posterior.DirectPosterior.default_x">
@@ -8522,8 +9470,7 @@ locations.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>37
-38
+<pre><span></span>38
 39
 40
 41
@@ -8579,7 +9526,8 @@ locations.</p>
 91
 92
 93
-94</pre>
+94
+95</pre>
 </div>
 </td>
 <td class="code">
@@ -8711,12 +9659,7 @@ This makes the call chainable:
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>205
-206
-207
-208
-209
-210
+<pre><span></span>210
 211
 212
 213
@@ -8746,7 +9689,12 @@ This makes the call chainable:
 237
 238
 239
-240</pre>
+240
+241
+242
+243
+244
+245</pre>
 </div>
 </td>
 <td class="code">
@@ -8886,21 +9834,7 @@ enforce a new leakage estimate for rounds after the first (2, 3,..).</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>215
-216
-217
-218
-219
-220
-221
-222
-223
-224
-225
-226
-227
-228
-229
+<pre><span></span>229
 230
 231
 232
@@ -8941,7 +9875,21 @@ enforce a new leakage estimate for rounds after the first (2, 3,..).</p>
 267
 268
 269
-270</pre>
+270
+271
+272
+273
+274
+275
+276
+277
+278
+279
+280
+281
+282
+283
+284</pre>
 </div>
 </td>
 <td class="code">
@@ -9013,7 +9961,7 @@ enforce a new leakage estimate for rounds after the first (2, 3,..).</p>
 <div class="doc doc-object doc-method">
 <h4 class="doc doc-heading" data-toc-label="log_prob()" id="sbi.inference.posteriors.direct_posterior.DirectPosterior.log_prob">
 <code class="highlight language-python">
-log_prob<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">norm_posterior</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">track_gradients</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> </code>
+log_prob<span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">norm_posterior</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">track_gradients</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">leakage_correction_params</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> </code>
 </h4>
 <div class="doc doc-contents">
 <p>Returns the log-probability of the posterior <span><span class="MathJax_Preview">p(\theta|x).</span><script type="math/tex">p(\theta|x).</script></span></p>
@@ -9069,6 +10017,18 @@ consumption.</p>
 </td>
 <td><code>False</code></td>
 </tr>
+<tr>
+<td><code>leakage_correction_params</code></td>
+<td><code>Optional[dict]</code></td>
+<td>
+<p>A <code>dict</code> of keyword arguments to override the
+default values of <code>leakage_correction()</code>. Possible options are:
+<code>num_rejection_samples</code>, <code>force_update</code>, <code>show_progress_bars</code>, and
+<code>rejection_sampling_batch_size</code>.
+These parameters only have an effect if <code>norm_posterior=True</code>.</p>
+</td>
+<td><code>None</code></td>
+</tr>
 </tbody>
 </table>
 <p><strong>Returns:</strong></p>
@@ -9095,8 +10055,7 @@ support of the prior, -∞ (corresponding to 0 probability) outside.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>155
-156
+<pre><span></span>156
 157
 158
 159
@@ -9153,7 +10112,21 @@ support of the prior, -∞ (corresponding to 0 probability) outside.</p>
 210
 211
 212
-213</pre>
+213
+214
+215
+216
+217
+218
+219
+220
+221
+222
+223
+224
+225
+226
+227</pre>
 </div>
 </td>
 <td class="code">
@@ -9164,6 +10137,7 @@ support of the prior, -∞ (corresponding to 0 probability) outside.</p>
     <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">norm_posterior</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="n">track_gradients</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">leakage_correction_params</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
     <span class="sa">r</span><span class="sd">"""</span>
 <span class="sd">    Returns the log-probability of the posterior $p(\theta|x).$</span>
@@ -9182,6 +10156,11 @@ support of the prior, -∞ (corresponding to 0 probability) outside.</p>
 <span class="sd">        track_gradients: Whether the returned tensor supports tracking gradients.</span>
 <span class="sd">            This can be helpful for e.g. sensitivity analysis, but increases memory</span>
 <span class="sd">            consumption.</span>
+<span class="sd">        leakage_correction_params: A `dict` of keyword arguments to override the</span>
+<span class="sd">            default values of `leakage_correction()`. Possible options are:</span>
+<span class="sd">            `num_rejection_samples`, `force_update`, `show_progress_bars`, and</span>
+<span class="sd">            `rejection_sampling_batch_size`.</span>
+<span class="sd">            These parameters only have an effect if `norm_posterior=True`.</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        `(len(θ),)`-shaped log posterior probability $\log p(\theta|x)$ for θ in the</span>
@@ -9193,25 +10172,32 @@ support of the prior, -∞ (corresponding to 0 probability) outside.</p>
     <span class="bp">self</span><span class="o">.</span><span class="n">net</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
 
     <span class="n">theta</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prepare_theta_and_x_for_log_prob_</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
+    <span class="n">theta_repeated</span><span class="p">,</span> <span class="n">x_repeated</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_match_theta_and_x_batch_shapes</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
 
     <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">set_grad_enabled</span><span class="p">(</span><span class="n">track_gradients</span><span class="p">):</span>
 
         <span class="c1"># Evaluate on device, move back to cpu for comparison with prior.</span>
         <span class="n">unnorm_log_prob</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">net</span><span class="o">.</span><span class="n">log_prob</span><span class="p">(</span>
-            <span class="n">theta</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">),</span> <span class="n">x</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">)</span>
+            <span class="n">theta_repeated</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">),</span> <span class="n">x_repeated</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">)</span>
         <span class="p">)</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span>
 
         <span class="c1"># Force probability to be zero outside prior support.</span>
-        <span class="n">is_prior_finite</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_prior</span><span class="o">.</span><span class="n">log_prob</span><span class="p">(</span><span class="n">theta</span><span class="p">))</span>
+        <span class="n">in_prior_support</span> <span class="o">=</span> <span class="n">within_support</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_prior</span><span class="p">,</span> <span class="n">theta</span><span class="p">)</span>
 
         <span class="n">masked_log_prob</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">where</span><span class="p">(</span>
-            <span class="n">is_prior_finite</span><span class="p">,</span>
+            <span class="n">in_prior_support</span><span class="p">,</span>
             <span class="n">unnorm_log_prob</span><span class="p">,</span>
             <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="s2">"-inf"</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">),</span>
         <span class="p">)</span>
 
+        <span class="k">if</span> <span class="n">leakage_correction_params</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">leakage_correction_params</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>  <span class="c1"># use defaults</span>
         <span class="n">log_factor</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="n">log</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">leakage_correction</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="n">batched_first_of_batch</span><span class="p">(</span><span class="n">x</span><span class="p">)))</span>
+            <span class="n">log</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">leakage_correction</span><span class="p">(</span>
+                    <span class="n">x</span><span class="o">=</span><span class="n">batched_first_of_batch</span><span class="p">(</span><span class="n">x</span><span class="p">),</span> <span class="o">**</span><span class="n">leakage_correction_params</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
             <span class="k">if</span> <span class="n">norm_posterior</span>
             <span class="k">else</span> <span class="mi">0</span>
         <span class="p">)</span>
@@ -9352,21 +10338,7 @@ the posterior.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>417
-418
-419
-420
-421
-422
-423
-424
-425
-426
-427
-428
-429
-430
-431
+<pre><span></span>431
 432
 433
 434
@@ -9412,7 +10384,21 @@ the posterior.</p>
 474
 475
 476
-477</pre>
+477
+478
+479
+480
+481
+482
+483
+484
+485
+486
+487
+488
+489
+490
+491</pre>
 </div>
 </td>
 <td class="code">
@@ -9603,21 +10589,7 @@ batch size speeds up sampling.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>272
-273
-274
-275
-276
-277
-278
-279
-280
-281
-282
-283
-284
-285
-286
+<pre><span></span>286
 287
 288
 289
@@ -9688,7 +10660,21 @@ batch size speeds up sampling.</p>
 354
 355
 356
-357</pre>
+357
+358
+359
+360
+361
+362
+363
+364
+365
+366
+367
+368
+369
+370
+371</pre>
 </div>
 </td>
 <td class="code">
@@ -9905,21 +10891,7 @@ locations.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>359
-360
-361
-362
-363
-364
-365
-366
-367
-368
-369
-370
-371
-372
-373
+<pre><span></span>373
 374
 375
 376
@@ -9961,7 +10933,21 @@ locations.</p>
 412
 413
 414
-415</pre>
+415
+416
+417
+418
+419
+420
+421
+422
+423
+424
+425
+426
+427
+428
+429</pre>
 </div>
 </td>
 <td class="code">
@@ -10093,15 +11079,7 @@ that calls like <code>posterior.set_default_x(my_x).sample(mytheta)</code> are p
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>104
-105
-106
-107
-108
-109
-110
-111
-112
+<pre><span></span>112
 113
 114
 115
@@ -10116,7 +11094,15 @@ that calls like <code>posterior.set_default_x(my_x).sample(mytheta)</code> are p
 124
 125
 126
-127</pre>
+127
+128
+129
+130
+131
+132
+133
+134
+135</pre>
 </div>
 </td>
 <td class="code">
@@ -10141,8 +11127,8 @@ that calls like <code>posterior.set_default_x(my_x).sample(mytheta)</code> are p
 <span class="sd">    Returns:</span>
 <span class="sd">        `NeuralPosterior` that will use a default `x` when not explicitly passed.</span>
 <span class="sd">    """</span>
-    <span class="n">processed_x</span> <span class="o">=</span> <span class="n">process_x</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_x_shape</span><span class="p">)</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">_x</span> <span class="o">=</span> <span class="n">processed_x</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_x</span> <span class="o">=</span> <span class="n">process_x</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_x_shape</span><span class="p">,</span> <span class="n">allow_iid_x</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_allow_iid_x</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_num_iid_trials</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
 
     <span class="k">return</span> <span class="bp">self</span>
 </code></pre>
@@ -10207,17 +11193,17 @@ set_mcmc_method<span class="p">(</span><span class="bp">self</span><span class="
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>139
-140
-141
-142
-143
-144
-145
-146
-147
+<pre><span></span>147
 148
-149</pre>
+149
+150
+151
+152
+153
+154
+155
+156
+157</pre>
 </div>
 </td>
 <td class="code">
@@ -10302,15 +11288,7 @@ locations.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>164
-165
-166
-167
-168
-169
-170
-171
-172
+<pre><span></span>172
 173
 174
 175
@@ -10319,7 +11297,15 @@ locations.</p>
 178
 179
 180
-181</pre>
+181
+182
+183
+184
+185
+186
+187
+188
+189</pre>
 </div>
 </td>
 <td class="code">
@@ -10405,8 +11391,7 @@ batch size speeds up sampling.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>137
-138
+<pre><span></span>138
 139
 140
 141
@@ -10421,7 +11406,8 @@ batch size speeds up sampling.</p>
 150
 151
 152
-153</pre>
+153
+154</pre>
 </div>
 </td>
 <td class="code">
@@ -10520,8 +11506,7 @@ do not support rejection sampling.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>108
-109
+<pre><span></span>109
 110
 111
 112
@@ -10534,7 +11519,8 @@ do not support rejection sampling.</p>
 119
 120
 121
-122</pre>
+122
+123</pre>
 </div>
 </td>
 <td class="code">
@@ -10571,17 +11557,17 @@ do not support rejection sampling.</p>
 <a class="headerlink" href="#sbi.inference.posteriors.likelihood_based_posterior.LikelihoodBasedPosterior" title="Permanent link">¶</a></h3>
 <div class="doc doc-contents first">
 <p>Posterior <span><span class="MathJax_Preview">p(\theta|x)</span><script type="math/tex">p(\theta|x)</script></span> with <code>log_prob()</code> and <code>sample()</code> methods, obtained with
-    SNLE.<br/>
+SNLE.<br/>
 <br/>
 
-    SNLE trains a neural network to approximate the likelihood <span><span class="MathJax_Preview">p(x|\theta)</span><script type="math/tex">p(x|\theta)</script></span>. The
-    <code>SNLE_Posterior</code> class wraps the trained network such that one can directly evaluate
-    the unnormalized posterior log probability <span><span class="MathJax_Preview">p(\theta|x) \propto p(x|\theta) \cdot
-    p(\theta)</span><script type="math/tex">p(\theta|x) \propto p(x|\theta) \cdot
-    p(\theta)</script></span> and draw samples from the posterior with MCMC.<br/>
+SNLE trains a neural network to approximate the likelihood <span><span class="MathJax_Preview">p(x|\theta)</span><script type="math/tex">p(x|\theta)</script></span>. The
+<code>SNLE_Posterior</code> class wraps the trained network such that one can directly evaluate
+the unnormalized posterior log probability <span><span class="MathJax_Preview">p(\theta|x) \propto p(x|\theta) \cdot
+p(\theta)</span><script type="math/tex">p(\theta|x) \propto p(x|\theta) \cdot
+p(\theta)</script></span> and draw samples from the posterior with MCMC.<br/>
 <br/>
 
-    The neural network itself can be accessed via the <code>.net</code> attribute.</p>
+The neural network itself can be accessed via the <code>.net</code> attribute.</p>
 <div class="doc doc-children">
 <div class="doc doc-object doc-attribute">
 <h4 class="doc doc-heading" data-toc-label="default_x" id="sbi.inference.posteriors.likelihood_based_posterior.LikelihoodBasedPosterior.default_x">
@@ -10673,7 +11659,12 @@ __init__<span class="p">(</span><span class="bp">self</span><span class="p">,</s
 <td><code>x_shape</code></td>
 <td><code>Size</code></td>
 <td>
-<p>Shape of a single simulator output.</p>
+<p>Shape of the simulated data. It can differ from the
+observed data the posterior is conditioned on later in the batch
+dimension. If it differs, the additional entries are interpreted as
+independent and identically distributed data / trials. I.e., the data is
+assumed to be generated based on the same (unknown) model parameters or
+experimental condations.</p>
 </td>
 <td><em>required</em></td>
 </tr>
@@ -10719,8 +11710,7 @@ locations.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>27
-28
+<pre><span></span>28
 29
 30
 31
@@ -10756,7 +11746,13 @@ locations.</p>
 61
 62
 63
-64</pre>
+64
+65
+66
+67
+68
+69
+70</pre>
 </div>
 </td>
 <td class="code">
@@ -10776,7 +11772,12 @@ locations.</p>
 <span class="sd">        method_family: One of snpe, snl, snre_a or snre_b.</span>
 <span class="sd">        neural_net: A classifier for SNRE, a density estimator for SNPE and SNL.</span>
 <span class="sd">        prior: Prior distribution with `.log_prob()` and `.sample()`.</span>
-<span class="sd">        x_shape: Shape of a single simulator output.</span>
+<span class="sd">        x_shape: Shape of the simulated data. It can differ from the</span>
+<span class="sd">            observed data the posterior is conditioned on later in the batch</span>
+<span class="sd">            dimension. If it differs, the additional entries are interpreted as</span>
+<span class="sd">            independent and identically distributed data / trials. I.e., the data is</span>
+<span class="sd">            assumed to be generated based on the same (unknown) model parameters or</span>
+<span class="sd">            experimental condations.</span>
 <span class="sd">        mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`,</span>
 <span class="sd">            `hmc`, `nuts`. Currently defaults to `slice_np` for a custom numpy</span>
 <span class="sd">            implementation of slice sampling; select `hmc`, `nuts` or `slice` for</span>
@@ -10796,8 +11797,8 @@ locations.</p>
     <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 
     <span class="bp">self</span><span class="o">.</span><span class="n">_purpose</span> <span class="o">=</span> <span class="p">(</span>
-        <span class="sa">f</span><span class="s2">"It provides MCMC to .sample() from the posterior and "</span>
-        <span class="sa">f</span><span class="s2">"can evaluate the _unnormalized_ posterior density with .log_prob()."</span>
+        <span class="s2">"It provides MCMC to .sample() from the posterior and "</span>
+        <span class="s2">"can evaluate the _unnormalized_ posterior density with .log_prob()."</span>
     <span class="p">)</span>
 </code></pre>
 </div>
@@ -10868,12 +11869,7 @@ This makes the call chainable:
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>205
-206
-207
-208
-209
-210
+<pre><span></span>210
 211
 212
 213
@@ -10903,7 +11899,12 @@ This makes the call chainable:
 237
 238
 239
-240</pre>
+240
+241
+242
+243
+244
+245</pre>
 </div>
 </td>
 <td class="code">
@@ -11023,13 +12024,7 @@ consumption.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span> 66
- 67
- 68
- 69
- 70
- 71
- 72
+<pre><span></span> 72
  73
  74
  75
@@ -11060,16 +12055,20 @@ consumption.</p>
 100
 101
 102
-103</pre>
+103
+104
+105
+106
+107
+108
+109
+110</pre>
 </div>
 </td>
 <td class="code">
 <div class="highlight">
 <pre><span></span><code><span class="k">def</span> <span class="nf">log_prob</span><span class="p">(</span>
-    <span class="bp">self</span><span class="p">,</span>
-    <span class="n">theta</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
-    <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">track_gradients</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="bp">self</span><span class="p">,</span> <span class="n">theta</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">track_gradients</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
     <span class="sa">r</span><span class="sd">"""</span>
 <span class="sd">    Returns the log-probability of $p(x|\theta) \cdot p(\theta).$</span>
@@ -11094,15 +12093,19 @@ consumption.</p>
 
     <span class="n">theta</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prepare_theta_and_x_for_log_prob_</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
 
+    <span class="c1"># Calculate likelihood over trials and in one batch.</span>
     <span class="n">warn</span><span class="p">(</span>
         <span class="s2">"The log probability from SNL is only correct up to a normalizing constant."</span>
     <span class="p">)</span>
+    <span class="n">log_likelihood_trial_sum</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_log_likelihoods_over_trials</span><span class="p">(</span>
+        <span class="n">x</span><span class="o">=</span><span class="n">x</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">),</span>
+        <span class="n">theta</span><span class="o">=</span><span class="n">theta</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">),</span>
+        <span class="n">net</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">net</span><span class="p">,</span>
+        <span class="n">track_gradients</span><span class="o">=</span><span class="n">track_gradients</span><span class="p">,</span>
+    <span class="p">)</span>
 
-    <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">set_grad_enabled</span><span class="p">(</span><span class="n">track_gradients</span><span class="p">):</span>
-        <span class="c1"># Evaluate on device, move to cpu for comparison with prior.</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">net</span><span class="o">.</span><span class="n">log_prob</span><span class="p">(</span>
-            <span class="n">x</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">),</span> <span class="n">theta</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">)</span>
-        <span class="p">)</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prior</span><span class="o">.</span><span class="n">log_prob</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
+    <span class="c1"># Move to cpu for comparison with prior.</span>
+    <span class="k">return</span> <span class="n">log_likelihood_trial_sum</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prior</span><span class="o">.</span><span class="n">log_prob</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
 </code></pre>
 </div>
 </td>
@@ -11238,14 +12241,7 @@ the posterior.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>221
-222
-223
-224
-225
-226
-227
-228
+<pre><span></span>228
 229
 230
 231
@@ -11297,7 +12293,14 @@ the posterior.</p>
 277
 278
 279
-280</pre>
+280
+281
+282
+283
+284
+285
+286
+287</pre>
 </div>
 </td>
 <td class="code">
@@ -11471,14 +12474,7 @@ locations.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>105
-106
-107
-108
-109
-110
-111
-112
+<pre><span></span>112
 113
 114
 115
@@ -11527,7 +12523,14 @@ locations.</p>
 158
 159
 160
-161</pre>
+161
+162
+163
+164
+165
+166
+167
+168</pre>
 </div>
 </td>
 <td class="code">
@@ -11715,14 +12718,7 @@ locations.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>163
-164
-165
-166
-167
-168
-169
-170
+<pre><span></span>170
 171
 172
 173
@@ -11771,7 +12767,14 @@ locations.</p>
 216
 217
 218
-219</pre>
+219
+220
+221
+222
+223
+224
+225
+226</pre>
 </div>
 </td>
 <td class="code">
@@ -11903,15 +12906,7 @@ that calls like <code>posterior.set_default_x(my_x).sample(mytheta)</code> are p
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>104
-105
-106
-107
-108
-109
-110
-111
-112
+<pre><span></span>112
 113
 114
 115
@@ -11926,7 +12921,15 @@ that calls like <code>posterior.set_default_x(my_x).sample(mytheta)</code> are p
 124
 125
 126
-127</pre>
+127
+128
+129
+130
+131
+132
+133
+134
+135</pre>
 </div>
 </td>
 <td class="code">
@@ -11951,8 +12954,8 @@ that calls like <code>posterior.set_default_x(my_x).sample(mytheta)</code> are p
 <span class="sd">    Returns:</span>
 <span class="sd">        `NeuralPosterior` that will use a default `x` when not explicitly passed.</span>
 <span class="sd">    """</span>
-    <span class="n">processed_x</span> <span class="o">=</span> <span class="n">process_x</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_x_shape</span><span class="p">)</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">_x</span> <span class="o">=</span> <span class="n">processed_x</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_x</span> <span class="o">=</span> <span class="n">process_x</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_x_shape</span><span class="p">,</span> <span class="n">allow_iid_x</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_allow_iid_x</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_num_iid_trials</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
 
     <span class="k">return</span> <span class="bp">self</span>
 </code></pre>
@@ -12017,17 +13020,17 @@ set_mcmc_method<span class="p">(</span><span class="bp">self</span><span class="
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>139
-140
-141
-142
-143
-144
-145
-146
-147
+<pre><span></span>147
 148
-149</pre>
+149
+150
+151
+152
+153
+154
+155
+156
+157</pre>
 </div>
 </td>
 <td class="code">
@@ -12112,15 +13115,7 @@ locations.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>164
-165
-166
-167
-168
-169
-170
-171
-172
+<pre><span></span>172
 173
 174
 175
@@ -12129,7 +13124,15 @@ locations.</p>
 178
 179
 180
-181</pre>
+181
+182
+183
+184
+185
+186
+187
+188
+189</pre>
 </div>
 </td>
 <td class="code">
@@ -12169,22 +13172,22 @@ locations.</p>
 <a class="headerlink" href="#sbi.inference.posteriors.ratio_based_posterior.RatioBasedPosterior" title="Permanent link">¶</a></h3>
 <div class="doc doc-contents first">
 <p>Posterior <span><span class="MathJax_Preview">p(\theta|x)</span><script type="math/tex">p(\theta|x)</script></span> with <code>log_prob()</code> and <code>sample()</code> methods, obtained with
-    SNRE.<br/>
+SNRE.<br/>
 <br/>
 
-    SNRE trains a neural network to approximate likelihood ratios, which in turn can be
-    used obtain an unnormalized posterior <span><span class="MathJax_Preview">p(\theta|x) \propto p(x|\theta) \cdot
-    p(\theta)</span><script type="math/tex">p(\theta|x) \propto p(x|\theta) \cdot
-    p(\theta)</script></span>. The <code>SNRE_Posterior</code> class wraps the trained network such that one can
-    directly evaluate the unnormalized posterior log-probability <span><span class="MathJax_Preview">p(\theta|x) \propto
-    p(x|\theta) \cdot p(\theta)</span><script type="math/tex">p(\theta|x) \propto
-    p(x|\theta) \cdot p(\theta)</script></span> and draw samples from the posterior with
-    MCMC. Note that, in the case of single-round SNRE_A / AALR, it is possible to
-    evaluate the log-probability of the <strong>normalized</strong> posterior, but sampling still
-    requires MCMC.<br/>
+SNRE trains a neural network to approximate likelihood ratios, which in turn can be
+used obtain an unnormalized posterior <span><span class="MathJax_Preview">p(\theta|x) \propto p(x|\theta) \cdot
+p(\theta)</span><script type="math/tex">p(\theta|x) \propto p(x|\theta) \cdot
+p(\theta)</script></span>. The <code>SNRE_Posterior</code> class wraps the trained network such that one can
+directly evaluate the unnormalized posterior log-probability <span><span class="MathJax_Preview">p(\theta|x) \propto
+p(x|\theta) \cdot p(\theta)</span><script type="math/tex">p(\theta|x) \propto
+p(x|\theta) \cdot p(\theta)</script></span> and draw samples from the posterior with
+MCMC. Note that, in the case of single-round SNRE_A / AALR, it is possible to
+evaluate the log-probability of the <strong>normalized</strong> posterior, but sampling still
+requires MCMC.<br/>
 <br/>
 
-    The neural network itself can be accessed via the <code>.net</code> attribute.</p>
+The neural network itself can be accessed via the <code>.net</code> attribute.</p>
 <div class="doc doc-children">
 <div class="doc doc-object doc-attribute">
 <h4 class="doc doc-heading" data-toc-label="default_x" id="sbi.inference.posteriors.ratio_based_posterior.RatioBasedPosterior.default_x">
@@ -12322,8 +13325,7 @@ locations.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>31
-32
+<pre><span></span>32
 33
 34
 35
@@ -12353,7 +13355,8 @@ locations.</p>
 59
 60
 61
-62</pre>
+62
+63</pre>
 </div>
 </td>
 <td class="code">
@@ -12459,12 +13462,7 @@ This makes the call chainable:
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>205
-206
-207
-208
-209
-210
+<pre><span></span>210
 211
 212
 213
@@ -12494,7 +13492,12 @@ This makes the call chainable:
 237
 238
 239
-240</pre>
+240
+241
+242
+243
+244
+245</pre>
 </div>
 </td>
 <td class="code">
@@ -12616,8 +13619,7 @@ consumption.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span> 64
- 65
+<pre><span></span> 65
  66
  67
  68
@@ -12654,21 +13656,15 @@ consumption.</p>
  99
 100
 101
-102
-103
-104</pre>
+102</pre>
 </div>
 </td>
 <td class="code">
 <div class="highlight">
 <pre><span></span><code><span class="k">def</span> <span class="nf">log_prob</span><span class="p">(</span>
-    <span class="bp">self</span><span class="p">,</span>
-    <span class="n">theta</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span>
-    <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">track_gradients</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="bp">self</span><span class="p">,</span> <span class="n">theta</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">track_gradients</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
-    <span class="sa">r</span><span class="sd">"""</span>
-<span class="sd">    Returns the log-probability of $p(x|\theta) \cdot p(\theta).$</span>
+    <span class="sa">r</span><span class="sd">"""Returns the log-probability of $p(x|\theta) \cdot p(\theta).$</span>
 
 <span class="sd">    This corresponds to an **unnormalized** posterior log-probability. Only for</span>
 <span class="sd">    single-round SNRE_A / AALR, the returned log-probability will correspond to the</span>
@@ -12694,14 +13690,15 @@ consumption.</p>
 
     <span class="bp">self</span><span class="o">.</span><span class="n">_warn_log_prob_snre</span><span class="p">()</span>
 
-    <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">set_grad_enabled</span><span class="p">(</span><span class="n">track_gradients</span><span class="p">):</span>
-        <span class="c1"># Send to device for evaluation, send to CPU for comparison with prior.</span>
-        <span class="n">log_ratio</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">net</span><span class="p">([</span><span class="n">theta</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">),</span> <span class="n">x</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">)])</span>
-            <span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
-            <span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">"cpu"</span><span class="p">)</span>
-        <span class="p">)</span>
-        <span class="k">return</span> <span class="n">log_ratio</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prior</span><span class="o">.</span><span class="n">log_prob</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
+    <span class="c1"># Sum log ratios over x batch of iid trials.</span>
+    <span class="n">log_ratio</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_log_ratios_over_trials</span><span class="p">(</span>
+        <span class="n">x</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">),</span>
+        <span class="n">theta</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">),</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">net</span><span class="p">,</span>
+        <span class="n">track_gradients</span><span class="o">=</span><span class="n">track_gradients</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">log_ratio</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prior</span><span class="o">.</span><span class="n">log_prob</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
 </code></pre>
 </div>
 </td>
@@ -12848,7 +13845,9 @@ the posterior.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>235
+<pre><span></span>233
+234
+235
 236
 237
 238
@@ -12909,9 +13908,7 @@ the posterior.</p>
 293
 294
 295
-296
-297
-298</pre>
+296</pre>
 </div>
 </td>
 <td class="code">
@@ -13089,7 +14086,9 @@ locations.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>119
+<pre><span></span>117
+118
+119
 120
 121
 122
@@ -13143,9 +14142,7 @@ locations.</p>
 170
 171
 172
-173
-174
-175</pre>
+173</pre>
 </div>
 </td>
 <td class="code">
@@ -13333,7 +14330,9 @@ locations.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>177
+<pre><span></span>175
+176
+177
 178
 179
 180
@@ -13387,9 +14386,7 @@ locations.</p>
 228
 229
 230
-231
-232
-233</pre>
+231</pre>
 </div>
 </td>
 <td class="code">
@@ -13521,15 +14518,7 @@ that calls like <code>posterior.set_default_x(my_x).sample(mytheta)</code> are p
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>104
-105
-106
-107
-108
-109
-110
-111
-112
+<pre><span></span>112
 113
 114
 115
@@ -13544,7 +14533,15 @@ that calls like <code>posterior.set_default_x(my_x).sample(mytheta)</code> are p
 124
 125
 126
-127</pre>
+127
+128
+129
+130
+131
+132
+133
+134
+135</pre>
 </div>
 </td>
 <td class="code">
@@ -13569,8 +14566,8 @@ that calls like <code>posterior.set_default_x(my_x).sample(mytheta)</code> are p
 <span class="sd">    Returns:</span>
 <span class="sd">        `NeuralPosterior` that will use a default `x` when not explicitly passed.</span>
 <span class="sd">    """</span>
-    <span class="n">processed_x</span> <span class="o">=</span> <span class="n">process_x</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_x_shape</span><span class="p">)</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">_x</span> <span class="o">=</span> <span class="n">processed_x</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_x</span> <span class="o">=</span> <span class="n">process_x</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_x_shape</span><span class="p">,</span> <span class="n">allow_iid_x</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_allow_iid_x</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_num_iid_trials</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
 
     <span class="k">return</span> <span class="bp">self</span>
 </code></pre>
@@ -13635,17 +14632,17 @@ set_mcmc_method<span class="p">(</span><span class="bp">self</span><span class="
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>139
-140
-141
-142
-143
-144
-145
-146
-147
+<pre><span></span>147
 148
-149</pre>
+149
+150
+151
+152
+153
+154
+155
+156
+157</pre>
 </div>
 </td>
 <td class="code">
@@ -13730,15 +14727,7 @@ locations.</p>
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span>164
-165
-166
-167
-168
-169
-170
-171
-172
+<pre><span></span>172
 173
 174
 175
@@ -13747,7 +14736,15 @@ locations.</p>
 178
 179
 180
-181</pre>
+181
+182
+183
+184
+185
+186
+187
+188
+189</pre>
 </div>
 </td>
 <td class="code">
@@ -13954,7 +14951,31 @@ Ignored if density estimator is not an mdn.</p>
 224
 225
 226
-227</pre>
+227
+228
+229
+230
+231
+232
+233
+234
+235
+236
+237
+238
+239
+240
+241
+242
+243
+244
+245
+246
+247
+248
+249
+250
+251</pre>
 </div>
 </td>
 <td class="code">
@@ -14018,17 +15039,41 @@ Ignored if density estimator is not an mdn.</p>
         <span class="p">)</span>
     <span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">build_fn</span><span class="p">(</span><span class="n">batch_theta</span><span class="p">,</span> <span class="n">batch_x</span><span class="p">):</span>
-        <span class="k">if</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">"mdn"</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">build_mdn</span><span class="p">(</span><span class="n">batch_x</span><span class="o">=</span><span class="n">batch_theta</span><span class="p">,</span> <span class="n">batch_y</span><span class="o">=</span><span class="n">batch_x</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">"made"</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">build_made</span><span class="p">(</span><span class="n">batch_x</span><span class="o">=</span><span class="n">batch_theta</span><span class="p">,</span> <span class="n">batch_y</span><span class="o">=</span><span class="n">batch_x</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">"maf"</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">build_maf</span><span class="p">(</span><span class="n">batch_x</span><span class="o">=</span><span class="n">batch_theta</span><span class="p">,</span> <span class="n">batch_y</span><span class="o">=</span><span class="n">batch_x</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-        <span class="k">elif</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">"nsf"</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">build_nsf</span><span class="p">(</span><span class="n">batch_x</span><span class="o">=</span><span class="n">batch_theta</span><span class="p">,</span> <span class="n">batch_y</span><span class="o">=</span><span class="n">batch_x</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+    <span class="k">if</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">"mdn_snpe_a"</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">num_components</span> <span class="o">!=</span> <span class="mi">10</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"You set `num_components`. For SNPE-A, this has to be done at "</span>
+                <span class="s2">"instantiation of the inference object, i.e. "</span>
+                <span class="s2">"`inference = SNPE_A(..., num_components=20)`"</span>
+            <span class="p">)</span>
+        <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">"num_components"</span><span class="p">)</span>
+
+        <span class="k">def</span> <span class="nf">build_fn</span><span class="p">(</span><span class="n">batch_theta</span><span class="p">,</span> <span class="n">batch_x</span><span class="p">,</span> <span class="n">num_components</span><span class="p">):</span>
+            <span class="c1"># Extract the number of components from the kwargs, such that</span>
+            <span class="c1"># they are exposed as a kwargs, offering the possibility to later</span>
+            <span class="c1"># override this kwarg with functools.partial. This is necessary</span>
+            <span class="c1"># in order to make sure that the MDN in SNPE-A only has one</span>
+            <span class="c1"># component when running the Algorithm 1 part.</span>
+            <span class="k">return</span> <span class="n">build_mdn</span><span class="p">(</span>
+                <span class="n">batch_x</span><span class="o">=</span><span class="n">batch_theta</span><span class="p">,</span>
+                <span class="n">batch_y</span><span class="o">=</span><span class="n">batch_x</span><span class="p">,</span>
+                <span class="n">num_components</span><span class="o">=</span><span class="n">num_components</span><span class="p">,</span>
+                <span class="o">**</span><span class="n">kwargs</span>
+            <span class="p">)</span>
+
+    <span class="k">else</span><span class="p">:</span>
+
+        <span class="k">def</span> <span class="nf">build_fn</span><span class="p">(</span><span class="n">batch_theta</span><span class="p">,</span> <span class="n">batch_x</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">"mdn"</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">build_mdn</span><span class="p">(</span><span class="n">batch_x</span><span class="o">=</span><span class="n">batch_theta</span><span class="p">,</span> <span class="n">batch_y</span><span class="o">=</span><span class="n">batch_x</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">"made"</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">build_made</span><span class="p">(</span><span class="n">batch_x</span><span class="o">=</span><span class="n">batch_theta</span><span class="p">,</span> <span class="n">batch_y</span><span class="o">=</span><span class="n">batch_x</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">"maf"</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">build_maf</span><span class="p">(</span><span class="n">batch_x</span><span class="o">=</span><span class="n">batch_theta</span><span class="p">,</span> <span class="n">batch_y</span><span class="o">=</span><span class="n">batch_x</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">"nsf"</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">build_nsf</span><span class="p">(</span><span class="n">batch_x</span><span class="o">=</span><span class="n">batch_theta</span><span class="p">,</span> <span class="n">batch_y</span><span class="o">=</span><span class="n">batch_x</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">NotImplementedError</span>
 
     <span class="k">return</span> <span class="n">build_fn</span>
 </code></pre>
@@ -15112,15 +16157,7 @@ or <code>(len(subset), len(subset))</code> if <code>subset</code> was specified.
 <tr>
 <td class="linenos">
 <div class="linenodiv">
-<pre><span></span> 62
- 63
- 64
- 65
- 66
- 67
- 68
- 69
- 70
+<pre><span></span> 70
  71
  72
  73
@@ -15154,7 +16191,15 @@ or <code>(len(subset), len(subset))</code> if <code>subset</code> was specified.
 101
 102
 103
-104</pre>
+104
+105
+106
+107
+108
+109
+110
+111
+112</pre>
 </div>
 </td>
 <td class="code">
@@ -15263,14 +16308,14 @@ or <code>(len(subset), len(subset))</code> if <code>subset</code> was specified.
 </div>
 </footer>
 </div>
-<script src="../assets/javascripts/vendor.d710d30a.min.js"></script>
-<script src="../assets/javascripts/bundle.b39636ac.min.js"></script><script id="__lang" type="application/json">{"clipboard.copy": "Copy to clipboard", "clipboard.copied": "Copied to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.result.placeholder": "Type to start searching", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents"}</script>
+<script src="../assets/javascripts/vendor.c3dc8c49.min.js"></script>
+<script src="../assets/javascripts/bundle.f9edbbd5.min.js"></script><script id="__lang" type="application/json">{"clipboard.copy": "Copy to clipboard", "clipboard.copied": "Copied to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.result.placeholder": "Type to start searching", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents"}</script>
 <script>
         app = initialize({
           base: "..",
           features: [],
           search: Object.assign({
-            worker: "../assets/javascripts/worker/search.a68abb33.min.js"
+            worker: "../assets/javascripts/worker/search.8e2cddea.min.js"
           }, typeof search !== "undefined" && search)
         })
       </script>
