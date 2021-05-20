@@ -223,7 +223,6 @@ class SNPE_A(PosteriorEstimator):
         self,
         density_estimator: Optional[TorchModule] = None,
         rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
-        allow_precision_correction: bool = False,
     ) -> DirectPosterior:
         r"""
         Build posterior from the neural density estimator.
@@ -251,10 +250,6 @@ class SNPE_A(PosteriorEstimator):
                 `max_sampling_batch_size` to set the batch size for drawing new
                 samples from the candidate distribution, e.g., the posterior. Larger
                 batch size speeds up sampling.
-            allow_precision_correction: Whether to add a diagonal with the smallest
-                eigenvalue in every entry in case the precision matrix becomes
-                ill-conditioned.
-
         Returns:
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods.
         """
@@ -287,10 +282,7 @@ class SNPE_A(PosteriorEstimator):
 
         # Create the SNPE_A_MDN
         wrapped_density_estimator = SNPE_A_MDN(
-            flow=density_estimator,
-            proposal=proposal,
-            prior=self._prior,
-            allow_precision_correction=allow_precision_correction,
+            flow=density_estimator, proposal=proposal, prior=self._prior
         )
 
         self._posterior = DirectPosterior(
@@ -385,7 +377,6 @@ class SNPE_A_MDN(nn.Module):
         flow: flows.Flow,
         proposal: Union["utils.BoxUniform", MultivariateNormal, "SNPE_A_MDN"],
         prior: Any,
-        allow_precision_correction: bool = False,
     ):
         """Constructor.
 
@@ -393,15 +384,12 @@ class SNPE_A_MDN(nn.Module):
             flow: The trained normalizing flow, passed when building the posterior.
             proposal: The proposal distribution.
             prior: The prior distribution.
-            allow_precision_correction: Add a diagonal with the smallest eigenvalue in
-                every entry in case the precision matrix becomes ill-conditioned.
         """
         # Call nn.Module's constructor.
         super().__init__()
 
         self._neural_net = flow
         self._prior = prior
-        self._allow_precision_correction = allow_precision_correction
 
         # Set the proposal using the `default_x`.
         if isinstance(proposal, (utils.BoxUniform, MultivariateNormal)):
@@ -720,18 +708,18 @@ class SNPE_A_MDN(nn.Module):
         for batches in precisions_pp:
             for pprior in batches:
                 eig_pprior = torch.symeig(pprior, eigenvectors=False).eigenvalues
-                assert (
-                    eig_pprior > 0
-                ).all(), (
-                    "The precision matrix of the proposal is not positive definite!"
-                )
+                if not (eig_pprior > 0).all():
+                    raise AssertionError(
+                        "The precision matrix of the proposal is not positive definite!"
+                    )
         for batches in precisions_d:
             for d in batches:
                 eig_d = torch.symeig(d, eigenvectors=False).eigenvalues
-                assert (
-                    eig_d > 0
-                ).all(), """The precision matrix of the density estimator is not
-                positive definite!"""
+                if not (eig_d > 0).all():
+                    raise AssertionError(
+                        "The precision matrix of the density estimator is not "
+                        "positive definite!"
+                    )
 
         precisions_pp_rep = precisions_pp.repeat_interleave(num_comps_d, dim=1)
         precisions_d_rep = precisions_d.repeat(1, num_comps_p, 1, 1)
@@ -745,26 +733,14 @@ class SNPE_A_MDN(nn.Module):
             for idx_comp, pp in enumerate(batches):
                 eig_pp = torch.symeig(pp, eigenvectors=False).eigenvalues
                 if not (eig_pp > 0).all():
-                    if self._allow_precision_correction:
-                        # Shift the eigenvalues to be at minimum 1e-6.
-                        precisions_p[idx_batch, idx_comp] = pp - torch.eye(
-                            pp.shape[0]
-                        ) * (min(eig_pp) - 1e-6)
-                        warnings.warn(
-                            "The precision matrix of a posterior has not been positive "
-                            "definite at least once. Added diagonal entries with the "
-                            "smallest eigenvalue to 1e-6."
-                        )
-
-                    else:
-                        # Fail when encountering an ill-conditioned precision matrix.
-                        raise AssertionError(
-                            "The precision matrix of a posterior is not positive "
-                            "definite! This is a known issue for SNPE-A. Either try a "
-                            "different parameter setting or pass"
-                            "`allow_precision_correction=True` when calling "
-                            "`build_posterior()`."
-                        )
+                    raise AssertionError(
+                        "The precision matrix of a posterior is not positive "
+                        "definite! This is a known issue for SNPE-A. Either try a "
+                        "different parameter setting, e.g. a different number of "
+                        "mixture components (when contracting SNPE-A), or a different "
+                        "value for the parameter perturbation (when building the "
+                        "posterior)."
+                    )
 
         covariances_p = torch.inverse(precisions_p)
         return precisions_p, covariances_p
