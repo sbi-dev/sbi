@@ -119,7 +119,7 @@ class SNPE_A(PosteriorEstimator):
         retrain_from_scratch_each_round: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
-        component_perturbation: float = 1e-5,
+        component_perturbation: float = 5e-3,
     ) -> DirectPosterior:
         r"""
         Return density estimator that approximates the proposal posterior $\tilde{p}(\theta|x)$.
@@ -162,7 +162,8 @@ class SNPE_A(PosteriorEstimator):
                 and validation dataloaders (like, e.g., a collate_fn)
             component_perturbation: The standard deviation applied to all weights and
                 biases when, in the last round, the Mixture of Gaussians is build from
-                a single Gaussian.
+                a single Gaussian. This value can be problem-specific and also depends
+                on the number of mixture components.
         Returns:
             Density estimator that approximates the distribution $p(\theta|x)$.
         """
