@@ -35,7 +35,7 @@ def sir(
     sir_batch_size: int = 1000,
     **kwargs: Any,
 ) -> Tensor:
-    r"""Return a sample obtained by sequential importance reweighing.
+    r"""Return a sample obtained by sequential importance reweighting.
 
     This function can also do `SIR` on the conditional posterior
     $p(\theta_i|\theta_j, x)$ when a `condition` and `dims_to_sample` are passed.
@@ -62,6 +62,8 @@ def sir(
         log_weights = torch.cat(log_weights)
         init_param_candidates = torch.cat(init_param_candidates)
 
+        # Norm weights in log space
+        log_weights -= torch.logsumexp(log_weights)
         probs = np.exp(log_weights.view(-1).numpy().astype(np.float64))
         probs[np.isnan(probs)] = 0.0
         probs[np.isinf(probs)] = 0.0
