@@ -9,6 +9,7 @@ from torch import Tensor, ones, tensor
 from torch.distributions import Distribution, Multinomial, MultivariateNormal
 
 from sbi.inference.abc.abc_base import ABCBASE
+from sbi.utils import within_support
 from sbi.utils.user_input_checks import process_x
 
 
@@ -496,7 +497,7 @@ class SMCABC(ABCBASE):
             # Create kernel on params and perturb.
             parms_perturbed = self.get_new_kernel(parms).sample()
 
-            is_within_prior = torch.isfinite(self.prior.log_prob(parms_perturbed))
+            is_within_prior = within_support(self.prior, parms_perturbed)
             num_accepted += is_within_prior.sum().item()
 
             if num_accepted > 0:
