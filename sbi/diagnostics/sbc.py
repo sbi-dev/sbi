@@ -112,6 +112,13 @@ def sbc_in_batches(
 def sbc_on_batch(thos, xos, posterior, L, ranking_rv):
     """Return SBC results for a batch of SBC parameters and data from prior.
 
+    Parameters
+        thos: samples of true theta, assumed to have shape (nsamples, ndims)
+        xos: samples of true x, assumed to have shape (nsamples, ndims)
+        posterior: approximated posterior p(theta|x)
+        L: number of draws from the posterior given x_o
+        ranking_rv: random variable to perform SBC ranking under
+
     Returns
         ranks: ranks of true parameters vs. posterior samples under the specified RV,
             for each posterior dimension.
@@ -124,19 +131,19 @@ def sbc_on_batch(thos, xos, posterior, L, ranking_rv):
     dap_samples = torch.zeros_like(thos)
     ranks = torch.zeros_like(thos)
 
-    for idx, (tho, xo) in enumerate(zip(thos, xos)):
+    for idx, (theta_o, x_o) in enumerate(zip(thos, xos)):
         # Log prob of true params under posterior.
-        log_prob_thos[idx] = posterior.log_prob(tho, x=xo)
+        log_prob_thos[idx] = posterior.log_prob(theta_o, x=x_o)
 
         # Rank true params vs posterior params under ranking_rv.
-        ths = posterior.sample((L,), x=xo, show_progress_bars=False)
+        ths = posterior.sample((L,), x=x_o, show_progress_bars=False)
         dap_samples[idx] = ths[
             0,
         ]
         # rank for each posterior dimension.
         for dim in range(thos.shape[1]):
             ranks[idx, dim] = (
-                (ranking_rv.log_prob(ths[:, dim]) < ranking_rv.log_prob(tho[dim]))
+                (ranking_rv.log_prob(ths[:, dim]) < ranking_rv.log_prob(theta_o[dim]))
                 .sum()
                 .item()
             )
