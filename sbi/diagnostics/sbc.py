@@ -179,12 +179,28 @@ def sbc_checks(
 
 
 def check_prior_vs_dap(prior_samples: Tensor, dap_samples: Tensor):
-    """Return the c2st accuracy between prior and data avaraged posterior samples.
+    """
+    Calculates if the distribution of prior_samples differs from the
+    distribution of dap_samples using c2st.
+
+    Return the c2st accuracy between prior and data avaraged posterior samples.
 
     c2st is calculated for each dimension separately.
+
+    Parameters
+    ----------
+    prior_samples: samples from the prior distribution, typically denoted theta
+    dap_samples: samples from the data avaraged posterior
+
+    Returns
+    -------
+    tensor of c2st scores
     """
 
-    assert prior_samples.shape == dap_samples.shape
+    msg = f"""prior_samples shape {prior_samples.shape} does not match
+    dap_samples shape {dap_samples.shape}"""
+
+    assert prior_samples.shape == dap_samples.shape, msg
 
     return torch.tensor(
         [
@@ -198,7 +214,8 @@ def check_uniformity(ranks, num_ranks: int, num_repetitions: int = 1):
     """
 
     Calculates Kolomogorov-Smirnov test using scipy to compare
-    rank distribution to uniform PDF. Uses sbi.c2st to do the same.
+    the rank distribution to a uniform PDF. Uses sbi.c2st to do the same.
+    Returns results for both.
 
     Parameters
     ----------
