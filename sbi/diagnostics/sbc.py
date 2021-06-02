@@ -194,10 +194,27 @@ def check_prior_vs_dap(prior_samples: Tensor, dap_samples: Tensor):
     )
 
 
-def check_uniformity(ranks, num_ranks, num_repetitions: int = 1):
-    """Return p-values and c2st scores for uniformity of the ranks.
+def check_uniformity(ranks, num_ranks: int, num_repetitions: int = 1):
+    """
 
-    Calculates Kolomogorov-Smirnov test using scipy.
+    Calculates Kolomogorov-Smirnov test using scipy to compare
+    rank distribution to uniform PDF. Uses sbi.c2st to do the same.
+
+    Parameters
+    ----------
+    ranks: ranks data
+    num_ranks: number of ranks to consider, i.e. number of bins in the ranking
+               histogram
+    num_repetitions: number of times to repeatedly call c2st to compare rank
+                     distribution and a uniform PDF
+
+    Return
+    ------
+    kstest_pvals: p-values of Kolomogorov-Smirnov of ranks distribution against
+                  a uniform PDF with loc=0 and scale=num_ranks
+    c2st_scores: mean of c2st scores of num_repetitions for uniformity of the ranks.
+
+    TODO: refactor this function as it currently has 2 responsibilities, 1 too many
     """
 
     from scipy.stats import kstest, uniform
