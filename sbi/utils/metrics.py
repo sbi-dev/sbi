@@ -30,7 +30,7 @@ def c2st(
         seed: Seed for sklearn
         n_folds: Number of folds
         z_score: Z-scoring using X
-        noise_scale: If passed, will add Gaussian noise with std noise_scale to samples
+        noise_scale: If passed, will add Gaussian noise with std noise_scale to samples of X and of Y
 
     References:
         [1]: https://scikit-learn.org/stable/modules/cross_validation.html
