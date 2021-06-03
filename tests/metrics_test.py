@@ -15,7 +15,7 @@ from sklearn.ensemble import RandomForestClassifier
 from torch import Tensor
 
 
-def rv_c2st(
+def alt_c2st(
     X: Tensor,
     Y: Tensor,
     seed: int = 1,
@@ -23,9 +23,13 @@ def rv_c2st(
     scoring: str = "accuracy",
     z_score: bool = True,
     noise_scale: Optional[float] = None,
-        verbosity=0
+        verbosity: int = 0,
+    **clf_kwargs
+
 ) -> Tensor:
-    """Return accuracy of classifier trained to distinguish samples from two distributions.
+    """
+    [Alternative implementation of c2st]
+    Return accuracy of classifier trained to distinguish samples from two distributions.
 
     Trains classifiers with N-fold cross-validation [1]. Scikit learn MLPClassifier are
     used, with 2 hidden layers of 10x dim each, where dim is the dimensionality of the
@@ -37,6 +41,9 @@ def rv_c2st(
         n_folds: Number of folds
         z_score: Z-scoring using X
         noise_scale: If passed, will add Gaussian noise with std noise_scale to samples of X and of Y
+        verbosity: control the verbosity of sklearn.model_selection.cross_val_score
+        clf_kwargs: key-word arguments to sklearn.ensemble.RandomForestClassifier
+
 
     References:
         [1]: https://scikit-learn.org/stable/modules/cross_validation.html
@@ -57,18 +64,10 @@ def rv_c2st(
     ndim = X.shape[1]
 
     clf = RandomForestClassifier(
-        # n_estimators=100,
-     #   max_depth=None,
         random_state=seed,
+        *clf_kwargs
     )
 
-    # clf = MLPClassifier(
-    #     activation="relu",
-    #     hidden_layer_sizes=(10 * ndim, 10 * ndim),
-    #     max_iter=1000,
-    #     solver="adam",
-    #     random_state=seed,
-    # )
 
     #prepare data
     data = np.concatenate((X, Y))
@@ -88,7 +87,7 @@ def rv_c2st(
     return torch.from_numpy(np.atleast_1d(scores))
 
 
-def test_same_distributions_rv():
+def test_same_distributions_alt():
 
     ndim = 5
     nsamples = 4048
@@ -98,13 +97,13 @@ def test_same_distributions_rv():
     X = xnormal.sample((nsamples,))
     Y = xnormal.sample((nsamples,))
 
-    obs_c2st = rv_c2st(X, Y, verbosity=2)
+    obs_c2st = alt_c2st(X, Y)
 
     assert obs_c2st != None
     print(obs_c2st)
 
 
-def test_diff_distributions_rv():
+def test_diff_distributions_alt():
 
     ndim = 5
     nsamples = 4048
@@ -115,12 +114,12 @@ def test_diff_distributions_rv():
     X = xnormal.sample((nsamples,))
     Y = ynormal.sample((nsamples,))
 
-    obs_c2st = rv_c2st(X, Y)
+    obs_c2st = alt_c2st(X, Y)
 
     assert obs_c2st != None
     print(obs_c2st)
 
-def test_distributions_overlap_by_two_sigma_rv():
+def test_distributions_overlap_by_two_sigma_alt():
 
     ndim = 5
     nsamples = 4048
@@ -131,7 +130,7 @@ def test_distributions_overlap_by_two_sigma_rv():
     X = xnormal.sample((nsamples,))
     Y = ynormal.sample((nsamples,))
 
-    obs_c2st = rv_c2st(X, Y)
+    obs_c2st = alt_c2st(X, Y)
 
     assert obs_c2st != None
     print(obs_c2st)
