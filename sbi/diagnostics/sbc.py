@@ -137,6 +137,8 @@ def sbc_on_batch(thos, xos, posterior, L, ranking_rv):
 
         # Rank true params vs posterior params under ranking_rv.
         ths = posterior.sample((L,), x=x_o, show_progress_bars=False)
+
+        # sample the posterior
         dap_samples[idx] = ths[
             0,
         ]
