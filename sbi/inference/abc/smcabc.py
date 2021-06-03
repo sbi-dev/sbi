@@ -496,7 +496,10 @@ class SMCABC(ABCBASE):
             # Create kernel on params and perturb.
             parms_perturbed = self.get_new_kernel(parms).sample()
 
-            is_within_prior = torch.isfinite(self.prior.log_prob(parms_perturbed))
+            try:
+                is_within_prior = self.prior.support.check(parms_perturbed)
+            except AttributeError:
+                is_within_prior = torch.isfinite(self.prior.log_prob(parms_perturbed))
             num_accepted += is_within_prior.sum().item()
 
             if num_accepted > 0:
