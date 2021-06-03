@@ -46,7 +46,11 @@ def test_running_sbc(method, model):
     )
     posterior = inferer.build_posterior().set_default_x(x_o)
 
-    sbc_in_batches(prior, simulator, posterior)
+    ranks, log_prob_thos, dap_samples = sbc_in_batches(prior, simulator, posterior)
+    assert ranks.shape != None
+    assert ranks.shape[-1] == theta.shape[-1]
+    assert dap_samples.shape[-1] == theta.shape[-1]
+    assert len(log_prob_thos.shape) == 1
 
 
 def test_sbc_checks():
@@ -55,6 +59,27 @@ def test_sbc_checks():
     num_dim = 2
     N = 10000
     L = 1000
+
+    prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
+    # Dummy log prob true params.
+    log_probs = prior.log_prob(prior.sample((N,)))
+    # Daps and ranks from prior for testing.
+    daps = prior.sample((N,))
+    ranks = torch.distributions.Uniform(zeros(num_dim), L * ones(num_dim)).sample((N,))
+
+    checks = sbc_checks(ranks, log_probs, prior.sample((N,)), daps, num_ranks=L)
+
+    assert (checks["ks_pvals"] > 0.05).all()
+    assert (checks["c2st_ranks"] < 0.55).all()
+    assert (checks["c2st_dap"] < 0.55).all()
+
+
+def test_sbc_checks_2():
+    """Test the uniformity checks for SBC with more dimensions and less ranks"""
+
+    num_dim = 12
+    N = 10000
+    L = 100
 
     prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
     # Dummy log prob true params.
