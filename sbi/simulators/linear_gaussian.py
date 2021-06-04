@@ -195,7 +195,7 @@ def samples_true_posterior_linear_gaussian_uniform_prior(
 
     while num_remaining > 0:
         candidate_samples = posterior.sample(sample_shape=(num_remaining,))
-        is_in_prior = within_support(prior.log_prob, candidate_samples)
+        is_in_prior = within_support(prior, candidate_samples)
         # accept if in prior
         if is_in_prior.sum():
             samples.append(candidate_samples[is_in_prior, :])
