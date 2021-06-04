@@ -63,7 +63,7 @@ def sir(
         init_param_candidates = torch.cat(init_param_candidates)
 
         # Norm weights in log space
-        log_weights -= torch.logsumexp(log_weights)
+        log_weights -= torch.logsumexp(log_weights, dim=0)
         probs = np.exp(log_weights.view(-1).numpy().astype(np.float64))
         probs[np.isnan(probs)] = 0.0
         probs[np.isinf(probs)] = 0.0

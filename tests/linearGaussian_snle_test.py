@@ -244,7 +244,10 @@ def test_c2st_multi_round_snl_on_linearGaussian(num_trials: int, set_seed):
     "sampling_method",
     ("slice_np", "slice_np_vectorized", "slice", "nuts", "hmc", "rejection"),
 )
-def test_api_snl_sampling_methods(sampling_method: str, prior_str: str, set_seed):
+@pytest.mark.parametrize("init_strategy", ("prior", "sir"))
+def test_api_snl_sampling_methods(
+    sampling_method: str, prior_str: str, init_strategy: str, set_seed
+):
     """Runs SNL on linear Gaussian and tests sampling from posterior via mcmc.
 
     Args:
@@ -285,5 +288,9 @@ def test_api_snl_sampling_methods(sampling_method: str, prior_str: str, set_seed
     posterior.sample(
         sample_shape=(num_samples,),
         x=x_o,
-        mcmc_parameters={"thin": 3, "num_chains": num_chains},
+        mcmc_parameters={
+            "thin": 3,
+            "num_chains": num_chains,
+            "init_strategy": init_strategy,
+        },
     )
