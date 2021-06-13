@@ -15,7 +15,9 @@ from tests.test_utils import check_c2st
 
 
 def test_mdn_conditional_density(num_dim: int = 3, cond_dim: int = 1):
-    """Test whether the conditional density infered from MDN parameters of a `DirectPosterior` matches analytical results for MVN. This uses a n-D joint and conditions on the last m values to generate a conditional.
+    """Test whether the conditional density infered from MDN parameters of a 
+    `DirectPosterior` matches analytical results for MVN. This uses a n-D joint and
+    conditions on the last m values to generate a conditional.
 
     Gaussian prior used for easier ground truthing of conditional posterior.
 
@@ -50,8 +52,6 @@ def test_mdn_conditional_density(num_dim: int = 3, cond_dim: int = 1):
     )
     joint_cov = joint_posterior.covariance_matrix
     joint_mean = joint_posterior.loc
-
-    joint_samples = joint_posterior.sample((num_samples,))
 
     conditional_mean, conditional_cov = conditional_of_mvn(
         joint_mean, joint_cov, condition[0, dims2condition]
