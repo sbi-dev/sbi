@@ -1,14 +1,13 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
-
-from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from typing import Any, Callable, List, Optional, Tuple, Union
 from warnings import warn
 
 import torch
 from torch import Tensor
 
+from pyknos.mdn.mdn import MultivariateGaussianMDN as mdn
 from sbi.utils.torchutils import ensure_theta_batched
 from sbi.utils.torchutils import BoxUniform
 
@@ -326,7 +325,7 @@ def _normalize_probs(probs: Tensor, limits: Tensor) -> Tensor:
 
 
 def extract_and_transform_mog(
-    posterior: DirectPosterior, context: Tensor = None
+    posterior: "DirectPosterior", context: Tensor = None
 ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
     """Extracts the Mixture of Gaussians (MoG) parameters
     from an MDN based DirectPosterior at either the default x or input x.
@@ -349,7 +348,7 @@ def extract_and_transform_mog(
 
     # extract and rescale means, mixture componenets and covariances
     nn = posterior.net
-    dist = posterior_net._distribution
+    dist = nn._distribution
 
     if context == None:
         encoded_x = nn._embedding_net(posterior.default_x)
