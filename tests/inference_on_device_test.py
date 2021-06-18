@@ -55,7 +55,7 @@ def test_training_and_mcmc_on_device(
 
     num_dim = 2
     num_samples = 10
-    num_simulations = 500
+    num_simulations = 100
     max_num_epochs = 5
 
     x_o = zeros(1, num_dim).to(data_device)
@@ -100,7 +100,7 @@ def test_training_and_mcmc_on_device(
 
     # Test for two rounds.
     for _ in range(2):
-        theta, x = simulate_for_sbi(simulator, prior, num_simulations)
+        theta, x = simulate_for_sbi(simulator, proposals[-1], num_simulations)
         theta, x = theta.to(data_device), x.to(data_device)
 
         _ = inferer.append_simulations(theta, x).train(

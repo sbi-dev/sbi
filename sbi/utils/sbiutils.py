@@ -7,13 +7,14 @@ from math import pi
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import torch
-from pyknos.nflows import transforms
+import pyknos.nflows.transforms as transforms
 from pyro.distributions import Empirical
 from torch import Tensor, as_tensor, float32
 from torch import nn as nn
-from torch import ones, optim, zeros
-from torch.distributions import Independent
+from torch import ones, optim, zeros, sqrt, tensor
+from torch.distributions import Independent, biject_to
 from torch.distributions.distribution import Distribution
+import torch.distributions.transforms as torch_tf
 from tqdm.auto import tqdm
 
 from sbi import utils as utils
@@ -882,6 +883,64 @@ def within_support(distribution: Any, samples: Tensor) -> Tensor:
     # custom wrapper distribution's.
     except (NotImplementedError, AttributeError):
         return torch.isfinite(distribution.log_prob(samples))
+
+
+def mcmc_transform(
+    prior: Any,
+    num_prior_samples_for_zscoring: int = 1000,
+    enable_transform: bool = True,
+    device: str = "cpu",
+    **kwargs,
+) -> torch_tf.Transform:
+    """
+    Builds a transform that is applied to parameters during MCMC.
+
+    It does two things:
+    1) When the prior support is bounded, it transforms the parameters into unbounded
+        space.
+    2) It z-scores the parameters such that MCMC is performed in a z-scored space.
+
+    Args:
+        prior: The prior distribution.
+        num_prior_samples_for_zscoring: The number of samples drawn from the prior
+            to infer the `mean` and `stddev` of the prior used for z-scoring. Unused if
+            the prior has bounded support or when the prior has `mean` and `stddev`
+            attributes.
+        enable_transform: Whether or not to use a transformation during MCMC.
+
+    Returns: A transformation that transforms whose `forward()` maps from unconstrained
+        (or z-scored) to constrained (or non-z-scored) space.
+    """
+
+    if enable_transform:
+        if hasattr(prior.support, "base_constraint") and hasattr(
+            prior.support.base_constraint, "upper_bound"
+        ):
+            transform = biject_to(prior.support)
+        else:
+            if hasattr(prior, "mean") and hasattr(prior, "stddev"):
+                prior_mean = prior.mean.to(device)
+                prior_std = prior.stddev.to(device)
+            else:
+                theta = prior.sample((num_prior_samples_for_zscoring,))
+                prior_mean = theta.mean(dim=0).to(device)
+                prior_std = theta.std(dim=0).to(device)
+
+            transform = torch_tf.AffineTransform(loc=prior_mean, scale=prior_std)
+    else:
+        transform = torch_tf.identity_transform
+
+    # Pytorch `transforms` do not sum the determinant over the parameters. However, if
+    # the `transform` explicitly is an `IndependentTransform`, it does. Since our
+    # `BoxUniform` is a `Independent` distribution, it will also automatically get a
+    # `IndependentTransform` wrapper in `biject_to`. Our solution here is to wrap all
+    # transforms as `IndependentTransform`.
+    if not isinstance(transform, torch_tf.IndependentTransform):
+        transform = torch_tf.IndependentTransform(
+            transform, reinterpreted_batch_ndims=1
+        )
+
+    return transform
 
 
 class ImproperEmpirical(Empirical):

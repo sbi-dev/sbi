@@ -19,6 +19,7 @@ from sbi.utils.sbiutils import (
     handle_invalid_x,
     logit,
     mask_sims_from_prior,
+    mcmc_transform,
     mog_log_prob,
     optimize_potential_fn,
     rejection_sample,
