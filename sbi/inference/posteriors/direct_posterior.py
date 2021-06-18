@@ -7,12 +7,13 @@ from warnings import warn
 
 import numpy as np
 import torch
+import torch.distributions.transforms as torch_tf
 from torch import Tensor, log, nn
 
 from sbi import utils as utils
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
-from sbi.types import ScalarFloat, Shape
-from sbi.utils import del_entries, rejection_sample, within_support
+from sbi.types import Shape
+from sbi.utils import del_entries, mcmc_transform, rejection_sample, within_support
 from sbi.utils.torchutils import (
     atleast_2d,
     batched_first_of_batch,
@@ -295,22 +296,26 @@ class DirectPosterior(NeuralPosterior):
                 samples are outside of the prior support.
             mcmc_method: Optional parameter to override `self.mcmc_method`.
             mcmc_parameters: Dictionary overriding the default parameters for MCMC.
-                The following parameters are supported: `thin` to set the thinning
-                factor for the chain, `warmup_steps` to set the initial number of
-                samples to discard, `num_chains` for the number of chains,
+                The following parameters are supported:
+                `thin` to set the thinning factor for the chain.
+                `warmup_steps` to set the initial number of samples to discard.
+                `num_chains` for the number of chains.
                 `init_strategy` for the initialisation strategy for chains; `prior`
                 will draw init locations from prior, whereas `sir` will use Sequential-
                 Importance-Resampling using `init_strategy_num_candidates` to find init
                 locations.
+                `enable_transform` a bool indicating whether MCMC is performed in
+                z-scored (and unconstrained) space.
             rejection_sampling_parameters: Dictionary overriding the default parameters
                 for rejection sampling. The following parameters are supported:
-                `proposal` as the proposal distribtution (default is the trained
-                neural net). `max_sampling_batch_size` as the batchsize of samples
-                being drawn from the proposal at every iteration.
+                `proposal` as the proposal distribtution (default is the prior).
+                `max_sampling_batch_size` as the batchsize of samples being drawn from
+                the proposal at every iteration.
                 `num_samples_to_find_max` as the number of samples that are used to
                 find the maximum of the `potential_fn / proposal` ratio.
                 `num_iter_to_find_max` as the number of gradient ascent iterations to
-                find the maximum of that ratio. `m` as multiplier to that ratio.
+                find the maximum of that ratio.
+                `m` as multiplier to that ratio.
             sample_with_mcmc: Deprecated since `sbi v0.17.0`. Use `sample_with=mcmc`
                 instead.
 
@@ -338,20 +343,27 @@ class DirectPosterior(NeuralPosterior):
             mcmc_method, mcmc_parameters = self._potentially_replace_mcmc_parameters(
                 mcmc_method, mcmc_parameters
             )
-            samples = self._sample_posterior_mcmc(
+            transform = mcmc_transform(
+                self._prior, device=self._device, **mcmc_parameters
+            )
+            tf_samples = self._sample_posterior_mcmc(
                 num_samples=num_samples,
                 potential_fn=potential_fn_provider(
-                    self._prior, self.net, x, mcmc_method
+                    self._prior, self.net, x, mcmc_method, transform
                 ),
                 init_fn=self._build_mcmc_init_fn(
                     self._prior,
-                    potential_fn_provider(self._prior, self.net, x, "slice_np"),
+                    potential_fn_provider(
+                        self._prior, self.net, x, "slice_np", transform
+                    ),
+                    transform=transform,
                     **mcmc_parameters,
                 ),
                 mcmc_method=mcmc_method,
                 show_progress_bars=show_progress_bars,
                 **mcmc_parameters,
             )
+            samples = transform(tf_samples)
         elif sample_with == "rejection":
             rejection_sampling_parameters = (
                 self._potentially_replace_rejection_parameters(
@@ -434,22 +446,26 @@ class DirectPosterior(NeuralPosterior):
             show_progress_bars: Whether to show sampling progress monitor.
             mcmc_method: Optional parameter to override `self.mcmc_method`.
             mcmc_parameters: Dictionary overriding the default parameters for MCMC.
-                The following parameters are supported: `thin` to set the thinning
-                factor for the chain, `warmup_steps` to set the initial number of
-                samples to discard, `num_chains` for the number of chains,
+                The following parameters are supported:
+                `thin` to set the thinning factor for the chain.
+                `warmup_steps` to set the initial number of samples to discard.
+                `num_chains` for the number of chains.
                 `init_strategy` for the initialisation strategy for chains; `prior`
                 will draw init locations from prior, whereas `sir` will use Sequential-
                 Importance-Resampling using `init_strategy_num_candidates` to find init
                 locations.
+                `enable_transform` a bool indicating whether MCMC is performed in
+                z-scored (and unconstrained) space.
             rejection_sampling_parameters: Dictionary overriding the default parameters
                 for rejection sampling. The following parameters are supported:
                 `proposal` as the proposal distribtution (default is the prior).
                 `max_sampling_batch_size` as the batchsize of samples being drawn from
-                the proposal at every iteration. `num_samples_to_find_max` as the
-                number of samples that are used to find the maximum of the
-                `potential_fn / proposal` ratio. `num_iter_to_find_max` as the number
-                of gradient ascent iterations to find the maximum of that ratio. `m` as
-                multiplier to that ratio.
+                the proposal at every iteration.
+                `num_samples_to_find_max` as the number of samples that are used to
+                find the maximum of the `potential_fn / proposal` ratio.
+                `num_iter_to_find_max` as the number of gradient ascent iterations to
+                find the maximum of that ratio.
+                `m` as multiplier to that ratio.
 
         Returns:
             Samples from conditional posterior.
@@ -551,7 +567,12 @@ class PotentialFunctionProvider:
     """
 
     def __call__(
-        self, prior, posterior_nn: nn.Module, x: Tensor, method: str
+        self,
+        prior,
+        posterior_nn: nn.Module,
+        x: Tensor,
+        method: str,
+        transform: torch_tf.Transform = torch_tf.identity_transform,
     ) -> Callable:
         """Return potential function.
 
@@ -561,6 +582,7 @@ class PotentialFunctionProvider:
         self.prior = prior
         self.device = next(posterior_nn.parameters()).device
         self.x = atleast_2d(x).to(self.device)
+        self.transform = transform
 
         if method == "slice":
             return partial(self.pyro_potential, track_gradients=False)
@@ -576,12 +598,22 @@ class PotentialFunctionProvider:
     def posterior_potential(
         self, theta: Union[Tensor, np.array], track_gradients: bool = False
     ) -> Tensor:
-        "Return posterior theta log prob. $p(\theta|x)$, $-\infty$ if outside prior."
+        """
+        Return posterior theta log prob. $p(\theta|x)$, $-\infty$ if outside prior.
+
+        Args:
+            theta:  Parameters $\theta$. If a `transform` is applied, `theta` should be
+                in transformed space.
+        """
 
         # Device is the same for net and prior.
-        theta = ensure_theta_batched(torch.as_tensor(theta, dtype=torch.float32)).to(
+        theta_tf = ensure_theta_batched(torch.as_tensor(theta, dtype=torch.float32)).to(
             self.device
         )
+        # Transform `theta` from transformed (i.e. unconstrained) to untransformed
+        # space.
+        theta = self.transform(theta_tf)
+        log_abs_det = self.transform.log_abs_det_jacobian(theta_tf, theta).sum(dim=1)
 
         theta_repeated, x_repeated = DirectPosterior._match_theta_and_x_batch_shapes(
             theta, self.x
@@ -591,17 +623,18 @@ class PotentialFunctionProvider:
 
             # Evaluate on device, move back to cpu for comparison with prior.
             posterior_log_prob = self.posterior_nn.log_prob(theta_repeated, x_repeated)
+            posterior_log_prob_tf = posterior_log_prob + log_abs_det
 
             # Force probability to be zero outside prior support.
             in_prior_support = within_support(self.prior, theta)
 
-            posterior_log_prob = torch.where(
+            posterior_log_prob_tf = torch.where(
                 in_prior_support,
-                posterior_log_prob,
+                posterior_log_prob_tf,
                 torch.tensor(float("-inf"), dtype=torch.float32, device=self.device),
             )
 
-        return posterior_log_prob
+        return posterior_log_prob_tf
 
     def pyro_potential(
         self, theta: Dict[str, Tensor], track_gradients: bool = False
@@ -609,12 +642,12 @@ class PotentialFunctionProvider:
         r"""Return posterior theta log prob. $p(\theta|x)$, $-\infty$ if outside prior."
 
         Args:
-            theta: Parameters $\theta$ (from pyro sampler).
+            theta: Parameters $\theta$ (from pyro sampler). If a `transform` is
+                applied, `theta` should be in transformed space.
 
         Returns:
             Negative posterior log probability $p(\theta|x)$, masked outside of prior.
         """
 
         theta = next(iter(theta.values()))
-
         return -self.posterior_potential(theta, track_gradients=track_gradients)

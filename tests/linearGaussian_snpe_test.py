@@ -432,7 +432,7 @@ def test_sample_conditional(snpe_method: type, set_seed):
     error = np.abs(sample_kde_grid - eval_grid.numpy())
 
     max_err = np.max(error)
-    assert max_err < 0.0025
+    assert max_err < 0.0026
 
 
 @pytest.mark.parametrize("snpe_method", [SNPE_A, SNPE_C])
