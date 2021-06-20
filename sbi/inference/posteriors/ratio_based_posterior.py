@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
+from functools import partial
 from typing import Any, Callable, Dict, List, Optional, Union
 from warnings import warn
 
@@ -10,8 +11,8 @@ from torch import Tensor, nn
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.types import Shape
-from sbi.utils import del_entries
-from sbi.utils.torchutils import ScalarFloat, ensure_theta_batched, ensure_x_batched
+from sbi.utils import del_entries, optimize_potential_fn, rejection_sample
+from sbi.utils.torchutils import ScalarFloat, atleast_2d, ensure_theta_batched
 
 
 class RatioBasedPosterior(NeuralPosterior):
@@ -34,8 +35,10 @@ class RatioBasedPosterior(NeuralPosterior):
         neural_net: nn.Module,
         prior,
         x_shape: torch.Size,
+        sample_with: str = "mcmc",
         mcmc_method: str = "slice_np",
         mcmc_parameters: Optional[Dict[str, Any]] = None,
+        rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
         device: str = "cpu",
     ):
         """
@@ -43,7 +46,14 @@ class RatioBasedPosterior(NeuralPosterior):
             method_family: One of snpe, snl, snre_a or snre_b.
             neural_net: A classifier for SNRE, a density estimator for SNPE and SNL.
             prior: Prior distribution with `.log_prob()` and `.sample()`.
-            x_shape: Shape of a single simulator output.
+            x_shape: Shape of the simulated data. It can differ from the
+                observed data the posterior is conditioned on later in the batch
+                dimension. If it differs, the additional entries are interpreted as
+                independent and identically distributed data / trials. I.e., the data is
+                assumed to be generated based on the same (unknown) model parameters or
+                experimental condations.
+            sample_with: Method to use for sampling from the posterior. Must be one of
+                [`mcmc` | `rejection`].
             mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`,
                 `hmc`, `nuts`. Currently defaults to `slice_np` for a custom numpy
                 implementation of slice sampling; select `hmc`, `nuts` or `slice` for
@@ -56,19 +66,24 @@ class RatioBasedPosterior(NeuralPosterior):
                 will draw init locations from prior, whereas `sir` will use Sequential-
                 Importance-Resampling using `init_strategy_num_candidates` to find init
                 locations.
+            rejection_sampling_parameters: Dictionary overriding the default parameters
+                for rejection sampling. The following parameters are supported:
+                `proposal` as the proposal distribtution (default is the prior).
+                `max_sampling_batch_size` as the batchsize of samples being drawn from
+                the proposal at every iteration. `num_samples_to_find_max` as the
+                number of samples that are used to find the maximum of the
+                `potential_fn / proposal` ratio. `num_iter_to_find_max` as the number
+                of gradient ascent iterations to find the maximum of that ratio. `m` as
+                multiplier to that ratio.
             device: Training device, e.g., cpu or cuda:0.
         """
         kwargs = del_entries(locals(), entries=("self", "__class__"))
         super().__init__(**kwargs)
 
     def log_prob(
-        self,
-        theta: Tensor,
-        x: Optional[Tensor] = None,
-        track_gradients: bool = False,
+        self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False
     ) -> Tensor:
-        r"""
-        Returns the log-probability of $p(x|\theta) \cdot p(\theta).$
+        r"""Returns the log-probability of $p(x|\theta) \cdot p(\theta).$
 
         This corresponds to an **unnormalized** posterior log-probability. Only for
         single-round SNRE_A / AALR, the returned log-probability will correspond to the
@@ -94,14 +109,15 @@ class RatioBasedPosterior(NeuralPosterior):
 
         self._warn_log_prob_snre()
 
-        with torch.set_grad_enabled(track_gradients):
-            # Send to device for evaluation, send to CPU for comparison with prior.
-            log_ratio = (
-                self.net([theta.to(self._device), x.to(self._device)])
-                .reshape(-1)
-                .to("cpu")
-            )
-            return log_ratio + self._prior.log_prob(theta)
+        # Sum log ratios over x batch of iid trials.
+        log_ratio = self._log_ratios_over_trials(
+            x.to(self._device),
+            theta.to(self._device),
+            self.net,
+            track_gradients=track_gradients,
+        )
+
+        return log_ratio.cpu() + self._prior.log_prob(theta)
 
     def _warn_log_prob_snre(self) -> None:
         if self._method_family == "snre_a":
@@ -121,9 +137,10 @@ class RatioBasedPosterior(NeuralPosterior):
         sample_shape: Shape = torch.Size(),
         x: Optional[Tensor] = None,
         show_progress_bars: bool = True,
-        sample_with_mcmc: Optional[bool] = None,
+        sample_with: Optional[str] = None,
         mcmc_method: Optional[str] = None,
         mcmc_parameters: Optional[Dict[str, Any]] = None,
+        rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
     ) -> Tensor:
         r"""
         Return samples from posterior distribution $p(\theta|x)$ with MCMC.
@@ -135,7 +152,8 @@ class RatioBasedPosterior(NeuralPosterior):
             x: Conditioning context for posterior $p(\theta|x)$. If not provided,
                 fall back onto `x` passed to `set_default_x()`.
             show_progress_bars: Whether to show sampling progress monitor.
-            sample_with_mcmc: Optional parameter to override `self.sample_with_mcmc`.
+            sample_with: Method to use for sampling from the posterior. Must be one of
+                [`mcmc` | `rejection`].
             mcmc_method: Optional parameter to override `self.mcmc_method`.
             mcmc_parameters: Dictionary overriding the default parameters for MCMC.
                 The following parameters are supported: `thin` to set the thinning
@@ -145,30 +163,64 @@ class RatioBasedPosterior(NeuralPosterior):
                 will draw init locations from prior, whereas `sir` will use Sequential-
                 Importance-Resampling using `init_strategy_num_candidates` to find init
                 locations.
+            rejection_sampling_parameters: Dictionary overriding the default parameters
+                for rejection sampling. The following parameters are supported:
+                `proposal` as the proposal distribtution (default is the prior).
+                `max_sampling_batch_size` as the batchsize of samples being drawn from
+                the proposal at every iteration. `num_samples_to_find_max` as the
+                number of samples that are used to find the maximum of the
+                `potential_fn / proposal` ratio. `num_iter_to_find_max` as the number
+                of gradient ascent iterations to find the maximum of that ratio. `m` as
+                multiplier to that ratio.
 
         Returns:
             Samples from posterior.
         """
 
-        x, num_samples, mcmc_method, mcmc_parameters = self._prepare_for_sample(
-            x, sample_shape, mcmc_method, mcmc_parameters
-        )
-
         self.net.eval()
 
+        sample_with = sample_with if sample_with is not None else self._sample_with
+        x, num_samples = self._prepare_for_sample(x, sample_shape)
+
         potential_fn_provider = PotentialFunctionProvider()
-        samples = self._sample_posterior_mcmc(
-            num_samples=num_samples,
-            potential_fn=potential_fn_provider(self._prior, self.net, x, mcmc_method),
-            init_fn=self._build_mcmc_init_fn(
-                self._prior,
-                potential_fn_provider(self._prior, self.net, x, "slice_np"),
+        if sample_with == "mcmc":
+            mcmc_method, mcmc_parameters = self._potentially_replace_mcmc_parameters(
+                mcmc_method, mcmc_parameters
+            )
+            samples = self._sample_posterior_mcmc(
+                num_samples=num_samples,
+                potential_fn=potential_fn_provider(
+                    self._prior, self.net, x, mcmc_method
+                ),
+                init_fn=self._build_mcmc_init_fn(
+                    self._prior,
+                    potential_fn_provider(self._prior, self.net, x, "slice_np"),
+                    **mcmc_parameters,
+                ),
+                mcmc_method=mcmc_method,
+                show_progress_bars=show_progress_bars,
                 **mcmc_parameters,
-            ),
-            mcmc_method=mcmc_method,
-            show_progress_bars=show_progress_bars,
-            **mcmc_parameters,
-        )
+            )
+        elif sample_with == "rejection":
+            rejection_sampling_parameters = (
+                self._potentially_replace_rejection_parameters(
+                    rejection_sampling_parameters
+                )
+            )
+            if "proposal" not in rejection_sampling_parameters:
+                rejection_sampling_parameters["proposal"] = self._prior
+
+            samples, _ = rejection_sample(
+                potential_fn=potential_fn_provider(
+                    self._prior, self.net, x, "rejection"
+                ),
+                num_samples=num_samples,
+                **rejection_sampling_parameters,
+            )
+        else:
+            raise NameError(
+                "The only implemented sampling methods are `mcmc` and `rejection`."
+            )
 
         self.net.train(True)
 
@@ -180,9 +232,11 @@ class RatioBasedPosterior(NeuralPosterior):
         condition: Tensor,
         dims_to_sample: List[int],
         x: Optional[Tensor] = None,
+        sample_with: str = "mcmc",
         show_progress_bars: bool = True,
         mcmc_method: Optional[str] = None,
         mcmc_parameters: Optional[Dict[str, Any]] = None,
+        rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
     ) -> Tensor:
         r"""
         Return samples from conditional posterior $p(\theta_i|\theta_j, x)$.
@@ -206,6 +260,9 @@ class RatioBasedPosterior(NeuralPosterior):
                 `condition`.
             x: Conditioning context for posterior $p(\theta|x)$. If not provided,
                 fall back onto `x` passed to `set_default_x()`.
+            sample_with: Method to use for sampling from the posterior. Must be one of
+                [`mcmc` | `rejection`]. In this method, the value of
+                `self._sample_with` will be ignored.
             show_progress_bars: Whether to show sampling progress monitor.
             mcmc_method: Optional parameter to override `self.mcmc_method`.
             mcmc_parameters: Dictionary overriding the default parameters for MCMC.
@@ -216,6 +273,15 @@ class RatioBasedPosterior(NeuralPosterior):
                 will draw init locations from prior, whereas `sir` will use Sequential-
                 Importance-Resampling using `init_strategy_num_candidates` to find init
                 locations.
+            rejection_sampling_parameters: Dictionary overriding the default parameters
+                for rejection sampling. The following parameters are supported:
+                `proposal` as the proposal distribtution (default is the prior).
+                `max_sampling_batch_size` as the batchsize of samples being drawn from
+                the proposal at every iteration. `num_samples_to_find_max` as the
+                number of samples that are used to find the maximum of the
+                `potential_fn / proposal` ratio. `num_iter_to_find_max` as the number
+                of gradient ascent iterations to find the maximum of that ratio. `m` as
+                multiplier to that ratio.
 
         Returns:
             Samples from conditional posterior.
@@ -227,9 +293,11 @@ class RatioBasedPosterior(NeuralPosterior):
             condition,
             dims_to_sample,
             x,
+            sample_with,
             show_progress_bars,
             mcmc_method,
             mcmc_parameters,
+            rejection_sampling_parameters,
         )
 
     def map(
@@ -262,10 +330,6 @@ class RatioBasedPosterior(NeuralPosterior):
                 fall back onto `x` passed to `set_default_x()`.
             num_iter: Maximum Number of optimization steps that the algorithm takes
                 to find the MAP.
-            early_stop_at: If `None`, it will optimize for `max_num_iter` iterations.
-                If `float`, the optimization will stop as soon as the steps taken by
-                the optimizer are smaller than `early_stop_at` times the standard
-                deviation of the initial guesses.
             learning_rate: Learning rate of the optimizer.
             init_method: How to select the starting parameters for the optimization. If
                 it is a string, it can be either [`posterior`, `prior`], which samples
@@ -324,6 +388,50 @@ class RatioBasedPosterior(NeuralPosterior):
             f"can evaluate the {normalized_or_not}posterior density with .log_prob()."
         )
 
+    @staticmethod
+    def _log_ratios_over_trials(
+        x: Tensor,
+        theta: Tensor,
+        net: nn.Module,
+        track_gradients: bool = False,
+    ) -> Tensor:
+        r"""Return log ratios summed over iid trials of `x`.
+
+        Note: `x` can be a batch with batch size larger 1. Batches in x are assumed to
+        be iid trials, i.e., data generated based on the same paramters / experimental
+        conditions.
+
+        Repeats `x` and $\theta$ to cover all their combinations of batch entries.
+
+        Args:
+            x: batch of iid data.
+            theta: batch of parameters
+            net: neural net representing the classifier to approximate the ratio.
+            track_gradients: Whether to track gradients.
+
+        Returns:
+            log_ratio_trial_sum: log ratio for each parameter, summed over all
+                batch entries (iid trials) in `x`.
+        """
+
+        theta_repeated, x_repeated = NeuralPosterior._match_theta_and_x_batch_shapes(
+            theta=theta, x=atleast_2d(x)
+        )
+        assert (
+            x_repeated.shape[0] == theta_repeated.shape[0]
+        ), "x and theta must match in batch shape."
+        assert (
+            next(net.parameters()).device == x.device and x.device == theta.device
+        ), f"device mismatch: net, x, theta: {next(net.parameters()).device}, {x.device}, {theta.device}."
+
+        # Calculate ratios in one batch.
+        with torch.set_grad_enabled(track_gradients):
+            log_ratio_trial_batch = net([theta_repeated, x_repeated])
+            # Reshape to (x-trials x parameters), sum over trial-log likelihoods.
+            log_ratio_trial_sum = log_ratio_trial_batch.reshape(x.shape[0], -1).sum(0)
+
+        return log_ratio_trial_sum
+
 
 class PotentialFunctionProvider:
     """
@@ -341,7 +449,7 @@ class PotentialFunctionProvider:
      most current trained posterior neural net.
 
     Returns:
-        Potential function for use by either numpy or pyro sampler
+        Potential function for use by either numpy, pyro, or rejection sampler.
     """
 
     def __call__(
@@ -349,18 +457,18 @@ class PotentialFunctionProvider:
         prior,
         classifier: nn.Module,
         x: Tensor,
-        mcmc_method: str,
+        method: str,
     ) -> Callable:
         r"""Return potential function for posterior $p(\theta|x)$.
 
-        Switch on numpy or pyro potential function based on `mcmc_method`.
+        Switch on numpy or pyro potential function based on `method`.
 
         Args:
             prior: Prior distribution that can be evaluated.
             classifier: Binary classifier approximating the likelihood up to a constant.
 
             x: Conditioning variable for posterior $p(\theta|x)$.
-            mcmc_method: One of `slice_np`, `slice`, `hmc` or `nuts`.
+            method: One of `slice_np`, `slice`, `hmc` or `nuts`, `rejection`.
 
         Returns:
             Potential function for sampler.
@@ -368,15 +476,26 @@ class PotentialFunctionProvider:
 
         self.classifier = classifier
         self.prior = prior
-        self.x = x
+        self.device = next(classifier.parameters()).device
+        self.x = atleast_2d(x).to(self.device)
 
-        if mcmc_method in ("slice", "hmc", "nuts"):
-            return self.pyro_potential
+        if method == "slice":
+            return partial(self.pyro_potential, track_gradients=False)
+        elif method in ("hmc", "nuts"):
+            return partial(self.pyro_potential, track_gradients=True)
+        elif "slice_np" in method:
+            return partial(self.posterior_potential, track_gradients=False)
+        elif method == "rejection":
+            return partial(self.posterior_potential, track_gradients=True)
         else:
-            return self.np_potential
+            NotImplementedError
 
-    def np_potential(self, theta: np.array) -> ScalarFloat:
-        """Return potential for Numpy slice sampler."
+    def posterior_potential(
+        self, theta: np.array, track_gradients: bool = False
+    ) -> ScalarFloat:
+        """Returns the unnormalized posterior log-probability.
+
+        This is the potential used in the numpy slice sampler and in rejection sampling.
 
         Args:
             theta: Parameters $\theta$, batch dimension 1.
@@ -386,23 +505,23 @@ class PotentialFunctionProvider:
         """
         theta = torch.as_tensor(theta, dtype=torch.float32)
         theta = ensure_theta_batched(theta)
-        num_batch = theta.shape[0]
-        x_batched = ensure_x_batched(self.x)
-        # Repeat x over batch dim to match theta batch, accounting for multi-D x.
-        x_repeated = x_batched.repeat(
-            num_batch, *(1 for _ in range(x_batched.ndim - 1))
+
+        log_ratio = RatioBasedPosterior._log_ratios_over_trials(
+            self.x,
+            theta.to(self.device),
+            self.classifier,
+            track_gradients=track_gradients,
         )
 
-        with torch.set_grad_enabled(False):
-            log_ratio = (
-                self.classifier([theta.to(self.x.device), x_repeated]).reshape(-1).cpu()
-            )
-
         # Notice opposite sign to pyro potential.
-        return log_ratio + self.prior.log_prob(theta)
+        return log_ratio.cpu() + self.prior.log_prob(theta)
 
-    def pyro_potential(self, theta: Dict[str, Tensor]) -> Tensor:
+    def pyro_potential(
+        self, theta: Dict[str, Tensor], track_gradients: bool = False
+    ) -> Tensor:
         r"""Return potential for Pyro sampler.
+
+        Note: for Pyro this is the negative unnormalized posterior log prob.
 
         Args:
             theta: Parameters $\theta$. The tensor's shape will be
@@ -417,8 +536,12 @@ class PotentialFunctionProvider:
 
         # Theta and x should have shape (1, dim).
         theta = ensure_theta_batched(theta)
-        x = ensure_x_batched(self.x)
 
-        log_ratio = self.classifier([theta.to(x.device), x]).cpu()
+        log_ratio = RatioBasedPosterior._log_ratios_over_trials(
+            self.x,
+            theta.to(self.device),
+            self.classifier,
+            track_gradients=track_gradients,
+        )
 
-        return -(log_ratio + self.prior.log_prob(theta))
+        return -(log_ratio.cpu() + self.prior.log_prob(theta))

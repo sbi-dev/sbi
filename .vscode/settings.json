@@ -73,9 +73,12 @@
     //
     // Signal that we are using shared workspace settings in .vscode
     "window.title": "sbi.vscode:: ${dirty}${activeEditorShort}${separator}${rootName}${separator}${appName}",
+<<<<<<< HEAD
     "python.linting.pylintEnabled": true,
     "python.linting.banditEnabled": false,
     "python.linting.mypyEnabled": false,
     "python.linting.pylamaEnabled": false,
     "python.pythonPath": "D:\\Anaconda3\\python.exe"
+=======
+>>>>>>> origin/main
 }

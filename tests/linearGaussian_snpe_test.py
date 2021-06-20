@@ -12,7 +12,7 @@ from torch.distributions import MultivariateNormal
 
 from sbi import analysis as analysis
 from sbi import utils as utils
-from sbi.inference import SNPE_B, SNPE_C, prepare_for_sbi, simulate_for_sbi
+from sbi.inference import SNPE_A, SNPE_B, SNPE_C, prepare_for_sbi, simulate_for_sbi
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     samples_true_posterior_linear_gaussian_mvn_prior_different_dims,
@@ -27,27 +27,30 @@ from tests.test_utils import (
 )
 
 
+@pytest.mark.parametrize("snpe_method", [SNPE_A, SNPE_C])
 @pytest.mark.parametrize(
-    "num_dim, prior_str",
+    "num_dim, prior_str, num_trials",
     (
-        (2, "gaussian"),
-        (2, "uniform"),
-        (1, "gaussian"),
+        (2, "gaussian", 1),
+        (2, "uniform", 1),
+        (1, "gaussian", 1),
+        # no iid x in snpe.
+        pytest.param(1, "gaussian", 2, marks=pytest.mark.xfail),
+        pytest.param(2, "gaussian", 2, marks=pytest.mark.xfail),
     ),
 )
 def test_c2st_snpe_on_linearGaussian(
-    num_dim: int,
-    prior_str: str,
-    set_seed,
+    snpe_method, num_dim: int, prior_str: str, num_trials: int, set_seed
 ):
-    """Test whether SNPE C infers well a simple example with available ground truth.
+    """Test whether SNPE infers well a simple example with available ground truth.
 
     Args:
         set_seed: fixture for manual seeding
     """
 
-    x_o = zeros(1, num_dim)
+    x_o = zeros(num_trials, num_dim)
     num_samples = 1000
+    num_simulations = 2500
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(num_dim)
@@ -58,7 +61,7 @@ def test_c2st_snpe_on_linearGaussian(
         prior_cov = eye(num_dim)
         prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
         gt_posterior = true_posterior_linear_gaussian_mvn_prior(
-            x_o[0], likelihood_shift, likelihood_cov, prior_mean, prior_cov
+            x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
         )
         target_samples = gt_posterior.sample((num_samples,))
     else:
@@ -67,16 +70,14 @@ def test_c2st_snpe_on_linearGaussian(
             x_o, likelihood_shift, likelihood_cov, prior=prior, num_samples=num_samples
         )
 
-    def simulator(theta):
-        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
-
-    simulator, prior = prepare_for_sbi(simulator, prior)
-    inference = SNPE_C(
-        prior,
-        show_progress_bars=False,
+    simulator, prior = prepare_for_sbi(
+        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov), prior
     )
+    inference = snpe_method(prior, show_progress_bars=False)
 
-    theta, x = simulate_for_sbi(simulator, prior, 2000, simulation_batch_size=1000)
+    theta, x = simulate_for_sbi(
+        simulator, prior, num_simulations, simulation_batch_size=1000
+    )
     _ = inference.append_simulations(theta, x).train(training_batch_size=100)
     posterior = inference.build_posterior().set_default_x(x_o)
     samples = posterior.sample((num_samples,))
@@ -103,7 +104,7 @@ def test_c2st_snpe_on_linearGaussian(
 
     elif prior_str == "uniform":
         # Check whether the returned probability outside of the support is zero.
-        posterior_prob = get_prob_outside_uniform_prior(posterior, num_dim)
+        posterior_prob = get_prob_outside_uniform_prior(posterior, prior, num_dim)
         assert (
             posterior_prob == 0.0
         ), "The posterior probability outside of the prior support is not zero"
@@ -155,7 +156,7 @@ def test_c2st_snpe_on_linearGaussian_different_dims(set_seed):
     prior_cov = eye(theta_dim)
     prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
     target_samples = samples_true_posterior_linear_gaussian_mvn_prior_different_dims(
-        x_o[0],
+        x_o,
         likelihood_shift,
         likelihood_cov,
         prior_mean,
@@ -164,19 +165,17 @@ def test_c2st_snpe_on_linearGaussian_different_dims(set_seed):
         num_samples=num_samples,
     )
 
-    def simulator(theta):
-        return linear_gaussian(
+    simulator, prior = prepare_for_sbi(
+        lambda theta: linear_gaussian(
             theta, likelihood_shift, likelihood_cov, num_discarded_dims=discard_dims
-        )
-
-    simulator, prior = prepare_for_sbi(simulator, prior)
-    inference = SNPE_C(
-        prior=None,  # Test whether prior can be `None`.
-        density_estimator="maf",
-        show_progress_bars=False,
+        ),
+        prior,
     )
+    # Test whether prior can be `None`.
+    inference = SNPE_C(prior=None, density_estimator="maf", show_progress_bars=False)
 
-    theta, x = simulate_for_sbi(simulator, prior, 2000, simulation_batch_size=1)  # type: ignore
+    # type: ignore
+    theta, x = simulate_for_sbi(simulator, prior, 2000, simulation_batch_size=1)
     inference = inference.append_simulations(theta, x)
     _ = inference.train(max_num_epochs=10)  # Test whether we can stop and resume.
     _ = inference.train(resume_training=True)
@@ -195,12 +194,12 @@ def test_c2st_snpe_on_linearGaussian_different_dims(set_seed):
         pytest.param(
             "snpe_b",
             marks=pytest.mark.xfail(
-                raises=NotImplementedError,
-                reason="""SNPE-B not implemented""",
+                raises=NotImplementedError, reason="""SNPE-B not implemented"""
             ),
         ),
         "snpe_c",
         "snpe_c_non_atomic",
+        "snpe_a",
     ),
 )
 def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str, set_seed):
@@ -223,20 +222,21 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str, set_seed):
     prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
 
     gt_posterior = true_posterior_linear_gaussian_mvn_prior(
-        x_o[0], likelihood_shift, likelihood_cov, prior_mean, prior_cov
+        x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
     )
     target_samples = gt_posterior.sample((num_samples,))
-
-    def simulator(theta):
-        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     if method_str == "snpe_c_non_atomic":
         density_estimator = utils.posterior_nn("mdn", num_components=5)
         method_str = "snpe_c"
+    elif method_str == "snpe_a":
+        density_estimator = "mdn_snpe_a"
     else:
         density_estimator = "maf"
 
-    simulator, prior = prepare_for_sbi(simulator, prior)
+    simulator, prior = prepare_for_sbi(
+        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov), prior
+    )
     creation_args = dict(
         simulator=simulator,
         prior=prior,
@@ -264,6 +264,21 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str, set_seed):
         )
         _ = inference.append_simulations(theta, x, proposal=posterior1).train()
         posterior = inference.build_posterior().set_default_x(x_o)
+    elif method_str == "snpe_a":
+        inference = SNPE_A(**creation_args)
+        proposal = prior
+        final_round = False
+        num_rounds = 3
+        for r in range(num_rounds):
+            if r == 2:
+                final_round = True
+            theta, x = simulate_for_sbi(
+                simulator, proposal, 500, simulation_batch_size=50
+            )
+            inference = inference.append_simulations(theta, x, proposal=proposal)
+            _ = inference.train(max_num_epochs=200, final_round=final_round)
+            posterior = inference.build_posterior().set_default_x(x_o)
+            proposal = posterior
 
     samples = posterior.sample((num_samples,))
 
@@ -273,18 +288,19 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str, set_seed):
 
 # Testing rejection and mcmc sampling methods.
 @pytest.mark.slow
+@pytest.mark.parametrize("snpe_method", [SNPE_A, SNPE_C])
 @pytest.mark.parametrize(
-    "sample_with_mcmc, mcmc_method, prior_str",
+    "sample_with, mcmc_method, prior_str",
     (
-        (True, "slice_np", "gaussian"),
-        (True, "slice", "gaussian"),
+        ("mcmc", "slice_np", "gaussian"),
+        ("mcmc", "slice", "gaussian"),
         # XXX (True, "slice", "uniform"),
         # XXX takes very long. fix when refactoring pyro sampling
-        (False, "rejection", "uniform"),
+        ("rejection", "rejection", "uniform"),
     ),
 )
 def test_api_snpe_c_posterior_correction(
-    sample_with_mcmc, mcmc_method, prior_str, set_seed
+    snpe_method: type, sample_with, mcmc_method, prior_str, set_seed
 ):
     """Test that leakage correction applied to sampling works, with both MCMC and
     rejection.
@@ -307,25 +323,22 @@ def test_api_snpe_c_posterior_correction(
     else:
         prior = utils.BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
 
-    def simulator(theta):
-        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
-
-    simulator, prior = prepare_for_sbi(simulator, prior)
-    inference = SNPE_C(
+    simulator, prior = prepare_for_sbi(
+        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov), prior
+    )
+    inference = snpe_method(
         prior,
-        density_estimator="maf",
         simulation_batch_size=50,
-        sample_with_mcmc=sample_with_mcmc,
+        sample_with=sample_with,
         mcmc_method=mcmc_method,
         show_progress_bars=False,
     )
 
     theta, x = simulate_for_sbi(simulator, prior, 1000)
     _ = inference.append_simulations(theta, x).train(max_num_epochs=5)
+
     posterior = inference.build_posterior()
-    posterior = posterior.set_sample_with_mcmc(sample_with_mcmc).set_mcmc_method(
-        mcmc_method
-    )
+    posterior = posterior.set_sample_with(sample_with).set_mcmc_method(mcmc_method)
 
     # Posterior should be corrected for leakage even if num_rounds just 1.
     samples = posterior.sample((10,), x=x_o)
@@ -335,7 +348,8 @@ def test_api_snpe_c_posterior_correction(
 
 
 @pytest.mark.slow
-def test_sample_conditional(set_seed):
+@pytest.mark.parametrize("snpe_method", [SNPE_A, SNPE_C])
+def test_sample_conditional(snpe_method: type, set_seed):
     """
     Test whether sampling from the conditional gives the same results as evaluating.
 
@@ -363,18 +377,18 @@ def test_sample_conditional(set_seed):
         else:
             return linear_gaussian(theta, -likelihood_shift, likelihood_cov)
 
-    net = utils.posterior_nn("maf", hidden_features=20)
+    if snpe_method == SNPE_A:
+        net = utils.posterior_nn("mdn_snpe_a", hidden_features=20)
+    else:
+        net = utils.posterior_nn("maf", hidden_features=20)
 
     simulator, prior = prepare_for_sbi(simulator, prior)
-    inference = SNPE_C(
-        prior,
-        density_estimator=net,
-        show_progress_bars=False,
-    )
+    inference = snpe_method(prior, density_estimator=net, show_progress_bars=False)
 
     # We need a pretty big dataset to properly model the bimodality.
     theta, x = simulate_for_sbi(simulator, prior, 10000)
     _ = inference.append_simulations(theta, x).train(max_num_epochs=50)
+
     posterior = inference.build_posterior().set_default_x(x_o)
     samples = posterior.sample((50,))
 
@@ -396,16 +410,8 @@ def test_sample_conditional(set_seed):
     density = gaussian_kde(cond_samples.numpy().T, bw_method="scott")
 
     X, Y = np.meshgrid(
-        np.linspace(
-            limits[0][0],
-            limits[0][1],
-            50,
-        ),
-        np.linspace(
-            limits[1][0],
-            limits[1][1],
-            50,
-        ),
+        np.linspace(limits[0][0], limits[0][1], 50),
+        np.linspace(limits[1][0], limits[1][1], 50),
     )
     positions = np.vstack([X.ravel(), Y.ravel()])
     sample_kde_grid = np.reshape(density(positions).T, X.shape)
@@ -429,7 +435,8 @@ def test_sample_conditional(set_seed):
     assert max_err < 0.0025
 
 
-def example_posterior():
+@pytest.mark.parametrize("snpe_method", [SNPE_A, SNPE_C])
+def test_example_posterior(snpe_method: type):
     """Return an inferred `NeuralPosterior` for interactive examination."""
     num_dim = 2
     x_o = zeros(1, num_dim)
@@ -442,16 +449,19 @@ def example_posterior():
     prior_cov = eye(num_dim)
     prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
 
-    def simulator(theta):
-        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
+    if snpe_method == SNPE_A:
+        extra_kwargs = dict(final_round=True)
+    else:
+        extra_kwargs = dict()
 
-    simulator, prior = prepare_for_sbi(simulator, prior)
-    inference = SNPE_C(
-        prior,
-        show_progress_bars=False,
+    simulator, prior = prepare_for_sbi(
+        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov), prior
     )
+    inference = snpe_method(prior, show_progress_bars=False, **extra_kwargs)
     theta, x = simulate_for_sbi(
         simulator, prior, 1000, simulation_batch_size=10, num_workers=6
     )
     _ = inference.append_simulations(theta, x).train()
-    return inference.build_posterior().set_default_x(x_o)
+
+    posterior = inference.build_posterior().set_default_x(x_o)
+    assert posterior is not None

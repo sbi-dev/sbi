@@ -68,7 +68,6 @@ def test_inference_with_2d_x(embedding, method):
     simulator, prior = prepare_for_sbi(simulator_2d, prior)
 
     theta_o = torch.ones(1, num_dim)
-    x_o = simulator(theta_o)
 
     if method == SNPE:
         net_provider = utils.posterior_nn(
@@ -76,21 +75,28 @@ def test_inference_with_2d_x(embedding, method):
             embedding_net=embedding(),
         )
         sample_kwargs = {"sample_with_mcmc": True}
+        num_trials = 1
     elif method == SNLE:
         net_provider = utils.likelihood_nn(model="mdn", embedding_net=embedding())
         sample_kwargs = {}
+        num_trials = 2
     else:
         net_provider = utils.classifier_nn(
             model="mlp",
             embedding_net_x=embedding(),
         )
-        sample_kwargs = {}
+        sample_kwargs = {
+            "mcmc_method": "slice_np_vectorized",
+            "mcmc_parameters": {"num_chains": 2},
+        }
+        num_trials = 2
 
     inference = method(prior, net_provider, show_progress_bars=False)
     theta, x = simulate_for_sbi(simulator, prior, num_simulations)
     _ = inference.append_simulations(theta, x).train(
         training_batch_size=100, max_num_epochs=10
     )
+    x_o = simulator(theta_o.repeat(num_trials, 1))
     posterior = inference.build_posterior(**sample_kwargs).set_default_x(x_o)
 
     posterior.log_prob(posterior.sample((num_samples,), show_progress_bars=False))

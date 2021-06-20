@@ -10,7 +10,8 @@ from sbi.utils.restriction_estimator import RestrictedPrior, RestrictionEstimato
 from sbi.utils.sbiutils import (
     batched_mixture_mv,
     batched_mixture_vmv,
-    check_if_boxuniform,
+    check_dist_class,
+    check_warn_and_setstate,
     clamp_and_warn,
     del_entries,
     expit,
@@ -18,7 +19,10 @@ from sbi.utils.sbiutils import (
     handle_invalid_x,
     logit,
     mask_sims_from_prior,
-    sample_posterior_within_prior,
+    mog_log_prob,
+    optimize_potential_fn,
+    rejection_sample,
+    rejection_sample_posterior_within_prior,
     standardizing_net,
     standardizing_transform,
     warn_if_zscoring_changes_data,
@@ -29,6 +33,7 @@ from sbi.utils.sbiutils import (
 )
 from sbi.utils.torchutils import (
     BoxUniform,
+    assert_all_finite,
     cbrt,
     create_alternating_binary_mask,
     create_mid_split_binary_mask,

@@ -168,6 +168,8 @@ class RestrictionEstimator:
         self._prior = prior
         self._classifier = None
 
+        self._device = "cpu"  # TODO hot fix to prevent the tests from crashing
+
         if isinstance(model, str):
             build_nn = build_classifier(
                 model,
@@ -202,7 +204,7 @@ class RestrictionEstimator:
             `RestrictionEstimator` object (returned so that this function is chainable).
         """
 
-        validate_theta_and_x(theta, x)
+        theta, x = validate_theta_and_x(theta, x, training_device=self._device)
 
         if self._valid_or_invalid_criterion == "nan":
             label, _, _ = handle_invalid_x(x)

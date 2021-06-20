@@ -1,3 +1,25 @@
+# v0.16.0
+
+## Major changes
+- Implementation of SNPE-A (thanks @famura and @theogruner, #474, #478, #480, #482)
+- Option to do inference over iid observations with SNLE and SNRE (#484, #488)
+
+## Minor changes
+- Fixed unused argument `num_bins` when using `nsf` as density estimator (#465)
+- Fixes to adapt to the new support handling in `torch` `v1.8.0` (#469)
+- More scalars for monitoring training progress (thanks @psteinb #471)
+- Fixed bug in `minimal.py` (thanks @psteinb, #485)
+- Depend on `pyknos` `v0.14.2`
+
+
+# v0.15.1
+
+- add option to pass `torch.data.DataLoader` kwargs to all inference methods (thanks @narendramukherjee, #445)
+- fix bug due to release of `torch` `v1.8.0` (#451)
+- expose `leakage_correction` parameters for `log_prob` correction in unnormalized 
+  posteriors (thanks @famura, #454)
+
+
 # v0.15.0
 
 ## Major changes

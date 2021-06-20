@@ -25,13 +25,19 @@ from sbi.mcmc import (
     sir,
 )
 from sbi.types import Array, Shape
-from sbi.utils.sbiutils import check_if_boxuniform
+from sbi.utils.sbiutils import (
+    check_dist_class,
+    check_warn_and_setstate,
+    optimize_potential_fn,
+    rejection_sample,
+)
 from sbi.utils.torchutils import (
+    BoxUniform,
     ScalarFloat,
     atleast_2d_float32_tensor,
     ensure_theta_batched,
 )
-from sbi.utils.user_input_checks import process_x
+from sbi.utils.user_input_checks import check_for_possibly_batched_x_shape, process_x
 
 
 class NeuralPosterior(ABC):
@@ -49,8 +55,10 @@ class NeuralPosterior(ABC):
         neural_net: nn.Module,
         prior,
         x_shape: torch.Size,
+        sample_with: str,
         mcmc_method: str = "slice_np",
         mcmc_parameters: Optional[Dict[str, Any]] = None,
+        rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
         device: str = "cpu",
     ):
         """
@@ -58,7 +66,9 @@ class NeuralPosterior(ABC):
             method_family: One of snpe, snl, snre_a or snre_b.
             neural_net: A classifier for SNRE, a density estimator for SNPE and SNL.
             prior: Prior distribution with `.log_prob()` and `.sample()`.
-            x_shape: Shape of a single simulator output.
+            x_shape: Shape of the simulator data.
+            sample_with: Method to use for sampling from the posterior. Must be one of
+                [`mcmc` | `rejection`].
             mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`,
                 `hmc`, `nuts`. Currently defaults to `slice_np` for a custom numpy
                 implementation of slice sampling; select `hmc`, `nuts` or `slice` for
@@ -71,25 +81,43 @@ class NeuralPosterior(ABC):
                 will draw init locations from prior, whereas `sir` will use Sequential-
                 Importance-Resampling. Init strategies may have their own keywords
                 which can also be set from `mcmc_parameters`.
+            rejection_sampling_parameters: Dictionary overriding the default parameters
+                for rejection sampling. The following parameters are supported:
+                `proposal` as the proposal distribtution.
+                `max_sampling_batch_size` as the batchsize of samples being drawn from
+                the proposal at every iteration. `num_samples_to_find_max` as the
+                number of samples that are used to find the maximum of the
+                `potential_fn / proposal` ratio. `num_iter_to_find_max` as the number
+                of gradient ascent iterations to find the maximum of that ratio. `m` as
+                multiplier to that ratio.
             device: Training device, e.g., cpu or cuda.
         """
         if method_family in ("snpe", "snle", "snre_a", "snre_b"):
             self._method_family = method_family
         else:
-            raise ValueError("Method family unsupported.")
+            raise ValueError(f"Method family '{method_family}' unsupported.")
 
         self.net = neural_net
 
         self.set_mcmc_method(mcmc_method)
         self.set_mcmc_parameters(mcmc_parameters)
+        self.set_sample_with(sample_with)
+        self.set_rejection_sampling_parameters(rejection_sampling_parameters)
 
         self._leakage_density_correction_factor = None  # Correction factor for SNPE.
         self._mcmc_init_params = None
         self._num_trained_rounds = 0
         self._prior = prior
         self._x = None
+        self._num_iid_trials = None
         self._x_shape = x_shape
         self._device = device
+        # Methods capable of handling iid xo.
+        self._iid_methods = ["snle", "snre_a", "snre_b"]
+        self._allow_iid_x = method_family in self._iid_methods
+
+        if not self._allow_iid_x:
+            check_for_possibly_batched_x_shape(self._x_shape)
 
     @property
     def default_x(self) -> Optional[Tensor]:
@@ -121,9 +149,41 @@ class NeuralPosterior(ABC):
         Returns:
             `NeuralPosterior` that will use a default `x` when not explicitly passed.
         """
-        processed_x = process_x(x, self._x_shape)
-        self._x = processed_x
+        self._x = process_x(x, self._x_shape, allow_iid_x=self._allow_iid_x)
+        self._num_iid_trials = self._x.shape[0]
 
+        return self
+
+    @property
+    def sample_with(self) -> str:
+        """
+        Return `True` if NeuralPosterior instance should use MCMC in `.sample()`.
+        """
+        return self._sample_with
+
+    @sample_with.setter
+    def sample_with(self, value: str) -> None:
+        """See `set_sample_with`."""
+        self.set_sample_with(value)
+
+    def set_sample_with(self, sample_with: str) -> "NeuralPosterior":
+        """Set the sampling method for the `NeuralPosterior`.
+
+        Args:
+            sample_with: The method to sample with.
+
+        Returns:
+            `NeuralPosterior` for chainable calls.
+
+        Raises:
+            ValueError: on attempt to turn off MCMC sampling for family of methods that
+                do not support rejection sampling.
+        """
+        if sample_with not in ("mcmc", "rejection"):
+            raise NameError(
+                "The only implemented sampling methods are `mcmc` and `rejection`."
+            )
+        self._sample_with = sample_with
         return self
 
     @property
@@ -180,12 +240,42 @@ class NeuralPosterior(ABC):
         self._mcmc_parameters = parameters
         return self
 
+    @property
+    def rejection_sampling_parameters(self) -> dict:
+        """Returns rejection sampling parameters."""
+        if self._rejection_sampling_parameters is None:
+            return {}
+        else:
+            return self._rejection_sampling_parameters
+
+    @rejection_sampling_parameters.setter
+    def rejection_sampling_parameters(self, parameters: Dict[str, Any]) -> None:
+        """See `set_rejection_sampling_parameters`."""
+        self.set_rejection_sampling_parameters(parameters)
+
+    def set_rejection_sampling_parameters(
+        self, parameters: Dict[str, Any]
+    ) -> "NeuralPosterior":
+        """Sets parameters for rejection sampling and returns `NeuralPosterior`.
+
+        Args:
+            parameters: Dictonary overriding the default parameters
+                for rejection sampling. The following parameters are supported:
+                `proposal` as the proposal distribtution. `num_samples_to_find_max`
+                as the number of samples that are used to find the maximum of the
+                `potential_fn / proposal` ratio. `m` as multiplier to that ratio.
+                `sampling_batch_size` as the batchsize of samples being drawn from
+                the proposal at every iteration.
+
+        Returns:
+            `NeuralPosterior for chainable calls.
+        """
+        self._rejection_sampling_parameters = parameters
+        return self
+
     @abstractmethod
     def log_prob(
-        self,
-        theta: Tensor,
-        x: Optional[Tensor] = None,
-        track_gradients: bool = False,
+        self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False
     ) -> Tensor:
         """See child classes for docstring."""
         pass
@@ -240,14 +330,14 @@ class NeuralPosterior(ABC):
         return self
 
     def _prepare_theta_and_x_for_log_prob_(
-        self,
-        theta: Tensor,
-        x: Optional[Tensor] = None,
+        self, theta: Tensor, x: Optional[Tensor] = None
     ) -> Tuple[Tensor, Tensor]:
         r"""Returns $\theta$ and $x$ in shape that can be used by posterior.log_prob().
 
         Checks shapes of $\theta$ and $x$ and then repeats $x$ as often as there were
         batch elements in $\theta$.
+
+        Moves $\theta$ and $x$ to the device of the neural net.
 
         Args:
             theta: Parameters $\theta$.
@@ -264,13 +354,9 @@ class NeuralPosterior(ABC):
 
         # Select and check x to condition on.
         x = atleast_2d_float32_tensor(self._x_else_default_x(x))
-        self._ensure_single_x(x)
+        if not self._allow_iid_x:
+            self._ensure_single_x(x)
         self._ensure_x_consistent_with_default_x(x)
-
-        # Repeat `x` in case of evaluation on multiple `theta`. This is needed below in
-        # when calling nflows in order to have matching shapes of theta and context x
-        # at neural network evaluation time.
-        x = self._match_x_with_theta_batch_shape(x, theta)
 
         return theta, x
 
@@ -278,11 +364,9 @@ class NeuralPosterior(ABC):
         self,
         x: Tensor,
         sample_shape: Optional[Tensor],
-        mcmc_method: Optional[str],
-        mcmc_parameters: Optional[Dict[str, Any]],
-    ) -> Tuple[Tensor, int, str, Dict[str, Any]]:
+    ) -> Tuple[Tensor, int]:
         r"""
-        Return checked and (potentially default) values to sample from the posterior.
+        Return checked, reshaped, potentially default values for `x` and `sample_shape`.
 
         Args:
             sample_shape: Desired shape of samples that are drawn from posterior. If
@@ -291,6 +375,27 @@ class NeuralPosterior(ABC):
             x: Conditioning context for posterior $p(\theta|x)$. If not provided,
                 fall back onto `x_o` if previously provided for multiround training, or
                 to a set default (see `set_default_x()` method).
+
+        Returns: Single (default) $x$ with batch dimension; an integer number of
+            samples.
+        """
+
+        x = atleast_2d_float32_tensor(self._x_else_default_x(x))
+        if not self._allow_iid_x:
+            self._ensure_single_x(x)
+        self._ensure_x_consistent_with_default_x(x)
+        num_samples = torch.Size(sample_shape).numel()
+
+        # Move x to current device.
+        return x.to(self._device), num_samples
+
+    def _potentially_replace_mcmc_parameters(
+        self, mcmc_method: Optional[str], mcmc_parameters: Optional[Dict[str, Any]]
+    ) -> Tuple[str, Dict[str, Any]]:
+        """
+        Return potentially default values to sample from the posterior with MCMC.
+
+        Args:
             mcmc_method: Optional parameter to override `self.mcmc_method`.
             mcmc_parameters: Dictionary overriding the default parameters for MCMC.
                 The following parameters are supported: `thin` to set the thinning
@@ -301,25 +406,39 @@ class NeuralPosterior(ABC):
                 Importance-Resampling using `init_strategy_num_candidates` to find init
                 locations.
 
-        Returns: Single (potentially default) $x$ with batch dimension; an integer
-            number of samples; a (potentially default) mcmc method; and (potentially
+        Returns: A (default) mcmc method and (potentially
             default) mcmc parameters.
         """
-
-        x = atleast_2d_float32_tensor(self._x_else_default_x(x))
-        self._ensure_single_x(x)
-        self._ensure_x_consistent_with_default_x(x)
-        num_samples = torch.Size(sample_shape).numel()
-
         mcmc_method = mcmc_method if mcmc_method is not None else self.mcmc_method
         mcmc_parameters = (
             mcmc_parameters if mcmc_parameters is not None else self.mcmc_parameters
         )
+        return mcmc_method, mcmc_parameters
 
-        # Move x to current device.
-        x = x.to(self._device)
+    def _potentially_replace_rejection_parameters(
+        self, rejection_sampling_parameters: Optional[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """
+        Return potentially default values to rejection sample the posterior.
 
-        return x, num_samples, mcmc_method, mcmc_parameters
+        Args:
+            rejection_sampling_parameters: Dictionary overriding the default
+                parameters for rejection sampling. The following parameters are
+                supported: `proposal` as the proposal distribtution.
+                `num_samples_to_find_max` as the number of samples that are used to
+                find the maximum of the `potential_fn / proposal` ratio. `m` as
+                multiplier to that ratio. `sampling_batch_size` as the batchsize of
+                samples being drawn from the proposal at every iteration.
+
+        Returns: Potentially default rejection sampling parameters.
+        """
+        rejection_sampling_parameters = (
+            rejection_sampling_parameters
+            if rejection_sampling_parameters is not None
+            else self.rejection_sampling_parameters
+        )
+
+        return rejection_sampling_parameters
 
     def _sample_posterior_mcmc(
         self,
@@ -516,9 +635,11 @@ class NeuralPosterior(ABC):
         condition: Tensor,
         dims_to_sample: List[int],
         x: Optional[Tensor] = None,
+        sample_with: str = "mcmc",
         show_progress_bars: bool = True,
         mcmc_method: Optional[str] = None,
         mcmc_parameters: Optional[Dict[str, Any]] = None,
+        rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
     ) -> Tensor:
         r"""
         Return samples from conditional posterior $p(\theta_i|\theta_j, x)$.
@@ -527,7 +648,7 @@ class NeuralPosterior(ABC):
         from a few parameter dimensions while the other parameter dimensions are kept
         fixed at values specified in `condition`.
 
-        Samples are obtained with MCMC.
+        Samples are obtained with MCMC or rejection sampling.
 
         Args:
             potential_fn_provider: Returns the potential function for the unconditional
@@ -545,6 +666,9 @@ class NeuralPosterior(ABC):
             x: Conditioning context for posterior $p(\theta|x)$. If not provided,
                 fall back onto `x_o` if previously provided for multiround training, or
                 to a set default (see `set_default_x()` method).
+            sample_with: Method to use for sampling from the posterior. Must be one of
+                [`mcmc` | `rejection`]. In this method, the value of
+                `self.sample_with` will be ignored.
             show_progress_bars: Whether to show sampling progress monitor.
             mcmc_method: Optional parameter to override `self.mcmc_method`.
             mcmc_parameters: Dictionary overriding the default parameters for MCMC.
@@ -555,38 +679,71 @@ class NeuralPosterior(ABC):
                 will draw init locations from prior, whereas `sir` will use Sequential-
                 Importance-Resampling using `init_strategy_num_candidates` to find init
                 locations.
+            rejection_sampling_parameters: Dictionary overriding the default parameters
+                for rejection sampling. The following parameters are supported:
+                `proposal` as the proposal distribtution (default is the prior).
+                `max_sampling_batch_size` as the batchsize of samples being drawn from
+                the proposal at every iteration. `num_samples_to_find_max` as the
+                number of samples that are used to find the maximum of the
+                `potential_fn / proposal` ratio. `num_iter_to_find_max` as the number
+                of gradient ascent iterations to find the maximum of that ratio. `m` as
+                multiplier to that ratio.
 
         Returns:
             Samples from conditional posterior.
         """
 
-        x, num_samples, mcmc_method, mcmc_parameters = self._prepare_for_sample(
-            x, sample_shape, mcmc_method, mcmc_parameters
-        )
-
         self.net.eval()
+
+        x, num_samples = self._prepare_for_sample(x, sample_shape)
 
         cond_potential_fn_provider = ConditionalPotentialFunctionProvider(
             potential_fn_provider, condition, dims_to_sample
         )
 
-        samples = self._sample_posterior_mcmc(
-            num_samples=num_samples,
-            potential_fn=cond_potential_fn_provider(
-                self._prior, self.net, x, mcmc_method
-            ),
-            init_fn=self._build_mcmc_init_fn(
-                # Restrict prior to sample only free dimensions.
-                RestrictedPriorForConditional(self._prior, dims_to_sample),
-                cond_potential_fn_provider(self._prior, self.net, x, "slice_np"),
+        if sample_with == "mcmc":
+            mcmc_method, mcmc_parameters = self._potentially_replace_mcmc_parameters(
+                mcmc_method, mcmc_parameters
+            )
+            samples = self._sample_posterior_mcmc(
+                num_samples=num_samples,
+                potential_fn=cond_potential_fn_provider(
+                    self._prior, self.net, x, mcmc_method
+                ),
+                init_fn=self._build_mcmc_init_fn(
+                    # Restrict prior to sample only free dimensions.
+                    RestrictedPriorForConditional(self._prior, dims_to_sample),
+                    cond_potential_fn_provider(self._prior, self.net, x, "slice_np"),
+                    **mcmc_parameters,
+                ),
+                mcmc_method=mcmc_method,
+                condition=condition,
+                dims_to_sample=dims_to_sample,
+                show_progress_bars=show_progress_bars,
                 **mcmc_parameters,
-            ),
-            mcmc_method=mcmc_method,
-            condition=condition,
-            dims_to_sample=dims_to_sample,
-            show_progress_bars=show_progress_bars,
-            **mcmc_parameters,
-        )
+            )
+        elif sample_with == "rejection":
+            rejection_sampling_parameters = (
+                self._potentially_replace_rejection_parameters(
+                    rejection_sampling_parameters
+                )
+            )
+            if "proposal" not in rejection_sampling_parameters:
+                rejection_sampling_parameters[
+                    "proposal"
+                ] = RestrictedPriorForConditional(self._prior, dims_to_sample)
+
+            samples, _ = rejection_sample(
+                potential_fn=cond_potential_fn_provider(
+                    self._prior, self.net, x, "rejection"
+                ),
+                num_samples=num_samples,
+                **rejection_sampling_parameters,
+            )
+        else:
+            raise NameError(
+                "The only implemented sampling methods are `mcmc` and `rejection`."
+            )
 
         self.net.train(True)
 
@@ -657,41 +814,6 @@ class NeuralPosterior(ABC):
             "https://github.com/mackelab/sbi/issues"
         )
 
-        # If the prior is `BoxUniform`, define a transformation to optimize in
-        # unbounded space.
-        is_boxuniform, boxuniform = check_if_boxuniform(self._prior)
-        if is_boxuniform:
-
-            def tf_inv(theta_t):
-                return utils.expit(
-                    theta_t,
-                    torch.as_tensor(
-                        boxuniform.support.base_constraint.lower_bound, dtype=float32
-                    ),
-                    torch.as_tensor(
-                        boxuniform.support.base_constraint.upper_bound, dtype=float32
-                    ),
-                )
-
-            def tf(theta):
-                return utils.logit(
-                    theta,
-                    torch.as_tensor(
-                        boxuniform.support.base_constraint.lower_bound, dtype=float32
-                    ),
-                    torch.as_tensor(
-                        boxuniform.support.base_constraint.upper_bound, dtype=float32
-                    ),
-                )
-
-        else:
-
-            def tf_inv(theta_t):
-                return theta_t
-
-            def tf(theta):
-                return theta
-
         if isinstance(init_method, str):
             # Find initial position.
             if init_method == "posterior":
@@ -710,79 +832,24 @@ class NeuralPosterior(ABC):
         else:
             inits = init_method
 
-        init_probs = self.log_prob(inits, x=x, **log_prob_kwargs)
+        def potential_fn(theta):
+            return self.log_prob(theta, x=x, track_gradients=True, **log_prob_kwargs)
 
-        # Pick the `num_to_optimize` best init locations.
-        sort_indices = torch.argsort(init_probs, dim=0)
-        sorted_inits = inits[sort_indices]
-        optimize_inits = sorted_inits[-num_to_optimize:]
+        interruption_note = "The last estimate of the MAP can be accessed via the `posterior.map_` attribute."
 
-        # The `_overall` variables store data accross the iterations, whereas the
-        # `_iter` variables contain data exclusively extracted from the current
-        # iteration.
-        best_log_prob_iter = torch.max(init_probs)
-        best_theta_iter = sorted_inits[-1]
-        best_theta_overall = best_theta_iter.detach().clone()
-        best_log_prob_overall = best_log_prob_iter.detach().clone()
+        self.map_, _ = optimize_potential_fn(
+            potential_fn=potential_fn,
+            inits=inits,
+            dist_specifying_bounds=self._prior,
+            num_iter=num_iter,
+            learning_rate=learning_rate,
+            num_to_optimize=num_to_optimize,
+            save_best_every=save_best_every,
+            show_progress_bars=show_progress_bars,
+            interruption_note=interruption_note,
+        )
 
-        self.map_ = best_theta_overall
-
-        optimize_inits = tf(optimize_inits)
-        optimize_inits.requires_grad_(True)
-        optimizer = optim.Adam([optimize_inits], lr=learning_rate)
-
-        iter_ = 0
-
-        # Try-except block in case the user interrupts the program and wants to fall
-        # back on the last saved `.map_`. We want to avoid a long error-message here.
-        try:
-
-            while iter_ < num_iter:
-
-                optimizer.zero_grad()
-                probs = self.log_prob(
-                    tf_inv(optimize_inits), x=x, track_gradients=True, **log_prob_kwargs
-                ).squeeze()
-                loss = -probs.sum()
-                loss.backward()
-                optimizer.step()
-
-                with torch.no_grad():
-                    if iter_ % save_best_every == 0 or iter_ == num_iter - 1:
-                        # Evaluate the optimized locations and pick the best one.
-                        log_probs_of_optimized = self.log_prob(
-                            tf_inv(optimize_inits), x=x, **log_prob_kwargs
-                        )
-                        best_theta_iter = optimize_inits[
-                            torch.argmax(log_probs_of_optimized)
-                        ]
-                        best_log_prob_iter = self.log_prob(
-                            tf_inv(best_theta_iter), x=x, **log_prob_kwargs
-                        )
-                        if best_log_prob_iter > best_log_prob_overall:
-                            best_theta_overall = best_theta_iter.detach().clone()
-                            best_log_prob_overall = best_log_prob_iter.detach().clone()
-
-                    print(
-                        f"Optimizing MAP estimate. Iterations: "
-                        f"{iter_+1} / {num_iter}.    "
-                        f"Performance in iteration "
-                        f"{divmod(iter_+1, save_best_every)[0] * save_best_every}: "
-                        f"{best_log_prob_iter.item():.2f} (= unnormalized log-prob)",
-                        end="\r",
-                    )
-                    self.map_ = tf_inv(best_theta_overall)
-
-                iter_ += 1
-
-        except KeyboardInterrupt:
-            print(
-                f"Optimization was interrupted after {iter_} iterations. The last "
-                "estimate of the MAP can be accessed via the `posterior.map_` "
-                "attribute."
-            )
-
-        return tf_inv(best_theta_overall)
+        return self.map_
 
     def _build_mcmc_init_fn(
         self,
@@ -850,10 +917,11 @@ class NeuralPosterior(ABC):
             raise ValueError(
                 """The `x` passed to condition the posterior for evaluation or sampling
                 has an inferred batch shape larger than one. This is not supported in
-                sbi for reasons depending on the scenario:
+                some sbi methods for reasons depending on the scenario:
 
                     - in case you want to evaluate or sample conditioned on several xs
-                    e.g., (p(theta | [x1, x2, x3])), this is not supported yet in sbi.
+                    e.g., (p(theta | [x1, x2, x3])), this is not supported yet except
+                    when using likelihood based SNLE.
 
                     - in case you trained with a single round to do amortized inference
                     and now you want to evaluate or sample a given theta conditioned on
@@ -871,29 +939,46 @@ class NeuralPosterior(ABC):
             )
 
     @staticmethod
-    def _match_x_with_theta_batch_shape(x: Tensor, theta: Tensor) -> Tensor:
-        """Return `x` with batch shape matched to that of `theta`.
+    def _match_theta_and_x_batch_shapes(
+        theta: Tensor, x: Tensor
+    ) -> Tuple[Tensor, Tensor]:
+        r"""Return $\theta$ and `x` with batch shape matched to each other.
+
+        When `x` is just a single observation it is repeated for all entries in the
+        batch of $\theta$s. When there is a batch of multiple `x`, i.e., iid `x`, then
+        individual `x` are repeated in the pattern AABBCC and individual $\theta$ are
+        repeated in the pattern ABCABC to cover all combinations.
 
         This is needed in nflows in order to have matching shapes of theta and context
         `x` when evaluating the neural network.
+
+        Args:
+            x: (a batch of iid) data
+            theta: a batch of parameters
+
+        Returns:
+            theta: with shape (theta_batch_size * x_batch_size, *theta_shape)
+            x: with shape (theta_batch_size * x_batch_size, *x_shape)
         """
 
         # Theta and x are ensured to have a batch dim, get the shape.
-        theta_batch_size, *_ = theta.shape
+        theta_batch_size, *theta_shape = theta.shape
         x_batch_size, *x_shape = x.shape
 
-        assert x_batch_size == 1, "Batch size 1 should be enforced by caller."
-        if theta_batch_size > x_batch_size:
-            x_matched = x.expand(theta_batch_size, *x_shape)
+        # Repeat iid trials as AABBCC.
+        x_repeated = x.repeat_interleave(theta_batch_size, dim=0)
+        # Repeat theta as ABCABC.
+        theta_repeated = theta.repeat(x_batch_size, 1)
 
-            # Double check.
-            x_matched_batch_size, *x_matched_shape = x_matched.shape
-            assert x_matched_batch_size == theta_batch_size
-            assert x_matched_shape == x_shape
-        else:
-            x_matched = x
+        # Double check: batch size for log prob evaluation must match.
+        assert x_repeated.shape == torch.Size(
+            [theta_batch_size * x_batch_size, *x_shape]
+        )
+        assert theta_repeated.shape == torch.Size(
+            [theta_batch_size * x_batch_size, *theta_shape]
+        )
 
-        return x_matched
+        return theta_repeated, x_repeated
 
     def _get_net_name(self) -> str:
         """
@@ -962,16 +1047,48 @@ class NeuralPosterior(ABC):
         """
         Sets the state when being loaded from pickle.
 
+        For developers: for any new attribute added to `NeuralPosterior`, we have to
+        add an entry here using `check_warn_and_setstate()`.
+
         Args:
             state_dict: State to be restored.
         """
-        if "_device" not in state_dict.keys():
-            state_dict["_device"] = "cpu"
-            warn(
+
+        # In the beginning, the warning message is empty.
+        warning_msg = ""
+
+        state_dict, warning_msg = check_warn_and_setstate(
+            state_dict, "_device", "cpu", warning_msg
+        )
+
+        if state_dict["_x"] is not None:
+            state_dict, warning_msg = check_warn_and_setstate(
+                state_dict, "_num_iid_trials", state_dict["_x"].shape[0], warning_msg
+            )
+        else:
+            state_dict, warning_msg = check_warn_and_setstate(
+                state_dict, "_num_iid_trials", None, warning_msg
+            )
+
+        state_dict, warning_msg = check_warn_and_setstate(
+            state_dict, "_iid_methods", ["snle", "snre_a", "snre_b"], warning_msg
+        )
+
+        state_dict, warning_msg = check_warn_and_setstate(
+            state_dict,
+            "_allow_iid_x",
+            state_dict["_method_family"] in state_dict["_iid_methods"],
+            warning_msg,
+        )
+
+        if warning_msg:
+            warning_description = (
                 "You had saved the posterior under an older version of `sbi`. To make "
                 "the loaded version comply with the version you are using right now, "
-                "we had to set `self._device = 'cpu'`"
+                "we had to set the following attributes:"
             )
+            warn(warning_description + warning_msg)
+
         self.__dict__ = state_dict
 
 
@@ -1003,24 +1120,43 @@ class ConditionalPotentialFunctionProvider:
         self.condition = ensure_theta_batched(condition)
         self.dims_to_sample = dims_to_sample
 
-    def __call__(
-        self,
-        prior,
-        net: nn.Module,
-        x: Tensor,
-        mcmc_method: str,
-    ) -> Callable:
+    def __call__(self, prior, net: nn.Module, x: Tensor, method: str) -> Callable:
         """Return potential function.
 
-        Switch on numpy or pyro potential function based on `mcmc_method`.
+        Switch on numpy or pyro potential function based on `method`.
         """
         # Set prior, net, and x as attributes of unconditional potential_fn_provider.
-        _ = self.potential_fn_provider.__call__(prior, net, x, mcmc_method)
+        _ = self.potential_fn_provider.__call__(prior, net, x, method)
 
-        if mcmc_method in ("slice", "hmc", "nuts"):
+        if method in ("slice", "hmc", "nuts"):
             return self.pyro_potential
-        else:
+        elif "slice_np" in method:
             return self.np_potential
+        elif method == "rejection":
+            return self.rejection_potential
+        else:
+            NotImplementedError
+
+    def rejection_potential(self, theta: np.ndarray) -> ScalarFloat:
+        r"""
+        Return conditional posterior log-probability or $-\infty$ if outside prior.
+
+        The only differences to the `np_potential` is that it tracks the gradients and
+        does not return a `numpy` array.
+
+        Args:
+            theta: Free parameters $\theta_i$, batch dimension 1.
+
+        Returns:
+            Conditional posterior log-probability $\log(p(\theta_i|\theta_j, x))$,
+            masked outside of prior.
+        """
+        theta = torch.as_tensor(theta, dtype=torch.float32)
+
+        theta_condition = deepcopy(self.condition)
+        theta_condition[:, self.dims_to_sample] = theta
+
+        return self.potential_fn_provider.rejection_potential(theta_condition)
 
     def np_potential(self, theta: np.ndarray) -> ScalarFloat:
         r"""
@@ -1076,11 +1212,7 @@ class RestrictedPriorForConditional:
     this class.
     """
 
-    def __init__(
-        self,
-        full_prior: Any,
-        dims_to_sample: List[int],
-    ):
+    def __init__(self, full_prior: Any, dims_to_sample: List[int]):
         self.full_prior = full_prior
         self.dims_to_sample = dims_to_sample
 

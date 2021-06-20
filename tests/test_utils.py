@@ -12,6 +12,7 @@ from torch.distributions import Distribution
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.simulators.linear_gaussian import true_posterior_linear_gaussian_mvn_prior
+from sbi.utils import BoxUniform, within_support
 from sbi.utils.metrics import c2st
 
 
@@ -82,7 +83,9 @@ def get_dkl_gaussian_prior(
     return kl_d_via_monte_carlo(target_dist, posterior, num_samples=200)
 
 
-def get_prob_outside_uniform_prior(posterior: NeuralPosterior, num_dim: int) -> Tensor:
+def get_prob_outside_uniform_prior(
+    posterior: NeuralPosterior, prior: BoxUniform, num_dim: int
+) -> Tensor:
     """
     Return posterior probability for a parameter set outside of the prior support.
 
@@ -90,9 +93,12 @@ def get_prob_outside_uniform_prior(posterior: NeuralPosterior, num_dim: int) -> 
         posterior: estimated posterior
         num_dim: dimensionality of the problem
     """
-    # Test whether likelihood outside prior support is zero. Prior bounds are [-1, 1] in
-    # each dimension, so tensor of 2s will be out of bounds.
-    sample_outside_support = 2 * torch.ones(num_dim)
+    # Test whether likelihood outside prior support is zero.
+    assert isinstance(prior, BoxUniform)
+    sample_outside_support = 1.1 * prior.base_dist.low
+    assert not within_support(
+        prior, sample_outside_support
+    ).all(), "Samples must be outside of support."
 
     return torch.exp(posterior.log_prob(sample_outside_support))
 
@@ -141,4 +147,4 @@ def check_c2st(x: Tensor, y: Tensor, alg: str, tol: float = 0.1) -> None:
 
     assert (
         (0.5 - tol) <= score <= (0.5 + tol)
-    ), f"c2st={score:.2f} is too far from the desired near-chance performance."
+    ), f"{alg}'s c2st={score:.2f} is too far from the desired near-chance performance."

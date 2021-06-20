@@ -1,6 +1,6 @@
 import torch
 
-from sbi.inference import SNPE, infer, prepare_for_sbi
+from sbi.inference import SNPE, infer, prepare_for_sbi, simulate_for_sbi
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
 
 
@@ -27,14 +27,18 @@ def flexible():
     x_o = torch.ones(1, num_dim)
     prior_mean = torch.zeros(num_dim)
     prior_cov = torch.eye(num_dim)
+    simulator = diagonal_linear_gaussian
 
     # flexible interface
     prior = torch.distributions.MultivariateNormal(
         loc=prior_mean, covariance_matrix=prior_cov
     )
-    simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior)
-    inference = SNPE(simulator, prior)
-    posterior = inference(num_simulations=500)
+    simulator, prior = prepare_for_sbi(simulator, prior)
+    inference = SNPE(prior)
+
+    theta, x = simulate_for_sbi(simulator, proposal=prior, num_simulations=500)
+    density_estimator = inference.append_simulations(theta, x).train()
+    posterior = inference.build_posterior(density_estimator)
     posterior.sample((100,), x=x_o)
 
     return posterior

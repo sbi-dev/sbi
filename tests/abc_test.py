@@ -5,8 +5,10 @@ from torch.distributions import MultivariateNormal
 from sbi.inference import ABC, SMC
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
+    samples_true_posterior_linear_gaussian_uniform_prior,
     true_posterior_linear_gaussian_mvn_prior,
 )
+from sbi.utils import BoxUniform
 from tests.test_utils import check_c2st
 
 
@@ -64,21 +66,34 @@ def test_mcabc_sass_lra(lra, sass_expansion_degree, set_seed):
 
 
 @pytest.mark.parametrize("num_dim", (1, 2))
+@pytest.mark.parametrize("prior_type", ("uniform", "gaussian"))
 def test_smcabc_inference_on_linear_gaussian(
-    num_dim, lra=False, sass=False, sass_expansion_degree=1
+    num_dim, prior_type: str, lra=False, sass=False, sass_expansion_degree=1
 ):
     x_o = zeros((1, num_dim))
     num_samples = 1000
     likelihood_shift = -1.0 * ones(num_dim)
     likelihood_cov = 0.3 * eye(num_dim)
 
-    prior_mean = zeros(num_dim)
-    prior_cov = eye(num_dim)
-    prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
-    gt_posterior = true_posterior_linear_gaussian_mvn_prior(
-        x_o[0], likelihood_shift, likelihood_cov, prior_mean, prior_cov
-    )
-    target_samples = gt_posterior.sample((num_samples,))
+    if prior_type == "gaussian":
+        prior_mean = zeros(num_dim)
+        prior_cov = eye(num_dim)
+        prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
+        gt_posterior = true_posterior_linear_gaussian_mvn_prior(
+            x_o[0], likelihood_shift, likelihood_cov, prior_mean, prior_cov
+        )
+        target_samples = gt_posterior.sample((num_samples,))
+    elif prior_type == "uniform":
+        prior = BoxUniform(-ones(num_dim), ones(num_dim))
+        target_samples = samples_true_posterior_linear_gaussian_uniform_prior(
+            x_o[0],
+            likelihood_shift,
+            likelihood_cov,
+            prior,
+            num_samples,
+        )
+    else:
+        raise ValueError("Wrong prior string.")
 
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
@@ -98,7 +113,9 @@ def test_smcabc_inference_on_linear_gaussian(
         sass_expansion_degree=sass_expansion_degree,
     )
 
-    check_c2st(phat.sample((num_samples,)), target_samples, alg="SMCABC")
+    check_c2st(
+        phat.sample((num_samples,)), target_samples, alg=f"SMCABC-{prior_type}-prior"
+    )
 
 
 @pytest.mark.slow

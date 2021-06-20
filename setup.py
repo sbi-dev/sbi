@@ -28,19 +28,19 @@ REQUIRED = [
     "matplotlib",
     "numpy",
     "pillow",
-    "pyknos>=0.14.0",
+    "pyknos>=0.14.2",
     "pyro-ppl>=1.3.1",
     "scikit-learn",
     "scipy",
     "tensorboard",
-    "torch>=1.6.0",
+    "torch>=1.8.0",
     "tqdm",
 ]
 
 EXTRAS = {
     "dev": [
         "autoflake",
-        "black",
+        "black>=20.8bo",
         "deepdiff",
         "flake8",
         "isort",
