@@ -13,6 +13,9 @@ import numpy as np
 import pandas as pd
 import time
 
+import os
+import uuid
+
 import multiprocessing
 
 import argparse
@@ -28,19 +31,7 @@ parser.add_argument(
     "method", type=str, help="One of vi or mcmc", nargs=1,
 )
 parser.add_argument(
-    "out", type=str, help="Output file", nargs=1,
-)
-parser.add_argument(
-    "--out_samples",
-    type=str,
-    help="Output directory of samples",
-    default="samples/",
-)
-parser.add_argument(
-    "--num_repeat",
-    type=int,
-    help="Number of repeats",
-    default=1,
+    "--num_repeat", type=int, help="Number of repeats", default=1,
 )
 parser.add_argument(
     "--num_chains",
@@ -66,6 +57,7 @@ parser.add_argument(
 parser.add_argument(
     "--alpha", type=float, help="Alpha when renjey divergence is used", default=0.5
 )
+parser.add_argument("--K", type=float, help="IW elbo K", default=256)
 parser.add_argument(
     "--beta", type=float, help="Alpha when tail adaptive loss is used", default=-0.5
 )
@@ -81,13 +73,15 @@ def run_mcmc_bm(args):
     post.set_default_x(x_obs)
 
     samples = post.sample((10000,), x_obs, mcmc_parameters={"num_chains": num_chains})
-    metrics = evaluate_metric(task, samples, 10000, num_observation, "SNL_mcmc")
+    metrics = evaluate_metric(
+        task, samples, 10000, num_observation, "SNL_mcmc", "na", "na"
+    )
     return samples, metrics
 
 
 def run_vi_bm(args):
     task = args.task[0]
-    loss = args.loss
+    loss = str(args.loss)
     num_observation = args.num_observation
     num_flows = args.num_flows
     num_comps = args.num_comps
@@ -95,13 +89,18 @@ def run_vi_bm(args):
 
     inf, task = get_model(task, "vi")
     x_obs = task.get_observation(num_observation)
-    post = inf.build_posterior(num_flows=num_flows, num_comps=num_comps, flow=type_flow)
+    post = inf.build_posterior(
+        num_flows=num_flows, num_components=num_comps, flow=type_flow
+    )
     post.set_default_x(x_obs)
-  
+
     if loss == "elbo":
         print("Elbo is optimized")
         post.train(
-            loss=loss, n_particles=args.n_particles, max_num_iters=args.max_num_iters
+            loss=loss,
+            n_particles=args.n_particles,
+            max_num_iters=args.max_num_iters,
+            learning_rate=1e-3,
         )
     elif loss == "renjey_divergence":
         print("Renjey is optimized")
@@ -110,7 +109,19 @@ def run_vi_bm(args):
             n_particles=args.n_particles,
             alpha=args.alpha,
             max_num_iters=args.max_num_iters,
+            learning_rate=1e-3,
         )
+        loss = str(loss) + str(args.alpha)
+    elif loss == "iwelbo":
+        print("Importance weighted elbo is optimized")
+        post.train(
+            loss=loss,
+            n_particles=int(args.n_particles),
+            K=int(args.K),
+            max_num_iters=args.max_num_iters,
+            learning_rate=1e-3,
+        )
+        loss = str(loss) + str(args.K)
     elif loss == "tail_adaptive_fdivergence":
         print("TailAptivefdiv is optimized")
         post.train(
@@ -118,12 +129,17 @@ def run_vi_bm(args):
             n_particles=args.n_particles,
             beta=args.beta,
             max_num_iters=args.max_num_iters,
+            learning_rate=1e-3,
         )
+        loss = str(loss) + str(args.beta)
     else:
         raise NotImplementedError("Unknown loss")
-
+    if num_comps > 1:
+        loss = "mof" + str(num_comps) + loss
     samples = post.sample((10000,))
-    metrics = evaluate_metric(task, samples, 10000, num_observation, "SNL_vi")
+    metrics = evaluate_metric(
+        task, samples, 10000, num_observation, "SNL_vi", loss, args.n_particles
+    )
     return samples, metrics
 
 
@@ -159,21 +175,35 @@ def get_model(task_name, method):
 
 
 def evaluate_metric(
-    task, samples: torch.Tensor, num_simulations: int, num_observation: int, algo: str,
+    task,
+    samples: torch.Tensor,
+    num_simulations: int,
+    num_observation: int,
+    algo: str,
+    loss: str,
+    n_particles,
 ):
     r""" Will evaluate the metrics c2st, mmd and mean_dist for a given set of samples """
     reference_samples = task.get_reference_posterior_samples(num_observation)
     c2st_accuracy = float(c2st(reference_samples, samples))
     mmd_metric = float(mmd(reference_samples, samples))
     median_dist = float(ppc.median_distance(reference_samples, samples))
+    folder_name = str(uuid.uuid4())
+    os.mkdir(folder_name)
+    np.save(folder_name + "/samples", samples)
 
     df = pd.DataFrame(
         {
+            "task": [task.name],
             "algorithm": [algo],
+            "loss": [loss],
+            "n_particles": [n_particles],
+            "num_observation": [num_observation],
             "num_simulations": [num_simulations],
             "c2st": [c2st_accuracy],
             "mmd": [mmd_metric],
             "median_dist": [median_dist],
+            "folder": [folder_name],
         }
     )
     return df
@@ -183,7 +213,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     iters = args.num_repeat
     method = args.method[0]
-    out = args.out[0]
+    out = "benchmark_divergences.csv"
     for _ in range(iters):
         if method == "mcmc":
             print("Running MCMC bm -----------------------------------------")
@@ -191,9 +221,6 @@ if __name__ == "__main__":
         else:
             print("Running VI bm -----------------------------------------")
             samples, metrics = run_vi_bm(args)
-        print(metrics)
-        print(samples)
+
         with open(out, "a") as f:
             metrics.to_csv(f, mode="a", header=f.tell() == 0)
-        samples = np.array(samples)
-        np.save(f"{str(args.out_samples)}samples_{method}_{str(args.task[0])}_{str(time.time())}", samples)

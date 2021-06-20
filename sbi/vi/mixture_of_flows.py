@@ -9,16 +9,15 @@ from typing import Optional, Iterable
 
 from pyro.nn import AutoRegressiveNN, DenseNN
 from pyro.distributions import transforms
-from pyro.distributions.transforms import (
-    AffineAutoregressive,
-    SplineAutoregressive,
-    ComposeTransform,
-)
+from pyro.distributions.transforms import ComposeTransform
+
 
 from .first_second_order_helpers import jacobian_in_batch
 from .flows import (
     AffineTransform,
     LowerCholeskyAffine,
+    AffineAutoregressive,
+    SplineAutoregressive,
     TransformedDistribution,
     build_flow,
 )
@@ -67,7 +66,7 @@ class StackedAutoRegressiveNN(nn.Module):
             )
             self.add_module("AutoRegressiveNN" + str(i), net)
             self.nets.append(net)
-            self.permutation.extend(list(net.permutation))
+            self.permutation = list(net.permutation)
 
     def forward(self, x):
         """ Forward pass through each network and stack it """
@@ -170,16 +169,37 @@ class MixtureSameTransform(torch.distributions.MixtureSameFamily):
         else:
             pass
 
+    def clear_cache(self):
+        if hasattr(self._component_distribution, "clear_cache"):
+            self._component_distribution.clear_cache()
+
     def conditional_logprobs(self, x):
         """ Logprobs for each component and dimension."""
         x_pad = self._pad(x)
-        transform = ComposeTransform(self._component_distribution.transforms)
-        eps = transform.inv(x_pad)
+        link_transform = self._component_distribution.transforms[-1]
+        transforms = self._component_distribution.transforms[:-1]
+        x_delinked = link_transform.inv(x_pad)
+        x = x_delinked
+        eps = torch.zeros_like(x)
+        jac = torch.zeros_like(x)
+        for t in reversed(transforms):
+            eps = t.inv(x)
+            jac += t.log_abs_jacobian_diag(eps, x)
+            x = eps
+
         base_dist = self._component_distribution.base_dist
         if isinstance(base_dist, Independent):
-            log_prob = base_dist.base_dist.log_prob(eps)
+            log_prob = (
+                base_dist.base_dist.log_prob(eps)
+                - jac
+                - link_transform.log_abs_det_jacobian(x_delinked, x_pad).squeeze()
+            )
         else:
-            log_prob = base_dist.log_prob(eps)
+            log_prob = (
+                base_dist.log_prob(eps)
+                - jac
+                - link_transform.log_abs_det_jacobian(x_delinked, x_pad).squeeze()
+            )
 
         return log_prob
 
@@ -211,13 +231,13 @@ class MixtureSameTransform(torch.distributions.MixtureSameFamily):
         cum_sum_logq_k
 
         logits_mix_prob = torch.log_softmax(self._mixture_distribution.logits, 0)
-        self._mixture_distribution.probs = logits_mix_prob.exp()
+        self._mixture_distribution.probs = logits_mix_prob.exp().detach()
         log_posterior_weights_x = logits_mix_prob.unsqueeze(1) + cum_sum_logq_k
         posterior_weights = torch.softmax(log_posterior_weights_x, 1)
 
         return torch.sum(posterior_weights * cdf_x, 1)
 
-    def rsample(self, shape=(), eps=0.):
+    def rsample(self, shape=(), eps=1e-8):
         """ Implicit reparamterization """
         x = self.sample(shape).detach()
         x.requires_grad = True
@@ -413,7 +433,7 @@ class MixtureAffineAutoregressive(MixtureSameTransform):
         self.transforms = []
         for _ in range(num_flows):
             net = StackedAutoRegressiveNN(num_components, event_dim, **kwargs)
-            transform = AffineAutoregressive(net).with_cache()
+            transform = AffineAutoregressive(net, log_scale_min_clip=-2).with_cache()
             self.nets.append(net)
             self.transforms.append(transform)
         link = biject_to(support).with_cache()
@@ -502,6 +522,14 @@ class Mixture(Distribution):
         self._batch_shape = components[0].batch_shape
         self.has_rsample = False
 
+    @property
+    def transforms(self):
+        transforms = []
+        for comp in self._components:
+            if hasattr(comp, "transforms"):
+                transforms.extend(comp.transforms)
+        return transforms
+
     def parameters(self):
         """ Returns the learnable paramters of the model """
         self._mixture_distribution.logits.requires_grad_(True)
@@ -540,6 +568,11 @@ class Mixture(Distribution):
     @property
     def num_components(self):
         return self._num_components
+
+    def clear_cache(self):
+        for comp in self._components:
+            if hasattr(comp, "clear_cache"):
+                comp.clear_cache()
 
     def log_prob(self, x):
         logmix = torch.log_softmax(self._mixture_distribution.logits, -1)
@@ -586,7 +619,7 @@ def build_mixture(
     event_shape: torch.Size,
     support: Constraint,
     num_components: int = 4,
-    rsample=True,
+    rsample=False,
     **kwargs,
 ) -> Mixture:
     """ This builds a mixture of normalizing flows.
@@ -628,7 +661,7 @@ def build_mixture(
             )
         else:
             raise NotImplementedError(
-                "Currently only mixtures whos component distributions satsify the autoregressive property have implicit rsample methods."
+                "Currently only mixtures whos component distributions satisfy the autoregressive property have implicit rsample methods."
             )
 
 

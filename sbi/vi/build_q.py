@@ -5,11 +5,12 @@ from .divergence_optimizers import (
     IWElboOptimizer,
     RenjeyDivergenceOptimizer,
     TailAdaptivefDivergenceOptimizer,
+    ForwardKLOptimizer,
 )
 
 import torch
 
-# Some of the main arguments for 
+# Some of the main arguments for
 KWARGS_Q = ["flow", "num_components", "rsample", "permute", "batch_norm"]
 
 
@@ -49,6 +50,8 @@ def build_optimizer(posterior, loss, **kwargs):
         optimizer = RenjeyDivergenceOptimizer(posterior, **kwargs)
     elif loss.lower() == "tail_adaptive_fdivergence":
         optimizer = TailAdaptivefDivergenceOptimizer(posterior, **kwargs)
+    elif loss.lower() == "forward_kl":
+        optimizer = ForwardKLOptimizer(posterior, **kwargs)
     else:
         raise NotImplementedError("Unknown loss...")
     return optimizer

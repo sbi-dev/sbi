@@ -18,6 +18,14 @@ from sbi.utils.torchutils import (
 
 from sbi.vi.build_q import build_q, build_optimizer
 from sbi.vi.divergence_optimizers import DivergenceOptimizer
+from sbi.vi.sampling import (
+    importance_resampling,
+    independent_mh,
+    rejection_sampling,
+    random_direction_slice_sampler,
+    paretto_smoothed_weights,
+    clamp_weights,
+)
 
 from tqdm import tqdm
 
@@ -61,7 +69,7 @@ class VariationalPosterior(NeuralPosterior):
 
     @property
     def q(self):
-        """Variational distributon that will be learned"""
+        """Variational distribution that will be learned"""
         return self._q
 
     @q.setter
@@ -89,10 +97,6 @@ class VariationalPosterior(NeuralPosterior):
             raise ValueError(
                 "We only support PyTorch distributions, please wrap your distributions as one!"
             )
-        if not hasattr(q, "parameters"):
-            warn(
-                "Your distributions has no parameters, you can give the parameters manually to train but may consider to 'parameterize' the distribution"
-            )
         self._q = q
 
     def predictive(self, x: Tensor, method: str = "naive", num_samples: int = 10000):
@@ -103,12 +107,18 @@ class VariationalPosterior(NeuralPosterior):
             num_samples=num_samples,
         )
 
-    def predictive_sample(self, shape: torch.Size()):
-        thetas = self.sample(shape)
+    def predictive_sample(self, shape: torch.Size(), **kwargs):
+        thetas = self.sample(shape, **kwargs)
         xs = self.net.sample(context=thetas)
         return xs
 
-    def expectation(self, f: Callable, method: str = "naive", num_samples: int = 10000):
+    def expectation(
+        self,
+        f: Callable,
+        x: Optional[Tensor] = None,
+        method: str = "naive",
+        num_samples: int = 10000,
+    ):
         """Computes the expectation with respect to the posterior E_q[f(X)]
 
         Args:
@@ -116,14 +126,32 @@ class VariationalPosterior(NeuralPosterior):
         method: Method either naive (just using the variatioanl posterior), is
         (importance sampling) or psis (pareto smoothed importance sampling).
         """
+        samples = self.sample((num_samples,))
         if method == "naive":
-            return f(self.sample((num_samples,))).mean()
-        elif method == "is":
-            print("TODO implemented")
-        elif method == "psis":
-            print("TODO implement")
+            return f(samples).mean(0)
         else:
-            raise NotImplementedError("We only have the methods naive, is and psis.")
+            with torch.no_grad():
+                x_obs = atleast_2d_float32_tensor(self._x_else_default_x(x))
+                x_obs = ensure_x_batched(x_obs)
+                obs = x_obs.repeat(num_samples, 1)
+                logweights = (
+                    self.net.log_prob(obs, samples)
+                    + self._prior.log_prob(samples)
+                    - self._q.log_prob(samples)
+                )
+                weights = torch.exp(logweights)
+            if method == "is":
+                pass
+            elif method == "psis":
+                weights = paretto_smoothed_weights(weights)
+            elif method == "clamped_is":
+                weights = clamp_weights(weights)
+            else:
+                raise NotImplementedError(
+                    "We only have the methods naive, is, psis and clamped_is."
+                )
+            weights /= weights.sum()
+            return torch.sum(f(samples) * weights.unsqueeze(-1), 0)
 
     def log_prob(
         self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False,
@@ -150,6 +178,7 @@ class VariationalPosterior(NeuralPosterior):
 
         # Select and check x to condition on..
         x = atleast_2d_float32_tensor(self._x_else_default_x(x))
+        x = ensure_x_batched(x)
         self._ensure_single_x(x)
         self._ensure_x_consistent_with_default_x(x)
 
@@ -161,6 +190,8 @@ class VariationalPosterior(NeuralPosterior):
         sample_shape: Shape = torch.Size(),
         x: Optional[Tensor] = None,
         track_gradients: bool = False,
+        method: str = "naive",
+        method_params: dict = {},
     ) -> Tensor:
         """
         Return samples from variational posterior distribution $q(\theta|x)$.
@@ -171,37 +202,74 @@ class VariationalPosterior(NeuralPosterior):
                 samples and then reshape into the desired shape.
             x: Conditioning context for posterior $p(\theta|x)$. If not provided,
                 fall back onto `x` passed to `set_default_x()`.
-            track_gradient: Wheater to reparamterize samples which enables to pass
+            track_gradient: Wheather to reparamterize samples which enables to pass
                 gradients through it.
+            method: A sampling method e.g. using correction methods as SIR, MCMC or ABC techniques.
 
         Returns:
             Samples from posterior.
         """
 
         # Select and check x to condition on..
+        sample_shape = torch.Size(sample_shape)
         x = atleast_2d_float32_tensor(self._x_else_default_x(x))
+        x = ensure_x_batched(x)
         self._ensure_single_x(x)
         self._ensure_x_consistent_with_default_x(x)
 
-        if track_gradients:
-            return self._q.rsample(sample_shape)
+        if method.lower() == "naive":
+            if track_gradients and self._q.has_rsample:
+                samples = self._q.rsample(sample_shape)
+            else:
+                samples = self._q.sample(sample_shape)
+        elif method.lower() == "ir":
+            samples = importance_resampling(
+                sample_shape.numel(), self, x, **method_params
+            )
+        elif method.lower() == "imh":
+            samples = independent_mh(sample_shape.numel(), self, x, **method_params)
+        elif method.lower() == "rejection":
+            samples = rejection_sampling(sample_shape.numel(), self, x, **method_params)
+        elif method.lower() == "slice":
+            samples = random_direction_slice_sampler(
+                sample_shape.numel(), self, x, **method_params
+            )
         else:
-            return self._q.sample(sample_shape)
+            raise NotImplementedError()
+
+        return samples
 
     def train(
         self,
         x: Optional[Array] = None,
         loss: str = "elbo",
         n_particles: Optional[int] = 128,
-        learning_rate: float = 1e-2,
-        min_num_iters: Optional[int] = 100,
-        max_num_iters: Optional[int] = 1000,
+        learning_rate: float = 1e-3,
+        gamma: float = 0.999,
+        max_num_iters: Optional[int] = 2000,
         clip_value: Optional[float] = 5.0,
+        warm_up_rounds: int = 200,
         retrain_from_scratch: bool = False,
-        resume_training: bool = False,
+        reset_optimizer: bool = False,
         show_progress_bar: bool = True,
+        check_for_convergence: bool = True,
         **kwargs,
     ):
+        """This methods trains the variational posterior.
+        
+        Args:
+            x: The observation
+            loss: The loss that is minimimzed, default is the ELBO
+            n_particles: Number of samples to approximate expectations.
+            learning_rate: Learning rate of the optimizer
+            gamma: Learning rate decay per iteration
+            max_num_iters: Maximum number of iterations
+            clip_value: Gradient clipping value
+            warm_up_rounds: Initialize the posterior as the prior.
+            retrain_from_scratch: Retrain the flow
+            resume_training: Resume training the flow
+            show_progress_bar: Show the progress bar
+        """
 
         # Init q and the optimizer if necessary
         if retrain_from_scratch:
@@ -209,12 +277,29 @@ class VariationalPosterior(NeuralPosterior):
                 self._prior.event_shape, self._prior.support, **self._flow_paras
             )
             self._optimizer = build_optimizer(
-                self, loss, lr=learning_rate, clip_value=clip_value, **kwargs
+                self,
+                loss,
+                lr=learning_rate,
+                clip_value=clip_value,
+                gamma=gamma,
+                n_particles=n_particles,
+                **kwargs,
             )
 
-        if resume_training or self._loss != loss or self._optimizer._loss_name != loss:
+        if (
+            reset_optimizer
+            or self._loss != loss
+            or self._optimizer._loss_name != loss
+            or self._optimizer.likelihood != self.net
+        ):
             self._optimizer = build_optimizer(
-                self, loss, lr=learning_rate, clip_value=clip_value, **kwargs
+                self,
+                loss,
+                lr=learning_rate,
+                clip_value=clip_value,
+                gamma=gamma,
+                n_particles=n_particles,
+                **kwargs,
             )
             self._loss = loss
 
@@ -231,28 +316,36 @@ class VariationalPosterior(NeuralPosterior):
         # Optimize
         self._optimizer.update(locals())
         optimizer = self._optimizer
+        optimizer.reset_loss_stats()
+
+        # Warmup before training
+        if optimizer.num_step == 0:
+            optimizer.warm_up(warm_up_rounds)
+
         if show_progress_bar:
             iters = tqdm(range(max_num_iters))
         else:
             iters = range(max_num_iters)
 
-        for i in iters:
-            l = optimizer.step(x).cpu().numpy()
-            if show_progress_bar and i % 10 == 0:
-                iters.set_description("Loss: " + str(np.round(l, 2)))
-            if i > min_num_iters:
-                if optimizer.converged() and show_progress_bar:
-                    print(f"Converged with loss: {np.round(l, 2)}")
-                    break
-        k = round(float(optimizer.evaluate(x)), 3)
-        if k > 1:
-            warn(
-                "The quality of the variational posterior seems to be bad, increase the training iterations or consider a different model!"
-            )
-        else:
+        for _ in iters:
+            optimizer.step(x)
+            mean_loss, std_loss = optimizer.get_loss_stats()
+            # Update progress bar
             if show_progress_bar:
-                print(
-                    f"Quality Score: {k} (smaller values are good, should be below 1, mode collapse may still occured.)"
+                iters.set_description(
+                    f"Loss: {np.round(mean_loss, 2)} Std: {np.round(std_loss, 2)}"
                 )
-        self._summary = optimizer.summary
-        self._summary["Quality score"] = k
+            # Check for convergence
+            if check_for_convergence:
+                if optimizer.converged():
+                    if show_progress_bar:
+                        print(f"\nConverged with loss: {np.round(mean_loss, 2)}")
+                    break
+        if show_progress_bar:
+            k = round(float(optimizer.evaluate(x)), 3)
+            print(f"Quality Score: {k} (smaller values are good, should be below 1)")
+            if k > 1:
+                warn(
+                    "The quality of the variational posterior seems to be bad, increase the training iterations or consider a different model!"
+                )
+

@@ -22,6 +22,29 @@ _MODELS = [
 ]
 
 
+def kolmogoriv_smirnov_test_uniform(samples):
+    """ Tests if samples are uniformly distributed. """
+    N = samples.shape[0]
+    d = samples.shape[-1]
+    # Cdf of uniform is linear
+    x = torch.linspace(0, 1, 1000)
+    # empirical cdf
+    F_n = torch.stack([1 / N * (torch.sum(samples < x_i, 0)) for x_i in x])
+    # Deviation
+    d = torch.abs(F_n.T - x)
+    T = np.sqrt(N) * d.max()
+    return T < 2
+
+
+@pytest.mark.parametrize("model", _MODELS)
+def test_standardization(model):
+    p = model(3, 2)
+    samples = p.sample((10000,))
+    eps = p.standardize(samples)
+    assert kolmogoriv_smirnov_test_uniform(eps)
+    assert not kolmogoriv_smirnov_test_uniform(samples)
+
+
 @pytest.mark.parametrize(
     "num_components,event_dim", [(2, 3), (3, 2), (3, 3), (4, 3), (3, 4), (4, 4)]
 )

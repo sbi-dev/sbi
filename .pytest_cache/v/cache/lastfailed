@@ -1,0 +1,23 @@
+{
+  "tests/abc_test.py": true,
+  "tests/base_test.py": true,
+  "tests/divergence_optimizers_test.py": true,
+  "tests/flows_test.py": true,
+  "tests/inference_on_device_test.py": true,
+  "tests/inference_with_NaN_simulator_test.py": true,
+  "tests/linearGaussian_mdn_test.py": true,
+  "tests/linearGaussian_snle_test.py": true,
+  "tests/linearGaussian_snpe_test.py": true,
+  "tests/linearGaussian_snre_test.py": true,
+  "tests/mcmc_test.py": true,
+  "tests/mixture_of_flows_test.py": true,
+  "tests/multidimensional_x_test.py": true,
+  "tests/posterior_nn_test.py": true,
+  "tests/pyroutils_test.py": true,
+  "tests/sbiutils_test.py": true,
+  "tests/simulator_utils_test.py": true,
+  "tests/test_utils.py": true,
+  "tests/torchutils_test.py": true,
+  "tests/user_input_checks_test.py": true,
+  "tests/variational_posterior_test.py": true
+}

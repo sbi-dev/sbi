@@ -74,4 +74,4 @@ def sir(
             p=probs,
         )
 
-        return init_param_candidates[torch.from_numpy(idxs.astype(int)), :]
+        return init_param_candidates[torch.from_numpy(idxs.astype(int)).long(), :]
