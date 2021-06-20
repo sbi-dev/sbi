@@ -91,3 +91,6 @@ target/
 
 # Class diagram
 *.pyns
+
+# User specific 
+experimental_nb
