@@ -44,6 +44,7 @@ class VariationalPosterior(NeuralPosterior):
         neural_net: nn.Module,
         prior: Distribution,
         x_shape: torch.Size,
+        sample_with: str = "mcmc",
         device: str = "cpu",
         flow_paras: dict = {},
     ):
@@ -144,11 +145,11 @@ class VariationalPosterior(NeuralPosterior):
                 pass
             elif method == "psis":
                 weights = paretto_smoothed_weights(weights)
-            elif method == "clamped_is":
+            elif method == "clamped":
                 weights = clamp_weights(weights)
             else:
                 raise NotImplementedError(
-                    "We only have the methods naive, is, psis and clamped_is."
+                    "We only have the methods naive, is, psis and clamped."
                 )
             weights /= weights.sum()
             return torch.sum(f(samples) * weights.unsqueeze(-1), 0)
@@ -318,14 +319,15 @@ class VariationalPosterior(NeuralPosterior):
         optimizer = self._optimizer
         optimizer.reset_loss_stats()
 
-        # Warmup before training
-        if optimizer.num_step == 0:
-            optimizer.warm_up(warm_up_rounds)
-
         if show_progress_bar:
             iters = tqdm(range(max_num_iters))
         else:
             iters = range(max_num_iters)
+
+        # Warmup before training
+        if optimizer.num_step == 0:
+            iters.set_description("Warmup phase, this takes some seconds...")
+            optimizer.warm_up(warm_up_rounds)
 
         for _ in iters:
             optimizer.step(x)

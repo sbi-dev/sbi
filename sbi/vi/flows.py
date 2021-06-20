@@ -56,14 +56,16 @@ def _inverse(self, y):
     is analytically not tractable. """
     with torch.no_grad():
         shape = y.shape
+
         def f(x):
             x = torch.from_numpy(x).reshape(shape).float()
             return (self(x) - y).flatten().numpy()
-     
+
         x = torch.tensor(fsolve(f, np.zeros(shape).flatten(), xtol=1e-5)).float()
     x = x.reshape(shape)
 
     return x
+
 
 def _inverse_batched(self, y, batch_size=20):
     """ Batched inverse. For large batches of data it is more efficient to process it in
@@ -71,9 +73,9 @@ def _inverse_batched(self, y, batch_size=20):
     shape = y.shape
     xs = []
     y = y.reshape(-1, y.shape[-1])
-    for i in range(batch_size,len(y) + batch_size, batch_size):
-        y_i = y[i-batch_size:i,:]
-        x_i = _inverse(self,y_i)
+    for i in range(batch_size, len(y) + batch_size, batch_size):
+        y_i = y[i - batch_size : i, :]
+        x_i = _inverse(self, y_i)
         xs.append(x_i)
     x = torch.stack(xs).reshape(shape)
 
@@ -230,6 +232,26 @@ def build_flow(
     return dist
 
 
+class DenseNN(DenseNN):
+    """ More powerfull dense net compared to the pyro implementation """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        layers = [
+            nn.Sequential(
+                nn.Linear(self.input_dim + self.context_dim, self.hidden_dims[0]),
+                nn.ReLU(),
+            )
+        ]
+        for hidden_dim in self.hidden_dims:
+            layers += [nn.Sequential(nn.Linear(hidden_dim, hidden_dim), nn.ReLU())]
+
+        layers += [
+            nn.Sequential(nn.Linear(self.hidden_dims[-1], self.output_multiplier))
+        ]
+        self.layers = nn.ModuleList(layers)
+
+
 def flow_block(dim, type, **kwargs):
     r""" Gives pyro flow of specified type.
     Args:
@@ -274,7 +296,7 @@ def flow_block(dim, type, **kwargs):
         flow = transforms.spline(dim, **kwargs)
     elif type.lower() == "spline_coupling":
         split_dim = kwargs.get("split_dim", dim // 2)
-        hidden_dims = kwargs.get("hidden_dims", [dim * 10, dim * 10])
+        hidden_dims = kwargs.get("hidden_dims", [dim * 20, dim * 20])
         count_bins = kwargs.get("count_bins", 8)
         order = kwargs.get("order", "linear")
         bound = kwargs.get("bound", 3.0)
