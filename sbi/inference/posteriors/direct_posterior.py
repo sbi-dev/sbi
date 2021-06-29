@@ -188,7 +188,7 @@ class DirectPosterior(NeuralPosterior):
             ).cpu()
 
             # Force probability to be zero outside prior support.
-            in_prior_support = within_support(self._prior, theta)
+            in_prior_support = within_support(self._prior, theta).cpu()
 
             masked_log_prob = torch.where(
                 in_prior_support,
