@@ -61,7 +61,7 @@ about:
   home: https://github.com/mackelab/sbi
   license: GNU Affero General Public v3 or later (AGPLv3+)
   license_family: AGPL
-  license_file: 
+  license_file: https://github.com/mackelab/sbi/blob/main/LICENSE.txt
   summary: Simulation-based inference.
   doc_url: https://www.mackelab.org/sbi/
   dev_url: 
