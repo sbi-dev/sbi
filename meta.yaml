@@ -63,7 +63,7 @@ about:
   license_family: AGPL
   license_file: 
   summary: Simulation-based inference.
-  doc_url: 
+  doc_url: https://www.mackelab.org/sbi/
   dev_url: 
 
 extra:
