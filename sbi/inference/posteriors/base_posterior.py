@@ -1116,6 +1116,13 @@ class NeuralPosterior(ABC):
             warning_msg,
         )
 
+        state_dict, warning_msg = check_warn_and_setstate(
+            state_dict,
+            "_sample_with",
+            "rejection" if state_dict["_method_family"] == "snpe" else "mcmc",
+            warning_msg,
+        )
+
         if warning_msg:
             warning_description = (
                 "You had saved the posterior under an older version of `sbi`. To make "
