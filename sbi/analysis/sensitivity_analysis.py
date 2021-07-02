@@ -445,9 +445,7 @@ class ActiveSubspace:
         outer_products = torch.einsum("bi,bj->bij", (gradients, gradients))
         average_outer_product = outer_products.mean(dim=0)
 
-        eigen_values, eigen_vectors = torch.symeig(
-            average_outer_product, eigenvectors=True
-        )
+        eigen_values, eigen_vectors = torch.linalg.eigh(average_outer_product, UPLO="U")
 
         # Identify the direction of the eigenvectors. Above, we have computed an outer
         # product m*mT=A. Note that the same matrix A can be constructed with the
