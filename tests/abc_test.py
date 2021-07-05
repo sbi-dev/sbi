@@ -14,10 +14,7 @@ from tests.test_utils import check_c2st
 
 @pytest.mark.parametrize("num_dim", (1, 2))
 def test_mcabc_inference_on_linear_gaussian(
-    num_dim,
-    lra=False,
-    sass=False,
-    sass_expansion_degree=1,
+    num_dim, lra=False, sass=False, sass_expansion_degree=1,
 ):
     x_o = zeros((1, num_dim))
     num_samples = 1000
@@ -58,10 +55,7 @@ def test_mcabc_inference_on_linear_gaussian(
 def test_mcabc_sass_lra(lra, sass_expansion_degree, set_seed):
 
     test_mcabc_inference_on_linear_gaussian(
-        num_dim=2,
-        lra=lra,
-        sass=True,
-        sass_expansion_degree=sass_expansion_degree,
+        num_dim=2, lra=lra, sass=True, sass_expansion_degree=sass_expansion_degree,
     )
 
 
@@ -86,11 +80,7 @@ def test_smcabc_inference_on_linear_gaussian(
     elif prior_type == "uniform":
         prior = BoxUniform(-ones(num_dim), ones(num_dim))
         target_samples = samples_true_posterior_linear_gaussian_uniform_prior(
-            x_o[0],
-            likelihood_shift,
-            likelihood_cov,
-            prior,
-            num_samples,
+            x_o[0], likelihood_shift, likelihood_cov, prior, num_samples,
         )
     else:
         raise ValueError("Wrong prior string.")
@@ -124,5 +114,9 @@ def test_smcabc_inference_on_linear_gaussian(
 def test_smcabc_sass_lra(lra, sass_expansion_degree, set_seed):
 
     test_smcabc_inference_on_linear_gaussian(
-        num_dim=2, lra=lra, sass=True, sass_expansion_degree=sass_expansion_degree
+        num_dim=2,
+        lra=lra,
+        sass=True,
+        sass_expansion_degree=sass_expansion_degree,
+        prior_type="gaussian",
     )

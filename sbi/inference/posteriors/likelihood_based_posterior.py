@@ -120,7 +120,7 @@ class LikelihoodBasedPosterior(NeuralPosterior):
         )
 
         # Move to cpu for comparison with prior.
-        return log_likelihood_trial_sum.cpu() + self._prior.log_prob(theta)
+        return log_likelihood_trial_sum + self._prior.log_prob(theta)
 
     def sample(
         self,
@@ -194,10 +194,8 @@ class LikelihoodBasedPosterior(NeuralPosterior):
                 **mcmc_parameters,
             )
         elif sample_with == "rejection":
-            rejection_sampling_parameters = (
-                self._potentially_replace_rejection_parameters(
-                    rejection_sampling_parameters
-                )
+            rejection_sampling_parameters = self._potentially_replace_rejection_parameters(
+                rejection_sampling_parameters
             )
             if "proposal" not in rejection_sampling_parameters:
                 rejection_sampling_parameters["proposal"] = self._prior
@@ -355,10 +353,7 @@ class LikelihoodBasedPosterior(NeuralPosterior):
 
     @staticmethod
     def _log_likelihoods_over_trials(
-        x: Tensor,
-        theta: Tensor,
-        net: nn.Module,
-        track_gradients: bool = False,
+        x: Tensor, theta: Tensor, net: nn.Module, track_gradients: bool = False,
     ) -> Tensor:
         r"""Return log likelihoods summed over iid trials of `x`.
 
@@ -423,11 +418,7 @@ class PotentialFunctionProvider:
     """
 
     def __call__(
-        self,
-        prior,
-        likelihood_nn: nn.Module,
-        x: Tensor,
-        method: str,
+        self, prior, likelihood_nn: nn.Module, x: Tensor, method: str,
     ) -> Callable:
         r"""Return potential function for posterior $p(\theta|x)$.
 
@@ -487,7 +478,7 @@ class PotentialFunctionProvider:
         # Notice opposite sign to pyro potential.
         return self.log_likelihood(
             theta, track_gradients=track_gradients
-        ).cpu() + self.prior.log_prob(theta)
+        ) + self.prior.log_prob(theta.to(self.device))
 
     def pyro_potential(
         self, theta: Dict[str, Tensor], track_gradients: bool = False
@@ -506,6 +497,6 @@ class PotentialFunctionProvider:
         theta = next(iter(theta.values()))
 
         return -(
-            self.log_likelihood(theta, track_gradients=track_gradients).cpu()
+            self.log_likelihood(theta, track_gradients=track_gradients)
             + self.prior.log_prob(theta)
         )

@@ -82,10 +82,7 @@ class DirectPosterior(NeuralPosterior):
             device: Training device, e.g., cpu or cuda:0
         """
 
-        kwargs = del_entries(
-            locals(),
-            entries=("self", "__class__"),
-        )
+        kwargs = del_entries(locals(), entries=("self", "__class__"))
         super().__init__(**kwargs)
 
         self._purpose = (
@@ -183,9 +180,7 @@ class DirectPosterior(NeuralPosterior):
         with torch.set_grad_enabled(track_gradients):
 
             # Evaluate on device, move back to cpu for comparison with prior.
-            unnorm_log_prob = self.net.log_prob(
-                theta_repeated.to(self._device), x_repeated.to(self._device)
-            ).cpu()
+            unnorm_log_prob = self.net.log_prob(theta_repeated, x_repeated)
 
             # Force probability to be zero outside prior support.
             in_prior_support = within_support(self._prior, theta)
@@ -193,7 +188,7 @@ class DirectPosterior(NeuralPosterior):
             masked_log_prob = torch.where(
                 in_prior_support,
                 unnorm_log_prob,
-                torch.tensor(float("-inf"), dtype=torch.float32),
+                torch.tensor(float("-inf"), dtype=torch.float32, device=self._device),
             )
 
             if leakage_correction_params is None:
@@ -358,10 +353,8 @@ class DirectPosterior(NeuralPosterior):
                 **mcmc_parameters,
             )
         elif sample_with == "rejection":
-            rejection_sampling_parameters = (
-                self._potentially_replace_rejection_parameters(
-                    rejection_sampling_parameters
-                )
+            rejection_sampling_parameters = self._potentially_replace_rejection_parameters(
+                rejection_sampling_parameters
             )
             if "proposal" not in rejection_sampling_parameters:
                 assert (
@@ -556,11 +549,7 @@ class PotentialFunctionProvider:
     """
 
     def __call__(
-        self,
-        prior,
-        posterior_nn: nn.Module,
-        x: Tensor,
-        method: str,
+        self, prior, posterior_nn: nn.Module, x: Tensor, method: str,
     ) -> Callable:
         """Return potential function.
 
@@ -602,8 +591,7 @@ class PotentialFunctionProvider:
 
         with torch.set_grad_enabled(track_gradients):
             target_log_prob = self.posterior_nn.log_prob(
-                inputs=theta.to(self.device),
-                context=x_repeated,
+                inputs=theta.to(self.device), context=x_repeated,
             )
             in_prior_support = within_support(self.prior, theta)
             target_log_prob[~in_prior_support] = -float("Inf")
@@ -628,9 +616,8 @@ class PotentialFunctionProvider:
             # Notice opposite sign to `posterior_potential`.
             # Move theta to device for evaluation.
             log_prob_posterior = -self.posterior_nn.log_prob(
-                inputs=theta.to(self.device),
-                context=self.x,
-            ).cpu()
+                inputs=theta.to(self.device), context=self.x,
+            )
 
         in_prior_support = within_support(self.prior, theta)
 

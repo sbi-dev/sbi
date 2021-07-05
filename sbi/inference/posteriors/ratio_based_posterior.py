@@ -117,7 +117,7 @@ class RatioBasedPosterior(NeuralPosterior):
             track_gradients=track_gradients,
         )
 
-        return log_ratio.cpu() + self._prior.log_prob(theta)
+        return log_ratio + self._prior.log_prob(theta)
 
     def _warn_log_prob_snre(self) -> None:
         if self._method_family == "snre_a":
@@ -202,10 +202,8 @@ class RatioBasedPosterior(NeuralPosterior):
                 **mcmc_parameters,
             )
         elif sample_with == "rejection":
-            rejection_sampling_parameters = (
-                self._potentially_replace_rejection_parameters(
-                    rejection_sampling_parameters
-                )
+            rejection_sampling_parameters = self._potentially_replace_rejection_parameters(
+                rejection_sampling_parameters
             )
             if "proposal" not in rejection_sampling_parameters:
                 rejection_sampling_parameters["proposal"] = self._prior
@@ -390,10 +388,7 @@ class RatioBasedPosterior(NeuralPosterior):
 
     @staticmethod
     def _log_ratios_over_trials(
-        x: Tensor,
-        theta: Tensor,
-        net: nn.Module,
-        track_gradients: bool = False,
+        x: Tensor, theta: Tensor, net: nn.Module, track_gradients: bool = False
     ) -> Tensor:
         r"""Return log ratios summed over iid trials of `x`.
 
@@ -453,11 +448,7 @@ class PotentialFunctionProvider:
     """
 
     def __call__(
-        self,
-        prior,
-        classifier: nn.Module,
-        x: Tensor,
-        method: str,
+        self, prior, classifier: nn.Module, x: Tensor, method: str
     ) -> Callable:
         r"""Return potential function for posterior $p(\theta|x)$.
 
@@ -514,7 +505,7 @@ class PotentialFunctionProvider:
         )
 
         # Notice opposite sign to pyro potential.
-        return log_ratio.cpu() + self.prior.log_prob(theta)
+        return log_ratio + self.prior.log_prob(theta.to(self.device))
 
     def pyro_potential(
         self, theta: Dict[str, Tensor], track_gradients: bool = False
@@ -544,4 +535,4 @@ class PotentialFunctionProvider:
             track_gradients=track_gradients,
         )
 
-        return -(log_ratio.cpu() + self.prior.log_prob(theta))
+        return -(log_ratio + self.prior.log_prob(theta))
