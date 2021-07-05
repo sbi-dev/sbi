@@ -510,8 +510,6 @@ class NeuralPosterior(ABC):
             else:
                 raise NameError
 
-        print("samples", samples)
-
         return samples
 
     def _slice_np_mcmc(
@@ -718,7 +716,7 @@ class NeuralPosterior(ABC):
             condition = atleast_2d_float32_tensor(condition)
 
             # Transform the `condition` to unconstrained space.
-            tf_condition = transform.inverse(condition)
+            tf_condition = transform.inv(condition)
             cond_potential_fn_provider = ConditionalPotentialFunctionProvider(
                 potential_fn_provider, tf_condition, dims_to_sample
             )
