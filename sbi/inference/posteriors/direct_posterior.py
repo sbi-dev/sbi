@@ -353,8 +353,10 @@ class DirectPosterior(NeuralPosterior):
                 **mcmc_parameters,
             )
         elif sample_with == "rejection":
-            rejection_sampling_parameters = self._potentially_replace_rejection_parameters(
-                rejection_sampling_parameters
+            rejection_sampling_parameters = (
+                self._potentially_replace_rejection_parameters(
+                    rejection_sampling_parameters
+                )
             )
             if "proposal" not in rejection_sampling_parameters:
                 assert (
@@ -549,7 +551,7 @@ class PotentialFunctionProvider:
     """
 
     def __call__(
-        self, prior, posterior_nn: nn.Module, x: Tensor, method: str,
+        self, prior, posterior_nn: nn.Module, x: Tensor, method: str
     ) -> Callable:
         """Return potential function.
 
@@ -591,7 +593,7 @@ class PotentialFunctionProvider:
 
         with torch.set_grad_enabled(track_gradients):
             target_log_prob = self.posterior_nn.log_prob(
-                inputs=theta.to(self.device), context=x_repeated,
+                inputs=theta.to(self.device), context=x_repeated
             )
             in_prior_support = within_support(self.prior, theta)
             target_log_prob[~in_prior_support] = -float("Inf")
@@ -616,7 +618,7 @@ class PotentialFunctionProvider:
             # Notice opposite sign to `posterior_potential`.
             # Move theta to device for evaluation.
             log_prob_posterior = -self.posterior_nn.log_prob(
-                inputs=theta.to(self.device), context=self.x,
+                inputs=theta.to(self.device), context=self.x
             )
 
         in_prior_support = within_support(self.prior, theta)

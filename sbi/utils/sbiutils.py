@@ -546,7 +546,7 @@ def check_warn_and_setstate(
 
 
 def get_simulations_since_round(
-    data: List, data_round_indices: List, starting_round_index: int,
+    data: List, data_round_indices: List, starting_round_index: int
 ) -> Tensor:
     """
     Returns tensor with all data coming from a round >= `starting_round`.
@@ -912,7 +912,7 @@ class ImproperEmpirical(Empirical):
 
 
 def mog_log_prob(
-    theta: Tensor, logits_pp: Tensor, means_pp: Tensor, precisions_pp: Tensor,
+    theta: Tensor, logits_pp: Tensor, means_pp: Tensor, precisions_pp: Tensor
 ) -> Tensor:
     r"""
     Returns the log-probability of parameter sets $\theta$ under a mixture of Gaussians.

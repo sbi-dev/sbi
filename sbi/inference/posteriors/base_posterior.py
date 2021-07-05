@@ -363,7 +363,7 @@ class NeuralPosterior(ABC):
         return theta.to(self._device), x.to(self._device)
 
     def _prepare_for_sample(
-        self, x: Tensor, sample_shape: Optional[Tensor],
+        self, x: Tensor, sample_shape: Optional[Tensor]
     ) -> Tuple[Tensor, int]:
         r"""
         Return checked, reshaped, potentially default values for `x` and `sample_shape`.
@@ -723,8 +723,10 @@ class NeuralPosterior(ABC):
                 **mcmc_parameters,
             )
         elif sample_with == "rejection":
-            rejection_sampling_parameters = self._potentially_replace_rejection_parameters(
-                rejection_sampling_parameters
+            rejection_sampling_parameters = (
+                self._potentially_replace_rejection_parameters(
+                    rejection_sampling_parameters
+                )
             )
             if "proposal" not in rejection_sampling_parameters:
                 rejection_sampling_parameters[
@@ -833,7 +835,8 @@ class NeuralPosterior(ABC):
         def potential_fn(theta):
             return self.log_prob(theta, x=x, track_gradients=True, **log_prob_kwargs)
 
-        interruption_note = "The last estimate of the MAP can be accessed via the `posterior.map_` attribute."
+        interruption_note = """The last estimate of the MAP can be accessed via the
+                            `posterior.map_` attribute."""
 
         self.map_, _ = optimize_potential_fn(
             potential_fn=potential_fn,

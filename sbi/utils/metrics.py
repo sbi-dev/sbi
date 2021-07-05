@@ -61,7 +61,7 @@ def c2st(
     )
 
     data = np.concatenate((X, Y))
-    target = np.concatenate((np.zeros((X.shape[0],)), np.ones((Y.shape[0],)),))
+    target = np.concatenate((np.zeros((X.shape[0],)), np.ones((Y.shape[0],))))
 
     shuffle = KFold(n_splits=n_folds, shuffle=True, random_state=seed)
     scores = cross_val_score(clf, data, target, cv=shuffle, scoring=scoring)
