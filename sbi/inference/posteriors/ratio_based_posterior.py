@@ -202,8 +202,10 @@ class RatioBasedPosterior(NeuralPosterior):
                 **mcmc_parameters,
             )
         elif sample_with == "rejection":
-            rejection_sampling_parameters = self._potentially_replace_rejection_parameters(
-                rejection_sampling_parameters
+            rejection_sampling_parameters = (
+                self._potentially_replace_rejection_parameters(
+                    rejection_sampling_parameters
+                )
             )
             if "proposal" not in rejection_sampling_parameters:
                 rejection_sampling_parameters["proposal"] = self._prior
