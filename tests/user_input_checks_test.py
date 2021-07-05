@@ -516,7 +516,8 @@ def test_train_with_different_data_and_training_device(
 
     # simulator, prior = prepare_for_sbi(user_simulator, user_prior)
     prior_ = MultivariateNormal(
-        loc=torch.zeros(num_dim), covariance_matrix=torch.eye(num_dim)
+        loc=torch.zeros(num_dim).to(training_device),
+        covariance_matrix=torch.eye(num_dim).to(training_device),
     )
     simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior_)
 

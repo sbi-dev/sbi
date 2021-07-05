@@ -217,10 +217,8 @@ def rejection_sample_posterior_within_prior(
     while num_remaining > 0:
 
         # Sample and reject.
-        candidates = (
-            posterior_nn.sample(sampling_batch_size, context=x)
-            .reshape(sampling_batch_size, -1)
-            .cpu()
+        candidates = posterior_nn.sample(sampling_batch_size, context=x).reshape(
+            sampling_batch_size, -1
         )
 
         # SNPE-style rejection-sampling when the proposal is the neural net.
@@ -332,7 +330,7 @@ def rejection_sample(
 
     # Define a potential as the ratio between target distribution and proposal.
     def potential_over_proposal(theta):
-        return potential_fn(theta) - proposal.log_prob(theta).cpu()
+        return potential_fn(theta) - proposal.log_prob(theta)
 
     # Search for the maximum of the ratio.
     _, max_log_ratio = optimize_potential_fn(
@@ -398,14 +396,11 @@ def rejection_sample(
                 sampling_batch_size, -1
             )
 
-            # `candidates` will lie on CPU if the proposal is the prior and
-            # possibly on the GPU if the proposal is a neural net. Everything returned
-            # by the `potential_fn` will lie on the CPU.
             target_proposal_ratio = torch.exp(
-                potential_fn(candidates) - proposal.log_prob(candidates).cpu()
+                potential_fn(candidates) - proposal.log_prob(candidates)
             )
             uniform_rand = torch.rand(target_proposal_ratio.shape)
-            samples = candidates.cpu()[target_proposal_ratio > uniform_rand]
+            samples = candidates[target_proposal_ratio > uniform_rand]
 
             accepted.append(samples)
 
@@ -551,9 +546,7 @@ def check_warn_and_setstate(
 
 
 def get_simulations_since_round(
-    data: List,
-    data_round_indices: List,
-    starting_round_index: int,
+    data: List, data_round_indices: List, starting_round_index: int,
 ) -> Tensor:
     """
     Returns tensor with all data coming from a round >= `starting_round`.
@@ -919,10 +912,7 @@ class ImproperEmpirical(Empirical):
 
 
 def mog_log_prob(
-    theta: Tensor,
-    logits_pp: Tensor,
-    means_pp: Tensor,
-    precisions_pp: Tensor,
+    theta: Tensor, logits_pp: Tensor, means_pp: Tensor, precisions_pp: Tensor,
 ) -> Tensor:
     r"""
     Returns the log-probability of parameter sets $\theta$ under a mixture of Gaussians.
