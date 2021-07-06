@@ -427,7 +427,8 @@ class DirectPosterior(NeuralPosterior):
 
             # Currently difficult to integrate `sample_posterior_within_prior`
             warn(
-                "Sampling MoG analytically. Some of the samples might not be within the prior support!"
+                "Sampling MoG analytically. "
+                "Some of the samples might not be within the prior support!"
             )
             samples = mdn.sample_mog(num_samples, logits, means, precfs)
             return samples.detach().reshape((*sample_shape, -1))
@@ -451,9 +452,11 @@ class DirectPosterior(NeuralPosterior):
         dims_to_evaluate: List[int],
         x: Optional[Tensor] = None,
     ) -> Tensor:
-        """Evaluates the conditional posterior probability of a MDN at a context x for a value theta given a condition.
+        """Evaluates the conditional posterior probability of a MDN at a context x for
+        a value theta given a condition.
 
-        This function only works for MDN based posteriors, becuase evaluation is done analytically. For all other density estimators a `NotImplementedError` will be
+        This function only works for MDN based posteriors, becuase evaluation is done 
+        analytically. For all other density estimators a `NotImplementedError` will be
         raised! 
 
         Args:

@@ -12,7 +12,7 @@ from torch.distributions import MultivariateNormal
 
 from sbi import analysis as analysis
 from sbi import utils as utils
-from sbi.inference import SNPE_B, SNPE_C, prepare_for_sbi, simulate_for_sbi
+from sbi.inference import SNPE, SNPE_B, SNPE_C, prepare_for_sbi, simulate_for_sbi
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     samples_true_posterior_linear_gaussian_mvn_prior_different_dims,
@@ -26,20 +26,13 @@ from tests.test_utils import (
     get_prob_outside_uniform_prior,
 )
 
+from tests.sbiutils_test import conditional_of_mvn
+
 
 @pytest.mark.parametrize(
-    "num_dim, prior_str",
-    (
-        (2, "gaussian"),
-        (2, "uniform"),
-        (1, "gaussian"),
-    ),
+    "num_dim, prior_str", ((2, "gaussian"), (2, "uniform"), (1, "gaussian"))
 )
-def test_c2st_snpe_on_linearGaussian(
-    num_dim: int,
-    prior_str: str,
-    set_seed,
-):
+def test_c2st_snpe_on_linearGaussian(num_dim: int, prior_str: str, set_seed):
     """Test whether SNPE C infers well a simple example with available ground truth.
 
     Args:
@@ -71,10 +64,7 @@ def test_c2st_snpe_on_linearGaussian(
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     simulator, prior = prepare_for_sbi(simulator, prior)
-    inference = SNPE_C(
-        prior,
-        show_progress_bars=False,
-    )
+    inference = SNPE_C(prior, show_progress_bars=False)
 
     theta, x = simulate_for_sbi(simulator, prior, 2000, simulation_batch_size=1000)
     _ = inference.append_simulations(theta, x).train(training_batch_size=100)
@@ -176,7 +166,9 @@ def test_c2st_snpe_on_linearGaussian_different_dims(set_seed):
         show_progress_bars=False,
     )
 
-    theta, x = simulate_for_sbi(simulator, prior, 2000, simulation_batch_size=1)  # type: ignore
+    theta, x = simulate_for_sbi(
+        simulator, prior, 2000, simulation_batch_size=1
+    )  # type: ignore
     inference = inference.append_simulations(theta, x)
     _ = inference.train(max_num_epochs=10)  # Test whether we can stop and resume.
     _ = inference.train(resume_training=True)
@@ -195,8 +187,7 @@ def test_c2st_snpe_on_linearGaussian_different_dims(set_seed):
         pytest.param(
             "snpe_b",
             marks=pytest.mark.xfail(
-                raises=NotImplementedError,
-                reason="""SNPE-B not implemented""",
+                raises=NotImplementedError, reason="""SNPE-B not implemented"""
             ),
         ),
         "snpe_c",
@@ -366,11 +357,7 @@ def test_sample_conditional(set_seed):
     net = utils.posterior_nn("maf", hidden_features=20)
 
     simulator, prior = prepare_for_sbi(simulator, prior)
-    inference = SNPE_C(
-        prior,
-        density_estimator=net,
-        show_progress_bars=False,
-    )
+    inference = SNPE_C(prior, density_estimator=net, show_progress_bars=False)
 
     # We need a pretty big dataset to properly model the bimodality.
     theta, x = simulate_for_sbi(simulator, prior, 10000)
@@ -396,16 +383,8 @@ def test_sample_conditional(set_seed):
     density = gaussian_kde(cond_samples.numpy().T, bw_method="scott")
 
     X, Y = np.meshgrid(
-        np.linspace(
-            limits[0][0],
-            limits[0][1],
-            50,
-        ),
-        np.linspace(
-            limits[1][0],
-            limits[1][1],
-            50,
-        ),
+        np.linspace(limits[0][0], limits[0][1], 50),
+        np.linspace(limits[1][0], limits[1][1], 50),
     )
     positions = np.vstack([X.ravel(), Y.ravel()])
     sample_kde_grid = np.reshape(density(positions).T, X.shape)
@@ -429,6 +408,74 @@ def test_sample_conditional(set_seed):
     assert max_err < 0.0025
 
 
+def test_mdn_conditional_density(num_dim: int = 3, cond_dim: int = 1):
+    """Test whether the conditional density infered from MDN parameters of a 
+    `DirectPosterior` matches analytical results for MVN. This uses a n-D joint and
+    conditions on the last m values to generate a conditional.
+
+    Gaussian prior used for easier ground truthing of conditional posterior.
+
+    Args:
+        num_dim: Dimensionality of the MVM.
+        cond_dim: Dimensionality of the condition.
+    """
+
+    assert (
+        num_dim > cond_dim
+    ), "The number of dimensions needs to be greater than that of the condition!"
+
+    x_o = zeros(1, num_dim)
+    num_samples = 1000
+    num_simulations = 2500
+    condition = 0.1 * ones(1, num_dim)
+
+    dims = list(range(num_dim))
+    dims2sample = dims[-cond_dim:]
+    dims2condition = dims[:-cond_dim]
+
+    # likelihood_mean will be likelihood_shift+theta
+    likelihood_shift = -1.0 * ones(num_dim)
+    likelihood_cov = 0.3 * eye(num_dim)
+
+    prior_mean = zeros(num_dim)
+    prior_cov = eye(num_dim)
+    prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
+
+    joint_posterior = true_posterior_linear_gaussian_mvn_prior(
+        x_o[0], likelihood_shift, likelihood_cov, prior_mean, prior_cov
+    )
+    joint_cov = joint_posterior.covariance_matrix
+    joint_mean = joint_posterior.loc
+
+    conditional_mean, conditional_cov = conditional_of_mvn(
+        joint_mean, joint_cov, condition[0, dims2condition]
+    )
+    conditional_dist_gt = MultivariateNormal(conditional_mean, conditional_cov)
+
+    conditional_samples_gt = conditional_dist_gt.sample((num_samples,))
+
+    def simulator(theta):
+        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
+
+    simulator, prior = prepare_for_sbi(simulator, prior)
+    inference = SNPE(prior, show_progress_bars=False, density_estimator="mdn")
+
+    theta, x = simulate_for_sbi(
+        simulator, prior, num_simulations, simulation_batch_size=1000
+    )
+    _ = inference.append_simulations(theta, x).train(training_batch_size=100)
+    posterior = inference.build_posterior().set_default_x(x_o)
+
+    conditional_samples_sbi = posterior.sample_conditional(
+        (num_samples,), condition, dims2sample, x_o
+    )
+    check_c2st(
+        conditional_samples_sbi,
+        conditional_samples_gt,
+        alg="analytic_mdn_conditioning_of_direct_posterior",
+    )
+
+
 def example_posterior():
     """Return an inferred `NeuralPosterior` for interactive examination."""
     num_dim = 2
@@ -446,10 +493,7 @@ def example_posterior():
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     simulator, prior = prepare_for_sbi(simulator, prior)
-    inference = SNPE_C(
-        prior,
-        show_progress_bars=False,
-    )
+    inference = SNPE_C(prior, show_progress_bars=False)
     theta, x = simulate_for_sbi(
         simulator, prior, 1000, simulation_batch_size=10, num_workers=6
     )

@@ -381,7 +381,7 @@ def condition_mog(
     means: Tensor,
     precfs: Tensor,
 ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
-    """Finds the conditional distribution p(X|Y) for a GMM.
+    """Finds the conditional distribution p(X|Y) for a MoG.
 
     Args:
         prior: Prior Distribution. Used to check if condition within support.
