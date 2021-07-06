@@ -1175,7 +1175,7 @@ class ConditionalPotentialFunctionProvider:
         theta_condition = deepcopy(self.condition)
         theta_condition[:, self.dims_to_sample] = theta
 
-        return self.potential_fn_provider.np_potential(
+        return self.potential_fn_provider.posterior_potential(
             utils.tensor2numpy(theta_condition)
         )
 

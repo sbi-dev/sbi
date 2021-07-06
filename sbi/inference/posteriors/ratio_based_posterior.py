@@ -484,8 +484,8 @@ class PotentialFunctionProvider:
             NotImplementedError
 
     def posterior_potential(
-        self, theta: np.array, track_gradients: bool = False
-    ) -> ScalarFloat:
+        self, theta: Union[Tensor, np.array], track_gradients: bool = False
+    ) -> Tensor:
         """Returns the unnormalized posterior log-probability.
 
         This is the potential used in the numpy slice sampler and in rejection sampling.
@@ -496,18 +496,19 @@ class PotentialFunctionProvider:
         Returns:
             Posterior log probability of theta.
         """
-        theta = torch.as_tensor(theta, dtype=torch.float32)
-        theta = ensure_theta_batched(theta)
+
+        # Device is the same for net and prior.
+        theta = ensure_theta_batched(torch.as_tensor(theta, dtype=torch.float32)).to(
+            self.device
+        )
 
         log_ratio = RatioBasedPosterior._log_ratios_over_trials(
             self.x,
-            theta.to(self.device),
+            theta,
             self.classifier,
             track_gradients=track_gradients,
         )
-
-        # Notice opposite sign to pyro potential.
-        return log_ratio + self.prior.log_prob(theta.to(self.device))
+        return log_ratio + self.prior.log_prob(theta)
 
     def pyro_potential(
         self, theta: Dict[str, Tensor], track_gradients: bool = False
@@ -527,14 +528,5 @@ class PotentialFunctionProvider:
 
         theta = next(iter(theta.values()))
 
-        # Theta and x should have shape (1, dim).
-        theta = ensure_theta_batched(theta)
-
-        log_ratio = RatioBasedPosterior._log_ratios_over_trials(
-            self.x,
-            theta.to(self.device),
-            self.classifier,
-            track_gradients=track_gradients,
-        )
-
-        return -(log_ratio + self.prior.log_prob(theta))
+        # Note the minus to match the pyro potential function requirements.
+        return -self.posterior_potential(theta, track_gradients=track_gradients)

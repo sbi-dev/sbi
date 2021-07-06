@@ -106,7 +106,7 @@ def test_c2st_snl_on_linearGaussian(set_seed):
 @pytest.mark.slow
 @pytest.mark.parametrize("num_dim", (1, 2))
 @pytest.mark.parametrize("prior_str", ("uniform", "gaussian"))
-def test_c2st_snl_on_linearGaussian_different_dims_and_trials(
+def test_c2st_and_map_snl_on_linearGaussian_different(
     num_dim: int, prior_str: str, set_seed
 ):
     """Test SNL on linear Gaussian, comparing to ground truth posterior via c2st.
@@ -117,8 +117,8 @@ def test_c2st_snl_on_linearGaussian_different_dims_and_trials(
         set_seed: fixture for manual seeding
     """
     num_samples = 500
-    num_simulations = 7500
-    trials_to_test = [1, 5, 10]
+    num_simulations = 5000
+    trials_to_test = [1]
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(num_dim)
@@ -138,7 +138,7 @@ def test_c2st_snl_on_linearGaussian_different_dims_and_trials(
     inference = SNL(prior, show_progress_bars=False)
 
     theta, x = simulate_for_sbi(
-        simulator, prior, num_simulations, simulation_batch_size=50
+        simulator, prior, num_simulations, simulation_batch_size=10000
     )
     _ = inference.append_simulations(theta, x).train()
 
@@ -150,7 +150,7 @@ def test_c2st_snl_on_linearGaussian_different_dims_and_trials(
                 x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
             )
             target_samples = gt_posterior.sample((num_samples,))
-        else:
+        elif prior_str == "uniform":
             target_samples = samples_true_posterior_linear_gaussian_uniform_prior(
                 x_o,
                 likelihood_shift,
@@ -158,6 +158,9 @@ def test_c2st_snl_on_linearGaussian_different_dims_and_trials(
                 prior=prior,
                 num_samples=num_samples,
             )
+        else:
+            raise ValueError(f"Wrong prior_str: '{prior_str}'.")
+
         posterior = inference.build_posterior(
             mcmc_method="slice_np_vectorized"
         ).set_default_x(x_o)
@@ -171,7 +174,9 @@ def test_c2st_snl_on_linearGaussian_different_dims_and_trials(
             samples, target_samples, alg=f"snle_a-{prior_str}-prior-{num_trials}-trials"
         )
 
-        map_ = posterior.map(num_init_samples=1_000, init_method="prior")
+        map_ = posterior.map(
+            num_init_samples=1_000, init_method="prior", show_progress_bars=False
+        )
 
         # TODO: we do not have a test for SNL log_prob(). This is because the output
         # TODO: density is not normalized, so KLd does not make sense.
@@ -239,10 +244,19 @@ def test_c2st_multi_round_snl_on_linearGaussian(num_trials: int, set_seed):
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("prior_str", ("gaussian", "uniform"))
 @pytest.mark.parametrize(
-    "sampling_method",
-    ("slice_np", "slice_np_vectorized", "slice", "nuts", "hmc", "rejection"),
+    "sampling_method, prior_str",
+    (
+        ("slice_np", "gaussian"),
+        ("slice_np", "uniform"),
+        ("slice_np_vectorized", "gaussian"),
+        ("slice_np_vectorized", "uniform"),
+        ("slice", "gaussian"),
+        ("slice", "uniform"),
+        ("nuts", "gaussian"),
+        ("nuts", "uniform"),
+        ("hmc", "gaussian"),
+    ),
 )
 @pytest.mark.parametrize("init_strategy", ("prior", "sir"))
 def test_api_snl_sampling_methods(
@@ -259,8 +273,7 @@ def test_api_snl_sampling_methods(
     num_dim = 2
     num_samples = 10
     num_trials = 2
-    # HMC with uniform prior needs good likelihood.
-    num_simulations = 10000 if sampling_method == "hmc" else 1000
+    num_simulations = 1000
     x_o = zeros((num_trials, num_dim))
     # Test for multiple chains is cheap when vectorized.
     num_chains = 3 if sampling_method == "slice_np_vectorized" else 1
@@ -278,7 +291,7 @@ def test_api_snl_sampling_methods(
     inference = SNL(prior, show_progress_bars=False)
 
     theta, x = simulate_for_sbi(
-        simulator, prior, num_simulations, simulation_batch_size=50
+        simulator, prior, num_simulations, simulation_batch_size=1000
     )
     _ = inference.append_simulations(theta, x).train(max_num_epochs=5)
     posterior = inference.build_posterior(

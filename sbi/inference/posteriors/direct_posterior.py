@@ -574,57 +574,47 @@ class PotentialFunctionProvider:
             NotImplementedError
 
     def posterior_potential(
-        self, theta: np.ndarray, track_gradients: bool = False
-    ) -> ScalarFloat:
-        r"""Return posterior theta log prob. $p(\theta|x)$, $-\infty$ if outside prior."
+        self, theta: Union[Tensor, np.array], track_gradients: bool = False
+    ) -> Tensor:
+        "Return posterior theta log prob. $p(\theta|x)$, $-\infty$ if outside prior."
 
-        Args:
-            theta: Parameters $\theta$, batch dimension 1.
+        # Device is the same for net and prior.
+        theta = ensure_theta_batched(torch.as_tensor(theta, dtype=torch.float32)).to(
+            self.device
+        )
 
-        Returns:
-            Posterior log probability $\log(p(\theta|x))$.
-        """
-        theta = torch.as_tensor(theta, dtype=torch.float32)
-        theta = ensure_theta_batched(theta)
-        num_batch = theta.shape[0]
-
-        # Repeat x over batch dim to match theta batch, accounting for multi-D x.
-        x_repeated = self.x.repeat(num_batch, *(1 for _ in range(self.x.ndim - 1)))
+        theta_repeated, x_repeated = DirectPosterior._match_theta_and_x_batch_shapes(
+            theta, self.x
+        )
 
         with torch.set_grad_enabled(track_gradients):
-            target_log_prob = self.posterior_nn.log_prob(
-                inputs=theta.to(self.device), context=x_repeated
-            )
-            in_prior_support = within_support(self.prior, theta)
-            target_log_prob[~in_prior_support] = -float("Inf")
 
-        return target_log_prob
+            # Evaluate on device, move back to cpu for comparison with prior.
+            posterior_log_prob = self.posterior_nn.log_prob(theta_repeated, x_repeated)
+
+            # Force probability to be zero outside prior support.
+            in_prior_support = within_support(self.prior, theta)
+
+            posterior_log_prob = torch.where(
+                in_prior_support,
+                posterior_log_prob,
+                torch.tensor(float("-inf"), dtype=torch.float32, device=self.device),
+            )
+
+        return posterior_log_prob
 
     def pyro_potential(
         self, theta: Dict[str, Tensor], track_gradients: bool = False
     ) -> Tensor:
-        r"""Return posterior log prob. of theta $p(\theta|x)$, -inf where outside prior.
+        r"""Return posterior theta log prob. $p(\theta|x)$, $-\infty$ if outside prior."
 
         Args:
             theta: Parameters $\theta$ (from pyro sampler).
 
         Returns:
-            Posterior log probability $p(\theta|x)$, masked outside of prior.
+            Negative posterior log probability $p(\theta|x)$, masked outside of prior.
         """
 
         theta = next(iter(theta.values()))
 
-        with torch.set_grad_enabled(track_gradients):
-            # Notice opposite sign to `posterior_potential`.
-            # Move theta to device for evaluation.
-            log_prob_posterior = -self.posterior_nn.log_prob(
-                inputs=theta.to(self.device), context=self.x
-            )
-
-        in_prior_support = within_support(self.prior, theta)
-
-        return torch.where(
-            in_prior_support,
-            log_prob_posterior,
-            float("-inf") * torch.ones_like(log_prob_posterior),
-        )
+        return -self.posterior_potential(theta, track_gradients=track_gradients)

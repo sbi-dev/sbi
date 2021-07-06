@@ -452,35 +452,23 @@ class PotentialFunctionProvider:
         else:
             NotImplementedError
 
-    def log_likelihood(self, theta: Tensor, track_gradients: bool = False) -> Tensor:
+    def posterior_potential(
+        self, theta: Union[Tensor, np.array], track_gradients: bool = False
+    ) -> Tensor:
         """Return log likelihood of fixed data given a batch of parameters."""
+
+        # Device is the same for net and prior.
+        theta = ensure_theta_batched(torch.as_tensor(theta, dtype=torch.float32)).to(
+            self.device
+        )
 
         log_likelihoods = LikelihoodBasedPosterior._log_likelihoods_over_trials(
             x=self.x,
-            theta=ensure_theta_batched(theta).to(self.device),
+            theta=theta,
             net=self.likelihood_nn,
             track_gradients=track_gradients,
         )
-
-        return log_likelihoods
-
-    def posterior_potential(
-        self, theta: np.array, track_gradients: bool = False
-    ) -> ScalarFloat:
-        r"""Return posterior log prob. of theta $p(\theta|x)$"
-
-        Args:
-            theta: Parameters $\theta$, batch dimension 1.
-
-        Returns:
-            Posterior log probability of the theta, $-\infty$ if impossible under prior.
-        """
-        theta = torch.as_tensor(theta, dtype=torch.float32)
-
-        # Notice opposite sign to pyro potential.
-        return self.log_likelihood(
-            theta, track_gradients=track_gradients
-        ) + self.prior.log_prob(theta.to(self.device))
+        return log_likelihoods + self.prior.log_prob(theta)
 
     def pyro_potential(
         self, theta: Dict[str, Tensor], track_gradients: bool = False
@@ -498,7 +486,5 @@ class PotentialFunctionProvider:
 
         theta = next(iter(theta.values()))
 
-        return -(
-            self.log_likelihood(theta, track_gradients=track_gradients)
-            + self.prior.log_prob(theta)
-        )
+        # Note the minus to match the pyro potential function requirements.
+        return -self.posterior_potential(theta, track_gradients=track_gradients)
