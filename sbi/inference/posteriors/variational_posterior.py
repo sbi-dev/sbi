@@ -15,13 +15,13 @@ from sbi.utils.torchutils import (
     ensure_x_batched,
     atleast_2d_float32_tensor,
 )
+from warnings import warn
 
 from sbi.vi.build_q import build_q, build_optimizer
 from sbi.vi.divergence_optimizers import DivergenceOptimizer
 from sbi.vi.sampling import (
     importance_resampling,
     independent_mh,
-    rejection_sampling,
     random_direction_slice_sampler,
     paretto_smoothed_weights,
     clamp_weights,
@@ -44,7 +44,7 @@ class VariationalPosterior(NeuralPosterior):
         neural_net: nn.Module,
         prior: Distribution,
         x_shape: torch.Size,
-        sample_with: str = "mcmc",
+        sample_with: str = "vi",
         device: str = "cpu",
         flow_paras: dict = {},
     ):
@@ -59,7 +59,7 @@ class VariationalPosterior(NeuralPosterior):
             device: Training device, e.g., cpu or cuda:0.
         """
         kwargs = del_entries(locals(), entries=("self", "__class__", "flow_paras"))
-
+        warn("THIS CLASS IS DEPRECATED DONT USE IT")
         super().__init__(**kwargs)
         self._purpose = f"Variational Posterior approximation"
         self._flow_paras = flow_paras
@@ -348,6 +348,6 @@ class VariationalPosterior(NeuralPosterior):
             print(f"Quality Score: {k} (smaller values are good, should be below 1)")
             if k > 1:
                 warn(
-                    "The quality of the variational posterior seems to be bad, increase the training iterations or consider a different model!"
+                    "The quality of the variational posterior seems to be bad, increase the training iterations or consider a different variational family!"
                 )
 

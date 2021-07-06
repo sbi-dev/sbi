@@ -130,7 +130,9 @@ class GerneralizedParetto(TransformedDistribution):
 
 def paretto_smoothed_weights(weights):
     """ This models the largest importance weights as paretto distributed and smooth
-    them as their expected values. """
+    them as their quantiles as proposed in https://arxiv.org/pdf/1507.02646.pdf .
+    
+    They show that this rule is asymtotically unbiased """
     with torch.no_grad():
         N = len(weights)
         M = int(min(N / 5, 3 * np.sqrt(N)))
@@ -154,7 +156,9 @@ def clamp_weights(weights):
     return weights
 
 
-def importance_resampling(num_samples, posterior, x_obs, K=32, num_samples_batch=10000):
+def importance_resampling(
+    num_samples, potential_fn, proposal, K=32, num_samples_batch=10000
+):
     """ This will sample based on the importance weights. This can correct for partially
    collapsed modes in the variational approximation. """
     final_samples = []
@@ -163,12 +167,9 @@ def importance_resampling(num_samples, posterior, x_obs, K=32, num_samples_batch
     for _ in range(iters):
         batch_size = min(num_samples_batch, num_samples - len(final_samples))
         with torch.no_grad():
-            obs = x_obs.repeat(K * batch_size, 1)
-            thetas = posterior.sample((batch_size * K,))
-            logp = posterior.net.log_prob(obs, thetas) + posterior._prior.log_prob(
-                thetas
-            )
-            logq = posterior.log_prob(thetas)
+            thetas = proposal.sample((batch_size * K,))
+            logp = potential_fn(thetas)
+            logq = proposal.log_prob(thetas)
             weights = (logp - logq).reshape(batch_size, K).softmax(-1).cumsum(-1)
             u = torch.rand(batch_size, 1)
             mask = torch.cumsum(weights >= u, -1) == 1
@@ -177,27 +178,24 @@ def importance_resampling(num_samples, posterior, x_obs, K=32, num_samples_batch
     return torch.vstack(final_samples)
 
 
-def independent_mh(num_samples, posterior, x_obs, T=20, num_samples_batch=10000):
+def independent_mh(num_samples, potential_fn, proposal, T=20, num_samples_batch=10000):
     """ Independent metropolis hasting algorithm, which uses as proposal the variational
     posterior approximation"""
     final_samples = []
     num_samples_batch = min(num_samples_batch, num_samples)
-    samples = posterior.sample((num_samples_batch,))
+    samples = proposal.sample((num_samples_batch,))
     sampling_steps = int(T / (int(num_samples / num_samples_batch)))
-    obs = x_obs.repeat(num_samples_batch, 1)
     for t in range(T):
-        potential_function = (
-            posterior.net.log_prob(obs, samples)
-            + posterior._prior.log_prob(samples)
-            - posterior.log_prob(samples)
+        potential = (
+            potential_fn(samples)
+            - proposal.log_prob(samples)
         )
-        new_samples = posterior.sample((num_samples_batch,))
-        new_potential_function = (
-            posterior.net.log_prob(obs, new_samples)
-            + posterior._prior.log_prob(new_samples)
-            - posterior.log_prob(new_samples)
+        new_samples = proposal.sample((num_samples_batch,))
+        new_potential = (
+            potential_fn(new_samples)
+            - proposal.log_prob(new_samples)
         )
-        acceptance_probability = torch.exp(new_potential_function - potential_function)
+        acceptance_probability = torch.exp(new_potential - potential)
         u = torch.rand(num_samples_batch)
         mask = u < acceptance_probability
         samples[mask] = new_samples[mask]
@@ -206,91 +204,17 @@ def independent_mh(num_samples, posterior, x_obs, T=20, num_samples_batch=10000)
     return torch.vstack(final_samples)
 
 
-def rejection_sampling(
-    num_samples,
-    posterior,
-    x_obs,
-    num_samples_batch=10000,
-    maxM=200,
-    eps=1e-5,
-    min_num_iters=200,
-    max_num_iters=1000,
-):
-    """ This is a rejection sampling algorithm. """
-    final_samples = []
-    current_samples = 0
-    num_samples_batch = min(num_samples_batch, num_samples)
-    obs = x_obs.repeat((num_samples_batch, 1))
-    # Select good candidate through MC
-    thetas = posterior._prior.sample((50000,))
-    max_theta = thetas.max()
-    min_theta = thetas.min()
-    mask = (
-        torch.logical_and(
-            (thetas <= max_theta - 0.02), (thetas >= min_theta + 0.02)
-        ).sum(1)
-        == thetas.shape[-1]
-    )
-    logratio = (
-        posterior.net.log_prob(x_obs.repeat((mask.sum(), 1)), thetas[mask])
-        + posterior._prior.log_prob(thetas[mask])
-        - posterior.log_prob(thetas[mask])
-    )
-    # Stochastic gradient decent on logratio
-    MC_logM = logratio.max()
-    theta = thetas[logratio.argmax()].clone().reshape(1, -1)
-    print(logratio.max().exp())
-    theta.requires_grad = True
-
-    logratio = (
-        lambda theta: posterior.net.log_prob(x_obs, theta)
-        + posterior._prior.log_prob(theta)
-        - posterior.log_prob(theta).detach()
-    )
-    optimizer = torch.optim.Adam([theta])
-    converged = False
-    loss = torch.zeros(1)
-    i = 0
-    while not converged:
-        optimizer.zero_grad()
-        old_loss = loss.clone().detach()
-        loss = -logratio(theta)
-        loss.backward()
-        optimizer.step()
-        i += 1
-        converged = torch.norm(old_loss - loss.detach()) <= eps and i > min_num_iters
-        if i > max_num_iters:
-            break
-    M = max(logratio(theta), MC_logM)
-    print(M.exp())
-
-    # Collect samples
-    while current_samples <= num_samples:
-        samples = posterior.sample((num_samples_batch,))
-        u = torch.rand((num_samples_batch,))
-        logp = posterior.net.log_prob(obs, samples) + posterior._prior.log_prob(samples)
-        logq = posterior.log_prob(samples,) + min(M, np.log(maxM))
-        r = torch.exp(logp - logq)
-        mask = u < r
-        final_samples.append(samples[mask])
-        current_samples += mask.sum()
-    return torch.vstack(final_samples)
-
-
 def random_direction_slice_sampler(
-    num_samples, posterior, x_obs, T=20, num_samples_batch=10000, steps=0.01
+    num_samples, potential_fn, proposal, T=20, num_samples_batch=1000, steps=0.01
 ):
     """ Random direction slice sampler """
     final_samples = []
     num_samples_batch = min(num_samples_batch, num_samples)
-    samples = posterior.sample((num_samples_batch,))
+    samples = proposal.sample((num_samples_batch,))
     sampling_steps = int(T / (int(num_samples / num_samples_batch)))
-    obs = x_obs.repeat(num_samples_batch, 1)
 
     for t in range(T):
-        potential_function = posterior.net.log_prob(
-            obs, samples
-        ) + posterior._prior.log_prob(samples)
+        potential_function = potential_fn(samples)
         y = torch.rand(num_samples) * potential_function.exp()
 
         random_directions = torch.randn(samples.shape)
@@ -299,6 +223,8 @@ def random_direction_slice_sampler(
         ub = torch.zeros((num_samples_batch,))
         mask_lb = y < potential_function.exp()
         mask_ub = mask_lb.clone()
+        
+
         while mask_lb.any() and mask_ub.any():
             lb[mask_lb] -= steps
             ub[mask_ub] += steps
@@ -311,12 +237,9 @@ def random_direction_slice_sampler(
                 + ub[mask_ub].unsqueeze(-1) * random_directions[mask_ub, :]
             )
 
-            potential_function_lb = posterior.net.log_prob(
-                obs[mask_lb], proposed_samples_lb
-            ) + posterior._prior.log_prob(proposed_samples_lb)
-            potential_function_ub = posterior.net.log_prob(
-                obs[mask_ub], proposed_samples_ub
-            ) + posterior._prior.log_prob(proposed_samples_ub)
+            potential_function_lb = potential_fn(proposed_samples_lb)
+            potential_function_ub = potential_fn(proposed_samples_ub)
+
 
             mask_lb[mask_lb.clone()] = y[mask_lb] < potential_function_lb.exp()
             mask_ub[mask_ub.clone()] = y[mask_ub] < potential_function_ub.exp()
@@ -327,127 +250,4 @@ def random_direction_slice_sampler(
     return torch.vstack(final_samples)
 
 
-# def abc_rejection(
-#     num_samples,
-#     posterior,
-#     x_obs,
-#     simulator=None,
-#     epsilon=0.1,
-#     pca_statistic=True,
-#     statistic_dim=2,
-#     min_samples_accept=50,
-#     num_samples_batch=5000,
-#     verbose=False,
-# ):
-#     final_samples = []
-#     current_samples = 0
-#     while current_samples < num_samples:
-#         batch_size = num_samples_batch
-#         samples = importance_resampling(batch_size, posterior, x_obs)
-#         if simulator is not None:
-#             data = simulator(samples)
-#         else:
-#             data = posterior.net.sample(1, samples).squeeze()
-#         data_m = data.mean(0)
-#         data_std = data.std(0)
-#         normed_data = (data - data_m) / data_std
-#         if pca_statistic:
-#             U = torch.pca_lowrank(normed_data)[-1][:, :statistic_dim]
-#             stats = torch.matmul(normed_data, U)
-#             stats_obs = torch.matmul((x_obs - data_m) / data_std, U)
-#         else:
-#             stats = normed_data
-#             stats_obs = (x_obs - data_m) / data_std
-
-#         dist = torch.linalg.norm(stats - stats_obs, dim=-1)
-#         epsilon_quantile = dist.quantile(min_samples_accept / batch_size)
-#         mask = dist <= max(epsilon, epsilon_quantile)
-#         final_samples.append(samples[mask])
-#         current_samples += len(samples[mask])
-#         if verbose:
-#             print("Epsilon quantile: ", epsilon_quantile)
-#             print("Accepted samples: ", current_samples)
-#     return torch.vstack(final_samples)
-
-
-# def abc_slice_mcmc(
-#     num_samples,
-#     posterior,
-#     x_obs,
-#     simulator=None,
-#     T=20,
-#     epsilon=0.1,
-#     num_samples_batch=1000,
-#     ir=True,
-#     steps=0.01,
-#     min_samples_accept=50,
-# ):
-#     final_samples = []
-#     current_samples = 0
-#     if num_samples_batch > num_samples:
-#         num_samples_batch = num_samples
-#     else:
-#         required_sampling_steps = int(num_samples / (num_samples_batch))
-#         sampling_steps = int(T / required_sampling_steps)
-
-#     if not ir:
-#         samples = posterior.sample((num_samples_batch,))
-#     else:
-#         samples = importance_resampling(num_samples_batch, posterior, x_obs)
-#     obs = x_obs.repeat(num_samples_batch, 1)
-#     for t in range(T):
-#         dim = samples.shape[-1]
-#         idx = torch.randint(dim, (1,))
-#         y = torch.rand(num_samples_batch) * torch.exp(
-#             posterior.net.log_prob(obs, samples) + posterior._prior.log_prob(samples)
-#         )
-
-#         lb = samples[:, idx]
-#         ub = samples[:, idx]
-#         samples[:, idx] = lb
-#         log_prob = posterior.net.log_prob(obs, samples) + posterior._prior.log_prob(
-#             samples
-#         )
-#         mask = y < log_prob.exp()
-#         while mask.any():
-#             lb[mask] -= steps
-#             samples[mask, idx] = lb[mask].squeeze()
-#             log_prob = posterior.net.log_prob(
-#                 obs[mask], samples[mask]
-#             ) + posterior._prior.log_prob(samples[mask])
-#             mask[mask] = y[mask] < log_prob.exp()
-#         samples[:, idx] = ub
-#         log_prob = posterior.net.log_prob(obs, samples) + posterior._prior.log_prob(
-#             samples
-#         )
-#         mask = y < log_prob.exp()
-#         while mask.any():
-#             ub[mask] += steps
-#             samples[mask, idx] = ub[mask].squeeze()
-#             log_prob = posterior.net.log_prob(
-#                 obs[mask], samples[mask]
-#             ) + posterior._prior.log_prob(samples[mask])
-#             mask[mask] = y[mask] < log_prob.exp()
-#         x = torch.rand(num_samples_batch, 1) * (ub - lb) + lb
-#         samples[:, idx] = x
-
-#         if simulator is None and (t + 1) % sampling_steps == 0:
-#             final_samples.append(samples.clone())
-#             continue
-
-#         if simulator is not None and t >= int(T / 2):
-#             data = simulator(samples)
-#             data_m = data.mean(0)
-#             data_std = data.std(0)
-#             normed_data = (data - data_m) / data_std
-#             U = torch.pca_lowrank(normed_data)[-1][:, :2]
-#             data_statistic = torch.matmul(normed_data, U)
-#             observed_statistic = torch.matmul((x_obs - data_m) / data_std, U)
-#             dist = torch.linalg.norm(data_statistic - observed_statistic, dim=-1)
-#             epsilon_quantile = dist.quantile(min_samples_accept / num_samples_batch)
-#             mask = dist <= max(epsilon, epsilon_quantile)
-#             final_samples.append(samples[mask].clone())
-#             current_samples += len(samples[mask])
-
-#     return torch.vstack(final_samples)
 

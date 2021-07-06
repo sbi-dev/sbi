@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
+from copy import deepcopy
 from functools import partial
 from typing import Any, Callable, Dict, List, Optional, Union
 from warnings import warn
@@ -10,9 +11,22 @@ import torch
 from torch import Tensor, nn
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
-from sbi.types import Shape
+from sbi.types import Shape, Array
 from sbi.utils import del_entries, optimize_potential_fn, rejection_sample
-from sbi.utils.torchutils import ScalarFloat, atleast_2d, ensure_theta_batched
+from sbi.utils.torchutils import (
+    ScalarFloat,
+    atleast_2d,
+    ensure_theta_batched,
+    atleast_2d_float32_tensor,
+)
+
+from sbi.vi.sampling import (
+    importance_resampling,
+    independent_mh,
+    random_direction_slice_sampler,
+)
+
+from tqdm import tqdm
 
 
 class LikelihoodBasedPosterior(NeuralPosterior):
@@ -35,6 +49,7 @@ class LikelihoodBasedPosterior(NeuralPosterior):
         mcmc_method: str = "slice_np",
         mcmc_parameters: Optional[Dict[str, Any]] = None,
         rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
+        vi_parameters: Optional[Dict[str, Any]] = None,
         device: str = "cpu",
     ):
         """
@@ -71,6 +86,8 @@ class LikelihoodBasedPosterior(NeuralPosterior):
                 `potential_fn / proposal` ratio. `num_iter_to_find_max` as the number
                 of gradient ascent iterations to find the maximum of that ratio. `m` as
                 multiplier to that ratio.
+            vi_parameters: Dictionary overriding the default parameters for Variational
+                Inference TODO write docstring when fixed
             device: Training device, e.g., cpu or cuda:0.
         """
 
@@ -108,19 +125,27 @@ class LikelihoodBasedPosterior(NeuralPosterior):
 
         theta, x = self._prepare_theta_and_x_for_log_prob_(theta, x)
 
-        # Calculate likelihood over trials and in one batch.
-        warn(
-            "The log probability from SNL is only correct up to a normalizing constant."
-        )
-        log_likelihood_trial_sum = self._log_likelihoods_over_trials(
-            x=x.to(self._device),
-            theta=theta.to(self._device),
-            net=self.net,
-            track_gradients=track_gradients,
-        )
+        if self.sample_with == "mcmc" or self.sample_with == "rejection":
+            # Calculate likelihood over trials and in one batch.
+            warn(
+                "The log probability from SNL is only correct up to a normalizing constant."
+            )
+            log_likelihood_trial_sum = self._log_likelihoods_over_trials(
+                x=x.to(self._device),
+                theta=theta.to(self._device),
+                net=self.net,
+                track_gradients=track_gradients,
+            )
 
-        # Move to cpu for comparison with prior.
-        return log_likelihood_trial_sum.cpu() + self._prior.log_prob(theta)
+            # Move to cpu for comparison with prior.
+            return log_likelihood_trial_sum.cpu() + self._prior.log_prob(theta)
+        elif self.sample_with == "vi":
+            with torch.set_grad_enabled(track_gradients):
+                return self._q.log_prob(theta.to(self._device))
+        else:
+            raise NotImplementedError(
+                "We only implement methods mcmc, rejection and vi"
+            )
 
     def sample(
         self,
@@ -131,6 +156,7 @@ class LikelihoodBasedPosterior(NeuralPosterior):
         mcmc_method: Optional[str] = None,
         mcmc_parameters: Optional[Dict[str, Any]] = None,
         rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
+        vi_parameters: Optional[Dict[str, Any]] = None,
     ) -> Tensor:
         r"""
         Return samples from posterior distribution $p(\theta|x)$ with MCMC.
@@ -162,6 +188,8 @@ class LikelihoodBasedPosterior(NeuralPosterior):
                 `potential_fn / proposal` ratio. `num_iter_to_find_max` as the number
                 of gradient ascent iterations to find the maximum of that ratio. `m` as
                 multiplier to that ratio.
+            vi_sampling_parameters: Dict for sampling parameters in vi e.g. one may use
+            a sample correction.
 
         Returns:
             Samples from posterior.
@@ -194,10 +222,8 @@ class LikelihoodBasedPosterior(NeuralPosterior):
                 **mcmc_parameters,
             )
         elif sample_with == "rejection":
-            rejection_sampling_parameters = (
-                self._potentially_replace_rejection_parameters(
-                    rejection_sampling_parameters
-                )
+            rejection_sampling_parameters = self._potentially_replace_rejection_parameters(
+                rejection_sampling_parameters
             )
             if "proposal" not in rejection_sampling_parameters:
                 rejection_sampling_parameters["proposal"] = self._prior
@@ -209,9 +235,47 @@ class LikelihoodBasedPosterior(NeuralPosterior):
                 num_samples=num_samples,
                 **rejection_sampling_parameters,
             )
+        elif sample_with == "vi":
+            vi_parameters = self._potentially_replace_vi_parameters(vi_parameters)
+            method = vi_parameters.get("method", "naive")
+            method_params = vi_parameters.get("method_params", {})
+            track_gradients = vi_parameters.get("track_gradients", False)
+            sample_shape = torch.Size(sample_shape)
+            if method.lower() == "naive":
+                if track_gradients and self._q.has_rsample:
+                    samples = self._q.rsample(sample_shape)
+                else:
+                    samples = self._q.sample(sample_shape)
+            elif method.lower() == "ir":
+                potential_fn = potential_fn_provider(self._prior, self.net, x, "rejection")
+                samples = importance_resampling(
+                    sample_shape.numel(), potential_fn=potential_fn, proposal=self._q, **method_params
+                )
+            elif method.lower() == "imh":
+                 potential_fn = potential_fn_provider(self._prior, self.net, x, "rejection")
+                 samples = independent_mh(sample_shape.numel(), potential_fn,self, **method_params)
+            elif method.lower() == "rejection":
+                rejection_sampling_parameters = self._potentially_replace_rejection_parameters(
+                    rejection_sampling_parameters
+                )
+                rejection_sampling_parameters["proposal"] = self._q
+                samples, _ = rejection_sample(
+                    potential_fn=potential_fn_provider(
+                        self._prior, self.net, x, "rejection"
+                    ),
+                    num_samples=num_samples,
+                    **rejection_sampling_parameters,
+                )
+            elif method.lower() == "slice":
+                potential_fn = potential_fn_provider(self._prior, self.net, x, "rejection")
+                samples = random_direction_slice_sampler(
+                    sample_shape.numel(), potential_fn, self._q, **method_params
+                )
+            else:
+                raise NotImplementedError("The sampling methods from the vi posterior are currently restricted to naive, ir, imh, rejection and slice")
         else:
             raise NameError(
-                "The only implemented sampling methods are `mcmc` and `rejection`."
+                "The only implemented sampling methods are `mcmc`, `rejection` and `vi`."
             )
 
         self.net.train(True)
@@ -355,10 +419,7 @@ class LikelihoodBasedPosterior(NeuralPosterior):
 
     @staticmethod
     def _log_likelihoods_over_trials(
-        x: Tensor,
-        theta: Tensor,
-        net: nn.Module,
-        track_gradients: bool = False,
+        x: Tensor, theta: Tensor, net: nn.Module, track_gradients: bool = False,
     ) -> Tensor:
         r"""Return log likelihoods summed over iid trials of `x`.
 
@@ -423,11 +484,7 @@ class PotentialFunctionProvider:
     """
 
     def __call__(
-        self,
-        prior,
-        likelihood_nn: nn.Module,
-        x: Tensor,
-        method: str,
+        self, prior, likelihood_nn: nn.Module, x: Tensor, method: str,
     ) -> Callable:
         r"""Return potential function for posterior $p(\theta|x)$.
 

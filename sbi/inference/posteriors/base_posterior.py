@@ -39,6 +39,9 @@ from sbi.utils.torchutils import (
 )
 from sbi.utils.user_input_checks import check_for_possibly_batched_x_shape, process_x
 
+from sbi.vi.build_q import build_q, build_optimizer, train_posterior, expectation
+from functools import partial
+
 
 class NeuralPosterior(ABC):
     r"""Posterior $p(\theta|x)$ with `log_prob()` and `sample()` methods.<br/><br/>
@@ -59,6 +62,7 @@ class NeuralPosterior(ABC):
         mcmc_method: str = "slice_np",
         mcmc_parameters: Optional[Dict[str, Any]] = None,
         rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
+        vi_parameters: Optional[Dict[str, Any]] = None,
         device: str = "cpu",
     ):
         """
@@ -103,6 +107,7 @@ class NeuralPosterior(ABC):
         self.set_mcmc_parameters(mcmc_parameters)
         self.set_sample_with(sample_with)
         self.set_rejection_sampling_parameters(rejection_sampling_parameters)
+        self.set_vi_parameters(vi_parameters)
 
         self._leakage_density_correction_factor = None  # Correction factor for SNPE.
         self._mcmc_init_params = None
@@ -118,6 +123,8 @@ class NeuralPosterior(ABC):
 
         if not self._allow_iid_x:
             check_for_possibly_batched_x_shape(self._x_shape)
+        if sample_with == "vi":
+            self.__set_up_for_vi(self.vi_parameters)
 
     @property
     def default_x(self) -> Optional[Tensor]:
@@ -179,9 +186,9 @@ class NeuralPosterior(ABC):
             ValueError: on attempt to turn off MCMC sampling for family of methods that
                 do not support rejection sampling.
         """
-        if sample_with not in ("mcmc", "rejection"):
+        if sample_with not in ("mcmc", "rejection", "vi"):
             raise NameError(
-                "The only implemented sampling methods are `mcmc` and `rejection`."
+                "The only implemented sampling methods are `mcmc`, `rejection` and `vi`."
             )
         self._sample_with = sample_with
         return self
@@ -273,6 +280,41 @@ class NeuralPosterior(ABC):
         self._rejection_sampling_parameters = parameters
         return self
 
+    @property
+    def vi_parameters(self) -> dict:
+        """Returns rejection sampling parameters."""
+        if self._vi_parameters is None:
+            return {}
+        else:
+            return self._vi_parameters
+
+    @vi_parameters.setter
+    def vi_parameters(self, parameters: Dict[str, Any]) -> None:
+        """See `set_vi_parameters`."""
+        self.set_vi_parameters(parameters)
+
+    def set_vi_parameters(self, parameters: Dict[str, Any]) -> "NeuralPosterior":
+        """Sets parameters for rejection sampling and returns `NeuralPosterior`.
+
+        Args:
+            TODO
+
+        Returns:
+            `NeuralPosterior for chainable calls.
+        """
+        self._vi_parameters = parameters
+        return self
+
+    def __set_up_for_vi(self, vi_parameters):
+        """ Sets up the posterior for variational inference"""
+        vi_parameters = self._potentially_replace_vi_parameters(vi_parameters)
+        self._q = build_q(self._prior.event_shape, self._prior.support, **vi_parameters)
+        loss = vi_parameters.get("loss", "elbo")
+        self._loss = loss
+        self._optimizer = build_optimizer(self, loss, **vi_parameters)
+        setattr(self, "train", partial(train_posterior, self))
+        setattr(self, "expectation", partial(expectation, self))
+
     @abstractmethod
     def log_prob(
         self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False
@@ -288,6 +330,7 @@ class NeuralPosterior(ABC):
         show_progress_bars: bool = True,
         mcmc_method: Optional[str] = None,
         mcmc_parameters: Optional[Dict[str, Any]] = None,
+        vi_parameters: Optional[Dict[str, Any]] = None,
     ) -> Tensor:
         """See child classes for docstring."""
         pass
@@ -326,6 +369,8 @@ class NeuralPosterior(ABC):
             self.set_rejection_sampling_parameters(
                 posterior._rejection_sampling_parameters
             )
+        if hasattr(self, "_vi_parameters"):
+            self._vi_parameters(posterior._vi_parameters)
 
         return self
 
@@ -361,9 +406,7 @@ class NeuralPosterior(ABC):
         return theta, x
 
     def _prepare_for_sample(
-        self,
-        x: Tensor,
-        sample_shape: Optional[Tensor],
+        self, x: Tensor, sample_shape: Optional[Tensor],
     ) -> Tuple[Tensor, int]:
         r"""
         Return checked, reshaped, potentially default values for `x` and `sample_shape`.
@@ -439,6 +482,29 @@ class NeuralPosterior(ABC):
         )
 
         return rejection_sampling_parameters
+
+    def _potentially_replace_vi_parameters(
+        self, vi_parameters: Optional[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """
+        Return potentially default values to rejection sample the posterior.
+
+        Args:
+            rejection_sampling_parameters: Dictionary overriding the default
+                parameters for rejection sampling. The following parameters are
+                supported: `proposal` as the proposal distribtution.
+                `num_samples_to_find_max` as the number of samples that are used to
+                find the maximum of the `potential_fn / proposal` ratio. `m` as
+                multiplier to that ratio. `sampling_batch_size` as the batchsize of
+                samples being drawn from the proposal at every iteration.
+
+        Returns: Potentially default rejection sampling parameters.
+        """
+        vi_parameters = (
+            vi_parameters if vi_parameters is not None else self.vi_parameters
+        )
+
+        return vi_parameters
 
     def _sample_posterior_mcmc(
         self,
@@ -723,10 +789,8 @@ class NeuralPosterior(ABC):
                 **mcmc_parameters,
             )
         elif sample_with == "rejection":
-            rejection_sampling_parameters = (
-                self._potentially_replace_rejection_parameters(
-                    rejection_sampling_parameters
-                )
+            rejection_sampling_parameters = self._potentially_replace_rejection_parameters(
+                rejection_sampling_parameters
             )
             if "proposal" not in rejection_sampling_parameters:
                 rejection_sampling_parameters[

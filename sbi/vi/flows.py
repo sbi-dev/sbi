@@ -1,7 +1,8 @@
-from pyro.distributions.transforms.spline_coupling import SplineCoupling
+
 import torch
+import numpy as np
 from torch import nn
-from torch.distributions import Distribution, Normal, Independent, transforms
+from torch.distributions import Distribution, Normal, Independent
 from torch.distributions.constraints import Constraint, real
 from torch.distributions.transforms import Transform, ComposeTransform
 from torch.distributions import biject_to
@@ -10,14 +11,17 @@ from typing import Optional, Iterable
 
 from scipy.optimize import fsolve
 
-from pyro.distributions import transforms
+from pyro.distributions import transforms, constraints, TransformModule
 from pyro.distributions.transforms.utils import clamp_preserve_gradients
 from pyro.nn import AutoRegressiveNN, DenseNN
+
+from torchdiffeq import odeint_adjoint, odeint 
 
 TYPES = [
     "planar",
     "radial",
     "sylvester",
+    "polynomial",
     "affine_diag",
     "affine_coupling",
     "affine_autoregressive",
@@ -51,17 +55,17 @@ def get_modules(t: Transform):
         pass
 
 
-def _inverse(self, y):
+def _inverse(self, y, xtol=1e-4):
     """ Numerical root finding algorithm to evaluate the log probability if the inverse
     is analytically not tractable. """
     with torch.no_grad():
-        shape = y.shape
+        shape = tuple(y.shape)
 
         def f(x):
             x = torch.from_numpy(x).reshape(shape).float()
             return (self(x) - y).flatten().numpy()
 
-        x = torch.tensor(fsolve(f, np.zeros(shape).flatten(), xtol=1e-5)).float()
+        x = torch.tensor(fsolve(f, np.random.randn(*shape).flatten(), xtol=xtol)).float()
     x = x.reshape(shape)
 
     return x
@@ -69,16 +73,18 @@ def _inverse(self, y):
 
 def _inverse_batched(self, y, batch_size=20):
     """ Batched inverse. For large batches of data it is more efficient to process it in
-   small batches. """
+   small batches, because a single 'hard' point can slow down all other."""
     shape = y.shape
+    batch_size = min(batch_size, shape[0])
     xs = []
-    y = y.reshape(-1, y.shape[-1])
-    for i in range(batch_size, len(y) + batch_size, batch_size):
-        y_i = y[i - batch_size : i, :]
+    y = y.reshape(-1, shape[-1])
+    for i in range(0, shape[0], batch_size):
+        y_i = y[i : i+batch_size, :]
         x_i = _inverse(self, y_i)
         xs.append(x_i)
-    x = torch.stack(xs).reshape(shape)
-
+    x = torch.vstack(xs).reshape(shape)
+    # For batched we need another forward pass to get correct determinant in cache
+    self(y)
     return x
 
 
@@ -251,6 +257,104 @@ class DenseNN(DenseNN):
         ]
         self.layers = nn.ModuleList(layers)
 
+def trace_df_dz(f, z):
+    trace = 0.
+    for i in range(z.shape[1]):
+        trace += torch.autograd.grad(f[:, i].sum(), z, create_graph=True)[0].contiguous()[:, i].contiguous()
+
+    return trace.contiguous()
+
+
+class ODEnet(nn.Module):
+    def __init__(self, input_dim,hidden_dim=20, num_layers=2, normalization=nn.Identity):
+        super().__init__()
+        self.time_embed = nn.Sequential(nn.Linear(1,hidden_dim), nn.ELU())
+        self.input_embed = nn.Sequential(nn.Linear(input_dim,hidden_dim), nn.ELU())
+        self.layers = nn.ModuleList([nn.Sequential(nn.Linear(hidden_dim,hidden_dim), nn.ELU()) for _ in range(num_layers)])
+        self.out_layer = nn.Linear(hidden_dim, input_dim)
+    
+    def forward(self, t, x):
+        h = self.input_embed(x)
+        h = h + self.time_embed(t.reshape(-1,1))
+        for layer in self.layers:
+            h = layer(h)
+        out = self.out_layer(h)
+        return out
+
+class NeuralODETransform(TransformModule):
+    domain = constraints.real_vector
+    codomain = constraints.real_vector 
+    bijective=True 
+    sign = +1
+
+    def __init__(self, ODEnet, T=1., t0 = 0.,atol=1e-5, rtol=1e-5, solver="rk4", options=dict(), adjoint=False):
+        """This is a continous normalizing flow, which use a neural ODE transform.
+        
+        
+        
+        Args:
+            ODEnet: An network that inputs time and x and outputs dx.
+            T: End time of the ODE (default T=1)
+            t0: Start time of the ODE (default t0=0)
+            atol: Absolute tolerance of the ODE solver
+            rtol: Relative tolerance of the ODE solver
+            solver: The ODE solver (one implemented in torchdiffeq)
+            options: Further options of odeint
+            adjoint: If the adjoint method should be used to compute gradients.
+            div_estimator: One of exact or hutchkinson
+            div_estimator_params: Parameters of the div estimator
+        
+        """
+        super().__init__(cache_size=1) 
+        self.net = ODEnet
+        self.T = float(T)
+        self.t0 = float(t0)
+        self.atol = 1e-5
+        self.rtol=1e-5
+        self.solver=solver
+        self.adjoint = adjoint
+        self.options=options
+
+
+    def _call(self, x):
+        logp_diff_t0 = torch.zeros(x.shape[0], 1)
+        if not self.adjoint:
+            y, logP_diff_T = odeint(self.ode_func, (x, logp_diff_t0), torch.tensor([self.t0, self.T]), atol=self.atol, rtol=self.rtol, method=self.solver, options=self.options)
+        else:
+            y, logP_diff_T = odeint_adjoint(self.ode_func, (x, logp_diff_t0), torch.tensor([self.t0, self.T]), atol=self.atol, rtol=self.rtol, method=self.solver, adjoint_params=self.net.parameters(), options=self.options)
+        self._logP_diff_T = -logP_diff_T[-1].flatten()
+        return y[-1]
+
+    def _inverse(self, y):
+        logp_diff_t0 = torch.zeros(y.shape[0], 1)
+        if not self.adjoint:
+            x, logP_diff_T = odeint(self.ode_func, (y, logp_diff_t0), torch.tensor([self.T, self.t0]), atol=self.atol, rtol=self.rtol, method=self.solver, options=self.options)
+        else:
+            x, logP_diff_T = odeint_adjoint(self.ode_func, (y, logp_diff_t0), torch.tensor([self.T, self.t0]), atol=self.atol, rtol=self.rtol, method=self.solver, adjoint_params=self.net.parameters(), options=self.options)
+        self._logP_diff_T = logP_diff_T[-1].flatten()
+        return x[-1]
+
+    def ode_func(self, t, states):
+        z = states[0]
+        logp_z = states[1]
+        batch_size = z.shape[0]
+        with torch.set_grad_enabled(True):
+            z.requires_grad_(True)
+            dz_dt = self.net(t, z)
+            dlogp_z_dt = -trace_df_dz(dz_dt, z)
+        return (dz_dt, dlogp_z_dt)
+
+    def log_abs_det_jacobian(self,x,y):
+        return self._logP_diff_T
+
+def neural_ode_transform(dim, **kwargs):
+    hidden_dim = 5*dim + 10
+    net = ODEnet(dim, hidden_dim=hidden_dim)
+    t = NeuralODETransform(net, **kwargs)
+    return t
+            
+
+
 
 def flow_block(dim, type, **kwargs):
     r""" Gives pyro flow of specified type.
@@ -262,6 +366,7 @@ def flow_block(dim, type, **kwargs):
         pyro.distributions.transform: Transform object of specified type
     
     """
+    inverse = kwargs.pop("inverse", False)
     if type.lower() == "planar":
         flow = transforms.planar(dim, **kwargs)
         flow._inverse = lambda x: _inverse_batched(flow, x)
@@ -271,21 +376,22 @@ def flow_block(dim, type, **kwargs):
     elif type.lower() == "sylvester":
         flow = transforms.sylvester(dim, **kwargs)
         flow._inverse = lambda x: _inverse_batched(flow, x)
+    elif type.lower() == "polynomial":
+        flow = transforms.polynomial(dim, **kwargs)
     elif type.lower() == "affine_diag":
+        # This is equivalent to a gaussian with diagonal covariance (up to support link transforms)
         flow = AffineTransform(torch.zeros(dim), torch.ones(dim))
     elif type.lower() == "affine_tril":
+        # This is equivalent to a gaussian with full covariance (up to support link transforms)
         flow = LowerCholeskyAffine(torch.zeros(dim), torch.eye(dim))
     elif type.lower() == "affine_coupling":
         flow = transforms.affine_coupling(dim, **kwargs)
     elif type.lower() == "affine_autoregressive":
-        inverse = kwargs.get("inverse", False)  # IAF or MAF
         hidden_dims = kwargs.get("hidden_dims", None)
         if hidden_dims is None:
             hidden_dims = [5 * dim + 5]
         arn = AutoRegressiveNN(dim, hidden_dims)
         flow = AffineAutoregressive(arn, log_scale_min_clip=-3.0)
-        if inverse:
-            flow = flow.inv()
     elif type.lower() == "neural_autoregressive":
         flow = transforms.neural_autoregressive(dim, **kwargs)
         flow._inverse = lambda x: _inverse_batched(flow, x)
@@ -295,6 +401,7 @@ def flow_block(dim, type, **kwargs):
     elif type.lower() == "spline":
         flow = transforms.spline(dim, **kwargs)
     elif type.lower() == "spline_coupling":
+        # Linear or quadratic rational splines
         split_dim = kwargs.get("split_dim", dim // 2)
         hidden_dims = kwargs.get("hidden_dims", [dim * 20, dim * 20])
         count_bins = kwargs.get("count_bins", 8)
@@ -318,7 +425,7 @@ def flow_block(dim, type, **kwargs):
             dim, split_dim, nn, count_bins, bound=bound, order=order
         )
     elif type.lower() == "spline_autoregressive":
-        inverse = kwargs.get("inverse", False)
+        # Linear or quadratic rational spline transform
         hidden_dims = kwargs.get("hidden_dims", [dim * 10, dim * 10])
         count_bins = kwargs.get("count_bins", 8)
         order = kwargs.get("order", "linear")
@@ -331,8 +438,13 @@ def flow_block(dim, type, **kwargs):
         flow = transforms.SplineAutoregressive(
             dim, nn, count_bins, bound=bound, order=order
         )
-        if inverse:
-            flow = flow.inv()
+    elif type.lower() == "neural_ode":
+        flow = neural_ode_transform(dim, **kwargs)
     else:
         raise NotImplementedError()
+
+    if inverse:
+        # That is relevant for e.g. Autoregressive Flows or Flows where the inverse is
+        # numerically tractable.
+        flow = flow.inv
     return flow

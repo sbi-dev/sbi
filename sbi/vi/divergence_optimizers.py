@@ -17,7 +17,7 @@ from sbi.vi.sampling import gpdfit, clamp_weights, paretto_smoothed_weights
 def parameterize_distribution(q, paras):
     assert isinstance(paras, Iterable)
 
-    def parameters(self):
+    def parameters():
         for para in paras:
             para.requires_grad_(True)
             yield para
@@ -33,6 +33,8 @@ def filter_kwrags_for_func(f, kwargs):
 
 
 def make_sure_nothing_in_cache(q):
+    """ This may be used before a 'deepcopy' call, as non leaf tensors (which are in the
+    cache) do not support the deepcopy protocol..."""
     q.clear_cache()
     # The original methods can miss some parts..
     for t in q.transforms:
@@ -50,6 +52,57 @@ def make_sure_nothing_in_cache(q):
                 obj = t_dict[key]
                 if torch.is_tensor(obj):
                     t_dict[key] = torch.zeros_like(obj)
+
+
+class LikelihoodPosteriorWrapper:
+    def __init__(self, posterior):
+        self.posterior = posterior
+
+    def log_prob(self, inputs, context=None):
+        """This returns the ratio. Adding the prior gives the posterior and thus it
+            behaves as the likelihood function up to normalizing constant
+        
+        
+        
+        Args:
+            inputs: Samples for which log probability is evaluated
+            context: Context on which we condition the samples
+        
+        Returns:
+            tensor : log likelihood
+        
+        """
+        self.posterior.net.eval()
+        ll = self.posterior._log_likelihoods_over_trials(
+            x=inputs, theta=context, net=self.posterior.net, track_gradients=True
+        )
+        return ll.squeeze()
+
+
+class RatioBasedPosteriorWrapper:
+    def __init__(self, posterior):
+        self.posterior = posterior
+
+    def log_prob(self, inputs, context=None):
+        """This returns the ratio. Adding the prior gives the posterior and thus it
+            behaves as the likelihood function up to normalizing constant, which drops
+            by differentiation leading to equivalent gradients.
+        
+        
+        
+        Args:
+            inputs: Samples for which log probability is evaluated
+            context: Context on which we condition the samples
+        
+        Returns:
+            [type]: [description]
+        
+        """
+        self.posterior.net.eval()
+        ratio = self.posterior._log_ratios_over_trials(
+            x=inputs, theta=context, net=self.posterior.net, track_gradients=True
+        )
+        return ratio.squeeze()
 
 
 class DivergenceOptimizer(ABC):
@@ -86,8 +139,9 @@ class DivergenceOptimizer(ABC):
         self.learning_rate = kwargs.get("lr", 1e-3)
         self._kwargs = kwargs
 
+        # For convenience these get good names
         self.q = posterior._q
-        self.likelihood = posterior.net
+        self.set_likelihood_fn(posterior)
         self.prior = posterior._prior
 
         # This prevents error through optimization
@@ -125,9 +179,7 @@ class DivergenceOptimizer(ABC):
         self._scheduler._step_count = 2  # Prevents unecessray warning...
 
         # Loss and summary
-        # self.loss_history = []
-        # self.summary = {"Moving average": np.array([]), "Moving std": np.array([])}
-        # self.eps = eps
+        self.eps = eps
         self.losses = np.ones(2000)
         self.moving_average = np.ones(2000)
         self.moving_std = np.ones(2000)
@@ -144,12 +196,19 @@ class DivergenceOptimizer(ABC):
         """ This generates the loss function that will be used. """
         pass
 
+    def set_likelihood_fn(self, posterior):
+        if "snle" in posterior._method_family:
+            self.likelihood = LikelihoodPosteriorWrapper(posterior)
+        elif "snre" in posterior._method_family:
+            self.likelihood = RatioBasedPosteriorWrapper(posterior)
+        else:
+            raise NotImplementedError("VI is only implemented for SNLE and SNRE")
+
     def to(self, device):
         """ This will move all parameters to the correct device, both for likelihood and
        posterior """
         for para in self.q.parameters():
             para.to(device)
-        self.likelihood.to(device)
 
     def warm_up(self, num_steps, method="prior"):
         """ This initializes q, either to follow the prior or the base distribution
@@ -193,7 +252,6 @@ class DivergenceOptimizer(ABC):
     def evaluate(self, x_obs, N=int(5e4)):
         """ This will evaluate the posteriors quality """
         M = int(min(N / 5, 3 * np.sqrt(N)))
-        x_obs = x_obs.repeat(N, 1)
         with torch.no_grad():
             samples = self.q.sample((N,))
             log_q = self.q.log_prob(samples)
@@ -229,9 +287,7 @@ class DivergenceOptimizer(ABC):
         if not torch.isfinite(surrogate_loss):
             self.resolve_state()
             return loss
-        nn.utils.clip_grad_norm_(
-            self.q.parameters(), self.clip_value, error_if_nonfinite=False
-        )
+        nn.utils.clip_grad_norm_(self.q.parameters(), self.clip_value)
         self._optimizer.step()
         self._scheduler.step()
         self.update_loss_stats(loss)
@@ -313,12 +369,17 @@ class DivergenceOptimizer(ABC):
             if key in self._optimizer.defaults:
                 for para in self._optimizer.param_groups:
                     para[key] = val
+            if key == "self":
+                posterior = kwargs[key]
+                self.posterior = posterior
+                self.q = posterior._q
+                self.set_likelihood_fn(posterior)
+                self.prior = posterior._prior
 
 
 class ElboOptimizer(DivergenceOptimizer):
     r"""This learns the variational posterior by minimizing the reverse KL
-    divergence using the evidence lower bound (ELBO). This is done automatically if
-    your variational distribution 'posterior.q' is a proper TransformedDistribution with a rsample method.
+    divergence using the evidence lower bound (ELBO)..
 
     Args:
     posterior: Variational Posterior object.
@@ -343,7 +404,7 @@ class ElboOptimizer(DivergenceOptimizer):
         self._generate_loss_function()
         self._loss_name = "elbo"
         self.HYPER_PARAMETERS += ["reduce_variance"]
-        self.eps = 1e-4
+        self.eps = 1e-5
 
     def _generate_loss_function(self):
         if self.q.has_rsample:
@@ -362,6 +423,7 @@ class ElboOptimizer(DivergenceOptimizer):
         return loss, loss.clone().detach()
 
     def loss_mixture(self, x_obs):
+        """ Equivalent loss for mixtures with reparameterizable components"""
         mix = torch.softmax(self.q.mixture_distribution.logits, -1)
         mixture_particles = self.generate_mixture_particles(x_obs)
         loss = -mix @ mixture_particles.mean(0)
@@ -371,7 +433,6 @@ class ElboOptimizer(DivergenceOptimizer):
         """ Generates elbo particles """
         if num_samples is None:
             num_samples = self.n_particles
-        x_obs = x_obs.repeat(num_samples, 1)
         samples = self.q.rsample((num_samples,))
         if self.reduce_variance:
             self.update_surrogate_q()
@@ -387,7 +448,7 @@ class ElboOptimizer(DivergenceOptimizer):
         """ Generates elbo particles for mixture distributions """
         if num_samples is None:
             num_samples = self.n_particles
-        x_obs = x_obs.repeat(num_samples, self.q.num_components, 1)
+        x_obs = x_obs.repeat(self.q.num_components, 1)
         samples = self.q.rsample_components((num_samples,))
         if self.reduce_variance:
             self.update_surrogate_q()
@@ -411,13 +472,14 @@ class ElboOptimizer(DivergenceOptimizer):
 
 
 class IWElboOptimizer(ElboOptimizer):
-    r"""This learns the variational posterior by minimizing the importance weighted elbo. This is done automatically if your variational distribution 'posterior.q' is a
-    proper TransformedDistribution with a rsample method.
-
-    If this is not the case, the optimizer expects a nn.Module class with a method
-    'build_loss_renjey' which returns a function that gets x_obs and computes the loss.
+    r"""This learns the variational posterior by minimizing the importance weighted
+    elbo, which is an tighter bound to the evidence but also promotes a support covering behaviour.
 
     References:
+    https://arxiv.org/abs/1509.00519
+
+    NOTE: You may want to turn on 'reduce_variance' here as this loss leads to gradient
+    estimates with vanishing SNR. This is relevant for large K, especially K > n_particles.
     """
 
     def __init__(self, *args, K=16, **kwargs):
@@ -428,7 +490,7 @@ class IWElboOptimizer(ElboOptimizer):
         self.eps = 5e-7
 
     def loss_rsample(self, x_obs):
-        """ Computes the elbo """
+        """ Computes the IWElbo """
         elbo_particles = self.generate_elbo_particles(x_obs, self.n_particles * self.K)
         elbo_particles = elbo_particles.reshape(self.n_particles, self.K)
         weights = self.get_importance_weight(elbo_particles.clone().detach())
@@ -437,6 +499,7 @@ class IWElboOptimizer(ElboOptimizer):
         return surrogate_loss, loss.clone().detach()
 
     def loss_mixture(self, x_obs):
+        """ Computes the IWElbo """
         mix = torch.softmax(self.q.mixture_distribution.logits, -1).unsqueeze(0)
         mixture_particles = self.generate_mixture_particles(
             x_obs, num_samples=self.n_particles * self.K
@@ -461,6 +524,8 @@ class IWElboOptimizer(ElboOptimizer):
 class ForwardKLOptimizer(DivergenceOptimizer):
     """This learns the variational posterior by minimizing the forward KL divergence
        using importance sampling.
+
+       NOTE: This may suffer in high dimension. Here a clamping strategy may help.
     """
 
     def __init__(
@@ -486,7 +551,7 @@ class ForwardKLOptimizer(DivergenceOptimizer):
         if self.proposal == "q":
             self._loss = self._loss_q_proposal
         elif self.proposal == "prior_q_mix":
-            self._loss = self._loss_adaptive
+            self._loss = self._loss_mix_q
         else:
             raise NotImplementedError("Unknown loss.")
 
@@ -503,6 +568,8 @@ class ForwardKLOptimizer(DivergenceOptimizer):
             )
 
     def effective_sample_size(self, weights):
+        """ This is an statistic which indicates how many iid samples from the true
+        distribution will give a estimate of comparabe quality """
         M = self.n_particles
         var_mean = 1 + weights.var() / weights.mean() ** 2
         ess = int(M / var_mean) + 1
@@ -510,8 +577,8 @@ class ForwardKLOptimizer(DivergenceOptimizer):
         return ess, M_new
 
     def _loss_q_proposal(self, x_obs):
+        """ This loss use the variational distribution as proposal."""
         samples = self.q.sample((self.n_particles,))
-        x_obs = x_obs.repeat(self.n_particles, 1)
         if hasattr(self.q, "clear_cache"):
             self.q.clear_cache()
         logq = self.q.log_prob(samples)
@@ -524,13 +591,13 @@ class ForwardKLOptimizer(DivergenceOptimizer):
         surrogate = -torch.sum(weights * logq)
         return surrogate, surrogate.detach()
 
-    def _loss_adaptive(self, x_obs):
+    def _loss_mix_q(self, x_obs):
+        """ This loss use a mixture of prior and variational distribution as proposal."""
         k = int(
             torch.binomial(
                 torch.tensor([float(self.n_particles)]), torch.tensor([self.alpha])
             )[0]
         )
-        x_obs = x_obs.repeat(self.n_particles + 2, 1)
         sample1 = self.prior.sample((k + 1,))
         sample2 = self.q.sample((self.n_particles - k + 1,))
         samples = torch.vstack([sample1, sample2])
@@ -555,18 +622,16 @@ class ForwardKLOptimizer(DivergenceOptimizer):
 
 
 class RenjeyDivergenceOptimizer(ElboOptimizer):
-    r"""This learns the variational posterior by minimizing alpha divergences. This is
-    done automatically if your variational distribution 'posterior.q' is a proper
-    TransformedDistribution with a rsample method.
+    r"""This learns the variational posterior by minimizing alpha divergences. For
+    alpha=0 we obtain a single sample Monte Carlo estiamte of the IWElbo. For alpha=1 we
+    obtain the ELBO. 
 
-    If this is not the case, the optimizer expects a nn.Module class with a method
-    'build_loss_renjey' which returns a function that gets x_obs and computes the
-    loss.
+    NOTE: We empirically suggest alpha around 0.5
 
     References: https://arxiv.org/abs/1602.02311
     """
 
-    def __init__(self, *args, alpha=0.5, **kwargs):
+    def __init__(self, *args, alpha=0.5, unbiased=False, **kwargs):
         """
         Args:
             posterior: Variational Posterior object.
@@ -576,15 +641,19 @@ class RenjeyDivergenceOptimizer(ElboOptimizer):
             clip_value: Max value for gradient clipping.
         """
         self.alpha = alpha
+        self.unbiased = unbiased
         super().__init__(*args, **kwargs)
         self._loss_name = "renjey_divergence"
-        self.HYPER_PARAMETERS += ["alpha"]
+        self.HYPER_PARAMETERS += ["alpha", "unbiased"]
         self.eps = 1e-5
 
     def _generate_loss_function(self):
         if isinstance(self.alpha, float):
             if self.q.has_rsample:
-                self._loss = self.loss_alpha
+                if not self.unbiased:
+                    self._loss = self.loss_alpha
+                else:
+                    self._loss = self.loss_alpha_unbiased
             elif isinstance(self.q, Mixture):
                 self._loss = self.loss_mixture_alpha
             else:
@@ -614,6 +683,7 @@ class RenjeyDivergenceOptimizer(ElboOptimizer):
                     self._loss = self.loss_max
 
     def loss_mixture_alpha(self, x_obs):
+        """ For mixture distributions with reparameterizable components"""
         mix = torch.softmax(self.q.mixture_distribution.logits, -1)
         mixture_particles = self.generate_mixture_particles(x_obs)
         weights, mean_log_weights = self.get_importance_weight(
@@ -623,8 +693,16 @@ class RenjeyDivergenceOptimizer(ElboOptimizer):
         loss = -mix @ mean_log_weights / (1 - self.alpha)
         return surrogate_loss, loss.clone().detach()
 
+    def loss_alpha_unbiased(self, x_obs):
+        """ Unbiased estimate of a surrogate RVB"""
+        elbo_particles = self.generate_elbo_particles(x_obs) * (1 - self.alpha)
+        _, mean_log_weights = self.get_importance_weight(elbo_particles)
+        surrogate_loss = -torch.exp(mean_log_weights)
+        loss = -mean_log_weights / (1 - self.alpha)
+        return surrogate_loss, loss.clone().detach()
+
     def loss_alpha(self, x_obs):
-        """ Loss given a finite alpha """
+        """ Renjy variation bound (RVB)."""
         elbo_particles = self.generate_elbo_particles(x_obs)
         weights, mean_log_weights = self.get_importance_weight(
             elbo_particles.clone().detach()
@@ -670,11 +748,8 @@ class RenjeyDivergenceOptimizer(ElboOptimizer):
 
 class TailAdaptivefDivergenceOptimizer(ElboOptimizer):
     r"""This learns the variational posterior by minimizing tail adaptive f divergences.
-    This is done automatically if your variational distribution 'posterior.q' is a
-    proper TransformedDistribution with a rsample method.
 
-    If this is not the case, the optimizer expects a nn.Module class with a method
-    'build_loss_renjey' which returns a function that gets x_obs and computes the loss.
+    NOTE: This currently does not support mixture distributions.
 
     References: https://arxiv.org/abs/1810.11943
     """
@@ -698,7 +773,7 @@ class TailAdaptivefDivergenceOptimizer(ElboOptimizer):
                 "This loss is only implemented for reparameterizable distributions!"
             )
 
-    def loss(self, x_obs):
+    def _loss(self, x_obs):
         """ Computes adaptive f divergence loss """
         elbo_particles = self.generate_elbo_particles(x_obs)
         gammas = self.get_tail_adaptive_weights(elbo_particles)
@@ -718,4 +793,92 @@ class TailAdaptivefDivergenceOptimizer(ElboOptimizer):
         return gammas.clone().detach()
 
 
-ElboOptimizer.__init__.__doc__ = Optimizer.__init__.__doc__
+class FDivergenceOptimizer(ElboOptimizer):
+    """ This gives a varaitonal f-divergence bounds for any f-divergence. It requires
+    the fenchel convex conjugate f*. 
+
+    NOTE: Most of the bounds will be numerically unstable, care must be taking on the
+    choice of f.
+    
+    References: https://arxiv.org/pdf/2009.13093.pdf
+    """
+
+    def __init__(self, *args, name="fKL", f_star=None, f=None, **kwargs):
+        """
+        Args:
+            posterior: Variational Posterior object.
+            alpha: Fixes which alpha divergence is optimized.
+            n_particles: Number of elbo_particels.
+            optimizer: PyTorch optimizer class, as default Adam is used.
+            clip_value: Max value for gradient clipping.
+        """
+        self.name = name
+        self.f = f
+        self.f_star = f_star
+        super().__init__(*args, **kwargs)
+        self._loss_name = "fdivergence"
+        self.HYPER_PARAMETERS += ["f", "f_star", "name"]
+        self.eps = 1e-5
+
+    def _generate_loss_function(self):
+        if self.f_star is None:
+            if self.name == "fKL":
+                self._loss = self._loss_fkl
+            elif self.name == "JS":
+                self._loss = self._loss_JS
+            elif self.name == "TV":
+                self._loss = self._loss_TV
+            elif self.name == "KL_pol2":
+                self._loss = self._loss_KL_pol2
+            else:
+                pass
+        else:
+            assert self.f_star is not None, "You must at least specify f_star or a name"
+            self._loss = self._loss_general
+
+    def _loss_fkl(self, x_obs):
+        """ This requires p(X) > 1/e
+        NOTE: The difference to the FKL optimizer is that this minimizes a evidence
+        upper bound. Its rather similar but we do not normalize the importance weights.
+        As the loss is a expectation we can use the reparameterization trick here which
+        we cannot use in the other loss. But we have unnormalized importance weights ..."""
+        particles = self.generate_elbo_particles(x_obs)
+        weights = particles.exp()
+        surrogate_loss = torch.mean(weights * particles)
+        return surrogate_loss, surrogate_loss.detach()
+
+    def _loss_TV(self, x_obs):
+        """ This is the loss to minimize the total variation"""
+        particles = self.generate_elbo_particles(x_obs).exp()
+        surrogate_loss = torch.mean(torch.abs(particles-1))
+        return surrogate_loss, surrogate_loss.detach()
+
+    def _loss_KL_pol2(self, x_obs):
+        particles = self.generate_elbo_particles(x_obs)
+        surrogate_loss = torch.mean(particles**2 + particles) 
+        return surrogate_loss, surrogate_loss.detach()
+
+
+    def _loss_JS(self, x_obs, domain=1000):
+        """ This at most is something proportional to the JS
+        
+        NOTE To domain should be bounded by log(2)... We extend it to log(100),
+        otherwise one would have to clamp all weights..."
+        """
+        particles = (
+            self.generate_elbo_particles(x_obs).exp().clamp_max(np.log(domain) - 1e-5)
+        )
+        surrogate_loss = torch.mean(-torch.log(domain - torch.exp(particles)))
+        return surrogate_loss, surrogate_loss.detach()
+
+    def _loss_general(self, x_obs):
+        """ This the general loss, which however is numerically unstable..."""
+        particles = self.generate_elbo_particles(x_obs).exp()
+        surrogate_loss = self.f_star(particles).mean()
+        if self.f is not None:
+            loss = self.f(particles).mean()
+        else:
+            loss = surrogate_loss
+        return surrogate_loss, loss.clone().detach()
+
+

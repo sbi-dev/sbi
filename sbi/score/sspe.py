@@ -1,55 +1,43 @@
-from abc import ABC, abstractmethod
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+
+
+from abc import ABC
 from copy import deepcopy
+from sbi.score.score_based_posterior import ScoreBasedPosterior
 from typing import Any, Callable, Dict, Optional, Union
 
 import torch
-from torch import Tensor, eye, ones, optim
+from torch import Tensor, optim
 from torch.nn.utils import clip_grad_norm_
 from torch.utils import data
 from torch.utils.tensorboard import SummaryWriter
 
 from sbi import utils as utils
-from sbi.inference.base import NeuralInference
-from sbi.inference.posteriors.ratio_based_posterior import RatioBasedPosterior
+from sbi.inference import NeuralInference
 from sbi.types import TorchModule
-from sbi.utils import (
-    check_estimator_arg,
-    clamp_and_warn,
-    validate_theta_and_x,
-    x_shape_from_simulation,
-)
+from sbi.utils import check_estimator_arg, validate_theta_and_x, x_shape_from_simulation
 from sbi.utils.sbiutils import mask_sims_from_prior
 
+from score_net import build_score_net_and_sde
+from score_loss import get_loss_function
 
-class RatioEstimator(NeuralInference, ABC):
+
+class ScoreEstimator(NeuralInference, ABC):
     def __init__(
         self,
         prior,
-        classifier: Union[str, Callable] = "resnet",
+        score_estimator: Union[str, Callable] = "TCS_VESDE",
         device: str = "cpu",
-        logging_level: Union[int, str] = "warning",
+        logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
         show_progress_bars: bool = True,
         **unused_args
     ):
-        r"""Sequential Neural Ratio Estimation.
-
-        We implement two inference methods in the respective subclasses.
-
-        - SNRE_A / AALR is limited to `num_atoms=2`, but allows for density evaluation
-          when training for one round.
-        - SNRE_B / SRE can use more than two atoms, potentially boosting performance,
-          but allows for posterior evaluation **only up to a normalizing constant**,
-          even when training only one round.
+        r"""Base class for Sequential Neural Likelihood Estimation methods.
 
         Args:
-            classifier: Classifier trained to approximate likelihood ratios. If it is
-                a string, use a pre-configured network of the provided type (one of
-                linear, mlp, resnet). Alternatively, a function that builds a custom
-                neural network can be provided. The function will be called with the
-                first batch of simulations (theta, x), which can thus be used for shape
-                inference and potentially for z-scoring. It needs to return a PyTorch
-                `nn.Module` implementing the classifier.
+            score_estimator: A score estimating network
             unused_args: Absorbs additional arguments. No entries will be used. If it
                 is not empty, we warn. In future versions, when the new interface of
                 0.14.0 is more mature, we will remove this argument.
@@ -71,21 +59,19 @@ class RatioEstimator(NeuralInference, ABC):
         # `_build_neural_net`. It will be called in the first round and receive
         # thetas and xs as inputs, so that they can be used for shape inference and
         # potentially for z-scoring.
-        check_estimator_arg(classifier)
-        if isinstance(classifier, str):
-            self._build_neural_net = utils.classifier_nn(model=classifier)
+        if isinstance(score_estimator, str):
+            build_scorenet, sde = build_score_net_and_sde(score_estimator)
+            self.sde = sde
+            self._build_neural_net = build_scorenet
         else:
-            self._build_neural_net = classifier
+            raise NotImplementedError()
 
-        # Ratio-based-specific summary_writer fields.
+        # SNLE-specific summary_writer fields.
         self._summary.update({"mcmc_times": []})  # type: ignore
 
     def append_simulations(
-        self,
-        theta: Tensor,
-        x: Tensor,
-        from_round: int = 0,
-    ) -> "RatioEstimator":
+        self, theta: Tensor, x: Tensor, from_round: int = 0,
+    ) -> "LikelihoodEstimator":
         r"""
         Store parameters and simulation outputs to use them for later training.
 
@@ -99,9 +85,10 @@ class RatioEstimator(NeuralInference, ABC):
             theta: Parameter sets.
             x: Simulation outputs.
             from_round: Which round the data stemmed from. Round 0 means from the prior.
-                With default settings, this is not used at all for `SNRE`. Only when
+                With default settings, this is not used at all for `SNLE`. Only when
                 the user later on requests `.train(discard_prior_samples=True)`, we
                 use these indices to find which training data stemmed from the prior.
+
         Returns:
             NeuralInference object (returned so that this function is chainable).
         """
@@ -117,11 +104,11 @@ class RatioEstimator(NeuralInference, ABC):
 
     def train(
         self,
-        num_atoms: int = 10,
-        training_batch_size: int = 50,
+        loss: str = "denoised",
+        training_batch_size: int = 1000,
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
-        stop_after_epochs: int = 20,
+        stop_after_epochs: int = 50,
         max_num_epochs: Optional[int] = None,
         clip_max_norm: Optional[float] = 5.0,
         exclude_invalid_x: bool = True,
@@ -130,12 +117,12 @@ class RatioEstimator(NeuralInference, ABC):
         retrain_from_scratch_each_round: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
-    ) -> RatioBasedPosterior:
+        loss_kwargs: Optional[Dict] = None,
+    ) -> ScoreBasedPosterior:
         r"""
-        Return classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
+        Train the density estimator to learn the distribution $p(x|\theta)$.
 
         Args:
-            num_atoms: Number of atoms to use for classification.
             exclude_invalid_x: Whether to exclude simulation outputs `x=NaN` or `x=±∞`
                 during training. Expect errors, silent or explicit, when `False`.
             resume_training: Can be used in case training time is limited, e.g. on a
@@ -147,11 +134,13 @@ class RatioEstimator(NeuralInference, ABC):
                 samples.
             retrain_from_scratch_each_round: Whether to retrain the conditional density
                 estimator for the posterior from scratch each round.
+            show_train_summary: Whether to print the number of epochs and validation
+                loss after the training.
             dataloader_kwargs: Additional or updated kwargs to be passed to the training
                 and validation dataloaders (like, e.g., a collate_fn)
 
         Returns:
-            Classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
+            Density estimator that has learned the distribution $p(x|\theta)$.
         """
 
         max_num_epochs = 2 ** 31 - 1 if max_num_epochs is None else max_num_epochs
@@ -175,12 +164,6 @@ class RatioEstimator(NeuralInference, ABC):
             dataloader_kwargs=dataloader_kwargs,
         )
 
-        clipped_batch_size = min(training_batch_size, len(val_loader))
-
-        num_atoms = clamp_and_warn(
-            "num_atoms", num_atoms, min_val=2, max_val=clipped_batch_size
-        )
-
         # First round or if retraining from scratch:
         # Call the `self._build_neural_net` with the rounds' thetas and xs as
         # arguments, which will build the neural network
@@ -191,15 +174,19 @@ class RatioEstimator(NeuralInference, ABC):
                 theta[self.train_indices], x[self.train_indices]
             )
             self._x_shape = x_shape_from_simulation(x)
+            assert (
+                len(self._x_shape) < 3
+            ), "SNLE cannot handle multi-dimensional simulator output."
 
         self._neural_net.to(self._device)
-
         if not resume_training:
             self.optimizer = optim.Adam(
-                list(self._neural_net.parameters()),
-                lr=learning_rate,
+                list(self._neural_net.parameters()), lr=learning_rate,
             )
             self.epoch, self._val_log_prob = 0, float("-Inf")
+
+        # Select loss function
+        loss_fn = get_loss_function(loss, self._neural_net, loss_kwargs)
 
         while self.epoch <= max_num_epochs and not self._converged(
             self.epoch, stop_after_epochs
@@ -213,12 +200,12 @@ class RatioEstimator(NeuralInference, ABC):
                     batch[0].to(self._device),
                     batch[1].to(self._device),
                 )
-                loss = self._loss(theta_batch, x_batch, num_atoms)
+                # Evaluate on x with theta as context.
+                loss = loss_fn(theta_batch, x_batch)
                 loss.backward()
                 if clip_max_norm is not None:
                     clip_grad_norm_(
-                        self._neural_net.parameters(),
-                        max_norm=clip_max_norm,
+                        self._neural_net.parameters(), max_norm=clip_max_norm,
                     )
                 self.optimizer.step()
 
@@ -233,14 +220,13 @@ class RatioEstimator(NeuralInference, ABC):
                         batch[0].to(self._device),
                         batch[1].to(self._device),
                     )
-                    loss = self._loss(theta_batch, x_batch, num_atoms)
-                    loss_sum -= loss.sum().item()
-                # Take mean over all validation samples.
-                self._val_log_prob = loss_sum / (
-                    len(val_loader) * val_loader.batch_size
-                )
-                # Log validation log prob for every epoch.
-                self._summary["validation_log_probs"].append(self._val_log_prob)
+                    # Evaluate on x with theta as context.
+                    loss_val = loss_fn(theta_batch, x_batch)
+                    loss_sum -= loss_val
+            # Take mean over all validation samples.
+            self._val_log_prob = loss_sum / (len(val_loader) * val_loader.batch_size)
+            # Log validation log prob for every epoch.
+            self._summary["validation_log_probs"].append(self._val_log_prob)
 
             self._maybe_show_progress(self._show_progress_bars, self.epoch)
 
@@ -252,10 +238,7 @@ class RatioEstimator(NeuralInference, ABC):
 
         # Update TensorBoard and summary dict.
         self._summarize(
-            round_=self._round,
-            x_o=None,
-            theta_bank=theta,
-            x_bank=x,
+            round_=self._round, x_o=None, theta_bank=theta, x_bank=x,
         )
 
         # Update description for progress bar.
@@ -272,18 +255,15 @@ class RatioEstimator(NeuralInference, ABC):
         mcmc_parameters: Optional[Dict[str, Any]] = None,
         rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
         vi_parameters: Optional[Dict[str, Any]] = None,
-    ) -> RatioBasedPosterior:
+    ) -> ScoreBasedPosterior:
         r"""
         Build posterior from the neural density estimator.
 
-        SNRE trains a neural network to approximate likelihood ratios, which in turn
-        can be used obtain an unnormalized posterior
-        $p(\theta|x) \propto p(x|\theta) \cdot p(\theta)$. The posterior returned here
-        wraps the trained network such that one can directly evaluate the unnormalized
-        posterior log-probability $p(\theta|x) \propto p(x|\theta) \cdot p(\theta)$ and
-        draw samples from the posterior with MCMC. Note that, in the case of
-        single-round SNRE_A / AALR, it is possible to evaluate the log-probability of
-        the **normalized** posterior, but sampling still requires MCMC.
+        SNLE trains a neural network to approximate the likelihood $p(x|\theta)$. The
+        `LikelihoodBasedPosterior` class wraps the trained network such that one can
+        directly evaluate the unnormalized posterior log probability
+        $p(\theta|x) \propto p(x|\theta) \cdot p(\theta)$ and draw samples from the
+        posterior with MCMC.
 
         Args:
             density_estimator: The density estimator that the posterior is based on.
@@ -325,10 +305,11 @@ class RatioEstimator(NeuralInference, ABC):
             # Otherwise, infer it from the device of the net parameters.
             device = next(density_estimator.parameters()).device
 
-        self._posterior = RatioBasedPosterior(
-            method_family=self.__class__.__name__.lower(),
+        self._posterior = ScoreBasedPosterior(
+            method_family="snle",
             neural_net=density_estimator,
             prior=self._prior,
+            sde=self.sde,
             x_shape=self._x_shape,
             sample_with=sample_with,
             mcmc_method=mcmc_method,
@@ -345,28 +326,3 @@ class RatioEstimator(NeuralInference, ABC):
         self._model_bank[-1].net.eval()
 
         return deepcopy(self._posterior)
-
-    def _classifier_logits(self, theta: Tensor, x: Tensor, num_atoms: int) -> Tensor:
-        """Return logits obtained through classifier forward pass.
-
-        The logits are obtained from atomic sets of (theta,x) pairs.
-        """
-        batch_size = theta.shape[0]
-        repeated_x = utils.repeat_rows(x, num_atoms)
-
-        # Choose `1` or `num_atoms - 1` thetas from the rest of the batch for each x.
-        probs = ones(batch_size, batch_size) * (1 - eye(batch_size)) / (batch_size - 1)
-
-        choices = torch.multinomial(probs, num_samples=num_atoms - 1, replacement=False)
-
-        contrasting_theta = theta[choices]
-
-        atomic_theta = torch.cat((theta[:, None, :], contrasting_theta), dim=1).reshape(
-            batch_size * num_atoms, -1
-        )
-
-        return self._neural_net([atomic_theta, repeated_x])
-
-    @abstractmethod
-    def _loss(self, theta: Tensor, x: Tensor, num_atoms: int) -> Tensor:
-        raise NotImplementedError

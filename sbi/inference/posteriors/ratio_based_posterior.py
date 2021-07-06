@@ -9,6 +9,12 @@ import numpy as np
 import torch
 from torch import Tensor, nn
 
+from sbi.vi.sampling import (
+    importance_resampling,
+    independent_mh,
+    random_direction_slice_sampler,
+)
+
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.types import Shape
 from sbi.utils import del_entries, optimize_potential_fn, rejection_sample
@@ -39,6 +45,7 @@ class RatioBasedPosterior(NeuralPosterior):
         mcmc_method: str = "slice_np",
         mcmc_parameters: Optional[Dict[str, Any]] = None,
         rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
+        vi_parameters: Optional[Dict[str, Any]] = None,
         device: str = "cpu",
     ):
         """
@@ -75,6 +82,8 @@ class RatioBasedPosterior(NeuralPosterior):
                 `potential_fn / proposal` ratio. `num_iter_to_find_max` as the number
                 of gradient ascent iterations to find the maximum of that ratio. `m` as
                 multiplier to that ratio.
+            vi_parameters: Dictionary overriding the default parameters for Variational
+                Inference TODO write docstring when fixed
             device: Training device, e.g., cpu or cuda:0.
         """
         kwargs = del_entries(locals(), entries=("self", "__class__"))
@@ -107,15 +116,23 @@ class RatioBasedPosterior(NeuralPosterior):
 
         theta, x = self._prepare_theta_and_x_for_log_prob_(theta, x)
 
-        self._warn_log_prob_snre()
+        if self.sample_with == "mcmc" or self.sample_with == "rejection":
+            self._warn_log_prob_snre()
 
-        # Sum log ratios over x batch of iid trials.
-        log_ratio = self._log_ratios_over_trials(
-            x.to(self._device),
-            theta.to(self._device),
-            self.net,
-            track_gradients=track_gradients,
-        )
+            # Sum log ratios over x batch of iid trials.
+            log_ratio = self._log_ratios_over_trials(
+                x.to(self._device),
+                theta.to(self._device),
+                self.net,
+                track_gradients=track_gradients,
+            )
+        elif self.sample_with == "vi":
+            with torch.set_grad_enabled(track_gradients):
+                return self._q.log_prob(theta.to(self._device))
+        else:
+            raise NotImplementedError(
+                "We only implement methods mcmc, rejection and vi"
+            )
 
         return log_ratio.cpu() + self._prior.log_prob(theta)
 
@@ -141,6 +158,8 @@ class RatioBasedPosterior(NeuralPosterior):
         mcmc_method: Optional[str] = None,
         mcmc_parameters: Optional[Dict[str, Any]] = None,
         rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
+        vi_parameters: Optional[Dict[str, Any]] = None,
+
     ) -> Tensor:
         r"""
         Return samples from posterior distribution $p(\theta|x)$ with MCMC.
@@ -172,6 +191,7 @@ class RatioBasedPosterior(NeuralPosterior):
                 `potential_fn / proposal` ratio. `num_iter_to_find_max` as the number
                 of gradient ascent iterations to find the maximum of that ratio. `m` as
                 multiplier to that ratio.
+            vi_parameters: TODO WRITE
 
         Returns:
             Samples from posterior.
@@ -217,9 +237,47 @@ class RatioBasedPosterior(NeuralPosterior):
                 num_samples=num_samples,
                 **rejection_sampling_parameters,
             )
+        elif sample_with == "vi":
+            vi_parameters = self._potentially_replace_vi_parameters(vi_parameters)
+            method = vi_parameters.get("method", "naive")
+            method_params = vi_parameters.get("method_params", {})
+            track_gradients = vi_parameters.get("track_gradients", False)
+            sample_shape = torch.Size(sample_shape)
+            if method.lower() == "naive":
+                if track_gradients and self._q.has_rsample:
+                    samples = self._q.rsample(sample_shape)
+                else:
+                    samples = self._q.sample(sample_shape)
+            elif method.lower() == "ir":
+                potential_fn = potential_fn_provider(self._prior, self.net, x, "rejection")
+                samples = importance_resampling(
+                    sample_shape.numel(), potential_fn=potential_fn, proposal=self._q, **method_params
+                )
+            elif method.lower() == "imh":
+                 potential_fn = potential_fn_provider(self._prior, self.net, x, "rejection")
+                 samples = independent_mh(sample_shape.numel(), potential_fn,self._q, **method_params)
+            elif method.lower() == "rejection":
+                rejection_sampling_parameters = self._potentially_replace_rejection_parameters(
+                    rejection_sampling_parameters
+                )
+                rejection_sampling_parameters["proposal"] = self
+                samples, _ = rejection_sample(
+                    potential_fn=potential_fn_provider(
+                        self._prior, self.net, x, "rejection"
+                    ),
+                    num_samples=num_samples,
+                    **rejection_sampling_parameters,
+                )
+            elif method.lower() == "slice":
+                potential_fn = potential_fn_provider(self._prior, self.net, x, "rejection")
+                samples = random_direction_slice_sampler(
+                    sample_shape.numel(), potential_fn, self._q, **method_params
+                )
+            else:
+                raise NotImplementedError("The sampling methods from the vi posterior are currently restricted to naive, ir, imh, rejection and slice")
         else:
             raise NameError(
-                "The only implemented sampling methods are `mcmc` and `rejection`."
+                "The only implemented sampling methods are `mcmc`, `rejection` and `vi`."
             )
 
         self.net.train(True)

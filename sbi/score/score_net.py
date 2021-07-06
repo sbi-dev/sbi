@@ -2,6 +2,8 @@ import torch
 from torch import nn
 import numpy as np
 
+from sbi.score.score_sde import VESDE, VPSDE, subVPSDE
+
 
 class GaussianFourierProjection(nn.Module):
     """Gaussian random features for encoding time steps."""
@@ -14,77 +16,104 @@ class GaussianFourierProjection(nn.Module):
 
     def forward(self, x):
         x_proj = x[:, None] * self.W[None, :] * 2 * np.pi
-        return torch.cat([torch.sin(x_proj), torch.cos(x_proj)], dim=-1)
+        return torch.cat([torch.sin(x_proj), torch.cos(x_proj)], dim=-1).squeeze()
 
 
-class ContinousTimeDenseScoreNet(nn.Module):
+class TimeConditionalDense(nn.Module):
+    """A fully connected time conditional layer."""
+
+    def __init__(
+        self,
+        in_features,
+        time_features,
+        out_features,
+        normalization=nn.LayerNorm,
+        nonlinearity=nn.ELU,
+        p_dropout=0,
+    ):
+        super().__init__()
+        self.layer = nn.Sequential(
+            nn.Linear(in_features, out_features),
+            normalization(out_features),
+            nonlinearity(),
+        )
+        self.time_embed = nn.Linear(time_features, out_features)
+        self.act = lambda x: x * torch.sigmoid(x)
+        self.dropout = nn.Dropout(p=p_dropout)
+
+    def forward(self, x, t):
+        h = x + self.time_embed(t)
+        h = self.act(h)
+        h = self.layer(h)
+        h = self.dropout(h)
+        return h, t
+
+
+class TimeConditionalScoreNet(nn.Module):
     def __init__(
         self,
         input_dim,
         marginal_prob,
-        hidden_dim=100,
+        hidden_dim=50,
+        num_layers=5,
         nonlinearity=nn.ELU,
+        normalization=nn.LayerNorm,
         context_dim=None,
+        scale_with_std=True,
+        p_dropout=0,
+        eps=1e-7
     ):
         super().__init__()
         self.input_dim = input_dim
-        self.context_dim = context_dim
         self.marginal_prob = marginal_prob
-        self.time_embed = nn.Sequential(
+        self.eps = eps
+        self.context_dim = context_dim
+        self.scale_with_std = scale_with_std
+        self.act = lambda x: x * torch.sigmoid(x)
+
+        self.time_embedding = nn.Sequential(
             GaussianFourierProjection(embed_dim=hidden_dim),
             nn.Linear(hidden_dim, hidden_dim),
         )
-        self.act = lambda x: x * torch.sigmoid(x)
-        self.input_embed = nn.Sequential(
+        self.input_embedding = nn.Sequential(
             nn.Linear(input_dim, hidden_dim), nonlinearity()
         )
         if context_dim is not None:
-            self.context_embed = nn.Sequential(
+            self.context_embedding = nn.Sequential(
                 nn.Linear(context_dim, hidden_dim), nonlinearity()
             )
-        self.layer1 = nn.Sequential(
-            nn.Linear(hidden_dim, hidden_dim), nn.LayerNorm(hidden_dim), nonlinearity()
+        self.output_layer = nn.Linear(hidden_dim, input_dim)
+        self.layers = nn.ModuleList(
+            [
+                TimeConditionalDense(
+                    hidden_dim,
+                    hidden_dim,
+                    hidden_dim,
+                    normalization=normalization,
+                    nonlinearity=nonlinearity,
+                    p_dropout=p_dropout,
+                )
+                for _ in range(num_layers)
+            ]
         )
-        self.dense1 = nn.Linear(hidden_dim, hidden_dim)
-        self.layer2 = nn.Sequential(
-            nn.Linear(hidden_dim, hidden_dim), nn.LayerNorm(hidden_dim), nonlinearity()
-        )
-        self.dense2 = nn.Linear(hidden_dim, hidden_dim)
-        self.layer3 = nn.Sequential(
-            nn.Linear(hidden_dim, hidden_dim), nn.LayerNorm(hidden_dim), nonlinearity()
-        )
-        self.dense3 = nn.Linear(hidden_dim, hidden_dim)
-        self.layer4 = nn.Sequential(
-            nn.Linear(hidden_dim, hidden_dim), nn.LayerNorm(hidden_dim), nonlinearity()
-        )
-        self.dense4 = nn.Linear(hidden_dim, hidden_dim)
-        self.out_layer = nn.Linear(hidden_dim, input_dim)
 
     def forward(self, x, t, context=None):
-        # Encoding for time
-        embed = self.act(self.time_embed(t.squeeze()))
+        # Embed time and context
+        h = self.input_embedding(x)
+        time = self.act(self.time_embedding(t))
         if self.context_dim is not None:
-            context_embed = self.context_embed(context)
-        # Encoding for input
-        h1 = self.input_embed(x)
-        if self.context_dim is not None:
-            h1 = h1 + context_embed
-        h1 += self.dense1(embed)
-        h1 = self.act(h1)
-        h2 = self.layer1(h1)
-        h2 += self.dense2(embed)
-        h2 = self.act(h2)
-        h3 = self.layer2(h2)
-        h3 += self.dense3(embed)
-        h3 = self.act(h3)
-        h4 = self.layer3(h3)
-        h4 += self.dense4(embed)
-        h4 = self.act(h4)
-        h4 = self.layer4(h4)
-        h = self.out_layer(h4)
-        # Normalize output
-        h = h / self.marginal_prob(t)[1]
-        return h
+            context_embed = self.context_embedding(context)
+            h = h + context_embed
+        # Pass through hidden layers
+        for layer in self.layers:
+            h, time = layer(h, time)
+
+        # Output
+        out = self.output_layer(h)
+        if self.scale_with_std:
+            std = self.marginal_prob(x, t)[1].squeeze().unsqueeze(-1)
+            out = out / std
+        return out
 
 
 class Dense(nn.Module):
@@ -98,12 +127,12 @@ class Dense(nn.Module):
         return self.dense(x)[..., None, None]
 
 
-class ContinousTimeConvolutionalScoreNet(nn.Module):
+class TimeConditionalConvScoreNet(nn.Module):
     """A time-dependent score-based model built upon U-Net architecture."""
 
     def __init__(
         self,
-        marginal_prob_std,
+        marginal_prob,
         channels=[32, 64, 128, 256],
         embed_dim=256,
         context_dim=None,
@@ -122,6 +151,10 @@ class ContinousTimeConvolutionalScoreNet(nn.Module):
             GaussianFourierProjection(embed_dim=embed_dim),
             nn.Linear(embed_dim, embed_dim),
         )
+        if context_dim is not None:
+            self.context_embedding = nn.Sequential(
+                nn.Linear(context_dim, embed_dim), nn.ELU()
+            )
         # Encoding layers where the resolution decreases
         self.conv1 = nn.Conv2d(1, channels[0], 3, stride=1, bias=False)
         self.dense1 = Dense(embed_dim, channels[0])
@@ -166,15 +199,18 @@ class ContinousTimeConvolutionalScoreNet(nn.Module):
 
         # The swish activation function
         self.act = lambda x: x * torch.sigmoid(x)
-        self.marginal_prob_std = marginal_prob_std
+        self.marginal_prob = marginal_prob
 
-    def forward(self, x, t):
+    def forward(self, x, t, context=None):
         # Obtain the Gaussian random feature embedding for t
         embed = self.act(self.embed(t))
         # Encoding path
         h1 = self.conv1(x)
-        ## Incorporate information from t
+        ## Incorporate information from t and context
         h1 += self.dense1(embed)
+        if self.context_dim is not None:
+            context_embed = self.context_embedding(context)
+            h1 = h1 + context_embed
         ## Group normalization
         h1 = self.gnorm1(h1)
         h1 = self.act(h1)
@@ -208,6 +244,31 @@ class ContinousTimeConvolutionalScoreNet(nn.Module):
         h = self.tconv1(torch.cat([h, h1], dim=1))
 
         # Normalize output
-        h = h / self.marginal_prob_std(t)[:, None, None, None]
+        h = h / self.marginal_prob(x, t)[1][:, None, None, None]
         return h
+
+
+def build_score_net_and_sde(name, **kwargs):
+    score_net, sde = name.split("_")
+    if sde.lower() == "vesde":
+        sde = VESDE()
+    elif sde.lower() == "vpsde":
+        sde = VPSDE()
+    elif sde.lower() == "subvpsde":
+        sde = subVPSDE()
+    else:
+        raise NotImplementedError()
+
+    if score_net.lower() == "tcs":
+        def build_score_net(theta, x):
+            input_dim = theta.shape[-1]
+            context_dim = x.shape[-1]
+            score_net = TimeConditionalScoreNet(
+                input_dim, sde.marginal_prob, context_dim=context_dim, **kwargs
+            )
+            return score_net
+
+    else:
+        raise NotImplementedError()
+    return build_score_net, sde
 

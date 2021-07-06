@@ -159,7 +159,7 @@ class MixtureSameTransform(torch.distributions.MixtureSameFamily):
             pass
 
     def modules(self):
-        """ Returns the learnable paramters of the model """
+        """ Returns the modules of the model """
         if hasattr(self._component_distribution, "modules"):
             yield from self._component_distribution.modules()
         elif hasattr(self._component_distribution, "transforms"):
@@ -546,7 +546,7 @@ class Mixture(Distribution):
                 pass
 
     def modules(self):
-        """ Returns the learnable paramters of the model """
+        """ Returns the learnable modules of the model """
         for comp in self.components:
             if hasattr(comp, "modules"):
                 yield from comp.modules()

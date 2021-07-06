@@ -13,6 +13,8 @@ from sbi.types import TensorboardSummaryWriter
 from sbi.types import TorchModule
 from sbi.utils import del_entries
 
+from warnings import warn
+
 import torch
 
 
@@ -106,6 +108,7 @@ class SNLE_B(LikelihoodEstimator):
             Density estimator that approximates the distribution $p(x|\theta)$.
         """
         kwargs = del_entries(locals(), entries=("self", "__class__"))
+        warn("THIS CLASS IS DEPRECATED DONT USE IT, IT IS IMPLEMENTED IN THE SNLE_A")
         return super().train(**kwargs)
 
     def build_posterior(
