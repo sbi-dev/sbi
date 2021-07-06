@@ -16,7 +16,10 @@ from sbi.types import Array, OneOrMore, ScalarFloat
 
 
 def process_device(device: str, prior: Optional[Any] = None) -> str:
-    """Set and return the default device to cpu or gpu."""
+    """Set and return the default device to cpu or gpu.
+
+    Throws an AssertionError if the prior is not matching the training device not.
+    """
 
     if not device == "cpu":
         if device == "gpu":
@@ -39,10 +42,10 @@ def process_device(device: str, prior: Optional[Any] = None) -> str:
         training_device = torch.zeros(1, device=device).device
         assert (
             prior_device == training_device
-        ), f"""Prior ({prior_device}) device must match training device ({device}).
-        When training on GPU make sure to pass a prior initialized on the GPU as well,
-        e.g., `prior = torch.distributions.Normal(torch.zeros(2, device='cuda'),
-        scale=1.0)`."""
+        ), f"""Prior ({prior_device}) device must match training device (
+            {training_device}). When training on GPU make sure to pass a prior
+            initialized on the GPU as well, e.g., `prior = torch.distributions.Normal
+            (torch.zeros(2, device='cuda'), scale=1.0)`."""
 
     return device
 
@@ -216,7 +219,11 @@ def gaussian_kde_log_eval(samples, query):
 
 class BoxUniform(Independent):
     def __init__(
-        self, low: ScalarFloat, high: ScalarFloat, reinterpreted_batch_ndims: int = 1
+        self,
+        low: ScalarFloat,
+        high: ScalarFloat,
+        reinterpreted_batch_ndims: int = 1,
+        device: str = "cpu",
     ):
         """Multidimensional uniform distribution defined on a box.
 
@@ -235,12 +242,14 @@ class BoxUniform(Independent):
             high: upper range (exclusive).
             reinterpreted_batch_ndims (int): the number of batch dims to
                                              reinterpret as event dims.
+            device: device of the prior, defaults to "cpu", should match the training
+                device when used in SBI.
         """
 
         super().__init__(
             Uniform(
-                low=torch.as_tensor(low, dtype=torch.float32),
-                high=torch.as_tensor(high, dtype=torch.float32),
+                low=torch.as_tensor(low, dtype=torch.float32, device=device),
+                high=torch.as_tensor(high, dtype=torch.float32, device=device),
                 validate_args=False,
             ),
             reinterpreted_batch_ndims,

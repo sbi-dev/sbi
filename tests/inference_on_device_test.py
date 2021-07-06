@@ -11,7 +11,7 @@ from torch.distributions import MultivariateNormal
 from sbi import utils as utils
 from sbi.inference import SNLE, SNPE_A, SNPE_C, SNRE_A, SNRE_B, simulate_for_sbi
 from sbi.simulators import linear_gaussian
-from sbi.utils.torchutils import process_device
+from sbi.utils.torchutils import BoxUniform, process_device
 
 
 @pytest.mark.slow
@@ -34,11 +34,18 @@ from sbi.utils.torchutils import process_device
         pytest.param("cpu", "cuda", marks=pytest.mark.xfail),
         pytest.param("cuda:0", "cpu", marks=pytest.mark.xfail),
         ("cuda:0", "cuda:0"),
+        ("cuda:0", "cuda:0"),
         ("cpu", "cpu"),
     ],
 )
 def test_training_and_mcmc_on_device(
-    method, model, data_device, mcmc_method, training_device, prior_device
+    method,
+    model,
+    data_device,
+    mcmc_method,
+    training_device,
+    prior_device,
+    prior_type="gaussian",
 ):
     """Test training on devices.
 
@@ -55,9 +62,16 @@ def test_training_and_mcmc_on_device(
     likelihood_shift = -1.0 * ones(num_dim).to(prior_device)
     likelihood_cov = 0.3 * eye(num_dim).to(prior_device)
 
-    prior_mean = zeros(num_dim).to(prior_device)
-    prior_cov = eye(num_dim).to(prior_device)
-    prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
+    if prior_type == "gaussian":
+        prior_mean = zeros(num_dim).to(prior_device)
+        prior_cov = eye(num_dim).to(prior_device)
+        prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
+    else:
+        prior = BoxUniform(
+            low=-2 * torch.ones(num_dim),
+            high=2 * torch.ones(num_dim),
+            device=prior_device,
+        )
 
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
