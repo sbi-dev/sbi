@@ -238,6 +238,7 @@ class RatioBasedPosterior(NeuralPosterior):
                 **rejection_sampling_parameters,
             )
         elif sample_with == "vi":
+            # TODO check if train was called before. And warn if not
             vi_parameters = self._potentially_replace_vi_parameters(vi_parameters)
             method = vi_parameters.get("method", "naive")
             method_params = vi_parameters.get("method_params", {})

@@ -20,7 +20,6 @@ from sbi.inference.base import (  # noqa: F401
     simulate_for_sbi,
 )
 from sbi.inference.snle.snle_a import SNLE_A
-from sbi.inference.snle.snle_b import SNLE_B
 # Unimplemented: don't export
 from sbi.inference.snpe.snpe_a import SNPE_A
 from sbi.inference.snpe.snpe_b import SNPE_B
@@ -29,8 +28,7 @@ from sbi.inference.snre import SNRE, SNRE_A, SNRE_B  # noqa: F401
 from sbi.utils.user_input_checks import prepare_for_sbi
 
 SNL = SNLE = SNLE_A
-SNLVI = SNLE_B
-_snle_family = ["SNL", "SNLVI"]
+_snle_family = ["SNL"]
 
 
 SNPE = APT = SNPE_C

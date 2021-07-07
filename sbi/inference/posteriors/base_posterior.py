@@ -294,7 +294,7 @@ class NeuralPosterior(ABC):
         self.set_vi_parameters(parameters)
 
     def set_vi_parameters(self, parameters: Dict[str, Any]) -> "NeuralPosterior":
-        """Sets parameters for rejection sampling and returns `NeuralPosterior`.
+        """Sets parameters for variational inference and returns `NeuralPosterior`.
 
         Args:
             TODO
@@ -487,18 +487,17 @@ class NeuralPosterior(ABC):
         self, vi_parameters: Optional[Dict[str, Any]]
     ) -> Dict[str, Any]:
         """
-        Return potentially default values to rejection sample the posterior.
+        Return potentially default values for VI.
 
         Args:
-            rejection_sampling_parameters: Dictionary overriding the default
-                parameters for rejection sampling. The following parameters are
-                supported: `proposal` as the proposal distribtution.
-                `num_samples_to_find_max` as the number of samples that are used to
-                find the maximum of the `potential_fn / proposal` ratio. `m` as
-                multiplier to that ratio. `sampling_batch_size` as the batchsize of
-                samples being drawn from the proposal at every iteration.
+            vi_parameters: Dictionary overriding the default
+            parameters for variational inference. One of the main supported parameters
+            'flow', which defines the normalizing flow, 'num_flows' which defines the
+            number of NF layers (default is 5) and 'num_components' which defines the
+            number of mixture components. Further one can define the 'loss' for training
+            and the sampling strategy directly.
 
-        Returns: Potentially default rejection sampling parameters.
+        Returns: Potentially default variational inference parameters.
         """
         vi_parameters = (
             vi_parameters if vi_parameters is not None else self.vi_parameters

@@ -8,7 +8,7 @@ from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
 from sbi import utils as utils
-from sbi.inference import SNLVI, prepare_for_sbi, simulate_for_sbi
+from sbi.inference import SNL, prepare_for_sbi, simulate_for_sbi
 from sbi.simulators.linear_gaussian import (
     diagonal_linear_gaussian,
     linear_gaussian,
@@ -37,14 +37,11 @@ def test_api_snl_on_linearGaussian(num_dim: int, set_seed):
     prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
 
     simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior)
-    inference = SNLVI(
-        prior,
-        show_progress_bars=False,
-    )
+    inference = SNL(prior, show_progress_bars=False,)
 
     theta, x = simulate_for_sbi(simulator, prior, 1000, simulation_batch_size=50)
     _ = inference.append_simulations(theta, x).train(max_num_epochs=5)
-    posterior = inference.build_posterior().set_default_x(x_o)
+    posterior = inference.build_posterior(sample_with="vi").set_default_x(x_o)
     posterior.train(show_progress_bar=False)
     posterior.sample(sample_shape=(num_samples,), x=x_o)
 
@@ -89,16 +86,13 @@ def test_c2st_snl_on_linearGaussian_different_dims(set_seed):
     )
 
     simulator, prior = prepare_for_sbi(simulator, prior)
-    inference = SNLVI(
-        prior,
-        show_progress_bars=False,
-    )
+    inference = SNL(prior, show_progress_bars=False,)
 
     theta, x = simulate_for_sbi(
         simulator, prior, num_simulations, simulation_batch_size=50
     )
     _ = inference.append_simulations(theta, x).train()
-    posterior = inference.build_posterior()
+    posterior = inference.build_posterior(sample_with="vi")
     posterior.set_default_x(x_o)
     posterior.train(show_progress_bar=False)
     samples = posterior.sample((num_samples,))
@@ -143,14 +137,11 @@ def test_c2st_snl_on_linearGaussian(num_dim: int, prior_str: str, set_seed):
     simulator = lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     simulator, prior = prepare_for_sbi(simulator, prior)
-    inference = SNLVI(
-        prior,
-        show_progress_bars=False,
-    )
+    inference = SNL(prior, show_progress_bars=False,)
 
     theta, x = simulate_for_sbi(simulator, prior, 1000, simulation_batch_size=50)
     _ = inference.append_simulations(theta, x).train()
-    posterior = inference.build_posterior().set_default_x(x_o)
+    posterior = inference.build_posterior(sample_with="vi").set_default_x(x_o)
     posterior.train(show_progress_bar=False)
 
     samples = posterior.sample(sample_shape=(num_samples,))
@@ -201,19 +192,18 @@ def test_c2st_multi_round_snl_on_linearGaussian(set_seed):
     simulator = lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     simulator, prior = prepare_for_sbi(simulator, prior)
-    inference = SNLVI(
-        prior,
-        show_progress_bars=False,
-    )
+    inference = SNL(prior, show_progress_bars=False,)
 
     theta, x = simulate_for_sbi(simulator, prior, 750, simulation_batch_size=50)
     _ = inference.append_simulations(theta, x).train()
-    posterior1 = inference.build_posterior().set_default_x(x_o)
+    posterior1 = inference.build_posterior(sample_with="vi").set_default_x(x_o)
     posterior1.train(show_progress_bar=False)
 
     theta, x = simulate_for_sbi(simulator, posterior1, 750, simulation_batch_size=50)
     _ = inference.append_simulations(theta, x).train()
-    posterior = inference.build_posterior().copy_hyperparameters_from(posterior1)
+    posterior = inference.build_posterior(sample_with="vi").copy_hyperparameters_from(
+        posterior1
+    )
     posterior.train(show_progress_bar=False)
 
     samples = posterior.sample(sample_shape=(num_samples,))
@@ -223,7 +213,7 @@ def test_c2st_multi_round_snl_on_linearGaussian(set_seed):
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("prior_str",["gaussian", "uniform"])
+@pytest.mark.parametrize("prior_str", ["gaussian", "uniform"])
 def test_api_snl_sampling_methods(prior_str: str, set_seed):
     """Runs SNL on linear Gaussian and tests sampling from posterior via mcmc.
 
@@ -242,14 +232,11 @@ def test_api_snl_sampling_methods(prior_str: str, set_seed):
         prior = utils.BoxUniform(-1.0 * ones(num_dim), ones(num_dim))
 
     simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior)
-    inference = SNLVI(
-        prior,
-        show_progress_bars=False,
-    )
+    inference = SNL(prior, show_progress_bars=False,)
 
     theta, x = simulate_for_sbi(simulator, prior, 200, simulation_batch_size=50)
     _ = inference.append_simulations(theta, x).train(max_num_epochs=5)
-    posterior = inference.build_posterior().set_default_x(x_o)
+    posterior = inference.build_posterior(sample_with="vi").set_default_x(x_o)
     posterior.train(show_progress_bar=False)
 
     posterior.sample(sample_shape=(num_samples,), x=x_o)

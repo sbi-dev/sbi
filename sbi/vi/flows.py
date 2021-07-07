@@ -1,4 +1,3 @@
-
 import torch
 import numpy as np
 from torch import nn
@@ -15,7 +14,7 @@ from pyro.distributions import transforms, constraints, TransformModule
 from pyro.distributions.transforms.utils import clamp_preserve_gradients
 from pyro.nn import AutoRegressiveNN, DenseNN
 
-from torchdiffeq import odeint_adjoint, odeint 
+from torchdiffeq import odeint_adjoint, odeint
 
 TYPES = [
     "planar",
@@ -30,6 +29,7 @@ TYPES = [
     "spline",
     "spline_coupling",
     "spline_autoregressive",
+    "neural_ode",
 ]
 
 
@@ -65,7 +65,9 @@ def _inverse(self, y, xtol=1e-4):
             x = torch.from_numpy(x).reshape(shape).float()
             return (self(x) - y).flatten().numpy()
 
-        x = torch.tensor(fsolve(f, np.random.randn(*shape).flatten(), xtol=xtol)).float()
+        x = torch.tensor(
+            fsolve(f, np.random.randn(*shape).flatten(), xtol=xtol)
+        ).float()
     x = x.reshape(shape)
 
     return x
@@ -79,7 +81,7 @@ def _inverse_batched(self, y, batch_size=20):
     xs = []
     y = y.reshape(-1, shape[-1])
     for i in range(0, shape[0], batch_size):
-        y_i = y[i : i+batch_size, :]
+        y_i = y[i : i + batch_size, :]
         x_i = _inverse(self, y_i)
         xs.append(x_i)
     x = torch.vstack(xs).reshape(shape)
@@ -257,37 +259,60 @@ class DenseNN(DenseNN):
         ]
         self.layers = nn.ModuleList(layers)
 
+
 def trace_df_dz(f, z):
-    trace = 0.
-    for i in range(z.shape[1]):
-        trace += torch.autograd.grad(f[:, i].sum(), z, create_graph=True)[0].contiguous()[:, i].contiguous()
+    trace = 0.0
+    for i in range(z.shape[-1]):
+        trace += (
+            torch.autograd.grad(f[:, i].sum(), z, create_graph=True)[0]
+            .contiguous()[:, i]
+            .contiguous()
+        )
 
     return trace.contiguous()
 
 
 class ODEnet(nn.Module):
-    def __init__(self, input_dim,hidden_dim=20, num_layers=2, normalization=nn.Identity):
+    def __init__(
+        self, input_dim, hidden_dim=20, num_layers=2, normalization=nn.Identity
+    ):
         super().__init__()
-        self.time_embed = nn.Sequential(nn.Linear(1,hidden_dim), nn.ELU())
-        self.input_embed = nn.Sequential(nn.Linear(input_dim,hidden_dim), nn.ELU())
-        self.layers = nn.ModuleList([nn.Sequential(nn.Linear(hidden_dim,hidden_dim), nn.ELU()) for _ in range(num_layers)])
+        self.time_embed = nn.Sequential(nn.Linear(1, hidden_dim), nn.ELU())
+        self.input_embed = nn.Sequential(nn.Linear(input_dim, hidden_dim), nn.ELU())
+        self.layers = nn.ModuleList(
+            [
+                nn.Sequential(nn.Linear(hidden_dim, hidden_dim), nn.ELU())
+                for _ in range(num_layers)
+            ]
+        )
         self.out_layer = nn.Linear(hidden_dim, input_dim)
-    
+
     def forward(self, t, x):
         h = self.input_embed(x)
-        h = h + self.time_embed(t.reshape(-1,1))
+        h = h + self.time_embed(t.reshape(-1, 1))
         for layer in self.layers:
             h = layer(h)
         out = self.out_layer(h)
         return out
 
+
 class NeuralODETransform(TransformModule):
     domain = constraints.real_vector
-    codomain = constraints.real_vector 
-    bijective=True 
+    codomain = constraints.real_vector
+    bijective = True
     sign = +1
 
-    def __init__(self, ODEnet, T=1., t0 = 0.,atol=1e-5, rtol=1e-5, solver="rk4", options=dict(), adjoint=False):
+    def __init__(
+        self,
+        ODEnet,
+        T=1.0,
+        t0=0.0,
+        atol=1e-5,
+        rtol=1e-5,
+        solver="rk4",
+        options=dict(),
+        adjoint=False,
+    ):
         """This is a continous normalizing flow, which use a neural ODE transform.
         
         
@@ -301,37 +326,68 @@ class NeuralODETransform(TransformModule):
             solver: The ODE solver (one implemented in torchdiffeq)
             options: Further options of odeint
             adjoint: If the adjoint method should be used to compute gradients.
-            div_estimator: One of exact or hutchkinson
-            div_estimator_params: Parameters of the div estimator
         
         """
-        super().__init__(cache_size=1) 
+        super().__init__(cache_size=1)
         self.net = ODEnet
         self.T = float(T)
         self.t0 = float(t0)
         self.atol = 1e-5
-        self.rtol=1e-5
-        self.solver=solver
+        self.rtol = 1e-5
+        self.solver = solver
         self.adjoint = adjoint
-        self.options=options
-
+        self.options = options
 
     def _call(self, x):
         logp_diff_t0 = torch.zeros(x.shape[0], 1)
         if not self.adjoint:
-            y, logP_diff_T = odeint(self.ode_func, (x, logp_diff_t0), torch.tensor([self.t0, self.T]), atol=self.atol, rtol=self.rtol, method=self.solver, options=self.options)
+            y, logP_diff_T = odeint(
+                self.ode_func,
+                (x, logp_diff_t0),
+                torch.tensor([self.t0, self.T]),
+                atol=self.atol,
+                rtol=self.rtol,
+                method=self.solver,
+                options=self.options,
+            )
         else:
-            y, logP_diff_T = odeint_adjoint(self.ode_func, (x, logp_diff_t0), torch.tensor([self.t0, self.T]), atol=self.atol, rtol=self.rtol, method=self.solver, adjoint_params=self.net.parameters(), options=self.options)
-        self._logP_diff_T = -logP_diff_T[-1].flatten()
+            y, logP_diff_T = odeint_adjoint(
+                self.ode_func,
+                (x, logp_diff_t0),
+                torch.tensor([self.t0, self.T]),
+                atol=self.atol,
+                rtol=self.rtol,
+                method=self.solver,
+                adjoint_params=self.net.parameters(),
+                options=self.options,
+            )
+        self._cached_logP_diff_T = -logP_diff_T[-1].flatten()
         return y[-1]
 
     def _inverse(self, y):
         logp_diff_t0 = torch.zeros(y.shape[0], 1)
         if not self.adjoint:
-            x, logP_diff_T = odeint(self.ode_func, (y, logp_diff_t0), torch.tensor([self.T, self.t0]), atol=self.atol, rtol=self.rtol, method=self.solver, options=self.options)
+            x, logP_diff_T = odeint(
+                self.ode_func,
+                (y, logp_diff_t0),
+                torch.tensor([self.T, self.t0]),
+                atol=self.atol,
+                rtol=self.rtol,
+                method=self.solver,
+                options=self.options,
+            )
         else:
-            x, logP_diff_T = odeint_adjoint(self.ode_func, (y, logp_diff_t0), torch.tensor([self.T, self.t0]), atol=self.atol, rtol=self.rtol, method=self.solver, adjoint_params=self.net.parameters(), options=self.options)
-        self._logP_diff_T = logP_diff_T[-1].flatten()
+            x, logP_diff_T = odeint_adjoint(
+                self.ode_func,
+                (y, logp_diff_t0),
+                torch.tensor([self.T, self.t0]),
+                atol=self.atol,
+                rtol=self.rtol,
+                method=self.solver,
+                adjoint_params=self.net.parameters(),
+                options=self.options,
+            )
+        self._cached_logP_diff_T = logP_diff_T[-1].flatten()
         return x[-1]
 
     def ode_func(self, t, states):
@@ -344,16 +400,15 @@ class NeuralODETransform(TransformModule):
             dlogp_z_dt = -trace_df_dz(dz_dt, z)
         return (dz_dt, dlogp_z_dt)
 
-    def log_abs_det_jacobian(self,x,y):
-        return self._logP_diff_T
+    def log_abs_det_jacobian(self, x, y):
+        return self._cached_logP_diff_T
+
 
 def neural_ode_transform(dim, **kwargs):
-    hidden_dim = 5*dim + 10
+    hidden_dim = 5 * dim + 10
     net = ODEnet(dim, hidden_dim=hidden_dim)
     t = NeuralODETransform(net, **kwargs)
     return t
-            
-
 
 
 def flow_block(dim, type, **kwargs):
