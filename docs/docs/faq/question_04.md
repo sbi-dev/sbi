@@ -1,18 +1,23 @@
 
 # Can I use the GPU for training the density estimator?
 
-TLDR; Yes, by passing `device="cuda"`. But no speed-ups for default density estimators.
+TLDR; Yes, by passing `device="cuda"` and by passing a prior that lives on the device
+name your passed. But no speed-ups for default density estimators.
 
 Yes. When creating the inference object in the flexible interface, you can pass the
 `device` as an argument, e.g.,
 
 ```python
-inference = SNPE(simulator, prior, device="cuda", density_estimator="maf")
+inference = SNPE(prior, device="cuda", density_estimator="maf")
 ```
 
 The device is set to `"cpu"` by default, and it can be set to anything, as long as it
 maps to an existing PyTorch CUDA device. `sbi` will take care of copying the `net` and
 the training data to and from the `device`. 
+Note that the prior must be on the training device already, e.g., when passing `device="cuda:0"`,
+make sure to pass a prior object that was created on that device, e.g., 
+`prior = torch.distributions.MultivariateNormal(loc=torch.zeros(2, device="cuda:0"), 
+                                                covariance_matrix=torch.eye(2, device="cuda:0"))`.
 
 ## Performance
 
