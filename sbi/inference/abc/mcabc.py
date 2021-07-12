@@ -1,13 +1,12 @@
-from typing import Callable, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Optional, Tuple, Union
 
 import torch
 from numpy import ndarray
-from pyro.distributions.empirical import Empirical
-from torch import Tensor, ones
-from torch.distributions.distribution import Distribution
+from torch import Tensor
+from torch.distributions.transforms import Transform
 
 from sbi.inference.abc.abc_base import ABCBASE
-from sbi.utils.user_input_checks import process_x
+from sbi.utils import KDEWrapper, get_kde, process_x
 
 
 class MCABC(ABCBASE):
@@ -61,14 +60,21 @@ class MCABC(ABCBASE):
         num_simulations: int,
         eps: Optional[float] = None,
         quantile: Optional[float] = None,
-        return_distances: bool = False,
-        return_x_accepted: bool = False,
         lra: bool = False,
         sass: bool = False,
         sass_fraction: float = 0.25,
         sass_expansion_degree: int = 1,
-    ) -> Union[Distribution, Tuple[Distribution, Tensor]]:
-        r"""Run MCABC.
+        kde: bool = False,
+        kde_kwargs: Dict[str, Any] = dict(
+            kde_bandwidth="cv",
+            kde_transform=None,
+            sample_weights=None,
+            num_cv_partitions=20,
+            num_cv_repetitions=5,
+        ),
+        return_summary: bool = False,
+    ) -> Union[Tuple[Tensor, dict], Tuple[KDEWrapper, dict], Tensor, KDEWrapper]:
+        r"""Run MCABC and return accepted parameters or KDE object fitted on them.
 
         Args:
             x_o: Observed data.
@@ -78,20 +84,30 @@ class MCABC(ABCBASE):
             quantile: Upper quantile of smallest distances for which the corresponding
                 parameters are returned, e.g, q=0.01 will return the top 1%. Exactly
                 one of quantile or `eps` have to be passed.
-            return_distances: Whether to return the distances corresponding to
-                the accepted parameters.
-            return_distances: Whether to return the simulated data corresponding to
-                the accepted parameters.
             lra: Whether to run linear regression adjustment as in Beaumont et al. 2002
             sass: Whether to determine semi-automatic summary statistics as in
                 Fearnhead & Prangle 2012.
             sass_fraction: Fraction of simulation budget used for the initial sass run.
             sass_expansion_degree: Degree of the polynomial feature expansion for the
                 sass regression, default 1 - no expansion.
+            kde: Whether to run KDE on the accepted parameters to return a KDE
+                object from which one can sample.
+            kde_kwargs: kwargs for performing KDE:
+                'bandwidth='; either a float, or a string naming a bandwidth
+                heuristics, e.g., 'cv' (cross validation), 'silvermann' or 'scott',
+                default 'cv'.
+                'transform': transform applied to the parameters before doing KDE.
+                'sample_weights': weights associated with samples. See 'get_kde' for
+                more details
+            return_summary: Whether to return the distances and data corresponding to
+                the accepted parameters.
 
         Returns:
-            posterior: Empirical distribution based on selected parameters.
-            distances: Tensor of distances of the selected parameters.
+            theta (if kde False): accepted parameters
+            kde (if kde True): KDE object based on accepted parameters from which one
+                can .sample() and .log_prob().
+            summary (if summary True): dictionary containing the accepted paramters (if
+                kde True), distances and simulated data x.
         """
         # Exactly one of eps or quantile need to be passed.
         assert (eps is not None) ^ (
@@ -152,19 +168,26 @@ class MCABC(ABCBASE):
         # Maybe adjust theta with LRA.
         if lra:
             self.logger.info("Running Linear regression adjustment.")
-            theta_adjusted = self.run_lra(
-                theta_accepted, x_accepted, observation=self.x_o
+            final_theta = self.run_lra(theta_accepted, x_accepted, observation=self.x_o)
+        else:
+            final_theta = theta_accepted
+
+        if kde:
+            self.logger.info(
+                f"""KDE on {final_theta.shape[0]} samples with bandwidth option
+                {kde_kwargs["bandwidth"]}. Beware that KDE can give unreliable
+                results when used with too few samples and in high dimensions."""
             )
-        else:
-            theta_adjusted = theta_accepted
 
-        posterior = Empirical(theta_adjusted, log_weights=ones(theta_accepted.shape[0]))
+            kde_dist = get_kde(final_theta, **kde_kwargs)
 
-        if return_distances and return_x_accepted:
-            return posterior, distances_accepted, x_accepted
-        if return_distances:
-            return posterior, distances_accepted
-        if return_x_accepted:
-            return posterior, x_accepted
+            if return_summary:
+                return kde_dist, dict(
+                    theta=final_theta, distances=distances_accepted, x=x_accepted
+                )
+            else:
+                return kde_dist
+        elif return_summary:
+            return final_theta, dict(distances=distances_accepted, x=x_accepted)
         else:
-            return posterior
+            return final_theta
