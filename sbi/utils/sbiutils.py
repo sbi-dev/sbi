@@ -11,9 +11,8 @@ import pyknos.nflows.transforms as transforms
 from pyro.distributions import Empirical
 from torch import Tensor, as_tensor, float32
 from torch import nn as nn
-from torch import ones, optim, zeros, sqrt, tensor
-from torch.distributions import Independent, biject_to
-from torch.distributions.distribution import Distribution
+from torch import ones, optim, zeros
+from torch.distributions import Distribution, Independent, biject_to
 import torch.distributions.transforms as torch_tf
 from tqdm.auto import tqdm
 
