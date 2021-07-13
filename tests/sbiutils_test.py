@@ -381,12 +381,13 @@ def test_mcmc_transform(prior, enable_transform):
     Test whether the transform for MCMC returns the log_abs_det in the correct shape.
     """
 
+    num_samples = 1000
     prior, _, _ = process_prior(prior)
     tf = mcmc_transform(prior, enable_transform=enable_transform)
 
-    samples = prior.sample((1000,))
-    unconstrained_samples = tf.inv(samples)
-    samples_original = tf(unconstrained_samples)
+    samples = prior.sample((num_samples,))
+    unconstrained_samples = tf(samples)
+    samples_original = tf.inv(unconstrained_samples)
 
-    log_abs_det = tf.log_abs_det_jacobian(unconstrained_samples, samples_original)
-    assert log_abs_det.shape == torch.Size([1000])
+    log_abs_det = tf.log_abs_det_jacobian(samples_original, unconstrained_samples)
+    assert log_abs_det.shape == torch.Size([num_samples])

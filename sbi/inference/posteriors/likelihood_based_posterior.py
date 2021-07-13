@@ -188,7 +188,7 @@ class LikelihoodBasedPosterior(NeuralPosterior):
                 self._prior, device=self._device, **mcmc_parameters
             )
 
-            tf_samples = self._sample_posterior_mcmc(
+            transformed_samples = self._sample_posterior_mcmc(
                 num_samples=num_samples,
                 potential_fn=potential_fn_provider(
                     self._prior, self.net, x, mcmc_method, transform
@@ -205,7 +205,7 @@ class LikelihoodBasedPosterior(NeuralPosterior):
                 show_progress_bars=show_progress_bars,
                 **mcmc_parameters,
             )
-            samples = transform(tf_samples)
+            samples = transform.inv(transformed_samples)
         elif sample_with == "rejection":
             rejection_sampling_parameters = (
                 self._potentially_replace_rejection_parameters(
@@ -489,13 +489,13 @@ class PotentialFunctionProvider:
         """
 
         # Device is the same for net and prior.
-        theta_tf = ensure_theta_batched(torch.as_tensor(theta, dtype=torch.float32)).to(
-            self.device
-        )
+        transformed_theta = ensure_theta_batched(
+            torch.as_tensor(theta, dtype=torch.float32)
+        ).to(self.device)
         # Transform `theta` from transformed (i.e. unconstrained) to untransformed
         # space.
-        theta = self.transform(theta_tf)
-        log_abs_det = self.transform.log_abs_det_jacobian(theta_tf, theta)
+        theta = self.transform.inv(transformed_theta)
+        log_abs_det = self.transform.log_abs_det_jacobian(theta, transformed_theta)
 
         log_likelihoods = LikelihoodBasedPosterior._log_likelihoods_over_trials(
             x=self.x,
@@ -504,8 +504,8 @@ class PotentialFunctionProvider:
             track_gradients=track_gradients,
         )
         posterior_potential = log_likelihoods + self.prior.log_prob(theta)
-        posterior_potential_tf = posterior_potential + log_abs_det
-        return posterior_potential_tf
+        posterior_potential_transformed = posterior_potential - log_abs_det
+        return posterior_potential_transformed
 
     def pyro_potential(
         self, theta: Dict[str, Tensor], track_gradients: bool = False
