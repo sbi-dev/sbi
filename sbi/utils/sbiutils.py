@@ -12,7 +12,7 @@ from pyro.distributions import Empirical
 from torch import Tensor, as_tensor, float32
 from torch import nn as nn
 from torch import ones, optim, zeros, sqrt, tensor
-from torch.distributions import Independent
+from torch.distributions import Independent, biject_to
 from torch.distributions.distribution import Distribution
 import torch.distributions.transforms as torch_tf
 from tqdm.auto import tqdm
@@ -916,14 +916,7 @@ def mcmc_transform(
         if hasattr(prior.support, "base_constraint") and hasattr(
             prior.support.base_constraint, "upper_bound"
         ):
-            upper = prior.support.base_constraint.upper_bound.to(device)
-            lower = prior.support.base_constraint.lower_bound.to(device)
-            tf = torch_tf.ComposeTransform(
-                [
-                    torch_tf.SigmoidTransform(),
-                    torch_tf.AffineTransform(loc=lower, scale=(upper - lower)),
-                ]
-            )
+            transform = biject_to(prior.support)
         else:
             if hasattr(prior, "mean") and hasattr(prior, "stddev"):
                 prior_mean = prior.mean.to(device)
@@ -933,11 +926,21 @@ def mcmc_transform(
                 prior_mean = theta.mean(dim=0).to(device)
                 prior_std = theta.std(dim=0).to(device)
 
-            tf = torch_tf.AffineTransform(loc=prior_mean, scale=prior_std)
+            transform = torch_tf.AffineTransform(loc=prior_mean, scale=prior_std)
     else:
-        tf = torch_tf.identity_transform
+        transform = torch_tf.identity_transform
 
-    return tf
+    # Pytorch `transforms` do not sum the determinant over the parameters. However, if
+    # the `transform` explicitly is an `IndependentTransform`, it does. Since our
+    # `BoxUniform` is a `Independent` distribution, it will also automatically get a
+    # `IndependentTransform` wrapper in `biject_to`. Our solution here is to wrap all
+    # transforms as `IndependentTransform`.
+    if not isinstance(transform, torch_tf.IndependentTransform):
+        transform = torch_tf.IndependentTransform(
+            transform, reinterpreted_batch_ndims=1
+        )
+
+    return transform
 
 
 class ImproperEmpirical(Empirical):

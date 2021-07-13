@@ -529,7 +529,7 @@ class PotentialFunctionProvider:
         # Transform `theta` from transformed (i.e. unconstrained) to untransformed
         # space.
         theta = self.transform(theta_tf)
-        log_abs_det = self.transform.log_abs_det_jacobian(theta_tf, theta).sum(dim=1)
+        log_abs_det = self.transform.log_abs_det_jacobian(theta_tf, theta)
 
         log_ratio = RatioBasedPosterior._log_ratios_over_trials(
             self.x,

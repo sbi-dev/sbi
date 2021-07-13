@@ -613,7 +613,7 @@ class PotentialFunctionProvider:
         # Transform `theta` from transformed (i.e. unconstrained) to untransformed
         # space.
         theta = self.transform(theta_tf)
-        log_abs_det = self.transform.log_abs_det_jacobian(theta_tf, theta).sum(dim=1)
+        log_abs_det = self.transform.log_abs_det_jacobian(theta_tf, theta)
 
         theta_repeated, x_repeated = DirectPosterior._match_theta_and_x_batch_shapes(
             theta, self.x

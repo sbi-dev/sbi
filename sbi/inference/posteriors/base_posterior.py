@@ -1298,7 +1298,7 @@ class RestrictedTransformForConditional(nn.Module):
         """
         full_theta = self.condition.repeat(theta.shape[0], 1)
         full_theta[:, self.dims_to_sample] = theta
-        tf_full_theta = self.transform.forward(full_theta)
+        tf_full_theta = self.transform(full_theta)
         return tf_full_theta[:, self.dims_to_sample]
 
     def inv(self, theta: Tensor) -> Tuple[Tensor, Tensor]:
