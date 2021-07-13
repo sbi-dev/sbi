@@ -27,8 +27,8 @@ class IterateParameters:
 def prior_init(prior: Any, transform: nflows.transforms, **kwargs: Any) -> Tensor:
     """Return a sample from the prior."""
     prior_samples = prior.sample((1,)).detach()
-    prior_samples_tf = transform.inv(prior_samples)
-    return prior_samples_tf
+    transformed_prior_samples = transform(prior_samples)
+    return transformed_prior_samples
 
 
 def sir(
@@ -61,9 +61,9 @@ def sir(
         init_param_candidates = []
         for i in range(sir_num_batches):
             batch_draws = prior.sample((sir_batch_size,)).detach()
-            batch_draws_tf = transform.inv(batch_draws)
-            init_param_candidates.append(batch_draws_tf)
-            log_weights.append(potential_fn(batch_draws_tf.numpy()).detach())
+            transformed_batch_draws = transform(batch_draws)
+            init_param_candidates.append(transformed_batch_draws)
+            log_weights.append(potential_fn(transformed_batch_draws.numpy()).detach())
         log_weights = torch.cat(log_weights)
         init_param_candidates = torch.cat(init_param_candidates)
 

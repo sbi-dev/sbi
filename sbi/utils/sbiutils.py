@@ -895,6 +895,9 @@ def mcmc_transform(
     """
     Builds a transform that is applied to parameters during MCMC.
 
+    The resulting transform is defined such that the forward mapping maps from
+    constrained to unconstrained space.
+
     It does two things:
     1) When the prior support is bounded, it transforms the parameters into unbounded
         space.
@@ -940,7 +943,7 @@ def mcmc_transform(
             transform, reinterpreted_batch_ndims=1
         )
 
-    return transform
+    return transform.inv
 
 
 class ImproperEmpirical(Empirical):

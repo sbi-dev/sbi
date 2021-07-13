@@ -308,7 +308,8 @@ class DirectPosterior(NeuralPosterior):
                 z-scored (and unconstrained) space.
             rejection_sampling_parameters: Dictionary overriding the default parameters
                 for rejection sampling. The following parameters are supported:
-                `proposal` as the proposal distribtution (default is the prior).
+                `proposal` as the proposal distribtution (default is the trained
+                neural net).
                 `max_sampling_batch_size` as the batchsize of samples being drawn from
                 the proposal at every iteration.
                 `num_samples_to_find_max` as the number of samples that are used to
@@ -346,7 +347,7 @@ class DirectPosterior(NeuralPosterior):
             transform = mcmc_transform(
                 self._prior, device=self._device, **mcmc_parameters
             )
-            tf_samples = self._sample_posterior_mcmc(
+            transformed_samples = self._sample_posterior_mcmc(
                 num_samples=num_samples,
                 potential_fn=potential_fn_provider(
                     self._prior, self.net, x, mcmc_method, transform
@@ -363,7 +364,7 @@ class DirectPosterior(NeuralPosterior):
                 show_progress_bars=show_progress_bars,
                 **mcmc_parameters,
             )
-            samples = transform(tf_samples)
+            samples = transform.inv(transformed_samples)
         elif sample_with == "rejection":
             rejection_sampling_parameters = (
                 self._potentially_replace_rejection_parameters(
@@ -607,13 +608,13 @@ class PotentialFunctionProvider:
         """
 
         # Device is the same for net and prior.
-        theta_tf = ensure_theta_batched(torch.as_tensor(theta, dtype=torch.float32)).to(
-            self.device
-        )
+        transformed_theta = ensure_theta_batched(
+            torch.as_tensor(theta, dtype=torch.float32)
+        ).to(self.device)
         # Transform `theta` from transformed (i.e. unconstrained) to untransformed
         # space.
-        theta = self.transform(theta_tf)
-        log_abs_det = self.transform.log_abs_det_jacobian(theta_tf, theta)
+        theta = self.transform.inv(transformed_theta)
+        log_abs_det = self.transform.log_abs_det_jacobian(theta, transformed_theta)
 
         theta_repeated, x_repeated = DirectPosterior._match_theta_and_x_batch_shapes(
             theta, self.x
@@ -623,18 +624,18 @@ class PotentialFunctionProvider:
 
             # Evaluate on device, move back to cpu for comparison with prior.
             posterior_log_prob = self.posterior_nn.log_prob(theta_repeated, x_repeated)
-            posterior_log_prob_tf = posterior_log_prob + log_abs_det
+            posterior_log_prob_transformed = posterior_log_prob - log_abs_det
 
             # Force probability to be zero outside prior support.
             in_prior_support = within_support(self.prior, theta)
 
-            posterior_log_prob_tf = torch.where(
+            posterior_log_prob_transformed = torch.where(
                 in_prior_support,
-                posterior_log_prob_tf,
+                posterior_log_prob_transformed,
                 torch.tensor(float("-inf"), dtype=torch.float32, device=self.device),
             )
 
-        return posterior_log_prob_tf
+        return posterior_log_prob_transformed
 
     def pyro_potential(
         self, theta: Dict[str, Tensor], track_gradients: bool = False

@@ -716,12 +716,12 @@ class NeuralPosterior(ABC):
             condition = atleast_2d_float32_tensor(condition)
 
             # Transform the `condition` to unconstrained space.
-            tf_condition = transform.inv(condition)
+            transformed_condition = transform(condition)
             cond_potential_fn_provider = ConditionalPotentialFunctionProvider(
-                potential_fn_provider, tf_condition, dims_to_sample
+                potential_fn_provider, transformed_condition, dims_to_sample
             )
 
-            tf_samples = self._sample_posterior_mcmc(
+            transformed_samples = self._sample_posterior_mcmc(
                 num_samples=num_samples,
                 potential_fn=cond_potential_fn_provider(
                     self._prior,
@@ -749,7 +749,7 @@ class NeuralPosterior(ABC):
                 show_progress_bars=show_progress_bars,
                 **mcmc_parameters,
             )
-            samples = transform_dims_to_sample(tf_samples)
+            samples = transform_dims_to_sample.inv(transformed_samples)
         elif sample_with == "rejection":
             cond_potential_fn_provider = ConditionalPotentialFunctionProvider(
                 potential_fn_provider, condition, dims_to_sample
