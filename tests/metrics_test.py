@@ -10,8 +10,9 @@ from torch.distributions import MultivariateNormal as tmvn
 from sbi.utils.metrics import c2st
 
 from sklearn.model_selection import KFold, cross_val_score
-# from sklearn.neural_network import MLPClassifier
+from sklearn.neural_network import MLPClassifier
 from sklearn.ensemble import RandomForestClassifier
+
 from torch import Tensor
 
 
@@ -23,8 +24,9 @@ def alt_c2st(
     scoring: str = "accuracy",
     z_score: bool = True,
     noise_scale: Optional[float] = None,
-        verbosity: int = 0,
-    **clf_kwargs
+    verbosity: int = 0,
+    clf_class = RandomForestClassifier,
+    clf_kwargs = {}
 
 ) -> Tensor:
     """
@@ -34,6 +36,7 @@ def alt_c2st(
     Trains classifiers with N-fold cross-validation [1]. Scikit learn MLPClassifier are
     used, with 2 hidden layers of 10x dim each, where dim is the dimensionality of the
     samples X and Y.
+
     Args:
         X: Samples from one distribution.
         Y: Samples from another distribution.
@@ -42,8 +45,10 @@ def alt_c2st(
         z_score: Z-scoring using X
         noise_scale: If passed, will add Gaussian noise with std noise_scale to samples of X and of Y
         verbosity: control the verbosity of sklearn.model_selection.cross_val_score
-        clf_kwargs: key-word arguments to sklearn.ensemble.RandomForestClassifier
+        clf_class: a scikit-learn classifier class
+        clf_kwargs: key-value arguments dictuinary to the class specified by clf_class, e.g. sklearn.ensemble.RandomForestClassifier
 
+    Example:
 
     References:
         [1]: https://scikit-learn.org/stable/modules/cross_validation.html
@@ -61,13 +66,10 @@ def alt_c2st(
     X = X.cpu().numpy()
     Y = Y.cpu().numpy()
 
-    ndim = X.shape[1]
-
-    clf = RandomForestClassifier(
+    clf = clf_class(
         random_state=seed,
-        *clf_kwargs
+        **clf_kwargs
     )
-
 
     #prepare data
     data = np.concatenate((X, Y))
@@ -92,7 +94,7 @@ def test_same_distributions_alt():
     ndim = 5
     nsamples = 4048
 
-    xnormal = tmvn(loc=torch.zeros(5),covariance_matrix=torch.eye(5))
+    xnormal = tmvn(loc=torch.zeros(ndim),covariance_matrix=torch.eye(ndim))
 
     X = xnormal.sample((nsamples,))
     Y = xnormal.sample((nsamples,))
@@ -100,6 +102,7 @@ def test_same_distributions_alt():
     obs_c2st = alt_c2st(X, Y)
 
     assert obs_c2st != None
+    assert .49 < obs_c2st[0] < .51 #only by chance we differentiate the 2 samples
     print(obs_c2st)
 
 
@@ -108,8 +111,8 @@ def test_diff_distributions_alt():
     ndim = 5
     nsamples = 4048
 
-    xnormal = tmvn(loc=torch.zeros(5),covariance_matrix=torch.eye(5))
-    ynormal = tmvn(loc=20.*torch.ones(5),covariance_matrix=torch.eye(5))
+    xnormal = tmvn(loc=torch.zeros(ndim),covariance_matrix=torch.eye(ndim))
+    ynormal = tmvn(loc=20.*torch.ones(ndim),covariance_matrix=torch.eye(ndim))
 
     X = xnormal.sample((nsamples,))
     Y = ynormal.sample((nsamples,))
@@ -117,15 +120,17 @@ def test_diff_distributions_alt():
     obs_c2st = alt_c2st(X, Y)
 
     assert obs_c2st != None
+    assert .98 < obs_c2st[0] #distributions do not overlap, classifiers label with high accuracy
     print(obs_c2st)
+
 
 def test_distributions_overlap_by_two_sigma_alt():
 
     ndim = 5
     nsamples = 4048
 
-    xnormal = tmvn(loc=torch.zeros(5),covariance_matrix=torch.eye(5))
-    ynormal = tmvn(loc=1.*torch.ones(5),covariance_matrix=torch.eye(5))
+    xnormal = tmvn(loc=torch.zeros(ndim),covariance_matrix=torch.eye(ndim))
+    ynormal = tmvn(loc=1.*torch.ones(ndim),covariance_matrix=torch.eye(ndim))
 
     X = xnormal.sample((nsamples,))
     Y = ynormal.sample((nsamples,))
@@ -136,12 +141,13 @@ def test_distributions_overlap_by_two_sigma_alt():
     print(obs_c2st)
     assert .8 < obs_c2st[0] #distributions do not overlap, classifiers label with high accuracy
 
+
 def test_same_distributions_default():
 
     ndim = 5
     nsamples = 4048
 
-    xnormal = tmvn(loc=torch.zeros(5),covariance_matrix=torch.eye(5))
+    xnormal = tmvn(loc=torch.zeros(ndim), covariance_matrix=torch.eye(ndim))
 
     X = xnormal.sample((nsamples,))
     Y = xnormal.sample((nsamples,))
@@ -152,13 +158,41 @@ def test_same_distributions_default():
     assert .49 < obs_c2st[0] < .51 #only by chance we differentiate the 2 samples
 
 
+def test_same_distributions_default_flexible_alt():
+
+    ndim = 5
+    nsamples = 4048
+
+    xnormal = tmvn(loc=torch.zeros(ndim), covariance_matrix=torch.eye(ndim))
+
+    X = xnormal.sample((nsamples,))
+    Y = xnormal.sample((nsamples,))
+
+    obs_c2st = c2st(X, Y)
+
+    assert obs_c2st != None
+    assert .49 < obs_c2st[0] < .51 #only by chance we differentiate the 2 samples
+
+    clf_class = MLPClassifier
+    clf_kwargs = {"activation": "relu",
+                  "hidden_layer_sizes": (10 * X.shape[1], 10 * X.shape[1]),
+                  "max_iter": 1000,
+                  "solver": "adam"}
+
+    obs2_c2st = alt_c2st(X, Y, clf_class=clf_class, clf_kwargs=clf_kwargs)
+
+    assert obs2_c2st != None
+    assert .49 < obs2_c2st[0] < .51 #only by chance we differentiate the 2 samples
+    assert np.allclose(obs2_c2st, obs_c2st)
+
+
 def test_diff_distributions_default():
 
     ndim = 5
     nsamples = 4048
 
-    xnormal = tmvn(loc=torch.zeros(5),covariance_matrix=torch.eye(5))
-    ynormal = tmvn(loc=20.*torch.ones(5),covariance_matrix=torch.eye(5))
+    xnormal = tmvn(loc=torch.zeros(ndim),covariance_matrix=torch.eye(ndim))
+    ynormal = tmvn(loc=20.*torch.ones(ndim),covariance_matrix=torch.eye(ndim))
 
     X = xnormal.sample((nsamples,))
     Y = ynormal.sample((nsamples,))
@@ -175,8 +209,8 @@ def test_distributions_overlap_by_two_sigma_default():
     ndim = 5
     nsamples = 4048
 
-    xnormal = tmvn(loc=torch.zeros(5),covariance_matrix=torch.eye(5))
-    ynormal = tmvn(loc=1.*torch.ones(5),covariance_matrix=torch.eye(5))
+    xnormal = tmvn(loc=torch.zeros(ndim),covariance_matrix=torch.eye(ndim))
+    ynormal = tmvn(loc=1.*torch.ones(ndim),covariance_matrix=torch.eye(ndim))
 
     X = xnormal.sample((nsamples,))
     Y = ynormal.sample((nsamples,))
