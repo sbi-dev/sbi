@@ -168,7 +168,7 @@ def test_same_distributions_default_flexible_alt():
     X = xnormal.sample((nsamples,))
     Y = xnormal.sample((nsamples,))
 
-    obs_c2st = c2st(X, Y)
+    obs_c2st = c2st(X, Y, seed=42)
 
     assert obs_c2st != None
     assert .49 < obs_c2st[0] < .51 #only by chance we differentiate the 2 samples
@@ -179,7 +179,7 @@ def test_same_distributions_default_flexible_alt():
                   "max_iter": 1000,
                   "solver": "adam"}
 
-    obs2_c2st = alt_c2st(X, Y, clf_class=clf_class, clf_kwargs=clf_kwargs)
+    obs2_c2st = alt_c2st(X, Y, seed=42, clf_class=clf_class, clf_kwargs=clf_kwargs)
 
     assert obs2_c2st != None
     assert .49 < obs2_c2st[0] < .51 #only by chance we differentiate the 2 samples
