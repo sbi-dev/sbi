@@ -154,17 +154,20 @@ class Slice(MCMCKernel):
                         )
                     ).unsqueeze(
                         0
-                    )  # TODO: The unsqueeze seems to give a speed up, figure out when this is the case exactly
+                    )  # TODO: The unsqueeze seems to give a speed up, figure out when
+                    # this is the case exactly
                 }
             )
 
         # Sample uniformly from slice
         log_height = _log_prob_d(params[self._site_name].view(-1)[dim]) + torch.log(
-            torch.rand(1)
+            torch.rand(1, device=params[self._site_name].device)
         )
 
         # Position the bracket randomly around the current sample
-        lower = params[self._site_name].view(-1)[dim] - self._width[dim] * torch.rand(1)
+        lower = params[self._site_name].view(-1)[dim] - self._width[dim] * torch.rand(
+            1, device=params[self._site_name].device
+        )
         upper = lower + self._width[dim]
 
         # Find lower bracket end
@@ -182,7 +185,9 @@ class Slice(MCMCKernel):
             upper += self._width[dim]
 
         # Sample uniformly from bracket
-        new_parameter = (upper - lower) * torch.rand(1) + lower
+        new_parameter = (upper - lower) * torch.rand(
+            1, device=params[self._site_name].device
+        ) + lower
 
         # If outside slice, reject sample and shrink bracket
         while _log_prob_d(new_parameter) < log_height:
@@ -190,6 +195,8 @@ class Slice(MCMCKernel):
                 lower = new_parameter
             else:
                 upper = new_parameter
-            new_parameter = (upper - lower) * torch.rand(1) + lower
+            new_parameter = (upper - lower) * torch.rand(
+                1, device=params[self._site_name].device
+            ) + lower
 
         return new_parameter, upper - lower

@@ -58,7 +58,7 @@ class CustomPytorchWrapper(Distribution):
                 torch.as_tensor(self.custom_prior.sample((1000,))), dim=0
             )
             warnings.warn(
-                "Prior is lacking mean attribute, estimating prior mean from samples...",
+                "Prior is lacking mean attribute, estimating prior mean from samples.",
                 UserWarning,
             )
         if hasattr(self.custom_prior, "variance"):
@@ -174,9 +174,7 @@ class MultipleIndependent(Distribution):
             Uniform(torch.ones(1), 2.0 * torch.ones(1))]
     """
 
-    def __init__(
-        self, dists: Sequence[Distribution], validate_args=None,
-    ):
+    def __init__(self, dists: Sequence[Distribution], validate_args=None):
         self._check_distributions(dists)
 
         self.dists = dists

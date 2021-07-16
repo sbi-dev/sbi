@@ -1,3 +1,24 @@
+# v0.17.0
+
+## Major changes
+- New API for specifying sampling methods (#487). Old syntax:
+```python
+posterior = inference.build_posterior(sample_with_mcmc=True)
+```
+New syntax:
+```python
+posterior = inference.build_posterior(sample_with="mcmc")  # or "rejection"
+```
+- Rejection sampling for likelihood(-ratio)-based posteriors (#487)
+- MCMC in unconstrained and z-scored space (#510)
+- Prior is now allowed to lie on GPU. The prior has to be on the same device as passed for training (#519)
+
+## Minor changes
+- `scatter` allowed for diagonal entries in pairplot (#510)
+- Changes to default hyperparameters for `SNPE_A` (thanks @famura, #496, #497)
+- bugfix for `within_prior` checks (#506)
+
+
 # v0.16.0
 
 ## Major changes

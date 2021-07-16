@@ -268,6 +268,13 @@ def pairplot(
                         ys,
                         color=opts["samples_colors"][n],
                     )
+                elif opts["upper"][n] == "scatter":
+                    for single_sample in v:
+                        plt.axvline(
+                            single_sample[row],
+                            color=opts["samples_colors"][n],
+                            **opts["scatter_diag"]
+                        )
                 else:
                     pass
 
@@ -758,6 +765,7 @@ def _get_default_opts():
             "edgecolor": "none",
             "rasterized": False,
         },
+        "scatter_diag": {},
         # options for plot
         "plot_offdiag": {},
         # formatting points (scale, markers)

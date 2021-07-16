@@ -3,17 +3,19 @@
 
 from abc import ABC, abstractmethod
 from copy import deepcopy
+from functools import partial
 from math import ceil
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 from warnings import warn
 
 import numpy as np
 import torch
+import torch.distributions.transforms as torch_tf
 from pyro.infer.mcmc import HMC, NUTS
 from pyro.infer.mcmc.api import MCMC
-from torch import Tensor, float32
+from torch import Tensor
 from torch import multiprocessing as mp
-from torch import nn, optim
+from torch import nn
 
 from sbi import utils as utils
 from sbi.mcmc import (
@@ -26,13 +28,12 @@ from sbi.mcmc import (
 )
 from sbi.types import Array, Shape
 from sbi.utils.sbiutils import (
-    check_dist_class,
     check_warn_and_setstate,
+    mcmc_transform,
     optimize_potential_fn,
     rejection_sample,
 )
 from sbi.utils.torchutils import (
-    BoxUniform,
     ScalarFloat,
     atleast_2d_float32_tensor,
     ensure_theta_batched,
@@ -149,7 +150,9 @@ class NeuralPosterior(ABC):
         Returns:
             `NeuralPosterior` that will use a default `x` when not explicitly passed.
         """
-        self._x = process_x(x, self._x_shape, allow_iid_x=self._allow_iid_x)
+        self._x = process_x(x, self._x_shape, allow_iid_x=self._allow_iid_x).to(
+            self._device
+        )
         self._num_iid_trials = self._x.shape[0]
 
         return self
@@ -358,12 +361,10 @@ class NeuralPosterior(ABC):
             self._ensure_single_x(x)
         self._ensure_x_consistent_with_default_x(x)
 
-        return theta, x
+        return theta.to(self._device), x.to(self._device)
 
     def _prepare_for_sample(
-        self,
-        x: Tensor,
-        sample_shape: Optional[Tensor],
+        self, x: Tensor, sample_shape: Optional[Tensor]
     ) -> Tuple[Tensor, int]:
         r"""
         Return checked, reshaped, potentially default values for `x` and `sample_shape`.
@@ -576,7 +577,7 @@ class NeuralPosterior(ABC):
         samples = samples.reshape(-1, dim_samples)[:num_samples, :]
         assert samples.shape[0] == num_samples
 
-        return samples.type(torch.float32)
+        return samples.type(torch.float32).to(self._device)
 
     def _pyro_mcmc(
         self,
@@ -672,22 +673,26 @@ class NeuralPosterior(ABC):
             show_progress_bars: Whether to show sampling progress monitor.
             mcmc_method: Optional parameter to override `self.mcmc_method`.
             mcmc_parameters: Dictionary overriding the default parameters for MCMC.
-                The following parameters are supported: `thin` to set the thinning
-                factor for the chain, `warmup_steps` to set the initial number of
-                samples to discard, `num_chains` for the number of chains,
+                The following parameters are supported:
+                `thin` to set the thinning factor for the chain.
+                `warmup_steps` to set the initial number of samples to discard.
+                `num_chains` for the number of chains.
                 `init_strategy` for the initialisation strategy for chains; `prior`
                 will draw init locations from prior, whereas `sir` will use Sequential-
                 Importance-Resampling using `init_strategy_num_candidates` to find init
                 locations.
+                `enable_transform` a bool indicating whether MCMC is performed in
+                z-scored (and unconstrained) space.
             rejection_sampling_parameters: Dictionary overriding the default parameters
                 for rejection sampling. The following parameters are supported:
                 `proposal` as the proposal distribtution (default is the prior).
                 `max_sampling_batch_size` as the batchsize of samples being drawn from
-                the proposal at every iteration. `num_samples_to_find_max` as the
-                number of samples that are used to find the maximum of the
-                `potential_fn / proposal` ratio. `num_iter_to_find_max` as the number
-                of gradient ascent iterations to find the maximum of that ratio. `m` as
-                multiplier to that ratio.
+                the proposal at every iteration.
+                `num_samples_to_find_max` as the number of samples that are used to
+                find the maximum of the `potential_fn / proposal` ratio.
+                `num_iter_to_find_max` as the number of gradient ascent iterations to
+                find the maximum of that ratio.
+                `m` as multiplier to that ratio.
 
         Returns:
             Samples from conditional posterior.
@@ -697,23 +702,45 @@ class NeuralPosterior(ABC):
 
         x, num_samples = self._prepare_for_sample(x, sample_shape)
 
-        cond_potential_fn_provider = ConditionalPotentialFunctionProvider(
-            potential_fn_provider, condition, dims_to_sample
-        )
-
         if sample_with == "mcmc":
             mcmc_method, mcmc_parameters = self._potentially_replace_mcmc_parameters(
                 mcmc_method, mcmc_parameters
             )
-            samples = self._sample_posterior_mcmc(
+            transform = mcmc_transform(
+                self._prior, device=self._device, **mcmc_parameters
+            )
+            transform_dims_to_sample = RestrictedTransformForConditional(
+                transform, condition, dims_to_sample
+            )
+
+            condition = atleast_2d_float32_tensor(condition)
+
+            # Transform the `condition` to unconstrained space.
+            transformed_condition = transform(condition)
+            cond_potential_fn_provider = ConditionalPotentialFunctionProvider(
+                potential_fn_provider, transformed_condition, dims_to_sample
+            )
+
+            transformed_samples = self._sample_posterior_mcmc(
                 num_samples=num_samples,
                 potential_fn=cond_potential_fn_provider(
-                    self._prior, self.net, x, mcmc_method
+                    self._prior,
+                    self.net,
+                    x,
+                    mcmc_method,
+                    transform,
                 ),
                 init_fn=self._build_mcmc_init_fn(
                     # Restrict prior to sample only free dimensions.
                     RestrictedPriorForConditional(self._prior, dims_to_sample),
-                    cond_potential_fn_provider(self._prior, self.net, x, "slice_np"),
+                    cond_potential_fn_provider(
+                        self._prior,
+                        self.net,
+                        x,
+                        "slice_np",
+                        transform,
+                    ),
+                    transform=transform_dims_to_sample,
                     **mcmc_parameters,
                 ),
                 mcmc_method=mcmc_method,
@@ -722,7 +749,11 @@ class NeuralPosterior(ABC):
                 show_progress_bars=show_progress_bars,
                 **mcmc_parameters,
             )
+            samples = transform_dims_to_sample.inv(transformed_samples)
         elif sample_with == "rejection":
+            cond_potential_fn_provider = ConditionalPotentialFunctionProvider(
+                potential_fn_provider, condition, dims_to_sample
+            )
             rejection_sampling_parameters = (
                 self._potentially_replace_rejection_parameters(
                     rejection_sampling_parameters
@@ -835,7 +866,8 @@ class NeuralPosterior(ABC):
         def potential_fn(theta):
             return self.log_prob(theta, x=x, track_gradients=True, **log_prob_kwargs)
 
-        interruption_note = "The last estimate of the MAP can be accessed via the `posterior.map_` attribute."
+        interruption_note = """The last estimate of the MAP can be accessed via the
+                            `posterior.map_` attribute."""
 
         self.map_, _ = optimize_potential_fn(
             potential_fn=potential_fn,
@@ -855,6 +887,7 @@ class NeuralPosterior(ABC):
         self,
         prior: Any,
         potential_fn: Callable,
+        transform: torch_tf.Transform,
         init_strategy: str = "prior",
         **kwargs,
     ) -> Callable:
@@ -873,9 +906,9 @@ class NeuralPosterior(ABC):
         Returns: Initialization function.
         """
         if init_strategy == "prior":
-            return lambda: prior_init(prior, **kwargs)
+            return lambda: prior_init(prior, transform=transform, **kwargs)
         elif init_strategy == "sir":
-            return lambda: sir(prior, potential_fn, **kwargs)
+            return lambda: sir(prior, potential_fn, transform=transform, **kwargs)
         elif init_strategy == "latest_sample":
             latest_sample = IterateParameters(self._mcmc_init_params, **kwargs)
             return latest_sample
@@ -1081,6 +1114,13 @@ class NeuralPosterior(ABC):
             warning_msg,
         )
 
+        state_dict, warning_msg = check_warn_and_setstate(
+            state_dict,
+            "_sample_with",
+            "rejection" if state_dict["_method_family"] == "snpe" else "mcmc",
+            warning_msg,
+        )
+
         if warning_msg:
             warning_description = (
                 "You had saved the posterior under an older version of `sbi`. To make "
@@ -1120,24 +1160,36 @@ class ConditionalPotentialFunctionProvider:
         self.condition = ensure_theta_batched(condition)
         self.dims_to_sample = dims_to_sample
 
-    def __call__(self, prior, net: nn.Module, x: Tensor, method: str) -> Callable:
+    def __call__(
+        self,
+        prior,
+        net: nn.Module,
+        x: Tensor,
+        method: str,
+        transform: torch_tf.Transform = torch_tf.identity_transform,
+    ) -> Callable:
         """Return potential function.
 
         Switch on numpy or pyro potential function based on `method`.
         """
         # Set prior, net, and x as attributes of unconditional potential_fn_provider.
-        _ = self.potential_fn_provider.__call__(prior, net, x, method)
+        _ = self.potential_fn_provider.__call__(prior, net, x, method, transform)
+        self.device = next(net.parameters()).device
 
-        if method in ("slice", "hmc", "nuts"):
-            return self.pyro_potential
+        if method == "slice":
+            return partial(self.pyro_potential, track_gradients=False)
+        elif method in ("hmc", "nuts"):
+            return partial(self.pyro_potential, track_gradients=True)
         elif "slice_np" in method:
-            return self.np_potential
+            return partial(self.posterior_potential, track_gradients=False)
         elif method == "rejection":
-            return self.rejection_potential
+            return partial(self.posterior_potential, track_gradients=True)
         else:
             NotImplementedError
 
-    def rejection_potential(self, theta: np.ndarray) -> ScalarFloat:
+    def posterior_potential(
+        self, theta: np.ndarray, track_gradients: bool = False
+    ) -> ScalarFloat:
         r"""
         Return conditional posterior log-probability or $-\infty$ if outside prior.
 
@@ -1151,34 +1203,21 @@ class ConditionalPotentialFunctionProvider:
             Conditional posterior log-probability $\log(p(\theta_i|\theta_j, x))$,
             masked outside of prior.
         """
-        theta = torch.as_tensor(theta, dtype=torch.float32)
-
-        theta_condition = deepcopy(self.condition)
-        theta_condition[:, self.dims_to_sample] = theta
-
-        return self.potential_fn_provider.rejection_potential(theta_condition)
-
-    def np_potential(self, theta: np.ndarray) -> ScalarFloat:
-        r"""
-        Return conditional posterior log-probability or $-\infty$ if outside prior.
-
-        Args:
-            theta: Free parameters $\theta_i$, batch dimension 1.
-
-        Returns:
-            Conditional posterior log-probability $\log(p(\theta_i|\theta_j, x))$,
-            masked outside of prior.
-        """
-        theta = torch.as_tensor(theta, dtype=torch.float32)
-
-        theta_condition = deepcopy(self.condition)
-        theta_condition[:, self.dims_to_sample] = theta
-
-        return self.potential_fn_provider.np_potential(
-            utils.tensor2numpy(theta_condition)
+        theta = ensure_theta_batched(torch.as_tensor(theta, dtype=torch.float32)).to(
+            self.device
         )
 
-    def pyro_potential(self, theta: Dict[str, Tensor]) -> Tensor:
+        theta_condition = deepcopy(self.condition).to(self.device)
+        theta_condition = theta_condition.repeat(theta.shape[0], 1)
+        theta_condition[:, self.dims_to_sample] = theta
+
+        return self.potential_fn_provider.posterior_potential(
+            theta_condition, track_gradients=track_gradients
+        )
+
+    def pyro_potential(
+        self, theta: Dict[str, Tensor], track_gradients: bool = False
+    ) -> Tensor:
         r"""
         Return conditional posterior log-probability or $-\infty$ if outside prior.
 
@@ -1191,11 +1230,14 @@ class ConditionalPotentialFunctionProvider:
         """
 
         theta = next(iter(theta.values()))
+        theta = ensure_theta_batched(theta).to(self.device)
 
-        theta_condition = deepcopy(self.condition)
+        theta_condition = deepcopy(self.condition).to(self.device)
         theta_condition[:, self.dims_to_sample] = theta
 
-        return self.potential_fn_provider.pyro_potential({"": theta_condition})
+        return self.potential_fn_provider.pyro_potential(
+            {"": theta_condition}, track_gradients=track_gradients
+        )
 
 
 class RestrictedPriorForConditional:
@@ -1229,3 +1271,60 @@ class RestrictedPriorForConditional:
         the $\theta$ under the full joint once we have added the condition.
         """
         return self.full_prior.log_prob(*args, **kwargs)
+
+
+class RestrictedTransformForConditional(nn.Module):
+    """
+    Class to restrict the transform to fewer dimensions for conditional sampling.
+
+    The resulting transform transforms only the free dimensions of the conditional.
+    Notably, the `log_abs_det` is computed given all dimensions. However, the
+    `log_abs_det` stemming from the fixed dimensions is a constant and drops out during
+    MCMC.
+
+    This is needed for the the MCMC initialization functions when conditioning and
+    when transforming the samples back into the original theta space after sampling.
+    """
+
+    def __init__(
+        self,
+        transform: torch_tf.Transform,
+        condition: Tensor,
+        dims_to_sample: List[int],
+    ) -> None:
+        super().__init__()
+        self.transform = transform
+        self.condition = ensure_theta_batched(condition)
+        self.dims_to_sample = dims_to_sample
+
+    def forward(self, theta: Tensor) -> Tuple[Tensor, Tensor]:
+        r"""
+        Transform restricted $\theta$.
+        """
+        full_theta = self.condition.repeat(theta.shape[0], 1)
+        full_theta[:, self.dims_to_sample] = theta
+        tf_full_theta = self.transform(full_theta)
+        return tf_full_theta[:, self.dims_to_sample]
+
+    def inv(self, theta: Tensor) -> Tuple[Tensor, Tensor]:
+        r"""
+        Inverse transform restricted $\theta$.
+        """
+        full_theta = self.condition.repeat(theta.shape[0], 1)
+        full_theta[:, self.dims_to_sample] = theta
+        tf_full_theta = self.transform.inv(full_theta)
+        return tf_full_theta[:, self.dims_to_sample]
+
+    def log_abs_det_jacobian(self, theta1: Tensor, theta2: Tensor) -> Tensor:
+        """
+        Return the `log_abs_det_jacobian` of |dtheta1 / dtheta2|.
+
+        The determinant is summed over all dimensions, not just the `dims_to_sample`
+        ones.
+        """
+        full_theta1 = self.condition.repeat(theta1.shape[0], 1)
+        full_theta1[:, self.dims_to_sample] = theta1
+        full_theta2 = self.condition.repeat(theta2.shape[0], 1)
+        full_theta2[:, self.dims_to_sample] = theta2
+        log_abs_det = self.transform.log_abs_det_jacobian(full_theta1, full_theta2)
+        return log_abs_det
