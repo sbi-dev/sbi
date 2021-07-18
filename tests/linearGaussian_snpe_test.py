@@ -438,7 +438,7 @@ def test_sample_conditional(snpe_method: type, set_seed):
 
 @pytest.mark.slow
 @pytest.mark.parametrize("snpe_method", [SNPE_A, SNPE_C])
-def test_mdn_conditional_density(num_dim: int = 3, cond_dim: int = 1):
+def test_mdn_conditional_density(snpe_method: type, num_dim: int = 3, cond_dim: int = 1):
     """Test whether the conditional density infered from MDN parameters of a 
     `DirectPosterior` matches analytical results for MVN. This uses a n-D joint and
     conditions on the last m values to generate a conditional.
