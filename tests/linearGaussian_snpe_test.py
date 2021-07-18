@@ -77,6 +77,8 @@ def test_c2st_snpe_on_linearGaussian(
     simulator, prior = prepare_for_sbi(
         lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov), prior
     )
+    
+    inference = snpe_method(prior, show_progress_bars=False)
 
     theta, x = simulate_for_sbi(
         simulator, prior, num_simulations, simulation_batch_size=1000
