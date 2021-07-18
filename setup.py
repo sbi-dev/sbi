@@ -28,7 +28,7 @@ REQUIRED = [
     "matplotlib",
     "numpy",
     "pillow",
-    "pyknos>=0.14.0",
+    "pyknos>=0.14.2",
     "pyro-ppl>=1.3.1",
     "scikit-learn",
     "scipy",
@@ -40,7 +40,7 @@ REQUIRED = [
 EXTRAS = {
     "dev": [
         "autoflake",
-        "black",
+        "black>=20.8bo",
         "deepdiff",
         "flake8",
         "isort",

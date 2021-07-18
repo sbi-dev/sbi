@@ -3,18 +3,7 @@
 
 from __future__ import annotations
 
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    List,
-    Optional,
-    Sequence,
-    Tuple,
-    TypeVar,
-    Union,
-    cast,
-)
+from typing import Callable
 
 import pytest
 import torch
@@ -23,9 +12,9 @@ from scipy.stats import beta, multivariate_normal, uniform
 from torch import Tensor, eye, nn, ones, zeros
 from torch.distributions import Beta, Distribution, Gamma, MultivariateNormal, Uniform
 
-from sbi.inference import SNPE_C, simulate_for_sbi
+from sbi.inference import SNPE_A, SNPE_C, simulate_for_sbi
+from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
-from sbi.utils.get_nn_models import posterior_nn
 from sbi.utils.torchutils import BoxUniform
 from sbi.utils.user_input_checks import (
     prepare_for_sbi,
@@ -261,6 +250,7 @@ def test_prepare_sbi_problem(simulator: Callable, prior):
     assert prior.sample().dtype == torch.float32
 
 
+@pytest.mark.parametrize("snpe_method", [SNPE_A, SNPE_C])
 @pytest.mark.parametrize(
     "user_simulator, user_prior",
     (
@@ -290,22 +280,34 @@ def test_prepare_sbi_problem(simulator: Callable, prior):
         ),
     ),
 )
-def test_inference_with_user_sbi_problems(user_simulator: Callable, user_prior):
+def test_inference_with_user_sbi_problems(
+    snpe_method: type, user_simulator: Callable, user_prior
+):
     """
     Test inference with combinations of user defined simulators, priors and x_os.
     """
 
     simulator, prior = prepare_for_sbi(user_simulator, user_prior)
-    inference = SNPE_C(
+    inference = snpe_method(
         prior,
-        density_estimator="maf",
+        density_estimator="mdn_snpe_a" if snpe_method == SNPE_A else "maf",
         show_progress_bars=False,
     )
 
     # Run inference.
     theta, x = simulate_for_sbi(simulator, prior, 100)
     _ = inference.append_simulations(theta, x).train(max_num_epochs=2)
-    _ = inference.build_posterior()
+
+    # Build posterior.
+    if snpe_method == SNPE_A:
+        if not isinstance(prior, (MultivariateNormal, BoxUniform, DirectPosterior)):
+            with pytest.raises(AssertionError):
+                # SNPE-A does not support priors yet.
+                _ = inference.build_posterior()
+        else:
+            _ = inference.build_posterior()
+    else:
+        _ = inference.build_posterior()
 
 
 @pytest.mark.parametrize(
@@ -384,6 +386,10 @@ def test_independent_joint_shapes_and_samples(dists):
     assert (true_samples == samples).all()
     assert (true_log_probs == log_probs).all()
 
+    # Check support attribute.
+    within_support = joint.support.check(true_samples)
+    assert within_support.all()
+
 
 def test_invalid_inputs():
 
@@ -459,51 +465,78 @@ def test_passing_custom_density_estimator(arg):
     _ = SNPE_C(prior=prior, density_estimator=density_estimator)
 
 
-def test_validate_theta_and_x_cpu():
+@pytest.mark.parametrize("device", ("cpu", "cuda:0"))
+def test_validate_theta_and_x_device(device):
 
-    cpu_device = torch.device("cpu")
+    # Skip GPU test if not available.
+    if device == "cuda:0" and not torch.cuda.is_available():
+        pass
+    else:
+        theta = torch.ones((2, 2), dtype=torch.float32).to(device)
+        x = torch.zeros((2, 10), dtype=torch.float32).to(device)
 
-    theta = torch.ones((32, 8), dtype=torch.float32).to(cpu_device)
-    x = torch.zeros((32, 100), dtype=torch.float32).to(cpu_device)
-    plain_ft = torch.FloatTensor((32, 8))  # using an explicit type
+        assert isinstance(
+            theta, torch.Tensor
+        ), f"{device} based torch.tensor is not an instance of torch.Tensor"
+        assert theta.dtype == torch.float32, (
+            f"{device} based torch.tensor(dtype=torch.float32) yields unexpected dtype"
+            f"{theta.dtype}."
+        )
+        if device == "cuda:0":
+            assert not isinstance(
+                theta, torch.FloatTensor
+            ), f"""{device} based torch.tensor(dtype=torch.float32) must not be 
+            FloatTensor."""
+        else:
+            assert isinstance(
+                theta, torch.FloatTensor
+            ), f"{device} based torch.tensor(dtype=torch.float32) must be FloatTensor."
+        validate_theta_and_x(theta, x)
 
-    assert isinstance(
-        theta, torch.Tensor
-    ), "cpu based torch.tensor is not an instance of torch.Tensor"
-    assert (
-        theta.dtype == torch.float32
-    ), f"cpu based torch.tensor(dtype=torch.float32) yields unexpected dtype {theta.dtype}."
-    assert isinstance(
-        theta, torch.FloatTensor
-    ), "cpu based torch.tensor(dtype=torch.float32) is no FloatTensor."
-    assert plain_ft.dtype == torch.float32, "FloatTensor does not expose float32 dtype."
+        with pytest.raises(AssertionError) as _:
+            validate_theta_and_x(theta, x.to(torch.float64))
 
-    # test on cpu
-    validate_theta_and_x(theta, x)
-
-    with pytest.raises(AssertionError) as exc:
-        validate_theta_and_x(theta, x.to(torch.float64))
+        plain_ft = torch.FloatTensor((32, 8))
+        assert (
+            plain_ft.dtype == torch.float32
+        ), "FloatTensor does not expose float32 dtype."
 
 
 @pytest.mark.gpu
-def test_validate_theta_and_x_gpu():
+@pytest.mark.parametrize("snpe_method", [SNPE_A, SNPE_C])
+@pytest.mark.parametrize("data_device", ("cpu", "cuda:0"))
+@pytest.mark.parametrize("training_device", ("cpu", "cuda:0"))
+def test_train_with_different_data_and_training_device(
+    snpe_method: type, data_device, training_device
+):
 
-    gpu_if_present = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    assert torch.cuda.is_available(), "gpu geared test has no GPU available"
 
-    theta = torch.ones((32, 8), dtype=torch.float32).to(gpu_if_present)
-    x = torch.zeros((32, 100), dtype=torch.float32).to(gpu_if_present)
+    num_dim = 2
 
-    assert isinstance(
-        theta, torch.Tensor
-    ), "gpu based torch.tensor is not an instance of torch.Tensor"
-    assert (
-        theta.dtype == torch.float32
-    ), f"gpu based torch.tensor(dtype=torch.float32) yields unexpected dtype {theta.dtype}."
-    assert not isinstance(
-        theta, torch.FloatTensor
-    ), "gpu based torch.tensor(dtype=torch.float32) is FloatTensor, even though it shouldn't be."
+    # simulator, prior = prepare_for_sbi(user_simulator, user_prior)
+    prior_ = MultivariateNormal(
+        loc=torch.zeros(num_dim).to(training_device),
+        covariance_matrix=torch.eye(num_dim).to(training_device),
+    )
+    simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior_)
 
-    validate_theta_and_x(theta, x)
+    inference = snpe_method(
+        prior,
+        density_estimator="mdn_snpe_a" if snpe_method == SNPE_A else "maf",
+        show_progress_bars=False,
+        device=training_device,
+    )
 
-    with pytest.raises(AssertionError) as exc:
-        validate_theta_and_x(theta, x.to(torch.float64))
+    # Run inference.
+    theta, x = simulate_for_sbi(simulator, prior, 100)
+    theta, x = theta.to(data_device), x.to(data_device)
+    inference = inference.append_simulations(theta, x)
+
+    _ = inference.train(max_num_epochs=2)
+
+    # Check for default device for inference object
+    weights_device = next(inference._neural_net.parameters()).device
+    assert torch.device(training_device) == weights_device
+
+    _ = inference.build_posterior()

@@ -2,6 +2,7 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 
+import logging
 import warnings
 from typing import Any, Callable, Optional, Sequence, Tuple, Union, cast
 
@@ -12,6 +13,7 @@ from scipy.stats._multivariate import multi_rv_frozen
 from torch import Tensor, float32, nn
 from torch.distributions import Distribution, Uniform
 
+from sbi.utils.sbiutils import warn_on_iid_x, within_support
 from sbi.utils.torchutils import BoxUniform, atleast_2d
 from sbi.utils.user_input_checks_utils import (
     CustomPytorchWrapper,
@@ -260,18 +262,6 @@ def check_for_possibly_batched_x_shape(x_shape):
         pass
 
 
-def check_for_possibly_batched_observations(x_o: Tensor):
-    """Raise `ValueError` if dimensionality of data doesn't match requirements.
-
-    sbi does not support multiple observations yet. For 2D observed data the leading
-    dimension will be interpreted as batch dimension and a ValueError will be raised if
-    the batch dimension is larger than 1.
-    Multidimensional observations e.g., images, are allowed when they are passed with an
-    additional leading batch dimension of size 1.
-    """
-    check_for_possibly_batched_x_shape(x_o.shape)
-
-
 def check_prior_attributes(prior) -> None:
     """Check for prior methods sample(sample_shape) .log_prob(value) methods.
 
@@ -348,6 +338,21 @@ def check_prior_batch_behavior(prior) -> None:
     assert (
         num_log_probs == num_samples
     ), "prior.log_prob must return as many log probs as samples."
+
+
+def check_prior_support(prior):
+    """Check whether prior allows to check for support.
+
+    This either uses the PyTorch support property, or the custom prior .logprob method
+    """
+
+    try:
+        within_support(prior, prior.sample())
+    except NotImplementedError:
+        raise NotImplementedError(
+            """The prior must implement the support property or allow to call
+            .log_prob() outside of support."""
+        )
 
 
 def process_simulator(
@@ -432,13 +437,14 @@ def get_batch_loop_simulator(simulator: Callable) -> Callable:
     return batch_loop_simulator
 
 
-def process_x(x: Tensor, x_shape: torch.Size) -> Tensor:
+def process_x(x: Tensor, x_shape: torch.Size, allow_iid_x: bool = False) -> Tensor:
     """Return observed data adapted to match sbi's shape and type requirements.
 
     Args:
         x: Observed data as provided by the user.
         x_shape: Prescribed shape - either directly provided by the user at init or
             inferred by sbi by running a simulation and checking the output.
+        allow_iid_x: Whether multiple trials in x are allowed.
 
     Returns:
         x: Observed data with shape ready for usage in sbi.
@@ -446,21 +452,24 @@ def process_x(x: Tensor, x_shape: torch.Size) -> Tensor:
 
     x = torch.as_tensor(atleast_2d(x), dtype=float32)
 
-    check_for_possibly_batched_observations(x)
     input_x_shape = x.shape
+    if not allow_iid_x:
+        check_for_possibly_batched_x_shape(input_x_shape)
+        start_idx = 0
+    else:
+        warn_on_iid_x(num_trials=input_x_shape[0])
+        start_idx = 1
 
-    assert input_x_shape == x_shape, (
-        f"Observed data shape ({input_x_shape}) must match "
-        f"the shape of simulated data x ({x_shape})."
+    # Number of trials can change for every new x, but single trial x shape must match.
+    assert input_x_shape[start_idx:] == x_shape[start_idx:], (
+        f"Observed data shape ({input_x_shape[start_idx:]}) must match "
+        f"the shape of simulated data x ({x_shape[start_idx:]})."
     )
 
     return x
 
 
-def prepare_for_sbi(
-    simulator: Callable,
-    prior,
-) -> Tuple[Callable, Distribution]:
+def prepare_for_sbi(simulator: Callable, prior) -> Tuple[Callable, Distribution]:
     """Prepare simulator, prior and for usage in sbi.
 
     One of the goals is to allow you to use sbi with inputs computed in numpy.
@@ -502,6 +511,7 @@ def check_sbi_inputs(simulator: Callable, prior: Distribution) -> None:
         prior: prior (Distribution like)
         x_shape: Shape of single simulation output $x$.
     """
+    check_prior_support(prior)
     num_prior_samples = 1
     theta = prior.sample((num_prior_samples,))
     theta_batch_shape, *_ = theta.shape
@@ -541,7 +551,9 @@ def check_estimator_arg(estimator: Union[str, Callable]) -> None:
     )
 
 
-def validate_theta_and_x(theta: Any, x: Any) -> None:
+def validate_theta_and_x(
+    theta: Any, x: Any, training_device: str = "cpu"
+) -> Tuple[Tensor, Tensor]:
     r"""
     Checks if the passed $(\theta, x)$ are valid.
 
@@ -557,6 +569,7 @@ def validate_theta_and_x(theta: Any, x: Any) -> None:
     Args:
         theta: Parameters.
         x: Simulation outputs.
+        training_device: Training device for net.
     """
     assert isinstance(theta, Tensor), "Parameters theta must be a `torch.Tensor`."
     assert isinstance(x, Tensor), "Simulator output must be a `torch.Tensor`."
@@ -570,6 +583,17 @@ def validate_theta_and_x(theta: Any, x: Any) -> None:
     # to give more explicit errors.
     assert theta.dtype == float32, "Type of parameters must be float32."
     assert x.dtype == float32, "Type of simulator outputs must be float32."
+
+    simulations_device = f"{x.device.type}:{x.device.index}"
+    if "cpu" not in simulations_device and "cpu" in training_device:
+        logging.warning(
+            f"""Simulations are on {simulations_device} but training device is
+            set to {training_device}, moving data to device to {training_device}."""
+        )
+        x = x.to(training_device)
+        theta = theta.to(training_device)
+
+    return theta, x
 
 
 def test_posterior_net_for_multi_d_x(net: nn.Module, theta: Tensor, x: Tensor) -> None:

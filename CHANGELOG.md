@@ -1,9 +1,45 @@
+# v0.17.0
+
+## Major changes
+- New API for specifying sampling methods (#487). Old syntax:
+```python
+posterior = inference.build_posterior(sample_with_mcmc=True)
+```
+New syntax:
+```python
+posterior = inference.build_posterior(sample_with="mcmc")  # or "rejection"
+```
+- Rejection sampling for likelihood(-ratio)-based posteriors (#487)
+- MCMC in unconstrained and z-scored space (#510)
+- Prior is now allowed to lie on GPU. The prior has to be on the same device as passed for training (#519)
+
+## Minor changes
+- `scatter` allowed for diagonal entries in pairplot (#510)
+- Changes to default hyperparameters for `SNPE_A` (thanks @famura, #496, #497)
+- bugfix for `within_prior` checks (#506)
+
+
+# v0.16.0
+
+## Major changes
+- Implementation of SNPE-A (thanks @famura and @theogruner, #474, #478, #480, #482)
+- Option to do inference over iid observations with SNLE and SNRE (#484, #488)
+
+## Minor changes
+- Fixed unused argument `num_bins` when using `nsf` as density estimator (#465)
+- Fixes to adapt to the new support handling in `torch` `v1.8.0` (#469)
+- More scalars for monitoring training progress (thanks @psteinb #471)
+- Fixed bug in `minimal.py` (thanks @psteinb, #485)
+- Depend on `pyknos` `v0.14.2`
+
+
 # v0.15.1
 
 - add option to pass `torch.data.DataLoader` kwargs to all inference methods (thanks @narendramukherjee, #445)
 - fix bug due to release of `torch` `v1.8.0` (#451)
 - expose `leakage_correction` parameters for `log_prob` correction in unnormalized 
   posteriors (thanks @famura, #454)
+
 
 # v0.15.0
 

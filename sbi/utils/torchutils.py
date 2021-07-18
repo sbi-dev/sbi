@@ -4,7 +4,7 @@
 """Various PyTorch utility functions."""
 
 import warnings
-from typing import Union
+from typing import Any, Optional, Union
 
 import numpy as np
 import torch
@@ -15,8 +15,11 @@ from sbi import utils as utils
 from sbi.types import Array, OneOrMore, ScalarFloat
 
 
-def process_device(device: str) -> str:
-    """Set and return the default device to cpu or gpu."""
+def process_device(device: str, prior: Optional[Any] = None) -> str:
+    """Set and return the default device to cpu or gpu.
+
+    Throws an AssertionError if the prior is not matching the training device not.
+    """
 
     if not device == "cpu":
         if device == "gpu":
@@ -33,6 +36,16 @@ def process_device(device: str) -> str:
         except (RuntimeError, AssertionError):
             warnings.warn(f"Device {device} not available, falling back to CPU.")
             device = "cpu"
+
+    if prior is not None:
+        prior_device = prior.sample((1,)).device
+        training_device = torch.zeros(1, device=device).device
+        assert (
+            prior_device == training_device
+        ), f"""Prior ({prior_device}) device must match training device (
+            {training_device}). When training on GPU make sure to pass a prior
+            initialized on the GPU as well, e.g., `prior = torch.distributions.Normal
+            (torch.zeros(2, device='cuda'), scale=1.0)`."""
 
     return device
 
@@ -63,7 +76,8 @@ def split_leading_dim(x, shape):
 
 
 def merge_leading_dims(x, num_dims):
-    """Reshapes the tensor `x` such that the first `num_dims` dimensions are merged to one."""
+    """Reshapes the tensor `x` such that the first `num_dims` dimensions are merged to
+    one."""
     if not utils.is_positive_int(num_dims):
         raise TypeError("Number of leading dims must be a positive integer.")
     if num_dims > x.dim():
@@ -209,6 +223,7 @@ class BoxUniform(Independent):
         low: ScalarFloat,
         high: ScalarFloat,
         reinterpreted_batch_ndims: int = 1,
+        device: str = "cpu",
     ):
         """Multidimensional uniform distribution defined on a box.
 
@@ -227,12 +242,14 @@ class BoxUniform(Independent):
             high: upper range (exclusive).
             reinterpreted_batch_ndims (int): the number of batch dims to
                                              reinterpret as event dims.
+            device: device of the prior, defaults to "cpu", should match the training
+                device when used in SBI.
         """
 
         super().__init__(
             Uniform(
-                low=torch.as_tensor(low, dtype=torch.float32),
-                high=torch.as_tensor(high, dtype=torch.float32),
+                low=torch.as_tensor(low, dtype=torch.float32, device=device),
+                high=torch.as_tensor(high, dtype=torch.float32, device=device),
                 validate_args=False,
             ),
             reinterpreted_batch_ndims,
@@ -324,3 +341,10 @@ def batched_first_of_batch(t: Tensor) -> Tensor:
     Takes in a tensor of shape (N, M) and outputs tensor of shape (1,M).
     """
     return t[:1]
+
+
+def assert_all_finite(quantity: Tensor, description: str = "tensor") -> None:
+    """Raise if tensor quantity contains any NaN or Inf element."""
+
+    msg = f"NaN/Inf present in {description}."
+    assert torch.isfinite(quantity).all(), msg

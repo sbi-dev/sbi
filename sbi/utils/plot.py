@@ -75,16 +75,24 @@ def _format_axis(ax, xhide=True, yhide=True, xlabel="", ylabel="", tickformatter
 
 
 def probs2contours(probs, levels):
-    """Takes an array of probabilities and produces an array of contours at specified percentile levels
+    """Takes an array of probabilities and produces an array of contours at specified
+    percentile levels.
     Parameters
     ----------
     probs : array
         Probability array. doesn't have to sum to 1, but it is assumed it contains all the mass
     levels : list
-        Percentile levels, have to be in [0.0, 1.0]
+        Percentile levels, have to be in [0.0, 1.0]. Specifies contour levels that
+        include a given proportion of samples, i.e., 0.1 specifies where the top 10% of
+        the density is.
     Return
     ------
-    Array of same shape as probs with percentile labels
+    Array of same shape as probs with percentile labels. Values in output array
+    denote labels which percentile bin the probability mass belongs to.
+
+    Example: for levels = [0.1, 0.5], output array will take on values [1.0, 0.5, 0.1],
+    where elements labeled "0.1" correspond to the top 10% of the density, "0.5"
+    corresponds to between top 50% to 10%, etc.
     """
     # make sure all contour levels are in [0.0, 1.0]
     levels = np.asarray(levels)
@@ -260,6 +268,13 @@ def pairplot(
                         ys,
                         color=opts["samples_colors"][n],
                     )
+                elif opts["upper"][n] == "scatter":
+                    for single_sample in v:
+                        plt.axvline(
+                            single_sample[row],
+                            color=opts["samples_colors"][n],
+                            **opts["scatter_diag"]
+                        )
                 else:
                     pass
 
@@ -717,7 +732,7 @@ def _pairplot_scaffold(diag_func, upper_func, dim, limits, points, opts):
 
 
 def _get_default_opts():
-    """ Return default values for plotting specs."""
+    """Return default values for plotting specs."""
 
     return {
         # 'lower': None,     # hist/scatter/None  # TODO: implement
@@ -750,6 +765,7 @@ def _get_default_opts():
             "edgecolor": "none",
             "rasterized": False,
         },
+        "scatter_diag": {},
         # options for plot
         "plot_offdiag": {},
         # formatting points (scale, markers)

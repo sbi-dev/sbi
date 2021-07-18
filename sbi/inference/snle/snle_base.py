@@ -4,25 +4,19 @@
 
 from abc import ABC
 from copy import deepcopy
-from typing import Any, Callable, Dict, NewType, Optional, Union
+from typing import Any, Callable, Dict, Optional, Union
 
 import torch
 from torch import Tensor, optim
 from torch.nn.utils import clip_grad_norm_
 from torch.utils import data
-from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 
 from sbi import utils as utils
 from sbi.inference import NeuralInference
 from sbi.inference.posteriors.likelihood_based_posterior import LikelihoodBasedPosterior
 from sbi.types import TorchModule
-from sbi.utils import (
-    check_estimator_arg,
-    test_posterior_net_for_multi_d_x,
-    validate_theta_and_x,
-    x_shape_from_simulation,
-)
+from sbi.utils import check_estimator_arg, validate_theta_and_x, x_shape_from_simulation
 from sbi.utils.sbiutils import mask_sims_from_prior
 
 
@@ -105,7 +99,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
             NeuralInference object (returned so that this function is chainable).
         """
 
-        validate_theta_and_x(theta, x)
+        theta, x = validate_theta_and_x(theta, x, training_device=self._device)
 
         self._theta_roundwise.append(theta)
         self._x_roundwise.append(x)
@@ -265,8 +259,10 @@ class LikelihoodEstimator(NeuralInference, ABC):
     def build_posterior(
         self,
         density_estimator: Optional[TorchModule] = None,
+        sample_with: str = "mcmc",
         mcmc_method: str = "slice_np",
         mcmc_parameters: Optional[Dict[str, Any]] = None,
+        rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
     ) -> LikelihoodBasedPosterior:
         r"""
         Build posterior from the neural density estimator.
@@ -280,6 +276,8 @@ class LikelihoodEstimator(NeuralInference, ABC):
         Args:
             density_estimator: The density estimator that the posterior is based on.
                 If `None`, use the latest neural density estimator that was trained.
+            sample_with: Method to use for sampling from the posterior. Must be one of
+                [`mcmc` | `rejection`].
             mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`,
                 `hmc`, `nuts`. Currently defaults to `slice_np` for a custom numpy
                 implementation of slice sampling; select `hmc`, `nuts` or `slice` for
@@ -292,6 +290,15 @@ class LikelihoodEstimator(NeuralInference, ABC):
                 draw init locations from prior, whereas `sir` will use
                 Sequential-Importance-Resampling using `init_strategy_num_candidates`
                 to find init locations.
+            rejection_sampling_parameters: Dictionary overriding the default parameters
+                for rejection sampling. The following parameters are supported:
+                `proposal` as the proposal distribtution (default is the prior).
+                `max_sampling_batch_size` as the batchsize of samples being drawn from
+                the proposal at every iteration. `num_samples_to_find_max` as the
+                number of samples that are used to find the maximum of the
+                `potential_fn / proposal` ratio. `num_iter_to_find_max` as the number
+                of gradient ascent iterations to find the maximum of that ratio. `m` as
+                multiplier to that ratio.
 
         Returns:
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods
@@ -311,8 +318,10 @@ class LikelihoodEstimator(NeuralInference, ABC):
             neural_net=density_estimator,
             prior=self._prior,
             x_shape=self._x_shape,
+            sample_with=sample_with,
             mcmc_method=mcmc_method,
             mcmc_parameters=mcmc_parameters,
+            rejection_sampling_parameters=rejection_sampling_parameters,
             device=device,
         )
 

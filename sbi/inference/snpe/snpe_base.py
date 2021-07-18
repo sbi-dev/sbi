@@ -1,7 +1,6 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
-
-
+import time
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from typing import Any, Callable, Dict, Optional, Union
@@ -11,7 +10,6 @@ import torch
 from torch import Tensor, ones, optim
 from torch.nn.utils import clip_grad_norm_
 from torch.utils import data
-from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 
 from sbi import utils as utils
@@ -37,7 +35,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
         show_progress_bars: bool = True,
-        **unused_args
+        **unused_args,
     ):
         """Base class for Sequential Neural Posterior Estimation methods.
 
@@ -84,10 +82,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         self._summary.update({"rejection_sampling_acceptance_rates": []})  # type:ignore
 
     def append_simulations(
-        self,
-        theta: Tensor,
-        x: Tensor,
-        proposal: Optional[Any] = None,
+        self, theta: Tensor, x: Tensor, proposal: Optional[Any] = None
     ) -> "PosteriorEstimator":
         r"""
         Store parameters and simulation outputs to use them for later training.
@@ -109,7 +104,7 @@ class PosteriorEstimator(NeuralInference, ABC):
             NeuralInference object (returned so that this function is chainable).
         """
 
-        validate_theta_and_x(theta, x)
+        theta, x = validate_theta_and_x(theta, x, training_device=self._device)
         self._check_proposal(proposal)
 
         if (
@@ -214,8 +209,11 @@ class PosteriorEstimator(NeuralInference, ABC):
         # Starting index for the training set (1 = discard round-0 samples).
         start_idx = int(discard_prior_samples and self._round > 0)
 
-        # For non-atomic loss, we can not reuse samples from prev. rounds as of now.
-        if self.use_non_atomic_loss:
+        # For non-atomic loss, we can not reuse samples from previous rounds as of now.
+        # SNPE-A can, by construction of the algorithm, only use samples from the last
+        # round. SNPE-A is the only algorithm that has an attribute `_ran_final_round`,
+        # so this is how we check for whether or not we are using SNPE-A.
+        if self.use_non_atomic_loss or hasattr(self, "_ran_final_round"):
             start_idx = self._round
 
         theta, x, prior_masks = self.get_simulations(
@@ -223,11 +221,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         )
 
         # Dataset is shared for training and validation loaders.
-        dataset = data.TensorDataset(
-            theta,
-            x,
-            prior_masks,
-        )
+        dataset = data.TensorDataset(theta, x, prior_masks)
 
         # Set the proposal to the last proposal that was passed by the user. For
         # atomic SNPE, it does not matter what the proposal is. For non-atomic
@@ -252,6 +246,13 @@ class PosteriorEstimator(NeuralInference, ABC):
             self._neural_net = self._build_neural_net(
                 theta[self.train_indices], x[self.train_indices]
             )
+            # If data on training device already move net as well.
+            if (
+                not self._device == "cpu"
+                and f"{x.device.type}:{x.device.index}" == self._device
+            ):
+                self._neural_net.to(self._device)
+
             test_posterior_net_for_multi_d_x(self._neural_net, theta, x)
             self._x_shape = x_shape_from_simulation(x)
 
@@ -260,8 +261,7 @@ class PosteriorEstimator(NeuralInference, ABC):
 
         if not resume_training:
             self.optimizer = optim.Adam(
-                list(self._neural_net.parameters()),
-                lr=learning_rate,
+                list(self._neural_net.parameters()), lr=learning_rate
             )
             self.epoch, self._val_log_prob = 0, float("-Inf")
 
@@ -271,6 +271,8 @@ class PosteriorEstimator(NeuralInference, ABC):
 
             # Train for a single epoch.
             self._neural_net.train()
+            train_log_prob_sum = 0
+            epoch_start_time = time.time()
             for batch in train_loader:
                 self.optimizer.zero_grad()
                 # Get batches on current device.
@@ -282,26 +284,28 @@ class PosteriorEstimator(NeuralInference, ABC):
 
                 batch_loss = torch.mean(
                     self._loss(
-                        theta_batch,
-                        x_batch,
-                        masks_batch,
-                        proposal,
-                        calibration_kernel,
+                        theta_batch, x_batch, masks_batch, proposal, calibration_kernel
                     )
                 )
+
+                train_log_prob_sum += batch_loss.sum().item()
+
                 batch_loss.backward()
                 if clip_max_norm is not None:
                     clip_grad_norm_(
-                        self._neural_net.parameters(),
-                        max_norm=clip_max_norm,
+                        self._neural_net.parameters(), max_norm=clip_max_norm
                     )
                 self.optimizer.step()
 
             self.epoch += 1
 
+            train_log_prob_sum /= int(theta.shape[0] * (1.0 - validation_fraction))
+            self._summary["train_log_probs"].append(train_log_prob_sum)
+
             # Calculate validation performance.
             self._neural_net.eval()
             log_prob_sum = 0
+
             with torch.no_grad():
                 for batch in val_loader:
                     theta_batch, x_batch, masks_batch = (
@@ -311,11 +315,7 @@ class PosteriorEstimator(NeuralInference, ABC):
                     )
                     # Take negative loss here to get validation log_prob.
                     batch_log_prob = -self._loss(
-                        theta_batch,
-                        x_batch,
-                        masks_batch,
-                        proposal,
-                        calibration_kernel,
+                        theta_batch, x_batch, masks_batch, proposal, calibration_kernel
                     )
                     log_prob_sum += batch_log_prob.sum().item()
 
@@ -325,6 +325,7 @@ class PosteriorEstimator(NeuralInference, ABC):
             )
             # Log validation log prob for every epoch.
             self._summary["validation_log_probs"].append(self._val_log_prob)
+            self._summary["epoch_durations_sec"].append(time.time() - epoch_start_time)
 
             self._maybe_show_progress(self._show_progress_bars, self.epoch)
 
@@ -335,12 +336,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         self._summary["best_validation_log_probs"].append(self._best_val_log_prob)
 
         # Update tensorboard and summary dict.
-        self._summarize(
-            round_=self._round,
-            x_o=None,
-            theta_bank=theta,
-            x_bank=x,
-        )
+        self._summarize(round_=self._round, x_o=None, theta_bank=theta, x_bank=x)
 
         # Update description for progress bar.
         if show_train_summary:
@@ -351,10 +347,11 @@ class PosteriorEstimator(NeuralInference, ABC):
     def build_posterior(
         self,
         density_estimator: Optional[TorchModule] = None,
-        rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
-        sample_with_mcmc: bool = False,
+        sample_with: str = "rejection",
         mcmc_method: str = "slice_np",
         mcmc_parameters: Optional[Dict[str, Any]] = None,
+        rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
+        sample_with_mcmc: Optional[bool] = None,
     ) -> DirectPosterior:
         r"""
         Build posterior from the neural density estimator.
@@ -371,13 +368,10 @@ class PosteriorEstimator(NeuralInference, ABC):
         Args:
             density_estimator: The density estimator that the posterior is based on.
                 If `None`, use the latest neural density estimator that was trained.
-            rejection_sampling_parameters: Dictionary overriding the default parameters
-                for rejection sampling. The following parameters are supported:
-                `max_sampling_batch_size` to set the batch size for drawing new
-                samples from the candidate distribution, e.g., the posterior. Larger
-                batch size speeds up sampling.
-            sample_with_mcmc: Whether to sample with MCMC. MCMC can be used to deal
-                with high leakage.
+            sample_with: Method to use for sampling from the posterior. Must be one of
+                [`rejection` | `mcmc`]. With default parameters, `rejection` samples
+                from the posterior estimated by the neural net and rejects only if the
+                samples are outside of the prior support.
             mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`,
                 `hmc`, `nuts`. Currently defaults to `slice_np` for a custom numpy
                 implementation of slice sampling; select `hmc`, `nuts` or `slice` for
@@ -390,10 +384,29 @@ class PosteriorEstimator(NeuralInference, ABC):
                 draw init locations from prior, whereas `sir` will use
                 Sequential-Importance-Resampling using `init_strategy_num_candidates`
                 to find init locations.
+            rejection_sampling_parameters: Dictionary overriding the default parameters
+                for rejection sampling. The following parameters are supported:
+                `proposal` as the proposal distribtution (default is the trained
+                neural net). `max_sampling_batch_size` as the batchsize of samples
+                being drawn from the proposal at every iteration.
+                `num_samples_to_find_max` as the number of samples that are used to
+                find the maximum of the `potential_fn / proposal` ratio.
+                `num_iter_to_find_max` as the number of gradient ascent iterations to
+                find the maximum of that ratio. `m` as multiplier to that ratio.
+            sample_with_mcmc: Deprecated since `sbi v0.16.0`. Use `sample_with=mcmc`
+                instead.
 
         Returns:
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods.
         """
+        if sample_with_mcmc is not None:
+            warn(
+                f"You set `sample_with_mcmc={sample_with_mcmc}`. This is deprecated "
+                "since `sbi v0.17.0` and will lead to an error in future versions. "
+                "Please use `sample_with='mcmc'` instead."
+            )
+            if sample_with_mcmc:
+                sample_with = "mcmc"
 
         if density_estimator is None:
             density_estimator = self._neural_net
@@ -408,10 +421,10 @@ class PosteriorEstimator(NeuralInference, ABC):
             neural_net=density_estimator,
             prior=self._prior,
             x_shape=self._x_shape,
-            rejection_sampling_parameters=rejection_sampling_parameters,
-            sample_with_mcmc=sample_with_mcmc,
+            sample_with=sample_with,
             mcmc_method=mcmc_method,
             mcmc_parameters=mcmc_parameters,
+            rejection_sampling_parameters=rejection_sampling_parameters,
             device=device,
         )
 

@@ -4,6 +4,7 @@
 from typing import Any, Callable
 
 import numpy as np
+from pyknos import nflows
 import torch
 from torch import Tensor
 
@@ -23,19 +24,22 @@ class IterateParameters:
         return next(self.iter)
 
 
-def prior_init(prior: Any, **kwargs: Any) -> Tensor:
+def prior_init(prior: Any, transform: nflows.transforms, **kwargs: Any) -> Tensor:
     """Return a sample from the prior."""
-    return prior.sample((1,)).detach()
+    prior_samples = prior.sample((1,)).detach()
+    transformed_prior_samples = transform(prior_samples)
+    return transformed_prior_samples
 
 
 def sir(
     prior: Any,
     potential_fn: Callable,
+    transform: nflows.transforms,
     sir_num_batches: int = 10,
     sir_batch_size: int = 1000,
     **kwargs: Any,
 ) -> Tensor:
-    r"""Return a sample obtained by sequential importance reweighing.
+    r"""Return a sample obtained by sequential importance reweighting.
 
     This function can also do `SIR` on the conditional posterior
     $p(\theta_i|\theta_j, x)$ when a `condition` and `dims_to_sample` are passed.
@@ -57,11 +61,14 @@ def sir(
         init_param_candidates = []
         for i in range(sir_num_batches):
             batch_draws = prior.sample((sir_batch_size,)).detach()
-            init_param_candidates.append(batch_draws)
-            log_weights.append(potential_fn(batch_draws.numpy()).detach())
+            transformed_batch_draws = transform(batch_draws)
+            init_param_candidates.append(transformed_batch_draws)
+            log_weights.append(potential_fn(transformed_batch_draws.numpy()).detach())
         log_weights = torch.cat(log_weights)
         init_param_candidates = torch.cat(init_param_candidates)
 
+        # Norm weights in log space
+        log_weights -= torch.logsumexp(log_weights, dim=0)
         probs = np.exp(log_weights.view(-1).numpy().astype(np.float64))
         probs[np.isnan(probs)] = 0.0
         probs[np.isinf(probs)] = 0.0

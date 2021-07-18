@@ -6,7 +6,7 @@ from pyknos.mdn.mdn import MultivariateGaussianMDN
 from pyknos.nflows import flows, transforms
 from torch import Tensor, nn
 
-from sbi.utils.sbiutils import standardizing_net, standardizing_transform
+import sbi.utils as utils
 
 
 def build_mdn(
@@ -17,7 +17,7 @@ def build_mdn(
     hidden_features: int = 50,
     num_components: int = 10,
     embedding_net: nn.Module = nn.Identity(),
-    **kwargs
+    **kwargs,
 ) -> nn.Module:
     """Builds MDN p(x|y).
 
@@ -42,11 +42,11 @@ def build_mdn(
     transform = transforms.IdentityTransform()
 
     if z_score_x:
-        transform_zx = standardizing_transform(batch_x)
+        transform_zx = utils.standardizing_transform(batch_x)
         transform = transforms.CompositeTransform([transform_zx, transform])
 
     if z_score_y:
-        embedding_net = nn.Sequential(standardizing_net(batch_y), embedding_net)
+        embedding_net = nn.Sequential(utils.standardizing_net(batch_y), embedding_net)
 
     distribution = MultivariateGaussianMDN(
         features=x_numel,
