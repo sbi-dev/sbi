@@ -11,7 +11,12 @@ posterior = inference.build_posterior(sample_with="mcmc")  # or "rejection"
 ```
 - Rejection sampling for likelihood(-ratio)-based posteriors (#487)
 - MCMC in unconstrained and z-scored space (#510)
-- Prior is now allowed to lie on GPU. The prior has to be on the same device as passed for training (#519)
+- Prior is now allowed to lie on GPU. The prior has to be on the same device as the one
+  passed for training (#519).
+- Rejection-ABC and SMC-ABC now return the accepted particles / parameters by default,
+  or a KDE fit on those particles (`kde=True`) (#525).
+- Fast analytical sampling, evaluation and conditioning for `DirectPosterior` trained
+  with MDNs (thanks @jnsbck #458). 
 
 ## Minor changes
 - `scatter` allowed for diagonal entries in pairplot (#510)
