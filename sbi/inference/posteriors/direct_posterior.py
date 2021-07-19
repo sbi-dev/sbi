@@ -1,16 +1,19 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
+
 from functools import partial
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union, Tuple
 from warnings import warn
 
 import numpy as np
 import torch
 import torch.distributions.transforms as torch_tf
 from torch import Tensor, log, nn
+from warnings import warn
 
 from sbi import utils as utils
+from pyknos.mdn.mdn import MultivariateGaussianMDN as mdn
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.types import Shape
 from sbi.utils import del_entries, mcmc_transform, rejection_sample, within_support
@@ -19,6 +22,7 @@ from sbi.utils.torchutils import (
     batched_first_of_batch,
     ensure_theta_batched,
 )
+from sbi.utils.conditional_density import extract_and_transform_mog, condition_mog
 
 
 class DirectPosterior(NeuralPosterior):
@@ -471,19 +475,101 @@ class DirectPosterior(NeuralPosterior):
         Returns:
             Samples from conditional posterior.
         """
+        if type(self.net._distribution) is mdn:
+            num_samples = torch.Size(sample_shape).numel()
 
-        return super().sample_conditional(
-            PotentialFunctionProvider(),
-            sample_shape,
-            condition,
-            dims_to_sample,
-            x,
-            sample_with,
-            show_progress_bars,
-            mcmc_method,
-            mcmc_parameters,
-            rejection_sampling_parameters,
-        )
+            logits, means, precfs, _ = extract_and_transform_mog(self, x)
+            logits, means, precfs, _ = condition_mog(
+                self._prior, condition, dims_to_sample, logits, means, precfs
+            )
+
+            # Currently difficult to integrate `sample_posterior_within_prior`
+            warn(
+                "Sampling MoG analytically. "
+                "Some of the samples might not be within the prior support!"
+            )
+            samples = mdn.sample_mog(num_samples, logits, means, precfs)
+            return samples.detach().reshape((*sample_shape, -1))
+
+        else:
+            return super().sample_conditional(
+                PotentialFunctionProvider(),
+                sample_shape,
+                condition,
+                dims_to_sample,
+                x,
+                sample_with,
+                show_progress_bars,
+                mcmc_method,
+                mcmc_parameters,
+                rejection_sampling_parameters,
+            )
+
+    def log_prob_conditional(
+        self,
+        theta: Tensor,
+        condition: Tensor,
+        dims_to_evaluate: List[int],
+        x: Optional[Tensor] = None,
+    ) -> Tensor:
+        """Evaluates the conditional posterior probability of a MDN at a context x for
+        a value theta given a condition.
+
+        This function only works for MDN based posteriors, becuase evaluation is done 
+        analytically. For all other density estimators a `NotImplementedError` will be
+        raised! 
+
+        Args:
+            theta: Parameters $\theta$.
+            condition: Parameter set that all dimensions not specified in
+                `dims_to_sample` will be fixed to. Should contain dim_theta elements,
+                i.e. it could e.g. be a sample from the posterior distribution.
+                The entries at all `dims_to_sample` will be ignored.
+            dims_to_evaluate: Which dimensions to evaluate the sample for. 
+                The dimensions not specified in `dims_to_evaluate` will be fixed to values given in `condition`.
+            x: Conditioning context for posterior $p(\theta|x)$. If not provided,
+                fall back onto `x` passed to `set_default_x()`.
+
+        Returns:
+            log_prob: `(len(θ),)`-shaped normalized (!) log posterior probability 
+                $\log p(\theta|x) for θ in the support of the prior, -∞ (corresponding 
+                to 0 probability) outside.
+        """
+
+        if type(self.net._distribution) == mdn:
+            logits, means, precfs, sumlogdiag = extract_and_transform_mog(self, x)
+            logits, means, precfs, sumlogdiag = condition_mog(
+                self._prior, condition, dims_to_evaluate, logits, means, precfs
+            )
+
+            batch_size, dim = theta.shape
+            prec = precfs.transpose(3, 2) @ precfs
+
+            self.net.eval()  # leakage correction requires eval mode
+
+            if dim != len(dims_to_evaluate):
+                X = X[:, dims_to_evaluate]
+
+            # Implementing leakage correction is difficult for conditioned MDNs,
+            # because samples from self i.e. the full posterior are used rather
+            # then from the new, conditioned posterior.
+            warn("Probabilities are not adjusted for leakage.")
+
+            log_prob = mdn.log_prob_mog(
+                theta,
+                logits.repeat(batch_size, 1),
+                means.repeat(batch_size, 1, 1),
+                prec.repeat(batch_size, 1, 1, 1),
+                sumlogdiag.repeat(batch_size, 1),
+            )
+
+            self.net.train(True)
+            return log_prob.detach()
+
+        else:
+            raise NotImplementedError(
+                "This functionality is only available for MDN based posteriors."
+            )
 
     def map(
         self,
