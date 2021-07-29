@@ -186,15 +186,9 @@ def independent_mh(num_samples, potential_fn, proposal, T=20, num_samples_batch=
     samples = proposal.sample((num_samples_batch,))
     sampling_steps = int(T / (int(num_samples / num_samples_batch)))
     for t in range(T):
-        potential = (
-            potential_fn(samples)
-            - proposal.log_prob(samples)
-        )
+        potential = potential_fn(samples) - proposal.log_prob(samples)
         new_samples = proposal.sample((num_samples_batch,))
-        new_potential = (
-            potential_fn(new_samples)
-            - proposal.log_prob(new_samples)
-        )
+        new_potential = potential_fn(new_samples) - proposal.log_prob(new_samples)
         acceptance_probability = torch.exp(new_potential - potential)
         u = torch.rand(num_samples_batch)
         mask = u < acceptance_probability
@@ -215,7 +209,7 @@ def random_direction_slice_sampler(
 
     for t in range(T):
         potential_function = potential_fn(samples)
-        y = torch.rand(num_samples) * potential_function.exp()
+        y = torch.rand(num_samples_batch) * potential_function.exp()
 
         random_directions = torch.randn(samples.shape)
         random_directions /= torch.linalg.norm(random_directions, dim=-1).unsqueeze(-1)
@@ -223,7 +217,6 @@ def random_direction_slice_sampler(
         ub = torch.zeros((num_samples_batch,))
         mask_lb = y < potential_function.exp()
         mask_ub = mask_lb.clone()
-        
 
         while mask_lb.any() and mask_ub.any():
             lb[mask_lb] -= steps
@@ -240,14 +233,11 @@ def random_direction_slice_sampler(
             potential_function_lb = potential_fn(proposed_samples_lb)
             potential_function_ub = potential_fn(proposed_samples_ub)
 
-
             mask_lb[mask_lb.clone()] = y[mask_lb] < potential_function_lb.exp()
             mask_ub[mask_ub.clone()] = y[mask_ub] < potential_function_ub.exp()
-        x = torch.rand(num_samples) * (ub - lb) + lb
+        x = torch.rand(num_samples_batch) * (ub - lb) + lb
         samples = samples + x.unsqueeze(-1) * random_directions
         if ((t + 1) % sampling_steps) == 0:
             final_samples.append(samples)
     return torch.vstack(final_samples)
-
-
 

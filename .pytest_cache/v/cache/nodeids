@@ -1,7 +1,0 @@
-[
-  "tests/divergence_optimizers_test.py::test_base_api[ElboOptimizer]",
-  "tests/divergence_optimizers_test.py::test_base_api[IWElboOptimizer]",
-  "tests/divergence_optimizers_test.py::test_base_api[RenjeyDivergenceOptimizer]",
-  "tests/divergence_optimizers_test.py::test_base_api[TailAdaptivefDivergenceOptimizer]",
-  "tests/divergence_optimizers_test.py::test_base_api[ForwardKLOptimizer]"
-]

@@ -124,7 +124,7 @@ class NeuralPosterior(ABC):
         if not self._allow_iid_x:
             check_for_possibly_batched_x_shape(self._x_shape)
         if sample_with == "vi":
-            self.__set_up_for_vi(self.vi_parameters)
+            self._set_up_for_vi(self.vi_parameters)
 
     @property
     def default_x(self) -> Optional[Tensor]:
@@ -305,13 +305,15 @@ class NeuralPosterior(ABC):
         self._vi_parameters = parameters
         return self
 
-    def __set_up_for_vi(self, vi_parameters):
+    def _set_up_for_vi(self, vi_parameters):
         """ Sets up the posterior for variational inference"""
         vi_parameters = self._potentially_replace_vi_parameters(vi_parameters)
         self._q = build_q(self._prior.event_shape, self._prior.support, **vi_parameters)
         loss = vi_parameters.get("loss", "elbo")
         self._loss = loss
-        self._optimizer = build_optimizer(self, loss, **vi_parameters)
+        if "loss" not in vi_parameters:
+            vi_parameters["loss"] = "elbo"
+        self._optimizer = build_optimizer(self, **vi_parameters)
         setattr(self, "train", partial(train_posterior, self))
         setattr(self, "expectation", partial(expectation, self))
 
@@ -369,8 +371,12 @@ class NeuralPosterior(ABC):
             self.set_rejection_sampling_parameters(
                 posterior._rejection_sampling_parameters
             )
-        if hasattr(self, "_vi_parameters"):
-            self._vi_parameters(posterior._vi_parameters)
+        if self.sample_with.lower() == "vi":
+            self.set_vi_parameters(posterior._vi_parameters)
+            self._q = posterior._q
+            self._optimizer = build_optimizer(self, **self._vi_parameters)
+            self._optimizer.warm_up_was_done = posterior._optimizer.warm_up_was_done
+            self._loss = posterior._loss
 
         return self
 

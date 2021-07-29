@@ -138,7 +138,7 @@ def train_posterior(
     posterior._ensure_x_consistent_with_default_x(x)
 
     # Optimize
-    posterior._optimizer.update(locals())
+    posterior._optimizer.update({**locals(), **kwargs})
     optimizer = posterior._optimizer
     optimizer.reset_loss_stats()
 
@@ -148,7 +148,7 @@ def train_posterior(
         iters = range(max_num_iters)
 
     # Warmup before training
-    if optimizer.num_step == 0:
+    if not optimizer.warm_up_was_done:
         if show_progress_bar:
             iters.set_description("Warmup phase, this takes some seconds...")
         optimizer.warm_up(warm_up_rounds)

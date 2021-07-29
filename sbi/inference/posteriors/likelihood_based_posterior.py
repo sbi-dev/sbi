@@ -238,8 +238,8 @@ class LikelihoodBasedPosterior(NeuralPosterior):
         elif sample_with == "vi":
             # TODO Check if train was called. And warn if not
             vi_parameters = self._potentially_replace_vi_parameters(vi_parameters)
-            method = vi_parameters.get("method", "naive")
-            method_params = vi_parameters.get("method_params", {})
+            method = vi_parameters.get("sampling_method", "naive")
+            method_params = vi_parameters.get("sampling_method_params", {})
             track_gradients = vi_parameters.get("track_gradients", False)
             sample_shape = torch.Size(sample_shape)
             if method.lower() == "naive":
@@ -248,13 +248,13 @@ class LikelihoodBasedPosterior(NeuralPosterior):
                 else:
                     samples = self._q.sample(sample_shape)
             elif method.lower() == "ir":
-                potential_fn = potential_fn_provider(self._prior, self.net, x, "rejection")
+                potential_fn = potential_fn_provider(self._prior, self.net, x, "vi")
                 samples = importance_resampling(
                     sample_shape.numel(), potential_fn=potential_fn, proposal=self._q, **method_params
                 )
             elif method.lower() == "imh":
-                 potential_fn = potential_fn_provider(self._prior, self.net, x, "rejection")
-                 samples = independent_mh(sample_shape.numel(), potential_fn,self, **method_params)
+                 potential_fn = potential_fn_provider(self._prior, self.net, x, "vi")
+                 samples = independent_mh(sample_shape.numel(), potential_fn,self._q, **method_params)
             elif method.lower() == "rejection":
                 rejection_sampling_parameters = self._potentially_replace_rejection_parameters(
                     rejection_sampling_parameters
@@ -268,7 +268,7 @@ class LikelihoodBasedPosterior(NeuralPosterior):
                     **rejection_sampling_parameters,
                 )
             elif method.lower() == "slice":
-                potential_fn = potential_fn_provider(self._prior, self.net, x, "rejection")
+                potential_fn = potential_fn_provider(self._prior, self.net, x, "vi")
                 samples = random_direction_slice_sampler(
                     sample_shape.numel(), potential_fn, self._q, **method_params
                 )
@@ -514,6 +514,8 @@ class PotentialFunctionProvider:
             return partial(self.posterior_potential, track_gradients=False)
         elif method == "rejection":
             return partial(self.posterior_potential, track_gradients=True)
+        elif method == "vi":
+            return partial(self.posterior_potential, track_gradients=False)
         else:
             NotImplementedError
 
@@ -567,3 +569,4 @@ class PotentialFunctionProvider:
             self.log_likelihood(theta, track_gradients=track_gradients).cpu()
             + self.prior.log_prob(theta)
         )
+

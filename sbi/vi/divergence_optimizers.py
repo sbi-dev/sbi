@@ -180,16 +180,17 @@ class DivergenceOptimizer(ABC):
 
         # Loss and summary
         self.eps = eps
+        self.num_step = 0
+        self.warm_up_was_done = False
         self.losses = np.ones(2000)
         self.moving_average = np.ones(2000)
         self.moving_std = np.ones(2000)
         self.moving_slope = np.ones(2000)
-        self.num_step = 0
 
         # The loss that will be used
         self._loss = lambda x: torch.zeros(1), torch.zeros(1)
         # Hyperparameters to change adaptively
-        self.HYPER_PARAMETERS = ["n_particles", "clip_value"]
+        self.HYPER_PARAMETERS = ["n_particles", "clip_value", "eps"]
 
     @abstractmethod
     def _generate_loss_function(self):
@@ -233,6 +234,8 @@ class DivergenceOptimizer(ABC):
                 loss = -torch.mean(self.q.log_prob(samples))
             loss.backward()
             self._optimizer.step()
+        # Denote that warmup was already done
+        self.warm_up_was_done = True
 
     def update_state(self):
         """ This updates the current state. """
@@ -309,6 +312,7 @@ class DivergenceOptimizer(ABC):
         self.moving_average = np.ones(2000)
         self.moving_std = np.ones(2000)
         self.moving_slope = np.ones(2000)
+        self.num_step = 0
 
     def update_loss_stats(self, loss, window=20):
         """Updates current loss statistics of the optimizer
@@ -318,14 +322,11 @@ class DivergenceOptimizer(ABC):
             window: Window size for running statistics
         """
         if self.num_step >= len(self.losses):
-            self.losses = np.append(self.losses, np.zeros(len(self.losses)))
-            self.moving_average = np.append(
-                self.moving_average, np.zeros(len(self.moving_average))
-            )
-            self.moving_std = np.append(self.moving_std, np.zeros(len(self.moving_std)))
-            self.moving_slope = np.append(
-                self.moving_slope, np.zeros(len(self.moving_slope))
-            )
+            self.losses = np.append(self.losses, np.zeros(2000))
+            self.moving_average = np.append(self.moving_average, np.zeros(2000))
+            self.moving_std = np.append(self.moving_std, np.zeros(2000))
+            self.moving_slope = np.append(self.moving_slope, np.zeros(2000))
+
         if self.num_step == 0:
             self.losses[self.num_step] = loss
             self.moving_average[self.num_step] = loss
@@ -364,17 +365,21 @@ class DivergenceOptimizer(ABC):
         for key, val in kwargs.items():
             if key in self.HYPER_PARAMETERS:
                 paras[key] = val
-            if key in self._scheduler.__dict__:
-                self._scheduler.__dict__[key] = val
-            if key in self._optimizer.defaults:
-                for para in self._optimizer.param_groups:
-                    para[key] = val
+
             if key == "self":
                 posterior = kwargs[key]
                 self.posterior = posterior
                 self.q = posterior._q
                 self.set_likelihood_fn(posterior)
                 self.prior = posterior._prior
+        opt_kwargs = filter_kwrags_for_func(type(self._optimizer).__init__, kwargs)
+        scheduler_kwargs = filter_kwrags_for_func(
+            type(self._scheduler).__init__, kwargs
+        )
+        scheduler_kwargs["gamma"] = scheduler_kwargs.get("gamma", 1.0)
+        self._optimizer = type(self._optimizer)(self.q.parameters(), **opt_kwargs)
+        self._scheduler = type(self._scheduler)(self._optimizer, **scheduler_kwargs)
+        self._scheduler._step_count = 2
 
 
 class ElboOptimizer(DivergenceOptimizer):
@@ -850,14 +855,13 @@ class FDivergenceOptimizer(ElboOptimizer):
     def _loss_TV(self, x_obs):
         """ This is the loss to minimize the total variation"""
         particles = self.generate_elbo_particles(x_obs).exp()
-        surrogate_loss = torch.mean(torch.abs(particles-1))
+        surrogate_loss = torch.mean(torch.abs(particles - 1))
         return surrogate_loss, surrogate_loss.detach()
 
     def _loss_KL_pol2(self, x_obs):
         particles = self.generate_elbo_particles(x_obs)
-        surrogate_loss = torch.mean(particles**2 + particles) 
+        surrogate_loss = torch.mean(particles ** 2 + particles)
         return surrogate_loss, surrogate_loss.detach()
-
 
     def _loss_JS(self, x_obs, domain=1000):
         """ This at most is something proportional to the JS
@@ -880,5 +884,4 @@ class FDivergenceOptimizer(ElboOptimizer):
         else:
             loss = surrogate_loss
         return surrogate_loss, loss.clone().detach()
-
 

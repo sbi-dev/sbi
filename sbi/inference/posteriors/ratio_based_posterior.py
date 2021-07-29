@@ -159,7 +159,6 @@ class RatioBasedPosterior(NeuralPosterior):
         mcmc_parameters: Optional[Dict[str, Any]] = None,
         rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
         vi_parameters: Optional[Dict[str, Any]] = None,
-
     ) -> Tensor:
         r"""
         Return samples from posterior distribution $p(\theta|x)$ with MCMC.
@@ -222,10 +221,8 @@ class RatioBasedPosterior(NeuralPosterior):
                 **mcmc_parameters,
             )
         elif sample_with == "rejection":
-            rejection_sampling_parameters = (
-                self._potentially_replace_rejection_parameters(
-                    rejection_sampling_parameters
-                )
+            rejection_sampling_parameters = self._potentially_replace_rejection_parameters(
+                rejection_sampling_parameters
             )
             if "proposal" not in rejection_sampling_parameters:
                 rejection_sampling_parameters["proposal"] = self._prior
@@ -238,10 +235,10 @@ class RatioBasedPosterior(NeuralPosterior):
                 **rejection_sampling_parameters,
             )
         elif sample_with == "vi":
-            # TODO check if train was called before. And warn if not
+            # TODO Check if train was called. And warn if not
             vi_parameters = self._potentially_replace_vi_parameters(vi_parameters)
-            method = vi_parameters.get("method", "naive")
-            method_params = vi_parameters.get("method_params", {})
+            method = vi_parameters.get("sampling_method", "naive")
+            method_params = vi_parameters.get("sampling_method_params", {})
             track_gradients = vi_parameters.get("track_gradients", False)
             sample_shape = torch.Size(sample_shape)
             if method.lower() == "naive":
@@ -250,18 +247,23 @@ class RatioBasedPosterior(NeuralPosterior):
                 else:
                     samples = self._q.sample(sample_shape)
             elif method.lower() == "ir":
-                potential_fn = potential_fn_provider(self._prior, self.net, x, "rejection")
+                potential_fn = potential_fn_provider(self._prior, self.net, x, "vi")
                 samples = importance_resampling(
-                    sample_shape.numel(), potential_fn=potential_fn, proposal=self._q, **method_params
+                    sample_shape.numel(),
+                    potential_fn=potential_fn,
+                    proposal=self._q,
+                    **method_params,
                 )
             elif method.lower() == "imh":
-                 potential_fn = potential_fn_provider(self._prior, self.net, x, "rejection")
-                 samples = independent_mh(sample_shape.numel(), potential_fn,self._q, **method_params)
+                potential_fn = potential_fn_provider(self._prior, self.net, x, "vi")
+                samples = independent_mh(
+                    sample_shape.numel(), potential_fn, self._q, **method_params
+                )
             elif method.lower() == "rejection":
                 rejection_sampling_parameters = self._potentially_replace_rejection_parameters(
                     rejection_sampling_parameters
                 )
-                rejection_sampling_parameters["proposal"] = self
+                rejection_sampling_parameters["proposal"] = self._q
                 samples, _ = rejection_sample(
                     potential_fn=potential_fn_provider(
                         self._prior, self.net, x, "rejection"
@@ -270,12 +272,14 @@ class RatioBasedPosterior(NeuralPosterior):
                     **rejection_sampling_parameters,
                 )
             elif method.lower() == "slice":
-                potential_fn = potential_fn_provider(self._prior, self.net, x, "rejection")
+                potential_fn = potential_fn_provider(self._prior, self.net, x, "vi")
                 samples = random_direction_slice_sampler(
                     sample_shape.numel(), potential_fn, self._q, **method_params
                 )
             else:
-                raise NotImplementedError("The sampling methods from the vi posterior are currently restricted to naive, ir, imh, rejection and slice")
+                raise NotImplementedError(
+                    "The sampling methods from the vi posterior are currently restricted to naive, ir, imh, rejection and slice"
+                )
         else:
             raise NameError(
                 "The only implemented sampling methods are `mcmc`, `rejection` and `vi`."
@@ -449,10 +453,7 @@ class RatioBasedPosterior(NeuralPosterior):
 
     @staticmethod
     def _log_ratios_over_trials(
-        x: Tensor,
-        theta: Tensor,
-        net: nn.Module,
-        track_gradients: bool = False,
+        x: Tensor, theta: Tensor, net: nn.Module, track_gradients: bool = False,
     ) -> Tensor:
         r"""Return log ratios summed over iid trials of `x`.
 
@@ -512,11 +513,7 @@ class PotentialFunctionProvider:
     """
 
     def __call__(
-        self,
-        prior,
-        classifier: nn.Module,
-        x: Tensor,
-        method: str,
+        self, prior, classifier: nn.Module, x: Tensor, method: str,
     ) -> Callable:
         r"""Return potential function for posterior $p(\theta|x)$.
 
@@ -546,6 +543,8 @@ class PotentialFunctionProvider:
             return partial(self.posterior_potential, track_gradients=False)
         elif method == "rejection":
             return partial(self.posterior_potential, track_gradients=True)
+        elif method == "vi":
+            return partial(self.posterior_potential, track_gradients=False)
         else:
             NotImplementedError
 
