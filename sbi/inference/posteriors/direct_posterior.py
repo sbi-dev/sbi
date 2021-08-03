@@ -21,6 +21,7 @@ from sbi.utils.torchutils import (
     atleast_2d,
     batched_first_of_batch,
     ensure_theta_batched,
+    atleast_2d_float32_tensor,
 )
 from sbi.utils.conditional_density import extract_and_transform_mog, condition_mog
 
@@ -475,15 +476,24 @@ class DirectPosterior(NeuralPosterior):
         Returns:
             Samples from conditional posterior.
         """
-        if type(self.net._distribution) is mdn:
+        if not hasattr(self.net, "_distribution"):
+            raise NotImplementedError(
+                "`sample_conditional` is not implemented for SNPE-A."
+            )
+
+        net = self.net
+        x = atleast_2d_float32_tensor(self._x_else_default_x(x))
+
+        if type(net._distribution) is mdn:
+            condition = atleast_2d_float32_tensor(condition)
             num_samples = torch.Size(sample_shape).numel()
 
-            logits, means, precfs, _ = extract_and_transform_mog(self, x)
+            logits, means, precfs, _ = extract_and_transform_mog(nn=net, context=x)
             logits, means, precfs, _ = condition_mog(
                 self._prior, condition, dims_to_sample, logits, means, precfs
             )
 
-            # Currently difficult to integrate `sample_posterior_within_prior`
+            # Currently difficult to integrate `sample_posterior_within_prior`.
             warn(
                 "Sampling MoG analytically. "
                 "Some of the samples might not be within the prior support!"
@@ -515,9 +525,9 @@ class DirectPosterior(NeuralPosterior):
         """Evaluates the conditional posterior probability of a MDN at a context x for
         a value theta given a condition.
 
-        This function only works for MDN based posteriors, becuase evaluation is done 
+        This function only works for MDN based posteriors, becuase evaluation is done
         analytically. For all other density estimators a `NotImplementedError` will be
-        raised! 
+        raised!
 
         Args:
             theta: Parameters $\theta$.
@@ -525,14 +535,14 @@ class DirectPosterior(NeuralPosterior):
                 `dims_to_sample` will be fixed to. Should contain dim_theta elements,
                 i.e. it could e.g. be a sample from the posterior distribution.
                 The entries at all `dims_to_sample` will be ignored.
-            dims_to_evaluate: Which dimensions to evaluate the sample for. 
+            dims_to_evaluate: Which dimensions to evaluate the sample for.
                 The dimensions not specified in `dims_to_evaluate` will be fixed to values given in `condition`.
             x: Conditioning context for posterior $p(\theta|x)$. If not provided,
                 fall back onto `x` passed to `set_default_x()`.
 
         Returns:
-            log_prob: `(len(θ),)`-shaped normalized (!) log posterior probability 
-                $\log p(\theta|x) for θ in the support of the prior, -∞ (corresponding 
+            log_prob: `(len(θ),)`-shaped normalized (!) log posterior probability
+                $\log p(\theta|x) for θ in the support of the prior, -∞ (corresponding
                 to 0 probability) outside.
         """
 
