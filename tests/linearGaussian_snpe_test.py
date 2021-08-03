@@ -73,11 +73,11 @@ def test_c2st_snpe_on_linearGaussian(
         target_samples = samples_true_posterior_linear_gaussian_uniform_prior(
             x_o, likelihood_shift, likelihood_cov, prior=prior, num_samples=num_samples
         )
-    
+
     simulator, prior = prepare_for_sbi(
         lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov), prior
     )
-    
+
     inference = snpe_method(prior, show_progress_bars=False)
 
     theta, x = simulate_for_sbi(
@@ -351,8 +351,7 @@ def test_api_snpe_c_posterior_correction(sample_with, mcmc_method, prior_str, se
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("snpe_method", [SNPE_A, SNPE_C])
-def test_sample_conditional(snpe_method: type, set_seed):
+def test_sample_conditional(set_seed):
     """
     Test whether sampling from the conditional gives the same results as evaluating.
 
@@ -380,14 +379,11 @@ def test_sample_conditional(snpe_method: type, set_seed):
         else:
             return linear_gaussian(theta, -likelihood_shift, likelihood_cov)
 
-    if snpe_method == SNPE_A:
-        net = utils.posterior_nn("mdn_snpe_a", hidden_features=20)
-    else:
-        net = utils.posterior_nn("maf", hidden_features=20)
+    net = utils.posterior_nn("maf", hidden_features=20)
 
     simulator, prior = prepare_for_sbi(simulator, prior)
 
-    inference = snpe_method(prior, density_estimator=net, show_progress_bars=False)
+    inference = SNPE_C(prior, density_estimator=net, show_progress_bars=False)
 
     # We need a pretty big dataset to properly model the bimodality.
     theta, x = simulate_for_sbi(simulator, prior, 10000)
@@ -438,10 +434,10 @@ def test_sample_conditional(snpe_method: type, set_seed):
     max_err = np.max(error)
     assert max_err < 0.0026
 
+
 @pytest.mark.slow
-@pytest.mark.parametrize("snpe_method", [SNPE_A, SNPE_C])
-def test_mdn_conditional_density(snpe_method: type, num_dim: int = 3, cond_dim: int = 1):
-    """Test whether the conditional density infered from MDN parameters of a 
+def test_mdn_conditional_density(num_dim: int = 3, cond_dim: int = 1):
+    """Test whether the conditional density infered from MDN parameters of a
     `DirectPosterior` matches analytical results for MVN. This uses a n-D joint and
     conditions on the last m values to generate a conditional.
 
@@ -490,7 +486,7 @@ def test_mdn_conditional_density(snpe_method: type, num_dim: int = 3, cond_dim: 
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     simulator, prior = prepare_for_sbi(simulator, prior)
-    inference = snpe_method(prior, show_progress_bars=False, density_estimator="mdn")
+    inference = SNPE_C(prior, show_progress_bars=False, density_estimator="mdn")
 
     theta, x = simulate_for_sbi(
         simulator, prior, num_simulations, simulation_batch_size=1000
@@ -506,6 +502,7 @@ def test_mdn_conditional_density(snpe_method: type, num_dim: int = 3, cond_dim: 
         conditional_samples_gt,
         alg="analytic_mdn_conditioning_of_direct_posterior",
     )
+
 
 @pytest.mark.parametrize("snpe_method", [SNPE_A, SNPE_C])
 def test_example_posterior(snpe_method: type):

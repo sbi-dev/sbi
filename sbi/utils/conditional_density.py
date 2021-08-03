@@ -8,6 +8,7 @@ import torch
 from torch import Tensor
 
 from pyknos.mdn.mdn import MultivariateGaussianMDN as mdn
+from pyknos.nflows.flows import Flow
 from sbi.utils.torchutils import ensure_theta_batched
 from sbi.utils.torchutils import BoxUniform
 
@@ -335,7 +336,7 @@ def _normalize_probs(probs: Tensor, limits: Tensor) -> Tensor:
 
 
 def extract_and_transform_mog(
-    posterior: "DirectPosterior", context: Tensor = None
+    nn: Flow, context: Tensor = None
 ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
     """Extracts the Mixture of Gaussians (MoG) parameters
     from an MDN based DirectPosterior at either the default x or input x.
@@ -344,26 +345,21 @@ def extract_and_transform_mog(
         posterior: DirectPosterior instance.
         context: Conditioning context for posterior $p(\theta|x)$. If not provided,
             fall back onto `x` passed to `set_default_x()`.
-    
+
     Returns:
-        norm_logits: Normalised log weights of the underyling MoG. 
+        norm_logits: Normalised log weights of the underyling MoG.
             (batch_size, n_mixtures)
         means_transformed: Recentred and rescaled means of the underlying MoG
             (batch_size, n_mixtures, n_dims)
-        precfs_transformed: Rescaled precision factors of the underlying MoG. 
+        precfs_transformed: Rescaled precision factors of the underlying MoG.
             (batch_size, n_mixtures, n_dims, n_dims)
         sumlogdiag: Sum of the log of the diagonal of the precision factors
             of the new conditional distribution. (batch_size, n_mixtures)
     """
 
     # extract and rescale means, mixture componenets and covariances
-    nn = posterior.net
     dist = nn._distribution
-
-    if context == None:
-        encoded_x = nn._embedding_net(posterior.default_x)
-    else:
-        encoded_x = nn._embedding_net(context)
+    encoded_x = nn._embedding_net(context)
 
     logits, means, _, sumlogdiag, precfs = dist.get_mixture_components(encoded_x)
     norm_logits = logits - torch.logsumexp(logits, dim=-1, keepdim=True)
@@ -384,7 +380,7 @@ def extract_and_transform_mog(
 
 
 def condition_mog(
-    prior: "Prior",
+    prior: Any,
     condition: Tensor,
     dims: List[int],
     logits: Tensor,
@@ -404,7 +400,7 @@ def condition_mog(
             `condition`.
         logits: Log weights of the MoG. (batch_size, n_mixtures)
         means: Means of the MoG. (batch_size, n_mixtures, n_dims)
-        precfs: Precision factors of the MoG. 
+        precfs: Precision factors of the MoG.
             (batch_size, n_mixtures, n_dims, n_dims)
 
     Raises:
@@ -413,21 +409,20 @@ def condition_mog(
     Returns:
         logits:  Log weights of the conditioned MoG. (batch_size, n_mixtures)
         means: Means of the conditioned MoG. (batch_size, n_mixtures, n_dims)
-        precfs_xx: Precision factors of the MoG. 
+        precfs_xx: Precision factors of the MoG.
             (batch_size, n_mixtures, n_dims, n_dims)
         sumlogdiag: Sum of the log of the diagonal of the precision factors
             of the new conditional distribution. (batch_size, n_mixtures)
     """
-
-    support = prior.support
 
     n_mixtures, n_dims = means.shape[1:]
 
     mask = torch.zeros(n_dims, dtype=bool)
     mask[dims] = True
 
-    # check whether the condition is within the prior bounds
+    # Check whether the condition is within the prior bounds.
     if type(prior) is torch.distributions.uniform.Uniform or type(prior) is BoxUniform:
+        support = prior.support.base_constraint
         cond_ubound = support.upper_bound[~mask]
         cond_lbound = support.lower_bound[~mask]
         within_support = torch.logical_and(
