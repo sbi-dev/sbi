@@ -225,9 +225,26 @@ def check_for_possibly_batched_x_shape(x_shape):
     # Reject multidimensional data with batch_shape > 1.
     if x_ndim > 1 and inferred_batch_shape > 1:
         raise ValueError(
-            """Observation/simulation `x` has D>1 dimensions. sbi interprets the
-            leading dimension as a batch dimension, but it *currently* only processes a
-            single observation, a batch of several is not supported yet.
+            """The `x` passed to condition the posterior for evaluation or sampling
+                has an inferred batch shape larger than one. This is not supported in
+                some sbi methods for reasons depending on the scenario:
+
+                    - in case you want to evaluate or sample conditioned on several xs
+                    e.g., (p(theta | [x1, x2, x3])), this is not supported yet except
+                    when using likelihood based SNLE and SNRE.
+
+                    - in case you trained with a single round to do amortized inference
+                    and now you want to evaluate or sample a given theta conditioned on
+                    several xs, one after the other, e.g, p(theta | x1), p(theta | x2),
+                    p(theta| x3): this broadcasting across xs is not supported in sbi.
+                    Instead, what you can do it to call posterior.log_prob(theta, xi)
+                    multiple times with different xi.
+
+                    - finally, if your observation is multidimensional, e.g., an image,
+                    make sure to pass it with a leading batch dimension, e.g., with
+                    shape (1, xdim1, xdim2). Beware that the current implementation
+                    of sbi might not provide stable support for this and result in
+                    shape mismatches.
 
             NOTE: below we use list notation to reduce clutter, but `x` should be of 
             type torch.Tensor or ndarray.
