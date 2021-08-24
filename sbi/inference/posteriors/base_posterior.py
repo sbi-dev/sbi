@@ -356,10 +356,7 @@ class NeuralPosterior(ABC):
         theta = ensure_theta_batched(torch.as_tensor(theta))
 
         # Select and check x to condition on.
-        x = atleast_2d_float32_tensor(self._x_else_default_x(x))
-        if not self._allow_iid_x:
-            self._ensure_single_x(x)
-        self._ensure_x_consistent_with_default_x(x)
+        x = self._x_else_default_x(x)
 
         return theta.to(self._device), x.to(self._device)
 
@@ -381,10 +378,8 @@ class NeuralPosterior(ABC):
             samples.
         """
 
-        x = atleast_2d_float32_tensor(self._x_else_default_x(x))
-        if not self._allow_iid_x:
-            self._ensure_single_x(x)
-        self._ensure_x_consistent_with_default_x(x)
+        # Select and check x to condition on.
+        x = self._x_else_default_x(x)
         num_samples = torch.Size(sample_shape).numel()
 
         # Move x to current device.
@@ -917,7 +912,7 @@ class NeuralPosterior(ABC):
 
     def _x_else_default_x(self, x: Optional[Array]) -> Array:
         if x is not None:
-            return x
+            return process_x(x, self._x_shape, allow_iid_x=self._allow_iid_x)
         elif self.default_x is None:
             raise ValueError(
                 "Context `x` needed when a default has not been set."
@@ -926,50 +921,9 @@ class NeuralPosterior(ABC):
         else:
             return self.default_x
 
-    def _ensure_x_consistent_with_default_x(self, x: Tensor) -> None:
+    def _ensure_x_consistent_with_x_shape(self, x: Tensor) -> None:
         """Check consistency with the shape of `self.default_x` (unless it's None)."""
-
-        # TODO: This is to check the passed x matches the NN input dimensions by
-        # comparing to `default_x`, which was checked in user input checks to match the
-        # simulator output. Later if we might not have `self.default_x` we might want to
-        # compare to the input dimension of `self.net` here.
-        if self.default_x is not None:
-            assert (
-                x.shape == self.default_x.shape
-            ), f"""The shape of the passed `x` {x.shape} and must match the shape of `x`
-            used during training, {self.default_x.shape}."""
-
-    @staticmethod
-    def _ensure_single_x(x: Tensor) -> None:
-        """Raise a ValueError if multiple (a batch of) xs are passed."""
-
-        inferred_batch_size, *_ = x.shape
-
-        if inferred_batch_size > 1:
-
-            raise ValueError(
-                """The `x` passed to condition the posterior for evaluation or sampling
-                has an inferred batch shape larger than one. This is not supported in
-                some sbi methods for reasons depending on the scenario:
-
-                    - in case you want to evaluate or sample conditioned on several xs
-                    e.g., (p(theta | [x1, x2, x3])), this is not supported yet except
-                    when using likelihood based SNLE.
-
-                    - in case you trained with a single round to do amortized inference
-                    and now you want to evaluate or sample a given theta conditioned on
-                    several xs, one after the other, e.g, p(theta | x1), p(theta | x2),
-                    p(theta| x3): this broadcasting across xs is not supported in sbi.
-                    Instead, what you can do it to call posterior.log_prob(theta, xi)
-                    multiple times with different xi.
-
-                    - finally, if your observation is multidimensional, e.g., an image,
-                    make sure to pass it with a leading batch dimension, e.g., with
-                    shape (1, xdim1, xdim2). Beware that the current implementation
-                    of sbi might not provide stable support for this and result in
-                    shape mismatches.
-                """
-            )
+        process_x(x, self._x_shape, allow_iid_x=self._allow_iid_x)
 
     @staticmethod
     def _match_theta_and_x_batch_shapes(
