@@ -3,27 +3,26 @@
 
 
 from functools import partial
-from typing import Any, Callable, Dict, List, Optional, Union, Tuple
+from typing import Any, Callable, Dict, List, Optional, Union
 from warnings import warn
 
 import numpy as np
 import torch
 import torch.distributions.transforms as torch_tf
+from pyknos.mdn.mdn import MultivariateGaussianMDN as mdn
 from torch import Tensor, log, nn
-from warnings import warn
 
 from sbi import utils as utils
-from pyknos.mdn.mdn import MultivariateGaussianMDN as mdn
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.types import Shape
 from sbi.utils import del_entries, mcmc_transform, rejection_sample, within_support
+from sbi.utils.conditional_density import condition_mog, extract_and_transform_mog
 from sbi.utils.torchutils import (
     atleast_2d,
     batched_first_of_batch,
     ensure_theta_batched,
     atleast_2d_float32_tensor,
 )
-from sbi.utils.conditional_density import extract_and_transform_mog, condition_mog
 
 
 class DirectPosterior(NeuralPosterior):
@@ -85,7 +84,8 @@ class DirectPosterior(NeuralPosterior):
                 find the maximum of the `potential_fn / proposal` ratio.
                 `num_iter_to_find_max` as the number of gradient ascent iterations to
                 find the maximum of that ratio. `m` as multiplier to that ratio.
-            device: Training device, e.g., cpu or cuda:0
+            device: Training device, e.g., "cpu", "gpu" or "cuda:0". Defaults to "cuda"
+                when "gpu" is passed.
         """
 
         kwargs = del_entries(locals(), entries=("self", "__class__"))

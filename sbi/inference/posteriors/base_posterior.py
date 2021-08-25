@@ -37,6 +37,7 @@ from sbi.utils.torchutils import (
     ScalarFloat,
     atleast_2d_float32_tensor,
     ensure_theta_batched,
+    process_device,
 )
 from sbi.utils.user_input_checks import check_for_possibly_batched_x_shape, process_x
 
@@ -91,12 +92,16 @@ class NeuralPosterior(ABC):
                 `potential_fn / proposal` ratio. `num_iter_to_find_max` as the number
                 of gradient ascent iterations to find the maximum of that ratio. `m` as
                 multiplier to that ratio.
-            device: Training device, e.g., cpu or cuda.
+            device: Training device, e.g., "cpu", "gpu" or "cuda:0". Defaults to "cuda"
+                when "gpu" is passed.
         """
         if method_family in ("snpe", "snle", "snre_a", "snre_b"):
             self._method_family = method_family
         else:
             raise ValueError(f"Method family '{method_family}' unsupported.")
+
+        # Ensure device string.
+        device = process_device(device)
 
         self.net = neural_net
 
@@ -112,6 +117,7 @@ class NeuralPosterior(ABC):
         self._x = None
         self._num_iid_trials = None
         self._x_shape = x_shape
+
         self._device = device
         # Methods capable of handling iid xo.
         self._iid_methods = ["snle", "snre_a", "snre_b"]

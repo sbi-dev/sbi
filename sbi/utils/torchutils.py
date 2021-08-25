@@ -16,12 +16,15 @@ from sbi.types import Array, OneOrMore, ScalarFloat
 
 
 def process_device(device: str, prior: Optional[Any] = None) -> str:
-    """Set and return the default device to cpu or gpu.
+    """Set and return the default device to cpu or cuda.
 
     Throws an AssertionError if the prior is not matching the training device not.
     """
 
     if not device == "cpu":
+        assert device == "gpu" or device.startswith(
+            "cuda"
+        ), f"Invalid device string: {device}."
         if device == "gpu":
             device = "cuda"
         try:
