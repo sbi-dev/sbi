@@ -3,26 +3,25 @@
 
 
 from functools import partial
-from typing import Any, Callable, Dict, List, Optional, Union, Tuple
+from typing import Any, Callable, Dict, List, Optional, Union
 from warnings import warn
 
 import numpy as np
 import torch
 import torch.distributions.transforms as torch_tf
+from pyknos.mdn.mdn import MultivariateGaussianMDN as mdn
 from torch import Tensor, log, nn
-from warnings import warn
 
 from sbi import utils as utils
-from pyknos.mdn.mdn import MultivariateGaussianMDN as mdn
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.types import Shape
 from sbi.utils import del_entries, mcmc_transform, rejection_sample, within_support
+from sbi.utils.conditional_density import condition_mog, extract_and_transform_mog
 from sbi.utils.torchutils import (
     atleast_2d,
     batched_first_of_batch,
     ensure_theta_batched,
 )
-from sbi.utils.conditional_density import extract_and_transform_mog, condition_mog
 
 
 class DirectPosterior(NeuralPosterior):
@@ -84,7 +83,8 @@ class DirectPosterior(NeuralPosterior):
                 find the maximum of the `potential_fn / proposal` ratio.
                 `num_iter_to_find_max` as the number of gradient ascent iterations to
                 find the maximum of that ratio. `m` as multiplier to that ratio.
-            device: Training device, e.g., cpu or cuda:0
+            device: Training device, e.g., "cpu", "gpu" or "cuda:0". Defaults to "cuda"
+                when "gpu" is passed.
         """
 
         kwargs = del_entries(locals(), entries=("self", "__class__"))
@@ -515,9 +515,9 @@ class DirectPosterior(NeuralPosterior):
         """Evaluates the conditional posterior probability of a MDN at a context x for
         a value theta given a condition.
 
-        This function only works for MDN based posteriors, becuase evaluation is done 
+        This function only works for MDN based posteriors, becuase evaluation is done
         analytically. For all other density estimators a `NotImplementedError` will be
-        raised! 
+        raised!
 
         Args:
             theta: Parameters $\theta$.
@@ -525,14 +525,14 @@ class DirectPosterior(NeuralPosterior):
                 `dims_to_sample` will be fixed to. Should contain dim_theta elements,
                 i.e. it could e.g. be a sample from the posterior distribution.
                 The entries at all `dims_to_sample` will be ignored.
-            dims_to_evaluate: Which dimensions to evaluate the sample for. 
+            dims_to_evaluate: Which dimensions to evaluate the sample for.
                 The dimensions not specified in `dims_to_evaluate` will be fixed to values given in `condition`.
             x: Conditioning context for posterior $p(\theta|x)$. If not provided,
                 fall back onto `x` passed to `set_default_x()`.
 
         Returns:
-            log_prob: `(len(θ),)`-shaped normalized (!) log posterior probability 
-                $\log p(\theta|x) for θ in the support of the prior, -∞ (corresponding 
+            log_prob: `(len(θ),)`-shaped normalized (!) log posterior probability
+                $\log p(\theta|x) for θ in the support of the prior, -∞ (corresponding
                 to 0 probability) outside.
         """
 
