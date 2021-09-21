@@ -117,6 +117,6 @@ def test_training_and_mcmc_on_device(
 
 
 @pytest.mark.gpu
-@pytest.mark.parametrize("device", ["cpu", "gpu", "cuda", "cuda:0", "cuda:42"])
+@pytest.mark.parametrize("device", ["cpu", "cuda", "cuda:0", "cuda:42"])
 def test_process_device(device: str):
     process_device(device)

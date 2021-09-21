@@ -22,11 +22,7 @@ def process_device(device: str, prior: Optional[Any] = None) -> str:
     """
 
     if not device == "cpu":
-        assert device == "gpu" or device.startswith(
-            "cuda"
-        ), f"Invalid device string: {device}."
-        if device == "gpu":
-            device = "cuda"
+        assert device.startswith("cuda"), f"Invalid device string: {device}."
         try:
             torch.zeros(1).to(device)
             warnings.warn(
@@ -248,7 +244,7 @@ class BoxUniform(Independent):
             device: device of the prior, defaults to "cpu", should match the training
                 device when used in SBI.
         """
-
+        device = process_device(device)
         super().__init__(
             Uniform(
                 low=torch.as_tensor(low, dtype=torch.float32, device=device),

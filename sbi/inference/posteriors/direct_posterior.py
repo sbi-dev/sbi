@@ -19,9 +19,9 @@ from sbi.utils import del_entries, mcmc_transform, rejection_sample, within_supp
 from sbi.utils.conditional_density import condition_mog, extract_and_transform_mog
 from sbi.utils.torchutils import (
     atleast_2d,
+    atleast_2d_float32_tensor,
     batched_first_of_batch,
     ensure_theta_batched,
-    atleast_2d_float32_tensor,
 )
 
 
@@ -84,8 +84,7 @@ class DirectPosterior(NeuralPosterior):
                 find the maximum of the `potential_fn / proposal` ratio.
                 `num_iter_to_find_max` as the number of gradient ascent iterations to
                 find the maximum of that ratio. `m` as multiplier to that ratio.
-            device: Training device, e.g., "cpu", "gpu" or "cuda:0". Defaults to "cuda"
-                when "gpu" is passed.
+            device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
         """
 
         kwargs = del_entries(locals(), entries=("self", "__class__"))

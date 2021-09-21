@@ -510,14 +510,12 @@ def test_train_with_different_data_and_training_device(
     snpe_method: type, data_device, training_device
 ):
 
-    assert torch.cuda.is_available(), "gpu geared test has no GPU available"
+    assert torch.cuda.is_available(), "this test requires that cuda is available."
 
     num_dim = 2
 
-    # simulator, prior = prepare_for_sbi(user_simulator, user_prior)
-    prior_ = MultivariateNormal(
-        loc=torch.zeros(num_dim).to(training_device),
-        covariance_matrix=torch.eye(num_dim).to(training_device),
+    prior_ = BoxUniform(
+        -torch.ones(num_dim), torch.ones(num_dim), device=training_device
     )
     simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior_)
 
