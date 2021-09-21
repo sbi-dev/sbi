@@ -76,8 +76,7 @@ class RatioBasedPosterior(NeuralPosterior):
                 `potential_fn / proposal` ratio. `num_iter_to_find_max` as the number
                 of gradient ascent iterations to find the maximum of that ratio. `m` as
                 multiplier to that ratio.
-            device: Training device, e.g., "cpu", "gpu" or "cuda:0". Defaults to "cuda"
-                when "gpu" is passed.
+            device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
         """
         kwargs = del_entries(locals(), entries=("self", "__class__"))
         super().__init__(**kwargs)

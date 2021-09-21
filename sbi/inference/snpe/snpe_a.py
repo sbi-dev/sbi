@@ -67,8 +67,7 @@ class SNPE_A(PosteriorEstimator):
             num_components: Number of components of the mixture of Gaussians in the
                 last round. This overrides the `num_components` value passed to
                 `posterior_nn()`.
-            device: Training device, e.g., "cpu", "gpu" or "cuda:0". Defaults to "cuda"
-                when "gpu" is passed.
+            device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
             summary_writer: A tensorboard `SummaryWriter` to control, among others, log

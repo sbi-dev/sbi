@@ -37,8 +37,7 @@ class SNRE_B(RatioEstimator):
                 first batch of simulations (theta, x), which can thus be used for shape
                 inference and potentially for z-scoring. It needs to return a PyTorch
                 `nn.Module` implementing the classifier.
-            device: Training device, e.g., "cpu", "gpu" or "cuda:0". Defaults to "cuda"
-                when "gpu" is passed.
+            device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
             summary_writer: A tensorboard `SummaryWriter` to control, among others, log
