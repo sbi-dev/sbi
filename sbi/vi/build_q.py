@@ -138,7 +138,7 @@ def train_posterior(
     x = atleast_2d_float32_tensor(posterior._x_else_default_x(x)).to(posterior._device)
     if not posterior._allow_iid_x:
         posterior._ensure_single_x(x)
-    posterior._ensure_x_consistent_with_default_x(x)
+    posterior._ensure_x_consistent_with_x_shape(x)
 
     # Optimize
     posterior._optimizer.update({**locals(), **kwargs})
