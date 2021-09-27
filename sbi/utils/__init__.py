@@ -2,9 +2,12 @@
 from sbi.utils.conditional_density import (
     conditional_corrcoeff,
     eval_conditional_density,
+    extract_and_transform_mog,
+    condition_mog,
 )
 from sbi.utils.get_nn_models import classifier_nn, likelihood_nn, posterior_nn
 from sbi.utils.io import get_data_root, get_log_root, get_project_root
+from sbi.utils.kde import KDEWrapper, get_kde
 from sbi.utils.plot import conditional_pairplot, pairplot
 from sbi.utils.restriction_estimator import RestrictedPrior, RestrictionEstimator
 from sbi.utils.sbiutils import (
@@ -19,6 +22,7 @@ from sbi.utils.sbiutils import (
     handle_invalid_x,
     logit,
     mask_sims_from_prior,
+    mcmc_transform,
     mog_log_prob,
     optimize_potential_fn,
     rejection_sample,
@@ -60,6 +64,7 @@ from sbi.utils.typechecks import (
 )
 from sbi.utils.user_input_checks import (
     check_estimator_arg,
+    process_x,
     test_posterior_net_for_multi_d_x,
     validate_theta_and_x,
 )

@@ -40,7 +40,7 @@ class SNLE_A(LikelihoodEstimator):
                 needs to return a PyTorch `nn.Module` implementing the density
                 estimator. The density estimator needs to provide the methods
                 `.log_prob` and `.sample()`.
-            device: torch device on which to compute, e.g. gpu, cpu.
+            device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
             summary_writer: A tensorboard `SummaryWriter` to control, among others, log

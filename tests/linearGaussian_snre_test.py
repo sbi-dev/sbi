@@ -142,7 +142,7 @@ def test_c2st_sre_variants_on_linearGaussian(
 
     x_o = zeros(num_trials, num_dim)
     num_samples = 500
-    num_simulations = 2500 if num_trials == 1 else 35000
+    num_simulations = 2500 if num_trials == 1 else 40000
 
     # `likelihood_mean` will be `likelihood_shift + theta`.
     likelihood_shift = -1.0 * ones(num_dim)
@@ -228,10 +228,19 @@ def test_c2st_sre_variants_on_linearGaussian(
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("prior_str", ("gaussian", "uniform"))
 @pytest.mark.parametrize(
-    "sampling_method",
-    ("slice_np", "slice_np_vectorized", "slice", "nuts", "hmc", "rejection"),
+    "sampling_method, prior_str",
+    (
+        ("slice_np", "gaussian"),
+        ("slice_np", "uniform"),
+        ("slice_np_vectorized", "gaussian"),
+        ("slice_np_vectorized", "uniform"),
+        ("slice", "gaussian"),
+        ("slice", "uniform"),
+        ("nuts", "gaussian"),
+        ("nuts", "uniform"),
+        ("hmc", "gaussian"),
+    ),
 )
 def test_api_sre_sampling_methods(sampling_method: str, prior_str: str, set_seed):
     """Test leakage correction both for MCMC and rejection sampling.
@@ -244,8 +253,7 @@ def test_api_sre_sampling_methods(sampling_method: str, prior_str: str, set_seed
     num_dim = 2
     num_samples = 10
     num_trials = 2
-    # HMC with uniform prior needs good likelihood.
-    num_simulations = 10000 if sampling_method == "hmc" else 1000
+    num_simulations = 1000
     x_o = zeros((num_trials, num_dim))
     # Test for multiple chains is cheap when vectorized.
     num_chains = 3 if sampling_method == "slice_np_vectorized" else 1

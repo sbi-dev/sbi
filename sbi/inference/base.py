@@ -115,7 +115,7 @@ class NeuralInference(ABC):
                 0.14.0 is more mature, we will remove this argument.
         """
 
-        self._device = process_device(device)
+        self._device = process_device(device, prior=prior)
 
         if unused_args:
             warn(
@@ -381,9 +381,7 @@ class NeuralInference(ABC):
 
         method = self.__class__.__name__
         logdir = Path(
-            get_log_root(),
-            method,
-            datetime.now().isoformat().replace(":", "_"),
+            get_log_root(), method, datetime.now().isoformat().replace(":", "_")
         )
         return SummaryWriter(logdir)
 
@@ -437,11 +435,7 @@ class NeuralInference(ABC):
             )
 
     def _summarize(
-        self,
-        round_: int,
-        x_o: Union[Tensor, None],
-        theta_bank: Tensor,
-        x_bank: Tensor,
+        self, round_: int, x_o: Union[Tensor, None], theta_bank: Tensor, x_bank: Tensor
     ) -> None:
         """Update the summary_writer with statistics for a given round.
 
@@ -456,12 +450,7 @@ class NeuralInference(ABC):
         # Median |x - x0| for most recent round.
         if x_o is not None:
             median_observation_distance = torch.median(
-                torch.sqrt(
-                    torch.sum(
-                        (x_bank - x_o.reshape(1, -1)) ** 2,
-                        dim=-1,
-                    )
-                )
+                torch.sqrt(torch.sum((x_bank - x_o.reshape(1, -1)) ** 2, dim=-1))
             )
             self._summary["median_observation_distances"].append(
                 median_observation_distance.item()
@@ -558,11 +547,7 @@ def simulate_for_sbi(
     theta = proposal.sample((num_simulations,))
 
     x = simulate_in_batches(
-        simulator,
-        theta,
-        simulation_batch_size,
-        num_workers,
-        show_progress_bar,
+        simulator, theta, simulation_batch_size, num_workers, show_progress_bar
     )
 
     return theta, x

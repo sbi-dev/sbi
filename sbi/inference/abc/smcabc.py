@@ -1,16 +1,14 @@
-from typing import Callable, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Optional, Tuple, Union
 
 import numpy as np
 import torch
 from numpy import ndarray
 from pyro.distributions import Uniform
-from pyro.distributions.empirical import Empirical
 from torch import Tensor, ones, tensor
 from torch.distributions import Distribution, Multinomial, MultivariateNormal
 
 from sbi.inference.abc.abc_base import ABCBASE
-from sbi.utils import within_support
-from sbi.utils.user_input_checks import process_x
+from sbi.utils import KDEWrapper, get_kde, process_x, within_support
 
 
 class SMCABC(ABCBASE):
@@ -106,13 +104,21 @@ class SMCABC(ABCBASE):
         kernel_variance_scale: float = 1.0,
         use_last_pop_samples: bool = True,
         return_summary: bool = False,
+        kde: bool = False,
+        kde_kwargs: Dict[str, Any] = dict(
+            kde_bandwidth="cv",
+            kde_transform=None,
+            sample_weights=None,
+            num_cv_partitions=20,
+            num_cv_repetitions=5,
+        ),
         lra: bool = False,
         lra_with_weights: bool = False,
         sass: bool = False,
         sass_fraction: float = 0.25,
         sass_expansion_degree: int = 1,
-    ) -> Union[Distribution, Tuple[Distribution, dict]]:
-        r"""Run SMCABC.
+    ) -> Union[Tensor, KDEWrapper, Tuple[Tensor, dict], Tuple[KDEWrapper, dict]]:
+        r"""Run SMCABC and return accepted parameters or KDE object fitted on them.
 
         Args:
             x_o: Observed data.
@@ -130,8 +136,6 @@ class SMCABC(ABCBASE):
                 samples from the previous population when the budget is used up. If
                 False, the current population is discarded and the previous population
                 is returned.
-            return_summary: Whether to return a dictionary with all accepted particles,
-                weights, etc. at the end.
             lra: Whether to run linear regression adjustment as in Beaumont et al. 2002
             lra_with_weights: Whether to run lra as weighted linear regression with SMC
                 weights
@@ -140,12 +144,25 @@ class SMCABC(ABCBASE):
             sass_fraction: Fraction of simulation budget used for the initial sass run.
             sass_expansion_degree: Degree of the polynomial feature expansion for the
                 sass regression, default 1 - no expansion.
+            kde: Whether to run KDE on the accepted parameters to return a KDE
+                object from which one can sample.
+            kde_kwargs: kwargs for performing KDE:
+                'bandwidth='; either a float, or a string naming a bandwidth
+                heuristics, e.g., 'cv' (cross validation), 'silvermann' or 'scott',
+                default 'cv'.
+                'transform': transform applied to the parameters before doing KDE.
+                'sample_weights': weights associated with samples. See 'get_kde' for
+                more details
+            return_summary: Whether to return a dictionary with all accepted particles,
+                weights, etc. at the end.
 
         Returns:
-            posterior: Empirical posterior distribution defined by the accepted
-                particles and their weights.
-            summary (optional): A dictionary containing particles, weights, epsilons
-                and distances of each population.
+            theta (if kde False): accepted parameters of the last population.
+            kde (if kde True): KDE object fitted on accepted parameters, from which one
+                can .sample() and .log_prob().
+            summary (if return_summary True): dictionary containing the accepted
+                paramters (if kde True), distances and simulated data x of all
+                populations.
         """
 
         pop_idx = 0
@@ -239,20 +256,43 @@ class SMCABC(ABCBASE):
         # Maybe run LRA and adjust weights.
         if lra:
             self.logger.info("Running Linear regression adjustment.")
-            adjusted_particels, adjusted_weights = self.run_lra_update_weights(
+            adjusted_particles, adjusted_weights = self.run_lra_update_weights(
                 particles=all_particles[-1],
                 xs=all_x[-1],
                 observation=x_o,
                 log_weights=all_log_weights[-1],
                 lra_with_weights=lra_with_weights,
             )
-            posterior = Empirical(adjusted_particels, log_weights=adjusted_weights)
+            final_particles = adjusted_particles
         else:
-            posterior = Empirical(all_particles[-1], log_weights=all_log_weights[-1])
+            final_particles = all_particles[-1]
+
+        if kde:
+            self.logger.info(
+                f"""KDE on {final_particles.shape[0]} samples with bandwidth option
+                {kde_kwargs["bandwidth"]}. Beware that KDE can give unreliable
+                results when used with too few samples and in high dimensions."""
+            )
+
+            kde_dist = get_kde(final_particles, **kde_kwargs)
+
+            if return_summary:
+                return (
+                    kde_dist,
+                    dict(
+                        particles=all_particles,
+                        weights=all_log_weights,
+                        epsilons=all_epsilons,
+                        distances=all_distances,
+                        xs=all_x,
+                    ),
+                )
+            else:
+                return kde_dist
 
         if return_summary:
             return (
-                posterior,
+                final_particles,
                 dict(
                     particles=all_particles,
                     weights=all_log_weights,
@@ -262,14 +302,14 @@ class SMCABC(ABCBASE):
                 ),
             )
         else:
-            return posterior
+            return final_particles
 
     def _set_xo_and_sample_initial_population(
         self,
         x_o,
         num_particles: int,
         num_initial_pop: int,
-    ) -> Tuple[Tensor, float, Tensor]:
+    ) -> Tuple[Tensor, float, Tensor, Tensor]:
         """Return particles, epsilon and distances of initial population."""
 
         assert (
@@ -307,7 +347,7 @@ class SMCABC(ABCBASE):
         epsilon: float,
         x: Tensor,
         use_last_pop_samples: bool = True,
-    ) -> Tuple[Tensor, Tensor, Tensor]:
+    ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
         """Return particles, weights and distances of new population."""
 
         new_particles = []

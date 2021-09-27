@@ -67,7 +67,7 @@ class SNPE_A(PosteriorEstimator):
             num_components: Number of components of the mixture of Gaussians in the
                 last round. This overrides the `num_components` value passed to
                 `posterior_nn()`.
-            device: torch device on which to compute, e.g. gpu, cpu.
+            device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
             summary_writer: A tensorboard `SummaryWriter` to control, among others, log
@@ -95,12 +95,7 @@ class SNPE_A(PosteriorEstimator):
         # to pass arguments between functions, and that's implicit state management.
         kwargs = utils.del_entries(
             locals(),
-            entries=(
-                "self",
-                "__class__",
-                "unused_args",
-                "num_components",
-            ),
+            entries=("self", "__class__", "unused_args", "num_components"),
         )
         super().__init__(**kwargs)
 
@@ -425,10 +420,7 @@ class SNPE_A_MDN(nn.Module):
 
             # Compute the log_prob of theta under the product.
             log_prob_proposal_posterior = utils.sbiutils.mog_log_prob(
-                theta,
-                logits_pp,
-                m_pp,
-                prec_pp,
+                theta, logits_pp, m_pp, prec_pp
             )
             utils.assert_all_finite(
                 log_prob_proposal_posterior, "proposal posterior eval"
@@ -527,12 +519,7 @@ class SNPE_A_MDN(nn.Module):
 
         # Compute the MoG parameters of the posterior.
         logits_p, m_p, prec_p, cov_p = self._proposal_posterior_transformation(
-            logits_pp,
-            m_pp,
-            prec_pp,
-            norm_logits_d,
-            m_d,
-            prec_d,
+            logits_pp, m_pp, prec_pp, norm_logits_d, m_d, prec_d
         )
         return logits_p, m_p, prec_p
 
@@ -575,11 +562,7 @@ class SNPE_A_MDN(nn.Module):
         )
 
         means_post = self._means_posterior(
-            covariances_post,
-            means_pp,
-            precisions_pp,
-            means_d,
-            precisions_d,
+            covariances_post, means_pp, precisions_pp, means_d, precisions_d
         )
 
         logits_post = SNPE_A_MDN._logits_posterior(
@@ -645,9 +628,8 @@ class SNPE_A_MDN(nn.Module):
         prior will not be exactly have mean=0 and std=1.
         """
         if self.z_score_theta:
-            # Default to cpu to avoid mismatch with prior (always on cpu) below.
-            scale = self._neural_net._transform._transforms[0]._scale.cpu()
-            shift = self._neural_net._transform._transforms[0]._shift.cpu()
+            scale = self._neural_net._transform._transforms[0]._scale
+            shift = self._neural_net._transform._transforms[0]._shift
 
             # Following the definition of the linear transform in
             # `standardizing_transform` in `sbiutils.py`:

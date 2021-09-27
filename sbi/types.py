@@ -2,7 +2,7 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 
-from typing import NewType, Sequence, Tuple, TypeVar, Union
+from typing import NewType, Optional, Sequence, Tuple, TypeVar, Union
 
 import numpy as np
 import torch
@@ -17,6 +17,13 @@ OneOrMore = Union[T, Sequence[T]]
 
 ScalarFloat = Union[torch.Tensor, float]
 
+transform_types = Optional[
+    Union[
+        torch.distributions.transforms.Transform,
+        torch.distributions.transforms.ComposeTransform,
+    ]
+]
+
 # Define alias types because otherwise, the documentation by mkdocs became very long and
 # made the website look ugly.
 TensorboardSummaryWriter = NewType("Writer", SummaryWriter)
@@ -29,4 +36,5 @@ __all__ = [
     "ScalarFloat",
     "TensorboardSummaryWriter",
     "TorchModule",
+    "transform_types",
 ]

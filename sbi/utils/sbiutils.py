@@ -7,13 +7,13 @@ from math import pi
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import torch
-from pyknos.nflows import transforms
+import pyknos.nflows.transforms as transforms
 from pyro.distributions import Empirical
 from torch import Tensor, as_tensor, float32
 from torch import nn as nn
 from torch import ones, optim, zeros
-from torch.distributions import Independent
-from torch.distributions.distribution import Distribution
+from torch.distributions import Distribution, Independent, biject_to
+import torch.distributions.transforms as torch_tf
 from tqdm.auto import tqdm
 
 from sbi import utils as utils
@@ -217,10 +217,8 @@ def rejection_sample_posterior_within_prior(
     while num_remaining > 0:
 
         # Sample and reject.
-        candidates = (
-            posterior_nn.sample(sampling_batch_size, context=x)
-            .reshape(sampling_batch_size, -1)
-            .cpu()
+        candidates = posterior_nn.sample(sampling_batch_size, context=x).reshape(
+            sampling_batch_size, -1
         )
 
         # SNPE-style rejection-sampling when the proposal is the neural net.
@@ -332,7 +330,7 @@ def rejection_sample(
 
     # Define a potential as the ratio between target distribution and proposal.
     def potential_over_proposal(theta):
-        return potential_fn(theta) - proposal.log_prob(theta).cpu()
+        return potential_fn(theta) - proposal.log_prob(theta)
 
     # Search for the maximum of the ratio.
     _, max_log_ratio = optimize_potential_fn(
@@ -398,14 +396,11 @@ def rejection_sample(
                 sampling_batch_size, -1
             )
 
-            # `candidates` will lie on CPU if the proposal is the prior and
-            # possibly on the GPU if the proposal is a neural net. Everything returned
-            # by the `potential_fn` will lie on the CPU.
             target_proposal_ratio = torch.exp(
-                potential_fn(candidates) - proposal.log_prob(candidates).cpu()
+                potential_fn(candidates) - proposal.log_prob(candidates)
             )
             uniform_rand = torch.rand(target_proposal_ratio.shape)
-            samples = candidates.cpu()[target_proposal_ratio > uniform_rand]
+            samples = candidates[target_proposal_ratio > uniform_rand]
 
             accepted.append(samples)
 
@@ -551,9 +546,7 @@ def check_warn_and_setstate(
 
 
 def get_simulations_since_round(
-    data: List,
-    data_round_indices: List,
-    starting_round_index: int,
+    data: List, data_round_indices: List, starting_round_index: int
 ) -> Tensor:
     """
     Returns tensor with all data coming from a round >= `starting_round`.
@@ -891,6 +884,67 @@ def within_support(distribution: Any, samples: Tensor) -> Tensor:
         return torch.isfinite(distribution.log_prob(samples))
 
 
+def mcmc_transform(
+    prior: Any,
+    num_prior_samples_for_zscoring: int = 1000,
+    enable_transform: bool = True,
+    device: str = "cpu",
+    **kwargs,
+) -> torch_tf.Transform:
+    """
+    Builds a transform that is applied to parameters during MCMC.
+
+    The resulting transform is defined such that the forward mapping maps from
+    constrained to unconstrained space.
+
+    It does two things:
+    1) When the prior support is bounded, it transforms the parameters into unbounded
+        space.
+    2) It z-scores the parameters such that MCMC is performed in a z-scored space.
+
+    Args:
+        prior: The prior distribution.
+        num_prior_samples_for_zscoring: The number of samples drawn from the prior
+            to infer the `mean` and `stddev` of the prior used for z-scoring. Unused if
+            the prior has bounded support or when the prior has `mean` and `stddev`
+            attributes.
+        enable_transform: Whether or not to use a transformation during MCMC.
+
+    Returns: A transformation that transforms whose `forward()` maps from unconstrained
+        (or z-scored) to constrained (or non-z-scored) space.
+    """
+
+    if enable_transform:
+        if hasattr(prior.support, "base_constraint") and hasattr(
+            prior.support.base_constraint, "upper_bound"
+        ):
+            transform = biject_to(prior.support)
+        else:
+            if hasattr(prior, "mean") and hasattr(prior, "stddev"):
+                prior_mean = prior.mean.to(device)
+                prior_std = prior.stddev.to(device)
+            else:
+                theta = prior.sample((num_prior_samples_for_zscoring,))
+                prior_mean = theta.mean(dim=0).to(device)
+                prior_std = theta.std(dim=0).to(device)
+
+            transform = torch_tf.AffineTransform(loc=prior_mean, scale=prior_std)
+    else:
+        transform = torch_tf.identity_transform
+
+    # Pytorch `transforms` do not sum the determinant over the parameters. However, if
+    # the `transform` explicitly is an `IndependentTransform`, it does. Since our
+    # `BoxUniform` is a `Independent` distribution, it will also automatically get a
+    # `IndependentTransform` wrapper in `biject_to`. Our solution here is to wrap all
+    # transforms as `IndependentTransform`.
+    if not isinstance(transform, torch_tf.IndependentTransform):
+        transform = torch_tf.IndependentTransform(
+            transform, reinterpreted_batch_ndims=1
+        )
+
+    return transform.inv
+
+
 class ImproperEmpirical(Empirical):
     """
     Wrapper around pyro's `Emprirical` distribution that returns constant `log_prob()`.
@@ -919,10 +973,7 @@ class ImproperEmpirical(Empirical):
 
 
 def mog_log_prob(
-    theta: Tensor,
-    logits_pp: Tensor,
-    means_pp: Tensor,
-    precisions_pp: Tensor,
+    theta: Tensor, logits_pp: Tensor, means_pp: Tensor, precisions_pp: Tensor
 ) -> Tensor:
     r"""
     Returns the log-probability of parameter sets $\theta$ under a mixture of Gaussians.

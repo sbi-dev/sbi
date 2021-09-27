@@ -8,17 +8,13 @@ from warnings import warn
 
 import numpy as np
 import torch
+import torch.distributions.transforms as torch_tf
 from torch import Tensor, nn
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
-from sbi.types import Shape, Array
-from sbi.utils import del_entries, optimize_potential_fn, rejection_sample
-from sbi.utils.torchutils import (
-    ScalarFloat,
-    atleast_2d,
-    ensure_theta_batched,
-    atleast_2d_float32_tensor,
-)
+from sbi.types import Shape
+from sbi.utils import del_entries, mcmc_transform, rejection_sample
+from sbi.utils.torchutils import atleast_2d, ensure_theta_batched
 
 from sbi.vi.sampling import (
     importance_resampling,
@@ -142,7 +138,7 @@ class LikelihoodBasedPosterior(NeuralPosterior):
             )
 
             # Move to cpu for comparison with prior.
-            return log_likelihood_trial_sum.cpu() + self._prior.log_prob(theta)
+            return log_likelihood_trial_sum + self._prior.log_prob(theta)
         elif self.sample_with == "vi":
             with torch.set_grad_enabled(track_gradients):
                 return self._q.log_prob(theta.to(self._device))
@@ -176,13 +172,16 @@ class LikelihoodBasedPosterior(NeuralPosterior):
                 [`mcmc` | `rejection`].
             mcmc_method: Optional parameter to override `self.mcmc_method`.
             mcmc_parameters: Dictionary overriding the default parameters for MCMC.
-                The following parameters are supported: `thin` to set the thinning
-                factor for the chain, `warmup_steps` to set the initial number of
-                samples to discard, `num_chains` for the number of chains,
+                The following parameters are supported:
+                `thin` to set the thinning factor for the chain.
+                `warmup_steps` to set the initial number of samples to discard.
+                `num_chains` for the number of chains.
                 `init_strategy` for the initialisation strategy for chains; `prior`
                 will draw init locations from prior, whereas `sir` will use Sequential-
                 Importance-Resampling using `init_strategy_num_candidates` to find init
                 locations.
+                `enable_transform` a bool indicating whether MCMC is performed in
+                z-scored (and unconstrained) space.
             rejection_sampling_parameters: Dictionary overriding the default parameters
                 for rejection sampling. The following parameters are supported:
                 `proposal` as the proposal distribtution (default is the prior).
@@ -211,20 +210,28 @@ class LikelihoodBasedPosterior(NeuralPosterior):
                 mcmc_method, mcmc_parameters
             )
 
-            samples = self._sample_posterior_mcmc(
+            transform = mcmc_transform(
+                self._prior, device=self._device, **mcmc_parameters
+            )
+
+            transformed_samples = self._sample_posterior_mcmc(
                 num_samples=num_samples,
                 potential_fn=potential_fn_provider(
-                    self._prior, self.net, x, mcmc_method
+                    self._prior, self.net, x, mcmc_method, transform
                 ),
                 init_fn=self._build_mcmc_init_fn(
                     self._prior,
-                    potential_fn_provider(self._prior, self.net, x, "slice_np"),
+                    potential_fn_provider(
+                        self._prior, self.net, x, "slice_np", transform
+                    ),
+                    transform=transform,
                     **mcmc_parameters,
                 ),
                 mcmc_method=mcmc_method,
                 show_progress_bars=show_progress_bars,
                 **mcmc_parameters,
             )
+            samples = transform.inv(transformed_samples)
         elif sample_with == "rejection":
             rejection_sampling_parameters = self._potentially_replace_rejection_parameters(
                 rejection_sampling_parameters
@@ -234,7 +241,7 @@ class LikelihoodBasedPosterior(NeuralPosterior):
 
             samples, _ = rejection_sample(
                 potential_fn=potential_fn_provider(
-                    self._prior, self.net, x, "rejection"
+                    self._prior, self.net, x, "rejection",
                 ),
                 num_samples=num_samples,
                 **rejection_sampling_parameters,
@@ -339,22 +346,26 @@ class LikelihoodBasedPosterior(NeuralPosterior):
             show_progress_bars: Whether to show sampling progress monitor.
             mcmc_method: Optional parameter to override `self.mcmc_method`.
             mcmc_parameters: Dictionary overriding the default parameters for MCMC.
-                The following parameters are supported: `thin` to set the thinning
-                factor for the chain, `warmup_steps` to set the initial number of
-                samples to discard, `num_chains` for the number of chains,
+                The following parameters are supported:
+                `thin` to set the thinning factor for the chain.
+                `warmup_steps` to set the initial number of samples to discard.
+                `num_chains` for the number of chains.
                 `init_strategy` for the initialisation strategy for chains; `prior`
                 will draw init locations from prior, whereas `sir` will use Sequential-
                 Importance-Resampling using `init_strategy_num_candidates` to find init
                 locations.
+                `enable_transform` a bool indicating whether MCMC is performed in
+                z-scored (and unconstrained) space.
             rejection_sampling_parameters: Dictionary overriding the default parameters
                 for rejection sampling. The following parameters are supported:
                 `proposal` as the proposal distribtution (default is the prior).
                 `max_sampling_batch_size` as the batchsize of samples being drawn from
-                the proposal at every iteration. `num_samples_to_find_max` as the
-                number of samples that are used to find the maximum of the
-                `potential_fn / proposal` ratio. `num_iter_to_find_max` as the number
-                of gradient ascent iterations to find the maximum of that ratio. `m` as
-                multiplier to that ratio.
+                the proposal at every iteration.
+                `num_samples_to_find_max` as the number of samples that are used to
+                find the maximum of the `potential_fn / proposal` ratio.
+                `num_iter_to_find_max` as the number of gradient ascent iterations to
+                find the maximum of that ratio.
+                `m` as multiplier to that ratio.
 
         Returns:
             Samples from conditional posterior.
@@ -436,7 +447,7 @@ class LikelihoodBasedPosterior(NeuralPosterior):
 
     @staticmethod
     def _log_likelihoods_over_trials(
-        x: Tensor, theta: Tensor, net: nn.Module, track_gradients: bool = False,
+        x: Tensor, theta: Tensor, net: nn.Module, track_gradients: bool = False
     ) -> Tensor:
         r"""Return log likelihoods summed over iid trials of `x`.
 
@@ -501,7 +512,12 @@ class PotentialFunctionProvider:
     """
 
     def __call__(
-        self, prior, likelihood_nn: nn.Module, x: Tensor, method: str,
+        self,
+        prior,
+        likelihood_nn: nn.Module,
+        x: Tensor,
+        method: str,
+        transform: torch_tf.Transform = None,
     ) -> Callable:
         r"""Return potential function for posterior $p(\theta|x)$.
 
@@ -521,6 +537,7 @@ class PotentialFunctionProvider:
         self.prior = prior
         self.device = next(likelihood_nn.parameters()).device
         self.x = atleast_2d(x).to(self.device)
+        self.transform = transform
 
         if method == "slice":
             return partial(self.pyro_potential, track_gradients=False)
@@ -535,35 +552,37 @@ class PotentialFunctionProvider:
         else:
             NotImplementedError
 
-    def log_likelihood(self, theta: Tensor, track_gradients: bool = False) -> Tensor:
-        """Return log likelihood of fixed data given a batch of parameters."""
+    def posterior_potential(
+        self, theta: Union[Tensor, np.array], track_gradients: bool = False
+    ) -> Tensor:
+        """Return log likelihood of fixed data given a batch of parameters.
+
+        Args:
+            theta:  Parameters $\theta$. If a `transform` is applied, `theta` should be
+                in transformed space.
+        """
+
+        # Device is the same for net and prior.
+        transformed_theta = ensure_theta_batched(
+            torch.as_tensor(theta, dtype=torch.float32)
+        ).to(self.device)
+        # Transform `theta` from transformed (i.e. unconstrained) to untransformed
+        # space.
+        if self.transform is not None:
+            theta = self.transform.inv(transformed_theta)
+            log_abs_det = self.transform.log_abs_det_jacobian(theta, transformed_theta)
 
         log_likelihoods = LikelihoodBasedPosterior._log_likelihoods_over_trials(
             x=self.x,
-            theta=ensure_theta_batched(theta).to(self.device),
+            theta=theta,
             net=self.likelihood_nn,
             track_gradients=track_gradients,
         )
-
-        return log_likelihoods
-
-    def posterior_potential(
-        self, theta: np.array, track_gradients: bool = False
-    ) -> ScalarFloat:
-        r"""Return posterior log prob. of theta $p(\theta|x)$"
-
-        Args:
-            theta: Parameters $\theta$, batch dimension 1.
-
-        Returns:
-            Posterior log probability of the theta, $-\infty$ if impossible under prior.
-        """
-        theta = torch.as_tensor(theta, dtype=torch.float32)
-
-        # Notice opposite sign to pyro potential.
-        return self.log_likelihood(
-            theta, track_gradients=track_gradients
-        ).cpu() + self.prior.log_prob(theta)
+        posterior_potential = log_likelihoods + self.prior.log_prob(theta)
+        posterior_potential_transformed = posterior_potential
+        if self.transform is not None:
+            posterior_potential_transformed -= log_abs_det
+        return posterior_potential_transformed
 
     def pyro_potential(
         self, theta: Dict[str, Tensor], track_gradients: bool = False
@@ -573,7 +592,8 @@ class PotentialFunctionProvider:
          Args:
             theta: Parameters $\theta$. The tensor's shape will be
                 (1, shape_of_single_theta) if running a single chain or just
-                (shape_of_single_theta) for multiple chains.
+                (shape_of_single_theta) for multiple chains. If a `transform` is
+                applied, `theta` should be in transformed space.
 
         Returns:
             The potential $-[\log r(x_o, \theta) + \log p(\theta)]$.
@@ -581,8 +601,5 @@ class PotentialFunctionProvider:
 
         theta = next(iter(theta.values()))
 
-        return -(
-            self.log_likelihood(theta, track_gradients=track_gradients).cpu()
-            + self.prior.log_prob(theta)
-        )
-
+        # Note the minus to match the pyro potential function requirements.
+        return -self.posterior_potential(theta, track_gradients=track_gradients)
