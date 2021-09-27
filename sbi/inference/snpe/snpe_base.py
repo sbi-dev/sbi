@@ -414,7 +414,7 @@ class PosteriorEstimator(NeuralInference, ABC):
             device = self._device
         else:
             # Otherwise, infer it from the device of the net parameters.
-            device = next(density_estimator.parameters()).device
+            device = str(next(density_estimator.parameters()).device)
 
         self._posterior = DirectPosterior(
             method_family="snpe",
