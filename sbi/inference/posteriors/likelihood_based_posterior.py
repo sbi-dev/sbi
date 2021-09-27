@@ -25,6 +25,10 @@ from sbi.vi.sampling import (
     independent_mh,
     random_direction_slice_sampler,
 )
+from sbi.vi.divergence_optimizers import (
+    make_sure_nothing_in_cache,
+    make_sure_nothing_in_cache_disabled_cache,
+)
 
 from tqdm import tqdm
 
@@ -250,16 +254,25 @@ class LikelihoodBasedPosterior(NeuralPosterior):
             elif method.lower() == "ir":
                 potential_fn = potential_fn_provider(self._prior, self.net, x, "vi")
                 samples = importance_resampling(
-                    sample_shape.numel(), potential_fn=potential_fn, proposal=self._q, **method_params
+                    sample_shape.numel(),
+                    potential_fn=potential_fn,
+                    proposal=self._q,
+                    **method_params,
                 )
             elif method.lower() == "imh":
-                 potential_fn = potential_fn_provider(self._prior, self.net, x, "vi")
-                 samples = independent_mh(sample_shape.numel(), potential_fn,self._q, **method_params)
+                potential_fn = potential_fn_provider(self._prior, self.net, x, "vi")
+                samples = independent_mh(
+                    sample_shape.numel(), potential_fn, self._q, **method_params
+                )
             elif method.lower() == "rejection":
                 rejection_sampling_parameters = self._potentially_replace_rejection_parameters(
                     rejection_sampling_parameters
                 )
-                rejection_sampling_parameters["proposal"] = self._q
+                make_sure_nothing_in_cache(self._q)
+                proposal = deepcopy(self._q)
+                make_sure_nothing_in_cache_disabled_cache(proposal)
+
+                rejection_sampling_parameters["proposal"] = proposal
                 samples, _ = rejection_sample(
                     potential_fn=potential_fn_provider(
                         self._prior, self.net, x, "rejection"
@@ -267,13 +280,16 @@ class LikelihoodBasedPosterior(NeuralPosterior):
                     num_samples=num_samples,
                     **rejection_sampling_parameters,
                 )
+
             elif method.lower() == "slice":
                 potential_fn = potential_fn_provider(self._prior, self.net, x, "vi")
                 samples = random_direction_slice_sampler(
                     sample_shape.numel(), potential_fn, self._q, **method_params
                 )
             else:
-                raise NotImplementedError("The sampling methods from the vi posterior are currently restricted to naive, ir, imh, rejection and slice")
+                raise NotImplementedError(
+                    "The sampling methods from the vi posterior are currently restricted to naive, ir, imh, rejection and slice"
+                )
         else:
             raise NameError(
                 "The only implemented sampling methods are `mcmc`, `rejection` and `vi`."

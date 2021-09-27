@@ -54,6 +54,30 @@ def make_sure_nothing_in_cache(q):
                     t_dict[key] = torch.zeros_like(obj)
 
 
+def make_sure_nothing_in_cache_disabled_cache(q):
+    """ This may be used before a 'deepcopy' call, as non leaf tensors (which are in the
+    cache) do not support the deepcopy protocol..."""
+    q.clear_cache()
+    # The original methods can miss some parts..
+    for t in q.transforms:
+        t._cached_x_y = None, None
+        t._cache_size = 0
+        # Compose transforms are not cleared correctly using q.clear_cache...
+        if isinstance(t, torch.distributions.transforms.IndependentTransform):
+            t = t.base_transform
+        if isinstance(t, torch.distributions.transforms.ComposeTransform):
+            for t_i in t.parts:
+                t_i._cached_x_y = None, None
+                t_i._cache_size = 0
+
+        t_dict = t.__dict__
+        for key in t_dict:
+            if "cache" in key or "det" in key:
+                obj = t_dict[key]
+                if torch.is_tensor(obj):
+                    t_dict[key] = torch.zeros_like(obj)
+
+
 class LikelihoodPosteriorWrapper:
     def __init__(self, posterior):
         self.posterior = posterior
@@ -487,12 +511,15 @@ class IWElboOptimizer(ElboOptimizer):
     estimates with vanishing SNR. This is relevant for large K, especially K > n_particles.
     """
 
-    def __init__(self, *args, K=16, **kwargs):
+    def __init__(self, *args, K=16, dreg=False, **kwargs):
         super().__init__(*args, **kwargs)
         self.K = K
         self.loss_name = "iwelbo"
         self.HYPER_PARAMETERS += ["K"]
-        self.eps = 5e-7
+        self.eps = 1e-5
+        self.dreg = dreg
+        if dreg:
+            self.reduce_variance = True
 
     def loss_rsample(self, x_obs):
         """ Computes the IWElbo """
@@ -500,7 +527,7 @@ class IWElboOptimizer(ElboOptimizer):
         elbo_particles = elbo_particles.reshape(self.n_particles, self.K)
         weights = self.get_importance_weight(elbo_particles.clone().detach())
         surrogate_loss = -(weights * elbo_particles).sum(-1).mean(0)
-        loss = -torch.mean(torch.exp(elbo_particles) + 1e-6, -1).log().mean()
+        loss = -torch.mean(torch.exp(elbo_particles) + 1e-20, -1).log().mean()
         return surrogate_loss, loss.clone().detach()
 
     def loss_mixture(self, x_obs):
@@ -523,6 +550,8 @@ class IWElboOptimizer(ElboOptimizer):
         normalized_weights = torch.exp(
             logweights - torch.logsumexp(logweights, -1).unsqueeze(-1)
         )
+        if self.dreg:
+            normalized_weights = normalized_weights ** 2
         return normalized_weights
 
 
@@ -636,7 +665,7 @@ class RenjeyDivergenceOptimizer(ElboOptimizer):
     References: https://arxiv.org/abs/1602.02311
     """
 
-    def __init__(self, *args, alpha=0.5, unbiased=False, **kwargs):
+    def __init__(self, *args, alpha=0.5, unbiased=False, dreg=False, **kwargs):
         """
         Args:
             posterior: Variational Posterior object.
@@ -651,6 +680,9 @@ class RenjeyDivergenceOptimizer(ElboOptimizer):
         self._loss_name = "renjey_divergence"
         self.HYPER_PARAMETERS += ["alpha", "unbiased"]
         self.eps = 1e-5
+        self.dreg = dreg
+        if dreg:
+            self.reduce_variance = True
 
     def _generate_loss_function(self):
         if isinstance(self.alpha, float):
@@ -748,6 +780,8 @@ class RenjeyDivergenceOptimizer(ElboOptimizer):
         mean_log_weights = torch.logsumexp(logweights, 0) - np.log(self.n_particles)
         normed_logweights = logweights - mean_log_weights
         weights = normed_logweights.exp()
+        if self.dreg:
+            weights = weights ** 2
         return weights, mean_log_weights
 
 
@@ -835,6 +869,10 @@ class FDivergenceOptimizer(ElboOptimizer):
                 self._loss = self._loss_TV
             elif self.name == "KL_pol2":
                 self._loss = self._loss_KL_pol2
+            elif self.name == "PVI":
+                self.t0 = torch.zeros(1, requires_grad=True)
+                self.t0_optimizer = torch.optim.Adam([self.t0])
+                self._loss = self._loss_pvi
             else:
                 pass
         else:
@@ -848,7 +886,7 @@ class FDivergenceOptimizer(ElboOptimizer):
         As the loss is a expectation we can use the reparameterization trick here which
         we cannot use in the other loss. But we have unnormalized importance weights ..."""
         particles = self.generate_elbo_particles(x_obs)
-        weights = particles.exp()
+        weights = torch.clamp(particles.exp(), 0, 10000)
         surrogate_loss = torch.mean(weights * particles)
         return surrogate_loss, surrogate_loss.detach()
 
@@ -859,8 +897,22 @@ class FDivergenceOptimizer(ElboOptimizer):
         return surrogate_loss, surrogate_loss.detach()
 
     def _loss_KL_pol2(self, x_obs):
+        """ Polynomial of degree 2 of elbo particles..."""
         particles = self.generate_elbo_particles(x_obs)
         surrogate_loss = torch.mean(particles ** 2 + particles)
+        return surrogate_loss, surrogate_loss.detach()
+
+    def _loss_pvi(self, x_obs):
+        """ Pertubation VI bound"""
+        self.t0_optimizer.step()
+        self.t0_optimizer.zero_grad()
+        particles = self.generate_elbo_particles(x_obs)
+        surrogate_loss = torch.mean(
+            -1 / 6 * (particles + self.t0) ** 3
+            - 0.5 * (particles + self.t0) ** 2
+            - (particles + self.t0)
+            - 1
+        )
         return surrogate_loss, surrogate_loss.detach()
 
     def _loss_JS(self, x_obs, domain=1000):

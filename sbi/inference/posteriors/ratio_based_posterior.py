@@ -14,6 +14,10 @@ from sbi.vi.sampling import (
     independent_mh,
     random_direction_slice_sampler,
 )
+from sbi.vi.divergence_optimizers import (
+    make_sure_nothing_in_cache,
+    make_sure_nothing_in_cache_disabled_cache,
+)
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.types import Shape
@@ -263,7 +267,11 @@ class RatioBasedPosterior(NeuralPosterior):
                 rejection_sampling_parameters = self._potentially_replace_rejection_parameters(
                     rejection_sampling_parameters
                 )
-                rejection_sampling_parameters["proposal"] = self._q
+                make_sure_nothing_in_cache(self._q)
+                proposal = deepcopy(self._q)
+                make_sure_nothing_in_cache_disabled_cache(proposal)
+
+                rejection_sampling_parameters["proposal"] = proposal
                 samples, _ = rejection_sample(
                     potential_fn=potential_fn_provider(
                         self._prior, self.net, x, "rejection"

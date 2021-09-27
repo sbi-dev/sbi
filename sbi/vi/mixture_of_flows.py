@@ -2,6 +2,7 @@ import torch
 from torch import nn
 from torch.distributions import Independent, Categorical, Distribution, biject_to
 from torch.distributions.constraints import Constraint, real
+from torch.distributions.transforms import IndependentTransform
 
 import numpy as np
 import warnings
@@ -25,23 +26,23 @@ from .flows import (
 
 class StackedAutoRegressiveNN(nn.Module):
     """This is implements several independent autoregressive networks, which is usefull
-        for mixture distributions.
+    for mixture distributions.
 
-        Args:
-            num_nn: Number of independent networks
-            input_dim: Input dimension of each network, the total dimension of this
-            network will be (num_nn, input_dim)
-            hidden_dim: Hidden dimension of the autoregressive neural network
-            param_dim: The shape and the number of paramters for each network. For
-            Affine Autoregressive flow [1,1] is default as we want to estimate one mean
-            and one scale.
+    Args:
+        num_nn: Number of independent networks
+        input_dim: Input dimension of each network, the total dimension of this
+        network will be (num_nn, input_dim)
+        hidden_dim: Hidden dimension of the autoregressive neural network
+        param_dim: The shape and the number of paramters for each network. For
+        Affine Autoregressive flow [1,1] is default as we want to estimate one mean
+        and one scale.
     """
 
     def __init__(
         self,
         num_nn: int,
         input_dim: int,
-        hidden_dim: Iterable = None,
+        hidden_dims: Iterable = None,
         param_dims: Iterable = [1, 1],
         **kwargs,
     ):
@@ -52,10 +53,10 @@ class StackedAutoRegressiveNN(nn.Module):
         self.nets = []
         self._kwargs = kwargs
         self.permutation = []
-        if hidden_dim is None:
+        if hidden_dims is None:
             self.hidden_dim = [input_dim * 5 + 10]
         else:
-            self.hidden_dim = hidden_dim
+            self.hidden_dim = hidden_dims
         for i in range(num_nn):
             net = AutoRegressiveNN(
                 input_dim,
@@ -69,7 +70,7 @@ class StackedAutoRegressiveNN(nn.Module):
             self.permutation = list(net.permutation)
 
     def forward(self, x):
-        """ Forward pass through each network and stack it """
+        """Forward pass through each network and stack it"""
         x = x.reshape(-1, self.num_nn, self.input_dim)
         out = list(zip(*[net(x[:, i]) for i, net in enumerate(self.nets)]))
         result = [
@@ -83,23 +84,23 @@ class StackedAutoRegressiveNN(nn.Module):
 
 class StackedDenseNN(nn.Module):
     """This is implements several independent dense networks, which is usefull
-        for mixture distributions of coupling flows.
+    for mixture distributions of coupling flows.
 
-        Args:
-            num_nn: Number of independent networks
-            split_dim: Input dimension of each network, which corresponds to the split
-            dimension in coupling flows.
-            hidden_dim: Hidden dimension of the autoregressive neural network
-            param_dim: The shape and the number of paramters for each network. For
-            Affine flow [1,1] is default as we want to estimate one mean
-            and one scale.
+    Args:
+        num_nn: Number of independent networks
+        split_dim: Input dimension of each network, which corresponds to the split
+        dimension in coupling flows.
+        hidden_dim: Hidden dimension of the autoregressive neural network
+        param_dim: The shape and the number of paramters for each network. For
+        Affine flow [1,1] is default as we want to estimate one mean
+        and one scale.
     """
 
     def __init__(
         self,
         num_nn: int,
         split_dim: int,
-        hidden_dim: Iterable = None,
+        hidden_dims: Iterable = None,
         param_dims: Iterable = [1, 1],
         **kwargs,
     ):
@@ -109,10 +110,10 @@ class StackedDenseNN(nn.Module):
         self.param_dims = param_dims
         self.nets = []
         self._kwargs = kwargs
-        if hidden_dim is None:
+        if hidden_dims is None:
             self.hidden_dim = [split_dim * 5 + 10]
         else:
-            self.hidden_dim = hidden_dim
+            self.hidden_dim = hidden_dims
         for i in range(num_nn):
             net = DenseNN(
                 split_dim, hidden_dims=self.hidden_dim, param_dims=param_dims, **kwargs
@@ -121,7 +122,7 @@ class StackedDenseNN(nn.Module):
             self.nets.append(net)
 
     def forward(self, x):
-        """ Forward pass through each network and stack it """
+        """Forward pass through each network and stack it"""
         x = x.reshape(-1, self.num_nn, self.split_dim)
         out = list(zip(*[net(x[:, i]) for i, net in enumerate(self.nets)]))
         result = [
@@ -137,14 +138,14 @@ class StackedDenseNN(nn.Module):
 class MixtureSameTransform(torch.distributions.MixtureSameFamily):
     """Trainable MixtureSameFamily using transformed distributions.  The component
     distribution should be of tpye TransformedDistribution!
-    
+
     We implement rsample for component distributions that satisfy the autoregressive
     property. If your are not sure if your model is correct use "check_rsample" method
 
     """
 
     def parameters(self):
-        """ Returns the learnable paramters of the model """
+        """Returns the learnable paramters of the model"""
         if not self._mixture_distribution.logits.requires_grad:
             self._mixture_distribution.logits.requires_grad_(True)
         yield self._mixture_distribution.logits
@@ -159,7 +160,7 @@ class MixtureSameTransform(torch.distributions.MixtureSameFamily):
             pass
 
     def modules(self):
-        """ Returns the modules of the model """
+        """Returns the modules of the model"""
         if hasattr(self._component_distribution, "modules"):
             yield from self._component_distribution.modules()
         elif hasattr(self._component_distribution, "transforms"):
@@ -174,9 +175,12 @@ class MixtureSameTransform(torch.distributions.MixtureSameFamily):
             self._component_distribution.clear_cache()
 
     def conditional_logprobs(self, x):
-        """ Logprobs for each component and dimension."""
+        """Logprobs for each component and dimension."""
+
         x_pad = self._pad(x)
         link_transform = self._component_distribution.transforms[-1]
+        if isinstance(link_transform, IndependentTransform):
+            link_transform = link_transform.base_transform
         transforms = self._component_distribution.transforms[:-1]
         x_delinked = link_transform.inv(x_pad)
         x = x_delinked
@@ -204,12 +208,12 @@ class MixtureSameTransform(torch.distributions.MixtureSameFamily):
         return log_prob
 
     def _pad(self, x):
-        """ Pads the input, by repeating in "_num_component" times """
+        """Pads the input, by repeating in "_num_component" times"""
         x = x.reshape(-1, self._event_shape[0])
         return x.unsqueeze(1).repeat(1, self._num_component, 1)
 
     def conditional_cdf(self, x):
-        """ Cdfs for each component and dimension. """
+        """Cdfs for each component and dimension."""
         x_pad = self._pad(x)
         transform = ComposeTransform(self._component_distribution.transforms)
         eps = transform.inv(x_pad)
@@ -220,8 +224,18 @@ class MixtureSameTransform(torch.distributions.MixtureSameFamily):
             cdf = base_dist.cdf(eps)
         return cdf
 
+    def replace_invalid_parameters(self):
+        probs_mask = ~torch.isfinite(self._mixture_distribution.probs)
+        if probs_mask.any():
+            self._mixture_distribution.probs.detach()
+            self._mixture_distribution.probs[probs_mask] = 1e-6
+            self._mixture_distribution.probs = torch.abs(
+                self._mixture_distribution.probs
+                / self._mixture_distribution.probs.sum()
+            )
+
     def standardize(self, x):
-        """ This transform converts samples from the distributions to Unif[0,1]
+        """This transform converts samples from the distributions to Unif[0,1]
         samples. This works only if the autoregressive property holds."""
         log_prob_x = self.conditional_logprobs(x)
         cdf_x = self.conditional_cdf(x)
@@ -238,8 +252,9 @@ class MixtureSameTransform(torch.distributions.MixtureSameFamily):
         return torch.sum(posterior_weights * cdf_x, 1)
 
     def rsample(self, shape=(), eps=1e-8):
-        """ Implicit reparamterization """
-        x = self.sample(shape).detach()
+        self.replace_invalid_parameters()
+        """Implicit reparamterization"""
+        x = self.sample(shape)
         x.requires_grad = True
         z = self.standardize(x)
         batch_jacobian = jacobian_in_batch(z, x) + (
@@ -250,9 +265,18 @@ class MixtureSameTransform(torch.distributions.MixtureSameFamily):
         ].squeeze(-1)
         return x.detach() + (surrogate - surrogate.detach())
 
+    def log_prob(self, *args, **kwargs):
+        """This prevents returning an error"""
+        self.replace_invalid_parameters()
+        return super().log_prob(*args, **kwargs)
+
+    def sample(self, *args, **kwargs):
+        self.replace_invalid_parameters()
+        return super().sample(*args, **kwargs)
+
     def check_rsample(self, num_samples=100):
-        """ The jacobian must be lower triangular such that rsample works. This is
-        checked here """
+        """The jacobian must be lower triangular such that rsample works. This is
+        checked here"""
         x = self.sample((num_samples,)).detach()
         x.requires_grad = True
         z = self.standardize(x)
@@ -264,16 +288,16 @@ class MixtureSameTransform(torch.distributions.MixtureSameFamily):
 
 
 class MixtureDiagGaussians(MixtureSameTransform):
-    """ This implements a learnable Mixture of Gaussians with diagonal covariance.
-    
-        Args:
-        num_components: Number of mixture components
-        event_dim: Dimension of the event.
-        loc: Starting location, as default this will be drawn randomly according to a
-        standard normal distribution.
-        scale: Scale, default is one.
-        support: The support of the distribution
-        """
+    """This implements a learnable Mixture of Gaussians with diagonal covariance.
+
+    Args:
+    num_components: Number of mixture components
+    event_dim: Dimension of the event.
+    loc: Starting location, as default this will be drawn randomly according to a
+    standard normal distribution.
+    scale: Scale, default is one.
+    support: The support of the distribution
+    """
 
     def __init__(
         self,
@@ -306,7 +330,9 @@ class MixtureDiagGaussians(MixtureSameTransform):
 
         # Create mixture distribution
         mix = Categorical(logits=torch.ones(num_components))
-        super().__init__(mix, qs, **kwargs)
+        qs.set_default_validate_args(False)
+        mix.set_default_validate_args(False)
+        super().__init__(mix, qs)
 
         self.transforms = [t, link]
         self.has_rsample = True
@@ -331,9 +357,9 @@ class MixtureDiagGaussians(MixtureSameTransform):
 
 class MixtureFullGaussians(MixtureSameTransform):
     """This implements a learnable Mixture of Gaussians with full covariance.
-    
-    
-    
+
+
+
     Args:
         num_components: Number of mixture components
         event_dim: Dimension of the event.
@@ -373,7 +399,9 @@ class MixtureFullGaussians(MixtureSameTransform):
         link = biject_to(support).with_cache()
         qs = TransformedDistribution(base_dist, [t, link])
         mix = Categorical(logits=torch.ones(num_components))
-        super().__init__(mix, qs, **kwargs)
+        qs.set_default_validate_args(False)
+        mix.set_default_validate_args(False)
+        super().__init__(mix, qs)
 
         self.transforms = [t, link]
         self.has_rsample = True
@@ -402,7 +430,7 @@ class MixtureFullGaussians(MixtureSameTransform):
 
 
 class MixtureAffineAutoregressive(MixtureSameTransform):
-    """A learnable Mixture of affine autoregressive flows 
+    """A learnable Mixture of affine autoregressive flows
     Args:
         num_components: Number of Mixture components.
         event_dim: Shape of events.
@@ -431,8 +459,11 @@ class MixtureAffineAutoregressive(MixtureSameTransform):
             )
         self.nets = []
         self.transforms = []
+        hidden_dims = kwargs.get("hidden_dims", [5 * event_dim + 5])
         for _ in range(num_flows):
-            net = StackedAutoRegressiveNN(num_components, event_dim, **kwargs)
+            net = StackedAutoRegressiveNN(
+                num_components, event_dim, hidden_dims=hidden_dims
+            )
             transform = AffineAutoregressive(net, log_scale_min_clip=-2).with_cache()
             self.nets.append(net)
             self.transforms.append(transform)
@@ -440,7 +471,9 @@ class MixtureAffineAutoregressive(MixtureSameTransform):
         self.transforms.append(link)
         qs = TransformedDistribution(base_dist, self.transforms)
         mix = Categorical(logits=torch.ones(num_components))
-        super().__init__(mix, qs, **kwargs)
+        qs.set_default_validate_args(False)
+        mix.set_default_validate_args(False)
+        super().__init__(mix, qs)
 
         self.has_rsample = True
         if check_rsample:
@@ -449,14 +482,14 @@ class MixtureAffineAutoregressive(MixtureSameTransform):
 
 
 class MixtureSplineAutoregressive(MixtureSameTransform):
-    """A learnable Mixture of spline autoregressive flows 
+    """A learnable Mixture of spline autoregressive flows
     Args:
         num_components: Number of Mixture components.
         event_dim: Shape of events.
         base_dist: Base distribution used to construct the flows
         num_flows: Number of flows per component.
         support: The support of the distribution
-    
+
     """
 
     def __init__(
@@ -482,10 +515,14 @@ class MixtureSplineAutoregressive(MixtureSameTransform):
         count_bins = kwargs.pop("count_bins", 8)
         bound = kwargs.pop("bound", 3.0)
         order = kwargs.pop("order", "linear")
+        hidden_dims = kwargs.get("hidden_dims", [event_dim * 10, event_dim * 10])
         param_dims = [count_bins, count_bins, count_bins - 1, count_bins]
         for _ in range(num_flows):
             net = StackedAutoRegressiveNN(
-                num_components, event_dim, param_dims=param_dims, **kwargs
+                num_components,
+                event_dim,
+                param_dims=param_dims,
+                hidden_dims=hidden_dims,
             )
             transform = SplineAutoregressive(
                 event_dim, net, count_bins=count_bins, bound=bound, order=order
@@ -496,7 +533,9 @@ class MixtureSplineAutoregressive(MixtureSameTransform):
         self.transforms.append(link)
         qs = TransformedDistribution(base_dist, self.transforms)
         mix = Categorical(logits=torch.ones(num_components))
-        super().__init__(mix, qs, **kwargs)
+        qs.set_default_validate_args(False)
+        mix.set_default_validate_args(False)
+        super().__init__(mix, qs)
 
         self.has_rsample = True
         if check_rsample:
@@ -505,7 +544,7 @@ class MixtureSplineAutoregressive(MixtureSameTransform):
 
 
 class Mixture(Distribution):
-    """ This is a general Mixture distribution. """
+    """This is a general Mixture distribution."""
 
     def __init__(self, cat: Categorical, components: Iterable[Distribution]):
         super().__init__()
@@ -515,8 +554,9 @@ class Mixture(Distribution):
         else:
             raise ValueError("Mixture distribution must be Categorical")
 
+        self._mixture_distribution.set_default_validate_args(False)
         self._components = components
-        self._validate_components
+        self._validate_components()
         self._num_components = len(components)
         self._event_shape = components[0].event_shape
         self._batch_shape = components[0].batch_shape
@@ -531,7 +571,7 @@ class Mixture(Distribution):
         return transforms
 
     def parameters(self):
-        """ Returns the learnable paramters of the model """
+        """Returns the learnable paramters of the model"""
         self._mixture_distribution.logits.requires_grad_(True)
         yield self._mixture_distribution.logits
         for comp in self.components:
@@ -546,7 +586,7 @@ class Mixture(Distribution):
                 pass
 
     def modules(self):
-        """ Returns the learnable modules of the model """
+        """Returns the learnable modules of the model"""
         for comp in self.components:
             if hasattr(comp, "modules"):
                 yield from comp.modules()
@@ -622,17 +662,17 @@ def build_mixture(
     rsample=False,
     **kwargs,
 ) -> Mixture:
-    """ This builds a mixture of normalizing flows.
+    """This builds a mixture of normalizing flows.
 
     Args:
         event_shape: Dimension of the events
         support: Support of the distribution.
         num_components: Number of mixture components
         kwargs: Arguments for the type of flow
-    
+
     Returns:
         MixtureOfFlows: Pytorch module that implements a trainable mixture of flows.
-    
+
     """
     if not rsample:
         components = []

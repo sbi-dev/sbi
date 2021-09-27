@@ -213,7 +213,11 @@ def build_flow(
         TransformedDistribution
     
     """
-
+    link_flow = biject_to(support)
+    additional_dim = len(link_flow(torch.zeros(event_shape))) - torch.tensor(
+        event_shape
+    )
+    event_shape = torch.Size(torch.tensor(event_shape) - additional_dim)
     # Base distribution is standard normal if not specified
     if base_dist is None:
         base_dist = Independent(
@@ -234,7 +238,6 @@ def build_flow(
             flows.append(transforms.permute(dim).with_cache())
         if batch_norm and i < num_flows - 1:
             flows.append(transforms.batchnorm(dim))
-    link_flow = biject_to(support)
     flows.append(link_flow.with_cache())
     dist = TransformedDistribution(base_dist, flows)
     return dist
@@ -307,9 +310,9 @@ class NeuralODETransform(TransformModule):
         ODEnet,
         T=1.0,
         t0=0.0,
-        atol=1e-5,
-        rtol=1e-5,
-        solver="rk4",
+        atol=1e-2,
+        rtol=1e-2,
+        solver="dopri5",
         options=dict(),
         adjoint=False,
     ):
@@ -332,8 +335,8 @@ class NeuralODETransform(TransformModule):
         self.net = ODEnet
         self.T = float(T)
         self.t0 = float(t0)
-        self.atol = 1e-5
-        self.rtol = 1e-5
+        self.atol = atol
+        self.rtol = rtol
         self.solver = solver
         self.adjoint = adjoint
         self.options = options
