@@ -543,7 +543,7 @@ class PotentialFunctionProvider:
         classifier: nn.Module,
         x: Tensor,
         method: str,
-        transform: torch_tf.Transform = torch_tf.identity_transform,
+        transform: torch_tf.Transform = None,
     ) -> Callable:
         r"""Return potential function for posterior $p(\theta|x)$.
 
@@ -600,14 +600,17 @@ class PotentialFunctionProvider:
         ).to(self.device)
         # Transform `theta` from transformed (i.e. unconstrained) to untransformed
         # space.
-        theta = self.transform.inv(transformed_theta)
-        log_abs_det = self.transform.log_abs_det_jacobian(theta, transformed_theta)
+        if self.transform is not None:
+            theta = self.transform.inv(transformed_theta)
+            log_abs_det = self.transform.log_abs_det_jacobian(theta, transformed_theta)
 
         log_ratio = RatioBasedPosterior._log_ratios_over_trials(
             self.x, theta, self.classifier, track_gradients=track_gradients,
         )
         posterior_potential = log_ratio + self.prior.log_prob(theta)
-        posterior_potential_transformed = posterior_potential - log_abs_det
+        posterior_potential_transformed = posterior_potential
+        if self.transform is not None:
+            posterior_potential_transformed -= log_abs_det
         return posterior_potential_transformed
 
     def pyro_potential(
