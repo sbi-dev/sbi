@@ -291,7 +291,7 @@ class NeuralPosterior(ABC):
 
     @property
     def posterior_sampler(self):
-        """Returns sampler created by `sample`."""
+        """Returns sampler created by `sample` or `sample_conditional` when `sample_with='mcmc'`."""
         return self._posterior_sampler
 
     @abstractmethod
