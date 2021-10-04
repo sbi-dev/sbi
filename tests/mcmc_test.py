@@ -10,7 +10,7 @@ from torch import eye, ones, zeros
 
 from sbi import utils
 from sbi.inference import SNLE, SNPE, SNRE, prepare_for_sbi, simulate_for_sbi
-from sbi.mcmc.slice_numpy import SliceSampler
+from sbi.mcmc.slice_numpy import SliceSampler, SliceSamplerSerial
 from sbi.mcmc.slice_numpy_vectorized import SliceSamplerVectorized
 from sbi.simulators.linear_gaussian import true_posterior_linear_gaussian_mvn_prior
 from tests.test_utils import check_c2st
@@ -50,7 +50,8 @@ def test_c2st_slice_np_on_Gaussian(num_dim: int, set_seed):
 
 
 @pytest.mark.parametrize("num_dim", (1, 2))
-def test_c2st_slice_np_vectorized_on_Gaussian(num_dim: int, set_seed):
+@pytest.mark.parametrize("slice_sampler", (SliceSamplerVectorized, SliceSamplerSerial))
+def test_c2st_slice_np_vectorized_on_Gaussian(num_dim: int, slice_sampler, set_seed):
     """Test MCMC on Gaussian, comparing to ground truth target via c2st.
 
     Args:
@@ -74,7 +75,7 @@ def test_c2st_slice_np_vectorized_on_Gaussian(num_dim: int, set_seed):
     def lp_f(x):
         return target_distribution.log_prob(torch.as_tensor(x, dtype=torch.float32))
 
-    sampler = SliceSamplerVectorized(
+    sampler = slice_sampler(
         log_prob_fn=lp_f,
         init_params=np.zeros(
             (
@@ -90,4 +91,9 @@ def test_c2st_slice_np_vectorized_on_Gaussian(num_dim: int, set_seed):
 
     samples = torch.as_tensor(samples, dtype=torch.float32)
 
-    check_c2st(samples, target_samples, alg=f"slice_np_vectorized")
+    alg = {
+        SliceSamplerVectorized: f"slice_np_vectorized",
+        SliceSamplerSerial: f"slice_np",
+    }[slice_sampler]
+
+    check_c2st(samples, target_samples, alg=alg)
