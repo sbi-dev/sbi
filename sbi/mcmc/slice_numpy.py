@@ -250,9 +250,12 @@ class SliceSamplerSerial:
                 verbose=self.verbose,
             )
             all_samples.append(posterior_sampler.gen(num_samples))
-        all_samples = np.stack(all_samples).astype(np.float32)
-        samples = torch.from_numpy(all_samples)  # chains x samples x dim
-        return samples.detach().numpy()
+
+        samples = np.stack(all_samples).astype(np.float32)
+
+        samples = samples[:, ::self.thin, :]  # thin chains
+
+        return samples
 
 
 def test_():
