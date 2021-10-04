@@ -24,6 +24,7 @@ class SliceSamplerVectorized:
         Args:
             log_prob_fn: Log prob function.
             init_params: Initial parameters.
+            num_chains: Number of MCMC chains to run in parallel
             verbose: Show/hide additional info such as progress bars.
             thin: amount of thinning; if None, no thinning.
             tuning: Number of tuning steps for brackets.
