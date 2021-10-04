@@ -40,9 +40,16 @@ def test_c2st_slice_np_on_Gaussian(num_dim: int, set_seed):
     def lp_f(x):
         return target_distribution.log_prob(torch.as_tensor(x, dtype=torch.float32))
 
-    sampler = SliceSampler(lp_f=lp_f, x=np.zeros((num_dim,)).astype(np.float32))
-    _ = sampler.gen(warmup)
+    sampler = SliceSampler(
+        lp_f=lp_f,
+        x=np.zeros((num_dim,)).astype(np.float32),
+        tuning=warmup,
+    )
+    warmup_samples = sampler.gen(warmup)
+    assert warmup_samples.shape == (warmup, num_dim)
+
     samples = sampler.gen(num_samples)
+    assert samples.shape == (num_samples, num_dim)
 
     samples = torch.as_tensor(samples, dtype=torch.float32)
 
