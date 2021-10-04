@@ -7,6 +7,7 @@ from sbi.samplers.mcmc.init_strategy import (
 from sbi.samplers.mcmc.slice import Slice
 from sbi.samplers.mcmc.slice_numpy import (
     SliceSampler,
+    SliceSamplerSerial,
     SliceSamplerVectorized,
-    slice_np_parallized,
+    run_slice_np_vectorized_parallelized,
 )
