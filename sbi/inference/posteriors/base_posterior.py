@@ -37,6 +37,7 @@ class NeuralPosterior(ABC):
                 Allows to perform, e.g. MCMC in unconstrained space.
             device: Training device, e.g., "cpu", "cuda" or "cuda:0". If None,
                 `potential_fn.device` is used.
+            x_shape: Shape of the observed data.
         """
 
         # Ensure device string.
@@ -140,6 +141,7 @@ class NeuralPosterior(ABC):
                 "Context `x` needed when a default has not been set."
                 "If you'd like to have a default, use the `.set_default_x()` method."
             )
+            self._posterior_sampler = None
         else:
             return self.default_x
 
