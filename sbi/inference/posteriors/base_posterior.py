@@ -769,6 +769,7 @@ class NeuralPosterior(ABC):
                 num_samples=num_samples,
                 **rejection_sampling_parameters,
             )
+            self._posterior_sampler = None
         else:
             raise NameError(
                 "The only implemented sampling methods are `mcmc` and `rejection`."
