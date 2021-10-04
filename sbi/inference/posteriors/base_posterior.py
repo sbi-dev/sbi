@@ -116,6 +116,7 @@ class NeuralPosterior(ABC):
         self._x = None
         self._num_iid_trials = None
         self._x_shape = x_shape
+        self._posterior_sampler = None
 
         self._device = device
         # Methods capable of handling iid xo.
@@ -287,6 +288,11 @@ class NeuralPosterior(ABC):
     ) -> Tensor:
         """See child classes for docstring."""
         pass
+
+    @property
+    def posterior_sampler(self):
+        """Returns sampler created by `sample`."""
+        return self._posterior_sampler
 
     @abstractmethod
     def sample(
@@ -577,6 +583,8 @@ class NeuralPosterior(ABC):
         samples = samples.reshape(-1, dim_samples)[:num_samples, :]
         assert samples.shape[0] == num_samples
 
+        self._posterior_sampler = posterior_sampler
+
         return samples.type(torch.float32).to(self._device)
 
     def _pyro_mcmc(
@@ -626,6 +634,8 @@ class NeuralPosterior(ABC):
 
         samples = samples[::thin][:num_samples]
         assert samples.shape[0] == num_samples
+
+        self._posterior_sampler = sampler
 
         return samples
 
