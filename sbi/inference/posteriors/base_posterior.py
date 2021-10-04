@@ -21,7 +21,7 @@ from sbi import utils as utils
 from sbi.mcmc import (
     IterateParameters,
     Slice,
-    SliceSampler,
+    SliceSamplerSerial,
     SliceSamplerVectorized,
     prior_init,
     sir,
@@ -547,35 +547,23 @@ class NeuralPosterior(ABC):
         num_chains = initial_params.shape[0]
         dim_samples = initial_params.shape[1]
 
-        if not vectorized:  # Sample all chains sequentially
-            all_samples = []
-            for c in range(num_chains):
-                posterior_sampler = SliceSampler(
-                    utils.tensor2numpy(initial_params[c, :]).reshape(-1),
-                    lp_f=potential_function,
-                    thin=thin,
-                    verbose=show_progress_bars,
-                )
-                if warmup_steps > 0:
-                    posterior_sampler.gen(int(warmup_steps))
-                all_samples.append(
-                    posterior_sampler.gen(ceil(num_samples / num_chains))
-                )
-            all_samples = np.stack(all_samples).astype(np.float32)
-            samples = torch.from_numpy(all_samples)  # chains x samples x dim
-        else:  # Sample all chains at the same time
-            posterior_sampler = SliceSamplerVectorized(
-                init_params=utils.tensor2numpy(initial_params),
-                log_prob_fn=potential_function,
-                num_chains=num_chains,
-                verbose=show_progress_bars,
-            )
-            warmup_ = warmup_steps * thin
-            num_samples_ = ceil((num_samples * thin) / num_chains)
-            samples = posterior_sampler.run(warmup_ + num_samples_)
-            samples = samples[:, warmup_:, :]  # discard warmup steps
-            samples = samples[:, ::thin, :]  # thin chains
-            samples = torch.from_numpy(samples)  # chains x samples x dim
+        if not vectorized:
+            SliceSamplerMultiChain = SliceSamplerSerial
+        else:
+            SliceSamplerMultiChain = SliceSamplerVectorized
+
+        posterior_sampler = SliceSamplerMultiChain(
+            init_params=utils.tensor2numpy(initial_params),
+            log_prob_fn=potential_function,
+            num_chains=num_chains,
+            thin=thin,
+            verbose=show_progress_bars,
+        )
+        warmup_ = warmup_steps * thin
+        num_samples_ = ceil((num_samples * thin) / num_chains)
+        samples = posterior_sampler.run(warmup_ + num_samples_)
+        samples = samples[:, warmup_steps:, :]  # discard warmup steps
+        samples = torch.from_numpy(samples)  # chains x samples x dim
 
         # Save sample as potential next init (if init_strategy == 'latest_sample').
         self._mcmc_init_params = samples[:, -1, :].reshape(num_chains, dim_samples)
