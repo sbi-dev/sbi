@@ -61,6 +61,7 @@ class NeuralPosterior(ABC):
         mcmc_method: str = "slice_np",
         mcmc_parameters: Optional[Dict[str, Any]] = None,
         rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
+        var_name: str = "theta",
         device: str = "cpu",
     ):
         """
@@ -92,6 +93,9 @@ class NeuralPosterior(ABC):
                 `potential_fn / proposal` ratio. `num_iter_to_find_max` as the number
                 of gradient ascent iterations to find the maximum of that ratio. `m` as
                 multiplier to that ratio.
+            var_name: Name of the sampled parameters used internally. When sampling with
+                `mcmc_method` of `slice`, `hmc`, or `nuts`, this name is used in the
+                sampler returned by `self.posterior_sampler` after sampling.
             device: Training device, e.g., "cpu", "cuda" or "cuda:0".
         """
         if method_family in ("snpe", "snle", "snre_a", "snre_b"):
@@ -117,6 +121,7 @@ class NeuralPosterior(ABC):
         self._num_iid_trials = None
         self._x_shape = x_shape
         self._posterior_sampler = None
+        self.var_name = var_name
 
         self._device = device
         # Methods capable of handling iid xo.
@@ -609,7 +614,7 @@ class NeuralPosterior(ABC):
             kernel=kernels[mcmc_method](potential_fn=potential_function),
             num_samples=(thin * num_samples) // num_chains + num_chains,
             warmup_steps=warmup_steps,
-            initial_params={"": initial_params},
+            initial_params={self.var_name: initial_params},
             num_chains=num_chains,
             mp_context="fork",
             disable_progbar=not show_progress_bars,
