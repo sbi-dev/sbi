@@ -249,9 +249,7 @@ class SliceSamplerSerial:
                 tuning=self.tuning,
                 verbose=self.verbose,
             )
-            all_samples.append(
-                posterior_sampler.gen(ceil(num_samples / self.num_chains))
-            )
+            all_samples.append(posterior_sampler.gen(num_samples))
         all_samples = np.stack(all_samples).astype(np.float32)
         samples = torch.from_numpy(all_samples)  # chains x samples x dim
         return samples.detach().numpy()
