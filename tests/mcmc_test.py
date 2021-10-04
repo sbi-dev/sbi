@@ -68,6 +68,7 @@ def test_c2st_slice_np_vectorized_on_Gaussian(num_dim: int, slice_sampler, set_s
     num_samples = 500
     warmup = 500
     num_chains = 5
+    thin = 2
 
     likelihood_shift = -1.0 * ones(num_dim)
     likelihood_cov = 0.3 * eye(num_dim)
@@ -90,9 +91,12 @@ def test_c2st_slice_np_vectorized_on_Gaussian(num_dim: int, slice_sampler, set_s
                 num_dim,
             )
         ).astype(np.float32),
+        tuning=warmup,
+        thin=thin,
         num_chains=num_chains,
     )
-    samples = sampler.run(warmup + int(num_samples / num_chains))
+    samples = sampler.run(thin * (warmup + int(num_samples / num_chains)))
+    assert samples.shape == (num_chains, warmup + int(num_samples / num_chains), num_dim)
     samples = samples[:, warmup:, :]
     samples = samples.reshape(-1, num_dim)
 
