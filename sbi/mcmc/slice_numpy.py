@@ -3,9 +3,11 @@
 
 import os
 import sys
+from math import ceil
 from typing import Callable, Optional
 
 import numpy as np
+import torch
 from matplotlib import pyplot as plt
 from tqdm import trange
 
@@ -191,6 +193,68 @@ class SliceSampler(MCMCSampler):
             xi = (ux - lx) * rng.rand() + lx
 
         return xi, ux - lx
+
+
+class SliceSamplerSerial:
+
+    def __init__(
+        self,
+        log_prob_fn: Callable,
+        init_params: np.ndarray,
+        num_chains: int = 1,
+        thin: Optional[int] = None,
+        tuning: int = 50,
+        verbose: bool = True,
+        max_width: float = float("inf"),
+    ):
+        """Slice sampler in pure Numpy, running for each chain in serial.
+
+        Args:
+            log_prob_fn: Log prob function.
+            init_params: Initial parameters.
+            num_chains: Number of MCMC chains to run in parallel
+            thin: amount of thinning; if None, no thinning.
+            tuning: Number of tuning steps for brackets.
+            verbose: Show/hide additional info such as progress bars.
+            max_width: Maximum width of brackets.
+        """
+        self._log_prob_fn = log_prob_fn
+
+        self.x = init_params
+        self.num_chains = num_chains
+        self.thin = thin
+        self.tuning = tuning
+        self.verbose = verbose
+
+        self.max_width = max_width
+
+        self.n_dims = self.x.size
+
+    def run(self, num_samples: int) -> np.ndarray:
+        """Runs MCMC
+
+        Args:
+            num_samples: Number of samples to generate
+
+        Returns:
+            MCMC samples
+        """
+        all_samples = []
+        for c in range(self.num_chains):
+            posterior_sampler = SliceSampler(
+                self.x[c, :].reshape(-1),
+                lp_f=self._log_prob_fn,
+                max_width=self.max_width,
+                thin=self.thin,
+                tuning=self.tuning,
+                verbose=self.verbose,
+            )
+            all_samples.append(
+                posterior_sampler.gen(ceil(num_samples / self.num_chains))
+            )
+        all_samples = np.stack(all_samples).astype(np.float32)
+        samples = torch.from_numpy(all_samples)  # chains x samples x dim
+        return samples.detach().numpy()
 
 
 def test_():
