@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
-from typing import Callable, Union
+from typing import Callable, Optional, Union
 
 import numpy as np
 from tqdm import tqdm
@@ -13,6 +13,7 @@ class SliceSamplerVectorized:
         log_prob_fn: Callable,
         init_params: np.ndarray,
         num_chains: int = 1,
+        thin: Optional[int] = None,
         tuning: int = 50,
         verbose: bool = True,
         init_width: Union[float, np.ndarray] = 0.01,
@@ -24,6 +25,7 @@ class SliceSamplerVectorized:
             log_prob_fn: Log prob function.
             init_params: Initial parameters.
             verbose: Show/hide additional info such as progress bars.
+            thin: amount of thinning; if None, no thinning.
             tuning: Number of tuning steps for brackets.
             init_width: Inital width of brackets.
             max_width: Maximum width of brackets.
@@ -32,6 +34,7 @@ class SliceSamplerVectorized:
 
         self.x = init_params
         self.num_chains = num_chains
+        self.thin = 1 if thin is None else thin
         self.tuning = tuning
         self.verbose = verbose
 
@@ -226,5 +229,7 @@ class SliceSamplerVectorized:
                     num_chains_finished += 1
 
         samples = np.stack([self.state[c]["samples"] for c in range(self.num_chains)])
+
+        samples = samples[:, ::self.thin, :]  # thin chains
 
         return samples
