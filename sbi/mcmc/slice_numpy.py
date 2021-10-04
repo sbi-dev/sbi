@@ -49,7 +49,7 @@ class MCMCSampler:
 
 class SliceSampler(MCMCSampler):
     def __init__(
-        self, x, lp_f, max_width=float("inf"), thin=None, verbose: bool = False
+        self, x, lp_f, max_width=float("inf"), thin=None, tuning: int = 50, verbose: bool = False
     ):
         """Slice sampling for multivariate continuous probability distributions.
 
@@ -60,12 +60,14 @@ class SliceSampler(MCMCSampler):
             lp_f: Function that returns the log prob.
             max_width: maximum bracket width
             thin: amount of thinning; if None, no thinning.
+            tuning: Number of tuning steps for brackets.
             verbose: Whether to show progress bars (False).
         """
 
         MCMCSampler.__init__(self, x, lp_f, thin, verbose=verbose)
         self.max_width = max_width
         self.width = None
+        self.tuning = tuning
 
     def gen(
         self, n_samples: int, logger=sys.stdout, show_info: bool = False, rng=np.random
@@ -131,15 +133,14 @@ class SliceSampler(MCMCSampler):
             rng: Random number generator to use.
         """
 
-        n_samples = 50
         order = list(range(self.n_dims))
         x = self.x.copy()
         self.width = np.full(self.n_dims, 0.01)
 
-        tbar = trange(n_samples, miniters=10, disable=not self.verbose)
+        tbar = trange(self.tuning, miniters=10, disable=not self.verbose)
         tbar.set_description("Tuning bracket width...")
         for n in tbar:
-            # for n in range(int(n_samples)):
+            # for n in range(int(self.tuning)):
             rng.shuffle(order)
 
             for i in range(self.n_dims):
