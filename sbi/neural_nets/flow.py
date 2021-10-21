@@ -209,4 +209,16 @@ def build_nsf(
     base = dist.MultivariateNormal(zeros(x_numel), eye(x_numel))
     flow = dist.ConditionalTransformedDistribution(base, trafo)
 
-    return flow, embedding_net
+    flow_with_embedding = FlowEmbedding(flow, embedding_net)
+
+    return flow_with_embedding
+
+
+class FlowEmbedding:
+    def __init__(self, flow, embedding_net):
+        self.flow = flow
+        self.embedding_net = embedding_net
+
+    def condition(self, context):
+        embedded_context = self.embedding_net(context)
+        return self.flow.condition(embedded_context)

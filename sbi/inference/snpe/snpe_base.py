@@ -342,7 +342,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         if show_train_summary:
             print(self._describe_round(self._round, self._summary))
 
-        return deepcopy(self._neural_net)
+        return deepcopy(self._neural_net.net), deepcopy(self._neural_net.embedding_net)
 
     def build_posterior(
         self,
@@ -461,7 +461,7 @@ class PosteriorEstimator(NeuralInference, ABC):
 
         if self._round == 0:
             # Use posterior log prob (without proposal correction) for first round.
-            log_prob = self._neural_net.log_prob(theta, x)
+            log_prob = self._neural_net.condition(x).log_prob(theta)
         else:
             log_prob = self._log_prob_proposal_posterior(theta, x, masks, proposal)
 
