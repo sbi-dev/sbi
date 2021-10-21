@@ -342,7 +342,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         if show_train_summary:
             print(self._describe_round(self._round, self._summary))
 
-        return deepcopy(self._neural_net.net), deepcopy(self._neural_net.embedding_net)
+        return deepcopy(self._neural_net)
 
     def build_posterior(
         self,
