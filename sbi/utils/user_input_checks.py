@@ -623,7 +623,7 @@ def test_posterior_net_for_multi_d_x(net: nn.Module, theta: Tensor, x: Tensor) -
 
     try:
         # torch.nn.functional needs at least two inputs here.
-        net.log_prob(theta[:2], x[:2])
+        net.condition(x[:2]).log_prob(theta[:2])
     except RuntimeError as rte:
         ndims = x.ndim
         if ndims > 2:

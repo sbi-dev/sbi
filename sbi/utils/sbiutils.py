@@ -7,8 +7,8 @@ from math import pi
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import torch
-import pyknos.nflows.transforms as transforms
 from pyro.distributions import Empirical
+import torch.distributions.transforms as transforms
 from torch import Tensor, as_tensor, float32
 from torch import nn as nn
 from torch import ones, optim, zeros
@@ -99,7 +99,7 @@ def standardizing_transform(
     t_std = torch.std(batch_t[is_valid_t], dim=0)
     t_std[t_std < min_std] = min_std
 
-    return transforms.AffineTransform(shift=-t_mean / t_std, scale=1 / t_std)
+    return transforms.AffineTransform(loc=-t_mean / t_std, scale=1 / t_std)
 
 
 class Standardize(nn.Module):

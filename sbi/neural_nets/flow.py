@@ -172,6 +172,7 @@ def build_nsf(
     Returns:
         Neural network.
     """
+    device = "cpu"
     x_numel = batch_x[0].numel()
     # Infer the output dimensionality of the embedding_net by making a forward pass.
     y_numel = embedding_net(batch_y[:1]).numel()
@@ -189,7 +190,7 @@ def build_nsf(
     trafo = []
     for _ in range(num_transforms):
         trafo.append(
-            tf.conditional_affine_coupling(
+            tf.conditional_spline(
                 x_numel,
                 context_dim=y_numel,
                 hidden_dims=[hidden_features, hidden_features],
@@ -198,7 +199,7 @@ def build_nsf(
                 order="quadratic",
             )
         )
-        trafo.append(tf.permute(1))
+        trafo.append(tf.permute(x_numel.to(device)))
 
     if z_score_x:
         trafo.append(standardizing_transform(batch_x))
@@ -214,11 +215,19 @@ def build_nsf(
     return flow_with_embedding
 
 
-class FlowEmbedding:
+class FlowEmbedding(nn.Module):
     def __init__(self, flow, embedding_net):
+        super().__init__()
         self.flow = flow
         self.embedding_net = embedding_net
 
     def condition(self, context):
         embedded_context = self.embedding_net(context)
         return self.flow.condition(embedded_context)
+
+    def parameters(self):
+        flow_parameters = nn.ModuleList(
+            [layer for layer in self.flow.transforms if isinstance(layer, nn.Module)]
+        ).parameters()
+        embedding_net_parameters = self.embedding_net.parameters()
+        return list(flow_parameters) + list(embedding_net_parameters)
