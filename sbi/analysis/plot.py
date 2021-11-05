@@ -32,6 +32,8 @@ def pairplot(
     labels: Optional[List[str]] = None,
     ticks: Union[List, torch.Tensor] = [],
     points_colors: List[str] = plt.rcParams["axes.prop_cycle"].by_key()["color"],
+    fig=None,
+    axes=None,
     **kwargs
 ):
     """
@@ -55,6 +57,8 @@ def pairplot(
         labels: List of strings specifying the names of the parameters.
         ticks: Position of the ticks.
         points_colors: Colors of the `points`.
+        fig: matplotlib figure to plot on.
+        axes: matplotlib axes corresponding to fig.
         **kwargs: Additional arguments to adjust the plot, see the source code in
             `_get_default_opts()` in `sbi.utils.plot` for more details.
 
@@ -72,6 +76,8 @@ def pairplot(
         ticks=ticks,
         points_colors=points_colors,
         warn_about_deprecation=False,
+        fig=fig,
+        axes=axes,
         **kwargs,
     )
 
@@ -89,6 +95,8 @@ def conditional_pairplot(
     labels: Optional[List[str]] = None,
     ticks: Union[List, torch.Tensor] = [],
     points_colors: List[str] = plt.rcParams["axes.prop_cycle"].by_key()["color"],
+    fig=None,
+    axes=None,
     **kwargs
 ):
     r"""
@@ -121,6 +129,8 @@ def conditional_pairplot(
         labels: List of strings specifying the names of the parameters.
         ticks: Position of the ticks.
         points_colors: Colors of the `points`.
+        fig: matplotlib figure to plot on.
+        axes: matplotlib axes corresponding to fig.
         **kwargs: Additional arguments to adjust the plot, see the source code in
             `_get_default_opts()` in `sbi.utils.plot` for more details.
 
@@ -138,5 +148,7 @@ def conditional_pairplot(
         ticks=ticks,
         points_colors=points_colors,
         warn_about_deprecation=False,
+        fig=fig,
+        axes=axes,
         **kwargs,
     )
