@@ -105,13 +105,8 @@ class SMCABC(ABCBASE):
         use_last_pop_samples: bool = True,
         return_summary: bool = False,
         kde: bool = False,
-        kde_kwargs: Dict[str, Any] = dict(
-            kde_bandwidth="cv",
-            kde_transform=None,
-            sample_weights=None,
-            num_cv_partitions=20,
-            num_cv_repetitions=5,
-        ),
+        kde_kwargs: Optional[Dict[str, Any]] = {},
+        kde_sample_weights: bool = False,
         lra: bool = False,
         lra_with_weights: bool = False,
         sass: bool = False,
@@ -153,6 +148,8 @@ class SMCABC(ABCBASE):
                 'transform': transform applied to the parameters before doing KDE.
                 'sample_weights': weights associated with samples. See 'get_kde' for
                 more details
+            kde_sample_weights: Whether perform weighted KDE with SMC weights or on raw
+                particles. 
             return_summary: Whether to return a dictionary with all accepted particles,
                 weights, etc. at the end.
 
@@ -270,9 +267,13 @@ class SMCABC(ABCBASE):
         if kde:
             self.logger.info(
                 f"""KDE on {final_particles.shape[0]} samples with bandwidth option
-                {kde_kwargs["bandwidth"]}. Beware that KDE can give unreliable
-                results when used with too few samples and in high dimensions."""
+                {kde_kwargs["bandwidth"] if "bandwidth" in kde_kwargs else "cv"}.
+                Beware that KDE can give unreliable results when used with too few
+                samples and in high dimensions."""
             )
+            # Maybe get particles weights from last population for weighted KDE.
+            if kde_sample_weights:
+                kde_kwargs["sample_weights"] = all_log_weights[-1].exp()
 
             kde_dist = get_kde(final_particles, **kde_kwargs)
 

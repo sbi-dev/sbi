@@ -65,13 +65,7 @@ class MCABC(ABCBASE):
         sass_fraction: float = 0.25,
         sass_expansion_degree: int = 1,
         kde: bool = False,
-        kde_kwargs: Dict[str, Any] = dict(
-            kde_bandwidth="cv",
-            kde_transform=None,
-            sample_weights=None,
-            num_cv_partitions=20,
-            num_cv_repetitions=5,
-        ),
+        kde_kwargs: Optional[Dict[str, Any]] = {},
         return_summary: bool = False,
     ) -> Union[Tuple[Tensor, dict], Tuple[KDEWrapper, dict], Tensor, KDEWrapper]:
         r"""Run MCABC and return accepted parameters or KDE object fitted on them.
@@ -109,6 +103,7 @@ class MCABC(ABCBASE):
             summary (if summary True): dictionary containing the accepted paramters (if
                 kde True), distances and simulated data x.
         """
+
         # Exactly one of eps or quantile need to be passed.
         assert (eps is not None) ^ (
             quantile is not None
@@ -175,8 +170,9 @@ class MCABC(ABCBASE):
         if kde:
             self.logger.info(
                 f"""KDE on {final_theta.shape[0]} samples with bandwidth option
-                {kde_kwargs["bandwidth"]}. Beware that KDE can give unreliable
-                results when used with too few samples and in high dimensions."""
+                {kde_kwargs["bandwidth"] if "bandwidth" in kde_kwargs else "cv"}.
+                Beware that KDE can give unreliable results when used with too few
+                samples and in high dimensions."""
             )
 
             kde_dist = get_kde(final_theta, **kde_kwargs)
