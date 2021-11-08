@@ -21,16 +21,9 @@ def sbc_in_batches(
     num_posterior_samples: int = 100,
     sbc_batch_size: int = 1,
     num_workers: int = 1,
-    ranking_rv: Optional[Union[str, Distribution]] = "gaussian",
     show_progress_bars: bool = True,
 ):
     """Run SBC in batches and parallelized across `num_workers`."""
-
-    if ranking_rv == "gaussian":
-        ranking_rv = Normal(loc=0, scale=10)
-    assert isinstance(
-        ranking_rv, Distribution
-    ), "Ranking RV must be a torch Distribution."
 
     if num_sbc_samples < 1000:
         warnings.warn(
@@ -68,7 +61,7 @@ def sbc_in_batches(
         ) as progress_bar:
             sbc_outputs = Parallel(n_jobs=num_workers)(
                 delayed(sbc_on_batch)(
-                    thos_batch, xos_batch, posterior, num_posterior_samples, ranking_rv
+                    thos_batch, xos_batch, posterior, num_posterior_samples
                 )
                 for thos_batch, xos_batch in zip(thos_batches, xos_batches)
             )
@@ -88,7 +81,6 @@ def sbc_in_batches(
                         xos_batch,
                         posterior,
                         num_posterior_samples,
-                        ranking_rv,
                     )
                 )
                 pbar.update(sbc_batch_size)
@@ -109,7 +101,7 @@ def sbc_in_batches(
     return ranks, log_probs, dap_samples
 
 
-def sbc_on_batch(thos, xos, posterior, L, ranking_rv):
+def sbc_on_batch(thos, xos, posterior, L):
     """Return SBC results for a batch of SBC parameters and data from prior.
 
     Returns
@@ -128,15 +120,15 @@ def sbc_on_batch(thos, xos, posterior, L, ranking_rv):
         # Log prob of true params under posterior.
         log_prob_thos[idx] = posterior.log_prob(tho, x=xo)
 
-        # Rank true params vs posterior params under ranking_rv.
+        # Draw posterior samples and save one for the data average posterior.
         ths = posterior.sample((L,), x=xo, show_progress_bars=False)
         dap_samples[idx] = ths[
             0,
         ]
-        # rank for each posterior dimension.
+        # rank for each posterior dimension as in Talts et al. section 4.1.
         for dim in range(thos.shape[1]):
             ranks[idx, dim] = (
-                (ranking_rv.log_prob(ths[:, dim]) < ranking_rv.log_prob(tho[dim]))
+                (ths[:, dim] < tho[dim])
                 .sum()
                 .item()
             )
