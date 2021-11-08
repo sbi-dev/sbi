@@ -50,7 +50,7 @@ def test_mcabc_inference_on_linear_gaussian(
         sass_expansion_degree=sass_expansion_degree,
         sass_fraction=0.33,
         kde=kde,
-        kde_kwargs=dict(bandwidth=kde_bandwidth),
+        kde_kwargs=dict(bandwidth=kde_bandwidth) if kde else {},
         return_summary=False,
     )
 

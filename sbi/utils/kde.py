@@ -10,6 +10,37 @@ from torch.distributions.transforms import identity_transform
 from sbi.types import transform_types
 
 
+class KDEWrapper:
+    """Wrapper class to enable sampling and evaluation with a kde object fitted on
+    transformed parameters.
+
+    Applies inverse transforms on samples and log abs det Jacobian on log prob.
+    """
+
+    def __init__(self, kde, transform):
+        self.kde = kde
+        self.transform = transform
+
+    def sample(self, *args, **kwargs):
+        Y = torch.from_numpy(self.kde.sample(*args, **kwargs).astype(np.float32))
+        return self.transform.inv(Y)
+
+    def log_prob(self, parameters_constrained):
+        parameters_unconstrained = self.transform(parameters_constrained)
+        log_probs = torch.from_numpy(
+            self.kde.score_samples(parameters_unconstrained.numpy()).astype(np.float32)
+        )
+        # Sum over event dimension of parameters returned by log abs det jacobian.
+        log_probs += self.transform.log_abs_det_jacobian(
+            parameters_constrained, parameters_unconstrained
+        )
+        assert (
+            log_probs.numel() == parameters_constrained.shape[0]
+        ), """batch shape mismatch, log_abs_det_jacobian not summing over event
+              dimensions?"""
+        return log_probs
+
+
 # The implementation of KDE was adapted from
 # https://github.com/sbi-benchmark/sbibm/blob/main/sbibm/utils/kde.py
 def get_kde(
@@ -19,7 +50,7 @@ def get_kde(
     sample_weights: Optional[np.ndarray] = None,
     num_cv_partitions: int = 20,
     num_cv_repetitions: int = 5,
-) -> KernelDensity:
+) -> KDEWrapper:
     """Get KDE estimator with selected bandwidth.
 
     Args:
@@ -126,34 +157,3 @@ def get_kde(
     kde.fit(transformed_samples, sample_weight=sample_weights)
 
     return KDEWrapper(kde, transform)
-
-
-class KDEWrapper:
-    """Wrapper class to enable sampling and evaluation with a kde object fitted on
-    transformed parameters.
-
-    Applies inverse transforms on samples and log abs det Jacobian on log prob.
-    """
-
-    def __init__(self, kde, transform):
-        self.kde = kde
-        self.transform = transform
-
-    def sample(self, *args, **kwargs):
-        Y = torch.from_numpy(self.kde.sample(*args, **kwargs).astype(np.float32))
-        return self.transform.inv(Y)
-
-    def log_prob(self, parameters_constrained):
-        parameters_unconstrained = self.transform(parameters_constrained)
-        log_probs = torch.from_numpy(
-            self.kde.score_samples(parameters_unconstrained.numpy()).astype(np.float32)
-        )
-        # Sum over event dimension of parameters returned by log abs det jacobian.
-        log_probs += self.transform.log_abs_det_jacobian(
-            parameters_constrained, parameters_unconstrained
-        )
-        assert (
-            log_probs.numel() == parameters_constrained.shape[0]
-        ), """batch shape mismatch, log_abs_det_jacobian not summing over event
-              dimensions?"""
-        return log_probs
