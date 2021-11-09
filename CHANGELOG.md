@@ -1,3 +1,11 @@
+# v0.17.1
+
+## Minor changes
+- improve kwarg handling for rejection abc and smcabc
+- typo and link fixes (#549, thanks to @pitmonticone)
+- tutorial notebook on crafting summary statistics with sbi (#511, thanks to @ybernaerts)
+- small fixes and improved documenentation for device handling (#544, thanks to @milagorecki)
+
 # v0.17.0
 
 ## Major changes
