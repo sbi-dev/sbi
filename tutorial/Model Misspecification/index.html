@@ -1,0 +1,761 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="canonical" href="https://mackelab.org/sbi/tutorial/Model%20Misspecification/">
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.1.2, mkdocs-material-7.1.3">
+    
+    
+      
+        <title>Model Misspecification - sbi</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.e35208c4.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ef6f36e2.min.css">
+        
+          
+          
+          <meta name="theme-color" content="#4051b5">
+        
+      
+    
+    
+    
+      
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,400i,700%7CRoboto+Mono&display=fallback">
+        <style>:root{--md-text-font-family:"Roboto";--md-code-font-family:"Roboto Mono"}</style>
+      
+    
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../static/global.css">
+    
+    
+      
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <script>function __prefix(e){return new URL("../..",location).pathname+"."+e}function __get(e,t=localStorage){return JSON.parse(t.getItem(__prefix(e)))}</script>
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#samples-from-assumed-and-true-model" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="sbi" class="md-header__button md-logo" aria-label="sbi" data-md-component="logo">
+      
+  <img src="../../static/logo.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            sbi
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Model Misspecification
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5z"/></svg>
+      </label>
+      
+<div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" data-md-state="active" required>
+      <label class="md-search__icon md-icon" for="__search">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12z"/></svg>
+      </label>
+      <button type="reset" class="md-search__icon md-icon" aria-label="Clear" tabindex="-1">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>
+      </button>
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        
+<a href="http://github.com/mackelab/sbi/" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    mackelab/sbi
+  </div>
+</a>
+      </div>
+    
+  </nav>
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="sbi" class="md-nav__button md-logo" aria-label="sbi" data-md-component="logo">
+      
+  <img src="../../static/logo.svg" alt="logo">
+
+    </a>
+    sbi
+  </label>
+  
+    <div class="md-nav__source">
+      
+<a href="http://github.com/mackelab/sbi/" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    mackelab/sbi
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        Home
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../install/" class="md-nav__link">
+        Installation
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+      
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3" type="checkbox" id="__nav_3" >
+      
+      <label class="md-nav__link" for="__nav_3">
+        Tutorials and Examples
+        <span class="md-nav__icon md-icon"></span>
+      </label>
+      <nav class="md-nav" aria-label="Tutorials and Examples" data-md-level="1">
+        <label class="md-nav__title" for="__nav_3">
+          <span class="md-nav__icon md-icon"></span>
+          Tutorials and Examples
+        </label>
+        <ul class="md-nav__list" data-md-scrollfix>
+          
+            
+  
+  
+  
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+      
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3_1" type="checkbox" id="__nav_3_1" >
+      
+      <label class="md-nav__link" for="__nav_3_1">
+        Introduction
+        <span class="md-nav__icon md-icon"></span>
+      </label>
+      <nav class="md-nav" aria-label="Introduction" data-md-level="2">
+        <label class="md-nav__title" for="__nav_3_1">
+          <span class="md-nav__icon md-icon"></span>
+          Introduction
+        </label>
+        <ul class="md-nav__list" data-md-scrollfix>
+          
+            
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../00_getting_started/" class="md-nav__link">
+        Getting started
+      </a>
+    </li>
+  
+
+          
+            
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../01_gaussian_amortized/" class="md-nav__link">
+        Amortized inference
+      </a>
+    </li>
+  
+
+          
+        </ul>
+      </nav>
+    </li>
+  
+
+          
+            
+  
+  
+  
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+      
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3_2" type="checkbox" id="__nav_3_2" >
+      
+      <label class="md-nav__link" for="__nav_3_2">
+        Advanced
+        <span class="md-nav__icon md-icon"></span>
+      </label>
+      <nav class="md-nav" aria-label="Advanced" data-md-level="2">
+        <label class="md-nav__title" for="__nav_3_2">
+          <span class="md-nav__icon md-icon"></span>
+          Advanced
+        </label>
+        <ul class="md-nav__list" data-md-scrollfix>
+          
+            
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../02_flexible_interface/" class="md-nav__link">
+        Flexible interface
+      </a>
+    </li>
+  
+
+          
+            
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../03_multiround_inference/" class="md-nav__link">
+        Multi-round inference
+      </a>
+    </li>
+  
+
+          
+            
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../04_density_estimators/" class="md-nav__link">
+        Custom density estimators
+      </a>
+    </li>
+  
+
+          
+            
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../05_embedding_net/" class="md-nav__link">
+        Learning summary statistics
+      </a>
+    </li>
+  
+
+          
+            
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../07_conditional_distributions/" class="md-nav__link">
+        Conditional distributions
+      </a>
+    </li>
+  
+
+          
+        </ul>
+      </nav>
+    </li>
+  
+
+          
+            
+  
+  
+  
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+      
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3_3" type="checkbox" id="__nav_3_3" >
+      
+      <label class="md-nav__link" for="__nav_3_3">
+        Examples
+        <span class="md-nav__icon md-icon"></span>
+      </label>
+      <nav class="md-nav" aria-label="Examples" data-md-level="2">
+        <label class="md-nav__title" for="__nav_3_3">
+          <span class="md-nav__icon md-icon"></span>
+          Examples
+        </label>
+        <ul class="md-nav__list" data-md-scrollfix>
+          
+            
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/00_HH_simulator.md" class="md-nav__link">
+        Hodgkin-Huxley example
+      </a>
+    </li>
+  
+
+          
+        </ul>
+      </nav>
+    </li>
+  
+
+          
+        </ul>
+      </nav>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contribute/" class="md-nav__link">
+        Contribute
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/" class="md-nav__link">
+        API Reference
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        FAQ
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../credits/" class="md-nav__link">
+        Credits
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#samples-from-assumed-and-true-model" class="md-nav__link">
+    Samples from assumed and true model
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#augment-simulator-with-gaussian-noise-model" class="md-nav__link">
+    Augment simulator with Gaussian noise model
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          <div class="md-content" data-md-component="content">
+            <article class="md-content__inner md-typeset">
+              
+                
+                  <a href="http://github.com/mackelab/sbi/edit/master/docs/tutorial/Model Misspecification.md" title="Edit this page" class="md-content__button md-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75L3 17.25z"/></svg>
+                  </a>
+                
+                
+                  <h1>Model Misspecification</h1>
+                
+                <div class="highlight"><pre><span></span><code>import numpy as np
+import torch
+
+from sbi.inference import SNPE, prepare_for_sbi
+from sbi.simulators import linear_gaussian, diagonal_linear_gaussian
+from sbi.utils import pairplot
+
+from torch.distributions import Gamma
+</code></pre></div>
+<div class="highlight"><pre><span></span><code>D = 1
+def assumed_model(theta, niid=10):
+    x = diagonal_linear_gaussian(theta.repeat(niid, 1)).reshape(theta.shape[0], theta.shape[1], niid)
+    return torch.cat((x.mean(axis=-1), x.std(axis=-1)**2), dim=1)
+
+def true_model(theta, v, niid=10):
+    x = linear_gaussian(theta.repeat(niid, 1), 
+                        likelihood_shift=torch.zeros(D), 
+                        likelihood_cov=v * torch.eye(D)).reshape(theta.shape[0], theta.shape[1], niid)
+    return torch.cat((x.mean(axis=-1), x.std(axis=-1)**2), dim=1)
+</code></pre></div>
+<h2 id="samples-from-assumed-and-true-model">Samples from assumed and true model<a class="headerlink" href="#samples-from-assumed-and-true-model" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code>v = 5
+N = 1000
+prior = torch.distributions.MultivariateNormal(torch.zeros(D), torch.eye(D))
+th = prior.sample((N, ))
+pairplot([assumed_model(th), true_model(th, v=v)], upper=&quot;scatter&quot;, 
+#          hist_diag=dict(bins=np.linspace(-3, 3, 20))
+        );
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>/home/janfb/qode/sbi/sbi/utils/plot.py:181: UserWarning: Importing `pairplot` from `sbi.utils` is deprecated since sbi v0.15.0. Instead, use `from sbi.analysis import pairplot`.
+  &quot;Importing `pairplot` from `sbi.utils` is deprecated since sbi &quot;
+</code></pre></div>
+
+<p><img alt="png" src="../Model%20Misspecification_files/Model%20Misspecification_3_1.png" /></p>
+<h2 id="augment-simulator-with-gaussian-noise-model">Augment simulator with Gaussian noise model<a class="headerlink" href="#augment-simulator-with-gaussian-noise-model" title="Permanent link">&para;</a></h2>
+<p>Standard simulator and prior: 
+$$
+x = f(\theta) \ 
+\theta \sim p(\theta)
+$$</p>
+<p>Augmented simulator
+$$
+x = f(\theta) + \xi(\gamma) \ 
+\theta \sim p(\theta) \ 
+\gamma \sim \Gamma(1, 2),
+$$
+where <span class="arithmatex">\(\xi(\gamma) \sim \mathcal{N}(0, \gamma)\)</span> is a Gaussian noise model with scale parameter <span class="arithmatex">\(\gamma\)</span></p>
+<p>Augmented simulator
+$$
+x = f(\theta) + \gamma \ 
+\theta \sim p(\theta) \ 
+\gamma \sim \mathcal{N}(0, 1),
+$$</p>
+<div class="highlight"><pre><span></span><code>def augmented_simulator(simulator, noise_model, theta, gamma):
+    return simulator(theta) + noise_model(gamma)
+
+def noise_model(gamma):
+    return gamma * torch.randn(gamma.shape)
+
+sim = lambda th: augmented_simulator(assumed_model, noise_model, th[:, :D], th[:, D:])
+</code></pre></div>
+<div class="highlight"><pre><span></span><code>s, p = prepare_for_sbi(sim, [prior] + [Gamma(torch.ones(1), 5 * torch.ones(1))] * 2)
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>/home/janfb/qode/sbi/sbi/utils/user_input_checks.py:45: UserWarning: Prior was provided as a sequence of 3 priors. They will be
+            interpreted as independent of each other and matched in order to the
+            components of the parameter.
+  components of the parameter.&quot;&quot;&quot;
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code>N = 100000
+th = p.sample((N,))
+x = s(th)
+</code></pre></div>
+<div class="highlight"><pre><span></span><code>estimator = SNPE(p, density_estimator=&quot;mdn&quot;)
+estimator = estimator.append_simulations(th, x)
+</code></pre></div>
+<div class="highlight"><pre><span></span><code>estimator.train(training_batch_size=1000)
+posterior = estimator.build_posterior()
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>/home/janfb/anaconda3/envs/consbi/lib/python3.7/site-packages/torch/autograd/__init__.py:147: UserWarning: CUDA initialization: Unexpected error from cudaGetDeviceCount(). Did you run some cuda functions before calling NumCudaDevices() that might have already set an error? Error 804: forward compatibility was attempted on non supported HW (Triggered internally at  /pytorch/c10/cuda/CUDAFunctions.cpp:109.)
+  allow_unreachable=True, accumulate_grad=True)  # allow_unreachable flag
+
+
+Neural network successfully converged after 75 epochs.
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code>xo = true_model(torch.ones(1, 1), v=1)
+xo
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>tensor([[0.9480, 1.4844]])
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code>ps = posterior.sample((1000,), x=xo)
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>HBox(children=(HTML(value=&#39;Drawing 1000 posterior samples&#39;), FloatProgress(value=0.0, max=1000.0), HTML(value=…
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code>pairplot(ps, upper=&quot;scatter&quot;);
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>/home/janfb/qode/sbi/sbi/utils/plot.py:181: UserWarning: Importing `pairplot` from `sbi.utils` is deprecated since sbi v0.15.0. Instead, use `from sbi.analysis import pairplot`.
+  &quot;Importing `pairplot` from `sbi.utils` is deprecated since sbi &quot;
+</code></pre></div>
+
+<p><img alt="png" src="../Model%20Misspecification_files/Model%20Misspecification_12_1.png" /></p>
+<div class="highlight"><pre><span></span><code>pps = assumed_model(ps)
+</code></pre></div>
+<div class="highlight"><pre><span></span><code>ps.shape
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>torch.Size([1000, 3])
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code>pps.shape
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>torch.Size([1000, 6])
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code>pairplot(pps, points=xo, upper=&quot;scatter&quot;)
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>/home/janfb/qode/sbi/sbi/utils/plot.py:181: UserWarning: Importing `pairplot` from `sbi.utils` is deprecated since sbi v0.15.0. Instead, use `from sbi.analysis import pairplot`.
+  &quot;Importing `pairplot` from `sbi.utils` is deprecated since sbi &quot;
+
+
+
+---------------------------------------------------------------------------
+
+IndexError                                Traceback (most recent call last)
+
+&lt;ipython-input-27-70febf8dc15f&gt; in &lt;module&gt;
+----&gt; 1 pairplot(pps, points=xo, upper=&quot;scatter&quot;)
+
+
+~/qode/sbi/sbi/utils/plot.py in pairplot(samples, points, limits, subset, upper, diag, figsize, labels, ticks, points_colors, warn_about_deprecation, **kwargs)
+    364                     pass
+    365 
+--&gt; 366     return _pairplot_scaffold(diag_func, upper_func, dim, limits, points, opts)
+    367 
+    368
+
+
+~/qode/sbi/sbi/utils/plot.py in _pairplot_scaffold(diag_func, upper_func, dim, limits, points, opts)
+    692                     for n, v in enumerate(points):
+    693                         h = plt.plot(
+--&gt; 694                             v[:, col],
+    695                             v[:, row],
+    696                             color=opts[&quot;points_colors&quot;][n],
+
+
+IndexError: index 2 is out of bounds for axis 1 with size 2
+</code></pre></div>
+
+<p><img alt="png" src="../Model%20Misspecification_files/Model%20Misspecification_16_2.png" /></p>
+<div class="highlight"><pre><span></span><code>
+</code></pre></div>
+                
+              
+              
+                
+
+
+              
+            </article>
+          </div>
+        </div>
+        
+      </main>
+      
+        
+<footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-footer-copyright">
+        
+        Made with
+        <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+          Material for MkDocs
+        </a>
+        
+      </div>
+      
+  <div class="md-footer-social">
+    
+      
+      
+        
+        
+      
+      <a href="https://github.com/mackelab/sbi" target="_blank" rel="noopener" title="github.com" class="md-footer-social__link">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 512"><path d="M186.1 328.7c0 20.9-10.9 55.1-36.7 55.1s-36.7-34.2-36.7-55.1 10.9-55.1 36.7-55.1 36.7 34.2 36.7 55.1zM480 278.2c0 31.9-3.2 65.7-17.5 95-37.9 76.6-142.1 74.8-216.7 74.8-75.8 0-186.2 2.7-225.6-74.8-14.6-29-20.2-63.1-20.2-95 0-41.9 13.9-81.5 41.5-113.6-5.2-15.8-7.7-32.4-7.7-48.8 0-21.5 4.9-32.3 14.6-51.8 45.3 0 74.3 9 108.8 36 29-6.9 58.8-10 88.7-10 27 0 54.2 2.9 80.4 9.2 34-26.7 63-35.2 107.8-35.2 9.8 19.5 14.6 30.3 14.6 51.8 0 16.4-2.6 32.7-7.7 48.2 27.5 32.4 39 72.3 39 114.2zm-64.3 50.5c0-43.9-26.7-82.6-73.5-82.6-18.9 0-37 3.4-56 6-14.9 2.3-29.8 3.2-45.1 3.2-15.2 0-30.1-.9-45.1-3.2-18.7-2.6-37-6-56-6-46.8 0-73.5 38.7-73.5 82.6 0 87.8 80.4 101.3 150.4 101.3h48.2c70.3 0 150.6-13.4 150.6-101.3zm-82.6-55.1c-25.8 0-36.7 34.2-36.7 55.1s10.9 55.1 36.7 55.1 36.7-34.2 36.7-55.1-10.9-55.1-36.7-55.1z"/></svg>
+      </a>
+    
+  </div>
+
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    <script id="__config" type="application/json">{"base": "../..", "features": [], "translations": {"clipboard.copy": "Copy to clipboard", "clipboard.copied": "Copied to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.placeholder": "Type to start searching", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.term.missing": "Missing"}, "search": "../../assets/javascripts/workers/search.fe42c31b.min.js", "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.4ea5477f.min.js"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+      
+    
+  </body>
+</html>
