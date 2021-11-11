@@ -151,7 +151,7 @@ def test_smcabc_sass_lra(lra, sass_expansion_degree, set_seed):
         sass=True,
         sass_expansion_degree=sass_expansion_degree,
         prior_type="gaussian",
-        num_simulations=120000
+        num_simulations=120000,
     )
 
 

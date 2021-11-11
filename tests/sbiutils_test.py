@@ -3,18 +3,20 @@ from typing import Tuple
 import matplotlib.pyplot as plt
 import pytest
 import torch
-from torch import Tensor, ones, eye, zeros
-from torch.distributions import LogNormal, MultivariateNormal, Exponential
+from torch import Tensor, eye, ones, zeros
+from torch.distributions import Exponential, LogNormal, MultivariateNormal
+from torch.distributions.transforms import IndependentTransform, identity_transform
 
 from sbi.inference import SNPE, SNPE_A
 from sbi.inference.snpe.snpe_a import SNPE_A_MDN
 from sbi.utils import (
     BoxUniform,
+    MultipleIndependent,
     conditional_corrcoeff,
     conditional_pairplot,
     eval_conditional_density,
+    get_kde,
     mcmc_transform,
-    MultipleIndependent,
     posterior_nn,
 )
 from sbi.utils.user_input_checks import process_prior
@@ -391,3 +393,43 @@ def test_mcmc_transform(prior, enable_transform):
 
     log_abs_det = tf.log_abs_det_jacobian(samples_original, unconstrained_samples)
     assert log_abs_det.shape == torch.Size([num_samples])
+
+
+@pytest.mark.parametrize(
+    "transform",
+    (
+        None,
+        identity_transform,
+        IndependentTransform(identity_transform, reinterpreted_batch_ndims=1),
+    ),
+)
+@pytest.mark.parametrize(
+    "sample_weights",
+    (True, False),
+)
+@pytest.mark.parametrize(
+    "bandwidth",
+    ("cv", "scott"),
+)
+def test_kde(bandwidth, transform, sample_weights):
+
+    num_dim = 3
+    num_samples = 100
+    num_draws = 10
+    dist = torch.distributions.MultivariateNormal(
+        torch.zeros(num_dim), torch.eye(num_dim)
+    )
+    samples = dist.sample((num_samples,))
+
+    kde = get_kde(
+        samples,
+        bandwidth=bandwidth,
+        transform=transform,
+        sample_weights=torch.rand(num_samples) if sample_weights else None,
+    )
+
+    kde_samples = kde.sample((num_draws,))
+    kde_vals = kde.log_prob(kde_samples)
+
+    assert kde_samples.shape == torch.Size((num_draws, num_dim))
+    assert kde_vals.shape == torch.Size((num_draws,))
