@@ -1,3 +1,8 @@
+# v0.17.2
+
+## Minor changes
+- bug fix for transforms in KDE (#552)
+
 # v0.17.1
 
 ## Minor changes
