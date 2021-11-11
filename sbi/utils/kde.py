@@ -5,7 +5,7 @@ import torch
 from sklearn.model_selection import GridSearchCV
 from sklearn.neighbors import KernelDensity
 from torch import Tensor
-from torch.distributions.transforms import identity_transform
+from torch.distributions.transforms import IndependentTransform, identity_transform
 
 from sbi.types import transform_types
 
@@ -30,7 +30,6 @@ class KDEWrapper:
         log_probs = torch.from_numpy(
             self.kde.score_samples(parameters_unconstrained.numpy()).astype(np.float32)
         )
-        # Sum over event dimension of parameters returned by log abs det jacobian.
         log_probs += self.transform.log_abs_det_jacobian(
             parameters_constrained, parameters_unconstrained
         )
@@ -46,7 +45,7 @@ class KDEWrapper:
 def get_kde(
     samples: Tensor,
     bandwidth: Union[float, str] = "cv",
-    transform: transform_types = None,
+    transform: transform_types = identity_transform,
     sample_weights: Optional[np.ndarray] = None,
     num_cv_partitions: int = 20,
     num_cv_repetitions: int = 5,
@@ -68,8 +67,11 @@ def get_kde(
     [1]: https://github.com/scikit-learn/scikit-learn/blob/
          0303fca35e32add9d7346dcb2e0e697d4e68706f/sklearn/neighbors/kde.py
     """
-    if transform is None or not transform:
+    if not transform:
         transform = identity_transform
+    # Make sure transform has event dimension and returns scalar log_prob.
+    if transform.event_dim == 0:
+        transform = IndependentTransform(transform, reinterpreted_batch_ndims=1)
     if isinstance(bandwidth, str):
         assert bandwidth in ["cv", "scott", "silvermann"], "invalid kde bandwidth name."
 

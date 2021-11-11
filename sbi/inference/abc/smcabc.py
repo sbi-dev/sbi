@@ -149,7 +149,7 @@ class SMCABC(ABCBASE):
                 'sample_weights': weights associated with samples. See 'get_kde' for
                 more details
             kde_sample_weights: Whether perform weighted KDE with SMC weights or on raw
-                particles. 
+                particles.
             return_summary: Whether to return a dictionary with all accepted particles,
                 weights, etc. at the end.
 
