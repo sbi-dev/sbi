@@ -1,5 +1,5 @@
 import warnings
-from typing import Callable, Optional, Union
+from typing import Callable, Optional, Tuple, Union
 
 import torch
 from joblib import Parallel, delayed
@@ -13,17 +13,36 @@ from sbi.simulators.simutils import tqdm_joblib
 from sbi.utils.metrics import c2st
 
 
-def sbc_in_batches(
+def run_sbc(
     prior: Distribution,
     simulator: Callable,
-    posterior: Union[NeuralPosterior, Distribution],
+    posterior: NeuralPosterior,
     num_sbc_samples: int = 1000,
     num_posterior_samples: int = 100,
-    sbc_batch_size: int = 1,
     num_workers: int = 1,
-    show_progress_bars: bool = True,
-):
-    """Run SBC in batches and parallelized across `num_workers`."""
+    sbc_batch_size: int = 1,
+    show_progress_bar: bool = True,
+) -> Tuple[Tensor, Tensor, Tensor]:
+    """Run simulation-based calibration (parallelized).
+
+    Returns sbc ranks, log probs of the true parameters under the posterior and samples
+    from the data averaged posterior, one for each sbc run, respectively.
+    
+    Args:
+        prior: prior distribution.
+        simulator: simulator (or likelihood) that can called to generate observations.
+        posterior: a posterior obtained from sbi. 
+        num_sbc_samples: number of sbc runs, i.e., number of repeated inferences. 
+            Should be high, ~100 to give reliable results.
+        num_workers: number of CPU cores to use in parallel for running num_sbc_samples inferences.
+        sbc_batch_size: batch size for workers.
+        show_progress_var: whether to display a progress over sbc runs.
+
+    Returns:
+        ranks: ranks of the ground truth parameters under the inferred posterior.
+        log_probs: log probs of the ground truth parameters under the inferred posterior.
+        dap_samples: samples from the data averaged posterior.
+    """
 
     if num_sbc_samples < 1000:
         warnings.warn(
@@ -53,7 +72,7 @@ def sbc_in_batches(
         with tqdm_joblib(
             tqdm(
                 thos_batches,
-                disable=not show_progress_bars,
+                disable=not show_progress_bar,
                 desc=f"""Running {num_sbc_samples} sbc runs in {len(thos_batches)}
                     batches.""",
                 total=len(thos_batches),
@@ -68,7 +87,7 @@ def sbc_in_batches(
     else:
         pbar = tqdm(
             total=num_sbc_samples,
-            disable=not show_progress_bars,
+            disable=not show_progress_bar,
             desc=f"Running {num_sbc_samples} sbc samples.",
         )
 
@@ -101,8 +120,14 @@ def sbc_in_batches(
     return ranks, log_probs, dap_samples
 
 
-def sbc_on_batch(thos, xos, posterior, L):
+def sbc_on_batch(thos: Tensor, xos: Tensor, posterior: NeuralPosterior, L: int) -> Tuple[Tensor, Tensor, Tensor]:
     """Return SBC results for a batch of SBC parameters and data from prior.
+
+    Args:
+        thos: ground truth parameters.
+        xos: corresponding observations.
+        posterior: sbi posterior.
+        L: number of samples to draw from the posterior in each sbc run.
 
     Returns
         ranks: ranks of true parameters vs. posterior samples under the specified RV,
@@ -136,7 +161,7 @@ def sbc_on_batch(thos, xos, posterior, L):
     return ranks, log_prob_thos, dap_samples
 
 
-def sbc_checks(
+def check_sbc(
     ranks: Tensor,
     log_probs: Tensor,
     prior_samples: Tensor,
@@ -152,13 +177,13 @@ def sbc_checks(
         )
 
     ks_pvals, c2st_ranks = check_uniformity(ranks, num_ranks)
-    c2st_scrores_dap = check_prior_vs_dap(prior_samples, dap_samples)
+    c2st_scores_dap = check_prior_vs_dap(prior_samples, dap_samples)
     nltp = torch.mean(-log_probs)
 
     return dict(
         ks_pvals=ks_pvals,
         c2st_ranks=c2st_ranks,
-        c2st_dap=c2st_scrores_dap,
+        c2st_dap=c2st_scores_dap,
         nltp=nltp,
     )
 
