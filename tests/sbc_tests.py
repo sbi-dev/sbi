@@ -63,7 +63,7 @@ def test_sbc_checks():
     daps = prior.sample((N,))
     ranks = torch.distributions.Uniform(zeros(num_dim), L * ones(num_dim)).sample((N,))
 
-    checks = check_sbc(ranks, log_probs, prior.sample((N,)), daps, num_ranks=L)
+    checks = check_sbc(ranks, log_probs, prior.sample((N,)), daps, num_posterior_samples=L)
     assert (checks["ks_pvals"] > 0.05).all()
     assert (checks["c2st_ranks"] < 0.55).all()
     assert (checks["c2st_dap"] < 0.55).all()
