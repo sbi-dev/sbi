@@ -88,7 +88,7 @@ M. Durkan's `lfi`. `sbi` runs as a community project; development is coordinated
 ## Support
 
 `sbi` has been developed in the context of the [ADIMEM
-grant](https://fit.uni-tuebingen.de/Activity/Details?id=6097), project A. ADIMEM is a
+grant](https://fit.uni-tuebingen.de/Activity/Details?id=9199), project A. ADIMEM is a
 BMBF grant awarded to groups at the Technical University of Munich, University of
 Tübingen and Research Center caesar of the Max Planck Gesellschaft.
 
