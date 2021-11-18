@@ -87,10 +87,7 @@ M. Durkan's `lfi`. `sbi` runs as a community project; development is coordinated
 
 ## Support
 
-`sbi` has been developed in the context of the [ADIMEM
-grant](https://fit.uni-tuebingen.de/Project/Details?id=9199), project A. ADIMEM is a
-BMBF grant awarded to groups at the Technical University of Munich, University of
-Tübingen and Research Center caesar of the Max Planck Gesellschaft.
+`sbi` has been supported by the German Federal Ministry of Education and Research (BMBF) through the project ADIMEM, FKZ 01IS18052 A-D). [ADIMEM](https://fit.uni-tuebingen.de/Project/Details?id=9199) is a collaborative project between the groups of Jakob Macke (Uni Tübingen), Philipp Berens (Uni Tübingen), Philipp Hennig (Uni Tübingen) and Marcel Oberlaender (caesar Bonn) which aims to develop inference methods for mechanistic models.
 
 
 ## License

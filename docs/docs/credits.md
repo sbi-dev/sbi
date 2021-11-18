@@ -1,11 +1,20 @@
 # Credits
 
+## License
+
 `sbi` is licensed under the [Affero General Public License version 3 (AGPLv3)](https://www.gnu.org/licenses/agpl-3.0.html) and
 
 > Copyright (C) 2020 Álvaro Tejero-Cantero, Jakob H. Macke, Jan-Matthis Lückmann,
 > Michael Deistler, Jan F. Bölts.
 
 > Copyright (C) 2020 Conor M. Durkan.
+
+## Support
+
+`sbi` has been supported by the German Federal Ministry of Education and Research (BMBF) through the project ADIMEM, FKZ 01IS18052 A-D). [ADIMEM](https://fit.uni-tuebingen.de/Project/Details?id=9199) is a collaborative project between the groups of Jakob Macke (Uni Tübingen), Philipp Berens (Uni Tübingen), Philipp Hennig (Uni Tübingen) and Marcel Oberlaender (caesar Bonn) which aims to develop inference methods for mechanistic models.
+
+![](static/logo_bmbf.svg)
+
 
 ## Important dependencies and prior art
 
@@ -31,6 +40,7 @@ Bekasov](https://arturbekasov.github.io/). These are proxied through
 
 * See [README.md](https://github.com/mackelab/sbi/blob/master/README.md) for a list of
   publications describing the methods implemented in `sbi`.
+
 
 ## Citation
 If you use `sbi` consider citing the [corresponding paper](https://doi.org/10.21105/joss.02505):
