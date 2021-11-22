@@ -50,7 +50,7 @@ def test_mcabc_inference_on_linear_gaussian(
         sass_expansion_degree=sass_expansion_degree,
         sass_fraction=0.33,
         kde=kde,
-        kde_kwargs=dict(bandwidth=kde_bandwidth),
+        kde_kwargs=dict(bandwidth=kde_bandwidth) if kde else {},
         return_summary=False,
     )
 
@@ -82,10 +82,10 @@ def test_smcabc_inference_on_linear_gaussian(
     kde=False,
     kde_bandwidth="cv",
     transform=False,
+    num_simulations=120000,
 ):
     x_o = zeros((1, num_dim))
     num_samples = 1000
-    num_simulations = 100000
     likelihood_shift = -1.0 * ones(num_dim)
     likelihood_cov = 0.3 * eye(num_dim)
 
@@ -151,6 +151,7 @@ def test_smcabc_sass_lra(lra, sass_expansion_degree, set_seed):
         sass=True,
         sass_expansion_degree=sass_expansion_degree,
         prior_type="gaussian",
+        num_simulations=120000,
     )
 
 

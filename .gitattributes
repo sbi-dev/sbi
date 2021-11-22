@@ -1,1 +1,2 @@
 *_gitlfs.* filter=lfs diff=lfs merge=lfs -text
+*.ipynb linguist-documentation

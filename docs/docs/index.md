@@ -15,8 +15,7 @@ posterior = infer(simulator, prior, method='SNPE', num_simulations=1000)
   inference methods included in `sbi`, read on below.
 
 - For example applications to canonical problems in neuroscience, browse the recent
-  preprint [Training deep neural density estimators to identify mechanistic models of
-  neural dynamics](https://www.biorxiv.org/content/10.1101/838383v3).
+  research article [Training deep neural density estimators to identify mechanistic models of neural dynamics](https://doi.org/10.7554/eLife.56261).
 
 - If you want to get started using `sbi` on your own problem, jump to
   [installation](install.md) and then check out the [tutorial](tutorial/00_getting_started.md).
@@ -74,7 +73,7 @@ The methods then proceed by
 
 ## Publications
 
-See [Cranmer, Brehmer, Louppe (2020)](https://www.pnas.org/content/early/2020/05/28/1912789117) for a recent
+See [Cranmer, Brehmer, Louppe (2020)](https://doi.org/10.1073/pnas.1912789117) for a recent
 review on simulation-based inference.
 
 The following papers offer additional details on the inference methods included in
