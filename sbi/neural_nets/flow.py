@@ -142,6 +142,63 @@ def build_maf(
     return neural_net
 
 
+def build_uncond_maf(
+    batch_x: Tensor = None,
+    z_score_x: bool = True,
+    hidden_features: int = 50,
+    num_transforms: int = 5,
+    **kwargs,
+) -> nn.Module:
+    """Builds MAF p(x).
+
+    Args:
+        batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
+        z_score_x: Whether to z-score xs passing into the network.
+        hidden_features: Number of hidden features.
+        num_transforms: Number of transforms.
+        kwargs: Additional arguments that are passed by the build function but are not
+            relevant for maf and are therefore ignored.
+
+    Returns:
+        Neural network.
+    """
+    x_numel = batch_x[0].numel()
+
+    if x_numel == 1:
+        warn(f"In one-dimensional output space, this flow is limited to Gaussians")
+
+    transform = transforms.CompositeTransform(
+        [
+            transforms.CompositeTransform(
+                [
+                    transforms.MaskedAffineAutoregressiveTransform(
+                        features=x_numel,
+                        hidden_features=hidden_features,
+                        context_features=None,
+                        num_blocks=2,
+                        use_residual_blocks=False,
+                        random_mask=False,
+                        activation=tanh,
+                        dropout_probability=0.0,
+                        use_batch_norm=True,
+                    ),
+                    transforms.RandomPermutation(features=x_numel),
+                ]
+            )
+            for _ in range(num_transforms)
+        ]
+    )
+
+    if z_score_x:
+        transform_zx = standardizing_transform(batch_x)
+        transform = transforms.CompositeTransform([transform_zx, transform])
+
+    distribution = distributions_.StandardNormal((x_numel,))
+    neural_net = flows.Flow(transform, distribution)
+
+    return neural_net
+
+
 def build_nsf(
     batch_x: Tensor = None,
     batch_y: Tensor = None,
@@ -218,9 +275,7 @@ def build_nsf(
                     nn.Linear(self.hidden_features, out_features),
                 )
 
-            def __call__(
-                self, inputs: Tensor, context: Tensor, *args, **kwargs
-            ) -> Tensor:
+            def __call__(self, inputs: Tensor, context: Tensor, *args, **kwargs) -> Tensor:
                 """
                 Return parameters of the spline given the context.
 
@@ -249,9 +304,7 @@ def build_nsf(
             )
 
     else:
-        mask_in_layer = lambda i: create_alternating_binary_mask(
-            features=x_numel, even=(i % 2 == 0)
-        )
+        mask_in_layer = lambda i: create_alternating_binary_mask(features=x_numel, even=(i % 2 == 0))
         conditioner = lambda in_features, out_features: nets.ResidualNet(
             in_features=in_features,
             out_features=out_features,
