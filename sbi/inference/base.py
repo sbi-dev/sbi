@@ -136,9 +136,14 @@ class NeuralInference(ABC):
 
         self._show_progress_bars = show_progress_bars
 
-        # Initialize roundwise (theta, x, prior_masks) for storage of parameters,
-        # simulations and masks indicating if simulations came from prior.
-        self._theta_roundwise, self._x_roundwise, self._prior_masks = [], [], []
+        # Initialize roundwise (theta, x, scores prior_masks) for storage of
+        # parameters, simulations, joint score, and masks indicating if simulations
+        # came from prior.
+        self._theta_roundwise = []
+        self._x_roundwise = []
+        self._score_roundwise = []
+        self._prior_masks = []
+
         self._model_bank = []
 
         # Initialize list that indicates the round from which simulations were drawn.
@@ -236,7 +241,8 @@ class NeuralInference(ABC):
             warn_on_invalid: Whether to give out a warning if invalid simulations were
                 found.
 
-        Returns: Parameters, simulation outputs, prior masks.
+        Returns: Parameters, simulation outputs, scores (if they had been passed in
+            `append_simulations`), and prior masks.
         """
 
         theta = get_simulations_since_round(
@@ -244,6 +250,9 @@ class NeuralInference(ABC):
         )
         x = get_simulations_since_round(
             self._x_roundwise, self._data_round_index, starting_round
+        )
+        score = get_simulations_since_round(
+            self._score_roundwise, self._data_round_index, starting_round
         )
         prior_masks = get_simulations_since_round(
             self._prior_masks, self._data_round_index, starting_round
@@ -259,7 +268,12 @@ class NeuralInference(ABC):
                 num_nans, num_infs, exclude_invalid_x, type(self).__name__, self._round
             )
 
-        return theta[is_valid_x], x[is_valid_x], prior_masks[is_valid_x]
+        return (
+            theta[is_valid_x],
+            x[is_valid_x],
+            score[is_valid_x],
+            prior_masks[is_valid_x],
+        )
 
     @abstractmethod
     def train(
