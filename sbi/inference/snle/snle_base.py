@@ -229,9 +229,10 @@ class LikelihoodEstimator(NeuralInference, ABC):
             log_prob_sum = 0
             with torch.no_grad():
                 for batch in val_loader:
-                    theta_batch, x_batch = (
+                    theta_batch, x_batch, score_batch = (
                         batch[0].to(self._device),
                         batch[1].to(self._device),
+                        batch[2].to(self._device),
                     )
                     # Evaluate on x with theta as context.
                     batch_log_prob = -self._loss(

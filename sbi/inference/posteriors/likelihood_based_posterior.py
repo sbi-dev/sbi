@@ -445,7 +445,7 @@ class PotentialFunctionProvider:
         likelihood_nn: nn.Module,
         x: Tensor,
         method: str,
-        transform: torch_tf.Transform = torch_tf.identity_transform,
+        transform: Optional[torch_tf.Transform] = None,
     ) -> Callable:
         r"""Return potential function for posterior $p(\theta|x)$.
 
@@ -465,7 +465,12 @@ class PotentialFunctionProvider:
         self.prior = prior
         self.device = next(likelihood_nn.parameters()).device
         self.x = atleast_2d(x).to(self.device)
-        self.transform = transform
+        if transform is None:
+            self.transform = torch_tf.IndependentTransform(
+                torch_tf.identity_transform, reinterpreted_batch_ndims=1
+            )
+        else:
+            self.transform = transform
 
         if method == "slice":
             return partial(self.pyro_potential, track_gradients=False)

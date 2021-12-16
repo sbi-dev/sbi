@@ -932,12 +932,14 @@ def mcmc_transform(
     else:
         transform = torch_tf.identity_transform
 
+    print("transform", transform)
     # Pytorch `transforms` do not sum the determinant over the parameters. However, if
     # the `transform` explicitly is an `IndependentTransform`, it does. Since our
     # `BoxUniform` is a `Independent` distribution, it will also automatically get a
     # `IndependentTransform` wrapper in `biject_to`. Our solution here is to wrap all
     # transforms as `IndependentTransform`.
     if not isinstance(transform, torch_tf.IndependentTransform):
+        print("Yeah")
         transform = torch_tf.IndependentTransform(
             transform, reinterpreted_batch_ndims=1
         )
