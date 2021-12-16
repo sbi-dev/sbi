@@ -106,6 +106,8 @@ class LikelihoodEstimator(NeuralInference, ABC):
         self._prior_masks.append(mask_sims_from_prior(int(from_round), theta.size(0)))
         self._data_round_index.append(int(from_round))
 
+        self._score_roundwise.append(torch.tensor([[False]] * theta.size(0)))
+
         return self
 
     def train(
@@ -122,6 +124,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         retrain_from_scratch_each_round: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
+        score_lambda: float = 1e-6,
     ) -> LikelihoodBasedPosterior:
         r"""
         Train the density estimator to learn the distribution $p(x|\theta)$.
@@ -153,12 +156,16 @@ class LikelihoodEstimator(NeuralInference, ABC):
         start_idx = int(discard_prior_samples and self._round > 0)
         # Load data from most recent round.
         self._round = max(self._data_round_index)
-        theta, x, _ = self.get_simulations(
+        theta, x, score, _ = self.get_simulations(
             start_idx, exclude_invalid_x, warn_on_invalid=True
         )
 
+        if torch.any(score):
+            self.score_stds = torch.std(score, dim=0)
+            self.score_means = torch.mean(score, dim=0)
+
         # Dataset is shared for training and validation loaders.
-        dataset = data.TensorDataset(theta, x)
+        dataset = data.TensorDataset(theta, x, score)
 
         train_loader, val_loader = self.get_dataloaders(
             dataset,
@@ -198,14 +205,16 @@ class LikelihoodEstimator(NeuralInference, ABC):
             self._neural_net.train()
             for batch in train_loader:
                 self.optimizer.zero_grad()
-                theta_batch, x_batch = (
+                theta_batch, x_batch, score_batch = (
                     batch[0].to(self._device),
                     batch[1].to(self._device),
+                    batch[2].to(self._device),
                 )
-                # Evaluate on x with theta as context.
-                log_prob = self._neural_net.log_prob(x_batch, context=theta_batch)
-                loss = -torch.mean(log_prob)
-                loss.backward()
+
+                batch_loss = torch.mean(
+                    self._loss(theta_batch, x_batch, score_batch, score_lambda)
+                )
+                batch_loss.backward()
                 if clip_max_norm is not None:
                     clip_grad_norm_(
                         self._neural_net.parameters(),
@@ -225,8 +234,10 @@ class LikelihoodEstimator(NeuralInference, ABC):
                         batch[1].to(self._device),
                     )
                     # Evaluate on x with theta as context.
-                    log_prob = self._neural_net.log_prob(x_batch, context=theta_batch)
-                    log_prob_sum += log_prob.sum().item()
+                    batch_log_prob = -self._loss(
+                        theta_batch, x_batch, score_batch, score_lambda
+                    )
+                    log_prob_sum += batch_log_prob.sum().item()
             # Take mean over all validation samples.
             self._val_log_prob = log_prob_sum / (
                 len(val_loader) * val_loader.batch_size
@@ -255,6 +266,9 @@ class LikelihoodEstimator(NeuralInference, ABC):
             print(self._describe_round(self._round, self._summary))
 
         return deepcopy(self._neural_net)
+
+    def _loss(self, theta: Tensor, x: Tensor, score: Tensor, score_lambda: float):
+        raise NotImplementedError
 
     def build_posterior(
         self,
