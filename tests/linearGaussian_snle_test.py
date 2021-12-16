@@ -256,6 +256,8 @@ def test_c2st_multi_round_snl_on_linearGaussian(num_trials: int, set_seed):
         ("nuts", "gaussian"),
         ("nuts", "uniform"),
         ("hmc", "gaussian"),
+        ("rejection", "uniform"),
+        ("rejection", "gaussian"),
     ),
 )
 @pytest.mark.parametrize("init_strategy", ("prior", "sir"))

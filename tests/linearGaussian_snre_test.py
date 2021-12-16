@@ -240,6 +240,8 @@ def test_c2st_sre_variants_on_linearGaussian(
         ("nuts", "gaussian"),
         ("nuts", "uniform"),
         ("hmc", "gaussian"),
+        ("rejection", "uniform"),
+        ("rejection", "gaussian"),
     ),
 )
 def test_api_sre_sampling_methods(sampling_method: str, prior_str: str, set_seed):
