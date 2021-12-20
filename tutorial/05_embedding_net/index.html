@@ -704,9 +704,6 @@
 <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
 <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>&lt;torch._C.Generator at 0x7fd1c9c577f0&gt;
-</code></pre></div>
-
 <h2 id="the-simulator-model">The simulator model<a class="headerlink" href="#the-simulator-model" title="Permanent link">&para;</a></h2>
 <p>The simulator model that we consider has two parameters: <span class="arithmatex">\(r\)</span> and <span class="arithmatex">\(\theta\)</span>. On each run, it generates 100 two-dimensional points centered around <span class="arithmatex">\((r \cos(\theta), r \sin(\theta))\)</span> and perturbed by a Gaussian noise with variance 0.01. Instead of simply outputting the <span class="arithmatex">\((x,y)\)</span> coordinates of each data point, the model generates a grayscale image of the scattered points with dimensions 32 by 32. This image is further perturbed by an uniform noise with values betweeen 0 and 0.2. The code below defines such model.</p>
 <div class="highlight"><pre><span></span><code> <span class="k">def</span> <span class="nf">simulator_model</span><span class="p">(</span><span class="n">parameter</span><span class="p">,</span> <span class="n">return_points</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
@@ -846,9 +843,6 @@
 <span class="n">x_observed</span> <span class="o">=</span> <span class="n">simulator_model</span><span class="p">(</span><span class="n">true_parameter</span><span class="p">)</span>
 <span class="n">samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">x_observed</span><span class="p">)</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">50000</span><span class="p">,))</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>Drawing 50000 posterior samples:   0%|          | 0/50000 [00:00&lt;?, ?it/s]
-</code></pre></div>
-
 <p>The figure below shows the statistics of the generated samples.</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># create the figure</span>
 <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">pairplot</span><span class="p">(</span><span class="n">samples</span><span class="p">,</span> 
