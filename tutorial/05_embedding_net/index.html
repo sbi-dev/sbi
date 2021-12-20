@@ -704,7 +704,7 @@
 <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
 <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>&lt;torch._C.Generator at 0x128d04990&gt;
+<div class="codehilite"><pre><span></span><code>&lt;torch._C.Generator at 0x7fd1c9c577f0&gt;
 </code></pre></div>
 
 <h2 id="the-simulator-model">The simulator model<a class="headerlink" href="#the-simulator-model" title="Permanent link">&para;</a></h2>
@@ -839,9 +839,6 @@
 <span class="n">density_estimator</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span><span class="n">density_estimator</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>HBox(children=(FloatProgress(value=0.0, description=&#39;Running 10000 simulations.&#39;, max=10000.0, style=ProgressS…
-</code></pre></div>
-
 <h2 id="visualizing-the-results">Visualizing the results<a class="headerlink" href="#visualizing-the-results" title="Permanent link">&para;</a></h2>
 <p>We now generate 50000 samples of the posterior distribution of <span class="arithmatex">\(r\)</span> and <span class="arithmatex">\(\theta\)</span> when observing an input data point <span class="arithmatex">\(x\)</span> generated from the <code>simulator model</code> with <span class="arithmatex">\(r = 0.70\)</span> and <span class="arithmatex">\(\theta = \pi/4\)</span>. </p>
 <div class="highlight"><pre><span></span><code><span class="c1"># generate posterior samples</span>
@@ -849,6 +846,9 @@
 <span class="n">x_observed</span> <span class="o">=</span> <span class="n">simulator_model</span><span class="p">(</span><span class="n">true_parameter</span><span class="p">)</span>
 <span class="n">samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">x_observed</span><span class="p">)</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">50000</span><span class="p">,))</span>
 </code></pre></div>
+<div class="codehilite"><pre><span></span><code>Drawing 50000 posterior samples:   0%|          | 0/50000 [00:00&lt;?, ?it/s]
+</code></pre></div>
+
 <p>The figure below shows the statistics of the generated samples.</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># create the figure</span>
 <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">pairplot</span><span class="p">(</span><span class="n">samples</span><span class="p">,</span> 
@@ -859,6 +859,7 @@
                              <span class="n">points_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;markersize&#39;</span><span class="p">:</span> <span class="mi">6</span><span class="p">},</span>
                              <span class="n">figsize</span><span class="o">=</span><span class="p">[</span><span class="mf">7.5</span><span class="p">,</span> <span class="mf">6.4</span><span class="p">])</span>
 </code></pre></div>
+<p><img alt="png" src="../05_embedding_net_files/05_embedding_net_15_0.png" /></p>
                 
               
               
