@@ -8,7 +8,15 @@ import torch
 from torch import Tensor, eye, ones, zeros
 from torch.distributions import MultivariateNormal, Uniform
 
-from sbi.inference import SNLE, SNPE, prepare_for_sbi, simulate_for_sbi
+from sbi.inference import (
+    SNLE,
+    SNPE,
+    DirectPosterior,
+    MCMCPosterior,
+    prepare_for_sbi,
+    simulate_for_sbi,
+    likelihood_potential,
+)
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     true_posterior_linear_gaussian_mvn_prior,
@@ -48,11 +56,19 @@ def mdn_inference_with_different_methods(method, set_seed):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     simulator, prior = prepare_for_sbi(simulator, prior)
-    inference = method(prior, density_estimator="mdn")
+    inference = method(density_estimator="mdn")
 
     theta, x = simulate_for_sbi(simulator, prior, num_simulations)
-    _ = inference.append_simulations(theta, x).train(training_batch_size=50)
-    posterior = inference.build_posterior().set_default_x(x_o)
+    model = inference.append_simulations(theta, x).train()
+    if method == SNPE:
+        posterior = DirectPosterior(posterior_model=model, prior=prior, xo=x_o)
+    else:
+        potential_fn, potential_tf = likelihood_potential(
+            likelihood_model=model, prior=prior, xo=x_o
+        )
+        posterior = MCMCPosterior(
+            potential_fn=potential_fn, potential_tf=potential_tf, prior=prior
+        )
 
     samples = posterior.sample((num_samples,))
 
@@ -82,11 +98,12 @@ def test_mdn_with_1D_uniform_prior():
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     simulator, prior = prepare_for_sbi(simulator, prior)
-    inference = SNPE(prior, density_estimator="mdn")
+    inference = SNPE(density_estimator="mdn")
 
     theta, x = simulate_for_sbi(simulator, prior, 100)
-    _ = inference.append_simulations(theta, x).train(training_batch_size=50)
-    posterior = inference.build_posterior().set_default_x(x_o)
+    posterior_model = inference.append_simulations(theta, x).train()
+    posterior_model = inference.append_simulations(theta, x).train()
+    posterior = DirectPosterior(posterior_model=posterior_model, prior=prior, xo=x_o)
     samples = posterior.sample((num_samples,))
     log_probs = posterior.log_prob(samples)
 

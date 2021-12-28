@@ -6,7 +6,18 @@ import torch
 from torch import eye, ones, zeros
 
 from sbi import utils as utils
-from sbi.inference import SNL, SNPE_A, SNPE_C, SRE, prepare_for_sbi, simulate_for_sbi
+from sbi.inference import (
+    SNL,
+    SNPE_A,
+    SNPE_C,
+    SRE,
+    prepare_for_sbi,
+    simulate_for_sbi,
+    DirectPosterior,
+    likelihood_potential,
+    ratio_potential,
+    MCMCPosterior,
+)
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     samples_true_posterior_linear_gaussian_uniform_prior,
@@ -89,14 +100,24 @@ def test_inference_with_nan_simulator(
     )
 
     simulator, prior = prepare_for_sbi(linear_gaussian_nan, prior)
-    inference = method(prior)
+    inference = method()
 
     theta, x = simulate_for_sbi(simulator, prior, num_simulations)
-    _ = inference.append_simulations(theta, x).train(
+    model = inference.append_simulations(theta, x).train(
         exclude_invalid_x=exclude_invalid_x
     )
-
-    posterior = inference.build_posterior().set_default_x(x_o)
+    if method == SNL:
+        potential_fn, potential_tf = likelihood_potential(model, prior, x_o)
+        posterior = MCMCPosterior(
+            potential_fn=potential_fn, potential_tf=potential_tf, prior=prior
+        )
+    elif method == SNPE_C:
+        posterior = DirectPosterior(prior=prior, posterior_model=model, xo=x_o)
+    elif method == SRE:
+        potential_fn, potential_tf = ratio_potential(model, prior, x_o)
+        posterior = MCMCPosterior(
+            potential_fn=potential_fn, potential_tf=potential_tf, prior=prior
+        )
 
     samples = posterior.sample((num_samples,))
 
@@ -133,25 +154,25 @@ def test_inference_with_restriction_estimator(set_seed):
     )
 
     simulator, prior = prepare_for_sbi(linear_gaussian_nan, prior)
-    rejection_estimator = RestrictionEstimator(prior=prior)
+    restriction_estimator = RestrictionEstimator(prior=prior)
     proposals = [prior]
     num_rounds = 2
 
     for r in range(num_rounds):
         theta, x = simulate_for_sbi(simulator, proposals[-1], 1000)
-        rejection_estimator.append_simulations(theta, x)
+        restriction_estimator.append_simulations(theta, x)
         if r < num_rounds - 1:
-            _ = rejection_estimator.train()
-        proposals.append(rejection_estimator.restrict_prior())
+            _ = restriction_estimator.train()
+        proposals.append(restriction_estimator.restrict_prior())
 
-    all_theta, all_x, _ = rejection_estimator.get_simulations()
+    all_theta, all_x, _ = restriction_estimator.get_simulations()
 
     # Any method can be used in combination with the `RejectionEstimator`.
     inference = SNPE_C(prior=prior)
-    _ = inference.append_simulations(all_theta, all_x).train()
+    posterior_model = inference.append_simulations(all_theta, all_x).train()
 
     # Build posterior.
-    posterior = inference.build_posterior().set_default_x(x_o)
+    posterior = DirectPosterior(prior=prior, posterior_model=posterior_model, xo=x_o)
 
     samples = posterior.sample((num_samples,))
 

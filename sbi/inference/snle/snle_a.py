@@ -13,7 +13,6 @@ from sbi.utils import del_entries
 class SNLE_A(LikelihoodEstimator):
     def __init__(
         self,
-        prior,
         density_estimator: Union[str, Callable] = "maf",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",

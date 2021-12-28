@@ -87,7 +87,6 @@ class NeuralInference(ABC):
 
     def __init__(
         self,
-        prior: Optional[Any] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
@@ -115,7 +114,7 @@ class NeuralInference(ABC):
                 0.14.0 is more mature, we will remove this argument.
         """
 
-        self._device = process_device(device, prior=prior)
+        self._device = process_device(device)
 
         if unused_args:
             warn(
@@ -129,7 +128,6 @@ class NeuralInference(ABC):
                 f"further information.",
             )
 
-        self._prior = prior
         self._posterior = None
         self._neural_net = None
         self._x_shape = None
@@ -542,7 +540,8 @@ def simulate_for_sbi(
     Returns: Sampled parameters $\theta$ and simulation-outputs $x$.
     """
 
-    check_if_proposal_has_default_x(proposal)
+    # As of v0.18.0, all posteriors have a default x.
+    # check_if_proposal_has_default_x(proposal)
 
     theta = proposal.sample((num_simulations,))
 

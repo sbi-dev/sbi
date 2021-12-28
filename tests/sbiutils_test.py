@@ -304,7 +304,7 @@ def test_gaussian_transforms(snpe_method: str, plot_results: bool = False):
             max_num_epochs=1
         )
         wrapped_density_estimator = SNPE_A_MDN(
-            flow=density_estimator, proposal=prior, prior=prior
+            flow=density_estimator, proposal=prior, proposal_x=None, prior=prior
         )
 
         precs1 = torch.inverse(covs1)

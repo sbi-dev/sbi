@@ -9,7 +9,19 @@ from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
 from sbi import utils as utils
-from sbi.inference import SNLE, SNPE_A, SNPE_C, SNRE_A, SNRE_B, simulate_for_sbi
+from sbi.inference import (
+    SNLE,
+    SNPE_A,
+    SNPE_C,
+    SNRE_A,
+    SNRE_B,
+    simulate_for_sbi,
+    MCMCPosterior,
+    RejectionPosterior,
+    ratio_potential,
+    likelihood_potential,
+    posterior_potential,
+)
 from sbi.simulators import linear_gaussian
 from sbi.utils.torchutils import BoxUniform, process_device
 
@@ -76,25 +88,22 @@ def test_training_and_mcmc_on_device(
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    training_device = process_device(training_device, prior)
+    training_device = process_device(training_device)
 
     if method in [SNPE_A, SNPE_C]:
-        kwargs = dict(density_estimator=utils.posterior_nn(model=model))
-        mcmc_kwargs = (
-            dict(sample_with="rejection", mcmc_method=mcmc_method)
-            if method == SNPE_C
-            else {}
+        kwargs = dict(
+            density_estimator=utils.posterior_nn(model=model, num_transforms=2)
         )
     elif method == SNLE:
-        kwargs = dict(density_estimator=utils.likelihood_nn(model=model))
-        mcmc_kwargs = dict(sample_with="mcmc", mcmc_method=mcmc_method)
+        kwargs = dict(
+            density_estimator=utils.likelihood_nn(model=model, num_transforms=2)
+        )
     elif method in (SNRE_A, SNRE_B):
         kwargs = dict(classifier=utils.classifier_nn(model=model))
-        mcmc_kwargs = dict(sample_with="mcmc", mcmc_method=mcmc_method)
     else:
         raise ValueError()
 
-    inferer = method(prior, show_progress_bars=False, device=training_device, **kwargs)
+    inferer = method(show_progress_bars=False, device=training_device, **kwargs)
 
     proposals = [prior]
 
@@ -103,17 +112,37 @@ def test_training_and_mcmc_on_device(
         theta, x = simulate_for_sbi(simulator, proposals[-1], num_simulations)
         theta, x = theta.to(data_device), x.to(data_device)
 
-        _ = inferer.append_simulations(theta, x).train(
+        model = inferer.append_simulations(theta, x).train(
             training_batch_size=100, max_num_epochs=max_num_epochs
         )
-        posterior = inferer.build_posterior(**mcmc_kwargs).set_default_x(x_o)
+        if method == SNLE:
+            potential_fn, potential_tf = likelihood_potential(model, prior, x_o)
+        elif method == SNPE_A or method == SNPE_C:
+            potential_fn, potential_tf = posterior_potential(model, prior, x_o)
+        elif method == SNRE_A or method == SNRE_B:
+            potential_fn, potential_tf = ratio_potential(model, prior, x_o)
+
+        if mcmc_method == "rejection":
+            posterior = RejectionPosterior(
+                proposal=prior,
+                potential_fn=potential_fn,
+                device=training_device,
+            )
+        else:
+            posterior = MCMCPosterior(
+                potential_fn=potential_fn,
+                potential_tf=potential_tf,
+                prior=prior,
+                method=mcmc_method,
+                device=training_device,
+            )
         proposals.append(posterior)
 
     # Check for default device for inference object
     weights_device = next(inferer._neural_net.parameters()).device
     assert torch.device(training_device) == weights_device
-    samples = proposals[-1].sample(sample_shape=(num_samples,), x=x_o, **mcmc_kwargs)
-    proposals[-1].log_prob(samples)
+    samples = proposals[-1].sample(sample_shape=(num_samples,))
+    proposals[-1].potential(samples)
 
 
 @pytest.mark.gpu

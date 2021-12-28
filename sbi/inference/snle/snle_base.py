@@ -4,17 +4,19 @@
 
 from abc import ABC
 from copy import deepcopy
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Callable, Dict, Optional, Tuple, Union
 
 import torch
-from torch import Tensor, optim
+from torch import Tensor, optim, nn
 from torch.nn.utils import clip_grad_norm_
 from torch.utils import data
 from torch.utils.tensorboard import SummaryWriter
 
 from sbi import utils as utils
 from sbi.inference import NeuralInference
-from sbi.inference.posteriors.likelihood_based_posterior import LikelihoodBasedPosterior
+from sbi.inference.potentials.likelihood_based_potential import (
+    likelihood_potential,
+)
 from sbi.types import TorchModule
 from sbi.utils import check_estimator_arg, validate_theta_and_x, x_shape_from_simulation
 from sbi.utils.sbiutils import mask_sims_from_prior
@@ -23,7 +25,6 @@ from sbi.utils.sbiutils import mask_sims_from_prior
 class LikelihoodEstimator(NeuralInference, ABC):
     def __init__(
         self,
-        prior,
         density_estimator: Union[str, Callable] = "maf",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
@@ -50,7 +51,6 @@ class LikelihoodEstimator(NeuralInference, ABC):
         """
 
         super().__init__(
-            prior=prior,
             device=device,
             logging_level=logging_level,
             summary_writer=summary_writer,
@@ -122,7 +122,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         retrain_from_scratch_each_round: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
-    ) -> LikelihoodBasedPosterior:
+    ) -> nn.Module:
         r"""
         Train the density estimator to learn the distribution $p(x|\theta)$.
 
@@ -255,80 +255,3 @@ class LikelihoodEstimator(NeuralInference, ABC):
             print(self._describe_round(self._round, self._summary))
 
         return deepcopy(self._neural_net)
-
-    def build_posterior(
-        self,
-        density_estimator: Optional[TorchModule] = None,
-        sample_with: str = "mcmc",
-        mcmc_method: str = "slice_np",
-        mcmc_parameters: Optional[Dict[str, Any]] = None,
-        rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
-    ) -> LikelihoodBasedPosterior:
-        r"""
-        Build posterior from the neural density estimator.
-
-        SNLE trains a neural network to approximate the likelihood $p(x|\theta)$. The
-        `LikelihoodBasedPosterior` class wraps the trained network such that one can
-        directly evaluate the unnormalized posterior log probability
-        $p(\theta|x) \propto p(x|\theta) \cdot p(\theta)$ and draw samples from the
-        posterior with MCMC.
-
-        Args:
-            density_estimator: The density estimator that the posterior is based on.
-                If `None`, use the latest neural density estimator that was trained.
-            sample_with: Method to use for sampling from the posterior. Must be one of
-                [`mcmc` | `rejection`].
-            mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`,
-                `hmc`, `nuts`. Currently defaults to `slice_np` for a custom numpy
-                implementation of slice sampling; select `hmc`, `nuts` or `slice` for
-                Pyro-based sampling.
-            mcmc_parameters: Dictionary overriding the default parameters for MCMC.
-                The following parameters are supported: `thin` to set the thinning
-                factor for the chain, `warmup_steps` to set the initial number of
-                samples to discard, `num_chains` for the number of chains,
-                `init_strategy` for the initialisation strategy for chains; `prior` will
-                draw init locations from prior, whereas `sir` will use
-                Sequential-Importance-Resampling using `init_strategy_num_candidates`
-                to find init locations.
-            rejection_sampling_parameters: Dictionary overriding the default parameters
-                for rejection sampling. The following parameters are supported:
-                `proposal` as the proposal distribtution (default is the prior).
-                `max_sampling_batch_size` as the batchsize of samples being drawn from
-                the proposal at every iteration. `num_samples_to_find_max` as the
-                number of samples that are used to find the maximum of the
-                `potential_fn / proposal` ratio. `num_iter_to_find_max` as the number
-                of gradient ascent iterations to find the maximum of that ratio. `m` as
-                multiplier to that ratio.
-
-        Returns:
-            Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods
-            (the returned log-probability is unnormalized).
-        """
-
-        if density_estimator is None:
-            density_estimator = self._neural_net
-            # If internal net is used device is defined.
-            device = self._device
-        else:
-            # Otherwise, infer it from the device of the net parameters.
-            device = next(density_estimator.parameters()).device.type
-
-        self._posterior = LikelihoodBasedPosterior(
-            method_family="snle",
-            neural_net=density_estimator,
-            prior=self._prior,
-            x_shape=self._x_shape,
-            sample_with=sample_with,
-            mcmc_method=mcmc_method,
-            mcmc_parameters=mcmc_parameters,
-            rejection_sampling_parameters=rejection_sampling_parameters,
-            device=device,
-        )
-
-        self._posterior._num_trained_rounds = self._round + 1
-
-        # Store models at end of each round.
-        self._model_bank.append(deepcopy(self._posterior))
-        self._model_bank[-1].net.eval()
-
-        return deepcopy(self._posterior)

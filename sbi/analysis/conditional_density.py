@@ -1,12 +1,23 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
-from typing import Any, List, Optional, Union
+from typing import Any, Callable, List, Optional, Union
 
-from torch import Tensor
+import torch
+from torch import Tensor, nn
 
 from sbi.utils import conditional_corrcoeff as utils_conditional_corrcoeff
 from sbi.utils import eval_conditional_density as utils_eval_conditional_density
+from sbi.types import Shape
+from pyknos.mdn.mdn import MultivariateGaussianMDN as mdn
+from sbi.utils.torchutils import atleast_2d_float32_tensor
+from sbi.utils.conditional_density import (
+    extract_and_transform_mog,
+    condition_mog,
+    RestrictedTransformForConditional,
+    RestrictedPriorForConditional,
+    build_conditioned_potential_fn,
+)
 
 
 def eval_conditional_density(
@@ -110,3 +121,68 @@ def conditional_corrcoeff(
         resolution=resolution,
         warn_about_deprecation=False,
     )
+
+
+def parameter_conditional_mdn(
+    net: nn.Module, xo: Tensor, prior: Any, condition: Tensor, dims_to_sample: List[int]
+):
+    class ConditionedMDN:
+        def __init__(
+            self,
+            net: nn.Module,
+            xo: Tensor,
+            condition: Tensor,
+            dims_to_sample: List[int],
+        ):
+            condition = atleast_2d_float32_tensor(condition)
+
+            logits, means, precfs, _ = extract_and_transform_mog(nn=net, context=xo)
+            self.logits, self.means, self.precfs, self.sumlogdiag = condition_mog(
+                prior, condition, dims_to_sample, logits, means, precfs
+            )
+            self.prec = self.precfs.transpose(3, 2) @ self.precfs
+
+        def sample(self, sample_shape: Shape = torch.Size()):
+            num_samples = torch.Size(sample_shape).numel()
+            samples = mdn.sample_mog(num_samples, self.logits, self.means, self.precfs)
+            return samples.detach().reshape((*sample_shape, -1))
+
+        def log_prob(self, theta: Tensor):
+            batch_size, dim = theta.shape
+
+            log_prob = mdn.log_prob_mog(
+                theta,
+                self.logits.repeat(batch_size, 1),
+                self.means.repeat(batch_size, 1, 1),
+                self.prec.repeat(batch_size, 1, 1, 1),
+                self.sumlogdiag.repeat(batch_size, 1),
+            )
+            return log_prob
+
+    conditioned_mdn = ConditionedMDN(net, xo, condition, dims_to_sample)
+    return conditioned_mdn
+
+
+def parameter_conditonal_potential(
+    potential_fn: Callable,
+    potential_tf,
+    prior: Any,
+    condition: Tensor,
+    dims_to_sample: List[int],
+):
+    restricted_tf = RestrictedTransformForConditional(
+        potential_tf, condition, dims_to_sample
+    )
+
+    condition = atleast_2d_float32_tensor(condition)
+
+    # Transform the `condition` to unconstrained space.
+    transformed_condition = potential_tf(condition)
+
+    conditioned_potential_fn = _build_conditioned_potential_fn(
+        potential_fn, transformed_condition, dims_to_sample
+    )
+
+    restricted_prior = RestrictedPriorForConditional(prior, dims_to_sample)
+
+    return conditioned_potential_fn, restricted_tf, restricted_prior

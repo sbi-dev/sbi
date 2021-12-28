@@ -3,14 +3,13 @@ from copy import deepcopy
 from typing import Any, Callable, Dict, Optional, Union
 
 import torch
-from torch import Tensor, eye, ones, optim
+from torch import Tensor, eye, ones, optim, nn
 from torch.nn.utils import clip_grad_norm_
 from torch.utils import data
 from torch.utils.tensorboard import SummaryWriter
 
 from sbi import utils as utils
 from sbi.inference.base import NeuralInference
-from sbi.inference.posteriors.ratio_based_posterior import RatioBasedPosterior
 from sbi.types import TorchModule
 from sbi.utils import (
     check_estimator_arg,
@@ -24,7 +23,6 @@ from sbi.utils.sbiutils import mask_sims_from_prior
 class RatioEstimator(NeuralInference, ABC):
     def __init__(
         self,
-        prior,
         classifier: Union[str, Callable] = "resnet",
         device: str = "cpu",
         logging_level: Union[int, str] = "warning",
@@ -58,7 +56,6 @@ class RatioEstimator(NeuralInference, ABC):
         """
 
         super().__init__(
-            prior=prior,
             device=device,
             logging_level=logging_level,
             summary_writer=summary_writer,
@@ -130,7 +127,7 @@ class RatioEstimator(NeuralInference, ABC):
         retrain_from_scratch_each_round: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
-    ) -> RatioBasedPosterior:
+    ) -> nn.Module:
         r"""
         Return classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
 
@@ -263,86 +260,6 @@ class RatioEstimator(NeuralInference, ABC):
             print(self._describe_round(self._round, self._summary))
 
         return deepcopy(self._neural_net)
-
-    def build_posterior(
-        self,
-        density_estimator: Optional[TorchModule] = None,
-        sample_with: str = "mcmc",
-        mcmc_method: str = "slice_np",
-        mcmc_parameters: Optional[Dict[str, Any]] = None,
-        rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
-    ) -> RatioBasedPosterior:
-        r"""
-        Build posterior from the neural density estimator.
-
-        SNRE trains a neural network to approximate likelihood ratios, which in turn
-        can be used obtain an unnormalized posterior
-        $p(\theta|x) \propto p(x|\theta) \cdot p(\theta)$. The posterior returned here
-        wraps the trained network such that one can directly evaluate the unnormalized
-        posterior log-probability $p(\theta|x) \propto p(x|\theta) \cdot p(\theta)$ and
-        draw samples from the posterior with MCMC. Note that, in the case of
-        single-round SNRE_A / AALR, it is possible to evaluate the log-probability of
-        the **normalized** posterior, but sampling still requires MCMC.
-
-        Args:
-            density_estimator: The density estimator that the posterior is based on.
-                If `None`, use the latest neural density estimator that was trained.
-            sample_with: Method to use for sampling from the posterior. Must be one of
-                [`mcmc` | `rejection`].
-            mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`,
-                `hmc`, `nuts`. Currently defaults to `slice_np` for a custom numpy
-                implementation of slice sampling; select `hmc`, `nuts` or `slice` for
-                Pyro-based sampling.
-            mcmc_parameters: Dictionary overriding the default parameters for MCMC.
-                The following parameters are supported: `thin` to set the thinning
-                factor for the chain, `warmup_steps` to set the initial number of
-                samples to discard, `num_chains` for the number of chains,
-                `init_strategy` for the initialisation strategy for chains; `prior` will
-                draw init locations from prior, whereas `sir` will use
-                Sequential-Importance-Resampling using `init_strategy_num_candidates`
-                to find init locations.
-            rejection_sampling_parameters: Dictionary overriding the default parameters
-                for rejection sampling. The following parameters are supported:
-                `proposal` as the proposal distribtution (default is the prior).
-                `max_sampling_batch_size` as the batchsize of samples being drawn from
-                the proposal at every iteration. `num_samples_to_find_max` as the
-                number of samples that are used to find the maximum of the
-                `potential_fn / proposal` ratio. `num_iter_to_find_max` as the number
-                of gradient ascent iterations to find the maximum of that ratio. `m` as
-                multiplier to that ratio.
-
-        Returns:
-            Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods
-            (the returned log-probability is unnormalized).
-        """
-
-        if density_estimator is None:
-            density_estimator = self._neural_net
-            # If internal net is used device is defined.
-            device = self._device
-        else:
-            # Otherwise, infer it from the device of the net parameters.
-            device = next(density_estimator.parameters()).device.type
-
-        self._posterior = RatioBasedPosterior(
-            method_family=self.__class__.__name__.lower(),
-            neural_net=density_estimator,
-            prior=self._prior,
-            x_shape=self._x_shape,
-            sample_with=sample_with,
-            mcmc_method=mcmc_method,
-            mcmc_parameters=mcmc_parameters,
-            rejection_sampling_parameters=rejection_sampling_parameters,
-            device=device,
-        )
-
-        self._posterior._num_trained_rounds = self._round + 1
-
-        # Store models at end of each round.
-        self._model_bank.append(deepcopy(self._posterior))
-        self._model_bank[-1].net.eval()
-
-        return deepcopy(self._posterior)
 
     def _classifier_logits(self, theta: Tensor, x: Tensor, num_atoms: int) -> Tensor:
         """Return logits obtained through classifier forward pass.

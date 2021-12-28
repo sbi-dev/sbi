@@ -20,6 +20,7 @@ from sbi.inference.base import (  # noqa: F401
     simulate_for_sbi,
 )
 from sbi.inference.snle.snle_a import SNLE_A
+
 # Unimplemented: don't export
 from sbi.inference.snpe.snpe_a import SNPE_A
 from sbi.inference.snpe.snpe_b import SNPE_B
@@ -45,3 +46,11 @@ _abc_family = ["ABC", "MCABC", "SMC", "SMCABC"]
 
 
 __all__ = _snpe_family + _snre_family + _snle_family + _abc_family
+
+from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
+from sbi.inference.posteriors.rejection_posterior import RejectionPosterior
+from sbi.inference.posteriors.direct_posterior import DirectPosterior
+from sbi.inference.posteriors.vi_posterior import VIPosterior
+from sbi.inference.potentials.likelihood_based_potential import likelihood_potential
+from sbi.inference.potentials.ratio_based_potential import ratio_potential
+from sbi.inference.potentials.posterior_based_potential import posterior_potential
