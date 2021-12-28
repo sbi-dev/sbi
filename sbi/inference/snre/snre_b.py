@@ -12,7 +12,6 @@ from sbi.utils import del_entries
 class SNRE_B(RatioEstimator):
     def __init__(
         self,
-        prior,
         classifier: Union[str, Callable] = "resnet",
         device: str = "cpu",
         logging_level: Union[int, str] = "warning",

@@ -8,7 +8,14 @@ from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
 from sbi import utils as utils
-from sbi.inference import SNL, prepare_for_sbi, simulate_for_sbi
+from sbi.inference import (
+    SNL,
+    likelihood_potential,
+    MCMCPosterior,
+    RejectionPosterior,
+    prepare_for_sbi,
+    simulate_for_sbi,
+)
 from sbi.simulators.linear_gaussian import (
     diagonal_linear_gaussian,
     linear_gaussian,
@@ -36,17 +43,22 @@ def test_api_snl_on_linearGaussian(num_dim: int, set_seed):
     prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
 
     simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior)
-    inference = SNL(prior, show_progress_bars=False)
+    inference = SNL(show_progress_bars=False)
 
     theta, x = simulate_for_sbi(simulator, prior, 1000, simulation_batch_size=50)
-    _ = inference.append_simulations(theta, x).train(max_num_epochs=5)
+    likelihood_model = inference.append_simulations(theta, x).train(
+        training_batch_size=100
+    )
 
     for num_trials in [1, 2]:
         x_o = zeros((num_trials, num_dim))
-        posterior = inference.build_posterior().set_default_x(x_o)
-        posterior.sample(
-            sample_shape=(num_samples,), x=x_o, mcmc_parameters={"thin": 3}
+        potential_fn, potential_tf = likelihood_potential(
+            prior=prior, likelihood_model=likelihood_model, xo=x_o
         )
+        posterior = MCMCPosterior(
+            prior=prior, potential_fn=potential_fn, potential_tf=potential_tf, thin=3
+        )
+        posterior.sample(sample_shape=(num_samples,))
 
 
 def test_c2st_snl_on_linearGaussian(set_seed):
@@ -65,7 +77,7 @@ def test_c2st_snl_on_linearGaussian(set_seed):
 
     x_o = ones(1, x_dim)
     num_samples = 1000
-    num_simulations = 5000
+    num_simulations = 2000
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(x_dim)
@@ -90,14 +102,19 @@ def test_c2st_snl_on_linearGaussian(set_seed):
         ),
         prior,
     )
-    inference = SNL(prior, show_progress_bars=False)
+    inference = SNL(show_progress_bars=False)
 
     theta, x = simulate_for_sbi(
         simulator, prior, num_simulations, simulation_batch_size=50
     )
-    _ = inference.append_simulations(theta, x).train()
-    posterior = inference.build_posterior()
-    samples = posterior.sample((num_samples,), x=x_o, mcmc_parameters={"thin": 3})
+    likelihood_model = inference.append_simulations(theta, x).train()
+    potential_fn, potential_tf = likelihood_potential(
+        prior=prior, likelihood_model=likelihood_model, xo=x_o
+    )
+    posterior = MCMCPosterior(
+        prior=prior, potential_fn=potential_fn, potential_tf=potential_tf, thin=3
+    )
+    samples = posterior.sample((num_samples,))
 
     # Compute the c2st and assert it is near chance level of 0.5.
     check_c2st(samples, target_samples, alg="snle_a")
@@ -117,7 +134,7 @@ def test_c2st_and_map_snl_on_linearGaussian_different(
         set_seed: fixture for manual seeding
     """
     num_samples = 500
-    num_simulations = 5000
+    num_simulations = 1000
     trials_to_test = [1]
 
     # likelihood_mean will be likelihood_shift+theta
@@ -135,12 +152,12 @@ def test_c2st_and_map_snl_on_linearGaussian_different(
     simulator, prior = prepare_for_sbi(
         lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov), prior
     )
-    inference = SNL(prior, show_progress_bars=False)
+    inference = SNL(show_progress_bars=False)
 
     theta, x = simulate_for_sbi(
         simulator, prior, num_simulations, simulation_batch_size=10000
     )
-    _ = inference.append_simulations(theta, x).train()
+    likelihood_model = inference.append_simulations(theta, x).train()
 
     # Test inference amortized over trials.
     for num_trials in trials_to_test:
@@ -161,13 +178,19 @@ def test_c2st_and_map_snl_on_linearGaussian_different(
         else:
             raise ValueError(f"Wrong prior_str: '{prior_str}'.")
 
-        posterior = inference.build_posterior(
-            mcmc_method="slice_np_vectorized"
-        ).set_default_x(x_o)
-
-        samples = posterior.sample(
-            sample_shape=(num_samples,), mcmc_parameters={"thin": 3, "num_chains": 2}
+        potential_fn, potential_tf = likelihood_potential(
+            prior=prior, likelihood_model=likelihood_model, xo=x_o
         )
+        posterior = MCMCPosterior(
+            prior=prior,
+            potential_fn=potential_fn,
+            potential_tf=potential_tf,
+            method="slice_np_vectorized",
+            thin=5,
+            num_chains=5,
+        )
+
+        samples = posterior.sample(sample_shape=(num_samples,))
 
         # Check performance based on c2st accuracy.
         check_c2st(
@@ -193,7 +216,7 @@ def test_c2st_and_map_snl_on_linearGaussian_different(
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("num_trials", (1, 5))
+@pytest.mark.parametrize("num_trials", (1, 3))
 def test_c2st_multi_round_snl_on_linearGaussian(num_trials: int, set_seed):
     """Test SNL on linear Gaussian, comparing to ground truth posterior via c2st.
 
@@ -204,7 +227,7 @@ def test_c2st_multi_round_snl_on_linearGaussian(num_trials: int, set_seed):
     num_dim = 2
     x_o = zeros((num_trials, num_dim))
     num_samples = 500
-    num_simulations_per_round = 1000 * num_trials
+    num_simulations_per_round = 500 * num_trials
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(num_dim)
@@ -221,23 +244,39 @@ def test_c2st_multi_round_snl_on_linearGaussian(num_trials: int, set_seed):
     simulator, prior = prepare_for_sbi(
         lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov), prior
     )
-    inference = SNL(prior, show_progress_bars=False)
+    inference = SNL(show_progress_bars=False)
 
     theta, x = simulate_for_sbi(
         simulator, prior, num_simulations_per_round, simulation_batch_size=50
     )
-    _ = inference.append_simulations(theta, x).train()
-    posterior1 = inference.build_posterior(
-        mcmc_method="slice_np_vectorized", mcmc_parameters={"thin": 5, "num_chains": 20}
-    ).set_default_x(x_o)
+    likelihood_model = inference.append_simulations(theta, x).train()
+    potential_fn, potential_tf = likelihood_potential(
+        prior=prior, likelihood_model=likelihood_model, xo=x_o
+    )
+    posterior1 = MCMCPosterior(
+        prior=prior,
+        potential_fn=potential_fn,
+        potential_tf=potential_tf,
+        thin=5,
+        num_chains=20,
+    )
 
     theta, x = simulate_for_sbi(
         simulator, posterior1, num_simulations_per_round, simulation_batch_size=50
     )
-    _ = inference.append_simulations(theta, x).train()
-    posterior = inference.build_posterior().copy_hyperparameters_from(posterior1)
+    likelihood_model = inference.append_simulations(theta, x).train()
+    potential_fn, potential_tf = likelihood_potential(
+        prior=prior, likelihood_model=likelihood_model, xo=x_o
+    )
+    posterior = MCMCPosterior(
+        prior=prior,
+        potential_fn=potential_fn,
+        potential_tf=potential_tf,
+        thin=5,
+        num_chains=20,
+    )
 
-    samples = posterior.sample(sample_shape=(num_samples,), mcmc_parameters={"thin": 3})
+    samples = posterior.sample(sample_shape=(num_samples,))
 
     # Check performance based on c2st accuracy.
     check_c2st(samples, target_samples, alg="multi-round-snl")
@@ -290,22 +329,26 @@ def test_api_snl_sampling_methods(
         prior = utils.BoxUniform(-1.0 * ones(num_dim), ones(num_dim))
 
     simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior)
-    inference = SNL(prior, show_progress_bars=False)
+    inference = SNL(show_progress_bars=False)
 
     theta, x = simulate_for_sbi(
         simulator, prior, num_simulations, simulation_batch_size=1000
     )
-    _ = inference.append_simulations(theta, x).train(max_num_epochs=5)
-    posterior = inference.build_posterior(
-        sample_with=sample_with, mcmc_method=sampling_method
-    ).set_default_x(x_o)
-
-    posterior.sample(
-        sample_shape=(num_samples,),
-        x=x_o,
-        mcmc_parameters={
-            "thin": 3,
-            "num_chains": num_chains,
-            "init_strategy": init_strategy,
-        },
+    likelihood_model = inference.append_simulations(theta, x).train(max_num_epochs=5)
+    potential_fn, potential_tf = likelihood_potential(
+        prior=prior, likelihood_model=likelihood_model, xo=x_o
     )
+    if sample_with == "rejection":
+        posterior = RejectionPosterior(potential_fn=potential_fn, proposal=prior)
+    else:
+        posterior = MCMCPosterior(
+            potential_fn,
+            prior=prior,
+            potential_tf=potential_tf,
+            method=sampling_method,
+            thin=3,
+            num_chains=num_chains,
+            init_strategy=init_strategy,
+        )
+
+    posterior.sample(sample_shape=(num_samples,))

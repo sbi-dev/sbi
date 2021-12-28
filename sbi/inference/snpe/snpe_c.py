@@ -7,11 +7,10 @@ from typing import Any, Callable, Dict, Optional, Union
 import torch
 from pyknos.mdn.mdn import MultivariateGaussianMDN as mdn
 from pyknos.nflows.transforms import CompositeTransform
-from torch import Tensor, eye, ones
+from torch import Tensor, eye, ones, nn
 from torch.distributions import MultivariateNormal, Uniform
 
 from sbi import utils as utils
-from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.inference.snpe.snpe_base import PosteriorEstimator
 from sbi.types import TensorboardSummaryWriter
 from sbi.utils import (
@@ -106,7 +105,7 @@ class SNPE_C(PosteriorEstimator):
         retrain_from_scratch_each_round: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
-    ) -> DirectPosterior:
+    ) -> nn.Module:
         r"""
         Return density estimator that approximates the distribution $p(\theta|x)$.
 
@@ -166,16 +165,13 @@ class SNPE_C(PosteriorEstimator):
             # SNPE, we only use the latest data that was passed, i.e. the one from the
             # last proposal.
             proposal = self._proposal_roundwise[-1]
-            if hasattr(proposal, "net"):
-                self.use_non_atomic_loss = (
-                    isinstance(proposal.net._distribution, mdn)
-                    and isinstance(self._neural_net._distribution, mdn)
-                    and check_dist_class(
-                        self._prior, class_to_check=(Uniform, MultivariateNormal)
-                    )[0]
-                )
-            else:
-                self.use_non_atomic_loss = False
+            self.use_non_atomic_loss = (
+                isinstance(proposal._distribution, mdn)
+                and isinstance(self._neural_net._distribution, mdn)
+                and check_dist_class(
+                    self._prior, class_to_check=(Uniform, MultivariateNormal)
+                )[0]
+            )
 
             algorithm = "non-atomic" if self.use_non_atomic_loss else "atomic"
             print(f"Using SNPE-C with {algorithm} loss")
@@ -262,7 +258,12 @@ class SNPE_C(PosteriorEstimator):
             self._maybe_z_scored_prior = self._prior
 
     def _log_prob_proposal_posterior(
-        self, theta: Tensor, x: Tensor, masks: Tensor, proposal: Optional[Any]
+        self,
+        theta: Tensor,
+        x: Tensor,
+        masks: Tensor,
+        proposal: Optional[Any],
+        proposal_x: Optional[Tensor],
     ) -> Tensor:
         """
         Return the log-probability of the proposal posterior.
@@ -282,7 +283,7 @@ class SNPE_C(PosteriorEstimator):
         """
 
         if self.use_non_atomic_loss:
-            return self._log_prob_proposal_posterior_mog(theta, x, proposal)
+            return self._log_prob_proposal_posterior_mog(theta, x, proposal, proposal_x)
         else:
             return self._log_prob_proposal_posterior_atomic(theta, x, masks)
 
@@ -364,7 +365,7 @@ class SNPE_C(PosteriorEstimator):
         return log_prob_proposal_posterior
 
     def _log_prob_proposal_posterior_mog(
-        self, theta: Tensor, x: Tensor, proposal: DirectPosterior
+        self, theta: Tensor, x: Tensor, proposal: nn.Module, proposal_x: Tensor
     ) -> Tensor:
         """
         Return log-probability of the proposal posterior for MoG proposal.
@@ -396,8 +397,8 @@ class SNPE_C(PosteriorEstimator):
         # Evaluate the proposal. MDNs do not have functionality to run the embedding_net
         # and then get the mixture_components (**without** calling log_prob()). Hence,
         # we call them separately here.
-        encoded_x = proposal.net._embedding_net(x)
-        dist = proposal.net._distribution  # defined to avoid ugly black formatting.
+        encoded_x = proposal._embedding_net(proposal_x)
+        dist = proposal._distribution  # defined to avoid ugly black formatting.
         logits_p, m_p, prec_p, _, _ = dist.get_mixture_components(encoded_x)
         norm_logits_p = logits_p - torch.logsumexp(logits_p, dim=-1, keepdim=True)
 

@@ -8,7 +8,15 @@ from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
 from sbi import utils as utils
-from sbi.inference import AALR, SNRE_B, prepare_for_sbi, simulate_for_sbi
+from sbi.inference import (
+    AALR,
+    SNRE_B,
+    ratio_potential,
+    MCMCPosterior,
+    RejectionPosterior,
+    prepare_for_sbi,
+    simulate_for_sbi,
+)
 from sbi.simulators.linear_gaussian import (
     diagonal_linear_gaussian,
     linear_gaussian,
@@ -37,18 +45,25 @@ def test_api_sre_on_linearGaussian(num_dim: int):
 
     simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior)
     inference = SNRE_B(
-        prior,
         classifier="resnet",
         show_progress_bars=False,
     )
 
     theta, x = simulate_for_sbi(simulator, prior, 1000, simulation_batch_size=50)
-    _ = inference.append_simulations(theta, x).train(max_num_epochs=5)
-    posterior = inference.build_posterior()
+    ratio_model = inference.append_simulations(theta, x).train(max_num_epochs=5)
 
     for num_trials in [1, 2]:
         x_o = zeros(num_trials, num_dim)
-        posterior.sample(sample_shape=(10,), x=x_o, mcmc_parameters={"num_chains": 2})
+        potential_fn, potential_tf = ratio_potential(
+            ratio_model=ratio_model, prior=prior, xo=x_o
+        )
+        posterior = MCMCPosterior(
+            potential_fn=potential_fn,
+            potential_tf=potential_tf,
+            prior=prior,
+            num_chains=2,
+        )
+        posterior.sample(sample_shape=(10,))
 
 
 def test_c2st_sre_on_linearGaussian(set_seed):
@@ -83,7 +98,6 @@ def test_c2st_sre_on_linearGaussian(set_seed):
         prior,
     )
     inference = SNRE_B(
-        prior,
         classifier="resnet",
         show_progress_bars=False,
     )
@@ -91,8 +105,7 @@ def test_c2st_sre_on_linearGaussian(set_seed):
     theta, x = simulate_for_sbi(
         simulator, prior, num_simulations, simulation_batch_size=100
     )
-    _ = inference.append_simulations(theta, x).train()
-    posterior = inference.build_posterior(mcmc_method="slice_np_vectorized")
+    ratio_model = inference.append_simulations(theta, x).train()
 
     num_trials = 1
     x_o = zeros(num_trials, x_dim)
@@ -105,11 +118,17 @@ def test_c2st_sre_on_linearGaussian(set_seed):
         num_discarded_dims=discard_dims,
         num_samples=num_samples,
     )
-    samples = posterior.sample(
-        (num_samples,),
-        x=x_o,
-        mcmc_parameters={"thin": 5, "num_chains": 2},
+    potential_fn, potential_tf = ratio_potential(
+        ratio_model=ratio_model, prior=prior, xo=x_o
     )
+    posterior = MCMCPosterior(
+        potential_fn=potential_fn,
+        potential_tf=potential_tf,
+        prior=prior,
+        thin=5,
+        num_chains=2,
+    )
+    samples = posterior.sample((num_samples,))
 
     # Compute the c2st and assert it is near chance level of 0.5.
     check_c2st(samples, target_samples, alg=f"snre-{num_trials}trials")
@@ -160,7 +179,6 @@ def test_c2st_sre_variants_on_linearGaussian(
 
     simulator, prior = prepare_for_sbi(simulator, prior)
     kwargs = dict(
-        prior=prior,
         classifier="resnet",
         show_progress_bars=False,
     )
@@ -171,14 +189,19 @@ def test_c2st_sre_variants_on_linearGaussian(
     theta, x = simulate_for_sbi(
         simulator, prior, num_simulations, simulation_batch_size=50
     )
-    _ = inference.append_simulations(theta, x).train()
-    posterior = inference.build_posterior().set_default_x(x_o)
-
-    samples = posterior.sample(
-        sample_shape=(num_samples,),
-        mcmc_method="slice_np_vectorized",
-        mcmc_parameters={"thin": 3, "num_chains": 5},
+    ratio_model = inference.append_simulations(theta, x).train()
+    potential_fn, potential_tf = ratio_potential(
+        ratio_model=ratio_model, prior=prior, xo=x_o
     )
+    posterior = MCMCPosterior(
+        potential_fn=potential_fn,
+        potential_tf=potential_tf,
+        prior=prior,
+        method="slice_np_vectorized",
+        thin=3,
+        num_chains=5,
+    )
+    samples = posterior.sample(sample_shape=(num_samples,))
 
     # Get posterior samples.
     if prior_str == "gaussian":
@@ -270,18 +293,25 @@ def test_api_sre_sampling_methods(sampling_method: str, prior_str: str, set_seed
         prior = utils.BoxUniform(-1.0 * ones(num_dim), ones(num_dim))
 
     simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior)
-    inference = SNRE_B(prior, classifier="resnet", show_progress_bars=False)
+    inference = SNRE_B(classifier="resnet", show_progress_bars=False)
 
     theta, x = simulate_for_sbi(
         simulator, prior, num_simulations, simulation_batch_size=50
     )
-    _ = inference.append_simulations(theta, x).train(max_num_epochs=5)
-    posterior = inference.build_posterior(
-        sample_with=sample_with, mcmc_method=sampling_method
-    ).set_default_x(x_o)
-
-    posterior.sample(
-        sample_shape=(num_samples,),
-        x=x_o,
-        mcmc_parameters={"thin": 3, "num_chains": num_chains},
+    ratio_model = inference.append_simulations(theta, x).train(max_num_epochs=5)
+    potential_fn, potential_tf = ratio_potential(
+        ratio_model=ratio_model, prior=prior, xo=x_o
     )
+    if sample_with == "rejection":
+        posterior = RejectionPosterior(potential_fn=potential_fn, proposal=prior)
+    else:
+        posterior = MCMCPosterior(
+            potential_fn=potential_fn,
+            potential_tf=potential_tf,
+            prior=prior,
+            method=sampling_method,
+            thin=3,
+            num_chains=num_chains,
+        )
+
+    posterior.sample(sample_shape=(num_samples,))

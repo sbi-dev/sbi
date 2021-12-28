@@ -15,7 +15,7 @@ from sbi import utils as utils
 from sbi.types import Array, OneOrMore, ScalarFloat
 
 
-def process_device(device: str, prior: Optional[Any] = None) -> str:
+def process_device(device: str) -> str:
     """Set and return the default device to cpu or cuda.
 
     Throws an AssertionError if the prior is not matching the training device not.
@@ -36,6 +36,10 @@ def process_device(device: str, prior: Optional[Any] = None) -> str:
             warnings.warn(f"Device {device} not available, falling back to CPU.")
             device = "cpu"
 
+    return device
+
+
+def check_if_prior_on_device(device, prior: Optional[Any] = None):
     if prior is not None:
         prior_device = prior.sample((1,)).device
         training_device = torch.zeros(1, device=device).device
@@ -45,8 +49,6 @@ def process_device(device: str, prior: Optional[Any] = None) -> str:
             {training_device}). When training on GPU make sure to pass a prior
             initialized on the GPU as well, e.g., `prior = torch.distributions.Normal
             (torch.zeros(2, device='cuda'), scale=1.0)`."""
-
-    return device
 
 
 def tile(x, n):
