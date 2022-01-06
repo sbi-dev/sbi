@@ -14,7 +14,10 @@ from torch.utils.tensorboard import SummaryWriter
 
 from sbi import utils as utils
 from sbi.inference import NeuralInference
-from sbi.inference.potentials.likelihood_based_potential import (
+from sbi.inference import (
+    VIPosterior,
+    MCMCPosterior,
+    RejectionPosterior,
     likelihood_potential,
 )
 from sbi.types import TorchModule
@@ -255,3 +258,77 @@ class LikelihoodEstimator(NeuralInference, ABC):
             print(self._describe_round(self._round, self._summary))
 
         return deepcopy(self._neural_net)
+
+    def build_posterior(
+        self,
+        prior: Any,
+        xo: Tensor,
+        density_estimator: Optional[TorchModule] = None,
+        sample_with: str = "mcmc",
+        mcmc_method: str = "slice_np",
+        mcmc_parameters: Dict[str, Any] = {},
+        rejection_sampling_parameters: Dict[str, Any] = {},
+    ) -> Union[MCMCPosterior, RejectionPosterior]:
+        r"""
+        Build posterior from the neural density estimator.
+
+        SNLE trains a neural network to approximate the likelihood $p(x|\theta)$. The
+        posterior wraps the trained network such that one can directly evaluate the
+        unnormalized posterior log probability $p(\theta|x) \propto p(x|\theta) \cdot
+        p(\theta)$ and draw samples from the posterior with MCMC or rejection sampling.
+
+        Args:
+            density_estimator: The density estimator that the posterior is based on.
+                If `None`, use the latest neural density estimator that was trained.
+            sample_with: Method to use for sampling from the posterior. Must be one of
+                [`mcmc` | `rejection`].
+            mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`,
+                `hmc`, `nuts`. Currently defaults to `slice_np` for a custom numpy
+                implementation of slice sampling; select `hmc`, `nuts` or `slice` for
+                Pyro-based sampling.
+            mcmc_parameters: Additional kwargs passed to `MCMCPosterior`.
+            rejection_sampling_parameters: Additional kwargs passed to
+                `RejectionPosterior`.
+        Returns:
+            Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods
+            (the returned log-probability is unnormalized).
+        """
+
+        if density_estimator is None:
+            density_estimator = self._neural_net
+            # If internal net is used device is defined.
+            device = self._device
+        else:
+            # Otherwise, infer it from the device of the net parameters.
+            device = next(density_estimator.parameters()).device.type
+
+        potential_fn, potential_tf = likelihood_potential(
+            likelihood_model=self._neural_net, prior=prior, xo=xo
+        )
+
+        if sample_with == "mcmc":
+            self._posterior = MCMCPosterior(
+                potential_fn=potential_fn,
+                potential_tf=potential_tf,
+                prior=prior,
+                method=mcmc_method,
+                device=device,
+                **mcmc_parameters
+            )
+        elif sample_with == "rejection":
+            self._posterior = RejectionPosterior(
+                potential_fn=potential_fn,
+                proposal=prior,
+                device=device,
+                **rejection_sampling_parameters
+            )
+        elif sample_with == "vi":
+            raise NotImplementedError
+        else:
+            raise NotImplementedError
+
+        # Store models at end of each round.
+        self._model_bank.append(deepcopy(self._posterior))
+        self._model_bank[-1].net.eval()
+
+        return deepcopy(self._posterior)

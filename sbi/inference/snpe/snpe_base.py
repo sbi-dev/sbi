@@ -12,6 +12,12 @@ from torch.nn.utils import clip_grad_norm_
 from torch.utils import data
 from torch.utils.tensorboard import SummaryWriter
 
+from sbi.inference import (
+    posterior_potential,
+    MCMCPosterior,
+    RejectionPosterior,
+    DirectPosterior,
+)
 from sbi import utils as utils
 from sbi.inference import NeuralInference, check_if_proposal_has_default_x
 from sbi.types import TorchModule
@@ -361,6 +367,94 @@ class PosteriorEstimator(NeuralInference, ABC):
             print(self._describe_round(self._round, self._summary))
 
         return deepcopy(self._neural_net)
+
+    def build_posterior(
+        self,
+        prior: Any,
+        xo: Tensor,
+        density_estimator: Optional[TorchModule] = None,
+        sample_with: str = "rejection",
+        mcmc_method: str = "slice_np",
+        mcmc_parameters: Dict[str, Any] = {},
+        rejection_sampling_parameters: Dict[str, Any] = {},
+    ) -> Union[MCMCPosterior, RejectionPosterior]:
+        r"""
+        Build posterior from the neural density estimator.
+
+        For SNPE, the posterior distribution that is returned here implements the
+        following functionality over the raw neural density estimator:
+        - correct the calculation of the log probability such that it compensates for
+            the leakage.
+        - reject samples that lie outside of the prior bounds.
+        - alternatively, if leakage is very high (which can happen for multi-round
+            SNPE), sample from the posterior with MCMC.
+
+        Args:
+            density_estimator: The density estimator that the posterior is based on.
+                If `None`, use the latest neural density estimator that was trained.
+            sample_with: Method to use for sampling from the posterior. Must be one of
+                [`mcmc` | `rejection`].
+            mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`,
+                `hmc`, `nuts`. Currently defaults to `slice_np` for a custom numpy
+                implementation of slice sampling; select `hmc`, `nuts` or `slice` for
+                Pyro-based sampling.
+            mcmc_parameters: Additional kwargs passed to `MCMCPosterior`.
+            rejection_sampling_parameters: Additional kwargs passed to
+                `RejectionPosterior` or `DirectPosterior`. By default,
+                `DirectPosterior` is used. Only if `rejection_sampling_parameters`
+                contains `proposal`, a `RejectionPosterior` is instantiated.
+
+        Returns:
+            Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods
+            (the returned log-probability is unnormalized).
+        """
+
+        if density_estimator is None:
+            density_estimator = self._neural_net
+            # If internal net is used device is defined.
+            device = self._device
+        else:
+            # Otherwise, infer it from the device of the net parameters.
+            device = next(density_estimator.parameters()).device.type
+
+        potential_fn, potential_tf = posterior_potential(
+            posterior_model=self._neural_net, prior=prior, xo=xo
+        )
+
+        if sample_with == "rejection":
+            if "proposal" in rejection_sampling_parameters.keys():
+                self._posterior = DirectPosterior(
+                    posterior_model=self._neural_net,
+                    prior=prior,
+                    xo=xo,
+                    device=device,
+                )
+            else:
+                self._posterior = RejectionPosterior(
+                    potential_fn=potential_fn,
+                    proposal=prior,
+                    device=device,
+                    **rejection_sampling_parameters,
+                )
+        elif sample_with == "mcmc":
+            self._posterior = MCMCPosterior(
+                potential_fn=potential_fn,
+                potential_tf=potential_tf,
+                prior=prior,
+                method=mcmc_method,
+                device=device,
+                **mcmc_parameters,
+            )
+        elif sample_with == "vi":
+            raise NotImplementedError
+        else:
+            raise NotImplementedError
+
+        # Store models at end of each round.
+        self._model_bank.append(deepcopy(self._posterior))
+        self._model_bank[-1].net.eval()
+
+        return deepcopy(self._posterior)
 
     @abstractmethod
     def _log_prob_proposal_posterior(
