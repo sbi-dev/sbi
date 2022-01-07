@@ -106,17 +106,17 @@ def test_inference_with_2d_x(embedding, method):
     x_o = simulator(theta_o.repeat(num_trials, 1))
 
     if method == SNLE:
-        potential_fn, potential_tf = likelihood_potential(model, prior, x_o)
+        potential_fn, theta_transform = likelihood_potential(model, prior, x_o)
     elif method == SNPE:
-        potential_fn, potential_tf = posterior_potential(model, prior, x_o)
+        potential_fn, theta_transform = posterior_potential(model, prior, x_o)
     elif method == SNRE:
-        potential_fn, potential_tf = ratio_potential(model, prior, x_o)
+        potential_fn, theta_transform = ratio_potential(model, prior, x_o)
     else:
         raise NotImplementedError
 
     posterior = MCMCPosterior(
         potential_fn=potential_fn,
-        potential_tf=potential_tf,
+        theta_transform=theta_transform,
         prior=prior,
         method="slice_np_vectorized",
         num_chains=2,

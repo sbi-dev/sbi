@@ -37,12 +37,12 @@ def test_log_prob_with_different_x(snpe_method: type, x_o_batch_dim: bool):
     posterior_model = inference.append_simulations(theta, x).train(max_num_epochs=3)
 
     if x_o_batch_dim == 0:
-        xo = ones(num_dim)
+        x_o = ones(num_dim)
     elif x_o_batch_dim == 1:
-        xo = ones(1, num_dim)
+        x_o = ones(1, num_dim)
     elif x_o_batch_dim == 2:
-        xo = ones(2, num_dim)
+        x_o = ones(2, num_dim)
 
-    posterior = DirectPosterior(posterior_model=posterior_model, prior=prior, xo=xo)
+    posterior = DirectPosterior(posterior_model=posterior_model, prior=prior, x_o=x_o)
     samples = posterior.sample((10,))
     _ = posterior.log_prob(samples)

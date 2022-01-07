@@ -16,13 +16,7 @@ from torch import multiprocessing as mp
 from torch import nn
 
 from sbi import utils as utils
-
-from sbi.types import Array, Shape
-from sbi.utils.sbiutils import (
-    check_warn_and_setstate,
-    mcmc_transform,
-    optimize_potential_fn,
-)
+from sbi.types import Array, Shape, TorchTransform
 from sbi.utils.torchutils import (
     ScalarFloat,
     atleast_2d_float32_tensor,
@@ -37,45 +31,20 @@ class NeuralPosterior(ABC):
     All inference methods in sbi train a neural network which is then used to obtain
     the posterior distribution. The `NeuralPosterior` class wraps the trained network
     such that one can directly evaluate the (unnormalized) log probability and draw
-    samples from the posterior. The neural network itself can be accessed via the `.net`
-    attribute.
+    samples from the posterior.
     """
 
     def __init__(
         self,
         potential_fn: Callable,
-        potential_tf: Optional[torch_tf.Transform] = None,
+        theta_transform: Optional[TorchTransform] = None,
         device: str = "cpu",
     ):
         """
         Args:
-            method_family: One of snpe, snl, snre_a or snre_b.
-            neural_net: A classifier for SNRE, a density estimator for SNPE and SNL.
-            prior: Prior distribution with `.log_prob()` and `.sample()`.
-            x_shape: Shape of the simulator data.
-            sample_with: Method to use for sampling from the posterior. Must be one of
-                [`mcmc` | `rejection`].
-            mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`,
-                `hmc`, `nuts`. Currently defaults to `slice_np` for a custom numpy
-                implementation of slice sampling; select `hmc`, `nuts` or `slice` for
-                Pyro-based sampling.
-            mcmc_parameters: Dictionary overriding the default parameters for MCMC.
-                The following parameters are supported: `thin` to set the thinning
-                factor for the chain, `warmup_steps` to set the initial number of
-                samples to discard, `num_chains` for the number of chains,
-                `init_strategy` for the initialisation strategy for chains; `prior`
-                will draw init locations from prior, whereas `sir` will use Sequential-
-                Importance-Resampling. Init strategies may have their own keywords
-                which can also be set from `mcmc_parameters`.
-            rejection_sampling_parameters: Dictionary overriding the default parameters
-                for rejection sampling. The following parameters are supported:
-                `proposal` as the proposal distribtution.
-                `max_sampling_batch_size` as the batchsize of samples being drawn from
-                the proposal at every iteration. `num_samples_to_find_max` as the
-                number of samples that are used to find the maximum of the
-                `potential_fn / proposal` ratio. `num_iter_to_find_max` as the number
-                of gradient ascent iterations to find the maximum of that ratio. `m` as
-                multiplier to that ratio.
+            potential_fn: The potential function from which to draw samples.
+            theta_transform: Transformation that will be applied during sampling.
+                Allows to perform, e.g. MCMC in unconstrained space.
             device: Training device, e.g., "cpu", "cuda" or "cuda:0".
         """
         # Ensure device string.
@@ -83,27 +52,47 @@ class NeuralPosterior(ABC):
 
         self.potential_fn = potential_fn
 
-        if potential_tf is None:
-            self.potential_tf = torch_tf.IndependentTransform(
+        if theta_transform is None:
+            self.theta_transform = torch_tf.IndependentTransform(
                 torch_tf.identity_transform, reinterpreted_batch_ndims=1
             )
         else:
-            self.potential_tf = potential_tf
-
-        self._num_trained_rounds = 0
-        self._num_iid_trials = None
+            self.theta_transform = theta_transform
 
         self._device = device
-
         self._purpose = ""
 
     def potential(self, theta: Tensor, track_gradients: bool = False) -> Tensor:
+        r"""
+        Evaluates $\theta$ under the potential that is used to sample the posterior.
+
+        The potential is the unnormalized log-probability of $\theta$ under the
+        posterior.
+
+        Args:
+            theta: Parameters $\theta$.
+            track_gradients: Whether the returned tensor supports tracking gradients.
+                This can be helpful for e.g. sensitivity analysis, but increases memory
+                consumption.
+        """
         theta = ensure_theta_batched(torch.as_tensor(theta))
         return self.potential_fn(
             theta.to(self._device), track_gradients=track_gradients
         )
 
     def log_prob(self, theta: Tensor, track_gradients: bool = False) -> Tensor:
+        r"""
+        Returns the log-probability of theta under the posterior.
+
+        Args:
+            theta: Parameters $\theta$.
+            track_gradients: Whether the returned tensor supports tracking gradients.
+                This can be helpful for e.g. sensitivity analysis, but increases memory
+                consumption.
+
+        Returns:
+            `len($\theta$)`-shaped log-probability.
+        """
         warn(
             "`.log_prob()` is deprecated for methods that can only evaluate the log-probability up to a normalizing constant. Use `.potential()` instead."
         )
@@ -125,15 +114,14 @@ class NeuralPosterior(ABC):
         """See child classes for docstring."""
         pass
 
-    def __str__(self):
-        msg = {0: "untrained", 1: "amortized"}
+    def __repr__(self):
+        desc = f"""{self.__class__.__name__} sampler for potential_fn=<{self.potential_fn.__name__}>"""
+        return desc
 
-        focused_msg = "multi-round"
+    def __str__(self):
 
         desc = (
-            f"Posterior conditional density p(θ|x) "
-            f"({msg.get(self._num_trained_rounds, focused_msg)}).\n\n"
-            f"This {self.__class__.__name__}-object"
+            f"Posterior conditional density p(θ|x) of type {self.__class__.__name__}. "
             f"{self._purpose}"
         )
 

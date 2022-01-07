@@ -3,14 +3,15 @@ from copy import deepcopy
 from typing import Any, Callable, Dict, Optional, Union
 
 import torch
-from torch import Tensor, eye, ones, optim, nn
+from torch import Tensor, eye, nn, ones, optim
 from torch.nn.utils import clip_grad_norm_
 from torch.utils import data
 from torch.utils.tensorboard import SummaryWriter
 
-from sbi.inference import MCMCPosterior, RejectionPosterior, ratio_potential
 from sbi import utils as utils
 from sbi.inference.base import NeuralInference
+from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior
+from sbi.inference.potentials import ratio_potential
 from sbi.types import TorchModule
 from sbi.utils import (
     check_estimator_arg,
@@ -19,6 +20,7 @@ from sbi.utils import (
     x_shape_from_simulation,
 )
 from sbi.utils.sbiutils import mask_sims_from_prior
+from sbi.utils.user_input_checks import process_x
 
 
 class RatioEstimator(NeuralInference, ABC):
@@ -290,7 +292,7 @@ class RatioEstimator(NeuralInference, ABC):
     def build_posterior(
         self,
         prior: Any,
-        xo: Tensor,
+        x_o: Tensor,
         density_estimator: Optional[TorchModule] = None,
         sample_with: str = "mcmc",
         mcmc_method: str = "slice_np",
@@ -333,14 +335,16 @@ class RatioEstimator(NeuralInference, ABC):
             # Otherwise, infer it from the device of the net parameters.
             device = next(density_estimator.parameters()).device.type
 
-        potential_fn, potential_tf = ratio_potential(
-            ratio_model=self._neural_net, prior=prior, xo=xo
+        x_o = process_x(x_o, self._x_shape, allow_iid_x=True).to(device)
+
+        potential_fn, theta_transform = ratio_potential(
+            ratio_model=self._neural_net, prior=prior, x_o=x_o
         )
 
         if sample_with == "mcmc":
             self._posterior = MCMCPosterior(
                 potential_fn=potential_fn,
-                potential_tf=potential_tf,
+                theta_transform=theta_transform,
                 prior=prior,
                 method=mcmc_method,
                 device=device,
@@ -360,6 +364,5 @@ class RatioEstimator(NeuralInference, ABC):
 
         # Store models at end of each round.
         self._model_bank.append(deepcopy(self._posterior))
-        self._model_bank[-1].net.eval()
 
         return deepcopy(self._posterior)

@@ -103,21 +103,10 @@ def test_inference_with_nan_simulator(
     inference = method()
 
     theta, x = simulate_for_sbi(simulator, prior, num_simulations)
-    model = inference.append_simulations(theta, x).train(
+    _ = inference.append_simulations(theta, x).train(
         exclude_invalid_x=exclude_invalid_x
     )
-    if method == SNL:
-        potential_fn, potential_tf = likelihood_potential(model, prior, x_o)
-        posterior = MCMCPosterior(
-            potential_fn=potential_fn, potential_tf=potential_tf, prior=prior
-        )
-    elif method == SNPE_C:
-        posterior = DirectPosterior(prior=prior, posterior_model=model, xo=x_o)
-    elif method == SRE:
-        potential_fn, potential_tf = ratio_potential(model, prior, x_o)
-        posterior = MCMCPosterior(
-            potential_fn=potential_fn, potential_tf=potential_tf, prior=prior
-        )
+    posterior = inference.build_posterior(prior=prior, x_o=x_o)
 
     samples = posterior.sample((num_samples,))
 
@@ -172,7 +161,7 @@ def test_inference_with_restriction_estimator(set_seed):
     posterior_model = inference.append_simulations(all_theta, all_x).train()
 
     # Build posterior.
-    posterior = DirectPosterior(prior=prior, posterior_model=posterior_model, xo=x_o)
+    posterior = DirectPosterior(prior=prior, posterior_model=posterior_model, x_o=x_o)
 
     samples = posterior.sample((num_samples,))
 

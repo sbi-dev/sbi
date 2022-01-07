@@ -2,56 +2,71 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+
 import torch
-from torch import Tensor, nn
-from sbi.inference.posteriors.base_posterior import NeuralPosterior
-from sbi.utils.torchutils import atleast_2d
-from sbi.utils import mcmc_transform
-from sbi.types import TorchModule
 import torch.distributions.transforms as torch_tf
-from sbi.utils.sbiutils import within_support, match_theta_and_x_batch_shapes
+from torch import Tensor, nn
+
+from sbi.utils import mcmc_transform
+from sbi.utils.sbiutils import match_theta_and_x_batch_shapes, within_support
 from sbi.utils.torchutils import atleast_2d, ensure_theta_batched
 
 
 def posterior_potential(
-    posterior_model: TorchModule,
+    posterior_model: nn.Module,
     prior: Any,
-    xo: Tensor,
+    x_o: Tensor,
 ) -> Tuple[Callable, torch_tf.Transform]:
     r"""
-    Build posterior from the neural density estimator.
+    Returns the potential for posterior-based methods.
 
-    This is to be used with SNPE. It is not used in the standard case in which the
-    posterior-net of SNPE is used to sample the posterior. It is only used when one
-    wants to sample the SNPE posterior with VI, MCMC, or standard rejection sampling.
+    It also returns a transformation that can be used to transform the potential into
+    unconstrained space.
+
+    The potential is the same as the log-probability of the `posterior_model`, but it
+    is set to $-\inf$ outside of the prior bounds.
 
     Args:
-        density_estimator: The density estimator that the posterior is based on.
-            If `None`, use the latest neural density estimator that was trained.
-        sample_with: Method to use for sampling from the posterior. Must be one of
-            [`mcmc` | `rejection`].
+        posterior_model: The neural network modelling the posterior.
+        prior: The prior distribution.
+        x_o: The observed data at which to evaluate the posterior.
 
     Returns:
-        Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods
-        (the returned log-probability is unnormalized).
+        The potential function and a transformation that maps
+        to unconstrained space.
     """
 
     device = str(next(posterior_model.parameters()).device)
 
-    potential_fn = _build_potential_fn(prior, posterior_model, xo, device=device)
-    potential_tf = mcmc_transform(prior, device=device)
+    potential_fn = _build_potential_fn(posterior_model, prior, x_o, device=device)
+    theta_transform = mcmc_transform(prior, device=device)
 
-    return potential_fn, potential_tf
+    return potential_fn, theta_transform
 
 
-def _build_potential_fn(prior, posterior_model: nn.Module, xo: Tensor, device: str):
-    # TODO Train exited here, entered after sampling?
+def _build_potential_fn(
+    posterior_model: nn.Module, prior: Any, x_o: Tensor, device: str
+) -> Callable:
+    r"""
+    Returns the potential for posterior-based methods.
+
+    The potential is the same as the log-probability of the `posterior_model`, but it
+    is set to $-\inf$ outside of the prior bounds.
+
+    Args:
+        posterior_model: The neural network modelling the posterior.
+        prior: The prior distribution.
+        x_o: The observed data at which to evaluate the posterior.
+
+    Returns:
+        The potential function.
+    """
     posterior_model.eval()
 
-    def direct_potential(theta: Tensor, track_gradients: bool = True):
+    def posterior_potential(theta: Tensor, track_gradients: bool = True):
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
-        theta, x_repeated = match_theta_and_x_batch_shapes(theta, xo)
+        theta, x_repeated = match_theta_and_x_batch_shapes(theta, x_o)
         theta, x_repeated = theta.to(device), x_repeated.to(device)
 
         with torch.set_grad_enabled(track_gradients):
@@ -67,4 +82,4 @@ def _build_potential_fn(prior, posterior_model: nn.Module, xo: Tensor, device: s
             )
         return posterior_log_prob
 
-    return direct_potential
+    return posterior_potential

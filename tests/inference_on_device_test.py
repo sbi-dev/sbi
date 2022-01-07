@@ -116,11 +116,11 @@ def test_training_and_mcmc_on_device(
             training_batch_size=100, max_num_epochs=max_num_epochs
         )
         if method == SNLE:
-            potential_fn, potential_tf = likelihood_potential(model, prior, x_o)
+            potential_fn, theta_transform = likelihood_potential(model, prior, x_o)
         elif method == SNPE_A or method == SNPE_C:
-            potential_fn, potential_tf = posterior_potential(model, prior, x_o)
+            potential_fn, theta_transform = posterior_potential(model, prior, x_o)
         elif method == SNRE_A or method == SNRE_B:
-            potential_fn, potential_tf = ratio_potential(model, prior, x_o)
+            potential_fn, theta_transform = ratio_potential(model, prior, x_o)
 
         if mcmc_method == "rejection":
             posterior = RejectionPosterior(
@@ -131,7 +131,7 @@ def test_training_and_mcmc_on_device(
         else:
             posterior = MCMCPosterior(
                 potential_fn=potential_fn,
-                potential_tf=potential_tf,
+                theta_transform=theta_transform,
                 prior=prior,
                 method=mcmc_method,
                 device=training_device,

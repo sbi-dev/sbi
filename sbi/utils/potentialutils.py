@@ -1,15 +1,17 @@
 from typing import Any, Callable, Dict, List, Optional, Union
-import torch
-from torch import Tensor
-import torch.distributions.transforms as torch_tf
-from sbi.utils.torchutils import atleast_2d, ensure_theta_batched
+
 import numpy as np
+import torch
+import torch.distributions.transforms as torch_tf
+from torch import Tensor
+
+from sbi.utils.torchutils import atleast_2d, ensure_theta_batched
 
 
 def transformed_potential(
     theta: Union[Tensor, np.array],
     potential_fn: Callable,
-    potential_tf: torch_tf.Transform,
+    theta_transform: torch_tf.Transform,
     device: str,
     track_gradients: bool = False,
 ) -> Tensor:
@@ -20,7 +22,7 @@ def transformed_potential(
     Args:
         theta:  Parameters $\theta$ in transformed space.
         potential_fn: Potential function.
-        potential_tf: Transformation applied before evaluating the `potential_fn`
+        theta_transform: Transformation applied before evaluating the `potential_fn`
         device: The device to which to move the parameters before evaluation.
         track_gradients: Whether or not to track the gradients of the `potential_fn`
             evaluation.
@@ -32,8 +34,8 @@ def transformed_potential(
     ).to(device)
     # Transform `theta` from transformed (i.e. unconstrained) to untransformed
     # space.
-    theta = potential_tf.inv(transformed_theta)
-    log_abs_det = potential_tf.log_abs_det_jacobian(theta, transformed_theta)
+    theta = theta_transform.inv(transformed_theta)
+    log_abs_det = theta_transform.log_abs_det_jacobian(theta, transformed_theta)
 
     posterior_potential = potential_fn(theta, track_gradients=track_gradients)
     posterior_potential_transformed = posterior_potential - log_abs_det

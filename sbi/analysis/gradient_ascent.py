@@ -4,10 +4,10 @@ from torch import Tensor, optim
 import torch.distributions.transforms as torch_tf
 
 
-def get_maximum(
+def gradient_ascent(
     potential_fn: Callable,
     inits: Tensor,
-    potential_tf: Optional[torch_tf.Transform] = None,
+    theta_transform: Optional[torch_tf.Transform] = None,
     num_iter: int = 1_000,
     num_to_optimize: int = 100,
     learning_rate: float = 0.01,
@@ -16,9 +16,9 @@ def get_maximum(
     interruption_note: str = "",
 ) -> Tuple[Tensor, Tensor]:
     """
-    Returns the `argmax` and `max` of a `potential_fn`.
+    Returns the `argmax` and `max` of a `potential_fn` via gradient ascent.
 
-    The method can be interrupted (Ctrl-C) when the user sees that the log-probability
+    The method can be interrupted (Ctrl-C) when the user sees that the potential_fn
     converges. The best estimate will be returned.
 
     The maximum is obtained by running gradient ascent from given starting parameters.
@@ -31,9 +31,8 @@ def get_maximum(
     Args:
         potential_fn: The function on which to optimize.
         inits: The initial parameters at which to start the gradient ascent steps.
-        dist_specifying_bounds: Distribution the specifies bounds for the optimization.
-            If it is a `sbi.utils.BoxUniform`, we transform the space into
-            unconstrained space and carry out the optimization there.
+        theta_transform: If passed, this transformation will be applied during the
+            optimization.
         num_iter: Number of optimization steps that the algorithm takes
             to find the MAP.
         num_to_optimize: From the drawn `num_init_samples`, use the `num_to_optimize`
@@ -51,12 +50,12 @@ def get_maximum(
         The `argmax` and `max` of the `potential_fn`.
     """
 
-    if potential_tf is None:
-        potential_tf = torch_tf.IndependentTransform(
+    if theta_transform is None:
+        theta_transform = torch_tf.IndependentTransform(
             torch_tf.identity_transform, reinterpreted_batch_ndims=1
         )
     else:
-        potential_tf = potential_tf
+        theta_transform = theta_transform
 
     init_probs = potential_fn(inits).detach()
 
@@ -76,7 +75,7 @@ def get_maximum(
     argmax_ = best_theta_overall
     max_val = best_log_prob_overall
 
-    optimize_inits = potential_tf(optimize_inits)
+    optimize_inits = theta_transform(optimize_inits)
     optimize_inits.requires_grad_(True)
     optimizer = optim.Adam([optimize_inits], lr=learning_rate)
 
@@ -89,7 +88,7 @@ def get_maximum(
         while iter_ < num_iter:
 
             optimizer.zero_grad()
-            probs = potential_fn(potential_tf.inv(optimize_inits)).squeeze()
+            probs = potential_fn(theta_transform.inv(optimize_inits)).squeeze()
             loss = -probs.sum()
             loss.backward()
             optimizer.step()
@@ -98,12 +97,14 @@ def get_maximum(
                 if iter_ % save_best_every == 0 or iter_ == num_iter - 1:
                     # Evaluate the optimized locations and pick the best one.
                     log_probs_of_optimized = potential_fn(
-                        potential_tf.inv(optimize_inits)
+                        theta_transform.inv(optimize_inits)
                     )
                     best_theta_iter = optimize_inits[
                         torch.argmax(log_probs_of_optimized)
                     ]
-                    best_log_prob_iter = potential_fn(potential_tf.inv(best_theta_iter))
+                    best_log_prob_iter = potential_fn(
+                        theta_transform.inv(best_theta_iter)
+                    )
                     if best_log_prob_iter > best_log_prob_overall:
                         best_theta_overall = best_theta_iter.detach().clone()
                         best_log_prob_overall = best_log_prob_iter.detach().clone()
@@ -116,7 +117,7 @@ def get_maximum(
                         {best_log_prob_iter.item():.2f} (= unnormalized log-prob""",
                         end="\r",
                     )
-                argmax_ = potential_tf.inv(best_theta_overall)
+                argmax_ = theta_transform.inv(best_theta_overall)
                 max_val = best_log_prob_overall
 
             iter_ += 1
@@ -126,4 +127,4 @@ def get_maximum(
         print(interruption + interruption_note)
         return argmax_, max_val
 
-    return potential_tf.inv(best_theta_overall), max_val
+    return theta_transform.inv(best_theta_overall), max_val

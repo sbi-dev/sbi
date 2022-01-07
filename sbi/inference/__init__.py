@@ -15,7 +15,6 @@ from sbi.inference.abc.mcabc import MCABC
 from sbi.inference.abc.smcabc import SMCABC
 from sbi.inference.base import (  # noqa: F401
     NeuralInference,
-    check_if_proposal_has_default_x,
     infer,
     simulate_for_sbi,
 )

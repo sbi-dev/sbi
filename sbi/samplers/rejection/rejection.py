@@ -1,19 +1,21 @@
-from typing import Callable, Any, Tuple
-from torch import Tensor
-import warnings
-import torch
 import logging
-from torch import Tensor, as_tensor
-from sbi import utils as utils
-from sbi.utils import optimize_potential_fn, within_support
-from tqdm.auto import tqdm
+import warnings
+from typing import Any, Callable, Optional, Tuple
+
+import torch
 import torch.distributions.transforms as torch_tf
+from torch import Tensor, as_tensor
+from tqdm.auto import tqdm
+
+from sbi import utils as utils
+from sbi.analysis import gradient_ascent
+from sbi.utils import within_support
 
 
 def rejection_sample(
     potential_fn: Callable,
     proposal: Any,
-    potential_tf: torch_tf.Transform = torch_tf.identity_transform,
+    theta_transform: Optional[torch_tf.Transform] = None,
     num_samples: int = 1,
     show_progress_bars: bool = False,
     warn_acceptance: float = 0.01,
@@ -57,6 +59,10 @@ def rejection_sample(
     Returns:
         Accepted samples and acceptance rate as scalar Tensor.
     """
+    if theta_transform is None:
+        theta_transform = torch_tf.IndependentTransform(
+            torch_tf.identity_transform, reinterpreted_batch_ndims=1
+        )
 
     samples_to_find_max = proposal.sample((num_samples_to_find_max,))
 
@@ -65,10 +71,10 @@ def rejection_sample(
         return potential_fn(theta) - proposal.log_prob(theta)
 
     # Search for the maximum of the ratio.
-    _, max_log_ratio = optimize_potential_fn(
+    _, max_log_ratio = gradient_ascent(
         potential_fn=potential_over_proposal,
         inits=samples_to_find_max,
-        potential_tf=potential_tf,
+        theta_transform=theta_transform,
         num_iter=num_iter_to_find_max,
         learning_rate=0.01,
         num_to_optimize=max(1, int(num_samples_to_find_max / 10)),

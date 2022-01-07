@@ -1,0 +1,3 @@
+from sbi.inference.potentials.likelihood_based_potential import likelihood_potential
+from sbi.inference.potentials.posterior_based_potential import posterior_potential
+from sbi.inference.potentials.ratio_based_potential import ratio_potential

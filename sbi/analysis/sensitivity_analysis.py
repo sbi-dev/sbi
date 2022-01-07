@@ -432,13 +432,13 @@ class ActiveSubspace:
         loss.backward()
         gradients = torch.squeeze(thetas.grad)
         if norm_gradients_to_prior:
-            if hasattr(self._posterior._prior, "stddev") and hasattr(
-                self._posterior._prior, "mean"
+            if hasattr(self._posterior.prior, "stddev") and hasattr(
+                self._posterior.prior, "mean"
             ):
-                self._prior_mean = self._posterior._prior.mean
-                self._prior_scale = self._posterior._prior.stddev
+                self._prior_mean = self._posterior.prior.mean
+                self._prior_scale = self._posterior.prior.stddev
             else:
-                prior_samples = self._posterior._prior.sample((10000,))
+                prior_samples = self._posterior.prior.sample((10000,))
                 self._prior_scale = torch.std(prior_samples, dim=0)
                 self._prior_mean = torch.mean(prior_samples, dim=0)
             gradients *= self._prior_scale

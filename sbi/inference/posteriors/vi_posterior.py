@@ -1,22 +1,23 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
-from math import ceil
 from functools import partial
+from math import ceil
 from typing import Any, Callable, Dict, List, Optional, Union
 from warnings import warn
-from pyro.infer.mcmc import HMC, NUTS
-from pyro.infer.mcmc.api import MCMC
+
 import numpy as np
 import torch
 import torch.distributions.transforms as torch_tf
+from pyro.infer.mcmc import HMC, NUTS
+from pyro.infer.mcmc.api import MCMC
 from torch import Tensor, nn
 
-from sbi.inference.posteriors.base_posterior import NeuralPosterior
-from sbi.types import Shape
-from sbi.utils import del_entries
-from sbi.samplers.rejection.rejection import rejection_sample
-from sbi.utils.torchutils import atleast_2d, ensure_theta_batched
 from sbi import utils as utils
+from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.samplers.rejection.rejection import rejection_sample
+from sbi.types import Shape, TorchTransform
+from sbi.utils import del_entries
+from sbi.utils.torchutils import atleast_2d, ensure_theta_batched
 
 
 class VIPosterior(NeuralPosterior):
@@ -32,14 +33,14 @@ class VIPosterior(NeuralPosterior):
     def __init__(
         self,
         potential_fn: Callable,
-        potential_tf: Any,
         prior,
+        theta_transform: Optional[TorchTransform] = None,
         device: str = "cpu",
     ):
         """
         Args:
             potential_fn:
-            potential_tf:
+            theta_transform:
             prior: Prior distribution with `.log_prob()` and `.sample()`.
             proposal: the proposal distribtution (default is the prior).
             max_sampling_batch_size: the batchsize of samples being drawn from
@@ -51,7 +52,7 @@ class VIPosterior(NeuralPosterior):
             m: multiplier to that ratio.
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
         """
-        super().__init__(potential_fn, potential_tf, prior, device)
+        super().__init__(potential_fn, theta_transform, device)
 
         self._device = device
 
