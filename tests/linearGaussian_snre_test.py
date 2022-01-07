@@ -54,12 +54,12 @@ def test_api_sre_on_linearGaussian(num_dim: int):
 
     for num_trials in [1, 2]:
         x_o = zeros(num_trials, num_dim)
-        potential_fn, potential_tf = ratio_potential(
-            ratio_model=ratio_model, prior=prior, xo=x_o
+        potential_fn, theta_transform = ratio_potential(
+            ratio_model=ratio_model, prior=prior, x_o=x_o
         )
         posterior = MCMCPosterior(
             potential_fn=potential_fn,
-            potential_tf=potential_tf,
+            theta_transform=theta_transform,
             prior=prior,
             num_chains=2,
         )
@@ -118,12 +118,12 @@ def test_c2st_sre_on_linearGaussian(set_seed):
         num_discarded_dims=discard_dims,
         num_samples=num_samples,
     )
-    potential_fn, potential_tf = ratio_potential(
-        ratio_model=ratio_model, prior=prior, xo=x_o
+    potential_fn, theta_transform = ratio_potential(
+        ratio_model=ratio_model, prior=prior, x_o=x_o
     )
     posterior = MCMCPosterior(
         potential_fn=potential_fn,
-        potential_tf=potential_tf,
+        theta_transform=theta_transform,
         prior=prior,
         thin=5,
         num_chains=2,
@@ -190,12 +190,12 @@ def test_c2st_sre_variants_on_linearGaussian(
         simulator, prior, num_simulations, simulation_batch_size=50
     )
     ratio_model = inference.append_simulations(theta, x).train()
-    potential_fn, potential_tf = ratio_potential(
-        ratio_model=ratio_model, prior=prior, xo=x_o
+    potential_fn, theta_transform = ratio_potential(
+        ratio_model=ratio_model, prior=prior, x_o=x_o
     )
     posterior = MCMCPosterior(
         potential_fn=potential_fn,
-        potential_tf=potential_tf,
+        theta_transform=theta_transform,
         prior=prior,
         method="slice_np_vectorized",
         thin=3,
@@ -299,15 +299,15 @@ def test_api_sre_sampling_methods(sampling_method: str, prior_str: str, set_seed
         simulator, prior, num_simulations, simulation_batch_size=50
     )
     ratio_model = inference.append_simulations(theta, x).train(max_num_epochs=5)
-    potential_fn, potential_tf = ratio_potential(
-        ratio_model=ratio_model, prior=prior, xo=x_o
+    potential_fn, theta_transform = ratio_potential(
+        ratio_model=ratio_model, prior=prior, x_o=x_o
     )
     if sample_with == "rejection":
         posterior = RejectionPosterior(potential_fn=potential_fn, proposal=prior)
     else:
         posterior = MCMCPosterior(
             potential_fn=potential_fn,
-            potential_tf=potential_tf,
+            theta_transform=theta_transform,
             prior=prior,
             method=sampling_method,
             thin=3,

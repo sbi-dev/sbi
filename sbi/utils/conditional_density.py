@@ -1,20 +1,25 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
-from warnings import warn
 from copy import deepcopy
 from functools import partial
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from warnings import warn
 
-import torch.distributions.transforms as torch_tf
-import torch
-from torch import Tensor, nn
 import numpy as np
-from sbi.types import Shape
+import torch
+import torch.distributions.transforms as torch_tf
 from pyknos.mdn.mdn import MultivariateGaussianMDN as mdn
 from pyknos.nflows.flows import Flow
-from sbi.utils.torchutils import ensure_theta_batched
-from sbi.utils.torchutils import BoxUniform, ScalarFloat, atleast_2d_float32_tensor
+from torch import Tensor, nn
+
+from sbi.types import Shape
+from sbi.utils.torchutils import (
+    BoxUniform,
+    ScalarFloat,
+    atleast_2d_float32_tensor,
+    ensure_theta_batched,
+)
 
 
 def eval_conditional_density(
@@ -384,7 +389,6 @@ def extract_and_transform_mog(
 
 
 def condition_mog(
-    prior: Any,
     condition: Tensor,
     dims: List[int],
     logits: Tensor,
@@ -423,17 +427,6 @@ def condition_mog(
 
     mask = torch.zeros(n_dims, dtype=bool)
     mask[dims] = True
-
-    # Check whether the condition is within the prior bounds.
-    if type(prior) is torch.distributions.uniform.Uniform or type(prior) is BoxUniform:
-        support = prior.support.base_constraint
-        cond_ubound = support.upper_bound[~mask]
-        cond_lbound = support.lower_bound[~mask]
-        within_support = torch.logical_and(
-            cond_lbound <= condition[:, ~mask], cond_ubound >= condition[:, ~mask]
-        )
-        if ~torch.all(within_support):
-            raise ValueError("The chosen condition is not within the prior support.")
 
     y = condition[:, ~mask]
     mu_x = means[:, :, mask]

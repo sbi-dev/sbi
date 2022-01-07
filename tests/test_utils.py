@@ -106,7 +106,6 @@ def get_prob_outside_uniform_prior(
 def get_normalization_uniform_prior(
     posterior: DirectPosterior,
     prior: Distribution,
-    true_observation: Tensor,
 ) -> Tuple[Tensor, Tensor, Tensor]:
     """
     Return the unnormalized posterior likelihood, the normalized posterior likelihood,
@@ -115,7 +114,6 @@ def get_normalization_uniform_prior(
     Args:
         posterior: estimated posterior
         prior: prior distribution
-        true_observation: observation where we evaluate the posterior
     """
 
     # Test normalization.
@@ -132,7 +130,7 @@ def get_normalization_uniform_prior(
     )
 
     # Estimate acceptance ratio through rejection sampling.
-    acceptance_prob = posterior.leakage_correction(x=true_observation)
+    acceptance_prob = posterior.leakage_correction()
 
     return posterior_likelihood_unnorm, posterior_likelihood_norm, acceptance_prob
 

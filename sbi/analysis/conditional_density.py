@@ -1,23 +1,24 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
-from typing import Any, Callable, List, Optional, Union
+from typing import Any, Callable, List, Optional, Tuple, Union
 
 import torch
+import torch.distributions.transforms as torch_tf
+from pyknos.mdn.mdn import MultivariateGaussianMDN as mdn
 from torch import Tensor, nn
 
+from sbi.types import Shape
 from sbi.utils import conditional_corrcoeff as utils_conditional_corrcoeff
 from sbi.utils import eval_conditional_density as utils_eval_conditional_density
-from sbi.types import Shape
-from pyknos.mdn.mdn import MultivariateGaussianMDN as mdn
-from sbi.utils.torchutils import atleast_2d_float32_tensor
 from sbi.utils.conditional_density import (
-    extract_and_transform_mog,
-    condition_mog,
-    RestrictedTransformForConditional,
     RestrictedPriorForConditional,
+    RestrictedTransformForConditional,
     build_conditioned_potential_fn,
+    condition_mog,
+    extract_and_transform_mog,
 )
+from sbi.utils.torchutils import atleast_2d_float32_tensor
 
 
 def eval_conditional_density(
@@ -124,30 +125,51 @@ def conditional_corrcoeff(
 
 
 def parameter_conditional_mdn(
-    net: nn.Module, xo: Tensor, prior: Any, condition: Tensor, dims_to_sample: List[int]
-):
+    net: nn.Module,
+    x_o: Tensor,
+    condition: Tensor,
+    dims_to_sample: List[int],
+) -> "ConditionedMDN":
+    r"""
+    Returns a class that can sample and log-prob a conditional mixture-of-gaussians.
+
+    Args:
+        net: Mixture density network that models $p(\theta|x).
+        x_o: The datapoint at which the `net` is evaluated.
+        condition: Parameter set that all dimensions not specified in
+            `dims_to_sample` will be fixed to. Should contain dim_theta elements,
+            i.e. it could e.g. be a sample from the posterior distribution.
+            The entries at all `dims_to_sample` will be ignored.
+        dims_to_sample: Which dimensions to sample from. The dimensions not
+            specified in `dims_to_sample` will be fixed to values given in
+            `condition`.
+
+    Returns:
+        A mixture of Gaussians with `.sample()` and `.log_prob` methods.
+    """
+
     class ConditionedMDN:
         def __init__(
             self,
             net: nn.Module,
-            xo: Tensor,
+            x_o: Tensor,
             condition: Tensor,
             dims_to_sample: List[int],
-        ):
+        ) -> None:
             condition = atleast_2d_float32_tensor(condition)
 
-            logits, means, precfs, _ = extract_and_transform_mog(nn=net, context=xo)
+            logits, means, precfs, _ = extract_and_transform_mog(nn=net, context=x_o)
             self.logits, self.means, self.precfs, self.sumlogdiag = condition_mog(
-                prior, condition, dims_to_sample, logits, means, precfs
+                condition, dims_to_sample, logits, means, precfs
             )
             self.prec = self.precfs.transpose(3, 2) @ self.precfs
 
-        def sample(self, sample_shape: Shape = torch.Size()):
+        def sample(self, sample_shape: Shape = torch.Size()) -> Tensor:
             num_samples = torch.Size(sample_shape).numel()
             samples = mdn.sample_mog(num_samples, self.logits, self.means, self.precfs)
             return samples.detach().reshape((*sample_shape, -1))
 
-        def log_prob(self, theta: Tensor):
+        def log_prob(self, theta: Tensor) -> Tensor:
             batch_size, dim = theta.shape
 
             log_prob = mdn.log_prob_mog(
@@ -159,27 +181,55 @@ def parameter_conditional_mdn(
             )
             return log_prob
 
-    conditioned_mdn = ConditionedMDN(net, xo, condition, dims_to_sample)
+    conditioned_mdn = ConditionedMDN(net, x_o, condition, dims_to_sample)
     return conditioned_mdn
 
 
 def parameter_conditonal_potential(
     potential_fn: Callable,
-    potential_tf,
+    theta_transform: torch_tf,
     prior: Any,
     condition: Tensor,
     dims_to_sample: List[int],
-):
+) -> Tuple[Callable, torch_tf.Transform, Any]:
+    r"""
+    Returns a potential function that can be used to sample the conditional potential.
+
+    It also returns a transform and a prior to be used to sample the conditional
+    potential.
+
+    The conditional potential is $p(\theta_i | \theta_j, x_o) \propto p(\theta | x_o)$
+    but is a function only of $\theta_i$.
+
+    Args:
+        potential_fn: The potential function to be conditioned.
+        theta_transform: The parameter transformation that should be reduced (by
+            ignoring dimensions not contained in `dims_to_sample`).
+        prior: The prior distribution that should be reduced (by ignoring dimensions
+            not contained in `dims_to_sample`).
+        condition: Parameter set that all dimensions not specified in
+            `dims_to_sample` will be fixed to. Should contain dim_theta elements,
+            i.e. it could e.g. be a sample from the posterior distribution.
+            The entries at all `dims_to_sample` will be ignored.
+        dims_to_sample: Which dimensions to sample from. The dimensions not
+            specified in `dims_to_sample` will be fixed to values given in
+            `condition`.
+
+    Returns:
+        A conditioned potential function, conditioned parameter transformation, and
+        a marginalised prior.
+    """
+
     restricted_tf = RestrictedTransformForConditional(
-        potential_tf, condition, dims_to_sample
+        theta_transform, condition, dims_to_sample
     )
 
     condition = atleast_2d_float32_tensor(condition)
 
     # Transform the `condition` to unconstrained space.
-    transformed_condition = potential_tf(condition)
+    transformed_condition = theta_transform(condition)
 
-    conditioned_potential_fn = _build_conditioned_potential_fn(
+    conditioned_potential_fn = build_conditioned_potential_fn(
         potential_fn, transformed_condition, dims_to_sample
     )
 

@@ -14,6 +14,13 @@
     rendering:
       show_root_heading: true
 
+::: sbi.inference.snpe.snpe_a.SNPE_A
+    rendering:
+      show_root_heading: true
+    selection:
+      filters: [ "!^_", "^__", "!^__class__" ]
+      inherited_members: true
+
 ::: sbi.inference.snpe.snpe_c.SNPE_C
     rendering:
       show_root_heading: true
@@ -65,14 +72,14 @@
       filters: [ "!^_", "^__", "!^__class__" ]
       inherited_members: true
       
-::: sbi.inference.posteriors.likelihood_based_posterior.LikelihoodBasedPosterior
+::: sbi.inference.posteriors.mcmc_posterior.MCMCPosterior
     rendering:
       show_root_heading: true
     selection:
       filters: [ "!^_", "^__", "!^__class__" ]
       inherited_members: true
       
-::: sbi.inference.posteriors.ratio_based_posterior.RatioBasedPosterior
+::: sbi.inference.posteriors.rejection_posterior.RejectionPosterior
     rendering:
       show_root_heading: true
     selection:
@@ -96,6 +103,29 @@
       show_root_heading: true
       show_object_full_path: true
 
+## Potentials
+
+::: sbi.inference.potentials.posterior_based_potential.posterior_potential
+    rendering:
+      show_root_heading: true
+    selection:
+      filters: [ "!^_", "^__", "!^__class__" ]
+      inherited_members: true
+      
+::: sbi.inference.potentials.likelihood_based_potential.likelihood_potential
+    rendering:
+      show_root_heading: true
+    selection:
+      filters: [ "!^_", "^__", "!^__class__" ]
+      inherited_members: true
+      
+::: sbi.inference.potentials.ratio_based_potential.ratio_potential
+    rendering:
+      show_root_heading: true
+    selection:
+      filters: [ "!^_", "^__", "!^__class__" ]
+      inherited_members: true
+  
 ## Analysis
 
 ::: sbi.analysis.plot.pairplot

@@ -6,4 +6,4 @@ from sbi.analysis.conditional_density import (
 )
 from sbi.analysis.plot import conditional_pairplot, pairplot
 from sbi.analysis.sensitivity_analysis import ActiveSubspace
-from sbi.analysis.get_maximum import get_maximum
+from sbi.analysis.gradient_ascent import gradient_ascent

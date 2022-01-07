@@ -12,7 +12,7 @@ from torch.distributions import MultivariateNormal
 
 from sbi import analysis as analysis
 from sbi import utils as utils
-from sbi.utils.conditional_density import (
+from sbi.analysis import (
     parameter_conditional_mdn,
     parameter_conditonal_potential,
 )
@@ -100,7 +100,7 @@ def test_c2st_snpe_on_linearGaussian(
     posterior_model = inference.append_simulations(theta, x).train(
         training_batch_size=100
     )
-    posterior = DirectPosterior(prior=prior, posterior_model=posterior_model, xo=x_o)
+    posterior = DirectPosterior(prior=prior, posterior_model=posterior_model, x_o=x_o)
     samples = posterior.sample((num_samples,))
 
     # Compute the c2st and assert it is near chance level of 0.5.
@@ -137,7 +137,7 @@ def test_c2st_snpe_on_linearGaussian(
             posterior_likelihood_unnorm,
             posterior_likelihood_norm,
             acceptance_prob,
-        ) = get_normalization_uniform_prior(posterior, prior, x_o)
+        ) = get_normalization_uniform_prior(posterior, prior)
         # The acceptance probability should be *exactly* the ratio of the unnormalized
         # and the normalized likelihood. However, we allow for an error margin of 1%,
         # since the estimation of the acceptance probability is random (based on
@@ -203,7 +203,7 @@ def test_c2st_snpe_on_linearGaussian_different_dims(set_seed):
         max_num_epochs=10
     )  # Test whether we can stop and resume.
     posterior_model = inference.train(resume_training=True)
-    posterior = DirectPosterior(prior=prior, posterior_model=posterior_model, xo=x_o)
+    posterior = DirectPosterior(prior=prior, posterior_model=posterior_model, x_o=x_o)
     samples = posterior.sample((num_samples,))
 
     # Compute the c2st and assert it is near chance level of 0.5.
@@ -272,7 +272,7 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str, set_seed):
         theta, x = simulate_for_sbi(simulator, prior, 500, simulation_batch_size=10)
         posterior_model = inference.append_simulations(theta, x).train()
         posterior1 = DirectPosterior(
-            prior=prior, posterior_model=posterior_model, xo=x_o
+            prior=prior, posterior_model=posterior_model, x_o=x_o
         )
         theta, x = simulate_for_sbi(
             simulator, posterior1, 1000, simulation_batch_size=10
@@ -281,45 +281,34 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str, set_seed):
             theta, x, proposal=posterior1
         ).train()
         posterior = DirectPosterior(
-            prior=prior, posterior_model=posterior_model, xo=x_o
+            prior=prior, posterior_model=posterior_model, x_o=x_o
         )
     elif method_str == "snpe_c":
         inference = SNPE_C(**creation_args)
         theta, x = simulate_for_sbi(simulator, prior, 500, simulation_batch_size=50)
         posterior_model = inference.append_simulations(theta, x).train()
         posterior1 = DirectPosterior(
-            prior=prior, posterior_model=posterior_model, xo=x_o
+            prior=prior, posterior_model=posterior_model, x_o=x_o
         )
         theta = posterior1.sample((1000,))
         x = simulator(theta)
-        posterior_model = inference.append_simulations(
-            theta, x, proposal=posterior_model, proposal_x=x_o
-        ).train()
-        posterior = DirectPosterior(
-            prior=prior, posterior_model=posterior_model, xo=x_o
-        )
+        _ = inference.append_simulations(theta, x, proposal=posterior1).train()
+        posterior = inference.build_posterior(prior=prior, x_o=x_o)
     elif method_str == "snpe_a":
         inference = SNPE_A(**creation_args)
-        simulation_proposal = prior
-        correction_proposal = prior
+        proposal = prior
         final_round = False
         num_rounds = 3
         for r in range(num_rounds):
             if r == 2:
                 final_round = True
             theta, x = simulate_for_sbi(
-                simulator, simulation_proposal, 500, simulation_batch_size=50
+                simulator, proposal, 500, simulation_batch_size=50
             )
-            inference = inference.append_simulations(
-                theta, x, proposal=correction_proposal, proposal_x=x_o
-            )
-            posterior_mdn = inference.train(max_num_epochs=200, final_round=final_round)
-            posterior_mdn_corrected = inference.correct_density()
-            posterior = DirectPosterior(
-                prior=prior, posterior_model=posterior_mdn_corrected, xo=x_o
-            )
-            simulation_proposal = posterior
-            correction_proposal = posterior_mdn_corrected
+            inference = inference.append_simulations(theta, x, proposal=proposal)
+            _ = inference.train(max_num_epochs=200, final_round=final_round)
+            posterior = inference.build_posterior(prior=prior, x_o=x_o)
+            proposal = posterior
 
     samples = posterior.sample((num_samples,))
 
@@ -370,11 +359,11 @@ def test_api_snpe_c_posterior_correction(sample_with, mcmc_method, prior_str, se
     _ = inference.append_simulations(theta, x).train(max_num_epochs=5)
 
     posterior_model = inference.append_simulations(theta, x).train()
-    potential_fn, parameter_transform = posterior_potential(posterior_model, prior, x_o)
+    potential_fn, theta_transform = posterior_potential(posterior_model, prior, x_o)
     if sample_with == "mcmc":
         posterior = MCMCPosterior(
             potential_fn=potential_fn,
-            potential_tf=parameter_transform,
+            theta_transform=theta_transform,
             prior=prior,
             method=mcmc_method,
         )
@@ -382,7 +371,7 @@ def test_api_snpe_c_posterior_correction(sample_with, mcmc_method, prior_str, se
         posterior = RejectionPosterior(
             potential_fn=potential_fn,
             proposal=prior,
-            potential_tf=parameter_transform,
+            theta_transform=theta_transform,
         )
 
     # Posterior should be corrected for leakage even if num_rounds just 1.
@@ -431,13 +420,13 @@ def test_sample_conditional(set_seed):
     theta, x = simulate_for_sbi(simulator, prior, 10000)
     posterior_model = inference.append_simulations(theta, x).train(max_num_epochs=50)
 
-    posterior = DirectPosterior(prior=prior, posterior_model=posterior_model, xo=x_o)
+    posterior = DirectPosterior(prior=prior, posterior_model=posterior_model, x_o=x_o)
     samples = posterior.sample((50,))
 
     # Evaluate the conditional density be drawing samples and smoothing with a Gaussian
     # kde.
-    potential_fn, potential_tf = posterior_potential(
-        posterior_model, prior=prior, xo=x_o
+    potential_fn, theta_transform = posterior_potential(
+        posterior_model, prior=prior, x_o=x_o
     )
     (
         conditioned_potential_fn,
@@ -445,14 +434,14 @@ def test_sample_conditional(set_seed):
         restricted_prior,
     ) = parameter_conditonal_potential(
         potential_fn=potential_fn,
-        potential_tf=potential_tf,
+        theta_transform=theta_transform,
         prior=prior,
         condition=samples[0],
         dims_to_sample=[dim_to_sample_1, dim_to_sample_2],
     )
     mcmc_posterior = MCMCPosterior(
         potential_fn=conditioned_potential_fn,
-        potential_tf=restricted_tf,
+        theta_transform=restricted_tf,
         prior=restricted_prior,
     )
     cond_samples = mcmc_posterior.sample((500,))
@@ -555,7 +544,7 @@ def test_mdn_conditional_density(num_dim: int = 3, cond_dim: int = 1):
         training_batch_size=100
     )
     conditioned_mdn = parameter_conditional_mdn(
-        posterior_mdn, x_o, prior=prior, condition=condition, dims_to_sample=[0]
+        posterior_mdn, x_o, condition=condition, dims_to_sample=[0]
     )
     conditional_samples_sbi = conditioned_mdn.sample((num_samples,))
     check_c2st(
@@ -595,5 +584,5 @@ def test_example_posterior(snpe_method: type):
     posterior_model = inference.append_simulations(theta, x).train()
     if snpe_method == SNPE_A:
         posterior_model = inference.correct_density()
-    posterior = DirectPosterior(prior=prior, posterior_model=posterior_model, xo=x_o)
+    posterior = DirectPosterior(prior=prior, posterior_model=posterior_model, x_o=x_o)
     assert posterior is not None

@@ -1,39 +1,37 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
-from math import ceil
 from functools import partial
+from math import ceil
 from typing import Any, Callable, Dict, List, Optional, Union
 from warnings import warn
-from pyro.infer.mcmc import HMC, NUTS
-from pyro.infer.mcmc.api import MCMC
+
 import numpy as np
 import torch
 import torch.distributions.transforms as torch_tf
+from pyro.infer.mcmc import HMC, NUTS
+from pyro.infer.mcmc.api import MCMC
 from torch import Tensor, nn
 
-from sbi.inference.posteriors.base_posterior import NeuralPosterior
-from sbi.types import Shape
-from sbi.utils import del_entries
-from sbi.samplers.rejection.rejection import rejection_sample
-from sbi.utils.torchutils import atleast_2d, ensure_theta_batched
 from sbi import utils as utils
+from sbi.analysis import gradient_ascent
+from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.samplers.rejection.rejection import rejection_sample
+from sbi.types import Shape, TorchTransform
+from sbi.utils import del_entries
+from sbi.utils.torchutils import atleast_2d, ensure_theta_batched
 
 
 class RejectionPosterior(NeuralPosterior):
-    r"""Posterior $p(\theta|x)$ with `log_prob()` and `sample()` methods, obtained with
-    SNLE.<br/><br/>
-    SNLE trains a neural network to approximate the likelihood $p(x|\theta)$. The
-    `SNLE_Posterior` class wraps the trained network such that one can directly evaluate
-    the unnormalized posterior log probability $p(\theta|x) \propto p(x|\theta) \cdot
-    p(\theta)$ and draw samples from the posterior with MCMC.<br/><br/>
-    The neural network itself can be accessed via the `.net` attribute.
+    r"""Provides rerjeciton sampling to sample from the posterior.<br/><br/>
+    SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
+    `RejectionPosterior` allows to sample from the posterior with rejection sampling.
     """
 
     def __init__(
         self,
         potential_fn: Callable,
         proposal: Any,
-        potential_tf: torch_tf.Transform = torch_tf.identity_transform,
+        theta_transform: Optional[TorchTransform] = None,
         max_sampling_batch_size: int = 10_000,
         num_samples_to_find_max: int = 10_000,
         num_iter_to_find_max: int = 100,
@@ -42,21 +40,22 @@ class RejectionPosterior(NeuralPosterior):
     ):
         """
         Args:
-            potential_fn:
-            proposal: The proposal distribtution.
-            potential_tf: Only used for MAP.
-            max_sampling_batch_size: the batchsize of samples being drawn from
+            potential_fn: The potential function from which to draw samples.
+            proposal: The proposal distribution.
+            theta_transform: Transformation that is applied to parameters. Is not used
+                during but only when calling `.map()`.
+            max_sampling_batch_size: The batchsize of samples being drawn from
                 the proposal at every iteration.
-            num_samples_to_find_max: the number of samples that are used to find the
+            num_samples_to_find_max: The number of samples that are used to find the
                 maximum of the `potential_fn / proposal` ratio.
-            num_iter_to_find_max: the number of gradient ascent iterations to find the
-                maximum of that ratio.
-            m: multiplier to that ratio.
+            num_iter_to_find_max: The number of gradient ascent iterations to find the
+                maximum of the `potential_fn / proposal` ratio.
+            m: Multiplier to the `potential_fn / proposal` ratio.
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
         """
         super().__init__(
             potential_fn,
-            potential_tf=potential_tf,
+            theta_transform=theta_transform,
             device=device,
         )
 
@@ -68,7 +67,7 @@ class RejectionPosterior(NeuralPosterior):
         self.m = m
 
         self._purpose = (
-            "It provides Rejection sampling to .sample() from the posterior and "
+            "It provides rejection sampling to .sample() from the posterior and "
             "can evaluate the _unnormalized_ posterior density with .log_prob()."
         )
 
@@ -77,6 +76,18 @@ class RejectionPosterior(NeuralPosterior):
         sample_shape: Shape = torch.Size(),
         show_progress_bars: bool = True,
     ):
+        r"""
+        Return samples from posterior distribution $p(\theta|x)$ via rejection sampling.
+
+        Args:
+            sample_shape: Desired shape of samples that are drawn from posterior. If
+                sample_shape is multidimensional we simply draw `sample_shape.numel()`
+                samples and then reshape into the desired shape.
+            show_progress_bars: Whether to show sampling progress monitor.
+
+        Returns:
+            Samples from posterior.
+        """
         num_samples = torch.Size(sample_shape).numel()
 
         potential = partial(self.potential_fn, track_gradients=True)
@@ -95,3 +106,64 @@ class RejectionPosterior(NeuralPosterior):
         )
 
         return samples.reshape((*sample_shape, -1))
+
+    def map(
+        self,
+        num_iter: int = 1_000,
+        num_to_optimize: int = 100,
+        learning_rate: float = 0.01,
+        num_init_samples: int = 1_000,
+        save_best_every: int = 10,
+        show_progress_bars: bool = False,
+    ) -> Tensor:
+        r"""
+        Returns the maximum-a-posteriori estimate (MAP).
+
+        The method can be interrupted (Ctrl-C) when the user sees that the
+        log-probability converges. The best estimate will be saved in `self.map_`.
+        The MAP is obtained by running gradient ascent from a given number of starting
+        positions (samples from the posterior with the highest log-probability). After
+        the optimization is done, we select the parameter set that has the highest
+        log-probability after the optimization.
+
+        Warning: The default values used by this function are not well-tested. They
+        might require hand-tuning for the problem at hand.
+
+        For developers: if the prior is a `BoxUniform`, we carry out the optimization
+        in unbounded space and transform the result back into bounded space.
+
+        Args:
+            num_iter: Number of optimization steps that the algorithm takes
+                to find the MAP.
+            learning_rate: Learning rate of the optimizer.
+            num_init_samples: Draw this number of samples from the posterior and
+                evaluate the log-probability of all of them.
+            num_to_optimize: From the drawn `num_init_samples`, use the
+                `num_to_optimize` with highest log-probability as the initial points
+                for the optimization.
+            save_best_every: The best log-probability is computed, saved in the
+                `map`-attribute, and printed every `save_best_every`-th iteration.
+                Computing the best log-probability creates a significant overhead
+                (thus, the default is `10`.)
+            show_progress_bars: Whether or not to show a progressbar for sampling from
+                the posterior.
+            log_prob_kwargs: Will be empty for SNLE and SNRE. Will contain
+                {'norm_posterior': True} for SNPE.
+
+        Returns:
+            The MAP estimate.
+        """
+
+        inits = self.proposal.sample((num_init_samples,))
+
+        self.map_ = gradient_ascent(
+            potential_fn=self.potential_fn,
+            inits=inits,
+            theta_transform=self.theta_transform,
+            num_iter=num_iter,
+            num_to_optimize=num_to_optimize,
+            learning_rate=learning_rate,
+            save_best_every=save_best_every,
+            show_progress_bars=show_progress_bars,
+        )[0]
+        return self.map_

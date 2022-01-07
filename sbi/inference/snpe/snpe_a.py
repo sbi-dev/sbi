@@ -14,8 +14,8 @@ from pyknos.nflows.transforms import CompositeTransform
 from torch import Tensor
 from torch.distributions import MultivariateNormal
 
-from sbi.inference.posteriors.direct_posterior import DirectPosterior
 import sbi.utils as utils
+from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.inference.snpe.snpe_base import PosteriorEstimator
 from sbi.types import TensorboardSummaryWriter, TorchModule
 from sbi.utils import torchutils
@@ -265,26 +265,67 @@ class SNPE_A(PosteriorEstimator):
             or self._proposal_roundwise[-1] is None
         ):
             proposal = self._prior
-            proposal_x = None
             assert isinstance(
                 proposal, (MultivariateNormal, utils.BoxUniform)
             ), "Prior must be `torch.distributions.MultivariateNormal` or `sbi.utils.BoxUniform`"
         else:
             assert isinstance(
-                self._proposal_roundwise[-1]._neural_net._distribution,
-                MultivariateGaussianMDN,
+                self._proposal_roundwise[-1], DirectPosterior
             ), "The proposal you passed to `append_simulations` is neither the prior nor a `DirectPosterior`. SNPE-A currently only supports these scenarios."
             proposal = self._proposal_roundwise[-1]
-            proposal_x = self._proposal_x_roundwise[-1]
 
         # Create the SNPE_A_MDN
         wrapped_density_estimator = SNPE_A_MDN(
             flow=density_estimator,
             proposal=proposal,
-            proposal_x=proposal_x,
             prior=self._prior,
         )
         return wrapped_density_estimator
+
+    def build_posterior(
+        self,
+        prior: Any,
+        x_o: Tensor,
+        density_estimator: Optional[TorchModule] = None,
+    ) -> "DirectPosterior":
+        r"""
+        Build posterior from the neural density estimator.
+
+        This class instantiates a `SNPE_A_MDN` object, which applies the
+        posthoc-correction required in SNPE-A.
+
+        In addition, the returned `DirectPosterior` object implements the following
+        functionality over the raw `SNPE_A_MDN` object:
+
+        - correct the calculation of the log probability such that it compensates for
+            the leakage.
+        - reject samples that lie outside of the prior bounds.
+        - alternatively, if leakage is very high (which can happen for multi-round
+            SNPE), sample from the posterior with MCMC.
+
+        The DirectPosterior class assumes that the density estimator approximates the
+        posterior.
+
+        Args:
+            density_estimator: The density estimator that the posterior is based on.
+                If `None`, use the latest neural density estimator that was trained.
+            rejection_sampling_parameters: Dictionary overriding the default parameters
+                for rejection sampling. The following parameters are supported:
+                `max_sampling_batch_size` to set the batch size for drawing new
+                samples from the candidate distribution, e.g., the posterior. Larger
+                batch size speeds up sampling.
+        Returns:
+            Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods.
+        """
+        wrapped_density_estimator = self.correct_density(
+            density_estimator=density_estimator
+        )
+        self._posterior = DirectPosterior(
+            posterior_model=wrapped_density_estimator,
+            prior=prior,
+            x_o=x_o,
+        )
+        return deepcopy(self._posterior)
 
     def _log_prob_proposal_posterior(
         self,
@@ -292,7 +333,6 @@ class SNPE_A(PosteriorEstimator):
         x: Tensor,
         masks: Tensor,
         proposal: Optional[Any],
-        proposal_x: Optional[Tensor],
     ) -> Tensor:
         """
         Return the log-probability of the proposal posterior.
@@ -363,8 +403,7 @@ class SNPE_A_MDN(nn.Module):
     def __init__(
         self,
         flow: flows.Flow,
-        proposal: Union["utils.BoxUniform", MultivariateNormal, "SNPE_A_MDN"],
-        proposal_x: Tensor,
+        proposal: Union["utils.BoxUniform", "DirectPosterior", "SNPE_A_MDN"],
         prior: Any,
     ):
         """Constructor.
@@ -372,9 +411,6 @@ class SNPE_A_MDN(nn.Module):
         Args:
             flow: The trained normalizing flow, passed when building the posterior.
             proposal: The proposal distribution.
-            proposal_x: The `x` at which to evaluate the proposal. In the future, as
-                we move to pyroflows, this will not be needed anymore since it will be
-                part of the `proposal` as a default.
             prior: The prior distribution.
         """
         # Call nn.Module's constructor.
@@ -388,7 +424,9 @@ class SNPE_A_MDN(nn.Module):
             self._apply_correction = False
         else:
             self._apply_correction = True
-            logits_pp, m_pp, prec_pp = proposal._posthoc_correction(proposal_x)
+            logits_pp, m_pp, prec_pp = proposal.posterior_model._posthoc_correction(
+                proposal.x_o
+            )
             self._logits_pp, self._m_pp, self._prec_pp = (
                 logits_pp.detach(),
                 m_pp.detach(),

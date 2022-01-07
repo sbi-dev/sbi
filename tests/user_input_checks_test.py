@@ -306,12 +306,12 @@ def test_inference_with_user_sbi_problems(
                 # SNPE-A does not support priors yet.
                 posterior_model = inference.correct_density()
                 _ = DirectPosterior(
-                    posterior_model=posterior_model, prior=prior, xo=x_o
+                    posterior_model=posterior_model, prior=prior, x_o=x_o
                 )
         else:
-            _ = DirectPosterior(posterior_model=posterior_model, prior=prior, xo=x_o)
+            _ = DirectPosterior(posterior_model=posterior_model, prior=prior, x_o=x_o)
     else:
-        _ = DirectPosterior(posterior_model=posterior_model, prior=prior, xo=x_o)
+        _ = DirectPosterior(posterior_model=posterior_model, prior=prior, x_o=x_o)
 
 
 @pytest.mark.parametrize(
@@ -542,4 +542,4 @@ def test_train_with_different_data_and_training_device(
     weights_device = next(inference._neural_net.parameters()).device
     assert torch.device(training_device) == weights_device
 
-    _ = DirectPosterior(posterior_model=posterior_model, prior=prior, xo=x_o)
+    _ = DirectPosterior(posterior_model=posterior_model, prior=prior, x_o=x_o)

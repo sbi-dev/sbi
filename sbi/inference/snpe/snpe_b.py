@@ -6,10 +6,10 @@ from typing import Any, Callable, Optional, Union
 
 import torch
 from torch import Tensor
-from sbi.types import TensorboardSummaryWriter
 
 import sbi.utils as utils
 from sbi.inference.snpe.snpe_base import PosteriorEstimator
+from sbi.types import TensorboardSummaryWriter
 from sbi.utils import del_entries
 
 

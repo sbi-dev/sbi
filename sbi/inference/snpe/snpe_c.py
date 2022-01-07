@@ -7,7 +7,7 @@ from typing import Any, Callable, Dict, Optional, Union
 import torch
 from pyknos.mdn.mdn import MultivariateGaussianMDN as mdn
 from pyknos.nflows.transforms import CompositeTransform
-from torch import Tensor, eye, ones, nn
+from torch import Tensor, eye, nn, ones
 from torch.distributions import MultivariateNormal, Uniform
 
 from sbi import utils as utils
@@ -166,7 +166,7 @@ class SNPE_C(PosteriorEstimator):
             # last proposal.
             proposal = self._proposal_roundwise[-1]
             self.use_non_atomic_loss = (
-                isinstance(proposal._distribution, mdn)
+                isinstance(proposal.posterior_model._distribution, mdn)
                 and isinstance(self._neural_net._distribution, mdn)
                 and check_dist_class(
                     self._prior, class_to_check=(Uniform, MultivariateNormal)
@@ -263,7 +263,6 @@ class SNPE_C(PosteriorEstimator):
         x: Tensor,
         masks: Tensor,
         proposal: Optional[Any],
-        proposal_x: Optional[Tensor],
     ) -> Tensor:
         """
         Return the log-probability of the proposal posterior.
@@ -283,7 +282,7 @@ class SNPE_C(PosteriorEstimator):
         """
 
         if self.use_non_atomic_loss:
-            return self._log_prob_proposal_posterior_mog(theta, x, proposal, proposal_x)
+            return self._log_prob_proposal_posterior_mog(theta, x, proposal)
         else:
             return self._log_prob_proposal_posterior_atomic(theta, x, masks)
 
@@ -365,7 +364,7 @@ class SNPE_C(PosteriorEstimator):
         return log_prob_proposal_posterior
 
     def _log_prob_proposal_posterior_mog(
-        self, theta: Tensor, x: Tensor, proposal: nn.Module, proposal_x: Tensor
+        self, theta: Tensor, x: Tensor, proposal: "DirectPosterior"
     ) -> Tensor:
         """
         Return log-probability of the proposal posterior for MoG proposal.
@@ -397,8 +396,10 @@ class SNPE_C(PosteriorEstimator):
         # Evaluate the proposal. MDNs do not have functionality to run the embedding_net
         # and then get the mixture_components (**without** calling log_prob()). Hence,
         # we call them separately here.
-        encoded_x = proposal._embedding_net(proposal_x)
-        dist = proposal._distribution  # defined to avoid ugly black formatting.
+        encoded_x = proposal.posterior_model._embedding_net(proposal.x_o)
+        dist = (
+            proposal.posterior_model._distribution
+        )  # defined to avoid ugly black formatting.
         logits_p, m_p, prec_p, _, _ = dist.get_mixture_components(encoded_x)
         norm_logits_p = logits_p - torch.logsumexp(logits_p, dim=-1, keepdim=True)
 

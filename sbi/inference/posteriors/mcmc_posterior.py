@@ -1,30 +1,22 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
-from math import ceil
 from functools import partial
+from math import ceil
 from typing import Any, Callable, Dict, List, Optional, Union
 from warnings import warn
-from pyro.infer.mcmc import HMC, NUTS
-from pyro.infer.mcmc.api import MCMC
+
 import numpy as np
 import torch
 import torch.distributions.transforms as torch_tf
-from torch import Tensor, nn
+from pyro.infer.mcmc import HMC, NUTS
+from pyro.infer.mcmc.api import MCMC
+from torch import Tensor
 from torch import multiprocessing as mp
-from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from torch import nn
 
-from sbi.utils import (
-    transformed_potential,
-    pyro_potential_wrapper,
-)
-from sbi.types import Shape
-from sbi.utils import del_entries, mcmc_transform
-from sbi.utils.torchutils import (
-    atleast_2d,
-    ensure_theta_batched,
-    atleast_2d_float32_tensor,
-)
 from sbi import utils as utils
+from sbi.analysis import gradient_ascent
+from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.samplers.mcmc import (
     IterateParameters,
     Slice,
@@ -33,23 +25,31 @@ from sbi.samplers.mcmc import (
     prior_init,
     sir,
 )
+from sbi.types import Shape, TorchTransform
+from sbi.utils import (
+    del_entries,
+    mcmc_transform,
+    pyro_potential_wrapper,
+    transformed_potential,
+)
+from sbi.utils.torchutils import (
+    atleast_2d,
+    atleast_2d_float32_tensor,
+    ensure_theta_batched,
+)
 
 
 class MCMCPosterior(NeuralPosterior):
-    r"""Posterior $p(\theta|x)$ with `log_prob()` and `sample()` methods, obtained with
-    SNLE.<br/><br/>
-    SNLE trains a neural network to approximate the likelihood $p(x|\theta)$. The
-    `SNLE_Posterior` class wraps the trained network such that one can directly evaluate
-    the unnormalized posterior log probability $p(\theta|x) \propto p(x|\theta) \cdot
-    p(\theta)$ and draw samples from the posterior with MCMC.<br/><br/>
-    The neural network itself can be accessed via the `.net` attribute.
+    r"""Provides MCMC to sample from the posterior.<br/><br/>
+    SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
+    `MCMCPosterior` allows to sample from the posterior with MCMC.
     """
 
     def __init__(
         self,
         potential_fn: Callable,
         prior: Any,
-        potential_tf: Optional[torch_tf.Transform] = None,
+        theta_transform: Optional[TorchTransform] = None,
         method: str = "slice_np",
         thin: int = 10,
         warmup_steps: int = 10,
@@ -60,9 +60,10 @@ class MCMCPosterior(NeuralPosterior):
     ):
         """
         Args:
-            potential_fn:
+            potential_fn: The potential function from which to draw samples.
             prior: Prior distribution. Is used to initialize the chain.
-            potential_tf:
+            theta_transform: Transformation that will be applied during sampling.
+                Allows to perform MCMC in unconstrained space.
             method: Method used for MCMC sampling, one of `slice_np`, `slice`,
                 `hmc`, `nuts`. Currently defaults to `slice_np` for a custom numpy
                 implementation of slice sampling; select `hmc`, `nuts` or `slice` for
@@ -81,7 +82,7 @@ class MCMCPosterior(NeuralPosterior):
 
         super().__init__(
             potential_fn,
-            potential_tf=potential_tf,
+            theta_transform=theta_transform,
             device=device,
         )
 
@@ -108,7 +109,7 @@ class MCMCPosterior(NeuralPosterior):
         self.potential_ = partial(
             transformed_potential,
             potential_fn=potential_fn,
-            potential_tf=self.potential_tf,
+            theta_transform=self.theta_transform,
             device=device,
             track_gradients=track_gradients,
         )
@@ -161,7 +162,7 @@ class MCMCPosterior(NeuralPosterior):
         """
 
         init_fn = self._build_mcmc_init_fn(
-            self.prior, self.potential_fn, transform=self.potential_tf
+            self.prior, self.potential_fn, transform=self.theta_transform
         )
         initial_params = torch.cat([init_fn() for _ in range(self.num_chains)])
 
@@ -193,7 +194,7 @@ class MCMCPosterior(NeuralPosterior):
             else:
                 raise NameError
 
-        samples = self.potential_tf.inv(transformed_samples)
+        samples = self.theta_transform.inv(transformed_samples)
         return samples.reshape((*sample_shape, -1))
 
     def _build_mcmc_init_fn(
@@ -344,3 +345,72 @@ class MCMCPosterior(NeuralPosterior):
         assert samples.shape[0] == num_samples
 
         return samples
+
+    def map(
+        self,
+        num_iter: int = 1_000,
+        num_to_optimize: int = 100,
+        learning_rate: float = 0.01,
+        init_method: Union[str, Tensor] = "prior",
+        num_init_samples: int = 1_000,
+        save_best_every: int = 10,
+        show_progress_bars: bool = False,
+    ) -> Tensor:
+        r"""
+        Returns the maximum-a-posteriori estimate (MAP).
+
+        The method can be interrupted (Ctrl-C) when the user sees that the
+        log-probability converges. The best estimate will be saved in `self.map_`.
+        The MAP is obtained by running gradient ascent from a given number of starting
+        positions (samples from the posterior with the highest log-probability). After
+        the optimization is done, we select the parameter set that has the highest
+        log-probability after the optimization.
+
+        Warning: The default values used by this function are not well-tested. They
+        might require hand-tuning for the problem at hand.
+
+        For developers: if the prior is a `BoxUniform`, we carry out the optimization
+        in unbounded space and transform the result back into bounded space.
+
+        Args:
+            num_iter: Number of optimization steps that the algorithm takes
+                to find the MAP.
+            learning_rate: Learning rate of the optimizer.
+            init_method: How to select the starting parameters for the optimization. If
+                it is a string, it can be either [`posterior`, `prior`], which samples
+                the respective distribution `num_init_samples` times. If it is a
+                tensor, the tensor will be used as init locations.
+            num_init_samples: Draw this number of samples from the posterior and
+                evaluate the log-probability of all of them.
+            num_to_optimize: From the drawn `num_init_samples`, use the
+                `num_to_optimize` with highest log-probability as the initial points
+                for the optimization.
+            save_best_every: The best log-probability is computed, saved in the
+                `map`-attribute, and printed every `save_best_every`-th iteration.
+                Computing the best log-probability creates a significant overhead
+                (thus, the default is `10`.)
+            show_progress_bars: Whether or not to show a progressbar for sampling from
+                the posterior.
+            log_prob_kwargs: Will be empty for SNLE and SNRE. Will contain
+                {'norm_posterior': True} for SNPE.
+
+        Returns:
+            The MAP estimate.
+        """
+
+        if init_method == "posterior":
+            inits = self.sample((num_init_samples,))
+        elif init_method == "prior":
+            inits = self.prior.sample((num_init_samples,))
+
+        self.map_ = gradient_ascent(
+            potential_fn=self.potential_fn,
+            inits=inits,
+            theta_transform=self.theta_transform,
+            num_iter=num_iter,
+            num_to_optimize=num_to_optimize,
+            learning_rate=learning_rate,
+            save_best_every=save_best_every,
+            show_progress_bars=show_progress_bars,
+        )[0]
+        return self.map_

@@ -2,63 +2,72 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+
 import torch
-from torch import Tensor, nn
-from sbi.inference.posteriors.base_posterior import NeuralPosterior
-from sbi.utils.torchutils import atleast_2d
-from sbi.utils import mcmc_transform
-from sbi.types import TorchModule
 import torch.distributions.transforms as torch_tf
+from torch import Tensor, nn
+
+from sbi.utils import mcmc_transform
 from sbi.utils.sbiutils import match_theta_and_x_batch_shapes
+from sbi.utils.torchutils import atleast_2d
 
 
 def likelihood_potential(
-    likelihood_model: TorchModule,
+    likelihood_model: nn.Module,
     prior: Any,
-    xo: Tensor,
+    x_o: Tensor,
 ) -> Tuple[Callable, torch_tf.Transform]:
     r"""
-    Build posterior from the neural density estimator.
+    Returns the potential $p(x_o|\theta)p(\theta)$ for likelihood-based methods.
 
-    SNLE trains a neural network to approximate the likelihood $p(x|\theta)$. The
-    `LikelihoodBasedPosterior` class wraps the trained network such that one can
-    directly evaluate the unnormalized posterior log probability
-    $p(\theta|x) \propto p(x|\theta) \cdot p(\theta)$ and draw samples from the
-    posterior with MCMC.
+    It also returns a transformation that can be used to transform the potential into
+    unconstrained space.
 
     Args:
-        density_estimator: The density estimator that the posterior is based on.
-            If `None`, use the latest neural density estimator that was trained.
-        sample_with: Method to use for sampling from the posterior. Must be one of
-            [`mcmc` | `rejection`].
+        likelihood_model: The neural network modelling the likelihood.
+        prior: The prior distribution.
+        x_o: The observed data at which to evaluate the likelihood.
 
     Returns:
-        Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods
-        (the returned log-probability is unnormalized).
+        The potential function $p(x_o|\theta)p(\theta)$ and a transformation that maps
+        to unconstrained space.
     """
 
     device = str(next(likelihood_model.parameters()).device)
 
-    potential_fn = _build_potential_fn(prior, likelihood_model, xo, device=device)
-    potential_tf = mcmc_transform(prior, device=device)
+    potential_fn = _build_potential_fn(likelihood_model, prior, x_o, device=device)
+    theta_transform = mcmc_transform(prior, device=device)
 
-    return potential_fn, potential_tf
+    return potential_fn, theta_transform
 
 
-def _build_potential_fn(prior, likelihood_nn: nn.Module, xo: Tensor, device: str):
-    # TODO Train exited here, entered after sampling?
-    likelihood_nn.eval()
+def _build_potential_fn(
+    likelihood_model: nn.Module, prior: Any, x_o: Tensor, device: str
+) -> Callable:
+    r"""
+    Returns the potential function for likelihood-based methods.
+
+    Args:
+        likelihood_model: The neural network modelling the likelihood.
+        prior: The prior distribution.
+        x_o: The observed data at which to evaluate the likelihood.
+        device: The device to which parameters and data are moved before evaluating
+            the `likelihood_nn`.
+
+    Returns:
+        The potential function $p(x_o|\theta)p(\theta)$.
+    """
+    likelihood_model.eval()
 
     def likelihood_potential(theta: Tensor, track_gradients: bool = True):
         # Calculate likelihood over trials and in one batch.
         log_likelihood_trial_sum = _log_likelihoods_over_trials(
-            x=xo.to(device),
+            x=x_o.to(device),
             theta=theta.to(device),
-            net=likelihood_nn,
+            net=likelihood_model,
             track_gradients=track_gradients,
         )
 
-        # Move to cpu for comparison with prior.
         return log_likelihood_trial_sum + prior.log_prob(theta)
 
     return likelihood_potential
