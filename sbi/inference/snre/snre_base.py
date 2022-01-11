@@ -26,6 +26,7 @@ from sbi.utils.user_input_checks import process_x
 class RatioEstimator(NeuralInference, ABC):
     def __init__(
         self,
+        prior: Optional[Any] = None,
         classifier: Union[str, Callable] = "resnet",
         device: str = "cpu",
         logging_level: Union[int, str] = "warning",
@@ -59,6 +60,7 @@ class RatioEstimator(NeuralInference, ABC):
         """
 
         super().__init__(
+            prior=prior,
             device=device,
             logging_level=logging_level,
             summary_writer=summary_writer,
