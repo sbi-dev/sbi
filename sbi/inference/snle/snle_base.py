@@ -25,6 +25,7 @@ from sbi.utils.user_input_checks import process_x
 class LikelihoodEstimator(NeuralInference, ABC):
     def __init__(
         self,
+        prior: Optional[Any] = None,
         density_estimator: Union[str, Callable] = "maf",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
@@ -35,6 +36,10 @@ class LikelihoodEstimator(NeuralInference, ABC):
         r"""Base class for Sequential Neural Likelihood Estimation methods.
 
         Args:
+            prior: A probability distribution that expresses prior knowledge about the
+                parameters, e.g. which ranges are meaningful for them. Any
+                object with `.log_prob()`and `.sample()` (for example, a PyTorch
+                distribution) can be used.
             density_estimator: If it is a string, use a pre-configured network of the
                 provided type (one of nsf, maf, mdn, made). Alternatively, a function
                 that builds a custom neural network can be provided. The function will
@@ -51,6 +56,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         """
 
         super().__init__(
+            prior=prior,
             device=device,
             logging_level=logging_level,
             summary_writer=summary_writer,

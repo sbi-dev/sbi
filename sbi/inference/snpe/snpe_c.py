@@ -63,9 +63,7 @@ class SNPE_C(PosteriorEstimator):
 
         Args:
             prior: A probability distribution that expresses prior knowledge about the
-                parameters, e.g. which ranges are meaningful for them. Any
-                object with `.log_prob()`and `.sample()` (for example, a PyTorch
-                distribution) can be used.
+                parameters, e.g. which ranges are meaningful for them.
             density_estimator: If it is a string, use a pre-configured network of the
                 provided type (one of nsf, maf, mdn, made). Alternatively, a function
                 that builds a custom neural network can be provided. The function will

@@ -58,6 +58,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         """
 
         super().__init__(
+            prior=prior,
             device=device,
             logging_level=logging_level,
             summary_writer=summary_writer,
