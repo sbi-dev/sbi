@@ -34,7 +34,7 @@ def test_log_prob_with_different_x(snpe_method: type, x_o_batch_dim: bool):
     simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior)
     inference = snpe_method(prior=prior)
     theta, x = simulate_for_sbi(simulator, prior, 1000)
-    posterior_model = inference.append_simulations(theta, x).train(max_num_epochs=3)
+    posterior_estimator = inference.append_simulations(theta, x).train(max_num_epochs=3)
 
     if x_o_batch_dim == 0:
         x_o = ones(num_dim)
@@ -42,7 +42,11 @@ def test_log_prob_with_different_x(snpe_method: type, x_o_batch_dim: bool):
         x_o = ones(1, num_dim)
     elif x_o_batch_dim == 2:
         x_o = ones(2, num_dim)
+    else:
+        raise NotImplementedError
 
-    posterior = DirectPosterior(posterior_model=posterior_model, prior=prior, x_o=x_o)
+    posterior = DirectPosterior(
+        posterior_estimator=posterior_estimator, prior=prior
+    ).set_default_x(x_o)
     samples = posterior.sample((10,))
     _ = posterior.log_prob(samples)

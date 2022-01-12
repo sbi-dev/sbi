@@ -100,8 +100,7 @@ def build_input_output_layer(
 
 class ActiveSubspace:
     def __init__(self, posterior: Any):
-        """
-        Identify the active subspace for sensitivity analyses.
+        """Identify the active subspace for sensitivity analyses.
 
         - Introduction to active subspaces: Constantine et al. 2015.
         - Application to analyse the sensitivity in neuroscience models:
@@ -131,8 +130,7 @@ class ActiveSubspace:
         z_score_property: bool = True,
         embedding_net: nn.Module = nn.Identity(),
     ) -> "ActiveSubspace":
-        r"""
-        Add a property whose sensitivity is to be analysed.
+        r"""Add a property whose sensitivity is to be analysed.
 
         To analyse the sensitivity of an emergent property, we train a neural network
         to predict the property from the parameter set $\theta$. The hyperparameters of
@@ -237,8 +235,7 @@ class ActiveSubspace:
         max_num_epochs: Optional[int] = None,
         clip_max_norm: Optional[float] = 5.0,
     ) -> nn.Module:
-        r"""
-        Train a regression network to predict the specified property from $\theta$.
+        r"""Train a regression network to predict the specified property from $\theta$.
 
         Args:
             training_batch_size: Training batch size.
@@ -327,9 +324,10 @@ class ActiveSubspace:
         return deepcopy(self._regression_net)
 
     def _converged(self, epoch: int, stop_after_epochs: int) -> bool:
-        r"""
-        Return whether the training converged yet and save best model state so far.
+        r"""Return whether the training converged yet and save best model state so far.
+
         Checks for improvement in validation performance over previous epochs.
+
         Args:
             epoch: Current epoch in training.
             stop_after_epochs: How many fruitless epochs to let pass before stopping.
@@ -361,8 +359,7 @@ class ActiveSubspace:
         norm_gradients_to_prior: bool = True,
         num_monte_carlo_samples: int = 1000,
     ) -> Tuple[Tensor, Tensor]:
-        r"""
-        Return eigenvectors and values corresponding to directions of sensitivity.
+        r"""Return eigenvectors and values corresponding to directions of sensitivity.
 
         The directions of sensitivity are the directions along which a specific
         property changes in the fastest way. They will have the largest eigenvalues.
@@ -469,8 +466,7 @@ class ActiveSubspace:
         return eigen_values, eigen_vectors
 
     def project(self, theta: Tensor, num_dimensions: int) -> Tensor:
-        r"""
-        Return $\theta$ that were projected into the subspace.
+        r"""Return $\theta$ that were projected into the subspace.
 
         To identify the dimensionality of the active subspace `num_dimensions`,
         Constantine et al. 2015 suggest to look at gaps in the eigenvalue spectrum.

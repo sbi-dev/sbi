@@ -13,7 +13,9 @@ from torch import Tensor, log, nn
 from sbi import utils as utils
 from sbi.analysis import gradient_ascent
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
-from sbi.inference.potentials.posterior_based_potential import posterior_potential
+from sbi.inference.potentials.posterior_based_potential import (
+    posterior_estimator_based_potential,
+)
 from sbi.samplers.rejection.rejection import rejection_sample_posterior_within_prior
 from sbi.types import Shape
 from sbi.utils import del_entries
@@ -43,7 +45,7 @@ class DirectPosterior(NeuralPosterior):
     def __init__(
         self,
         prior: Callable,
-        posterior_model: nn.Module,
+        posterior_estimator: nn.Module,
         max_sampling_batch_size: int = 10_000,
         device: Optional[str] = None,
         x_shape: Optional[torch.Size] = None,
@@ -51,8 +53,8 @@ class DirectPosterior(NeuralPosterior):
         """
         Args:
             prior: Prior distribution with `.log_prob()` and `.sample()`.
-            posterior_model: The trained neural posterior.
-            x_o: Tensor at which to evaluate the `posterior_model`.
+            posterior_estimator: The trained neural posterior.
+            x_o: Tensor at which to evaluate the `posterior_estimator`.
             max_sampling_batch_size: Batchsize of samples being drawn from
                 the proposal at every iteration.
             device: Training device, e.g., "cpu", "cuda" or "cuda:0". If None,
@@ -63,8 +65,8 @@ class DirectPosterior(NeuralPosterior):
         # Because `DirectPosterior` does not take the `potential_fn` as input, it
         # builds it itself. The `potential_fn` and `theta_transform` are used only for
         # obtaining the MAP.
-        potential_fn, theta_transform = posterior_potential(
-            posterior_model, prior, None
+        potential_fn, theta_transform = posterior_estimator_based_potential(
+            posterior_estimator, prior, None
         )
 
         super().__init__(
@@ -75,7 +77,7 @@ class DirectPosterior(NeuralPosterior):
         )
 
         self.prior = prior
-        self.posterior_model = posterior_model
+        self.posterior_estimator = posterior_estimator
 
         self.max_sampling_batch_size = max_sampling_batch_size
         self._leakage_density_correction_factor = None
@@ -86,28 +88,43 @@ class DirectPosterior(NeuralPosterior):
         self,
         sample_shape: Shape = torch.Size(),
         x: Optional[Tensor] = None,
+        max_sampling_batch_size: int = 10_000,
+        sample_with: Optional[str] = None,
         show_progress_bars: bool = True,
     ):
-        r"""
-        Return samples from posterior distribution $p(\theta|x)$.
+        r"""Return samples from posterior distribution $p(\theta|x)$.
 
         Args:
             sample_shape: Desired shape of samples that are drawn from posterior. If
                 sample_shape is multidimensional we simply draw `sample_shape.numel()`
                 samples and then reshape into the desired shape.
+            sample_with: This argument only exists to keep backward-compatibility with
+                `sbi` v0.17.2 or older. If it is set, we instantly raise an error.
             show_progress_bars: Whether to show sampling progress monitor.
         """
 
         num_samples = torch.Size(sample_shape).numel()
         x = self._x_else_default_x(x)
+        max_sampling_batch_size = (
+            self.max_sampling_batch_size
+            if max_sampling_batch_size is None
+            else max_sampling_batch_size
+        )
+
+        if sample_with is not None:
+            raise ValueError(
+                f"You set `sample_with={sample_with}`. As of sbi v0.18.0, setting "
+                f"`sample_with` is no longer supported. You have to rerun "
+                f"`.build_posterior(sample_with={sample_with}).`"
+            )
 
         samples = rejection_sample_posterior_within_prior(
-            posterior_nn=self.posterior_model,
+            posterior_nn=self.posterior_estimator,
             prior=self.prior,
             x=x,
             num_samples=num_samples,
             show_progress_bars=show_progress_bars,
-            max_sampling_batch_size=self.max_sampling_batch_size,
+            max_sampling_batch_size=max_sampling_batch_size,
         )[0]
         return samples
 
@@ -119,8 +136,7 @@ class DirectPosterior(NeuralPosterior):
         track_gradients: bool = False,
         leakage_correction_params: Optional[dict] = None,
     ) -> Tensor:
-        r"""
-        Returns the log-probability of the posterior $p(\theta|x).$
+        r"""Returns the log-probability of the posterior $p(\theta|x).$
 
         Args:
             theta: Parameters $\theta$.
@@ -147,7 +163,7 @@ class DirectPosterior(NeuralPosterior):
         x = self._x_else_default_x(x)
 
         # TODO Train exited here, entered after sampling?
-        self.posterior_model.eval()
+        self.posterior_estimator.eval()
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
         theta_repeated, x_repeated = match_theta_and_x_batch_shapes(theta, x)
@@ -155,7 +171,7 @@ class DirectPosterior(NeuralPosterior):
         with torch.set_grad_enabled(track_gradients):
 
             # Evaluate on device, move back to cpu for comparison with prior.
-            unnorm_log_prob = self.posterior_model.log_prob(
+            unnorm_log_prob = self.posterior_estimator.log_prob(
                 theta_repeated, context=x_repeated
             )
 
@@ -209,7 +225,7 @@ class DirectPosterior(NeuralPosterior):
         def acceptance_at(x: Tensor) -> Tensor:
 
             return rejection_sample_posterior_within_prior(
-                posterior_nn=self.posterior_model,
+                posterior_nn=self.posterior_estimator,
                 prior=self.prior,
                 x=x.to(self._device),
                 num_samples=num_rejection_samples,
@@ -243,8 +259,7 @@ class DirectPosterior(NeuralPosterior):
         save_best_every: int = 10,
         show_progress_bars: bool = False,
     ) -> Tensor:
-        r"""
-        Returns the maximum-a-posteriori estimate (MAP).
+        r"""Returns the maximum-a-posteriori estimate (MAP).
 
         The method can be interrupted (Ctrl-C) when the user sees that the
         log-probability converges. The best estimate will be saved in `self.map_`.

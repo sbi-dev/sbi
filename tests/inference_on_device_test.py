@@ -18,9 +18,9 @@ from sbi.inference import (
     simulate_for_sbi,
     MCMCPosterior,
     RejectionPosterior,
-    ratio_potential,
-    likelihood_potential,
-    posterior_potential,
+    ratio_estimator_based_potential,
+    likelihood_estimator_based_potential,
+    posterior_estimator_based_potential,
 )
 from sbi.simulators import linear_gaussian
 from sbi.utils.torchutils import BoxUniform, process_device
@@ -112,15 +112,21 @@ def test_training_and_mcmc_on_device(
         theta, x = simulate_for_sbi(simulator, proposals[-1], num_simulations)
         theta, x = theta.to(data_device), x.to(data_device)
 
-        model = inferer.append_simulations(theta, x).train(
+        estimator = inferer.append_simulations(theta, x).train(
             training_batch_size=100, max_num_epochs=max_num_epochs
         )
         if method == SNLE:
-            potential_fn, theta_transform = likelihood_potential(model, prior, x_o)
+            potential_fn, theta_transform = likelihood_estimator_based_potential(
+                estimator, prior, x_o
+            )
         elif method == SNPE_A or method == SNPE_C:
-            potential_fn, theta_transform = posterior_potential(model, prior, x_o)
+            potential_fn, theta_transform = posterior_estimator_based_potential(
+                estimator, prior, x_o
+            )
         elif method == SNRE_A or method == SNRE_B:
-            potential_fn, theta_transform = ratio_potential(model, prior, x_o)
+            potential_fn, theta_transform = ratio_estimator_based_potential(
+                estimator, prior, x_o
+            )
 
         if mcmc_method == "rejection":
             posterior = RejectionPosterior(

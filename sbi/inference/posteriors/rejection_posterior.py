@@ -76,19 +76,51 @@ class RejectionPosterior(NeuralPosterior):
             "can evaluate the _unnormalized_ posterior density with .log_prob()."
         )
 
+    def log_prob(
+        self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False
+    ) -> Tensor:
+        r"""Returns the log-probability of theta under the posterior.
+
+        Args:
+            theta: Parameters $\theta$.
+            track_gradients: Whether the returned tensor supports tracking gradients.
+                This can be helpful for e.g. sensitivity analysis, but increases memory
+                consumption.
+
+        Returns:
+            `len($\theta$)`-shaped log-probability.
+        """
+        warn(
+            "`.log_prob()` is deprecated for methods that can only evaluate the log-probability up to a normalizing constant. Use `.potential()` instead."
+        )
+        warn("The log-probability is unnormalized!")
+
+        self.potential_fn.set_x(self._x_else_default_x(x))
+
+        theta = ensure_theta_batched(torch.as_tensor(theta))
+        return self.potential_fn(
+            theta.to(self._device), track_gradients=track_gradients
+        )
+
     def sample(
         self,
         sample_shape: Shape = torch.Size(),
         x: Optional[Tensor] = None,
+        max_sampling_batch_size: Optional[int] = None,
+        num_samples_to_find_max: Optional[int] = None,
+        num_iter_to_find_max: Optional[int] = None,
+        m: Optional[float] = None,
+        sample_with: Optional[str] = None,
         show_progress_bars: bool = True,
     ):
-        r"""
-        Return samples from posterior distribution $p(\theta|x)$ via rejection sampling.
+        r"""Return samples from posterior $p(\theta|x)$ via rejection sampling.
 
         Args:
             sample_shape: Desired shape of samples that are drawn from posterior. If
                 sample_shape is multidimensional we simply draw `sample_shape.numel()`
                 samples and then reshape into the desired shape.
+            sample_with: This argument only exists to keep backward-compatibility with
+                `sbi` v0.17.2 or older. If it is set, we instantly raise an error.
             show_progress_bars: Whether to show sampling progress monitor.
 
         Returns:
@@ -99,16 +131,40 @@ class RejectionPosterior(NeuralPosterior):
 
         potential = partial(self.potential_fn, track_gradients=True)
 
+        if sample_with is not None:
+            raise ValueError(
+                f"You set `sample_with={sample_with}`. As of sbi v0.18.0, setting "
+                f"`sample_with` is no longer supported. You have to rerun "
+                f"`.build_posterior(sample_with={sample_with}).`"
+            )
+        # Replace arguments that were not passed with their default.
+        max_sampling_batch_size = (
+            self.max_sampling_batch_size
+            if max_sampling_batch_size is None
+            else max_sampling_batch_size
+        )
+        num_samples_to_find_max = (
+            self.num_samples_to_find_max
+            if num_samples_to_find_max is None
+            else num_samples_to_find_max
+        )
+        num_iter_to_find_max = (
+            self.num_iter_to_find_max
+            if num_iter_to_find_max is None
+            else num_iter_to_find_max
+        )
+        m = self.m if m is None else m
+
         samples, _ = rejection_sample(
             potential,
             proposal=self.proposal,
             num_samples=num_samples,
             show_progress_bars=show_progress_bars,
             warn_acceptance=0.01,
-            max_sampling_batch_size=self.max_sampling_batch_size,
-            num_samples_to_find_max=self.num_samples_to_find_max,
-            num_iter_to_find_max=self.num_iter_to_find_max,
-            m=self.m,
+            max_sampling_batch_size=max_sampling_batch_size,
+            num_samples_to_find_max=num_samples_to_find_max,
+            num_iter_to_find_max=num_iter_to_find_max,
+            m=m,
             device=self._device,
         )
 
@@ -124,8 +180,7 @@ class RejectionPosterior(NeuralPosterior):
         save_best_every: int = 10,
         show_progress_bars: bool = False,
     ) -> Tensor:
-        r"""
-        Returns the maximum-a-posteriori estimate (MAP).
+        r"""Returns the maximum-a-posteriori estimate (MAP).
 
         The method can be interrupted (Ctrl-C) when the user sees that the
         log-probability converges. The best estimate will be saved in `self.map_`.

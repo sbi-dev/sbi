@@ -67,8 +67,7 @@ class SNRE_B(RatioEstimator):
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
     ) -> NeuralPosterior:
-        r"""
-        Return classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
+        r"""Return classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
 
         Args:
             num_atoms: Number of atoms to use for classification.
@@ -105,8 +104,7 @@ class SNRE_B(RatioEstimator):
         return super().train(**kwargs)
 
     def _loss(self, theta: Tensor, x: Tensor, num_atoms: int) -> Tensor:
-        """
-        Return cross-entropy loss for 1-out-of-`num_atoms` classification.
+        """Return cross-entropy loss for 1-out-of-`num_atoms` classification.
 
         The classifier takes as input `num_atoms` $(\theta,x)$ pairs. Out of these
         pairs, one pair was sampled from the joint $p(\theta,x)$ and all others from the

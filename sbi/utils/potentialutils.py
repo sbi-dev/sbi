@@ -17,7 +17,8 @@ def transformed_potential(
 ) -> Tensor:
     """Return potential after a transformation by adding the log-abs-determinant.
 
-    In addition, this method taken care of moving the parameters to the correct device.
+    In addition, this function takes care of moving the parameters to the correct
+    device.
 
     Args:
         theta:  Parameters $\theta$ in transformed space.

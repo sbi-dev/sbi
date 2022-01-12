@@ -15,7 +15,7 @@ from torch.utils.tensorboard import SummaryWriter
 from sbi import utils as utils
 from sbi.inference import NeuralInference
 from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior
-from sbi.inference.potentials import likelihood_potential
+from sbi.inference.potentials import likelihood_estimator_based_potential
 from sbi.types import TorchModule
 from sbi.utils import check_estimator_arg, validate_theta_and_x, x_shape_from_simulation
 from sbi.utils.sbiutils import mask_sims_from_prior
@@ -84,8 +84,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         x: Tensor,
         from_round: int = 0,
     ) -> "LikelihoodEstimator":
-        r"""
-        Store parameters and simulation outputs to use them for later training.
+        r"""Store parameters and simulation outputs to use them for later training.
 
         Data are stored as entries in lists for each type of variable (parameter/data).
 
@@ -129,8 +128,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
     ) -> nn.Module:
-        r"""
-        Train the density estimator to learn the distribution $p(x|\theta)$.
+        r"""Train the density estimator to learn the distribution $p(x|\theta)$.
 
         Args:
             exclude_invalid_x: Whether to exclude simulation outputs `x=NaN` or `x=±∞`
@@ -264,15 +262,14 @@ class LikelihoodEstimator(NeuralInference, ABC):
 
     def build_posterior(
         self,
-        prior: Optional[Any] = None,
         density_estimator: Optional[TorchModule] = None,
+        prior: Optional[Any] = None,
         sample_with: str = "mcmc",
         mcmc_method: str = "slice_np",
         mcmc_parameters: Dict[str, Any] = {},
         rejection_sampling_parameters: Dict[str, Any] = {},
     ) -> Union[MCMCPosterior, RejectionPosterior]:
-        r"""
-        Build posterior from the neural density estimator.
+        r"""Build posterior from the neural density estimator.
 
         SNLE trains a neural network to approximate the likelihood $p(x|\theta)$. The
         posterior wraps the trained network such that one can directly evaluate the
@@ -280,9 +277,9 @@ class LikelihoodEstimator(NeuralInference, ABC):
         p(\theta)$ and draw samples from the posterior with MCMC or rejection sampling.
 
         Args:
-            prior: Prior distribution.
             density_estimator: The density estimator that the posterior is based on.
                 If `None`, use the latest neural density estimator that was trained.
+            prior: Prior distribution.
             sample_with: Method to use for sampling from the posterior. Must be one of
                 [`mcmc` | `rejection`].
             mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`,
@@ -310,8 +307,8 @@ class LikelihoodEstimator(NeuralInference, ABC):
             # Otherwise, infer it from the device of the net parameters.
             device = next(density_estimator.parameters()).device.type
 
-        potential_fn, theta_transform = likelihood_potential(
-            likelihood_model=self._neural_net, prior=prior, x_o=None
+        potential_fn, theta_transform = likelihood_estimator_based_potential(
+            likelihood_estimator=self._neural_net, prior=prior, x_o=None
         )
 
         if sample_with == "mcmc":

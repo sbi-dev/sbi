@@ -35,8 +35,7 @@ def infer(
     num_simulations: int,
     num_workers: int = 1,
 ) -> NeuralPosterior:
-    r"""
-    Runs simulation-based inference and returns the posterior.
+    r"""Runs simulation-based inference and returns the posterior.
 
     This function provides a simple interface to run sbi. Inference is run for a single
     round and hence the returned posterior $p(\theta|x)$ can be sampled and evaluated
@@ -98,8 +97,7 @@ class NeuralInference(ABC):
         show_progress_bars: bool = True,
         **unused_args,
     ):
-        r"""
-        Base class for inference methods.
+        r"""Base class for inference methods.
 
         Args:
             prior: A probability distribution that expresses prior knowledge about the
@@ -190,8 +188,7 @@ class NeuralInference(ABC):
     def provide_presimulated(
         self, theta: Tensor, x: Tensor, from_round: int = 0
     ) -> None:
-        r"""
-        Deprecated since sbi 0.14.0.
+        r"""Deprecated since sbi 0.14.0.
 
         Instead of using this, please use `.append_simulations()`. Please consult
         release notes to see how you can update your code:
@@ -227,8 +224,7 @@ class NeuralInference(ABC):
         exclude_invalid_x: bool = True,
         warn_on_invalid: bool = True,
     ) -> Tuple[Tensor, Tensor, Tensor]:
-        r"""
-        Returns all $\theta$, $x$, and prior_masks from rounds >= `starting_round`.
+        r"""Returns all $\theta$, $x$, and prior_masks from rounds >= `starting_round`.
 
         If requested, do not return invalid data.
 
@@ -518,8 +514,7 @@ def simulate_for_sbi(
     simulation_batch_size: int = 1,
     show_progress_bar: bool = True,
 ) -> Tuple[Tensor, Tensor]:
-    r"""
-    Returns ($\theta, x$) pairs obtained from sampling the proposal and simulating.
+    r"""Returns ($\theta, x$) pairs obtained from sampling the proposal and simulating.
 
     This function performs two steps:
 
@@ -556,8 +551,8 @@ def simulate_for_sbi(
 
 
 def check_if_proposal_has_default_x(proposal: Any):
-    """
-    Check for validity of the provided proposal distribution.
+    """Check for validity of the provided proposal distribution.
+
     If the proposal is a `NeuralPosterior`, we check if the default_x is set and
     if it matches the `_x_o_training_focused_on`.
     """

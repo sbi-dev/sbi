@@ -14,9 +14,9 @@ from sbi.inference import (
     MCMCPosterior,
     prepare_for_sbi,
     simulate_for_sbi,
-    likelihood_potential,
-    ratio_potential,
-    posterior_potential,
+    likelihood_estimator_based_potential,
+    ratio_estimator_based_potential,
+    posterior_estimator_based_potential,
 )
 
 
@@ -100,17 +100,23 @@ def test_inference_with_2d_x(embedding, method):
     else:
         inference = method(density_estimator=net_provider, show_progress_bars=False)
     theta, x = simulate_for_sbi(simulator, prior, num_simulations)
-    model = inference.append_simulations(theta, x).train(
+    estimator = inference.append_simulations(theta, x).train(
         training_batch_size=100, max_num_epochs=10
     )
     x_o = simulator(theta_o.repeat(num_trials, 1))
 
     if method == SNLE:
-        potential_fn, theta_transform = likelihood_potential(model, prior, x_o)
+        potential_fn, theta_transform = likelihood_estimator_based_potential(
+            estimator, prior, x_o
+        )
     elif method == SNPE:
-        potential_fn, theta_transform = posterior_potential(model, prior, x_o)
+        potential_fn, theta_transform = posterior_estimator_based_potential(
+            estimator, prior, x_o
+        )
     elif method == SNRE:
-        potential_fn, theta_transform = ratio_potential(model, prior, x_o)
+        potential_fn, theta_transform = ratio_estimator_based_potential(
+            estimator, prior, x_o
+        )
     else:
         raise NotImplementedError
 

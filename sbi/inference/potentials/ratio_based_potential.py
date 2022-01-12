@@ -7,25 +7,24 @@ import torch
 import torch.distributions.transforms as torch_tf
 from torch import Tensor, nn
 
+from sbi.inference.potentials.base_potential import BasePotential
 from sbi.utils import mcmc_transform
 from sbi.utils.sbiutils import match_theta_and_x_batch_shapes
 from sbi.utils.torchutils import atleast_2d
-from sbi.inference.potentials.base_potential import BasePotential
 
 
-def ratio_potential(
-    ratio_model: nn.Module,
+def ratio_estimator_based_potential(
+    ratio_estimator: nn.Module,
     prior: Any,
     x_o: Optional[Tensor],
 ) -> Tuple[Callable, torch_tf.Transform]:
-    r"""
-    Returns the potential for ratio-based methods.
+    r"""Returns the potential for ratio-based methods.
 
     It also returns a transformation that can be used to transform the potential into
     unconstrained space.
 
     Args:
-        ratio_model: The neural network modelling likelihood-to-evidence ratio.
+        ratio_estimator: The neural network modelling likelihood-to-evidence ratio.
         prior: The prior distribution.
         x_o: The observed data at which to evaluate the likelihood-to-evidence ratio.
 
@@ -34,29 +33,28 @@ def ratio_potential(
         to unconstrained space.
     """
 
-    device = str(next(ratio_model.parameters()).device)
+    device = str(next(ratio_estimator.parameters()).device)
 
-    potential_fn = RatioPotential(ratio_model, prior, x_o, device=device)
+    potential_fn = RatioBasedPotential(ratio_estimator, prior, x_o, device=device)
     theta_transform = mcmc_transform(prior, device=device)
 
     return potential_fn, theta_transform
 
 
-class RatioPotential(BasePotential):
+class RatioBasedPotential(BasePotential):
     allow_iid_x = True  # type: ignore
 
     def __init__(
         self,
-        ratio_model: nn.Module,
+        ratio_estimator: nn.Module,
         prior: Any,
         x_o: Optional[Tensor],
         device: str = "cpu",
     ):
-        r"""
-        Returns the potential for ratio-based methods.
+        r"""Returns the potential for ratio-based methods.
 
         Args:
-            ratio_model: The neural network modelling likelihood-to-evidence ratio.
+            ratio_estimator: The neural network modelling likelihood-to-evidence ratio.
             prior: The prior distribution.
             x_o: The observed data at which to evaluate the likelihood-to-evidence
                 ratio.
@@ -65,12 +63,11 @@ class RatioPotential(BasePotential):
             The potential function.
         """
         super().__init__(prior, x_o, device)
-        self.ratio_model = ratio_model
-        self.ratio_model.eval()
+        self.ratio_estimator = ratio_estimator
+        self.ratio_estimator.eval()
 
     def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
-        r"""
-        Returns the potential for likelihood-ratio-based methods.
+        r"""Returns the potential for likelihood-ratio-based methods.
 
         Args:
             theta: The parameter set at which to evaluate the potential function.
@@ -84,7 +81,7 @@ class RatioPotential(BasePotential):
         log_likelihood_trial_sum = _log_ratios_over_trials(
             x=self.x_o,
             theta=theta.to(self.device),
-            net=self.ratio_model,
+            net=self.ratio_estimator,
             track_gradients=track_gradients,
         )
 
@@ -96,10 +93,13 @@ def _log_ratios_over_trials(
     x: Tensor, theta: Tensor, net: nn.Module, track_gradients: bool = False
 ) -> Tensor:
     r"""Return log ratios summed over iid trials of `x`.
+
     Note: `x` can be a batch with batch size larger 1. Batches in x are assumed to
     be iid trials, i.e., data generated based on the same paramters / experimental
     conditions.
+
     Repeats `x` and $\theta$ to cover all their combinations of batch entries.
+
     Args:
         x: batch of iid data.
         theta: batch of parameters

@@ -12,7 +12,6 @@ import torch.distributions.transforms as torch_tf
 from pyknos.mdn.mdn import MultivariateGaussianMDN as mdn
 from pyknos.nflows.flows import Flow
 from torch import Tensor, nn
-
 from sbi.types import Shape
 from sbi.utils.torchutils import (
     BoxUniform,
@@ -20,6 +19,7 @@ from sbi.utils.torchutils import (
     atleast_2d_float32_tensor,
     ensure_theta_batched,
 )
+from sbi.utils.user_input_checks import process_x
 
 
 def eval_conditional_density(
@@ -461,17 +461,28 @@ def condition_mog(
     return logits, means, precfs_xx, sumlogdiag
 
 
-def build_conditioned_potential_fn(
-    potential_fn: Callable, condition: Tensor, dims_to_sample: List[int]
-) -> Callable:
-    def conditioned_potential_fn(
-        theta: np.ndarray, track_gradients: bool = False
-    ) -> ScalarFloat:
+class ConditionedPotential:
+    def __init__(
+        self, potential_fn: Callable, condition: Tensor, dims_to_sample: List[int]
+    ):
         r"""
         Return conditional posterior log-probability or $-\infty$ if outside prior.
 
-        The only differences to the `np_potential` is that it tracks the gradients and
-        does not return a `numpy` array.
+        Args:
+            theta: Free parameters $\theta_i$, batch dimension 1.
+
+        Returns:
+            Conditional posterior log-probability $\log(p(\theta_i|\theta_j, x))$,
+            masked outside of prior.
+        """
+        self.potential_fn = potential_fn
+        self.condition = condition
+        self.dims_to_sample = dims_to_sample
+        self.device = self.potential_fn.device
+
+    def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
+        r"""
+        Returns the conditional potential $\log(p(\theta_i|\theta_j, x))$.
 
         Args:
             theta: Free parameters $\theta_i$, batch dimension 1.
@@ -481,13 +492,44 @@ def build_conditioned_potential_fn(
             masked outside of prior.
         """
         theta_ = ensure_theta_batched(torch.as_tensor(theta, dtype=torch.float32))
-        theta_condition = deepcopy(condition)
+
+        # `theta_condition`` will first have all entries of the `condition` and then
+        # override the entries that should be sampled with `theta` (see below).
+        theta_condition = deepcopy(self.condition)
+
+        # In case `theta` is a batch of theta (e.g. multi-chain MCMC), we have to
+        # repeat `theta_condition`` to the same batchsize.
         theta_condition = theta_condition.repeat(theta_.shape[0], 1)
-        theta_condition[:, dims_to_sample] = theta_
+        theta_condition[:, self.dims_to_sample] = theta_
 
-        return potential_fn(theta_condition, track_gradients=track_gradients)
+        return self.potential_fn(theta_condition, track_gradients=track_gradients)
 
-    return conditioned_potential_fn
+    def set_x(self, x_o: Optional[Tensor]):
+        """Check the shape of the observed data and, if valid, set it."""
+        if x_o is not None:
+            x_o = process_x(x_o, allow_iid_x=False).to(self.device)
+        self.potential_fn.set_x(x_o)
+
+    @property
+    def x_o(self) -> Tensor:
+        """Return the observed data at which the potential is evaluated."""
+        if self.potential_fn._x_o is not None:
+            return self.potential_fn._x_o
+        else:
+            raise ValueError("No observed data is available.")
+
+    @x_o.setter
+    def x_o(self, x_o: Optional[Tensor]) -> None:
+        """Check the shape of the observed data and, if valid, set it."""
+        self.set_x(x_o)
+
+    def return_x_o(self) -> Optional[Tensor]:
+        """Return the observed data at which the potential is evaluated.
+
+        Difference to the `x_o` property is that it will not raise an error if
+        `self._x_o` is `None`.
+        """
+        return self.potential_fn._x_o
 
 
 class RestrictedPriorForConditional:
@@ -531,6 +573,12 @@ class RestrictedTransformForConditional(nn.Module):
     Notably, the `log_abs_det` is computed given all dimensions. However, the
     `log_abs_det` stemming from the fixed dimensions is a constant and drops out during
     MCMC.
+
+    All methods work in a similar way:
+    `full_theta`` will first have all entries of the `condition` and then override the
+    entries that should be sampled with `theta`. In case `theta` is a batch of `theta`
+    (e.g. multi-chain MCMC), we have to repeat `theta_condition`` to the match the
+    batchsize.
 
     This is needed for the the MCMC initialization functions when conditioning and
     when transforming the samples back into the original theta space after sampling.
