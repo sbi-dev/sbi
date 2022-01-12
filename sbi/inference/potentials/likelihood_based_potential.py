@@ -10,6 +10,7 @@ from torch import Tensor, nn
 from sbi.utils import mcmc_transform
 from sbi.utils.sbiutils import match_theta_and_x_batch_shapes
 from sbi.utils.torchutils import atleast_2d
+from sbi.inference.potentials.base_potential import BasePotential
 
 
 def likelihood_potential(
@@ -35,42 +36,61 @@ def likelihood_potential(
 
     device = str(next(likelihood_model.parameters()).device)
 
-    potential_fn = _build_potential_fn(likelihood_model, prior, x_o, device=device)
+    potential_fn = LikelihoodPotential(likelihood_model, prior, x_o, device=device)
     theta_transform = mcmc_transform(prior, device=device)
 
     return potential_fn, theta_transform
 
 
-def _build_potential_fn(
-    likelihood_model: nn.Module, prior: Any, x_o: Tensor, device: str
-) -> Callable:
-    r"""
-    Returns the potential function for likelihood-based methods.
+class LikelihoodPotential(BasePotential):
+    allow_iid_x = True  # type: ignore
 
-    Args:
-        likelihood_model: The neural network modelling the likelihood.
-        prior: The prior distribution.
-        x_o: The observed data at which to evaluate the likelihood.
-        device: The device to which parameters and data are moved before evaluating
-            the `likelihood_nn`.
+    def __init__(
+        self,
+        likelihood_model: nn.Module,
+        prior: Any,
+        x_o: Optional[Tensor] = None,
+        device: str = "cpu",
+    ):
+        r"""
+        Returns the potential function for likelihood-based methods.
 
-    Returns:
-        The potential function $p(x_o|\theta)p(\theta)$.
-    """
-    likelihood_model.eval()
+        Args:
+            likelihood_model: The neural network modelling the likelihood.
+            prior: The prior distribution.
+            x_o: The observed data at which to evaluate the likelihood.
+            device: The device to which parameters and data are moved before evaluating
+                the `likelihood_nn`.
 
-    def likelihood_potential(theta: Tensor, track_gradients: bool = True):
+        Returns:
+            The potential function $p(x_o|\theta)p(\theta)$.
+        """
+
+        super().__init__(prior, x_o, device)
+        self.likelihood_model = likelihood_model
+        self.likelihood_model.eval()
+
+    def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
+        r"""
+        Returns the potential $p(x_o|\theta)p(\theta)$ for likelihood-based methods.
+
+        Args:
+            theta: The parameter set at which to evaluate the potential function.
+            track_gradients: Whether to track the gradients.
+
+        Returns:
+            The potential $p(x_o|\theta)p(\theta)$.
+        """
+
         # Calculate likelihood over trials and in one batch.
         log_likelihood_trial_sum = _log_likelihoods_over_trials(
-            x=x_o.to(device),
-            theta=theta.to(device),
-            net=likelihood_model,
+            x=self.x_o,
+            theta=theta.to(self.device),
+            net=self.likelihood_model,
             track_gradients=track_gradients,
         )
 
-        return log_likelihood_trial_sum + prior.log_prob(theta)
-
-    return likelihood_potential
+        return log_likelihood_trial_sum + self.prior.log_prob(theta)
 
 
 def _log_likelihoods_over_trials(

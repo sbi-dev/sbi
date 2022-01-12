@@ -10,6 +10,7 @@ from torch import Tensor, nn
 from sbi.utils import mcmc_transform
 from sbi.utils.sbiutils import match_theta_and_x_batch_shapes
 from sbi.utils.torchutils import atleast_2d
+from sbi.inference.potentials.base_potential import BasePotential
 
 
 def ratio_potential(
@@ -35,39 +36,60 @@ def ratio_potential(
 
     device = str(next(ratio_model.parameters()).device)
 
-    potential_fn = _build_potential_fn(prior, ratio_model, x_o, device=device)
+    potential_fn = RatioPotential(ratio_model, prior, x_o, device=device)
     theta_transform = mcmc_transform(prior, device=device)
 
     return potential_fn, theta_transform
 
 
-def _build_potential_fn(prior, likelihood_nn: nn.Module, x_o: Tensor, device: str):
-    r"""
-    Returns the potential for ratio-based methods.
+class RatioPotential(BasePotential):
+    allow_iid_x = True  # type: ignore
 
-    Args:
-        ratio_model: The neural network modelling likelihood-to-evidence ratio.
-        prior: The prior distribution.
-        x_o: The observed data at which to evaluate the likelihood-to-evidence ratio.
+    def __init__(
+        self,
+        ratio_model: nn.Module,
+        prior: Any,
+        x_o: Optional[Tensor] = None,
+        device: str = "cpu",
+    ):
+        r"""
+        Returns the potential for ratio-based methods.
 
-    Returns:
-        The potential function.
-    """
-    likelihood_nn.eval()
+        Args:
+            ratio_model: The neural network modelling likelihood-to-evidence ratio.
+            prior: The prior distribution.
+            x_o: The observed data at which to evaluate the likelihood-to-evidence
+                ratio.
 
-    def ratio_potential(theta: Tensor, track_gradients: bool = True):
+        Returns:
+            The potential function.
+        """
+        super().__init__(prior, x_o, device)
+        self.ratio_model = ratio_model
+        self.ratio_model.eval()
+
+    def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
+        r"""
+        Returns the potential for likelihood-ratio-based methods.
+
+        Args:
+            theta: The parameter set at which to evaluate the potential function.
+            track_gradients: Whether to track the gradients.
+
+        Returns:
+            The potential.
+        """
+
         # Calculate likelihood over trials and in one batch.
         log_likelihood_trial_sum = _log_ratios_over_trials(
-            x=x_o.to(device),
-            theta=theta.to(device),
-            net=likelihood_nn,
+            x=self.x_o,
+            theta=theta.to(self.device),
+            net=self.ratio_model,
             track_gradients=track_gradients,
         )
 
         # Move to cpu for comparison with prior.
-        return log_likelihood_trial_sum + prior.log_prob(theta)
-
-    return ratio_potential
+        return log_likelihood_trial_sum + self.prior.log_prob(theta)
 
 
 def _log_ratios_over_trials(
