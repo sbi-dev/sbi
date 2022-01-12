@@ -37,6 +37,7 @@ class RejectionPosterior(NeuralPosterior):
         num_iter_to_find_max: int = 100,
         m: float = 1.2,
         device: Optional[str] = None,
+        x_shape: Optional[torch.Size] = None,
     ):
         """
         Args:
@@ -53,11 +54,14 @@ class RejectionPosterior(NeuralPosterior):
             m: Multiplier to the `potential_fn / proposal` ratio.
             device: Training device, e.g., "cpu", "cuda" or "cuda:0". If None,
                 `potential_fn.device` is used.
+            x_shape: Shape of a single simulator output. If passed, it is used to check
+                the shape of the observed data and give a descriptive error.
         """
         super().__init__(
             potential_fn,
             theta_transform=theta_transform,
             device=device,
+            x_shape=x_shape,
         )
 
         self.proposal = proposal
