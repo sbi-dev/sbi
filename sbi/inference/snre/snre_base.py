@@ -294,7 +294,6 @@ class RatioEstimator(NeuralInference, ABC):
     def build_posterior(
         self,
         prior: Any,
-        x_o: Tensor,
         density_estimator: Optional[TorchModule] = None,
         sample_with: str = "mcmc",
         mcmc_method: str = "slice_np",
@@ -313,6 +312,7 @@ class RatioEstimator(NeuralInference, ABC):
         still requires MCMC (or rejection sampling).
 
         Args:
+            prior: Prior distribution.
             density_estimator: The density estimator that the posterior is based on.
                 If `None`, use the latest neural density estimator that was trained.
             sample_with: Method to use for sampling from the posterior. Must be one of
@@ -328,6 +328,11 @@ class RatioEstimator(NeuralInference, ABC):
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods
             (the returned log-probability is unnormalized).
         """
+        if prior is None:
+            assert (
+                self._prior is not None
+            ), "You did not pass a prior. You have to pass the prior either at initialization `inference = SNRE(prior)` or to `.build_posterior(prior=prior)`."
+            prior = self._prior
 
         if density_estimator is None:
             density_estimator = self._neural_net
@@ -337,10 +342,8 @@ class RatioEstimator(NeuralInference, ABC):
             # Otherwise, infer it from the device of the net parameters.
             device = next(density_estimator.parameters()).device.type
 
-        x_o = process_x(x_o, self._x_shape, allow_iid_x=True).to(device)
-
         potential_fn, theta_transform = ratio_potential(
-            ratio_model=self._neural_net, prior=prior, x_o=x_o
+            ratio_model=self._neural_net, prior=prior, x_o=None
         )
 
         if sample_with == "mcmc":

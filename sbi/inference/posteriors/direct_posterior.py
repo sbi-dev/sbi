@@ -44,9 +44,8 @@ class DirectPosterior(NeuralPosterior):
         self,
         prior: Callable,
         posterior_model: nn.Module,
-        x_o: Tensor,
         max_sampling_batch_size: int = 10_000,
-        device: str = "cpu",
+        device: Optional[str] = None,
     ):
         """
         Args:
@@ -55,12 +54,15 @@ class DirectPosterior(NeuralPosterior):
             x_o: Tensor at which to evaluate the `posterior_model`.
             max_sampling_batch_size: Batchsize of samples being drawn from
                 the proposal at every iteration.
-            device: Training device, e.g., "cpu", "cuda" or "cuda:0".
+            device: Training device, e.g., "cpu", "cuda" or "cuda:0". If None,
+                `potential_fn.device` is used.
         """
         # Because `DirectPosterior` does not take the `potential_fn` as input, it
         # builds it itself. The `potential_fn` and `theta_transform` are used only for
         # obtaining the MAP.
-        potential_fn, theta_transform = posterior_potential(posterior_model, prior, x_o)
+        potential_fn, theta_transform = posterior_potential(
+            posterior_model, prior, None
+        )
 
         super().__init__(
             potential_fn=potential_fn, theta_transform=theta_transform, device=device
@@ -68,11 +70,6 @@ class DirectPosterior(NeuralPosterior):
 
         self.prior = prior
         self.posterior_model = posterior_model
-
-        # once we move to pyroflows, we might get rid of this x_o and force that
-        # posterior_nn has a default x_o
-        self.x_o = atleast_2d_float32_tensor(x_o).to(device)
-        check_for_possibly_batched_x_shape(self.x_o.shape)
 
         self.max_sampling_batch_size = max_sampling_batch_size
         self._leakage_density_correction_factor = None
@@ -82,6 +79,7 @@ class DirectPosterior(NeuralPosterior):
     def sample(
         self,
         sample_shape: Shape = torch.Size(),
+        x: Optional[Tensor] = None,
         show_progress_bars: bool = True,
     ):
         r"""
@@ -95,11 +93,12 @@ class DirectPosterior(NeuralPosterior):
         """
 
         num_samples = torch.Size(sample_shape).numel()
+        x = self._x_else_default_x(x)
 
         samples = rejection_sample_posterior_within_prior(
             posterior_nn=self.posterior_model,
             prior=self.prior,
-            x=self.x_o,
+            x=x,
             num_samples=num_samples,
             show_progress_bars=show_progress_bars,
             max_sampling_batch_size=self.max_sampling_batch_size,
@@ -109,6 +108,7 @@ class DirectPosterior(NeuralPosterior):
     def log_prob(
         self,
         theta: Tensor,
+        x: Optional[Tensor] = None,
         norm_posterior: bool = True,
         track_gradients: bool = False,
         leakage_correction_params: Optional[dict] = None,
@@ -138,12 +138,13 @@ class DirectPosterior(NeuralPosterior):
             `(len(θ),)`-shaped log posterior probability $\log p(\theta|x)$ for θ in the
             support of the prior, -∞ (corresponding to 0 probability) outside.
         """
+        x = self._x_else_default_x(x)
 
         # TODO Train exited here, entered after sampling?
         self.posterior_model.eval()
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
-        theta_repeated, x_repeated = match_theta_and_x_batch_shapes(theta, self.x_o)
+        theta_repeated, x_repeated = match_theta_and_x_batch_shapes(theta, x)
 
         with torch.set_grad_enabled(track_gradients):
 
@@ -164,7 +165,7 @@ class DirectPosterior(NeuralPosterior):
             if leakage_correction_params is None:
                 leakage_correction_params = dict()  # use defaults
             log_factor = (
-                log(self.leakage_correction(**leakage_correction_params))
+                log(self.leakage_correction(x=x, **leakage_correction_params))
                 if norm_posterior
                 else 0
             )
@@ -174,7 +175,9 @@ class DirectPosterior(NeuralPosterior):
     @torch.no_grad()
     def leakage_correction(
         self,
+        x: Tensor,
         num_rejection_samples: int = 10_000,
+        force_update: bool = False,
         show_progress_bars: bool = False,
         rejection_sampling_batch_size: int = 10_000,
     ) -> Tensor:
@@ -209,15 +212,23 @@ class DirectPosterior(NeuralPosterior):
                 max_sampling_batch_size=rejection_sampling_batch_size,
             )[1]
 
-        if self._leakage_density_correction_factor is None:
-            acceptance = acceptance_at(self.x_o)
-            self._leakage_density_correction_factor = acceptance
-            return acceptance
-        else:
-            return self._leakage_density_correction_factor
+        # Check if the provided x matches the default x (short-circuit on identity).
+        is_new_x = self.default_x is None or (
+            x is not self.default_x and (x != self.default_x).any()
+        )
+
+        not_saved_at_default_x = self._leakage_density_correction_factor is None
+
+        if is_new_x:  # Calculate at x; don't save.
+            return acceptance_at(x)
+        elif not_saved_at_default_x or force_update:  # Calculate at default_x; save.
+            self._leakage_density_correction_factor = acceptance_at(self.default_x)
+
+        return self._leakage_density_correction_factor  # type:ignore
 
     def map(
         self,
+        x: Optional[Tensor] = None,
         num_iter: int = 1_000,
         num_to_optimize: int = 100,
         learning_rate: float = 0.01,
@@ -267,11 +278,14 @@ class DirectPosterior(NeuralPosterior):
         Returns:
             The MAP estimate.
         """
+        self.potential_fn.set_x(self._x_else_default_x(x))
 
         if init_method == "posterior":
             inits = self.sample((num_init_samples,))
         elif init_method == "prior":
             inits = self.prior.sample((num_init_samples,))
+        else:
+            raise ValueError
 
         self.map_ = gradient_ascent(
             potential_fn=self.potential_fn,

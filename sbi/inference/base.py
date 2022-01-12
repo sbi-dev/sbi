@@ -36,10 +36,7 @@ def infer(
     num_workers: int = 1,
 ) -> NeuralPosterior:
     r"""
-    Runs simulation-based inference.
-
-    After running this, you will have to run `inference.build_posterior(prior, x_o)` to
-    obtain the posterior.
+    Runs simulation-based inference and returns the posterior.
 
     This function provides a simple interface to run sbi. Inference is run for a single
     round and hence the returned posterior $p(\theta|x)$ can be sampled and evaluated
@@ -76,7 +73,7 @@ def infer(
 
     simulator, prior = prepare_for_sbi(simulator, prior)
 
-    inference = method_fun()
+    inference = method_fun(prior=prior)
     theta, x = simulate_for_sbi(
         simulator=simulator,
         proposal=prior,
@@ -84,8 +81,9 @@ def infer(
         num_workers=num_workers,
     )
     _ = inference.append_simulations(theta, x).train()
+    posterior = inference.build_posterior()
 
-    return inference
+    return posterior
 
 
 class NeuralInference(ABC):
@@ -93,6 +91,7 @@ class NeuralInference(ABC):
 
     def __init__(
         self,
+        prior: Optional[Any] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
@@ -120,6 +119,7 @@ class NeuralInference(ABC):
                 0.14.0 is more mature, we will remove this argument.
         """
 
+        self._prior = prior
         self._device = process_device(device)
 
         if unused_args:
@@ -553,3 +553,18 @@ def simulate_for_sbi(
     )
 
     return theta, x
+
+
+def check_if_proposal_has_default_x(proposal: Any):
+    """
+    Check for validity of the provided proposal distribution.
+    If the proposal is a `NeuralPosterior`, we check if the default_x is set and
+    if it matches the `_x_o_training_focused_on`.
+    """
+    if isinstance(proposal, NeuralPosterior):
+        if proposal.default_x is None:
+            raise ValueError(
+                "`proposal.default_x` is None, i.e. there is no "
+                "x_o for training. Set it with "
+                "`posterior.set_default_x(x_o)`."
+            )

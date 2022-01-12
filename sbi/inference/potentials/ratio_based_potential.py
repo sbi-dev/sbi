@@ -16,7 +16,7 @@ from sbi.inference.potentials.base_potential import BasePotential
 def ratio_potential(
     ratio_model: nn.Module,
     prior: Any,
-    x_o: Tensor,
+    x_o: Optional[Tensor],
 ) -> Tuple[Callable, torch_tf.Transform]:
     r"""
     Returns the potential for ratio-based methods.
@@ -49,7 +49,7 @@ class RatioPotential(BasePotential):
         self,
         ratio_model: nn.Module,
         prior: Any,
-        x_o: Optional[Tensor] = None,
+        x_o: Optional[Tensor],
         device: str = "cpu",
     ):
         r"""

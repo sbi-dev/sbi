@@ -36,7 +36,7 @@ class RejectionPosterior(NeuralPosterior):
         num_samples_to_find_max: int = 10_000,
         num_iter_to_find_max: int = 100,
         m: float = 1.2,
-        device: str = "cpu",
+        device: Optional[str] = None,
     ):
         """
         Args:
@@ -51,7 +51,8 @@ class RejectionPosterior(NeuralPosterior):
             num_iter_to_find_max: The number of gradient ascent iterations to find the
                 maximum of the `potential_fn / proposal` ratio.
             m: Multiplier to the `potential_fn / proposal` ratio.
-            device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
+            device: Training device, e.g., "cpu", "cuda" or "cuda:0". If None,
+                `potential_fn.device` is used.
         """
         super().__init__(
             potential_fn,
@@ -74,6 +75,7 @@ class RejectionPosterior(NeuralPosterior):
     def sample(
         self,
         sample_shape: Shape = torch.Size(),
+        x: Optional[Tensor] = None,
         show_progress_bars: bool = True,
     ):
         r"""
@@ -89,6 +91,7 @@ class RejectionPosterior(NeuralPosterior):
             Samples from posterior.
         """
         num_samples = torch.Size(sample_shape).numel()
+        self.potential_fn.set_x(self._x_else_default_x(x))
 
         potential = partial(self.potential_fn, track_gradients=True)
 
@@ -109,6 +112,7 @@ class RejectionPosterior(NeuralPosterior):
 
     def map(
         self,
+        x: Optional[Tensor] = None,
         num_iter: int = 1_000,
         num_to_optimize: int = 100,
         learning_rate: float = 0.01,
@@ -155,6 +159,7 @@ class RejectionPosterior(NeuralPosterior):
         """
 
         inits = self.proposal.sample((num_init_samples,))
+        self.potential_fn.set_x(self._x_else_default_x(x))
 
         self.map_ = gradient_ascent(
             potential_fn=self.potential_fn,

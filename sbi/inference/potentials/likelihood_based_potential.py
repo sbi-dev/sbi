@@ -16,7 +16,7 @@ from sbi.inference.potentials.base_potential import BasePotential
 def likelihood_potential(
     likelihood_model: nn.Module,
     prior: Any,
-    x_o: Tensor,
+    x_o: Optional[Tensor],
 ) -> Tuple[Callable, torch_tf.Transform]:
     r"""
     Returns the potential $p(x_o|\theta)p(\theta)$ for likelihood-based methods.
@@ -49,7 +49,7 @@ class LikelihoodPotential(BasePotential):
         self,
         likelihood_model: nn.Module,
         prior: Any,
-        x_o: Optional[Tensor] = None,
+        x_o: Optional[Tensor],
         device: str = "cpu",
     ):
         r"""

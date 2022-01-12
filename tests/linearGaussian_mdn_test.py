@@ -61,7 +61,7 @@ def mdn_inference_with_different_methods(method, set_seed):
     theta, x = simulate_for_sbi(simulator, prior, num_simulations)
     model = inference.append_simulations(theta, x).train()
     if method == SNPE:
-        posterior = DirectPosterior(posterior_model=model, prior=prior, x_o=x_o)
+        posterior = DirectPosterior(posterior_model=model, prior=prior)
     else:
         potential_fn, theta_transform = likelihood_potential(
             likelihood_model=model, prior=prior, x_o=x_o
@@ -70,7 +70,7 @@ def mdn_inference_with_different_methods(method, set_seed):
             potential_fn=potential_fn, theta_transform=theta_transform, prior=prior
         )
 
-    samples = posterior.sample((num_samples,))
+    samples = posterior.sample((num_samples,), x=x_o)
 
     # Compute the c2st and assert it is near chance level of 0.5.
     check_c2st(samples, target_samples, alg=f"{method}")
@@ -102,8 +102,8 @@ def test_mdn_with_1D_uniform_prior():
 
     theta, x = simulate_for_sbi(simulator, prior, 100)
     posterior_model = inference.append_simulations(theta, x).train()
-    posterior = DirectPosterior(posterior_model=posterior_model, prior=prior, x_o=x_o)
-    samples = posterior.sample((num_samples,))
-    log_probs = posterior.log_prob(samples)
+    posterior = DirectPosterior(posterior_model=posterior_model, prior=prior)
+    samples = posterior.sample((num_samples,), x=x_o)
+    log_probs = posterior.log_prob(samples, x=x_o)
 
     assert log_probs.shape == torch.Size([num_samples])

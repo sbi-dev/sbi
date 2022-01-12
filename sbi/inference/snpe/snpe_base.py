@@ -13,7 +13,7 @@ from torch.utils import data
 from torch.utils.tensorboard import SummaryWriter
 
 from sbi import utils as utils
-from sbi.inference import NeuralInference
+from sbi.inference import NeuralInference, check_if_proposal_has_default_x
 from sbi.inference.posteriors import DirectPosterior, MCMCPosterior, RejectionPosterior
 from sbi.inference.potentials import posterior_potential
 from sbi.types import TorchModule
@@ -65,8 +65,6 @@ class PosteriorEstimator(NeuralInference, ABC):
             show_progress_bars=show_progress_bars,
             **unused_args,
         )
-
-        self._prior = prior
 
         # As detailed in the docstring, `density_estimator` is either a string or
         # a callable. The function creating the neural network is attached to
@@ -361,14 +359,13 @@ class PosteriorEstimator(NeuralInference, ABC):
 
     def build_posterior(
         self,
-        prior: Any,
-        x_o: Tensor,
+        prior: Optional[Any] = None,
         density_estimator: Optional[TorchModule] = None,
         sample_with: str = "rejection",
         mcmc_method: str = "slice_np",
         mcmc_parameters: Dict[str, Any] = {},
         rejection_sampling_parameters: Dict[str, Any] = {},
-    ) -> Union[MCMCPosterior, RejectionPosterior]:
+    ) -> Union[MCMCPosterior, RejectionPosterior, DirectPosterior]:
         r"""
         Build posterior from the neural density estimator.
 
@@ -381,8 +378,7 @@ class PosteriorEstimator(NeuralInference, ABC):
             SNPE), sample from the posterior with MCMC.
 
         Args:
-            prior:
-            x_o:
+            prior: Prior distribution.
             density_estimator: The density estimator that the posterior is based on.
                 If `None`, use the latest neural density estimator that was trained.
             sample_with: Method to use for sampling from the posterior. Must be one of
@@ -401,6 +397,11 @@ class PosteriorEstimator(NeuralInference, ABC):
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods
             (the returned log-probability is unnormalized).
         """
+        if prior is None:
+            assert (
+                self._prior is not None
+            ), "You did not pass a prior. You have to pass the prior either at initialization `inference = SNPE(prior)` or to `.build_posterior(prior=prior)`."
+            prior = self._prior
 
         if density_estimator is None:
             density_estimator = self._neural_net
@@ -410,10 +411,8 @@ class PosteriorEstimator(NeuralInference, ABC):
             # Otherwise, infer it from the device of the net parameters.
             device = next(density_estimator.parameters()).device.type
 
-        x_o = process_x(x_o, self._x_shape, allow_iid_x=False).to(device)
-
         potential_fn, theta_transform = posterior_potential(
-            posterior_model=self._neural_net, prior=prior, x_o=x_o
+            posterior_model=self._neural_net, prior=prior, x_o=None
         )
 
         if sample_with == "rejection":
@@ -428,7 +427,6 @@ class PosteriorEstimator(NeuralInference, ABC):
                 self._posterior = DirectPosterior(
                     posterior_model=self._neural_net,
                     prior=prior,
-                    x_o=x_o,
                     device=device,
                 )
         elif sample_with == "mcmc":
@@ -493,6 +491,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         the user simply passed the prior, but this would still trigger atomic loss.
         """
         if proposal is not None:
+            check_if_proposal_has_default_x(proposal)
 
             if isinstance(proposal, RestrictedPrior):
                 if proposal._prior is not self._prior:

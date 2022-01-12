@@ -394,7 +394,7 @@ class SNPE_C(PosteriorEstimator):
         # Evaluate the proposal. MDNs do not have functionality to run the embedding_net
         # and then get the mixture_components (**without** calling log_prob()). Hence,
         # we call them separately here.
-        encoded_x = proposal.posterior_model._embedding_net(proposal.x_o)
+        encoded_x = proposal.posterior_model._embedding_net(proposal.default_x)
         dist = (
             proposal.posterior_model._distribution
         )  # defined to avoid ugly black formatting.
