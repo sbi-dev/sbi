@@ -16,7 +16,7 @@ from sbi.inference.potentials.base_potential import BasePotential
 def posterior_potential(
     posterior_model: nn.Module,
     prior: Any,
-    x_o: Tensor,
+    x_o: Optional[Tensor],
 ) -> Tuple[Callable, torch_tf.Transform]:
     r"""
     Returns the potential for posterior-based methods.
@@ -52,7 +52,7 @@ class PosteriorPotential(BasePotential):
         self,
         posterior_model: nn.Module,
         prior: Any,
-        x_o: Optional[Tensor] = None,
+        x_o: Optional[Tensor],
         device: str = "cpu",
     ):
         r"""

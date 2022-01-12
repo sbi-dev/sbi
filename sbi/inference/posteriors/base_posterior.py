@@ -38,17 +38,21 @@ class NeuralPosterior(ABC):
         self,
         potential_fn: Callable,
         theta_transform: Optional[TorchTransform] = None,
-        device: str = "cpu",
+        device: Optional[str] = None,
     ):
         """
         Args:
             potential_fn: The potential function from which to draw samples.
             theta_transform: Transformation that will be applied during sampling.
                 Allows to perform, e.g. MCMC in unconstrained space.
-            device: Training device, e.g., "cpu", "cuda" or "cuda:0".
+            device: Training device, e.g., "cpu", "cuda" or "cuda:0". If None,
+                `potential_fn.device` is used.
         """
+        if device is None:
+            device = potential_fn.device
+
         # Ensure device string.
-        device = process_device(device)
+        self._device = process_device(device)
 
         self.potential_fn = potential_fn
 
@@ -59,10 +63,16 @@ class NeuralPosterior(ABC):
         else:
             self.theta_transform = theta_transform
 
-        self._device = device
         self._purpose = ""
 
-    def potential(self, theta: Tensor, track_gradients: bool = False) -> Tensor:
+        # If the sampler interface (#573) is used, the user might have passed `x_o`
+        # already to the potential function builder. If so, this `x_o` will be used
+        # as default x.
+        self._x = self.potential_fn._x_o
+
+    def potential(
+        self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False
+    ) -> Tensor:
         r"""
         Evaluates $\theta$ under the potential that is used to sample the posterior.
 
@@ -75,12 +85,16 @@ class NeuralPosterior(ABC):
                 This can be helpful for e.g. sensitivity analysis, but increases memory
                 consumption.
         """
+        self.potential_fn.set_x(self._x_else_default_x(x))
+
         theta = ensure_theta_batched(torch.as_tensor(theta))
         return self.potential_fn(
             theta.to(self._device), track_gradients=track_gradients
         )
 
-    def log_prob(self, theta: Tensor, track_gradients: bool = False) -> Tensor:
+    def log_prob(
+        self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False
+    ) -> Tensor:
         r"""
         Returns the log-probability of theta under the posterior.
 
@@ -97,6 +111,9 @@ class NeuralPosterior(ABC):
             "`.log_prob()` is deprecated for methods that can only evaluate the log-probability up to a normalizing constant. Use `.potential()` instead."
         )
         warn("The log-probability is unnormalized!")
+
+        self.potential_fn.set_x(self._x_else_default_x(x))
+
         theta = ensure_theta_batched(torch.as_tensor(theta))
         return self.potential_fn(
             theta.to(self._device), track_gradients=track_gradients
@@ -114,8 +131,63 @@ class NeuralPosterior(ABC):
         """See child classes for docstring."""
         pass
 
+    @property
+    def default_x(self) -> Optional[Tensor]:
+        """Return default x used by `.sample(), .log_prob` as conditioning context."""
+        return self._x
+
+    @default_x.setter
+    def default_x(self, x: Tensor) -> None:
+        """See `set_default_x`."""
+        self.set_default_x(x)
+
+    def set_default_x(self, x: Tensor) -> "NeuralPosterior":
+        """Set new default x for `.sample(), .log_prob` to use as conditioning context.
+        This is a pure convenience to avoid having to repeatedly specify `x` in calls to
+        `.sample()` and `.log_prob()` - only θ needs to be passed.
+        This convenience is particularly useful when the posterior is focused, i.e.
+        has been trained over multiple rounds to be accurate in the vicinity of a
+        particular `x=x_o` (you can check if your posterior object is focused by
+        printing it).
+        NOTE: this method is chainable, i.e. will return the NeuralPosterior object so
+        that calls like `posterior.set_default_x(my_x).sample(mytheta)` are possible.
+        Args:
+            x: The default observation to set for the posterior $p(theta|x)$.
+        Returns:
+            `NeuralPosterior` that will use a default `x` when not explicitly passed.
+        """
+        self._x = process_x(x, allow_iid_x=self.potential_fn.allow_iid_x).to(
+            self._device
+        )
+        return self
+
+    def _x_else_default_x(self, x: Optional[Array]) -> Tensor:
+        if x is not None:
+            return process_x(x, allow_iid_x=self.potential_fn.allow_iid_x)
+        elif self.default_x is None:
+            raise ValueError(
+                "Context `x` needed when a default has not been set."
+                "If you'd like to have a default, use the `.set_default_x()` method."
+            )
+        else:
+            return self.default_x
+
+    @abstractmethod
+    def map(
+        self,
+        x: Optional[Tensor] = None,
+        num_iter: int = 1_000,
+        num_to_optimize: int = 100,
+        learning_rate: float = 0.01,
+        init_method: Union[str, Tensor] = "posterior",
+        num_init_samples: int = 1_000,
+        save_best_every: int = 10,
+        show_progress_bars: bool = False,
+    ) -> Tensor:
+        raise NotImplementedError
+
     def __repr__(self):
-        desc = f"""{self.__class__.__name__} sampler for potential_fn=<{self.potential_fn.__name__}>"""
+        desc = f"""{self.__class__.__name__} sampler for potential_fn=<{self.potential_fn.__class__.__name__}>"""
         return desc
 
     def __str__(self):

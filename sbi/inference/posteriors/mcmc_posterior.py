@@ -56,7 +56,7 @@ class MCMCPosterior(NeuralPosterior):
         num_chains: int = 1,
         init_strategy: str = "prior",
         init_strategy_num_candidates: int = 1_000,
-        device: str = "cpu",
+        device: Optional[str] = None,
     ):
         """
         Args:
@@ -77,7 +77,8 @@ class MCMCPosterior(NeuralPosterior):
                 Importance-Resampling
             init_strategy_num_candidates: Number of candidates to to find init
                 locations in `init_strategy=sir`.
-            device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
+            device: Training device, e.g., "cpu", "cuda" or "cuda:0". If None,
+                `potential_fn.device` is used.
         """
 
         super().__init__(
@@ -110,7 +111,7 @@ class MCMCPosterior(NeuralPosterior):
             transformed_potential,
             potential_fn=potential_fn,
             theta_transform=self.theta_transform,
-            device=device,
+            device=self._device,
             track_gradients=track_gradients,
         )
         if pyro:
@@ -146,6 +147,7 @@ class MCMCPosterior(NeuralPosterior):
     def sample(
         self,
         sample_shape: Shape = torch.Size(),
+        x: Optional[Tensor] = None,
         show_progress_bars: bool = True,
     ) -> Tensor:
         r"""
@@ -160,6 +162,7 @@ class MCMCPosterior(NeuralPosterior):
         Returns:
             Samples from posterior.
         """
+        self.potential_fn.set_x(self._x_else_default_x(x))
 
         init_fn = self._build_mcmc_init_fn(
             self.prior, self.potential_fn, transform=self.theta_transform
@@ -348,6 +351,7 @@ class MCMCPosterior(NeuralPosterior):
 
     def map(
         self,
+        x: Optional[Tensor] = None,
         num_iter: int = 1_000,
         num_to_optimize: int = 100,
         learning_rate: float = 0.01,
@@ -397,11 +401,14 @@ class MCMCPosterior(NeuralPosterior):
         Returns:
             The MAP estimate.
         """
+        self.potential_fn.set_x(self._x_else_default_x(x))
 
         if init_method == "posterior":
             inits = self.sample((num_init_samples,))
         elif init_method == "prior":
             inits = self.prior.sample((num_init_samples,))
+        else:
+            raise ValueError
 
         self.map_ = gradient_ascent(
             potential_fn=self.potential_fn,

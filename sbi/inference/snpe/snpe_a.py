@@ -284,8 +284,7 @@ class SNPE_A(PosteriorEstimator):
 
     def build_posterior(
         self,
-        prior: Any,
-        x_o: Tensor,
+        prior: Optional[Any] = None,
         density_estimator: Optional[TorchModule] = None,
     ) -> "DirectPosterior":
         r"""
@@ -317,13 +316,18 @@ class SNPE_A(PosteriorEstimator):
         Returns:
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods.
         """
+        if prior is None:
+            assert (
+                self._prior is not None
+            ), "You did not pass a prior. You have to pass the prior either at initialization `inference = SNPE_A(prior)` or to `.build_posterior(prior=prior)`."
+            prior = self._prior
+
         wrapped_density_estimator = self.correct_density(
             density_estimator=density_estimator
         )
         self._posterior = DirectPosterior(
             posterior_model=wrapped_density_estimator,
             prior=prior,
-            x_o=x_o,
         )
         return deepcopy(self._posterior)
 

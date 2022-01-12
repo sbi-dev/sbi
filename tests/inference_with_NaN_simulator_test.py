@@ -100,15 +100,15 @@ def test_inference_with_nan_simulator(
     )
 
     simulator, prior = prepare_for_sbi(linear_gaussian_nan, prior)
-    inference = method()
+    inference = method(prior=prior)
 
     theta, x = simulate_for_sbi(simulator, prior, num_simulations)
     _ = inference.append_simulations(theta, x).train(
         exclude_invalid_x=exclude_invalid_x
     )
-    posterior = inference.build_posterior(prior=prior, x_o=x_o)
+    posterior = inference.build_posterior()
 
-    samples = posterior.sample((num_samples,))
+    samples = posterior.sample((num_samples,), x=x_o)
 
     # Compute the c2st and assert it is near chance level of 0.5.
     check_c2st(samples, target_samples, alg=f"{method}")
