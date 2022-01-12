@@ -46,6 +46,7 @@ class DirectPosterior(NeuralPosterior):
         posterior_model: nn.Module,
         max_sampling_batch_size: int = 10_000,
         device: Optional[str] = None,
+        x_shape: Optional[torch.Size] = None,
     ):
         """
         Args:
@@ -56,6 +57,8 @@ class DirectPosterior(NeuralPosterior):
                 the proposal at every iteration.
             device: Training device, e.g., "cpu", "cuda" or "cuda:0". If None,
                 `potential_fn.device` is used.
+            x_shape: Shape of a single simulator output. If passed, it is used to check
+                the shape of the observed data and give a descriptive error.
         """
         # Because `DirectPosterior` does not take the `potential_fn` as input, it
         # builds it itself. The `potential_fn` and `theta_transform` are used only for
@@ -65,7 +68,10 @@ class DirectPosterior(NeuralPosterior):
         )
 
         super().__init__(
-            potential_fn=potential_fn, theta_transform=theta_transform, device=device
+            potential_fn=potential_fn,
+            theta_transform=theta_transform,
+            device=device,
+            x_shape=x_shape,
         )
 
         self.prior = prior

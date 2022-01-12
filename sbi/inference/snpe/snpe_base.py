@@ -421,12 +421,14 @@ class PosteriorEstimator(NeuralInference, ABC):
                     potential_fn=potential_fn,
                     proposal=prior,
                     device=device,
+                    x_shape=self._x_shape,
                     **rejection_sampling_parameters,
                 )
             else:
                 self._posterior = DirectPosterior(
                     posterior_model=self._neural_net,
                     prior=prior,
+                    x_shape=self._x_shape,
                     device=device,
                 )
         elif sample_with == "mcmc":
@@ -436,6 +438,7 @@ class PosteriorEstimator(NeuralInference, ABC):
                 prior=prior,
                 method=mcmc_method,
                 device=device,
+                x_shape=self._x_shape,
                 **mcmc_parameters,
             )
         elif sample_with == "vi":

@@ -454,8 +454,12 @@ def get_batch_loop_simulator(simulator: Callable) -> Callable:
     return batch_loop_simulator
 
 
-def process_x(x: Tensor, allow_iid_x: bool = False) -> Tensor:
+def process_x(
+    x: Tensor, x_shape: Optional[torch.Size] = None, allow_iid_x: bool = False
+) -> Tensor:
     """Return observed data adapted to match sbi's shape and type requirements.
+
+    If `x_shape` is `None`, the shape is not checked.
 
     Args:
         x: Observed data as provided by the user.
@@ -472,28 +476,19 @@ def process_x(x: Tensor, allow_iid_x: bool = False) -> Tensor:
     input_x_shape = x.shape
     if not allow_iid_x:
         check_for_possibly_batched_x_shape(input_x_shape)
+        start_idx = 0
     else:
         warn_on_iid_x(num_trials=input_x_shape[0])
+        start_idx = 1
 
+    if x_shape is not None:
+        # Number of trials can change for every new x, but single trial x shape must
+        # match.
+        assert input_x_shape[start_idx:] == x_shape[start_idx:], (
+            f"Observed data shape ({input_x_shape[start_idx:]}) must match "
+            f"the shape of simulated data x ({x_shape[start_idx:]})."
+        )
     return x
-
-
-def assert_correct_x_shape(x: Tensor, x_shape: torch.Size) -> None:
-    """
-    Asserts that `x` matches `x_shape`.
-
-    Args:
-        x: Observed data as provided by the user.
-        x_shape: Prescribed shape - either directly provided by the user at init or
-            inferred by sbi by running a simulation and checking the output.
-    """
-    input_x_shape = x.shape
-
-    # Number of trials can change for every new x, but single trial x shape must match.
-    assert input_x_shape[1:] == x_shape[1:], (
-        f"Observed data shape ({input_x_shape[1:]}) must match "
-        f"the shape of simulated data x ({x_shape[1:]})."
-    )
 
 
 def prepare_for_sbi(simulator: Callable, prior) -> Tuple[Callable, Distribution]:

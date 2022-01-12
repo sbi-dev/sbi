@@ -39,6 +39,7 @@ class NeuralPosterior(ABC):
         potential_fn: Callable,
         theta_transform: Optional[TorchTransform] = None,
         device: Optional[str] = None,
+        x_shape: Optional[torch.Size] = None,
     ):
         """
         Args:
@@ -64,6 +65,7 @@ class NeuralPosterior(ABC):
             self.theta_transform = theta_transform
 
         self._purpose = ""
+        self._x_shape = x_shape
 
         # If the sampler interface (#573) is used, the user might have passed `x_o`
         # already to the potential function builder. If so, this `x_o` will be used
@@ -156,14 +158,16 @@ class NeuralPosterior(ABC):
         Returns:
             `NeuralPosterior` that will use a default `x` when not explicitly passed.
         """
-        self._x = process_x(x, allow_iid_x=self.potential_fn.allow_iid_x).to(
-            self._device
-        )
+        self._x = process_x(
+            x, x_shape=self._x_shape, allow_iid_x=self.potential_fn.allow_iid_x
+        ).to(self._device)
         return self
 
     def _x_else_default_x(self, x: Optional[Array]) -> Tensor:
         if x is not None:
-            return process_x(x, allow_iid_x=self.potential_fn.allow_iid_x)
+            return process_x(
+                x, x_shape=self._x_shape, allow_iid_x=self.potential_fn.allow_iid_x
+            )
         elif self.default_x is None:
             raise ValueError(
                 "Context `x` needed when a default has not been set."
