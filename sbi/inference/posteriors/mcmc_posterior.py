@@ -99,27 +99,7 @@ class MCMCPosterior(NeuralPosterior):
         self.init_strategy = init_strategy
         self.init_strategy_num_candidates = init_strategy_num_candidates
 
-        if method == "slice":
-            track_gradients = False
-            pyro = True
-        elif method in ("hmc", "nuts"):
-            track_gradients = True
-            pyro = True
-        elif "slice_np" in method:
-            track_gradients = False
-            pyro = False
-        else:
-            raise NotImplementedError
-
-        self.potential_ = partial(
-            transformed_potential,
-            potential_fn=potential_fn,
-            theta_transform=self.theta_transform,
-            device=self._device,
-            track_gradients=track_gradients,
-        )
-        if pyro:
-            self.potential_ = partial(pyro_potential_wrapper, potential=self.potential_)
+        self.potential_ = self._prepare_potential(method)
 
         self._purpose = (
             "It provides MCMC to .sample() from the posterior and "
@@ -148,19 +128,62 @@ class MCMCPosterior(NeuralPosterior):
         self._mcmc_method = method
         return self
 
+    def log_prob(
+        self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False
+    ) -> Tensor:
+        r"""Returns the log-probability of theta under the posterior.
+
+        Args:
+            theta: Parameters $\theta$.
+            track_gradients: Whether the returned tensor supports tracking gradients.
+                This can be helpful for e.g. sensitivity analysis, but increases memory
+                consumption.
+
+        Returns:
+            `len($\theta$)`-shaped log-probability.
+        """
+        warn(
+            "`.log_prob()` is deprecated for methods that can only evaluate the log-probability up to a normalizing constant. Use `.potential()` instead."
+        )
+        warn("The log-probability is unnormalized!")
+
+        self.potential_fn.set_x(self._x_else_default_x(x))
+
+        theta = ensure_theta_batched(torch.as_tensor(theta))
+        return self.potential_fn(
+            theta.to(self._device), track_gradients=track_gradients
+        )
+
     def sample(
         self,
         sample_shape: Shape = torch.Size(),
         x: Optional[Tensor] = None,
+        method: Optional[str] = None,
+        thin: Optional[int] = None,
+        warmup_steps: Optional[int] = None,
+        num_chains: Optional[int] = None,
+        init_strategy: Optional[str] = None,
+        init_strategy_num_candidates: Optional[int] = None,
+        mcmc_parameters: Dict = {},
+        mcmc_method: Optional[str] = None,
+        sample_with: Optional[str] = None,
         show_progress_bars: bool = True,
     ) -> Tensor:
-        r"""
-        Return samples from posterior distribution $p(\theta|x)$ with MCMC.
+        r"""Return samples from posterior distribution $p(\theta|x)$ with MCMC.
+
+        Check the `__init__()` method for a description of all arguments as well as
+        their default values.
 
         Args:
             sample_shape: Desired shape of samples that are drawn from posterior. If
                 sample_shape is multidimensional we simply draw `sample_shape.numel()`
                 samples and then reshape into the desired shape.
+            mcmc_parameters: Dictionary that is passed only to support the API of
+                `sbi` v0.17.2 or older.
+            mcmc_method: This argument only exists to keep backward-compatibility with
+                `sbi` v0.17.2 or older. Please use `method` instead.
+            sample_with: This argument only exists to keep backward-compatibility with
+                `sbi` v0.17.2 or older. If it is set, we instantly raise an error.
             show_progress_bars: Whether to show sampling progress monitor.
 
         Returns:
@@ -168,34 +191,80 @@ class MCMCPosterior(NeuralPosterior):
         """
         self.potential_fn.set_x(self._x_else_default_x(x))
 
+        # Replace arguments that were not passed with their default.
+        method = self.method if method is None else method
+        thin = self.thin if thin is None else thin
+        warmup_steps = self.warmup_steps if warmup_steps is None else warmup_steps
+        num_chains = self.num_chains if num_chains is None else num_chains
+        init_strategy = self.init_strategy if init_strategy is None else init_strategy
+        init_strategy_num_candidates = (
+            self.init_strategy_num_candidates
+            if init_strategy_num_candidates is None
+            else init_strategy_num_candidates
+        )
+        if sample_with is not None:
+            raise ValueError(
+                f"You set `sample_with={sample_with}`. As of sbi v0.18.0, setting "
+                f"`sample_with` is no longer supported. You have to rerun "
+                f"`.build_posterior(sample_with={sample_with}).`"
+            )
+        if mcmc_method is not None:
+            warn(
+                "You passed `mcmc_method` to `.sample()`. As of sbi v0.18.0, this "
+                "is deprecated and will be removed in a future release. Use `method` "
+                "instead of `mcmc_method`."
+            )
+            method = mcmc_method
+        if mcmc_parameters:
+            warn(
+                "You passed `mcmc_parameters` to `.sample()`. As of sbi v0.18.0, this "
+                "is deprecated and will be removed in a future release. Instead, pass "
+                "the variable to `.sample()` directly, e.g. "
+                "`posterior.sample((1,), num_chains=5)`."
+            )
+        # The following lines are only for backwards compatibility with sbi v0.17.2 or
+        # older.
+        m_p = mcmc_parameters  # define to shorten the variable name
+        method = _maybe_use_dict_entry(method, "mcmc_method", m_p)
+        thin = _maybe_use_dict_entry(thin, "thin", m_p)
+        warmup_steps = _maybe_use_dict_entry(warmup_steps, "warmup_steps", m_p)
+        num_chains = _maybe_use_dict_entry(num_chains, "num_chains", m_p)
+        init_strategy = _maybe_use_dict_entry(init_strategy, "init_strategy", m_p)
+        init_strategy_num_candidates = _maybe_use_dict_entry(
+            init_strategy_num_candidates, "init_strategy_num_candidates", m_p
+        )
+        self.potential_ = self._prepare_potential(method)  # type: ignore
+
         init_fn = self._build_mcmc_init_fn(
             self.prior, self.potential_fn, transform=self.theta_transform
         )
-        initial_params = torch.cat([init_fn() for _ in range(self.num_chains)])
+        initial_params = torch.cat(
+            [init_fn() for _ in range(num_chains)]  # type: ignore
+        )
 
         num_samples = torch.Size(sample_shape).numel()
 
-        track_gradients = self.method in ("hmc", "nuts")
+        track_gradients = method in ("hmc", "nuts")
         with torch.set_grad_enabled(track_gradients):
-            if self.method in ("slice_np", "slice_np_vectorized"):
+            if method in ("slice_np", "slice_np_vectorized"):
                 transformed_samples = self._slice_np_mcmc(
                     num_samples=num_samples,
                     potential_function=self.potential_,
                     initial_params=initial_params,
-                    thin=self.thin,
-                    warmup_steps=self.warmup_steps,
-                    vectorized=(self.method == "slice_np_vectorized"),
+                    thin=thin,  # type: ignore
+                    warmup_steps=warmup_steps,  # type: ignore
+                    vectorized=(method == "slice_np_vectorized"),
                     show_progress_bars=show_progress_bars,
                 )
-            elif self.method in ("hmc", "nuts", "slice"):
+            elif method in ("hmc", "nuts", "slice"):
                 transformed_samples = self._pyro_mcmc(
                     num_samples=num_samples,
                     potential_function=self.potential_,
                     initial_params=initial_params,
-                    mcmc_method=self.method,
-                    thin=self.thin,
-                    warmup_steps=self.warmup_steps,
-                    num_chains=self.num_chains,
+                    mcmc_method=method,  # type: ignore
+                    thin=thin,  # type: ignore
+                    warmup_steps=warmup_steps,  # type: ignore
+                    num_chains=num_chains,
                     show_progress_bars=show_progress_bars,
                 ).detach()
             else:
@@ -212,8 +281,7 @@ class MCMCPosterior(NeuralPosterior):
         init_strategy: str = "prior",
         **kwargs,
     ) -> Callable:
-        """
-        Return function that, when called, creates an initial parameter set for MCMC.
+        """Return function that, when called, creates an initial parameter set for MCMC.
 
         Args:
             prior: Prior distribution.
@@ -246,8 +314,7 @@ class MCMCPosterior(NeuralPosterior):
         vectorized: bool = False,
         show_progress_bars: bool = True,
     ) -> Tensor:
-        """
-        Custom implementation of slice sampling using Numpy.
+        """Custom implementation of slice sampling using Numpy.
 
         Args:
             num_samples: Desired number of samples.
@@ -353,6 +420,41 @@ class MCMCPosterior(NeuralPosterior):
 
         return samples
 
+    def _prepare_potential(self, method: str) -> Callable:
+        """Combines potential and transform and takes care of gradients and pyro.
+
+        Args:
+            method: Which MCMC method to use.
+
+        Returns:
+            A potential function that is ready to be used in MCMC.
+        """
+        if method == "slice":
+            track_gradients = False
+            pyro = True
+        elif method in ("hmc", "nuts"):
+            track_gradients = True
+            pyro = True
+        elif "slice_np" in method:
+            track_gradients = False
+            pyro = False
+        else:
+            raise NotImplementedError
+
+        prepared_potential = partial(
+            transformed_potential,
+            potential_fn=self.potential_fn,
+            theta_transform=self.theta_transform,
+            device=self._device,
+            track_gradients=track_gradients,
+        )
+        if pyro:
+            prepared_potential = partial(
+                pyro_potential_wrapper, potential=prepared_potential
+            )
+
+        return prepared_potential
+
     def map(
         self,
         x: Optional[Tensor] = None,
@@ -364,8 +466,7 @@ class MCMCPosterior(NeuralPosterior):
         save_best_every: int = 10,
         show_progress_bars: bool = False,
     ) -> Tensor:
-        r"""
-        Returns the maximum-a-posteriori estimate (MAP).
+        r"""Returns the maximum-a-posteriori estimate (MAP).
 
         The method can be interrupted (Ctrl-C) when the user sees that the
         log-probability converges. The best estimate will be saved in `self.map_`.
@@ -425,3 +526,21 @@ class MCMCPosterior(NeuralPosterior):
             show_progress_bars=show_progress_bars,
         )[0]
         return self.map_
+
+
+def _maybe_use_dict_entry(default: Any, key: str, dict_to_check: Dict) -> Any:
+    """Returns `default` if `key` is not in the dict and otherwise the dict entry.
+
+    This method exists only to keep backwards compatibility with `sbi` v0.17.2 or
+    older. It allows passing `mcmc_parameters` to `.sample()`.
+
+    Args:
+        default: The default value if `key` is not in `dict_to_check`.
+        key: The key for which to check in `dict_to_check`.
+        dict_to_check: The dictionary to be checked.
+
+    Returns:
+        The potentially replaced value.
+    """
+    attribute = default if key not in dict_to_check.keys() else dict_to_check[key]
+    return attribute

@@ -1,7 +1,8 @@
 from typing import Callable, Dict, Optional, Tuple, Union
+
 import torch
-from torch import Tensor, optim
 import torch.distributions.transforms as torch_tf
+from torch import Tensor, optim
 
 
 def gradient_ascent(
@@ -15,11 +16,10 @@ def gradient_ascent(
     show_progress_bars: bool = False,
     interruption_note: str = "",
 ) -> Tuple[Tensor, Tensor]:
-    """
-    Returns the `argmax` and `max` of a `potential_fn` via gradient ascent.
+    """Returns the `argmax` and `max` of a `potential_fn` via gradient ascent.
 
     The method can be interrupted (Ctrl-C) when the user sees that the potential_fn
-    converges. The best estimate will be returned.
+    converges. The currently best estimate will be returned.
 
     The maximum is obtained by running gradient ascent from given starting parameters.
     After the optimization is done, we select the parameter set that has the highest

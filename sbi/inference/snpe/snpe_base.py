@@ -15,7 +15,7 @@ from torch.utils.tensorboard import SummaryWriter
 from sbi import utils as utils
 from sbi.inference import NeuralInference, check_if_proposal_has_default_x
 from sbi.inference.posteriors import DirectPosterior, MCMCPosterior, RejectionPosterior
-from sbi.inference.potentials import posterior_potential
+from sbi.inference.potentials import posterior_estimator_based_potential
 from sbi.types import TorchModule
 from sbi.utils import (
     RestrictedPrior,
@@ -89,8 +89,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         x: Tensor,
         proposal: Optional[DirectPosterior] = None,
     ) -> "PosteriorEstimator":
-        r"""
-        Store parameters and simulation outputs to use them for later training.
+        r"""Store parameters and simulation outputs to use them for later training.
 
         Data are stored as entries in lists for each type of variable (parameter/data).
 
@@ -110,7 +109,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         """
 
         theta, x = validate_theta_and_x(theta, x, training_device=self._device)
-        # self._check_proposal(proposal)   # XXX do this again once moved to pyroflows
+        self._check_proposal(proposal)
 
         if (
             proposal is None
@@ -169,8 +168,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[dict] = None,
     ) -> nn.Module:
-        r"""
-        Return density estimator that approximates the distribution $p(\theta|x)$.
+        r"""Return density estimator that approximates the distribution $p(\theta|x)$.
 
         Args:
             training_batch_size: Training batch size.
@@ -359,15 +357,14 @@ class PosteriorEstimator(NeuralInference, ABC):
 
     def build_posterior(
         self,
-        prior: Optional[Any] = None,
         density_estimator: Optional[TorchModule] = None,
+        prior: Optional[Any] = None,
         sample_with: str = "rejection",
         mcmc_method: str = "slice_np",
         mcmc_parameters: Dict[str, Any] = {},
         rejection_sampling_parameters: Dict[str, Any] = {},
     ) -> Union[MCMCPosterior, RejectionPosterior, DirectPosterior]:
-        r"""
-        Build posterior from the neural density estimator.
+        r"""Build posterior from the neural density estimator.
 
         For SNPE, the posterior distribution that is returned here implements the
         following functionality over the raw neural density estimator:
@@ -378,9 +375,9 @@ class PosteriorEstimator(NeuralInference, ABC):
             SNPE), sample from the posterior with MCMC.
 
         Args:
-            prior: Prior distribution.
             density_estimator: The density estimator that the posterior is based on.
                 If `None`, use the latest neural density estimator that was trained.
+            prior: Prior distribution.
             sample_with: Method to use for sampling from the posterior. Must be one of
                 [`mcmc` | `rejection`].
             mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`,
@@ -411,22 +408,21 @@ class PosteriorEstimator(NeuralInference, ABC):
             # Otherwise, infer it from the device of the net parameters.
             device = next(density_estimator.parameters()).device.type
 
-        potential_fn, theta_transform = posterior_potential(
-            posterior_model=self._neural_net, prior=prior, x_o=None
+        potential_fn, theta_transform = posterior_estimator_based_potential(
+            posterior_estimator=self._neural_net, prior=prior, x_o=None
         )
 
         if sample_with == "rejection":
             if "proposal" in rejection_sampling_parameters.keys():
                 self._posterior = RejectionPosterior(
                     potential_fn=potential_fn,
-                    proposal=prior,
                     device=device,
                     x_shape=self._x_shape,
                     **rejection_sampling_parameters,
                 )
             else:
                 self._posterior = DirectPosterior(
-                    posterior_model=self._neural_net,
+                    posterior_estimator=self._neural_net,
                     prior=prior,
                     x_shape=self._x_shape,
                     device=device,
@@ -435,7 +431,7 @@ class PosteriorEstimator(NeuralInference, ABC):
             self._posterior = MCMCPosterior(
                 potential_fn=potential_fn,
                 theta_transform=theta_transform,
-                prior=prior,
+                proposal=prior,
                 method=mcmc_method,
                 device=device,
                 x_shape=self._x_shape,

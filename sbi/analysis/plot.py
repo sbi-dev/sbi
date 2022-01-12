@@ -36,8 +36,7 @@ def pairplot(
     axes=None,
     **kwargs
 ):
-    """
-    Plot samples in a 2D grid showing marginals and pairwise marginals.
+    """Plot samples in a 2D grid showing marginals and pairwise marginals.
 
     Each of the diagonal plots can be interpreted as a 1D-marginal of the distribution
     that the samples were drawn from. Each upper-diagonal plot can be interpreted as a
@@ -99,8 +98,7 @@ def conditional_pairplot(
     axes=None,
     **kwargs
 ):
-    r"""
-    Plot conditional distribution given all other parameters.
+    r"""Plot conditional distribution given all other parameters.
 
     The conditionals can be interpreted as slices through the `density` at a location
     given by `condition`.

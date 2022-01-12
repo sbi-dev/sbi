@@ -2,13 +2,13 @@ from abc import ABCMeta, abstractmethod
 from typing import Any, Optional
 
 from torch import Tensor
+
 from sbi.utils.user_input_checks import process_x
 
 
 class BasePotential(metaclass=ABCMeta):
     def __init__(self, prior: Any, x_o: Optional[Tensor] = None, device: str = "cpu"):
-        """
-        Initialize potential function.
+        """Initialize potential function.
 
         This parent class takes care of setting `x_o`.
 
@@ -38,9 +38,19 @@ class BasePotential(metaclass=ABCMeta):
         if self._x_o is not None:
             return self._x_o
         else:
-            raise ValueError("No observed data is available.")
+            raise ValueError(
+                "No observed data is available. Use `potential_fn.set_x(x_o)`."
+            )
 
     @x_o.setter
     def x_o(self, x_o: Optional[Tensor]) -> None:
         """Check the shape of the observed data and, if valid, set it."""
         self.set_x(x_o)
+
+    def return_x_o(self) -> Optional[Tensor]:
+        """Return the observed data at which the potential is evaluated.
+
+        Difference to the `x_o` property is that it will not raise an error if
+        `self._x_o` is `None`.
+        """
+        return self._x_o

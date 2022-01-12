@@ -70,13 +70,12 @@ class NeuralPosterior(ABC):
         # If the sampler interface (#573) is used, the user might have passed `x_o`
         # already to the potential function builder. If so, this `x_o` will be used
         # as default x.
-        self._x = self.potential_fn._x_o
+        self._x = self.potential_fn.return_x_o()
 
     def potential(
         self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False
     ) -> Tensor:
-        r"""
-        Evaluates $\theta$ under the potential that is used to sample the posterior.
+        r"""Evaluates $\theta$ under the potential that is used to sample the posterior.
 
         The potential is the unnormalized log-probability of $\theta$ under the
         posterior.
@@ -87,33 +86,6 @@ class NeuralPosterior(ABC):
                 This can be helpful for e.g. sensitivity analysis, but increases memory
                 consumption.
         """
-        self.potential_fn.set_x(self._x_else_default_x(x))
-
-        theta = ensure_theta_batched(torch.as_tensor(theta))
-        return self.potential_fn(
-            theta.to(self._device), track_gradients=track_gradients
-        )
-
-    def log_prob(
-        self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False
-    ) -> Tensor:
-        r"""
-        Returns the log-probability of theta under the posterior.
-
-        Args:
-            theta: Parameters $\theta$.
-            track_gradients: Whether the returned tensor supports tracking gradients.
-                This can be helpful for e.g. sensitivity analysis, but increases memory
-                consumption.
-
-        Returns:
-            `len($\theta$)`-shaped log-probability.
-        """
-        warn(
-            "`.log_prob()` is deprecated for methods that can only evaluate the log-probability up to a normalizing constant. Use `.potential()` instead."
-        )
-        warn("The log-probability is unnormalized!")
-
         self.potential_fn.set_x(self._x_else_default_x(x))
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
@@ -145,14 +117,18 @@ class NeuralPosterior(ABC):
 
     def set_default_x(self, x: Tensor) -> "NeuralPosterior":
         """Set new default x for `.sample(), .log_prob` to use as conditioning context.
+
         This is a pure convenience to avoid having to repeatedly specify `x` in calls to
         `.sample()` and `.log_prob()` - only θ needs to be passed.
+
         This convenience is particularly useful when the posterior is focused, i.e.
         has been trained over multiple rounds to be accurate in the vicinity of a
         particular `x=x_o` (you can check if your posterior object is focused by
         printing it).
+
         NOTE: this method is chainable, i.e. will return the NeuralPosterior object so
         that calls like `posterior.set_default_x(my_x).sample(mytheta)` are possible.
+
         Args:
             x: The default observation to set for the posterior $p(theta|x)$.
         Returns:
@@ -204,8 +180,7 @@ class NeuralPosterior(ABC):
         return desc
 
     def __getstate__(self) -> Dict:
-        """
-        Returns the state of the object that is supposed to be pickled.
+        """Returns the state of the object that is supposed to be pickled.
 
         Returns:
             Dictionary containing the state.
@@ -213,8 +188,7 @@ class NeuralPosterior(ABC):
         return self.__dict__
 
     def __setstate__(self, state_dict: Dict):
-        """
-        Sets the state when being loaded from pickle.
+        """Sets the state when being loaded from pickle.
 
         For developers: for any new attribute added to `NeuralPosterior`, we have to
         add an entry here using `check_warn_and_setstate()`.

@@ -116,8 +116,7 @@ class SNPE_A(PosteriorEstimator):
         dataloader_kwargs: Optional[Dict] = None,
         component_perturbation: float = 5e-3,
     ) -> nn.Module:
-        r"""
-        Return density estimator that approximates the proposal posterior $\tilde{p}(\theta|x)$.
+        r"""Return density estimator that approximates the proposal posterior.
 
         [1] _Fast epsilon-free Inference of Simulation Models with Bayesian Conditional
             Density Estimation_, Papamakarios et al., NeurIPS 2016,
@@ -215,27 +214,14 @@ class SNPE_A(PosteriorEstimator):
 
         return super().train(**kwargs)
 
-    def correct_density(
+    def correct_for_proposal(
         self,
         density_estimator: Optional[TorchModule] = None,
     ) -> TorchModule:
-        r"""
-        Build posterior from the neural density estimator.
+        r"""Build mixture of Gaussians that approximates the posterior.
 
-        This class instantiates a `SNPE_A_MDN` object, which applies the
-        posthoc-correction required in SNPE-A.
-
-        In addition, the returned `DirectPosterior` object implements the following
-        functionality over the raw `SNPE_A_MDN` object:
-
-        - correct the calculation of the log probability such that it compensates for
-            the leakage.
-        - reject samples that lie outside of the prior bounds.
-        - alternatively, if leakage is very high (which can happen for multi-round
-            SNPE), sample from the posterior with MCMC.
-
-        The DirectPosterior class assumes that the density estimator approximates the
-        posterior.
+        Returns a `SNPE_A_MDN` object, which applies the posthoc-correction required in
+        SNPE-A.
 
         Args:
             density_estimator: The density estimator that the posterior is based on.
@@ -276,38 +262,24 @@ class SNPE_A(PosteriorEstimator):
 
         # Create the SNPE_A_MDN
         wrapped_density_estimator = SNPE_A_MDN(
-            flow=density_estimator,
-            proposal=proposal,
-            prior=self._prior,
+            flow=density_estimator, proposal=proposal, prior=self._prior, device=device
         )
         return wrapped_density_estimator
 
     def build_posterior(
         self,
-        prior: Optional[Any] = None,
         density_estimator: Optional[TorchModule] = None,
+        prior: Optional[Any] = None,
     ) -> "DirectPosterior":
-        r"""
-        Build posterior from the neural density estimator.
+        r"""Build posterior from the neural density estimator.
 
-        This class instantiates a `SNPE_A_MDN` object, which applies the
-        posthoc-correction required in SNPE-A.
-
-        In addition, the returned `DirectPosterior` object implements the following
-        functionality over the raw `SNPE_A_MDN` object:
-
-        - correct the calculation of the log probability such that it compensates for
-            the leakage.
-        - reject samples that lie outside of the prior bounds.
-        - alternatively, if leakage is very high (which can happen for multi-round
-            SNPE), sample from the posterior with MCMC.
-
-        The DirectPosterior class assumes that the density estimator approximates the
-        posterior.
+        This method first corrects the estimated density with `correct_for_proposal`
+        and then returns a `DirectPosterior`.
 
         Args:
             density_estimator: The density estimator that the posterior is based on.
                 If `None`, use the latest neural density estimator that was trained.
+            prior: Prior distribution.
             rejection_sampling_parameters: Dictionary overriding the default parameters
                 for rejection sampling. The following parameters are supported:
                 `max_sampling_batch_size` to set the batch size for drawing new
@@ -322,11 +294,11 @@ class SNPE_A(PosteriorEstimator):
             ), "You did not pass a prior. You have to pass the prior either at initialization `inference = SNPE_A(prior)` or to `.build_posterior(prior=prior)`."
             prior = self._prior
 
-        wrapped_density_estimator = self.correct_density(
+        wrapped_density_estimator = self.correct_for_proposal(
             density_estimator=density_estimator
         )
         self._posterior = DirectPosterior(
-            posterior_model=wrapped_density_estimator,
+            posterior_estimator=wrapped_density_estimator,
             prior=prior,
         )
         return deepcopy(self._posterior)
@@ -338,8 +310,7 @@ class SNPE_A(PosteriorEstimator):
         masks: Tensor,
         proposal: Optional[Any],
     ) -> Tensor:
-        """
-        Return the log-probability of the proposal posterior.
+        """Return the log-probability of the proposal posterior.
 
         For SNPE-A this is the same as `self._neural_net.log_prob(theta, x)` in
         `_loss()` to be found in `snpe_base.py`.
@@ -387,8 +358,7 @@ class SNPE_A(PosteriorEstimator):
 
 
 class SNPE_A_MDN(nn.Module):
-    """
-    Generates a posthoc-corrected MDN which approximates the posterior.
+    """Generates a posthoc-corrected MDN which approximates the posterior.
 
     This class takes as input the density estimator (abbreviated with `_d` suffix, aka
     the proposal posterior) and the proposal prior (abbreviated with `_pp` suffix) from
@@ -409,6 +379,7 @@ class SNPE_A_MDN(nn.Module):
         flow: flows.Flow,
         proposal: Union["utils.BoxUniform", "DirectPosterior", "SNPE_A_MDN"],
         prior: Any,
+        device: str,
     ):
         """Constructor.
 
@@ -422,14 +393,15 @@ class SNPE_A_MDN(nn.Module):
 
         self._neural_net = flow
         self._prior = prior
+        self._device = device
 
         # Set the proposal using the `default_x`.
         if isinstance(proposal, (utils.BoxUniform, MultivariateNormal)):
             self._apply_correction = False
         else:
             self._apply_correction = True
-            logits_pp, m_pp, prec_pp = proposal.posterior_model._posthoc_correction(
-                proposal.x_o
+            logits_pp, m_pp, prec_pp = proposal.posterior_estimator._posthoc_correction(
+                proposal.default_x
             )
             self._logits_pp, self._m_pp, self._prec_pp = (
                 logits_pp.detach(),
@@ -441,6 +413,8 @@ class SNPE_A_MDN(nn.Module):
         self._set_state_for_mog_proposal()
 
     def log_prob(self, inputs, context=None):
+        inputs, context = inputs.to(self._device), context.to(self._device)
+
         if not self._apply_correction:
             return self._neural_net.log_prob(inputs, context)
         else:
@@ -464,6 +438,8 @@ class SNPE_A_MDN(nn.Module):
             return log_prob_proposal_posterior  # \hat{p} from eq (3) in [1]
 
     def sample(self, num_samples, context=None, batch_size=None) -> Tensor:
+        context = context.to(self._device)
+
         if not self._apply_correction:
             return self._neural_net.sample(num_samples, context, batch_size)
         else:
@@ -475,8 +451,7 @@ class SNPE_A_MDN(nn.Module):
     def _sample_approx_posterior_mog(
         self, num_samples, x: Tensor, batch_size: int
     ) -> Tensor:
-        r"""
-        Sample from the approximate posterior.
+        r"""Sample from the approximate posterior.
 
         Args:
             num_samples: Desired number of samples.
@@ -568,8 +543,7 @@ class SNPE_A_MDN(nn.Module):
         means_d: Tensor,
         precisions_d: Tensor,
     ):
-        r"""
-        Transforms the proposal posterior (the MDN) into the posterior.
+        r"""Transforms the proposal posterior (the MDN) into the posterior.
 
         The approximate posterior is:
         $p(\theta|x) = 1/Z * q(\theta|x) * p(\theta) / prop(\theta)$
@@ -704,8 +678,7 @@ class SNPE_A_MDN(nn.Module):
         return theta
 
     def _precisions_posterior(self, precisions_pp: Tensor, precisions_d: Tensor):
-        r"""
-        Return the precisions and covariances of the MoG posterior.
+        r"""Return the precisions and covariances of the MoG posterior.
 
         As described at the end of Appendix C in [1], it can happen that the
         proposal's precision matrix is not positive definite.
@@ -772,8 +745,7 @@ class SNPE_A_MDN(nn.Module):
         means_d: Tensor,
         precisions_d: Tensor,
     ):
-        r"""
-        Return the means of the MoG posterior.
+        r"""Return the means of the MoG posterior.
 
         $m_k^\prime = S_k^\prime ( S_k^{-1} m_k - S_0^{-1} m_0 )$
         (see eq (24) in Appendix C of [1])
@@ -819,8 +791,7 @@ class SNPE_A_MDN(nn.Module):
         means_d: Tensor,
         precisions_d: Tensor,
     ):
-        r"""
-        Return the component weights (i.e. logits) of the MoG posterior.
+        r"""Return the component weights (i.e. logits) of the MoG posterior.
 
         $\alpha_k^\prime = \frac{ \alpha_k exp(-0.5 c_k) }{ \sum{j} \alpha_j exp(-0.5
         c_j) } $

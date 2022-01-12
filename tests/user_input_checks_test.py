@@ -297,21 +297,25 @@ def test_inference_with_user_sbi_problems(
     # Run inference.
     theta, x = simulate_for_sbi(simulator, prior, 100)
     x_o = torch.zeros(x.shape[1])
-    posterior_model = inference.append_simulations(theta, x).train(max_num_epochs=2)
+    posterior_estimator = inference.append_simulations(theta, x).train(max_num_epochs=2)
 
     # Build posterior.
     if snpe_method == SNPE_A:
         if not isinstance(prior, (MultivariateNormal, BoxUniform, DirectPosterior)):
             with pytest.raises(AssertionError):
                 # SNPE-A does not support priors yet.
-                posterior_model = inference.correct_density()
+                posterior_estimator = inference.correct_for_proposal()
                 _ = DirectPosterior(
-                    posterior_model=posterior_model, prior=prior, x_o=x_o
-                )
+                    posterior_estimator=posterior_estimator, prior=prior
+                ).set_default_x(x_o)
         else:
-            _ = DirectPosterior(posterior_model=posterior_model, prior=prior, x_o=x_o)
+            _ = DirectPosterior(
+                posterior_estimator=posterior_estimator, prior=prior
+            ).set_default_x(x_o)
     else:
-        _ = DirectPosterior(posterior_model=posterior_model, prior=prior, x_o=x_o)
+        _ = DirectPosterior(
+            posterior_estimator=posterior_estimator, prior=prior
+        ).set_default_x(x_o)
 
 
 @pytest.mark.parametrize(
@@ -536,10 +540,12 @@ def test_train_with_different_data_and_training_device(
     x_o = torch.zeros(x.shape[1])
     inference = inference.append_simulations(theta, x)
 
-    posterior_model = inference.train(max_num_epochs=2)
+    posterior_estimator = inference.train(max_num_epochs=2)
 
     # Check for default device for inference object
     weights_device = next(inference._neural_net.parameters()).device
     assert torch.device(training_device) == weights_device
 
-    _ = DirectPosterior(posterior_model=posterior_model, prior=prior, x_o=x_o)
+    _ = DirectPosterior(
+        posterior_estimator=posterior_estimator, prior=prior
+    ).set_default_x(x_o)

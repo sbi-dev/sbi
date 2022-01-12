@@ -69,8 +69,7 @@ class SNLE_A(LikelihoodEstimator):
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
     ) -> NeuralPosterior:
-        r"""
-        Return density estimator that approximates the distribution $p(x|\theta)$.
+        r"""Return density estimator that approximates the distribution $p(x|\theta)$.
 
         Args:
             training_batch_size: Training batch size.

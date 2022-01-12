@@ -7,25 +7,24 @@ import torch
 import torch.distributions.transforms as torch_tf
 from torch import Tensor, nn
 
+from sbi.inference.potentials.base_potential import BasePotential
 from sbi.utils import mcmc_transform
 from sbi.utils.sbiutils import match_theta_and_x_batch_shapes
 from sbi.utils.torchutils import atleast_2d
-from sbi.inference.potentials.base_potential import BasePotential
 
 
-def likelihood_potential(
-    likelihood_model: nn.Module,
+def likelihood_estimator_based_potential(
+    likelihood_estimator: nn.Module,
     prior: Any,
     x_o: Optional[Tensor],
 ) -> Tuple[Callable, torch_tf.Transform]:
-    r"""
-    Returns the potential $p(x_o|\theta)p(\theta)$ for likelihood-based methods.
+    r"""Returns potential $\log(p(x_o|\theta)p(\theta))$ for likelihood-based methods.
 
     It also returns a transformation that can be used to transform the potential into
     unconstrained space.
 
     Args:
-        likelihood_model: The neural network modelling the likelihood.
+        likelihood_estimator: The neural network modelling the likelihood.
         prior: The prior distribution.
         x_o: The observed data at which to evaluate the likelihood.
 
@@ -34,29 +33,30 @@ def likelihood_potential(
         to unconstrained space.
     """
 
-    device = str(next(likelihood_model.parameters()).device)
+    device = str(next(likelihood_estimator.parameters()).device)
 
-    potential_fn = LikelihoodPotential(likelihood_model, prior, x_o, device=device)
+    potential_fn = LikelihoodBasedPotential(
+        likelihood_estimator, prior, x_o, device=device
+    )
     theta_transform = mcmc_transform(prior, device=device)
 
     return potential_fn, theta_transform
 
 
-class LikelihoodPotential(BasePotential):
+class LikelihoodBasedPotential(BasePotential):
     allow_iid_x = True  # type: ignore
 
     def __init__(
         self,
-        likelihood_model: nn.Module,
+        likelihood_estimator: nn.Module,
         prior: Any,
         x_o: Optional[Tensor],
         device: str = "cpu",
     ):
-        r"""
-        Returns the potential function for likelihood-based methods.
+        r"""Returns the potential function for likelihood-based methods.
 
         Args:
-            likelihood_model: The neural network modelling the likelihood.
+            likelihood_estimator: The neural network modelling the likelihood.
             prior: The prior distribution.
             x_o: The observed data at which to evaluate the likelihood.
             device: The device to which parameters and data are moved before evaluating
@@ -67,26 +67,25 @@ class LikelihoodPotential(BasePotential):
         """
 
         super().__init__(prior, x_o, device)
-        self.likelihood_model = likelihood_model
-        self.likelihood_model.eval()
+        self.likelihood_estimator = likelihood_estimator
+        self.likelihood_estimator.eval()
 
     def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
-        r"""
-        Returns the potential $p(x_o|\theta)p(\theta)$ for likelihood-based methods.
+        r"""Returns the potential $\log(p(x_o|\theta)p(\theta))$.
 
         Args:
             theta: The parameter set at which to evaluate the potential function.
             track_gradients: Whether to track the gradients.
 
         Returns:
-            The potential $p(x_o|\theta)p(\theta)$.
+            The potential $\log(p(x_o|\theta)p(\theta))$.
         """
 
         # Calculate likelihood over trials and in one batch.
         log_likelihood_trial_sum = _log_likelihoods_over_trials(
             x=self.x_o,
             theta=theta.to(self.device),
-            net=self.likelihood_model,
+            net=self.likelihood_estimator,
             track_gradients=track_gradients,
         )
 

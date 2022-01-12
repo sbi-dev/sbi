@@ -117,7 +117,7 @@ def random_orthogonal(size):
 
     # Use the QR decomposition of a random Gaussian matrix.
     x = torch.randn(size, size)
-    q, _ = torch.qr(x)
+    q, _ = torch.linalg.qr(x)
     return q
 
 

@@ -12,12 +12,14 @@ from sbi.inference.snpe.snpe_a import SNPE_A_MDN
 from sbi.utils import (
     BoxUniform,
     MultipleIndependent,
-    conditional_corrcoeff,
-    conditional_pairplot,
-    eval_conditional_density,
     get_kde,
     mcmc_transform,
     posterior_nn,
+)
+from sbi.analysis import (
+    conditional_corrcoeff,
+    conditional_pairplot,
+    eval_conditional_density,
 )
 from sbi.utils.user_input_checks import process_prior
 
@@ -304,7 +306,7 @@ def test_gaussian_transforms(snpe_method: str, plot_results: bool = False):
             max_num_epochs=1
         )
         wrapped_density_estimator = SNPE_A_MDN(
-            flow=density_estimator, proposal=prior, prior=prior
+            flow=density_estimator, proposal=prior, prior=prior, device="cpu"
         )
 
         precs1 = torch.inverse(covs1)

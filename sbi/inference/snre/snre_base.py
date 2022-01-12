@@ -11,7 +11,7 @@ from torch.utils.tensorboard import SummaryWriter
 from sbi import utils as utils
 from sbi.inference.base import NeuralInference
 from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior
-from sbi.inference.potentials import ratio_potential
+from sbi.inference.potentials import ratio_estimator_based_potential
 from sbi.types import TorchModule
 from sbi.utils import (
     check_estimator_arg,
@@ -88,8 +88,7 @@ class RatioEstimator(NeuralInference, ABC):
         x: Tensor,
         from_round: int = 0,
     ) -> "RatioEstimator":
-        r"""
-        Store parameters and simulation outputs to use them for later training.
+        r"""Store parameters and simulation outputs to use them for later training.
 
         Data are stored as entries in lists for each type of variable (parameter/data).
 
@@ -133,8 +132,7 @@ class RatioEstimator(NeuralInference, ABC):
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
     ) -> nn.Module:
-        r"""
-        Return classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
+        r"""Return classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
 
         Args:
             num_atoms: Number of atoms to use for classification.
@@ -293,15 +291,14 @@ class RatioEstimator(NeuralInference, ABC):
 
     def build_posterior(
         self,
-        prior: Any,
         density_estimator: Optional[TorchModule] = None,
+        prior: Optional[Any] = None,
         sample_with: str = "mcmc",
         mcmc_method: str = "slice_np",
         mcmc_parameters: Dict[str, Any] = {},
         rejection_sampling_parameters: Dict[str, Any] = {},
     ) -> Union[MCMCPosterior, RejectionPosterior]:
-        r"""
-        Build posterior from the neural density estimator.
+        r"""Build posterior from the neural density estimator.
 
         SNRE trains a neural network to approximate likelihood ratios. The
         posterior wraps the trained network such that one can directly evaluate the
@@ -312,9 +309,9 @@ class RatioEstimator(NeuralInference, ABC):
         still requires MCMC (or rejection sampling).
 
         Args:
-            prior: Prior distribution.
             density_estimator: The density estimator that the posterior is based on.
                 If `None`, use the latest neural density estimator that was trained.
+            prior: Prior distribution.
             sample_with: Method to use for sampling from the posterior. Must be one of
                 [`mcmc` | `rejection`].
             mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`,
@@ -342,15 +339,15 @@ class RatioEstimator(NeuralInference, ABC):
             # Otherwise, infer it from the device of the net parameters.
             device = next(density_estimator.parameters()).device.type
 
-        potential_fn, theta_transform = ratio_potential(
-            ratio_model=self._neural_net, prior=prior, x_o=None
+        potential_fn, theta_transform = ratio_estimator_based_potential(
+            ratio_estimator=self._neural_net, prior=prior, x_o=None
         )
 
         if sample_with == "mcmc":
             self._posterior = MCMCPosterior(
                 potential_fn=potential_fn,
                 theta_transform=theta_transform,
-                prior=prior,
+                proposal=prior,
                 method=mcmc_method,
                 device=device,
                 x_shape=self._x_shape,

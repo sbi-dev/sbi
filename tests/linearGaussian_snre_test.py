@@ -11,7 +11,7 @@ from sbi import utils as utils
 from sbi.inference import (
     AALR,
     SNRE_B,
-    ratio_potential,
+    ratio_estimator_based_potential,
     MCMCPosterior,
     RejectionPosterior,
     prepare_for_sbi,
@@ -50,12 +50,12 @@ def test_api_sre_on_linearGaussian(num_dim: int):
     )
 
     theta, x = simulate_for_sbi(simulator, prior, 1000, simulation_batch_size=50)
-    ratio_model = inference.append_simulations(theta, x).train(max_num_epochs=5)
+    ratio_estimator = inference.append_simulations(theta, x).train(max_num_epochs=5)
 
     for num_trials in [1, 2]:
         x_o = zeros(num_trials, num_dim)
-        potential_fn, theta_transform = ratio_potential(
-            ratio_model=ratio_model, prior=prior, x_o=x_o
+        potential_fn, theta_transform = ratio_estimator_based_potential(
+            ratio_estimator=ratio_estimator, prior=prior, x_o=x_o
         )
         posterior = MCMCPosterior(
             potential_fn=potential_fn,
@@ -105,7 +105,7 @@ def test_c2st_sre_on_linearGaussian(set_seed):
     theta, x = simulate_for_sbi(
         simulator, prior, num_simulations, simulation_batch_size=100
     )
-    ratio_model = inference.append_simulations(theta, x).train()
+    ratio_estimator = inference.append_simulations(theta, x).train()
 
     num_trials = 1
     x_o = zeros(num_trials, x_dim)
@@ -118,8 +118,8 @@ def test_c2st_sre_on_linearGaussian(set_seed):
         num_discarded_dims=discard_dims,
         num_samples=num_samples,
     )
-    potential_fn, theta_transform = ratio_potential(
-        ratio_model=ratio_model, prior=prior, x_o=x_o
+    potential_fn, theta_transform = ratio_estimator_based_potential(
+        ratio_estimator=ratio_estimator, prior=prior, x_o=x_o
     )
     posterior = MCMCPosterior(
         potential_fn=potential_fn,
@@ -189,16 +189,16 @@ def test_c2st_sre_variants_on_linearGaussian(
     theta, x = simulate_for_sbi(
         simulator, prior, num_simulations, simulation_batch_size=50
     )
-    ratio_model = inference.append_simulations(theta, x).train()
-    potential_fn, theta_transform = ratio_potential(
-        ratio_model=ratio_model, prior=prior, x_o=x_o
+    ratio_estimator = inference.append_simulations(theta, x).train()
+    potential_fn, theta_transform = ratio_estimator_based_potential(
+        ratio_estimator=ratio_estimator, prior=prior, x_o=x_o
     )
     posterior = MCMCPosterior(
         potential_fn=potential_fn,
         theta_transform=theta_transform,
         prior=prior,
         method="slice_np_vectorized",
-        thin=3,
+        thin=5,
         num_chains=5,
     )
     samples = posterior.sample(sample_shape=(num_samples,))
@@ -298,9 +298,9 @@ def test_api_sre_sampling_methods(sampling_method: str, prior_str: str, set_seed
     theta, x = simulate_for_sbi(
         simulator, prior, num_simulations, simulation_batch_size=50
     )
-    ratio_model = inference.append_simulations(theta, x).train(max_num_epochs=5)
-    potential_fn, theta_transform = ratio_potential(
-        ratio_model=ratio_model, prior=prior, x_o=x_o
+    ratio_estimator = inference.append_simulations(theta, x).train(max_num_epochs=5)
+    potential_fn, theta_transform = ratio_estimator_based_potential(
+        ratio_estimator=ratio_estimator, prior=prior, x_o=x_o
     )
     if sample_with == "rejection":
         posterior = RejectionPosterior(potential_fn=potential_fn, proposal=prior)

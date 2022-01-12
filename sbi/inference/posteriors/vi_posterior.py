@@ -66,4 +66,4 @@ class VIPosterior(NeuralPosterior):
         sample_shape: Shape = torch.Size(),
         show_progress_bars: bool = True,
     ):
-        pass
+        raise NotImplementedError

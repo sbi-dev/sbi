@@ -14,8 +14,6 @@ from sbi.inference import (
     prepare_for_sbi,
     simulate_for_sbi,
     DirectPosterior,
-    likelihood_potential,
-    ratio_potential,
     MCMCPosterior,
 )
 from sbi.simulators.linear_gaussian import (
@@ -158,10 +156,12 @@ def test_inference_with_restriction_estimator(set_seed):
 
     # Any method can be used in combination with the `RejectionEstimator`.
     inference = SNPE_C(prior=prior)
-    posterior_model = inference.append_simulations(all_theta, all_x).train()
+    posterior_estimator = inference.append_simulations(all_theta, all_x).train()
 
     # Build posterior.
-    posterior = DirectPosterior(prior=prior, posterior_model=posterior_model, x_o=x_o)
+    posterior = DirectPosterior(
+        prior=prior, posterior_estimator=posterior_estimator
+    ).set_default_x(x_o)
 
     samples = posterior.sample((num_samples,))
 

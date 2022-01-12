@@ -15,7 +15,7 @@ from sbi.inference import (
     MCMCPosterior,
     prepare_for_sbi,
     simulate_for_sbi,
-    likelihood_potential,
+    likelihood_estimator_based_potential,
 )
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
@@ -59,12 +59,12 @@ def mdn_inference_with_different_methods(method, set_seed):
     inference = method(density_estimator="mdn")
 
     theta, x = simulate_for_sbi(simulator, prior, num_simulations)
-    model = inference.append_simulations(theta, x).train()
+    estimator = inference.append_simulations(theta, x).train()
     if method == SNPE:
-        posterior = DirectPosterior(posterior_model=model, prior=prior)
+        posterior = DirectPosterior(posterior_estimator=estimator, prior=prior)
     else:
-        potential_fn, theta_transform = likelihood_potential(
-            likelihood_model=model, prior=prior, x_o=x_o
+        potential_fn, theta_transform = likelihood_estimator_based_potential(
+            likelihood_estimator=estimator, prior=prior, x_o=x_o
         )
         posterior = MCMCPosterior(
             potential_fn=potential_fn, theta_transform=theta_transform, prior=prior
@@ -101,8 +101,8 @@ def test_mdn_with_1D_uniform_prior():
     inference = SNPE(density_estimator="mdn")
 
     theta, x = simulate_for_sbi(simulator, prior, 100)
-    posterior_model = inference.append_simulations(theta, x).train()
-    posterior = DirectPosterior(posterior_model=posterior_model, prior=prior)
+    posterior_estimator = inference.append_simulations(theta, x).train()
+    posterior = DirectPosterior(posterior_estimator=posterior_estimator, prior=prior)
     samples = posterior.sample((num_samples,), x=x_o)
     log_probs = posterior.log_prob(samples, x=x_o)
 
