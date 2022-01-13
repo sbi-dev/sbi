@@ -127,6 +127,8 @@ def test_training_and_mcmc_on_device(
             potential_fn, theta_transform = ratio_estimator_based_potential(
                 estimator, prior, x_o
             )
+        else:
+            raise ValueError
 
         if mcmc_method == "rejection":
             posterior = RejectionPosterior(
@@ -138,7 +140,7 @@ def test_training_and_mcmc_on_device(
             posterior = MCMCPosterior(
                 potential_fn=potential_fn,
                 theta_transform=theta_transform,
-                prior=prior,
+                proposal=prior,
                 method=mcmc_method,
                 device=training_device,
             )

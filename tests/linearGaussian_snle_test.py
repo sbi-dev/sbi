@@ -59,7 +59,7 @@ def test_api_snl_on_linearGaussian(num_dim: int, set_seed):
             prior=prior, likelihood_estimator=likelihood_estimator, x_o=x_o
         )
         posterior = MCMCPosterior(
-            prior=prior,
+            proposal=prior,
             potential_fn=potential_fn,
             theta_transform=theta_transform,
             thin=3,
@@ -118,7 +118,7 @@ def test_c2st_snl_on_linearGaussian(set_seed):
         prior=prior, likelihood_estimator=likelihood_estimator, x_o=x_o
     )
     posterior = MCMCPosterior(
-        prior=prior,
+        proposal=prior,
         potential_fn=potential_fn,
         theta_transform=theta_transform,
         method="slice_np_vectorized",
@@ -194,7 +194,7 @@ def test_c2st_and_map_snl_on_linearGaussian_different(
             prior=prior, likelihood_estimator=likelihood_estimator, x_o=x_o
         )
         posterior = MCMCPosterior(
-            prior=prior,
+            proposal=prior,
             potential_fn=potential_fn,
             theta_transform=theta_transform,
             method="slice_np_vectorized",
@@ -210,7 +210,7 @@ def test_c2st_and_map_snl_on_linearGaussian_different(
         )
 
         map_ = posterior.map(
-            num_init_samples=1_000, init_method="prior", show_progress_bars=False
+            num_init_samples=1_000, init_method="proposal", show_progress_bars=False
         )
 
         # TODO: we do not have a test for SNL log_prob(). This is because the output
@@ -266,7 +266,7 @@ def test_c2st_multi_round_snl_on_linearGaussian(num_trials: int, set_seed):
         prior=prior, likelihood_estimator=likelihood_estimator, x_o=x_o
     )
     posterior1 = MCMCPosterior(
-        prior=prior,
+        proposal=prior,
         potential_fn=potential_fn,
         theta_transform=theta_transform,
         thin=5,
@@ -281,7 +281,7 @@ def test_c2st_multi_round_snl_on_linearGaussian(num_trials: int, set_seed):
         prior=prior, likelihood_estimator=likelihood_estimator, x_o=x_o
     )
     posterior = MCMCPosterior(
-        prior=prior,
+        proposal=prior,
         potential_fn=potential_fn,
         theta_transform=theta_transform,
         thin=5,
@@ -357,7 +357,7 @@ def test_api_snl_sampling_methods(
     else:
         posterior = MCMCPosterior(
             potential_fn,
-            prior=prior,
+            proposal=prior,
             theta_transform=theta_transform,
             method=sampling_method,
             thin=3,

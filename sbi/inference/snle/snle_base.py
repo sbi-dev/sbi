@@ -315,7 +315,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
             self._posterior = MCMCPosterior(
                 potential_fn=potential_fn,
                 theta_transform=theta_transform,
-                prior=prior,
+                proposal=prior,
                 method=mcmc_method,
                 device=device,
                 x_shape=self._x_shape,

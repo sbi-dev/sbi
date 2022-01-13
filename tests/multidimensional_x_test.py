@@ -123,7 +123,7 @@ def test_inference_with_2d_x(embedding, method):
     posterior = MCMCPosterior(
         potential_fn=potential_fn,
         theta_transform=theta_transform,
-        prior=prior,
+        proposal=prior,
         method="slice_np_vectorized",
         num_chains=2,
     )

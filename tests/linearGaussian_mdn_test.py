@@ -67,7 +67,7 @@ def mdn_inference_with_different_methods(method, set_seed):
             likelihood_estimator=estimator, prior=prior, x_o=x_o
         )
         posterior = MCMCPosterior(
-            potential_fn=potential_fn, theta_transform=theta_transform, prior=prior
+            potential_fn=potential_fn, theta_transform=theta_transform, proposal=prior
         )
 
     samples = posterior.sample((num_samples,), x=x_o)

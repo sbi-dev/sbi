@@ -370,7 +370,7 @@ def test_api_snpe_c_posterior_correction(sample_with, mcmc_method, prior_str, se
         posterior = MCMCPosterior(
             potential_fn=potential_fn,
             theta_transform=theta_transform,
-            prior=prior,
+            proposal=prior,
             method=mcmc_method,
         )
     elif sample_with == "rejection":
@@ -448,7 +448,7 @@ def test_sample_conditional(set_seed):
     mcmc_posterior = MCMCPosterior(
         potential_fn=conditioned_potential_fn,
         theta_transform=restricted_tf,
-        prior=restricted_prior,
+        proposal=restricted_prior,
     )
     cond_samples = mcmc_posterior.sample((500,))
 

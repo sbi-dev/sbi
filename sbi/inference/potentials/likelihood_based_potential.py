@@ -11,13 +11,14 @@ from sbi.inference.potentials.base_potential import BasePotential
 from sbi.utils import mcmc_transform
 from sbi.utils.sbiutils import match_theta_and_x_batch_shapes
 from sbi.utils.torchutils import atleast_2d
+from sbi.types import TorchTransform
 
 
 def likelihood_estimator_based_potential(
     likelihood_estimator: nn.Module,
     prior: Any,
     x_o: Optional[Tensor],
-) -> Tuple[Callable, torch_tf.Transform]:
+) -> Tuple[Callable, TorchTransform]:
     r"""Returns potential $\log(p(x_o|\theta)p(\theta))$ for likelihood-based methods.
 
     It also returns a transformation that can be used to transform the potential into
