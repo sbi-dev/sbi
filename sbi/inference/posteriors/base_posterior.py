@@ -16,6 +16,7 @@ from torch import multiprocessing as mp
 from torch import nn
 
 from sbi import utils as utils
+from sbi.analysis import gradient_ascent
 from sbi.types import Array, Shape, TorchTransform
 from sbi.utils.torchutils import (
     ScalarFloat,
@@ -164,7 +165,29 @@ class NeuralPosterior(ABC):
         save_best_every: int = 10,
         show_progress_bars: bool = False,
     ) -> Tensor:
-        raise NotImplementedError
+        """See child classes for docstring."""
+        self.potential_fn.set_x(self._x_else_default_x(x))
+
+        if init_method == "posterior":
+            inits = self.sample((num_init_samples,))
+        elif init_method == "proposal":
+            inits = self.proposal.sample((num_init_samples,))  # type: ignore
+        elif isinstance(init_method, Tensor):
+            inits = init_method
+        else:
+            raise ValueError
+
+        self.map_ = gradient_ascent(
+            potential_fn=self.potential_fn,
+            inits=inits,
+            theta_transform=self.theta_transform,
+            num_iter=num_iter,
+            num_to_optimize=num_to_optimize,
+            learning_rate=learning_rate,
+            save_best_every=save_best_every,
+            show_progress_bars=show_progress_bars,
+        )[0]
+        return self.map_
 
     def __repr__(self):
         desc = f"""{self.__class__.__name__} sampler for potential_fn=<{self.potential_fn.__class__.__name__}>"""

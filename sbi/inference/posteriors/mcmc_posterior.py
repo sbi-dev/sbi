@@ -15,7 +15,6 @@ from torch import multiprocessing as mp
 from torch import nn
 
 from sbi import utils as utils
-from sbi.analysis import gradient_ascent
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.samplers.mcmc import (
     IterateParameters,
@@ -48,7 +47,7 @@ class MCMCPosterior(NeuralPosterior):
     def __init__(
         self,
         potential_fn: Callable,
-        prior: Any,
+        proposal: Any,
         theta_transform: Optional[TorchTransform] = None,
         method: str = "slice_np",
         thin: int = 10,
@@ -62,20 +61,19 @@ class MCMCPosterior(NeuralPosterior):
         """
         Args:
             potential_fn: The potential function from which to draw samples.
-            prior: Prior distribution. Is used to initialize the chain.
+            proposal: Proposal distribution that is used to initialize the MCMC chain.
             theta_transform: Transformation that will be applied during sampling.
                 Allows to perform MCMC in unconstrained space.
             method: Method used for MCMC sampling, one of `slice_np`, `slice`,
                 `hmc`, `nuts`. Currently defaults to `slice_np` for a custom numpy
                 implementation of slice sampling; select `hmc`, `nuts` or `slice` for
                 Pyro-based sampling.
-            thin: set the thinning factor for the chain
-            warmup_steps: set the initial number of
-                samples to discard
-            num_chains: for the number of chains,
-            init_strategy: the initialisation strategy for chains; `prior`
-                will draw init locations from prior, whereas `sir` will use Sequential-
-                Importance-Resampling
+            thin: The thinning factor for the chain.
+            warmup_steps: The initial number of samples to discard.
+            num_chains: The number of chains.
+            init_strategy: The initialisation strategy for chains; `prior` will draw
+                init locations from `proposal`, whereas `sir` will use Sequential-
+                Importance-Resampling (using the `proposal` as initial guesses).
             init_strategy_num_candidates: Number of candidates to to find init
                 locations in `init_strategy=sir`.
             device: Training device, e.g., "cpu", "cuda" or "cuda:0". If None,
@@ -91,7 +89,7 @@ class MCMCPosterior(NeuralPosterior):
             x_shape=x_shape,
         )
 
-        self.prior = prior
+        self.proposal = proposal
         self.method = method
         self.thin = thin
         self.warmup_steps = warmup_steps
@@ -236,7 +234,7 @@ class MCMCPosterior(NeuralPosterior):
         self.potential_ = self._prepare_potential(method)  # type: ignore
 
         init_fn = self._build_mcmc_init_fn(
-            self.prior, self.potential_fn, transform=self.theta_transform
+            self.proposal, self.potential_fn, transform=self.theta_transform
         )
         initial_params = torch.cat(
             [init_fn() for _ in range(num_chains)]  # type: ignore
@@ -275,7 +273,7 @@ class MCMCPosterior(NeuralPosterior):
 
     def _build_mcmc_init_fn(
         self,
-        prior: Any,
+        proposal: Any,
         potential_fn: Callable,
         transform: torch_tf.Transform,
         init_strategy: str = "prior",
@@ -284,7 +282,7 @@ class MCMCPosterior(NeuralPosterior):
         """Return function that, when called, creates an initial parameter set for MCMC.
 
         Args:
-            prior: Prior distribution.
+            proposal: Proposal distribution.
             potential_fn: Potential function that the candidate samples are weighted
                 with.
             init_strategy: Specifies the initialization method. Either of
@@ -295,9 +293,9 @@ class MCMCPosterior(NeuralPosterior):
         Returns: Initialization function.
         """
         if init_strategy == "prior":
-            return lambda: prior_init(prior, transform=transform, **kwargs)
+            return lambda: prior_init(proposal, transform=transform, **kwargs)
         elif init_strategy == "sir":
-            return lambda: sir(prior, potential_fn, transform=transform, **kwargs)
+            return lambda: sir(proposal, potential_fn, transform=transform, **kwargs)
         elif init_strategy == "latest_sample":
             latest_sample = IterateParameters(self._mcmc_init_params, **kwargs)
             return latest_sample
@@ -461,7 +459,7 @@ class MCMCPosterior(NeuralPosterior):
         num_iter: int = 1_000,
         num_to_optimize: int = 100,
         learning_rate: float = 0.01,
-        init_method: Union[str, Tensor] = "prior",
+        init_method: Union[str, Tensor] = "proposal",
         num_init_samples: int = 1_000,
         save_best_every: int = 10,
         show_progress_bars: bool = False,
@@ -482,13 +480,14 @@ class MCMCPosterior(NeuralPosterior):
         in unbounded space and transform the result back into bounded space.
 
         Args:
+            x: Observed data at which to evaluate the MAP.
             num_iter: Number of optimization steps that the algorithm takes
                 to find the MAP.
             learning_rate: Learning rate of the optimizer.
             init_method: How to select the starting parameters for the optimization. If
-                it is a string, it can be either [`posterior`, `prior`], which samples
-                the respective distribution `num_init_samples` times. If it is a
-                tensor, the tensor will be used as init locations.
+                it is a string, it can be either [`posterior`, `proposal`], which
+                samples the respective distribution `num_init_samples` times. If it is
+                a tensor, the tensor will be used as init locations.
             num_init_samples: Draw this number of samples from the posterior and
                 evaluate the log-probability of all of them.
             num_to_optimize: From the drawn `num_init_samples`, use the
@@ -506,26 +505,16 @@ class MCMCPosterior(NeuralPosterior):
         Returns:
             The MAP estimate.
         """
-        self.potential_fn.set_x(self._x_else_default_x(x))
-
-        if init_method == "posterior":
-            inits = self.sample((num_init_samples,))
-        elif init_method == "prior":
-            inits = self.prior.sample((num_init_samples,))
-        else:
-            raise ValueError
-
-        self.map_ = gradient_ascent(
-            potential_fn=self.potential_fn,
-            inits=inits,
-            theta_transform=self.theta_transform,
+        return super().map(
+            x=x,
             num_iter=num_iter,
             num_to_optimize=num_to_optimize,
             learning_rate=learning_rate,
+            init_method=init_method,
+            num_init_samples=num_init_samples,
             save_best_every=save_best_every,
             show_progress_bars=show_progress_bars,
-        )[0]
-        return self.map_
+        )
 
 
 def _maybe_use_dict_entry(default: Any, key: str, dict_to_check: Dict) -> Any:

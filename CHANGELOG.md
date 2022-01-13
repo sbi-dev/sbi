@@ -19,7 +19,7 @@ inference = SNLE()  # no more prior needed
 likelihood_estimator = inference.append_simulations(theta, x).train()
 
 potential_fn, theta_transform = likelihood_estimator_based_potential(likelihood_estimator, prior, x_o)
-posterior = MCMCPosterior(potential_fn, theta_transform=theta_transform, prior=prior)
+posterior = MCMCPosterior(potential_fn, proposal=prior, theta_transform=theta_transform)
 
 samples = posterior.sample((100,))
 ```

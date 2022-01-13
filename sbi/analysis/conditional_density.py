@@ -19,6 +19,7 @@ from sbi.utils.conditional_density import (
     extract_and_transform_mog,
 )
 from sbi.utils.torchutils import atleast_2d_float32_tensor
+from sbi.types import TorchTransform
 
 
 def eval_conditional_density(
@@ -130,7 +131,7 @@ class ConditionedMDN:
         condition: Tensor,
         dims_to_sample: List[int],
     ) -> None:
-        r"""Class that can sample and log-prob a conditional mixture-of-gaussians.
+        r"""Class that can sample and evaluate a conditional mixture-of-gaussians.
 
         Args:
             net: Mixture density network that models $p(\theta|x).
@@ -171,11 +172,11 @@ class ConditionedMDN:
 
 def conditonal_potential(
     potential_fn: Callable,
-    theta_transform: torch_tf.Transform,
+    theta_transform: TorchTransform,
     prior: Any,
     condition: Tensor,
     dims_to_sample: List[int],
-) -> Tuple[Callable, torch_tf.Transform, Any]:
+) -> Tuple[Callable, TorchTransform, Any]:
     r"""Returns potential function that can be used to sample the conditional potential.
 
     It also returns a transform and a prior to be used to sample the conditional

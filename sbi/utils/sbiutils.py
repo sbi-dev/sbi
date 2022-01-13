@@ -17,6 +17,7 @@ import torch.distributions.transforms as torch_tf
 from tqdm.auto import tqdm
 
 from sbi import utils as utils
+from sbi.types import TorchTransform
 from sbi.utils.torchutils import BoxUniform, atleast_2d
 
 
@@ -475,7 +476,7 @@ def mcmc_transform(
     enable_transform: bool = True,
     device: str = "cpu",
     **kwargs,
-) -> torch_tf.Transform:
+) -> TorchTransform:
     """
     Builds a transform that is applied to parameters during MCMC.
 

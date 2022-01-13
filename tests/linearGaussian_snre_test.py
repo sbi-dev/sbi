@@ -60,7 +60,7 @@ def test_api_sre_on_linearGaussian(num_dim: int):
         posterior = MCMCPosterior(
             potential_fn=potential_fn,
             theta_transform=theta_transform,
-            prior=prior,
+            proposal=prior,
             num_chains=2,
         )
         posterior.sample(sample_shape=(10,))
@@ -124,7 +124,7 @@ def test_c2st_sre_on_linearGaussian(set_seed):
     posterior = MCMCPosterior(
         potential_fn=potential_fn,
         theta_transform=theta_transform,
-        prior=prior,
+        proposal=prior,
         thin=5,
         num_chains=2,
     )
@@ -196,7 +196,7 @@ def test_c2st_sre_variants_on_linearGaussian(
     posterior = MCMCPosterior(
         potential_fn=potential_fn,
         theta_transform=theta_transform,
-        prior=prior,
+        proposal=prior,
         method="slice_np_vectorized",
         thin=5,
         num_chains=5,
@@ -219,7 +219,7 @@ def test_c2st_sre_variants_on_linearGaussian(
         samples, target_samples, alg=f"sre-{prior_str}-{method_str}-{num_trials}trials"
     )
 
-    map_ = posterior.map(num_init_samples=1_000, init_method="prior")
+    map_ = posterior.map(num_init_samples=1_000, init_method="proposal")
 
     # Checks for log_prob()
     if prior_str == "gaussian" and method_str == "aalr":
@@ -308,7 +308,7 @@ def test_api_sre_sampling_methods(sampling_method: str, prior_str: str, set_seed
         posterior = MCMCPosterior(
             potential_fn=potential_fn,
             theta_transform=theta_transform,
-            prior=prior,
+            proposal=prior,
             method=sampling_method,
             thin=3,
             num_chains=num_chains,

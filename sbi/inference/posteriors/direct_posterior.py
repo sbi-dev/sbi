@@ -11,7 +11,6 @@ from pyro.infer.mcmc.api import MCMC
 from torch import Tensor, log, nn
 
 from sbi import utils as utils
-from sbi.analysis import gradient_ascent
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.posterior_based_potential import (
     posterior_estimator_based_potential,
@@ -44,8 +43,8 @@ class DirectPosterior(NeuralPosterior):
 
     def __init__(
         self,
-        prior: Callable,
         posterior_estimator: nn.Module,
+        prior: Callable,
         max_sampling_batch_size: int = 10_000,
         device: Optional[str] = None,
         x_shape: Optional[torch.Size] = None,
@@ -136,7 +135,7 @@ class DirectPosterior(NeuralPosterior):
         track_gradients: bool = False,
         leakage_correction_params: Optional[dict] = None,
     ) -> Tensor:
-        r"""Returns the log-probability of the posterior $p(\theta|x).$
+        r"""Returns the log-probability of the posterior $p(\theta|x)$.
 
         Args:
             theta: Parameters $\theta$.
@@ -275,6 +274,7 @@ class DirectPosterior(NeuralPosterior):
         in unbounded space and transform the result back into bounded space.
 
         Args:
+            x: Observed data at which to evaluate the MAP.
             num_iter: Number of optimization steps that the algorithm takes
                 to find the MAP.
             learning_rate: Learning rate of the optimizer.
@@ -299,23 +299,13 @@ class DirectPosterior(NeuralPosterior):
         Returns:
             The MAP estimate.
         """
-        self.potential_fn.set_x(self._x_else_default_x(x))
-
-        if init_method == "posterior":
-            inits = self.sample((num_init_samples,))
-        elif init_method == "prior":
-            inits = self.prior.sample((num_init_samples,))
-        else:
-            raise ValueError
-
-        self.map_ = gradient_ascent(
-            potential_fn=self.potential_fn,
-            inits=inits,
-            theta_transform=self.theta_transform,
+        return super().map(
+            x=x,
             num_iter=num_iter,
             num_to_optimize=num_to_optimize,
             learning_rate=learning_rate,
+            init_method=init_method,
+            num_init_samples=num_init_samples,
             save_best_every=save_best_every,
             show_progress_bars=show_progress_bars,
-        )[0]
-        return self.map_
+        )
