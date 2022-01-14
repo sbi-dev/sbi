@@ -15,6 +15,7 @@ from torch.utils.tensorboard import SummaryWriter
 from sbi import utils as utils
 from sbi.inference import NeuralInference, check_if_proposal_has_default_x
 from sbi.inference.posteriors import DirectPosterior, MCMCPosterior, RejectionPosterior
+from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials import posterior_estimator_based_potential
 from sbi.types import TorchModule
 from sbi.utils import (
@@ -501,7 +502,10 @@ class PosteriorEstimator(NeuralInference, ABC):
                         "recommend to mix the `RestrictedPrior` with multi-round "
                         "SNPE."
                     )
-            elif not isinstance(proposal, nn.Module) and proposal is not self._prior:
+            elif (
+                not isinstance(proposal, NeuralPosterior)
+                and proposal is not self._prior
+            ):
                 warn(
                     "The proposal you passed is neither the prior nor a "
                     "`NeuralPosterior` object. If you are an expert user and did so "
