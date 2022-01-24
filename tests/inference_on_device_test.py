@@ -132,9 +132,7 @@ def test_training_and_mcmc_on_device(
 
         if mcmc_method == "rejection":
             posterior = RejectionPosterior(
-                proposal=prior,
-                potential_fn=potential_fn,
-                device=training_device,
+                proposal=prior, potential_fn=potential_fn, device=training_device,
             )
         else:
             posterior = MCMCPosterior(

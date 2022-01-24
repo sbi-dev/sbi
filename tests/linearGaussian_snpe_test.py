@@ -195,7 +195,7 @@ def test_c2st_snpe_on_linearGaussian_different_dims(set_seed):
         prior,
     )
     # Test whether prior can be `None`.
-    inference = SNPE_C(prior=None, density_estimator="maf", show_progress_bars=False)
+    inference = SNPE_C(prior=None, density_estimator="nsf", show_progress_bars=False)
 
     # type: ignore
     theta, x = simulate_for_sbi(simulator, prior, 2000, simulation_batch_size=1)
@@ -266,9 +266,7 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str, set_seed):
         lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov), prior
     )
     creation_args = dict(
-        prior=prior,
-        density_estimator=density_estimator,
-        show_progress_bars=False,
+        prior=prior, density_estimator=density_estimator, show_progress_bars=False,
     )
 
     if method_str == "snpe_b":
@@ -375,9 +373,7 @@ def test_api_snpe_c_posterior_correction(sample_with, mcmc_method, prior_str, se
         )
     elif sample_with == "rejection":
         posterior = RejectionPosterior(
-            potential_fn=potential_fn,
-            proposal=prior,
-            theta_transform=theta_transform,
+            potential_fn=potential_fn, proposal=prior, theta_transform=theta_transform,
         )
 
     # Posterior should be corrected for leakage even if num_rounds just 1.
@@ -416,7 +412,7 @@ def test_sample_conditional(set_seed):
         else:
             return linear_gaussian(theta, -likelihood_shift, likelihood_cov)
 
-    net = utils.posterior_nn("maf", hidden_features=20)
+    net = utils.posterior_nn("nsf", hidden_features=20)
 
     simulator, prior = prepare_for_sbi(simulator, prior)
 

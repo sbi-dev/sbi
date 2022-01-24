@@ -45,7 +45,7 @@ def test_api_snl_on_linearGaussian(num_dim: int, set_seed):
     prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
 
     simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior)
-    density_estimator = likelihood_nn("maf", num_transforms=3)
+    density_estimator = likelihood_nn("nsf", num_transforms=3)
     inference = SNLE(density_estimator=density_estimator, show_progress_bars=False)
 
     theta, x = simulate_for_sbi(simulator, prior, 1000, simulation_batch_size=50)
@@ -107,7 +107,7 @@ def test_c2st_snl_on_linearGaussian(set_seed):
         ),
         prior,
     )
-    density_estimator = likelihood_nn("maf", num_transforms=3)
+    density_estimator = likelihood_nn("nsf", num_transforms=3)
     inference = SNLE(density_estimator=density_estimator, show_progress_bars=False)
 
     theta, x = simulate_for_sbi(
@@ -163,7 +163,7 @@ def test_c2st_and_map_snl_on_linearGaussian_different(
     simulator, prior = prepare_for_sbi(
         lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov), prior
     )
-    density_estimator = likelihood_nn("maf", num_transforms=3)
+    density_estimator = likelihood_nn("nsf", num_transforms=3)
     inference = SNLE(density_estimator=density_estimator, show_progress_bars=False)
 
     theta, x = simulate_for_sbi(
