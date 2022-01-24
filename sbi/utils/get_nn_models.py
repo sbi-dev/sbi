@@ -2,7 +2,7 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 
-from typing import Callable
+from typing import Callable, Optional
 
 from torch import nn
 
@@ -17,8 +17,8 @@ from sbi.neural_nets.mdn import build_mdn
 
 def classifier_nn(
     model: str,
-    z_score_theta: bool = True,
-    z_score_x: bool = True,
+    z_score_theta: Optional[str] = "independent",
+    z_score_x: Optional[str] = "independent",
     hidden_features: int = 50,
     embedding_net_theta: nn.Module = nn.Identity(),
     embedding_net_x: nn.Module = nn.Identity(),
@@ -35,9 +35,13 @@ def classifier_nn(
         model: The type of classifier that will be created. One of [`linear`, `mlp`,
             `resnet`].
         z_score_theta: Whether to z-score parameters $\theta$ before passing them into
-            the network.
+            the network, can take one of the following:
+            - `none`, None, or False (for backwards compatibility): do not z-score
+            - `independent` or True (for backwards compatibility): z-score each dimension independently
+            - `structured`: treat dimensions as related, therefore compute mean and std
+            over the entire batch, instead of per-dimension.
         z_score_x: Whether to z-score simulation outputs $x$ before passing them into
-            the network.
+            the network, same as z_score_theta.
         hidden_features: Number of hidden features.
         embedding_net_theta:  Optional embedding network for parameters $\theta$.
         embedding_net_x:  Optional embedding network for simulation outputs $x$. This
@@ -83,8 +87,8 @@ def classifier_nn(
 
 def likelihood_nn(
     model: str,
-    z_score_theta: bool = True,
-    z_score_x: bool = True,
+    z_score_theta: Optional[str] = "independent",
+    z_score_x: Optional[str] = "independent",
     hidden_features: int = 50,
     num_transforms: int = 5,
     num_bins: int = 10,
@@ -155,8 +159,8 @@ def likelihood_nn(
 
 def posterior_nn(
     model: str,
-    z_score_theta: bool = True,
-    z_score_x: bool = True,
+    z_score_theta: Optional[str] = "independent",
+    z_score_x: Optional[str] = "independent",
     hidden_features: int = 50,
     num_transforms: int = 5,
     num_bins: int = 10,

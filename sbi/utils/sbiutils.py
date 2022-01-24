@@ -79,6 +79,41 @@ def clamp_and_warn(name: str, value: float, min_val: float, max_val: float) -> f
     return clamped_val
 
 
+def z_score_parser(z_score_flag: Optional["str"]) -> Tuple[bool, bool]:
+    """Parses z-score flag into 2 booleans: to z-score or not, and whether the data
+    requires structured z-scoring (e.g., time series).
+
+    Args:
+        z_score_flag: string flag for z-scoring method stating whether the data
+        dimensions are structured or independent.
+
+    Returns:
+        Flag for whether or not to z-score, and whether data is structured
+    """
+    if type(z_score_flag) is bool:
+        # if boolean was passed
+        warnings.warn(
+            """Boolean flag for z-scoring is accepted for backwards
+                      compatibility only. Please use 'none', 'independent', or
+                      'structured' to indicate z-scoring option.
+        """
+        )
+        z_score_bool, structured_data = z_score_flag, False
+    elif (z_score_flag is None) or (z_score_flag == "none"):
+        # if "none" or None was passed
+        z_score_bool, structured_data = False, False
+    elif (z_score_flag == "independent") or (z_score_flag == "structured"):
+        # one of two valid z-scoring methods
+        z_score_bool = True
+        structured_data = True if z_score_flag == "structured" else False
+    else:
+        # invalid option
+        warnings.warn("Invalid z-scoring option, defaulting to no z-scoring")
+        z_score_bool, structured_data = False, False
+
+    return z_score_bool, structured_data
+
+
 def standardizing_transform(
     batch_t: Tensor, min_std: float = 1e-14
 ) -> transforms.AffineTransform:
@@ -118,7 +153,7 @@ class Standardize(nn.Module):
 
 def standardizing_net(
     batch_t: Tensor,
-    structured_dims: bool,
+    structured_dims: bool = False,
     min_std: float = 1e-7,
 ) -> nn.Module:
     """Builds standardizing network
@@ -129,7 +164,7 @@ def standardizing_net(
         structured_dim: Whether data dimensions are structured (e.g., time-series,
             images), which requires computing mean and std per sample first before
             aggregating over samples for a single standardization mean and std for the
-            batch, or independent, which z-scores each dimension independently.
+            batch, or independent (default), which z-scores dimensions independently.
         min_std:  Minimum value of the standard deviation to use when z-scoring to
             avoid division by zero.
 
