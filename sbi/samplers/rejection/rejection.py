@@ -8,8 +8,7 @@ from torch import Tensor, as_tensor
 from tqdm.auto import tqdm
 
 from sbi import utils as utils
-from sbi.analysis import gradient_ascent
-from sbi.utils import within_support
+from sbi.utils import gradient_ascent, within_support
 
 
 def rejection_sample(

@@ -18,6 +18,7 @@ from sbi.utils.sbiutils import (
     del_entries,
     expit,
     get_simulations_since_round,
+    gradient_ascent,
     handle_invalid_x,
     logit,
     mask_sims_from_prior,

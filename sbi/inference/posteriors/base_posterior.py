@@ -9,8 +9,8 @@ import torch.distributions.transforms as torch_tf
 from torch import Tensor
 
 from sbi import utils as utils
-from sbi.analysis import gradient_ascent
 from sbi.types import Array, Shape, TorchTransform
+from sbi.utils import gradient_ascent
 from sbi.utils.torchutils import (
     ensure_theta_batched,
     process_device,
