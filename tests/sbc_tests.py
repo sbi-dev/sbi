@@ -8,12 +8,11 @@ import torch
 from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
-from sbi.diagnostics import check_sbc, run_sbc
-from sbi.inference import SNPE_C, simulate_for_sbi
+from sbi.analysis import check_sbc, run_sbc
+from sbi.inference import SNLE, SNPE_C, simulate_for_sbi
 from sbi.simulators import linear_gaussian
 
 
-@pytest.mark.slow
 @pytest.mark.parametrize(
     "method, model",
     [
@@ -23,8 +22,9 @@ from sbi.simulators import linear_gaussian
 def test_running_sbc(method, model):
 
     num_dim = 2
-    num_simulations = 10000
-    max_num_epochs = 5
+    num_simulations = 100
+    max_num_epochs = 1
+    num_sbc_runs = 2
 
     x_o = zeros(1, num_dim)
     likelihood_shift = -1.0 * ones(num_dim)
@@ -46,7 +46,10 @@ def test_running_sbc(method, model):
     )
     posterior = inferer.build_posterior().set_default_x(x_o)
 
-    run_sbc(prior, simulator, posterior, num_workers=5)
+    thetas = prior.sample((num_sbc_runs,))
+    xs = simulator(thetas)
+
+    run_sbc(thetas, xs, posterior, num_workers=5)
 
 
 def test_sbc_checks():
@@ -63,7 +66,9 @@ def test_sbc_checks():
     daps = prior.sample((N,))
     ranks = torch.distributions.Uniform(zeros(num_dim), L * ones(num_dim)).sample((N,))
 
-    checks = check_sbc(ranks, log_probs, prior.sample((N,)), daps, num_posterior_samples=L)
+    checks = check_sbc(
+        ranks, log_probs, prior.sample((N,)), daps, num_posterior_samples=L
+    )
     assert (checks["ks_pvals"] > 0.05).all()
     assert (checks["c2st_ranks"] < 0.55).all()
     assert (checks["c2st_dap"] < 0.55).all()

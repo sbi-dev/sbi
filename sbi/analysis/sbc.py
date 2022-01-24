@@ -1,70 +1,66 @@
 import warnings
-from typing import Callable, Dict, Optional, Tuple, Union
+from typing import Dict, Tuple
 
 import torch
 from joblib import Parallel, delayed
+from scipy.stats import kstest, uniform
 from torch import Tensor, ones, zeros
-from torch.distributions import Distribution, Normal, Uniform
+from torch.distributions import Uniform
 from tqdm.auto import tqdm
 
-from sbi.inference import simulate_for_sbi
+from sbi.inference import DirectPosterior
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.simulators.simutils import tqdm_joblib
 from sbi.utils.metrics import c2st
 
 
 def run_sbc(
-    prior: Distribution,
-    simulator: Callable,
+    thetas: Tensor,
+    xs: Tensor,
     posterior: NeuralPosterior,
-    num_sbc_samples: int = 1000,
-    num_posterior_samples: int = 100,
+    num_posterior_samples: int = 1000,
     num_workers: int = 1,
     sbc_batch_size: int = 1,
     show_progress_bar: bool = True,
 ) -> Tuple[Tensor, Tensor, Tensor]:
-    """Run simulation-based calibration (parallelized).
+    """Run simulation-based calibration (parallelized across sbc runs).
 
     Returns sbc ranks, log probs of the true parameters under the posterior and samples
     from the data averaged posterior, one for each sbc run, respectively.
 
     Args:
-        prior: prior distribution.
-        simulator: simulator (or likelihood) that can called to generate observations.
+        thetas: ground-truth parameters for sbc, simulated from the prior.
+        xs: observed data for sbc, simulated from thetas.
         posterior: a posterior obtained from sbi.
-        num_sbc_samples: number of sbc runs, i.e., number of repeated inferences.
-            Should be high, ~100 to give reliable results.
         num_posterior_samples: number of approximate posterior samples used for ranking.
         num_workers: number of CPU cores to use in parallel for running num_sbc_samples inferences.
         sbc_batch_size: batch size for workers.
-        show_progress_var: whether to display a progress over sbc runs.
+        show_progress_bar: whether to display a progress over sbc runs.
 
     Returns:
         ranks: ranks of the ground truth parameters under the inferred posterior.
         log_probs: log probs of the ground truth parameters under the inferred posterior.
         dap_samples: samples from the data averaged posterior.
     """
+    num_sbc_samples = thetas.shape[0]
 
     if num_sbc_samples < 1000:
         warnings.warn(
-            """Number of SBC samples should be on the order ~100 to give realiable
-            results. We recommend using 1000."""
+            """Number of SBC samples should be on the order of 100s to give realiable
+            results. We recommend using 300."""
         )
     if num_posterior_samples < 100:
         warnings.warn(
             """Number of posterior samples for ranking should be on the order
-            of ~100 to give reliable SBC results. We recommend using at least 100."""
+            of 100s to give reliable SBC results. We recommend using at least 300."""
         )
 
-    thos, xos = simulate_for_sbi(
-        simulator,
-        prior,
-        num_sbc_samples,
-        simulation_batch_size=1000,
-    )
+    assert (
+        thetas.shape[0] == xs.shape[0]
+    ), "Unequal number of parameters and observations."
 
-    thos_batches = torch.split(thos, sbc_batch_size, dim=0)
-    xos_batches = torch.split(xos, sbc_batch_size, dim=0)
+    thetas_batches = torch.split(thetas, sbc_batch_size, dim=0)
+    xs_batches = torch.split(xs, sbc_batch_size, dim=0)
 
     if num_workers > 1:
         # Parallelize the sequence of batches across workers.
@@ -72,18 +68,18 @@ def run_sbc(
         # to update the pbar only after the workers finished a task.
         with tqdm_joblib(
             tqdm(
-                thos_batches,
+                thetas_batches,
                 disable=not show_progress_bar,
-                desc=f"""Running {num_sbc_samples} sbc runs in {len(thos_batches)}
+                desc=f"""Running {num_sbc_samples} sbc runs in {len(thetas_batches)}
                     batches.""",
-                total=len(thos_batches),
+                total=len(thetas_batches),
             )
         ) as progress_bar:
             sbc_outputs = Parallel(n_jobs=num_workers)(
                 delayed(sbc_on_batch)(
-                    thos_batch, xos_batch, posterior, num_posterior_samples
+                    thetas_batch, xs_batch, posterior, num_posterior_samples
                 )
-                for thos_batch, xos_batch in zip(thos_batches, xos_batches)
+                for thetas_batch, xs_batch in zip(thetas_batches, xs_batches)
             )
     else:
         pbar = tqdm(
@@ -94,11 +90,11 @@ def run_sbc(
 
         with pbar:
             sbc_outputs = []
-            for thos_batch, xos_batch in zip(thos_batches, xos_batches):
+            for thetas_batch, xs_batch in zip(thetas_batches, xs_batches):
                 sbc_outputs.append(
                     sbc_on_batch(
-                        thos_batch,
-                        xos_batch,
+                        thetas_batch,
+                        xs_batch,
                         posterior,
                         num_posterior_samples,
                     )
@@ -122,42 +118,55 @@ def run_sbc(
 
 
 def sbc_on_batch(
-    thos: Tensor, xos: Tensor, posterior: NeuralPosterior, L: int
+    thetas: Tensor, xs: Tensor, posterior: NeuralPosterior, num_posterior_samples: int
 ) -> Tuple[Tensor, Tensor, Tensor]:
     """Return SBC results for a batch of SBC parameters and data from prior.
 
     Args:
-        thos: ground truth parameters.
-        xos: corresponding observations.
+        thetas: ground truth parameters.
+        xs: corresponding observations.
         posterior: sbi posterior.
-        L: number of samples to draw from the posterior in each sbc run.
+        num_posterior_samples: number of samples to draw from the posterior in each sbc run.
 
     Returns
         ranks: ranks of true parameters vs. posterior samples under the specified RV,
             for each posterior dimension.
-        log_prob_thos: log prob of true parameters under the approximate posterior.
+        log_prob_thetas: log prob of true parameters under the approximate posterior.
+            Note that this is interpretable only for normalized log probs, i.e., when
+            using (S)NPE.
         dap_samples: samples from the data averaged posterior for the current batch,
             i.e., a single sample from each approximate posterior.
     """
 
-    log_prob_thos = torch.zeros(thos.shape[0])
-    dap_samples = torch.zeros_like(thos)
-    ranks = torch.zeros_like(thos)
+    log_prob_thetas = torch.zeros(thetas.shape[0])
+    dap_samples = torch.zeros_like(thetas)
+    ranks = torch.zeros_like(thetas)
+    unnormalized_log_prob = not isinstance(posterior, DirectPosterior)
 
-    for idx, (tho, xo) in enumerate(zip(thos, xos)):
+    for idx, (tho, xo) in enumerate(zip(thetas, xs)):
         # Log prob of true params under posterior.
-        log_prob_thos[idx] = posterior.log_prob(tho, x=xo)
+        if unnormalized_log_prob:
+            log_prob_thetas[idx] = posterior.potential(tho, x=xo)
+        else:
+            log_prob_thetas[idx] = posterior.log_prob(tho, x=xo)
 
         # Draw posterior samples and save one for the data average posterior.
-        ths = posterior.sample((L,), x=xo, show_progress_bars=False)
-        dap_samples[idx] = ths[
-            0,
-        ]
+        ths = posterior.sample((num_posterior_samples,), x=xo, show_progress_bars=False)
+
+        # Save one random sample for data average posterior (dap).
+        dap_samples[idx] = ths[0]
+
         # rank for each posterior dimension as in Talts et al. section 4.1.
-        for dim in range(thos.shape[1]):
+        for dim in range(thetas.shape[1]):
             ranks[idx, dim] = (ths[:, dim] < tho[dim]).sum().item()
 
-    return ranks, log_prob_thos, dap_samples
+    if unnormalized_log_prob:
+        warnings.warn(
+            """Note that log probs of the true parameters under the posteriors
+        are not normalized because the posterior used is likelihood-based."""
+        )
+
+    return ranks, log_prob_thetas, dap_samples
 
 
 def check_sbc(
@@ -166,16 +175,23 @@ def check_sbc(
     prior_samples: Tensor,
     dap_samples: Tensor,
     num_posterior_samples: int,
+    num_c2st_repetitions: int = 1,
 ) -> Dict[str, Tensor]:
     """Return uniformity checks, data averaged posterior checks and NLTP for SBC.
 
+    NLTP: negative log probs of true parameters under the approximate posterior. Its
+    mean over many N gives a lower bound on the posterior accuracy and can be used to
+    compare different methods.
+
     Args:
         ranks: ranks for each sbc run and for each model parameter, i.e.,
-        shape (N, dim_parameters)
-        log_probs: log probs for each sbc run, shape (N,)
+            shape (N, dim_parameters)
+        log_probs: log probs of true parameters under approximate posteriors, for each
+            sbc run, shape (N,)
         prior_samples: N samples from the prior
         dap_samples: N samples from the data averaged posterior
         num_posterior_samples: number of posterior samples used for sbc ranking.
+        num_c2st_repetitions: number of times c2st is repeated to estimate robustness.
 
     Returns (all in a dictionary):
         ks_pvals: p-values of the Kolmogorov-Smirnov test of uniformity,
@@ -184,6 +200,9 @@ def check_sbc(
             one for each dim_parameters.
         c2st_dap: C2ST accuracy between prior and dap samples, single value.
         nltp: mean negative log prob of true parameters under approximate posteriors.
+            If N is large, e.g., N>100, then nltp can be used as a comparative measure
+            of posterior accuracy, e.g., for comparing multiple inference methods, or
+            hyperparameter settings (see num_posterior_samplesueckmann et al. 2021, appendix for details).
     """
     if ranks.shape[0] < 100:
         warnings.warn(
@@ -192,7 +211,10 @@ def check_sbc(
             recommend using at least 100."""
         )
 
-    ks_pvals, c2st_ranks = check_uniformity(ranks, num_posterior_samples)
+    ks_pvals = check_uniformity_frequentist(ranks, num_posterior_samples)
+    c2st_ranks = check_uniformity_c2st(
+        ranks, num_posterior_samples, num_repetitions=num_c2st_repetitions
+    )
     c2st_scores_dap = check_prior_vs_dap(prior_samples, dap_samples)
     nltp = torch.mean(-log_probs)
 
@@ -220,10 +242,8 @@ def check_prior_vs_dap(prior_samples: Tensor, dap_samples: Tensor) -> Tensor:
     )
 
 
-def check_uniformity(
-    ranks, num_posterior_samples, num_repetitions: int = 1
-) -> Tuple[Tensor, Tensor]:
-    """Return p-values and c2st scores for uniformity of the ranks.
+def check_uniformity_frequentist(ranks, num_posterior_samples) -> Tensor:
+    """Return p-values for uniformity of the ranks.
 
     Calculates Kolomogorov-Smirnov test using scipy.
 
@@ -231,17 +251,11 @@ def check_uniformity(
         ranks: ranks for each sbc run and for each model parameter, i.e.,
             shape (N, dim_parameters)
         num_posterior_samples: number of posterior samples used for sbc ranking.
-        num_repetitions: repetitions of C2ST tests estimate classifier variance.
 
-    Returns (all in a dictionary):
+    Returns:
         ks_pvals: p-values of the Kolmogorov-Smirnov test of uniformity,
             one for each dim_parameters.
-        c2st_ranks: C2ST accuracy of between ranks and uniform baseline,
-            one for each dim_parameters.
     """
-
-    from scipy.stats import kstest, uniform
-
     kstest_pvals = torch.tensor(
         [
             kstest(rks, uniform(loc=0, scale=num_posterior_samples).cdf)[1]
@@ -249,6 +263,27 @@ def check_uniformity(
         ],
         dtype=torch.float32,
     )
+
+    return kstest_pvals
+
+
+def check_uniformity_c2st(
+    ranks, num_posterior_samples, num_repetitions: int = 1
+) -> Tensor:
+    """Return c2st scores for uniformity of the ranks.
+
+    Run a c2st between ranks and uniform samples.
+
+    Args:
+        ranks: ranks for each sbc run and for each model parameter, i.e.,
+            shape (N, dim_parameters)
+        num_posterior_samples: number of posterior samples used for sbc ranking.
+        num_repetitions: repetitions of C2ST tests estimate classifier variance.
+
+    Returns:
+        c2st_ranks: C2ST accuracy of between ranks and uniform baseline,
+            one for each dim_parameters.
+    """
 
     c2st_scores = torch.tensor(
         [
@@ -265,9 +300,11 @@ def check_uniformity(
         ]
     )
 
+    # Use variance over repetitions to estimate robustness of c2st.
     if (c2st_scores.std(0) > 0.05).any():
         warnings.warn(
             "C2ST score variability is larger {0.05}, result may be unreliable."
         )
 
-    return kstest_pvals, c2st_scores.mean(0)
+    # Return the mean over repetitions as c2st score estimate.
+    return c2st_scores.mean(0)
