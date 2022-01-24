@@ -48,8 +48,8 @@ def build_input_layer(
         batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
         batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
         z_score_x: Whether to z-score xs passing into the network, can take one of the following:
-            - `none`, None, or False (for backwards compatibility): do not z-score
-            - `independent` or True (for backwards compatibility): z-score each dimension independently
+            - `none`, None: do not z-score
+            - `independent`: z-score each dimension independently
             - `structured`: treat dimensions as related, therefore compute mean and std
             over the entire batch, instead of per-dimension.
         z_score_y: Whether to z-score ys passing into the network, same as z_score_x.
@@ -96,8 +96,8 @@ def build_linear_classifier(
         batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
         batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
         z_score_x: Whether to z-score xs passing into the network, can take one of the following:
-            - `none`, None, or False (for backwards compatibility): do not z-score
-            - `independent` or True (for backwards compatibility): z-score each dimension independently
+            - `none`, None: do not z-score
+            - `independent`: z-score each dimension independently
             - `structured`: treat dimensions as related, therefore compute mean and std
             over the entire batch, instead of per-dimension.
         z_score_y: Whether to z-score ys passing into the network, same as z_score_x.
@@ -142,8 +142,8 @@ def build_mlp_classifier(
         batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
         batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
         z_score_x: Whether to z-score xs passing into the network, can take one of the following:
-            - `none`, None, or False (for backwards compatibility): do not z-score
-            - `independent` or True (for backwards compatibility): z-score each dimension independently
+            - `none`, None: do not z-score
+            - `independent`: z-score each dimension independently
             - `structured`: treat dimensions as related, therefore compute mean and std
             over the entire batch, instead of per-dimension.
         z_score_y: Whether to z-score ys passing into the network, same as z_score_x.
@@ -195,8 +195,8 @@ def build_resnet_classifier(
         batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
         batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
         z_score_x: Whether to z-score xs passing into the network, can take one of the following:
-            - `none`, None, or False (for backwards compatibility): do not z-score
-            - `independent` or True (for backwards compatibility): z-score each dimension independently
+            - `none`, None: do not z-score
+            - `independent`: z-score each dimension independently
             - `structured`: treat dimensions as related, therefore compute mean and std
             over the entire batch, instead of per-dimension.
         z_score_y: Whether to z-score ys passing into the network, same as z_score_x.

@@ -144,7 +144,7 @@ def standardizing_transform(
     if structured_dims:
         # Structured data so compute a single mean over all dimensions
         # equivalent to taking mean over per-sample mean, i.e.,
-        # `torch.mean(torch.mean(.., dim=1)).`
+        # `torch.mean(torch.mean(.., dim=1))`.
         t_mean = torch.mean(batch_t[is_valid_t])
         # Compute std per-sample first.
         sample_std = torch.std(batch_t[is_valid_t], dim=1)
@@ -198,7 +198,7 @@ def standardizing_net(
     if structured_dims:
         # Structured data so compute a single mean over all dimensions
         # equivalent to taking mean over per-sample mean, i.e.,
-        # `torch.mean(torch.mean(.., dim=1)).`
+        # `torch.mean(torch.mean(.., dim=1))`.
         t_mean = torch.mean(batch_t[is_valid_t])
     else:
         # Compute per-dimension (independent) mean.
