@@ -27,7 +27,7 @@ class SNPE_C(PosteriorEstimator):
     def __init__(
         self,
         prior: Optional[Any] = None,
-        density_estimator: Union[str, Callable] = "maf",
+        density_estimator: Union[str, Callable] = "nsf",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[TensorboardSummaryWriter] = None,
@@ -253,11 +253,7 @@ class SNPE_C(PosteriorEstimator):
             self._maybe_z_scored_prior = self._prior
 
     def _log_prob_proposal_posterior(
-        self,
-        theta: Tensor,
-        x: Tensor,
-        masks: Tensor,
-        proposal: Optional[Any],
+        self, theta: Tensor, x: Tensor, masks: Tensor, proposal: Optional[Any],
     ) -> Tensor:
         """Return the log-probability of the proposal posterior.
 

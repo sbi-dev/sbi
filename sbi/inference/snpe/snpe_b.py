@@ -17,7 +17,7 @@ class SNPE_B(PosteriorEstimator):
     def __init__(
         self,
         prior: Optional[Any] = None,
-        density_estimator: Union[str, Callable] = "maf",
+        density_estimator: Union[str, Callable] = "nsf",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[TensorboardSummaryWriter] = None,
