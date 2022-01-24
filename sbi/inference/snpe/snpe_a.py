@@ -106,7 +106,7 @@ class SNPE_A(PosteriorEstimator):
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
         stop_after_epochs: int = 20,
-        max_num_epochs: Optional[int] = None,
+        max_num_epochs: int = 2 ** 31 - 1,
         clip_max_norm: Optional[float] = 5.0,
         calibration_kernel: Optional[Callable] = None,
         exclude_invalid_x: bool = True,
@@ -135,8 +135,8 @@ class SNPE_A(PosteriorEstimator):
             stop_after_epochs: The number of epochs to wait for improvement on the
                 validation set before terminating training.
             max_num_epochs: Maximum number of epochs to run. If reached, we stop
-                training even when the validation loss is still decreasing. If None, we
-                train until validation loss increases (see also `stop_after_epochs`).
+                training even when the validation loss is still decreasing. Otherwise,
+                we train until validation loss increases (see also `stop_after_epochs`).
             clip_max_norm: Value at which to clip the total gradient norm in order to
                 prevent exploding gradients. Use None for no clipping.
             calibration_kernel: A function to calibrate the loss with respect to the
@@ -217,7 +217,7 @@ class SNPE_A(PosteriorEstimator):
     def correct_for_proposal(
         self,
         density_estimator: Optional[TorchModule] = None,
-    ) -> TorchModule:
+    ) -> "SNPE_A_MDN":
         r"""Build mixture of Gaussians that approximates the posterior.
 
         Returns a `SNPE_A_MDN` object, which applies the posthoc-correction required in
@@ -242,7 +242,7 @@ class SNPE_A(PosteriorEstimator):
             device = self._device
         else:
             # Otherwise, infer it from the device of the net parameters.
-            device = next(density_estimator.parameters()).device
+            device = str(next(density_estimator.parameters()).device)
 
         # Set proposal of the density estimator.
         # This also evokes the z-scoring correction if necessary.
@@ -377,7 +377,7 @@ class SNPE_A_MDN(nn.Module):
     def __init__(
         self,
         flow: flows.Flow,
-        proposal: Union["utils.BoxUniform", "DirectPosterior", "SNPE_A_MDN"],
+        proposal: Union["utils.BoxUniform", "MultivariateNormal", "DirectPosterior"],
         prior: Any,
         device: str,
     ):
@@ -429,7 +429,7 @@ class SNPE_A_MDN(nn.Module):
             theta = self._maybe_z_score_theta(inputs)
 
             # Compute the log_prob of theta under the product.
-            log_prob_proposal_posterior = utils.sbiutils.mog_log_prob(
+            log_prob_proposal_posterior = utils.mog_log_prob(
                 theta, logits_pp, m_pp, prec_pp
             )
             utils.assert_all_finite(

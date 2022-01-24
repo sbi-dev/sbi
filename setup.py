@@ -54,6 +54,7 @@ EXTRAS = {
         "pep517",
         "pytest",
         "pyyaml",
+        "pyright",
         "torchtestcase",
         "twine",
     ],

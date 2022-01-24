@@ -403,7 +403,7 @@ class MCMCPosterior(NeuralPosterior):
 
         Returns: Tensor of shape (num_samples, shape_of_single_theta).
         """
-        num_chains = mp.cpu_count - 1 if num_chains is None else num_chains
+        num_chains = mp.cpu_count() - 1 if num_chains is None else num_chains
 
         kernels = dict(slice=Slice, hmc=HMC, nuts=NUTS)
 
