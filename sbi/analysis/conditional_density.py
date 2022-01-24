@@ -4,15 +4,14 @@
 from typing import Any, Callable, List, Optional, Tuple, Union
 
 import torch
-import torch.distributions.transforms as torch_tf
 from pyknos.mdn.mdn import MultivariateGaussianMDN as mdn
 from torch import Tensor, nn
 
 from sbi.types import Shape
-from sbi.utils import conditional_corrcoeff as utils_conditional_corrcoeff
-from sbi.utils import eval_conditional_density as utils_eval_conditional_density
-from sbi.utils.conditional_density import (
+from sbi.utils.conditional_density_utils import (
     ConditionedPotential,
+    conditional_corrcoeff as utils_conditional_corrcoeff,
+    eval_conditional_density as utils_eval_conditional_density,
     RestrictedPriorForConditional,
     RestrictedTransformForConditional,
     condition_mog,
