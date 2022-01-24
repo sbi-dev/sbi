@@ -38,8 +38,8 @@ def c2st(
         [1]: https://scikit-learn.org/stable/modules/cross_validation.html
     """
     if z_score:
-        X_mean = torch.mean(X, axis=0)
-        X_std = torch.std(X, axis=0)
+        X_mean = torch.mean(X, dim=0)
+        X_std = torch.std(X, dim=0)
         X = (X - X_mean) / X_std
         Y = (Y - X_mean) / X_std
 

@@ -9,7 +9,7 @@ from sbi.utils.torchutils import atleast_2d, ensure_theta_batched
 
 
 def transformed_potential(
-    theta: Union[Tensor, np.array],
+    theta: Union[Tensor, np.ndarray],
     potential_fn: Callable,
     theta_transform: torch_tf.Transform,
     device: str,
@@ -56,7 +56,7 @@ def pyro_potential_wrapper(theta: Dict[str, Tensor], potential: Callable) -> Cal
         The negative potential $-[\log r(x_o, \theta) + \log p(\theta)]$.
     """
 
-    theta = next(iter(theta.values()))
+    theta_tensor = next(iter(theta.values()))
 
     # Note the minus to match the pyro potential function requirements.
-    return -potential(theta)
+    return -potential(theta_tensor)

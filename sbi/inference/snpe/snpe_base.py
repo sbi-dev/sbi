@@ -17,7 +17,6 @@ from sbi.inference import NeuralInference, check_if_proposal_has_default_x
 from sbi.inference.posteriors import DirectPosterior, MCMCPosterior, RejectionPosterior
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials import posterior_estimator_based_potential
-from sbi.types import TorchModule
 from sbi.utils import (
     RestrictedPrior,
     check_estimator_arg,
@@ -331,7 +330,7 @@ class PosteriorEstimator(NeuralInference, ABC):
 
             # Take mean over all validation samples.
             self._val_log_prob = log_prob_sum / (
-                len(val_loader) * val_loader.batch_size
+                len(val_loader) * val_loader.batch_size  # type: ignore
             )
             # Log validation log prob for every epoch.
             self._summary["validation_log_probs"].append(self._val_log_prob)
@@ -356,7 +355,7 @@ class PosteriorEstimator(NeuralInference, ABC):
 
     def build_posterior(
         self,
-        density_estimator: Optional[TorchModule] = None,
+        density_estimator: Optional[nn.Module] = None,
         prior: Optional[Any] = None,
         sample_with: str = "rejection",
         mcmc_method: str = "slice_np",

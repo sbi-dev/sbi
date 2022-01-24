@@ -12,7 +12,6 @@ from sbi import utils as utils
 from sbi.inference.base import NeuralInference
 from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior
 from sbi.inference.potentials import ratio_estimator_based_potential
-from sbi.types import TorchModule
 from sbi.utils import (
     check_estimator_arg,
     clamp_and_warn,
@@ -236,7 +235,7 @@ class RatioEstimator(NeuralInference, ABC):
                     loss_sum -= loss.sum().item()
                 # Take mean over all validation samples.
                 self._val_log_prob = loss_sum / (
-                    len(val_loader) * val_loader.batch_size
+                    len(val_loader) * val_loader.batch_size  # type: ignore
                 )
                 # Log validation log prob for every epoch.
                 self._summary["validation_log_probs"].append(self._val_log_prob)
@@ -290,7 +289,7 @@ class RatioEstimator(NeuralInference, ABC):
 
     def build_posterior(
         self,
-        density_estimator: Optional[TorchModule] = None,
+        density_estimator: Optional[nn.Module] = None,
         prior: Optional[Any] = None,
         sample_with: str = "mcmc",
         mcmc_method: str = "slice_np",

@@ -45,7 +45,7 @@ class KDEWrapper:
 def get_kde(
     samples: Tensor,
     bandwidth: Union[float, str] = "cv",
-    transform: transform_types = identity_transform,
+    transform: transform_types = None,
     sample_weights: Optional[np.ndarray] = None,
     num_cv_partitions: int = 20,
     num_cv_repetitions: int = 5,
@@ -67,15 +67,15 @@ def get_kde(
     [1]: https://github.com/scikit-learn/scikit-learn/blob/
          0303fca35e32add9d7346dcb2e0e697d4e68706f/sklearn/neighbors/kde.py
     """
-    if not transform:
-        transform = identity_transform
+    transform_ = identity_transform if transform is None else transform
+
     # Make sure transform has event dimension and returns scalar log_prob.
-    if transform.event_dim == 0:
-        transform = IndependentTransform(transform, reinterpreted_batch_ndims=1)
+    if transform_.event_dim == 0:
+        transform_ = IndependentTransform(transform_, reinterpreted_batch_ndims=1)
     if isinstance(bandwidth, str):
         assert bandwidth in ["cv", "scott", "silvermann"], "invalid kde bandwidth name."
 
-    transformed_samples = transform(samples).numpy()
+    transformed_samples = transform_(samples).numpy()
     num_samples, dim_samples = transformed_samples.shape
 
     algorithm = "auto"
@@ -138,7 +138,7 @@ def get_kde(
                 if upper < lower:
                     upper, lower = lower, upper
 
-        bandwidth_selected = grid.best_params_["bandwidth"]
+        bandwidth_selected = grid.best_params_["bandwidth"]  # type: ignore
     elif float(bandwidth) > 0:
         bandwidth_selected = float(bandwidth)
     else:
@@ -158,4 +158,4 @@ def get_kde(
     )
     kde.fit(transformed_samples, sample_weight=sample_weights)
 
-    return KDEWrapper(kde, transform)
+    return KDEWrapper(kde, transform_)

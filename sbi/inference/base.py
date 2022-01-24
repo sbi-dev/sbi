@@ -11,7 +11,8 @@ from warnings import warn
 import torch
 from torch import Tensor
 from torch.utils import data
-from torch.utils.tensorboard import SummaryWriter
+from torch.utils.data.sampler import SubsetRandomSampler
+from torch.utils.tensorboard.writer import SummaryWriter
 
 import sbi.inference
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
@@ -147,6 +148,7 @@ class NeuralInference(ABC):
         self._data_round_index = []
 
         self._round = 0
+        self._val_log_prob = float("-Inf")
 
         # XXX We could instantiate here the Posterior for all children. Two problems:
         #     1. We must dispatch to right PotentialProvider for mcmc based on name
@@ -322,7 +324,7 @@ class NeuralInference(ABC):
         train_loader_kwargs = {
             "batch_size": min(training_batch_size, num_training_examples),
             "drop_last": True,
-            "sampler": data.sampler.SubsetRandomSampler(self.train_indices),
+            "sampler": SubsetRandomSampler(self.train_indices.tolist()),
         }
         train_loader_kwargs = (
             dict(train_loader_kwargs, **dataloader_kwargs)
@@ -333,7 +335,7 @@ class NeuralInference(ABC):
             "batch_size": min(training_batch_size, num_validation_examples),
             "shuffle": False,
             "drop_last": True,
-            "sampler": data.sampler.SubsetRandomSampler(self.val_indices),
+            "sampler": SubsetRandomSampler(self.val_indices.tolist()),
         }
         val_loader_kwargs = (
             dict(val_loader_kwargs, **dataloader_kwargs)
@@ -359,6 +361,7 @@ class NeuralInference(ABC):
         """
         converged = False
 
+        assert self._neural_net is not None
         neural_net = self._neural_net
 
         # (Re)-start the epoch count with the first epoch or any improvement.
@@ -384,21 +387,6 @@ class NeuralInference(ABC):
             get_log_root(), method, datetime.now().isoformat().replace(":", "_")
         )
         return SummaryWriter(logdir)
-
-    @staticmethod
-    def _ensure_list(
-        num_simulations_per_round: Union[List[int], int], num_rounds: int
-    ) -> List[int]:
-        """Return `num_simulations_per_round` as a list of length `num_rounds`."""
-        try:
-            assert len(num_simulations_per_round) == num_rounds, (
-                "Please provide a list with number of simulations per round for each "
-                "round, or a single integer to be used for all rounds."
-            )
-        except TypeError:
-            num_simulations_per_round: List = [num_simulations_per_round] * num_rounds
-
-        return cast(list, num_simulations_per_round)
 
     @staticmethod
     def _describe_round(round_: int, summary: Dict[str, list]) -> str:
@@ -477,7 +465,9 @@ class NeuralInference(ABC):
 
         # Add validation log prob for every epoch.
         # Offset with all previous epochs.
-        offset = torch.tensor(self._summary["epochs"][:-1], dtype=int).sum().item()
+        offset = (
+            torch.tensor(self._summary["epochs"][:-1], dtype=torch.int).sum().item()
+        )
         for i, vlp in enumerate(self._summary["validation_log_probs"][offset:]):
             self._summary_writer.add_scalar(
                 tag="validation_log_probs_across_rounds",

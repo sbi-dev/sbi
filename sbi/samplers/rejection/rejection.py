@@ -88,7 +88,7 @@ def rejection_sample(
         Proposal for rejection sampling which is strictly larger than the potential_fn.
         """
 
-        def __init__(self, proposal: Any, max_log_ratio: float, log_m: float):
+        def __init__(self, proposal: Any, max_log_ratio: Tensor, log_m: Tensor):
             self.proposal = proposal
             self.max_log_ratio = max_log_ratio
             self.log_m = log_m

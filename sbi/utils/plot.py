@@ -15,7 +15,7 @@ from scipy.stats import gaussian_kde
 from sbi.utils import eval_conditional_density
 
 try:
-    collectionsAbc = collections.abc
+    collectionsAbc = collections.abc  # type: ignore
 except:
     collectionsAbc = collections
 
@@ -37,9 +37,9 @@ def _update(d, u):
     # https://stackoverflow.com/a/3233356
     for k, v in six.iteritems(u):
         dv = d.get(k, {})
-        if not isinstance(dv, collectionsAbc.Mapping):
+        if not isinstance(dv, collectionsAbc.Mapping):  # type: ignore
             d[k] = v
-        elif isinstance(v, collectionsAbc.Mapping):
+        elif isinstance(v, collectionsAbc.Mapping):  # type: ignore
             d[k] = _update(dv, v)
         else:
             d[k] = v
@@ -137,9 +137,7 @@ def ensure_numpy(t: Union[np.ndarray, torch.Tensor]) -> np.ndarray:
 
 
 def pairplot(
-    samples: Union[
-        List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor
-    ] = None,
+    samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
     points: Optional[
         Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor]
     ] = None,
@@ -154,7 +152,7 @@ def pairplot(
     warn_about_deprecation: bool = True,
     fig=None,
     axes=None,
-    **kwargs
+    **kwargs,
 ):
     """
     Plot samples in a 2D grid showing marginals and pairwise marginals.
@@ -215,14 +213,13 @@ def pairplot(
 
     # Prepare samples
     if type(samples) != list:
-        samples = ensure_numpy(samples)
-        samples = [samples]
+        samples_np = ensure_numpy(samples)  # type: ignore
+        samples_np_list = [samples_np]
     else:
-        for i, sample_pack in enumerate(samples):
-            samples[i] = ensure_numpy(samples[i])
+        samples_np_list = [ensure_numpy(samples[i]) for i, _ in enumerate(samples)]
 
     # Dimensionality of the problem.
-    dim = samples[0].shape[1]
+    dim = samples_np_list[0].shape[1]
 
     # Prepare limits. Infer them from samples if they had not been passed.
     if limits == [] or limits is None:
@@ -230,7 +227,7 @@ def pairplot(
         for d in range(dim):
             min = +np.inf
             max = -np.inf
-            for sample in samples:
+            for sample in samples_np_list:
                 min_ = sample[:, d].min()
                 min = min_ if min_ < min else min
                 max_ = sample[:, d].max()
@@ -245,16 +242,16 @@ def pairplot(
 
     # Prepare diag/upper/lower
     if type(opts["diag"]) is not list:
-        opts["diag"] = [opts["diag"] for _ in range(len(samples))]
+        opts["diag"] = [opts["diag"] for _ in range(len(samples_np_list))]
     if type(opts["upper"]) is not list:
-        opts["upper"] = [opts["upper"] for _ in range(len(samples))]
+        opts["upper"] = [opts["upper"] for _ in range(len(samples_np_list))]
     # if type(opts['lower']) is not list:
     #    opts['lower'] = [opts['lower'] for _ in range(len(samples))]
     opts["lower"] = None
 
     def diag_func(row, **kwargs):
-        if len(samples) > 0:
-            for n, v in enumerate(samples):
+        if len(samples_np_list) > 0:
+            for n, v in enumerate(samples_np_list):
                 if opts["diag"][n] == "hist":
                     h = plt.hist(
                         v[:, row], color=opts["samples_colors"][n], **opts["hist_diag"]
@@ -277,14 +274,14 @@ def pairplot(
                         plt.axvline(
                             single_sample[row],
                             color=opts["samples_colors"][n],
-                            **opts["scatter_diag"]
+                            **opts["scatter_diag"],
                         )
                 else:
                     pass
 
     def upper_func(row, col, limits, **kwargs):
-        if len(samples) > 0:
-            for n, v in enumerate(samples):
+        if len(samples_np_list) > 0:
+            for n, v in enumerate(samples_np_list):
                 if opts["upper"][n] == "hist" or opts["upper"][n] == "hist2d":
                     hist, xedges, yedges = np.histogram2d(
                         v[:, col],
@@ -293,7 +290,7 @@ def pairplot(
                             [limits[col][0], limits[col][1]],
                             [limits[row][0], limits[row][1]],
                         ],
-                        **opts["hist_offdiag"]
+                        **opts["hist_offdiag"],
                     )
                     h = plt.imshow(
                         hist.T,
@@ -370,14 +367,14 @@ def pairplot(
                         v[:, col],
                         v[:, row],
                         color=opts["samples_colors"][n],
-                        **opts["scatter_offdiag"]
+                        **opts["scatter_offdiag"],
                     )
                 elif opts["upper"][n] == "plot":
                     h = plt.plot(
                         v[:, col],
                         v[:, row],
                         color=opts["samples_colors"][n],
-                        **opts["plot_offdiag"]
+                        **opts["plot_offdiag"],
                     )
                 else:
                     pass
@@ -403,7 +400,7 @@ def conditional_pairplot(
     warn_about_deprecation: bool = True,
     fig=None,
     axes=None,
-    **kwargs
+    **kwargs,
 ):
     r"""
     Plot conditional distribution given all other parameters.
@@ -438,7 +435,7 @@ def conditional_pairplot(
         warn_about_deprecation: With sbi v0.15.0, we depracated the import of this
             function from `sbi.utils`. Instead, it should be imported from
             `sbi.analysis`.
-        fig: matplotlib figure to plot on. 
+        fig: matplotlib figure to plot on.
         axes: matplotlib axes corresponding to fig.
         **kwargs: Additional arguments to adjust the plot, see the source code in
             `_get_default_opts()` in `sbi.utils.plot` for more details.
@@ -558,7 +555,7 @@ def _pairplot_scaffold(
         opts: Dictionary built by the functions that call `pairplot_scaffold`. Must
             contain at least `labels`, `subset`, `figsize`, `subplots`,
             `fig_subplots_adjust`, `title`, `title_format`, ..
-        fig: matplotlib figure to plot on. 
+        fig: matplotlib figure to plot on.
         axes: matplotlib axes corresponding to fig.
 
     Returns: figure and axis
@@ -568,7 +565,7 @@ def _pairplot_scaffold(
     if points is None:
         points = []
     if type(points) != list:
-        points = ensure_numpy(points)
+        points = ensure_numpy(points)  # type: ignore
         points = [points]
     points = [np.atleast_2d(p) for p in points]
     points = [np.atleast_2d(ensure_numpy(p)) for p in points]
@@ -610,7 +607,10 @@ def _pairplot_scaffold(
             rows, cols, figsize=opts["figsize"], **opts["subplots"]
         )
     else:
-        assert axes.shape == (rows, cols), f"Passed axes must match subplot shape: {rows, cols}."
+        assert axes.shape == (
+            rows,
+            cols,
+        ), f"Passed axes must match subplot shape: {rows, cols}."
     # Cast to ndarray in case of 1D subplots.
     axes = np.array(axes).reshape(rows, cols)
 
@@ -713,7 +713,7 @@ def _pairplot_scaffold(
                             [v[:, row], v[:, row]],
                             extent,
                             color=opts["points_colors"][n],
-                            **opts["points_diag"]
+                            **opts["points_diag"],
                         )
 
             # Off-diagonals
@@ -731,7 +731,7 @@ def _pairplot_scaffold(
                             v[:, col],
                             v[:, row],
                             color=opts["points_colors"][n],
-                            **opts["points_offdiag"]
+                            **opts["points_offdiag"],
                         )
 
     if len(subset) < dim:
@@ -747,7 +747,7 @@ def _pairplot_scaffold(
                     y0 - (y1 - y0) / 1.5,
                     "...",
                     rotation=-45,
-                    **text_kwargs
+                    **text_kwargs,
                 )
 
     return fig, axes

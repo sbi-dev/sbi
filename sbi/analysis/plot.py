@@ -1,7 +1,6 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
-import collections
 from typing import Any, List, Optional, Tuple, Union
 
 import numpy as np
@@ -11,16 +10,9 @@ from matplotlib import pyplot as plt
 from sbi.utils import conditional_pairplot as utils_conditional_pairplot
 from sbi.utils import pairplot as utils_pairplot
 
-try:
-    collectionsAbc = collections.abc
-except:
-    collectionsAbc = collections
-
 
 def pairplot(
-    samples: Union[
-        List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor
-    ] = None,
+    samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
     points: Optional[
         Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor]
     ] = None,

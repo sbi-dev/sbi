@@ -32,8 +32,8 @@ class StandardizeInputs(nn.Module):
 
 
 def build_input_layer(
-    batch_x: Tensor = None,
-    batch_y: Tensor = None,
+    batch_x: Tensor,
+    batch_y: Tensor,
     z_score_x: bool = True,
     z_score_y: bool = True,
     embedding_net_x: nn.Module = nn.Identity(),
@@ -69,8 +69,8 @@ def build_input_layer(
 
 
 def build_linear_classifier(
-    batch_x: Tensor = None,
-    batch_y: Tensor = None,
+    batch_x: Tensor,
+    batch_y: Tensor,
     z_score_x: bool = True,
     z_score_y: bool = True,
     embedding_net_x: nn.Module = nn.Identity(),
@@ -111,8 +111,8 @@ def build_linear_classifier(
 
 
 def build_mlp_classifier(
-    batch_x: Tensor = None,
-    batch_y: Tensor = None,
+    batch_x: Tensor,
+    batch_y: Tensor,
     z_score_x: bool = True,
     z_score_y: bool = True,
     hidden_features: int = 50,
@@ -160,8 +160,8 @@ def build_mlp_classifier(
 
 
 def build_resnet_classifier(
-    batch_x: Tensor = None,
-    batch_y: Tensor = None,
+    batch_x: Tensor,
+    batch_y: Tensor,
     z_score_x: bool = True,
     z_score_y: bool = True,
     hidden_features: int = 50,

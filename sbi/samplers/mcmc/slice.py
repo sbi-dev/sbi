@@ -2,8 +2,10 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from copy import deepcopy
+from typing import Callable, Dict, Optional
 
 import torch
+from torch import Tensor
 from pyro.infer.mcmc.mcmc_kernel import MCMCKernel
 from pyro.infer.mcmc.util import initialize_model
 
@@ -11,16 +13,16 @@ from pyro.infer.mcmc.util import initialize_model
 class Slice(MCMCKernel):
     def __init__(
         self,
-        model=None,
-        potential_fn=None,
-        initial_width=0.01,
+        model: Optional[Callable],
+        potential_fn: Optional[Callable] = None,
+        initial_width: float = 0.01,
         max_width=float("inf"),
-        transforms=None,
-        max_plate_nesting=None,
-        jit_compile=False,
-        jit_options=None,
-        ignore_jit_warnings=False,
-    ):
+        transforms: Optional[Dict] = None,
+        max_plate_nesting: Optional[int] = None,
+        jit_compile: Optional[bool] = False,
+        jit_options: Optional[Dict] = None,
+        ignore_jit_warnings: bool = False,
+    ) -> None:
         """
         Slice sampling kernel [1].
 
@@ -32,27 +34,28 @@ class Slice(MCMCKernel):
         [1] `Slice Sampling <https://doi.org/10.1214/aos/1056562461>`_,
             Radford M. Neal
 
-        :param model: Python callable containing Pyro primitives.
-        :param potential_fn: Python callable calculating potential energy with input
-            is a dict of real support parameters.
-        :param initial_width: Initial bracket width
-        :param max_width: Maximum bracket width
-        :param dict transforms: Optional dictionary that specifies a transform
-            for a sample site with constrained support to unconstrained space. The
-            transform should be invertible, and implement `log_abs_det_jacobian`.
-            If not specified and the model has sites with constrained support,
-            automatic transformations will be applied, as specified in
-            :mod:`torch.distributions.constraint_registry`.
-        :param int max_plate_nesting: Optional bound on max number of nested
-            :func:`pyro.plate` contexts. This is required if model contains
-            discrete sample sites that can be enumerated over in parallel.
-        :param bool jit_compile: Optional parameter denoting whether to use
-            the PyTorch JIT to trace the log density computation, and use this
-            optimized executable trace in the integrator.
-        :param dict jit_options: A dictionary contains optional arguments for
-            :func:`torch.jit.trace` function.
-        :param bool ignore_jit_warnings: Flag to ignore warnings from the JIT
-            tracer when ``jit_compile=True``. Default is False.
+        Args:
+            model: Python callable containing Pyro primitives.
+            potential_fn: Python callable calculating potential energy with input
+                is a dict of real support parameters.
+            initial_width: Initial bracket width
+            max_width: Maximum bracket width
+            transforms: Optional dictionary that specifies a transform
+                for a sample site with constrained support to unconstrained space. The
+                transform should be invertible, and implement `log_abs_det_jacobian`.
+                If not specified and the model has sites with constrained support,
+                automatic transformations will be applied, as specified in
+                :mod:`torch.distributions.constraint_registry`.
+            max_plate_nesting: Optional bound on max number of nested
+                :func:`pyro.plate` contexts. This is required if model contains
+                discrete sample sites that can be enumerated over in parallel.
+            jit_compile: Optional parameter denoting whether to use
+                the PyTorch JIT to trace the log density computation, and use this
+                optimized executable trace in the integrator.
+            jit_options: A dictionary contains optional arguments for
+                :func:`torch.jit.trace` function.
+            ignore_jit_warnings: Flag to ignore warnings from the JIT
+                tracer when ``jit_compile=True``. Default is False.
         """
         if not ((model is None) ^ (potential_fn is None)):
             raise ValueError("Only one of `model` or `potential_fn` must be specified.")
@@ -75,9 +78,9 @@ class Slice(MCMCKernel):
 
     def _reset(self):
         self._t = 0
-        self._width = None
-        self._num_dimensions = None
-        self._initial_params = None
+        self._width: Optional[Tensor] = None
+        self._num_dimensions: Optional[int] = None
+        self._initial_params: Optional[Dict] = None
         self._site_name = None
 
     def setup(self, warmup_steps, *args, **kwargs):
@@ -86,6 +89,7 @@ class Slice(MCMCKernel):
             self._initialize_model_properties(args, kwargs)
 
         # TODO: Clean up required for multiple sites
+        assert self.initial_params is not None
         self._site_name = next(iter(self.initial_params.keys()))
         self._num_dimensions = next(iter(self.initial_params.values())).shape[-1]
 
@@ -123,6 +127,10 @@ class Slice(MCMCKernel):
         self._reset()
 
     def sample(self, params):
+        assert (
+            self._num_dimensions is not None and self._width is not None
+        ), "Chain not initialized."
+
         for dim in torch.randperm(self._num_dimensions):
             (
                 params[self._site_name].view(-1)[dim.item()],
@@ -144,6 +152,8 @@ class Slice(MCMCKernel):
         # https://pints.readthedocs.io/en/latest/mcmc_samplers/slice_stepout_mcmc.html
 
         def _log_prob_d(x):
+            assert self.potential_fn is not None, "Chain not initialized."
+
             return -self.potential_fn(
                 {
                     self._site_name: torch.cat(
@@ -158,6 +168,10 @@ class Slice(MCMCKernel):
                     # this is the case exactly
                 }
             )
+
+        assert (
+            self._site_name is not None and self._width is not None
+        ), "Chain not initialized."
 
         # Sample uniformly from slice
         log_height = _log_prob_d(params[self._site_name].view(-1)[dim]) + torch.log(

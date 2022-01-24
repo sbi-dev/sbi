@@ -12,6 +12,7 @@ from scipy.stats._distn_infrastructure import rv_frozen
 from scipy.stats._multivariate import multi_rv_frozen
 from torch import Tensor, float32, nn
 from torch.distributions import Distribution, Uniform
+from pyknos.nflows import flows
 
 from sbi.types import Array
 from sbi.utils.sbiutils import warn_on_iid_x, within_support
@@ -472,7 +473,7 @@ def process_x(
         x: Observed data with shape ready for usage in sbi.
     """
 
-    x = torch.as_tensor(atleast_2d(x), dtype=float32)
+    x = atleast_2d(torch.as_tensor(x, dtype=float32))
 
     input_x_shape = x.shape
     if not allow_iid_x:
@@ -619,7 +620,7 @@ def validate_theta_and_x(
     return theta, x
 
 
-def test_posterior_net_for_multi_d_x(net: nn.Module, theta: Tensor, x: Tensor) -> None:
+def test_posterior_net_for_multi_d_x(net: flows.Flow, theta: Tensor, x: Tensor) -> None:
     """Test log prob method of the net.
 
     This is done to make sure the net can handle multidimensional inputs via an

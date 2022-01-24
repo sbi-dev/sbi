@@ -4,7 +4,7 @@
 from typing import Any, Callable
 
 import numpy as np
-from pyknos import nflows
+from pyknos.nflows.transforms import Transform
 import torch
 from torch import Tensor
 
@@ -24,7 +24,7 @@ class IterateParameters:
         return next(self.iter)
 
 
-def prior_init(prior: Any, transform: nflows.transforms, **kwargs: Any) -> Tensor:
+def prior_init(prior: Any, transform: Transform, **kwargs: Any) -> Tensor:
     """Return a sample from the prior."""
     prior_samples = prior.sample((1,)).detach()
     transformed_prior_samples = transform(prior_samples)
@@ -34,7 +34,7 @@ def prior_init(prior: Any, transform: nflows.transforms, **kwargs: Any) -> Tenso
 def sir(
     prior: Any,
     potential_fn: Callable,
-    transform: nflows.transforms,
+    transform: Transform,
     sir_num_batches: int = 10,
     sir_batch_size: int = 1000,
     **kwargs: Any,

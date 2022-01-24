@@ -6,7 +6,7 @@ import torch
 import torch.nn.functional as F
 from pyknos.nflows.nn import nets
 from torch import Tensor, nn, optim, relu
-from torch.nn.utils import clip_grad_norm_
+from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler, WeightedRandomSampler
 from tqdm.auto import tqdm
@@ -21,7 +21,7 @@ from sbi.utils.user_input_checks import validate_theta_and_x
 
 
 def build_input_layer(
-    batch_theta: Tensor = None,
+    batch_theta: Tensor,
     z_score_theta: bool = True,
     embedding_net_theta: nn.Module = nn.Identity(),
 ) -> nn.Module:
@@ -84,7 +84,7 @@ def build_classifier(
     """
     if model == "resnet":
 
-        def build_nn(theta):
+        def build_nn(theta) -> nn.Module:
             classifier = nets.ResidualNet(
                 in_features=theta.shape[1],
                 out_features=2,
@@ -101,7 +101,7 @@ def build_classifier(
 
     elif model == "mlp":
 
-        def build_nn(theta):
+        def build_nn(theta) -> nn.Module:
             classifier = nn.Sequential(
                 nn.Linear(theta.shape[1], hidden_features),
                 nn.BatchNorm1d(hidden_features),
@@ -209,6 +209,7 @@ class RestrictionEstimator:
         if self._valid_or_invalid_criterion == "nan":
             label, _, _ = handle_invalid_x(x)
         else:
+            assert isinstance(self._valid_or_invalid_criterion, Callable)
             label = self._valid_or_invalid_criterion(x)
 
         label = label.long()
@@ -248,7 +249,7 @@ class RestrictionEstimator:
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
         stop_after_epochs: int = 20,
-        max_num_epochs: Optional[int] = None,
+        max_num_epochs: int = 2 ** 31 - 1,
         clip_max_norm: Optional[float] = 5.0,
         loss_importance_weights: Union[bool, float] = False,
         subsample_invalid_sims: Union[float, str] = 1.0,
@@ -280,8 +281,8 @@ class RestrictionEstimator:
                 subsample weights such that the data is balanced.
         """
 
-        theta = torch.cat(self._theta_roundwise)
-        label = torch.cat(self._label_roundwise)
+        theta: Tensor = torch.cat(self._theta_roundwise)
+        label: Tensor = torch.cat(self._label_roundwise)
 
         # Get indices for permutation of the data.
         num_examples = len(theta)
@@ -297,12 +298,14 @@ class RestrictionEstimator:
         # E.g. if there are fewer `valid` datapoints, one might want to sample them
         # more often (i.e. show them to the neural network more often). Such a sampler
         # is implemented below. Also see: https://discuss.pytorch.org/t/29907
-        subsample_weights = torch.ones(num_examples)
+        subsample_weights: Tensor = torch.ones(num_examples)
         if subsample_invalid_sims == "auto":
-            subsample_invalid_sims = float(label.sum()) / float(
-                theta.shape[0] - label.sum()
-            )
-        subsample_weights[~label.bool()] = subsample_invalid_sims
+            subsample_invalid = float(label.sum()) / float(theta.shape[0] - label.sum())
+        else:
+            assert isinstance(subsample_invalid_sims, float)
+            subsample_invalid = subsample_invalid_sims
+
+        subsample_weights[torch.logical_not(label.bool())] = subsample_invalid
 
         subsample_weights = deepcopy(subsample_weights)
         subsample_weights[val_indices] = 0.0
@@ -316,7 +319,9 @@ class RestrictionEstimator:
             batch_size=training_batch_size,
             drop_last=True,
             sampler=WeightedRandomSampler(
-                subsample_weights, int(subsample_weights.sum()), replacement=False
+                subsample_weights.tolist(),
+                int(subsample_weights.sum()),
+                replacement=False,
             ),
         )
         val_loader = data.DataLoader(
@@ -326,7 +331,7 @@ class RestrictionEstimator:
             ),
             shuffle=False,
             drop_last=True,
-            sampler=SubsetRandomSampler(val_indices),
+            sampler=SubsetRandomSampler(val_indices.tolist()),
         )
 
         if self._classifier is None:
@@ -342,21 +347,22 @@ class RestrictionEstimator:
             list(self._classifier.parameters()),
             lr=learning_rate,
         )
-        max_num_epochs = 2 ** 31 - 1 if max_num_epochs is None else max_num_epochs
 
         # Compute the fraction of good simulations in dataset.
         if loss_importance_weights:
             if isinstance(loss_importance_weights, bool):
                 good_sim_fraction = torch.sum(label, dtype=torch.float) / label.shape[0]
-                loss_importance_weights = good_sim_fraction
+                importance_weights = good_sim_fraction
+            else:
+                importance_weights = loss_importance_weights
         else:
-            loss_importance_weights = 0.5
+            importance_weights = 0.5
 
         # Factor of two such that the average learning rate remains the same.
         # Needed because the average of reweigh_factor and 1-reweigh_factor will be 0.5
         # only.
         importance_weights = 2 * torch.tensor(
-            [loss_importance_weights, 1 - loss_importance_weights]
+            [importance_weights, 1 - importance_weights]
         )
 
         criterion = nn.CrossEntropyLoss(importance_weights, reduction="none")
@@ -432,10 +438,14 @@ class RestrictionEstimator:
 
         """
         if classifier is None:
-            classifier = self._classifier
+            assert self._classifier is not None, "Classifier must be trained first."
+            classifier_ = self._classifier
+        else:
+            classifier_ = classifier
+
         return RestrictedPrior(
             self._prior,
-            classifier,
+            classifier_,
             self._first_round_validation_theta,
             self._first_round_validation_label,
             allowed_false_negatives,
@@ -456,6 +466,7 @@ class RestrictionEstimator:
         """
         converged = False
 
+        assert self._classifier is not None, "Classifier must be trained first."
         posterior_nn = self._classifier
 
         # (Re)-start the epoch count with the first epoch or any improvement.
@@ -478,7 +489,7 @@ class RestrictedPrior:
     def __init__(
         self,
         prior: Any,
-        classifier: "RestrictionEstimator",
+        classifier: nn.Module,
         validation_theta: Tensor,
         validation_label: Tensor,
         allowed_false_negatives: float = 0.0,
@@ -674,6 +685,7 @@ class RestrictedPrior:
             else:
                 raise NameError(f"`safety_margin` {safety_margin} not supported.")
         else:
+            assert allowed_false_negatives is not None, "Set allowed_false_negatives!"
             quantile_index = floor(num_valid * allowed_false_negatives)
             self._classifier_thr, _ = torch.kthvalue(clf_probs, quantile_index + 1)
 

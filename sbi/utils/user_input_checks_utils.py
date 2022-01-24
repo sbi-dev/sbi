@@ -181,7 +181,7 @@ class MultipleIndependent(Distribution):
         # numel() instead of event_shape because for all dists both is possible,
         # event_shape=[1] or batch_shape=[1]
         self.dims_per_dist = torch.as_tensor([d.sample().numel() for d in self.dists])
-        self.ndims = torch.sum(torch.as_tensor(self.dims_per_dist)).item()
+        self.ndims = int(torch.sum(torch.as_tensor(self.dims_per_dist)).item())
 
         super().__init__(
             batch_shape=torch.Size([]),  # batch size was ensured to be <= 1 above.
@@ -292,8 +292,8 @@ class MultipleIndependent(Distribution):
     def support(self):
         # return independent constraints for each distribution.
         return MultipleIndependentConstraints(
-            constraints=[d.support for d in self.dists],
-            dims_per_constraint=self.dims_per_dist,
+            constraints=[d.support for d in self.dists],  # type: ignore
+            dims_per_constraint=self.dims_per_dist.tolist(),
         )
 
 
