@@ -80,18 +80,21 @@ def clamp_and_warn(name: str, value: float, min_val: float, max_val: float) -> f
 
 
 def z_score_parser(z_score_flag: Optional["str"]) -> Tuple[bool, bool]:
-    """Parses z-score flag into 2 booleans: to z-score or not, and whether the data
-    requires structured z-scoring (e.g., time series).
+    """Parses string z-score flag into booleans.
+
+    Converts string flag into booleans denoting whether to z-score or not, and whether
+    data dimensions are structured or independent.
 
     Args:
-        z_score_flag: string flag for z-scoring method stating whether the data
-        dimensions are structured or independent.
+        z_score_flag: str flag for z-scoring method stating whether the data
+        dimensions are "structured" or "independent", or does not require z-scoring
+        ("none" or None).
 
     Returns:
         Flag for whether or not to z-score, and whether data is structured
     """
     if type(z_score_flag) is bool:
-        # if boolean was passed
+        # Raise warning if boolean was passed.
         warnings.warn(
             """Boolean flag for z-scoring is accepted for backwards
                       compatibility only. Please use 'none', 'independent', or
@@ -99,29 +102,36 @@ def z_score_parser(z_score_flag: Optional["str"]) -> Tuple[bool, bool]:
         """
         )
         z_score_bool, structured_data = z_score_flag, False
+
     elif (z_score_flag is None) or (z_score_flag == "none"):
-        # if "none" or None was passed
+        # Return Falses if "none" or None was passed.
         z_score_bool, structured_data = False, False
+
     elif (z_score_flag == "independent") or (z_score_flag == "structured"):
-        # one of two valid z-scoring methods
+        # Got one of two valid z-scoring methods.
         z_score_bool = True
         structured_data = True if z_score_flag == "structured" else False
+
     else:
-        # invalid option
-        warnings.warn("Invalid z-scoring option, defaulting to no z-scoring")
+        # Return warning due to invalid option, defaults to not z-scoring.
+        warnings.warn("Invalid z-scoring option, defaulting to no z-scoring.")
         z_score_bool, structured_data = False, False
 
     return z_score_bool, structured_data
 
 
 def standardizing_transform(
-    batch_t: Tensor, min_std: float = 1e-14
+    batch_t: Tensor, structured_dims: bool = False, min_std: float = 1e-14
 ) -> transforms.AffineTransform:
     """Builds standardizing transform
 
     Args:
         batch_t: Batched tensor from which mean and std deviation (across
             first dimension) are computed.
+        structured_dim: Whether data dimensions are structured (e.g., time-series,
+            images), which requires computing mean and std per sample first before
+            aggregating over samples for a single standardization mean and std for the
+            batch, or independent (default), which z-scores dimensions independently.
         min_std:  Minimum value of the standard deviation to use when z-scoring to
             avoid division by zero.
 
@@ -131,9 +141,20 @@ def standardizing_transform(
 
     is_valid_t, *_ = handle_invalid_x(batch_t, True)
 
-    t_mean = torch.mean(batch_t[is_valid_t], dim=0)
-    t_std = torch.std(batch_t[is_valid_t], dim=0)
-    t_std[t_std < min_std] = min_std
+    if structured_dims:
+        # Structured data so compute a single mean over all dimensions
+        # equivalent to taking mean over per-sample mean, i.e.,
+        # `torch.mean(torch.mean(.., dim=1)).`
+        t_mean = torch.mean(batch_t[is_valid_t])
+        # Compute std per-sample first.
+        sample_std = torch.std(batch_t[is_valid_t], dim=1)
+        sample_std[sample_std < min_std] = min_std
+        # Average over all samples for batch std.
+        t_std = torch.mean(sample_std)
+    else:
+        t_mean = torch.mean(batch_t[is_valid_t], dim=0)
+        t_std = torch.std(batch_t[is_valid_t], dim=0)
+        t_std[t_std < min_std] = min_std
 
     return transforms.AffineTransform(shift=-t_mean / t_std, scale=1 / t_std)
 
@@ -175,20 +196,20 @@ def standardizing_net(
     is_valid_t, *_ = handle_invalid_x(batch_t, True)
 
     if structured_dims:
-        # structured data so compute a single mean over all dimensions
+        # Structured data so compute a single mean over all dimensions
         # equivalent to taking mean over per-sample mean, i.e.,
-        # torch.mean(torch.mean(.., dim=1))
+        # `torch.mean(torch.mean(.., dim=1)).`
         t_mean = torch.mean(batch_t[is_valid_t])
     else:
-        # compute per-dimension (independent) mean
+        # Compute per-dimension (independent) mean.
         t_mean = torch.mean(batch_t[is_valid_t], dim=0)
 
     if len(batch_t > 1):
         if structured_dims:
-            # compute std per-sample first
-            sample_std = torch.std(batch_t[is_valid_t], dim=0)
+            # Compute std per-sample first.
+            sample_std = torch.std(batch_t[is_valid_t], dim=1)
             sample_std[sample_std < min_std] = min_std
-            # average over all samples for batch std
+            # Average over all samples for batch std.
             t_std = torch.mean(sample_std)
         else:
             t_std = torch.std(batch_t[is_valid_t], dim=0)

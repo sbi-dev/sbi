@@ -36,8 +36,8 @@ def classifier_nn(
             `resnet`].
         z_score_theta: Whether to z-score parameters $\theta$ before passing them into
             the network, can take one of the following:
-            - `none`, None, or False (for backwards compatibility): do not z-score
-            - `independent` or True (for backwards compatibility): z-score each dimension independently
+            - `none`, None: do not z-score
+            - `independent`: z-score each dimension independently
             - `structured`: treat dimensions as related, therefore compute mean and std
             over the entire batch, instead of per-dimension.
         z_score_x: Whether to z-score simulation outputs $x$ before passing them into
@@ -105,9 +105,13 @@ def likelihood_nn(
         model: The type of density estimator that will be created. One of [`mdn`,
             `made`, `maf`, `nsf`].
         z_score_theta: Whether to z-score parameters $\theta$ before passing them into
-            the network.
+            the network, can take one of the following:
+            - `none`, None: do not z-score
+            - `independent`: z-score each dimension independently
+            - `structured`: treat dimensions as related, therefore compute mean and std
+            over the entire batch, instead of per-dimension.
         z_score_x: Whether to z-score simulation outputs $x$ before passing them into
-            the network.
+            the network, same as z_score_theta.
         hidden_features: Number of hidden features.
         num_transforms: Number of transforms when a flow is used. Only relevant if
             density estimator is a normalizing flow (i.e. currently either a `maf` or a
@@ -177,9 +181,13 @@ def posterior_nn(
         model: The type of density estimator that will be created. One of [`mdn`,
             `made`, `maf`, `nsf`].
         z_score_theta: Whether to z-score parameters $\theta$ before passing them into
-            the network.
+            the network, can take one of the following:
+            - `none`, None: do not z-score
+            - `independent`: z-score each dimension independently
+            - `structured`: treat dimensions as related, therefore compute mean and std
+            over the entire batch, instead of per-dimension.
         z_score_x: Whether to z-score simulation outputs $x$ before passing them into
-            the network.
+            the network, same as z_score_theta.
         hidden_features: Number of hidden features.
         num_transforms: Number of transforms when a flow is used. Only relevant if
             density estimator is a normalizing flow (i.e. currently either a `maf` or a
