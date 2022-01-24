@@ -85,10 +85,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         self._summary.update({"rejection_sampling_acceptance_rates": []})  # type:ignore
 
     def append_simulations(
-        self,
-        theta: Tensor,
-        x: Tensor,
-        proposal: Optional[DirectPosterior] = None,
+        self, theta: Tensor, x: Tensor, proposal: Optional[DirectPosterior] = None,
     ) -> "PosteriorEstimator":
         r"""Store parameters and simulation outputs to use them for later training.
 
@@ -165,7 +162,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         exclude_invalid_x: bool = True,
         resume_training: bool = False,
         discard_prior_samples: bool = False,
-        retrain_from_scratch_each_round: bool = False,
+        retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[dict] = None,
     ) -> nn.Module:
@@ -193,7 +190,7 @@ class PosteriorEstimator(NeuralInference, ABC):
             discard_prior_samples: Whether to discard samples simulated in round 1, i.e.
                 from the prior. Training may be sped up by ignoring such less targeted
                 samples.
-            retrain_from_scratch_each_round: Whether to retrain the conditional density
+            retrain_from_scratch: Whether to retrain the conditional density
                 estimator for the posterior from scratch each round.
             show_train_summary: Whether to print the number of epochs and validation
                 loss after the training.
@@ -246,7 +243,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         # arguments, which will build the neural network.
         # This is passed into NeuralPosterior, to create a neural posterior which
         # can `sample()` and `log_prob()`. The network is accessible via `.net`.
-        if self._neural_net is None or retrain_from_scratch_each_round:
+        if self._neural_net is None or retrain_from_scratch:
             self._neural_net = self._build_neural_net(
                 theta[self.train_indices], x[self.train_indices]
             )
@@ -288,11 +285,7 @@ class PosteriorEstimator(NeuralInference, ABC):
 
                 batch_loss = torch.mean(
                     self._loss(
-                        theta_batch,
-                        x_batch,
-                        masks_batch,
-                        proposal,
-                        calibration_kernel,
+                        theta_batch, x_batch, masks_batch, proposal, calibration_kernel,
                     )
                 )
 
@@ -323,11 +316,7 @@ class PosteriorEstimator(NeuralInference, ABC):
                     )
                     # Take negative loss here to get validation log_prob.
                     batch_log_prob = -self._loss(
-                        theta_batch,
-                        x_batch,
-                        masks_batch,
-                        proposal,
-                        calibration_kernel,
+                        theta_batch, x_batch, masks_batch, proposal, calibration_kernel,
                     )
                     log_prob_sum += batch_log_prob.sum().item()
 
@@ -450,11 +439,7 @@ class PosteriorEstimator(NeuralInference, ABC):
 
     @abstractmethod
     def _log_prob_proposal_posterior(
-        self,
-        theta: Tensor,
-        x: Tensor,
-        masks: Tensor,
-        proposal: Optional[Any],
+        self, theta: Tensor, x: Tensor, masks: Tensor, proposal: Optional[Any],
     ) -> Tensor:
         raise NotImplementedError
 

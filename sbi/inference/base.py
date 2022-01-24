@@ -273,7 +273,7 @@ class NeuralInference(ABC):
         calibration_kernel: Optional[Callable] = None,
         exclude_invalid_x: bool = True,
         discard_prior_samples: bool = False,
-        retrain_from_scratch_each_round: bool = False,
+        retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
     ) -> NeuralPosterior:
         raise NotImplementedError
