@@ -13,6 +13,7 @@ from scipy.stats._multivariate import multi_rv_frozen
 from torch import Tensor, float32, nn
 from torch.distributions import Distribution, Uniform
 
+from sbi.types import Array
 from sbi.utils.sbiutils import warn_on_iid_x, within_support
 from sbi.utils.torchutils import BoxUniform, atleast_2d
 from sbi.utils.user_input_checks_utils import (
@@ -523,7 +524,7 @@ def get_batch_loop_simulator(simulator: Callable) -> Callable:
 
 
 def process_x(
-    x: Tensor, x_shape: Optional[torch.Size] = None, allow_iid_x: bool = False
+    x: Array, x_shape: Optional[torch.Size] = None, allow_iid_x: bool = False
 ) -> Tensor:
     """Return observed data adapted to match sbi's shape and type requirements.
 

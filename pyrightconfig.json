@@ -1,0 +1,13 @@
+{
+    "include": [
+        "sbi"
+    ],
+    "exclude": [
+        "**/__pycache__",
+        "**/node_modules",
+        ".git",
+    ],
+    "reportUnsupportedDunderAll": false,
+    "pythonVersion": "3.8",
+    "stubPath": ""
+}

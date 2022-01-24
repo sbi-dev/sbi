@@ -11,6 +11,7 @@ from torch import Tensor, eye, nn, ones
 from torch.distributions import MultivariateNormal, Uniform
 
 from sbi import utils as utils
+from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.inference.snpe.snpe_base import PosteriorEstimator
 from sbi.types import TensorboardSummaryWriter
 from sbi.utils import (
@@ -93,7 +94,7 @@ class SNPE_C(PosteriorEstimator):
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
         stop_after_epochs: int = 20,
-        max_num_epochs: Optional[int] = None,
+        max_num_epochs: int = 2 ** 31 - 1,
         clip_max_norm: Optional[float] = 5.0,
         calibration_kernel: Optional[Callable] = None,
         exclude_invalid_x: bool = True,
@@ -114,8 +115,8 @@ class SNPE_C(PosteriorEstimator):
             stop_after_epochs: The number of epochs to wait for improvement on the
                 validation set before terminating training.
             max_num_epochs: Maximum number of epochs to run. If reached, we stop
-                training even when the validation loss is still decreasing. If None, we
-                train until validation loss increases (see also `stop_after_epochs`).
+                training even when the validation loss is still decreasing. Otherwise,
+                we train until validation loss increases (see also `stop_after_epochs`).
             clip_max_norm: Value at which to clip the total gradient norm in order to
                 prevent exploding gradients. Use None for no clipping.
             calibration_kernel: A function to calibrate the loss with respect to the
@@ -257,7 +258,7 @@ class SNPE_C(PosteriorEstimator):
         theta: Tensor,
         x: Tensor,
         masks: Tensor,
-        proposal: Optional[Any],
+        proposal: DirectPosterior,
     ) -> Tensor:
         """Return the log-probability of the proposal posterior.
 
@@ -305,8 +306,8 @@ class SNPE_C(PosteriorEstimator):
 
         batch_size = theta.shape[0]
 
-        num_atoms = clamp_and_warn(
-            "num_atoms", self._num_atoms, min_val=2, max_val=batch_size
+        num_atoms = int(
+            clamp_and_warn("num_atoms", self._num_atoms, min_val=2, max_val=batch_size)
         )
 
         # Each set of parameter atoms is evaluated using the same x,
@@ -357,7 +358,7 @@ class SNPE_C(PosteriorEstimator):
         return log_prob_proposal_posterior
 
     def _log_prob_proposal_posterior_mog(
-        self, theta: Tensor, x: Tensor, proposal: "DirectPosterior"
+        self, theta: Tensor, x: Tensor, proposal: DirectPosterior
     ) -> Tensor:
         """Return log-probability of the proposal posterior for MoG proposal.
 

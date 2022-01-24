@@ -4,6 +4,8 @@
 
 from typing import Any, Callable, Dict, Optional, Union
 
+from pyknos.nflows import flows
+
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.snle.snle_base import LikelihoodEstimator
 from sbi.types import TensorboardSummaryWriter
@@ -60,7 +62,7 @@ class SNLE_A(LikelihoodEstimator):
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
         stop_after_epochs: int = 20,
-        max_num_epochs: Optional[int] = None,
+        max_num_epochs: int = 2 ** 31 - 1,
         clip_max_norm: Optional[float] = 5.0,
         exclude_invalid_x: bool = True,
         resume_training: bool = False,
@@ -68,7 +70,7 @@ class SNLE_A(LikelihoodEstimator):
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
-    ) -> NeuralPosterior:
+    ) -> flows.Flow:
         r"""Return density estimator that approximates the distribution $p(x|\theta)$.
 
         Args:
@@ -78,8 +80,8 @@ class SNLE_A(LikelihoodEstimator):
             stop_after_epochs: The number of epochs to wait for improvement on the
                 validation set before terminating training.
             max_num_epochs: Maximum number of epochs to run. If reached, we stop
-                training even when the validation loss is still decreasing. If None, we
-                train until validation loss increases (see also `stop_after_epochs`).
+                training even when the validation loss is still decreasing. Otherwise,
+                we train until validation loss increases (see also `stop_after_epochs`).
             clip_max_norm: Value at which to clip the total gradient norm in order to
                 prevent exploding gradients. Use None for no clipping.
             exclude_invalid_x: Whether to exclude simulation outputs `x=NaN` or `x=±∞`

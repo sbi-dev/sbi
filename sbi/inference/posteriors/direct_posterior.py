@@ -4,6 +4,7 @@ from typing import Callable, Optional, Union
 
 import torch
 from torch import Tensor, log, nn
+from pyknos.nflows import flows
 
 from sbi import utils as utils
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
@@ -32,8 +33,8 @@ class DirectPosterior(NeuralPosterior):
 
     def __init__(
         self,
-        posterior_estimator: nn.Module,
-        prior: Callable,
+        posterior_estimator: flows.Flow,
+        prior: Any,
         max_sampling_batch_size: int = 10_000,
         device: Optional[str] = None,
         x_shape: Optional[torch.Size] = None,
@@ -232,9 +233,12 @@ class DirectPosterior(NeuralPosterior):
         if is_new_x:  # Calculate at x; don't save.
             return acceptance_at(x)
         elif not_saved_at_default_x or force_update:  # Calculate at default_x; save.
+            assert self.default_x is not None
             self._leakage_density_correction_factor = acceptance_at(self.default_x)
+        else:
+            raise ValueError
 
-        return self._leakage_density_correction_factor  # type:ignore
+        return self._leakage_density_correction_factor
 
     def map(
         self,

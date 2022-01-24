@@ -8,9 +8,10 @@ from typing import Any, Callable, Dict, Optional, Tuple, Union
 
 import torch
 from torch import Tensor, nn, optim
-from torch.nn.utils import clip_grad_norm_
+from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.utils import data
-from torch.utils.tensorboard import SummaryWriter
+from torch.utils.tensorboard.writer import SummaryWriter
+from pyknos.nflows import flows
 
 from sbi import utils as utils
 from sbi.inference import NeuralInference
@@ -119,7 +120,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
         stop_after_epochs: int = 20,
-        max_num_epochs: Optional[int] = None,
+        max_num_epochs: int = 2 ** 31 - 1,
         clip_max_norm: Optional[float] = 5.0,
         exclude_invalid_x: bool = True,
         resume_training: bool = False,
@@ -127,7 +128,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
-    ) -> nn.Module:
+    ) -> flows.Flow:
         r"""Train the density estimator to learn the distribution $p(x|\theta)$.
 
         Args:
@@ -150,8 +151,6 @@ class LikelihoodEstimator(NeuralInference, ABC):
         Returns:
             Density estimator that has learned the distribution $p(x|\theta)$.
         """
-
-        max_num_epochs = 2 ** 31 - 1 if max_num_epochs is None else max_num_epochs
 
         # Starting index for the training set (1 = discard round-0 samples).
         start_idx = int(discard_prior_samples and self._round > 0)

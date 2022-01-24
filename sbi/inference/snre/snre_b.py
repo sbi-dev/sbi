@@ -1,9 +1,8 @@
 from typing import Any, Callable, Dict, Optional, Union
 
 import torch
-from torch import Tensor
+from torch import nn, Tensor
 
-from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.snre.snre_base import RatioEstimator
 from sbi.types import TensorboardSummaryWriter
 from sbi.utils import del_entries
@@ -58,7 +57,7 @@ class SNRE_B(RatioEstimator):
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
         stop_after_epochs: int = 20,
-        max_num_epochs: Optional[int] = None,
+        max_num_epochs: int = 2 ** 31 - 1,
         clip_max_norm: Optional[float] = 5.0,
         exclude_invalid_x: bool = True,
         resume_training: bool = False,
@@ -66,7 +65,7 @@ class SNRE_B(RatioEstimator):
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
-    ) -> NeuralPosterior:
+    ) -> nn.Module:
         r"""Return classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
 
         Args:
@@ -77,8 +76,8 @@ class SNRE_B(RatioEstimator):
             stop_after_epochs: The number of epochs to wait for improvement on the
                 validation set before terminating training.
             max_num_epochs: Maximum number of epochs to run. If reached, we stop
-                training even when the validation loss is still decreasing. If None, we
-                train until validation loss increases (see also `stop_after_epochs`).
+                training even when the validation loss is still decreasing. Otherwise,
+                we train until validation loss increases (see also `stop_after_epochs`).
             clip_max_norm: Value at which to clip the total gradient norm in order to
                 prevent exploding gradients. Use None for no clipping.
             exclude_invalid_x: Whether to exclude simulation outputs `x=NaN` or `x=±∞`
@@ -104,7 +103,7 @@ class SNRE_B(RatioEstimator):
         return super().train(**kwargs)
 
     def _loss(self, theta: Tensor, x: Tensor, num_atoms: int) -> Tensor:
-        """Return cross-entropy loss for 1-out-of-`num_atoms` classification.
+        r"""Return cross-entropy loss for 1-out-of-`num_atoms` classification.
 
         The classifier takes as input `num_atoms` $(\theta,x)$ pairs. Out of these
         pairs, one pair was sampled from the joint $p(\theta,x)$ and all others from the
