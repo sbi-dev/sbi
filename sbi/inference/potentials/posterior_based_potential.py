@@ -6,6 +6,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import torch
 import torch.distributions.transforms as torch_tf
 from torch import Tensor, nn
+from pyknos.nflows import flows
 
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.utils import mcmc_transform
@@ -52,7 +53,7 @@ class PosteriorBasedPotential(BasePotential):
 
     def __init__(
         self,
-        posterior_estimator: nn.Module,
+        posterior_estimator: flows.Flow,
         prior: Any,
         x_o: Optional[Tensor],
         device: str = "cpu",

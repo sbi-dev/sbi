@@ -4,9 +4,9 @@ from typing import Any, Callable, Dict, Optional, Union
 
 import torch
 from torch import Tensor, eye, nn, ones, optim
-from torch.nn.utils import clip_grad_norm_
+from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.utils import data
-from torch.utils.tensorboard import SummaryWriter
+from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi import utils as utils
 from sbi.inference.base import NeuralInference
@@ -20,7 +20,6 @@ from sbi.utils import (
     x_shape_from_simulation,
 )
 from sbi.utils.sbiutils import mask_sims_from_prior
-from sbi.utils.user_input_checks import process_x
 
 
 class RatioEstimator(NeuralInference, ABC):
@@ -123,7 +122,7 @@ class RatioEstimator(NeuralInference, ABC):
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
         stop_after_epochs: int = 20,
-        max_num_epochs: Optional[int] = None,
+        max_num_epochs: int = 2 ** 31 - 1,
         clip_max_norm: Optional[float] = 5.0,
         exclude_invalid_x: bool = True,
         resume_training: bool = False,
@@ -154,8 +153,6 @@ class RatioEstimator(NeuralInference, ABC):
             Classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
         """
 
-        max_num_epochs = 2 ** 31 - 1 if max_num_epochs is None else max_num_epochs
-
         # Starting index for the training set (1 = discard round-0 samples).
         start_idx = int(discard_prior_samples and self._round > 0)
         # Load data from most recent round.
@@ -177,8 +174,10 @@ class RatioEstimator(NeuralInference, ABC):
 
         clipped_batch_size = min(training_batch_size, len(val_loader))
 
-        num_atoms = clamp_and_warn(
-            "num_atoms", num_atoms, min_val=2, max_val=clipped_batch_size
+        num_atoms = int(
+            clamp_and_warn(
+                "num_atoms", num_atoms, min_val=2, max_val=clipped_batch_size
+            )
         )
 
         # First round or if retraining from scratch:

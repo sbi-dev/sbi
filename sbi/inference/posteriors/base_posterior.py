@@ -41,11 +41,9 @@ class NeuralPosterior(ABC):
             device: Training device, e.g., "cpu", "cuda" or "cuda:0". If None,
                 `potential_fn.device` is used.
         """
-        if device is None:
-            device = potential_fn.device
 
         # Ensure device string.
-        self._device = process_device(device)
+        self._device = process_device(potential_fn.device if device is None else device)
 
         self.potential_fn = potential_fn
 

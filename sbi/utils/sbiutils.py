@@ -4,7 +4,7 @@
 import logging
 import warnings
 from math import pi
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, Union
 
 import torch
 import pyknos.nflows.transforms as transforms
@@ -361,7 +361,7 @@ def logit(theta: Tensor, lower_bound: Tensor, upper_bound: Tensor) -> Tensor:
 
 
 def check_dist_class(
-    dist, class_to_check: Union[Distribution, Sequence[Distribution]]
+    dist, class_to_check: Union[Type[Distribution], Sequence[Type[Distribution]]]
 ) -> Tuple[bool, Optional[Distribution]]:
     """Returns whether the `dist` is instance of `class_to_check`.
 
