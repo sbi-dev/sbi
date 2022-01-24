@@ -22,8 +22,8 @@ from sbi.utils.sbiutils import DefaultEmbeddingNet
 
 
 def build_made(
-    batch_x: Tensor = None,
-    batch_y: Tensor = None,
+    batch_x: Tensor,
+    batch_y: Tensor,
     z_score_x: bool = True,
     z_score_y: bool = True,
     hidden_features: int = 50,
@@ -99,8 +99,8 @@ def build_made(
 
 
 def build_maf(
-    batch_x: Tensor = None,
-    batch_y: Tensor = None,
+    batch_x: Tensor,
+    batch_y: Tensor,
     z_score_x: bool = True,
     z_score_y: bool = True,
     hidden_features: int = 50,
@@ -183,8 +183,8 @@ def build_maf(
 
 
 def build_nsf(
-    batch_x: Tensor = None,
-    batch_y: Tensor = None,
+    batch_x: Tensor,
+    batch_y: Tensor,
     z_score_x: bool = True,
     z_score_y: bool = True,
     hidden_features: int = 50,
@@ -228,13 +228,13 @@ def build_nsf(
     check_embedding_net_device(embedding_net=embedding_net, datum=batch_y)
     y_numel = embedding_net(batch_y[:1]).numel()
 
+    # Define mask function to alternate between predicted x-dimensions.
+    def mask_in_layer(i):
+        return create_alternating_binary_mask(features=x_numel, even=(i % 2 == 0))
+
     # If x is just a scalar then use a dummy mask and learn spline parameters using the
     # conditioning variables only.
     if x_numel == 1:
-
-        # Define dummy mask because there is only one dimension.
-        def mask_in_layer(_):
-            return tensor([1], dtype=uint8)
 
         # Conditioner ignores the data and uses the conditioning variables only.
         conditioner = partial(
@@ -243,12 +243,7 @@ def build_nsf(
             context_features=y_numel,
             hidden_layers=hidden_layers_spline_context,
         )
-
     else:
-        # Define mask function to alternate between predicted x-dimensions.
-        def mask_in_layer(i):
-            return create_alternating_binary_mask(features=x_numel, even=(i % 2 == 0))
-
         # Use conditional resnet as spline conditioner.
         conditioner = partial(
             nets.ResidualNet,
@@ -265,7 +260,7 @@ def build_nsf(
     for i in range(num_transforms):
         block = [
             transforms.PiecewiseRationalQuadraticCouplingTransform(
-                mask=mask_in_layer(i),
+                mask=mask_in_layer(i) if x_numel > 1 else tensor([1], dtype=uint8),
                 transform_net_create_fn=conditioner,
                 num_bins=num_bins,
                 tails="linear",

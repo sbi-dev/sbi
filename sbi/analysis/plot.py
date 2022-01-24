@@ -3,6 +3,7 @@
 
 import collections
 from typing import Any, Dict, List, Optional, Tuple, Union
+from warnings import warn
 
 import matplotlib as mpl
 import numpy as np
@@ -15,11 +16,6 @@ from scipy.stats import binom, gaussian_kde
 from torch import Tensor
 
 from sbi.utils import eval_conditional_density
-
-try:
-    collectionsAbc = collections.abc
-except:
-    collectionsAbc = collections
 
 
 def hex2rgb(hex):
@@ -274,9 +270,7 @@ def get_conditional_diag_func(opts, limits, eps_margins, resolution):
 
 
 def pairplot(
-    samples: Union[
-        List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor
-    ] = None,
+    samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
     points: Optional[
         Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor]
     ] = None,

@@ -19,7 +19,7 @@ class MCABC(ABCBASE):
         simulation_batch_size: int = 1,
         show_progress_bars: bool = True,
     ):
-        """Monte-Carlo Approximate Bayesian Computation (Rejection ABC) [1].
+        r"""Monte-Carlo Approximate Bayesian Computation (Rejection ABC) [1].
 
         [1] Pritchard, J. K., Seielstad, M. T., Perez-Lezaun, A., & Feldman, M. W.
         (1999). Population growth of human Y chromosomes: a study of Y chromosome
@@ -65,7 +65,7 @@ class MCABC(ABCBASE):
         sass_fraction: float = 0.25,
         sass_expansion_degree: int = 1,
         kde: bool = False,
-        kde_kwargs: Optional[Dict[str, Any]] = {},
+        kde_kwargs: Dict[str, Any] = {},
         return_summary: bool = False,
     ) -> Union[Tuple[Tensor, dict], Tuple[KDEWrapper, dict], Tensor, KDEWrapper]:
         r"""Run MCABC and return accepted parameters or KDE object fitted on them.

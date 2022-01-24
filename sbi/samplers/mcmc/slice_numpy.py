@@ -158,6 +158,7 @@ class SliceSampler(MCMCSampler):
         Returns:
             new state, final bracket width
         """
+        assert self.width is not None, "Chain not initialized."
 
         # conditional log prob
         Li = lambda t: self.lp_f(np.concatenate([self.x[:i], [t], self.x[i + 1 :]]))

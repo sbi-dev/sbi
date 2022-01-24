@@ -12,7 +12,8 @@ import torch.distributions.transforms as torch_tf
 from pyknos.mdn.mdn import MultivariateGaussianMDN as mdn
 from pyknos.nflows.flows import Flow
 from torch import Tensor, nn
-from sbi.types import Shape
+from sbi.types import TorchTransform
+
 from sbi.utils.torchutils import (
     BoxUniform,
     ScalarFloat,
@@ -164,8 +165,7 @@ def conditional_corrcoeff(
 
     device = density._device if hasattr(density, "_device") else "cpu"
 
-    if subset is None:
-        subset = range(condition.shape[1])
+    subset_ = subset if subset is not None else range(condition.shape[1])
 
     correlation_matrices = []
     for cond in condition:
@@ -184,8 +184,8 @@ def conditional_corrcoeff(
                         ),
                         limits[[dim1, dim2]].to(device),
                     )
-                    for dim1 in subset
-                    for dim2 in subset
+                    for dim1 in subset_
+                    for dim2 in subset_
                     if dim1 < dim2
                 ]
             )
@@ -429,7 +429,7 @@ def condition_mog(
 
     n_mixtures, n_dims = means.shape[1:]
 
-    mask = torch.zeros(n_dims, dtype=bool)
+    mask = torch.zeros(n_dims, dtype=torch.bool)
     mask[dims] = True
 
     y = condition[:, ~mask]
@@ -569,7 +569,7 @@ class RestrictedPriorForConditional:
         return self.full_prior.log_prob(*args, **kwargs)
 
 
-class RestrictedTransformForConditional(nn.Module):
+class RestrictedTransformForConditional(torch_tf.Transform):
     """
     Class to restrict the transform to fewer dimensions for conditional sampling.
 
@@ -594,7 +594,7 @@ class RestrictedTransformForConditional(nn.Module):
         condition: Tensor,
         dims_to_sample: List[int],
     ) -> None:
-        super().__init__()
+        super().__init__()  # type: ignore
         self.transform = transform
         self.condition = ensure_theta_batched(condition)
         self.dims_to_sample = dims_to_sample

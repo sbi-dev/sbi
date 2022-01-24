@@ -175,8 +175,8 @@ def c2st_scores(
         [4]: https://github.com/psteinb/c2st/
     """
     if z_score:
-        X_mean = torch.mean(X, axis=0)
-        X_std = torch.std(X, axis=0)
+        X_mean = torch.mean(X, dim=0)
+        X_std = torch.std(X, dim=0)
         X = (X - X_mean) / X_std
         Y = (Y - X_mean) / X_std
 

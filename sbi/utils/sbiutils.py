@@ -439,7 +439,7 @@ def logit(theta: Tensor, lower_bound: Tensor, upper_bound: Tensor) -> Tensor:
 
 
 def check_dist_class(
-    dist, class_to_check: Union[Type[Distribution], Sequence[Type[Distribution]]]
+    dist, class_to_check: Union[Type, Tuple[Type]]
 ) -> Tuple[bool, Optional[Distribution]]:
     """Returns whether the `dist` is instance of `class_to_check`.
 
@@ -505,7 +505,7 @@ def within_support(distribution: Any, samples: Tensor) -> Tensor:
         # for a single sample in 3D, v1.7.0 would return [[True, True, True]] and
         # v1.8.0 would return [True].
         if sample_check.ndim > 1:
-            return torch.all(sample_check, axis=1)
+            return torch.all(sample_check, dim=1)
         else:
             return sample_check
     # Falling back to log prob method of either the NeuralPosterior's net, or of a
@@ -637,7 +637,7 @@ def mcmc_transform(
             transform, reinterpreted_batch_ndims=1
         )
 
-    return transform.inv
+    return transform.inv  # type: ignore
 
 
 class ImproperEmpirical(Empirical):

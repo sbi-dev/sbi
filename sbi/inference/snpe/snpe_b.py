@@ -53,6 +53,8 @@ class SNPE_B(PosteriorEstimator):
             Log probability of proposal posterior.
         """
 
+        raise NotImplementedError
+
         batch_size = theta.shape[0]
 
         # Evaluate posterior.

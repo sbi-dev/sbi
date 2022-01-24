@@ -6,6 +6,7 @@ from typing import Any, Callable, List, Optional, Tuple, Union
 import torch
 from pyknos.mdn.mdn import MultivariateGaussianMDN as mdn
 from torch import Tensor, nn
+import torch.distributions.transforms as torch_tf
 
 from sbi.types import Shape
 from sbi.utils.conditional_density_utils import (
@@ -175,7 +176,7 @@ def conditonal_potential(
     prior: Any,
     condition: Tensor,
     dims_to_sample: List[int],
-) -> Tuple[Callable, TorchTransform, Any]:
+) -> Tuple[Callable, torch_tf.Transform, Any]:
     r"""Returns potential function that can be used to sample the conditional potential.
 
     It also returns a transform and a prior to be used to sample the conditional

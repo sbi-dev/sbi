@@ -17,7 +17,6 @@ from sbi.inference import NeuralInference, check_if_proposal_has_default_x
 from sbi.inference.posteriors import DirectPosterior, MCMCPosterior, RejectionPosterior
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials import posterior_estimator_based_potential
-from sbi.types import TorchModule
 from sbi.utils import (
     RestrictedPrior,
     check_estimator_arg,
@@ -355,7 +354,7 @@ class PosteriorEstimator(NeuralInference, ABC):
 
     def build_posterior(
         self,
-        density_estimator: Optional[TorchModule] = None,
+        density_estimator: Optional[nn.Module] = None,
         prior: Optional[Any] = None,
         sample_with: str = "rejection",
         mcmc_method: str = "slice_np",

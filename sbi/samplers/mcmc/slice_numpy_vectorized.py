@@ -216,7 +216,7 @@ class SliceSamplerVectorized:
 
                                 if self.verbose:
                                     if sc["t"] % 10 == 0:
-                                        pbar.update(10)
+                                        pbar.update(10)  # type: ignore
 
                         else:
                             sc["state"] = "DONE"
