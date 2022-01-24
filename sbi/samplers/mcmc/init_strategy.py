@@ -33,7 +33,7 @@ def proposal_init(proposal: Any, transform: nflows.transforms, **kwargs: Any) ->
 def sir(
     proposal: Any,
     potential_fn: Callable,
-    transform: nflows.transforms,
+    transform: Transform,
     sir_num_batches: int = 10,
     sir_batch_size: int = 1000,
     **kwargs: Any,
@@ -55,7 +55,7 @@ def sir(
     Returns:
         A single sample.
     """
-    
+
     with torch.set_grad_enabled(False):
         log_weights = []
         init_param_candidates = []

@@ -12,7 +12,6 @@ from sbi import utils as utils
 from sbi.inference.base import NeuralInference
 from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior, VIPosterior
 from sbi.inference.potentials import ratio_estimator_based_potential
-from sbi.types import TorchModule
 from sbi.utils import (
     check_estimator_arg,
     clamp_and_warn,
@@ -304,7 +303,7 @@ class RatioEstimator(NeuralInference, ABC):
 
     def build_posterior(
         self,
-        density_estimator: Optional[TorchModule] = None,
+        density_estimator: Optional[nn.Module] = None,
         prior: Optional[Any] = None,
         sample_with: str = "mcmc",
         mcmc_method: str = "slice_np",

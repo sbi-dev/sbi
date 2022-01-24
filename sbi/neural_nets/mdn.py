@@ -14,8 +14,8 @@ from sbi.utils.sbiutils import DefaultEmbeddingNet
 
 
 def build_mdn(
-    batch_x: Tensor = None,
-    batch_y: Tensor = None,
+    batch_x: Tensor,
+    batch_y: Tensor,
     z_score_x: bool = True,
     z_score_y: bool = True,
     hidden_features: int = 50,

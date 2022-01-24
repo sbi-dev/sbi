@@ -1,6 +1,6 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
-from typing import Callable, Optional, Union
+from typing import Any, Callable, Optional, Union
 
 import torch
 from torch import Tensor, log, nn
@@ -235,10 +235,8 @@ class DirectPosterior(NeuralPosterior):
         elif not_saved_at_default_x or force_update:  # Calculate at default_x; save.
             assert self.default_x is not None
             self._leakage_density_correction_factor = acceptance_at(self.default_x)
-        else:
-            raise ValueError
 
-        return self._leakage_density_correction_factor
+        return self._leakage_density_correction_factor  # type: ignore
 
     def map(
         self,

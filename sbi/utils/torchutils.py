@@ -262,8 +262,12 @@ class BoxUniform(Independent):
         device = process_device(device)
         super().__init__(
             Uniform(
-                low=torch.as_tensor(low, dtype=torch.float32, device=device),
-                high=torch.as_tensor(high, dtype=torch.float32, device=device),
+                low=torch.as_tensor(
+                    low, dtype=torch.float32, device=torch.device(device)
+                ),
+                high=torch.as_tensor(
+                    high, dtype=torch.float32, device=torch.device(device)
+                ),
                 validate_args=False,
             ),
             reinterpreted_batch_ndims,
@@ -321,7 +325,7 @@ def atleast_2d_many(*arys: Array) -> OneOrMore[Tensor]:
             arr = torch.from_numpy(arr)
         return atleast_2d(arr)
     else:
-        return [atleast_2d_many(arr) for arr in arys]
+        return [atleast_2d_many(arr) for arr in arys]  # type: ignore
 
 
 def atleast_2d(t: Tensor) -> Tensor:
@@ -343,7 +347,7 @@ def maybe_add_batch_dim_to_size(s: torch.Size) -> torch.Size:
     Returns: Batch size.
 
     """
-    return s if len(s) >= 2 else torch.Size([1]) + s
+    return s if len(s) >= 2 else torch.Size([1]) + s  # type: ignore
 
 
 def atleast_2d_float32_tensor(arr: Union[Tensor, np.ndarray]) -> Tensor:

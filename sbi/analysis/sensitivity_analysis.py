@@ -10,7 +10,7 @@ import torch
 from pyknos.nflows.nn import nets
 from torch import Tensor, nn, optim, relu
 from torch.nn import MSELoss
-from torch.nn.utils import clip_grad_norm_
+from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 
@@ -62,8 +62,8 @@ def destandardizing_net(batch_t: Tensor, min_std: float = 1e-7) -> nn.Module:
 
 
 def build_input_output_layer(
-    batch_theta: Tensor = None,
-    batch_property: Tensor = None,
+    batch_theta: Tensor,
+    batch_property: Tensor,
     z_score_theta: bool = True,
     z_score_property: bool = True,
     embedding_net_theta: nn.Module = nn.Identity(),
@@ -172,58 +172,56 @@ class ActiveSubspace:
         self._theta = theta
         self._emergent_property = emergent_property
 
+        def build_resnet(theta):
+            classifier = nets.ResidualNet(
+                in_features=theta.shape[1],
+                out_features=1,
+                hidden_features=hidden_features,
+                context_features=None,
+                num_blocks=num_blocks,
+                activation=relu,
+                dropout_probability=dropout_probability,
+                use_batch_norm=True,
+            )
+            input_layer, output_layer = build_input_output_layer(
+                theta,
+                emergent_property,
+                z_score_theta,
+                z_score_property,
+                embedding_net,
+            )
+            classifier = nn.Sequential(input_layer, classifier, output_layer)
+            return classifier
+
+        def build_mlp(theta):
+            classifier = nn.Sequential(
+                nn.Linear(theta.shape[1], hidden_features),
+                nn.BatchNorm1d(hidden_features),
+                nn.ReLU(),
+                nn.Linear(hidden_features, hidden_features),
+                nn.BatchNorm1d(hidden_features),
+                nn.ReLU(),
+                nn.Linear(hidden_features, 1),
+            )
+            input_layer, output_layer = build_input_output_layer(
+                theta,
+                emergent_property,
+                z_score_theta,
+                z_score_property,
+                embedding_net,
+            )
+            classifier = nn.Sequential(input_layer, classifier, output_layer)
+            return classifier
+
         if isinstance(model, str):
             if model == "resnet":
-
-                def build_nn(theta):
-                    classifier = nets.ResidualNet(
-                        in_features=theta.shape[1],
-                        out_features=1,
-                        hidden_features=hidden_features,
-                        context_features=None,
-                        num_blocks=num_blocks,
-                        activation=relu,
-                        dropout_probability=dropout_probability,
-                        use_batch_norm=True,
-                    )
-                    input_layer, output_layer = build_input_output_layer(
-                        theta,
-                        emergent_property,
-                        z_score_theta,
-                        z_score_property,
-                        embedding_net,
-                    )
-                    classifier = nn.Sequential(input_layer, classifier, output_layer)
-                    return classifier
-
+                self._build_nn = build_resnet
             elif model == "mlp":
-
-                def build_nn(theta):
-                    classifier = nn.Sequential(
-                        nn.Linear(theta.shape[1], hidden_features),
-                        nn.BatchNorm1d(hidden_features),
-                        nn.ReLU(),
-                        nn.Linear(hidden_features, hidden_features),
-                        nn.BatchNorm1d(hidden_features),
-                        nn.ReLU(),
-                        nn.Linear(hidden_features, 1),
-                    )
-                    input_layer, output_layer = build_input_output_layer(
-                        theta,
-                        emergent_property,
-                        z_score_theta,
-                        z_score_property,
-                        embedding_net,
-                    )
-                    classifier = nn.Sequential(input_layer, classifier, output_layer)
-                    return classifier
-
+                self._build_nn = build_mlp
             else:
                 raise NameError
         else:
-            build_nn = model
-
-        self._build_nn = build_nn
+            self._build_nn = model
 
         return self
 
@@ -233,7 +231,7 @@ class ActiveSubspace:
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
         stop_after_epochs: int = 20,
-        max_num_epochs: Optional[int] = None,
+        max_num_epochs: int = 2 ** 31 - 1,
         clip_max_norm: Optional[float] = 5.0,
     ) -> nn.Module:
         r"""Train a regression network to predict the specified property from $\theta$.
@@ -245,11 +243,15 @@ class ActiveSubspace:
             stop_after_epochs: The number of epochs to wait for improvement on the
                 validation set before terminating training.
             max_num_epochs: Maximum number of epochs to run. If reached, we stop
-                training even when the validation loss is still decreasing. If None, we
-                train until validation loss increases (see also `stop_after_epochs`).
+                training even when the validation loss is still decreasing. Otherwise,
+                we train until validation loss increases (see also `stop_after_epochs`).
             clip_max_norm: Value at which to clip the total gradient norm in order to
                 prevent exploding gradients. Use `None` for no clipping.
         """
+
+        assert (
+            self._theta is not None and self._emergent_property is not None
+        ), "You must call .add_property() first."
 
         # Get indices for permutation of the data.
         num_examples = len(self._theta)
@@ -269,14 +271,14 @@ class ActiveSubspace:
             dataset,
             batch_size=training_batch_size,
             drop_last=True,
-            sampler=SubsetRandomSampler(train_indices),
+            sampler=SubsetRandomSampler(train_indices.tolist()),
         )
         val_loader = data.DataLoader(
             dataset,
             batch_size=min(training_batch_size, num_examples - num_training_examples),
             shuffle=False,
             drop_last=True,
-            sampler=SubsetRandomSampler(val_indices),
+            sampler=SubsetRandomSampler(val_indices.tolist()),
         )
 
         if self._regression_net is None:
@@ -339,6 +341,7 @@ class ActiveSubspace:
         """
         converged = False
 
+        assert self._regression_net is not None
         posterior_nn = self._regression_net
 
         # (Re)-start the epoch count with the first epoch or any improvement.
@@ -427,6 +430,7 @@ class ActiveSubspace:
         if posterior_log_prob_as_property:
             predictions = self._posterior.potential(thetas, track_gradients=True)
         else:
+            assert self._regression_net is not None, "You must call `.train()` first."
             predictions = self._regression_net.forward(thetas)
         loss = predictions.mean()
         loss.backward()

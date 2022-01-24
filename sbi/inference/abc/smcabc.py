@@ -7,6 +7,7 @@ from pyro.distributions import Uniform
 from torch import Tensor, ones, tensor
 from torch.distributions import Distribution, Multinomial, MultivariateNormal
 
+from sbi.types import Array
 from sbi.inference.abc.abc_base import ABCBASE
 from sbi.utils import KDEWrapper, get_kde, process_x, within_support
 
@@ -105,7 +106,7 @@ class SMCABC(ABCBASE):
         use_last_pop_samples: bool = True,
         return_summary: bool = False,
         kde: bool = False,
-        kde_kwargs: Optional[Dict[str, Any]] = {},
+        kde_kwargs: Dict[str, Any] = {},
         kde_sample_weights: bool = False,
         lra: bool = False,
         lra_with_weights: bool = False,
@@ -256,7 +257,7 @@ class SMCABC(ABCBASE):
             adjusted_particles, adjusted_weights = self.run_lra_update_weights(
                 particles=all_particles[-1],
                 xs=all_x[-1],
-                observation=x_o,
+                observation=process_x(x_o),
                 log_weights=all_log_weights[-1],
                 lra_with_weights=lra_with_weights,
             )
@@ -307,7 +308,7 @@ class SMCABC(ABCBASE):
 
     def _set_xo_and_sample_initial_population(
         self,
-        x_o,
+        x_o: Array,
         num_particles: int,
         num_initial_pop: int,
     ) -> Tuple[Tensor, float, Tensor, Tensor]:
@@ -539,7 +540,7 @@ class SMCABC(ABCBASE):
             parms_perturbed = self.get_new_kernel(parms).sample()
 
             is_within_prior = within_support(self.prior, parms_perturbed)
-            num_accepted += is_within_prior.sum().item()
+            num_accepted += int(is_within_prior.sum().item())
 
             if num_accepted > 0:
                 parameters.append(parms_perturbed[is_within_prior])
