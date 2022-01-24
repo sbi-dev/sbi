@@ -65,7 +65,7 @@ class SNLE_A(LikelihoodEstimator):
         exclude_invalid_x: bool = True,
         resume_training: bool = False,
         discard_prior_samples: bool = False,
-        retrain_from_scratch_each_round: bool = False,
+        retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
     ) -> NeuralPosterior:
@@ -91,7 +91,7 @@ class SNLE_A(LikelihoodEstimator):
             discard_prior_samples: Whether to discard samples simulated in round 1, i.e.
                 from the prior. Training may be sped up by ignoring such less targeted
                 samples.
-            retrain_from_scratch_each_round: Whether to retrain the conditional density
+            retrain_from_scratch: Whether to retrain the conditional density
                 estimator for the posterior from scratch each round.
             show_train_summary: Whether to print the number of epochs and validation
                 loss and leakage after the training.

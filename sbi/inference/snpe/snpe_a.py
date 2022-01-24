@@ -111,7 +111,7 @@ class SNPE_A(PosteriorEstimator):
         calibration_kernel: Optional[Callable] = None,
         exclude_invalid_x: bool = True,
         resume_training: bool = False,
-        retrain_from_scratch_each_round: bool = False,
+        retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
         component_perturbation: float = 5e-3,
@@ -147,7 +147,7 @@ class SNPE_A(PosteriorEstimator):
                 cluster. If `True`, the split between train and validation set, the
                 optimizer, the number of epochs, and the best validation log-prob will
                 be restored from the last time `.train()` was called.
-            retrain_from_scratch_each_round: Whether to retrain the conditional density
+            retrain_from_scratch: Whether to retrain the conditional density
                 estimator for the posterior from scratch each round. Not supported for
                 SNPE-A.
             show_train_summary: Whether to print the number of epochs and validation
@@ -162,7 +162,7 @@ class SNPE_A(PosteriorEstimator):
             Density estimator that approximates the distribution $p(\theta|x)$.
         """
 
-        assert not retrain_from_scratch_each_round, """Retraining from scratch is not supported in SNPE-A yet. The reason for
+        assert not retrain_from_scratch, """Retraining from scratch is not supported in SNPE-A yet. The reason for
         this is that, if we reininitialized the density estimator, the z-scoring would
         change, which would break the posthoc correction. This is a pure implementation
         issue."""
@@ -186,7 +186,7 @@ class SNPE_A(PosteriorEstimator):
             # Run Algorithm 2 from [1].
             elif not self._ran_final_round:
                 # Now switch to the specified number of components. This method will
-                # only be used if `retrain_from_scratch_each_round=True`. Otherwise,
+                # only be used if `retrain_from_scratch=True`. Otherwise,
                 # the MDN will be built from replicating the single-component net for
                 # `num_component` times (via `_expand_mog()`).
                 self._build_neural_net = partial(
