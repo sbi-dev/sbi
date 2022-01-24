@@ -2,7 +2,7 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 from functools import partial
 from math import ceil
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, Optional, Union
 from warnings import warn
 
 import numpy as np
@@ -12,7 +12,6 @@ from pyro.infer.mcmc import HMC, NUTS
 from pyro.infer.mcmc.api import MCMC
 from torch import Tensor
 from torch import multiprocessing as mp
-from torch import nn
 
 from sbi import utils as utils
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
@@ -26,14 +25,10 @@ from sbi.samplers.mcmc import (
 )
 from sbi.types import Shape, TorchTransform
 from sbi.utils import (
-    del_entries,
-    mcmc_transform,
     pyro_potential_wrapper,
     transformed_potential,
 )
 from sbi.utils.torchutils import (
-    atleast_2d,
-    atleast_2d_float32_tensor,
     ensure_theta_batched,
 )
 
