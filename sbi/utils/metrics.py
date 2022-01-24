@@ -5,8 +5,8 @@ from typing import Optional
 
 import numpy as np
 import torch
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import KFold, cross_val_score
-from sklearn.neural_network import MLPClassifier
 from torch import Tensor
 
 from sbi.utils import tensor2numpy
@@ -20,12 +20,26 @@ def c2st(
     scoring: str = "accuracy",
     z_score: bool = True,
     noise_scale: Optional[float] = None,
+    verbosity: int = 0,
+    clf_class=RandomForestClassifier,
+    clf_kwargs={},
 ) -> Tensor:
-    """Return accuracy of classifier trained to distinguish samples from two distributions.
+    """
+    Return accuracy of classifier trained to distinguish samples from supposedly
+    two distributions <X> and <Y>. For details on the method, see [1].
+    If the returned accuracy is 0.5, <X> and <Y> are considered to be from the
+    same generating PDF, i.e. they can not be differentiated.
+    If the returned accuracy is around 1., <X> and <Y> are considered to be from
+    two different generating PDFs.
 
-    Trains classifiers with N-fold cross-validation [1]. Scikit learn MLPClassifier are
-    used, with 2 hidden layers of 10x dim each, where dim is the dimensionality of the
-    samples X and Y.
+    Trains classifiers with N-fold cross-validation [2]. By default, a `RandomForestClassifier`
+    by scikit-learn is used. This can be adopted using <clf_class> and
+    <clf_kwargs> as in:
+
+    ```
+    clf = clf_class(random_state=seed, **clf_kwargs)
+    ```
+
     Args:
         X: Samples from one distribution.
         Y: Samples from another distribution.
@@ -33,9 +47,15 @@ def c2st(
         n_folds: Number of folds
         z_score: Z-scoring using X
         noise_scale: If passed, will add Gaussian noise with std noise_scale to samples of X and of Y
+        verbosity: control the verbosity of sklearn.model_selection.cross_val_score
+        clf_class: a scikit-learn classifier class
+        clf_kwargs: key-value arguments dictuinary to the class specified by clf_class, e.g. sklearn.ensemble.RandomForestClassifier
+
+    Example:
 
     References:
-        [1]: https://scikit-learn.org/stable/modules/cross_validation.html
+        [1]: http://arxiv.org/abs/1610.06545
+        [2]: https://scikit-learn.org/stable/modules/cross_validation.html
     """
     if z_score:
         X_mean = torch.mean(X, axis=0)
@@ -47,24 +67,25 @@ def c2st(
         X += noise_scale * torch.randn(X.shape)
         Y += noise_scale * torch.randn(Y.shape)
 
-    X = tensor2numpy(X)
-    Y = tensor2numpy(Y)
+    X = X.cpu().numpy()
+    Y = Y.cpu().numpy()
 
-    ndim = X.shape[1]
+    clf = clf_class(random_state=seed, **clf_kwargs)
 
-    clf = MLPClassifier(
-        activation="relu",
-        hidden_layer_sizes=(10 * ndim, 10 * ndim),
-        max_iter=1000,
-        solver="adam",
-        random_state=seed,
+    # prepare data
+    data = np.concatenate((X, Y))
+    # labels
+    target = np.concatenate(
+        (
+            np.zeros((X.shape[0],)),
+            np.ones((Y.shape[0],)),
+        )
     )
 
-    data = np.concatenate((X, Y))
-    target = np.concatenate((np.zeros((X.shape[0],)), np.ones((Y.shape[0],))))
-
     shuffle = KFold(n_splits=n_folds, shuffle=True, random_state=seed)
-    scores = cross_val_score(clf, data, target, cv=shuffle, scoring=scoring)
+    scores = cross_val_score(
+        clf, data, target, cv=shuffle, scoring=scoring, verbose=verbosity
+    )
 
     scores = np.asarray(np.mean(scores)).astype(np.float32)
     return torch.from_numpy(np.atleast_1d(scores))
