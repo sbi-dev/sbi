@@ -903,6 +903,7 @@ def _arrange_plots(
             y0, y1 = ax.get_ylim()
             text_kwargs = {"fontsize": plt.rcParams["font.size"] * 2.0}
             ax.text(x1 + (x1 - x0) / 8.0, (y0 + y1) / 2.0, "...", **text_kwargs)
+<<<<<<< HEAD:sbi/analysis/plot.py
         else:
             for row in range(len(subset)):
                 ax = axes[row, len(subset) - 1]
@@ -918,6 +919,16 @@ def _arrange_plots(
                         rotation=-45,
                         **text_kwargs,
                     )
+=======
+            if row == len(subset) - 1:
+                ax.text(
+                    x1 + (x1 - x0) / 12.0,
+                    y0 - (y1 - y0) / 1.5,
+                    "...",
+                    rotation=-45,
+                    **text_kwargs,
+                )
+>>>>>>> sbiutils.standardizing_net now takes flag whether to z-score data with structured or independent dimensions:sbi/utils/plot.py
 
     return fig, axes
 

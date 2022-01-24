@@ -116,12 +116,20 @@ class Standardize(nn.Module):
         return (tensor - self._mean) / self._std
 
 
-def standardizing_net(batch_t: Tensor, min_std: float = 1e-7) -> nn.Module:
+def standardizing_net(
+    batch_t: Tensor,
+    structured_dims: bool,
+    min_std: float = 1e-7,
+) -> nn.Module:
     """Builds standardizing network
 
     Args:
         batch_t: Batched tensor from which mean and std deviation (across
             first dimension) are computed.
+        structured_dim: Whether data dimensions are structured (e.g., time-series,
+            images), which requires computing mean and std per sample first before
+            aggregating over samples for a single standardization mean and std for the
+            batch, or independent, which z-scores each dimension independently.
         min_std:  Minimum value of the standard deviation to use when z-scoring to
             avoid division by zero.
 
@@ -131,10 +139,25 @@ def standardizing_net(batch_t: Tensor, min_std: float = 1e-7) -> nn.Module:
 
     is_valid_t, *_ = handle_invalid_x(batch_t, True)
 
-    t_mean = torch.mean(batch_t[is_valid_t], dim=0)
+    if structured_dims:
+        # structured data so compute a single mean over all dimensions
+        # equivalent to taking mean over per-sample mean, i.e.,
+        # torch.mean(torch.mean(.., dim=1))
+        t_mean = torch.mean(batch_t[is_valid_t])
+    else:
+        # compute per-dimension (independent) mean
+        t_mean = torch.mean(batch_t[is_valid_t], dim=0)
+
     if len(batch_t > 1):
-        t_std = torch.std(batch_t[is_valid_t], dim=0)
-        t_std[t_std < min_std] = min_std
+        if structured_dims:
+            # compute std per-sample first
+            sample_std = torch.std(batch_t[is_valid_t], dim=0)
+            sample_std[sample_std < min_std] = min_std
+            # average over all samples for batch std
+            t_std = torch.mean(sample_std)
+        else:
+            t_std = torch.std(batch_t[is_valid_t], dim=0)
+            t_std[t_std < min_std] = min_std
     else:
         t_std = 1
         logging.warning(
