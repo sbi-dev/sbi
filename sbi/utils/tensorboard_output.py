@@ -1,3 +1,5 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 """Utils for processing tensorboard event data."""
 import inspect
 import logging
@@ -36,8 +38,7 @@ def plot_summary(
     ylabel: List[str] = [],
     plot_kwargs: Dict[str, Any] = {},
 ) -> Tuple[Figure, Axes]:
-    """Plots tensorboard scalar events logged by the summary writer held by an
-     inference object.
+    """Plots data logged by the tensorboard summary writer of an inference object.
 
     Args:
         inference: inference object that holds a ._summary_writer.log_dir attribute.
@@ -120,7 +121,7 @@ def plot_summary(
 
 
 def list_all_logs(inference: _NeuralInference) -> List:
-    """Returns a list of all log dirs for an inference object."""
+    """Returns a list of all log dirs for an inference class."""
     method = inference.__class__.__name__
     log_dir = Path(get_log_root()) / method
     return sorted(log_dir.iterdir())
@@ -129,12 +130,10 @@ def list_all_logs(inference: _NeuralInference) -> List:
 def _get_event_data_from_log_dir(
     log_dir: Union[str, Path], size_guidance=DEFAULT_SIZE_GUIDANCE
 ) -> Dict[str, Dict[str, Dict[str, List[Any]]]]:
-    """Returns an exhaustive nested dictionary of all event data stored by tensorboards
-    SummaryWriter.
+    """All event data stored by tensorboards summary writer as nested dictionary.
 
     The event data is stripped off from their native tensorboard event types and
-    represented in a tabular
-    way, i.e. Dict[str, List].
+    represented in a tabular way, i.e. Dict[str, List].
 
     The hierarchy of the dictionary is:
         1. tag type: event types that can be logged with tensorboard like 'scalars',
@@ -143,11 +142,11 @@ def _get_event_data_from_log_dir(
         3. tag type attribute: attribute of the event.
 
     Args:
-        log_dir
-        size_guidance: to avoid OOming. Defaults to tensorboards default size_guidance.
+        log_dir: log dir of a tensorboard summary writer.
+        size_guidance: to avoid causing out of memory erros by loading too much data at
+            once into memory. Defaults to tensorboards default size_guidance.
 
-    Returns:
-        Dict[str, Dict[str, Dict[str, Any]]]
+    Returns a nested, exhaustive dictionary of all event data unter log_dir.
 
     Based on: https://stackoverflow.com/a/45899735/7770835
     """
