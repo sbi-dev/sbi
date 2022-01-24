@@ -12,7 +12,7 @@ import torch
 from matplotlib import pyplot as plt
 from scipy.stats import gaussian_kde
 
-from sbi.utils.conditional_density import eval_conditional_density
+from sbi.utils import eval_conditional_density
 
 try:
     collectionsAbc = collections.abc

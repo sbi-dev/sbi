@@ -1,5 +1,5 @@
 # flake8: noqa
-from sbi.utils.conditional_density import (
+from sbi.utils.conditional_density_utils import (
     conditional_corrcoeff,
     eval_conditional_density,
     extract_and_transform_mog,
