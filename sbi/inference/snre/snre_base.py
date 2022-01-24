@@ -83,10 +83,7 @@ class RatioEstimator(NeuralInference, ABC):
         self._summary.update({"mcmc_times": []})  # type: ignore
 
     def append_simulations(
-        self,
-        theta: Tensor,
-        x: Tensor,
-        from_round: int = 0,
+        self, theta: Tensor, x: Tensor, from_round: int = 0,
     ) -> "RatioEstimator":
         r"""Store parameters and simulation outputs to use them for later training.
 
@@ -128,7 +125,7 @@ class RatioEstimator(NeuralInference, ABC):
         exclude_invalid_x: bool = True,
         resume_training: bool = False,
         discard_prior_samples: bool = False,
-        retrain_from_scratch_each_round: bool = False,
+        retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
     ) -> nn.Module:
@@ -145,7 +142,7 @@ class RatioEstimator(NeuralInference, ABC):
             discard_prior_samples: Whether to discard samples simulated in round 1, i.e.
                 from the prior. Training may be sped up by ignoring such less targeted
                 samples.
-            retrain_from_scratch_each_round: Whether to retrain the conditional density
+            retrain_from_scratch: Whether to retrain the conditional density
                 estimator for the posterior from scratch each round.
             dataloader_kwargs: Additional or updated kwargs to be passed to the training
                 and validation dataloaders (like, e.g., a collate_fn)
@@ -186,7 +183,7 @@ class RatioEstimator(NeuralInference, ABC):
         # arguments, which will build the neural network
         # This is passed into NeuralPosterior, to create a neural posterior which
         # can `sample()` and `log_prob()`. The network is accessible via `.net`.
-        if self._neural_net is None or retrain_from_scratch_each_round:
+        if self._neural_net is None or retrain_from_scratch:
             self._neural_net = self._build_neural_net(
                 theta[self.train_indices], x[self.train_indices]
             )
@@ -196,8 +193,7 @@ class RatioEstimator(NeuralInference, ABC):
 
         if not resume_training:
             self.optimizer = optim.Adam(
-                list(self._neural_net.parameters()),
-                lr=learning_rate,
+                list(self._neural_net.parameters()), lr=learning_rate,
             )
             self.epoch, self._val_log_prob = 0, float("-Inf")
 
@@ -217,8 +213,7 @@ class RatioEstimator(NeuralInference, ABC):
                 loss.backward()
                 if clip_max_norm is not None:
                     clip_grad_norm_(
-                        self._neural_net.parameters(),
-                        max_norm=clip_max_norm,
+                        self._neural_net.parameters(), max_norm=clip_max_norm,
                     )
                 self.optimizer.step()
 
@@ -252,10 +247,7 @@ class RatioEstimator(NeuralInference, ABC):
 
         # Update TensorBoard and summary dict.
         self._summarize(
-            round_=self._round,
-            x_o=None,
-            theta_bank=theta,
-            x_bank=x,
+            round_=self._round, x_o=None, theta_bank=theta, x_bank=x,
         )
 
         # Update description for progress bar.
