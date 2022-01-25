@@ -59,10 +59,12 @@ class MCMCPosterior(NeuralPosterior):
             proposal: Proposal distribution that is used to initialize the MCMC chain.
             theta_transform: Transformation that will be applied during sampling.
                 Allows to perform MCMC in unconstrained space.
-            method: Method used for MCMC sampling, one of `slice_np`, `slice`,
-                `hmc`, `nuts`. Currently defaults to `slice_np` for a custom numpy
-                implementation of slice sampling; select `hmc`, `nuts` or `slice` for
-                Pyro-based sampling.
+            method: Method used for MCMC sampling, one of `slice_np`,
+                `slice_np_vectorized`, `slice`, `hmc`, `nuts`. `slice_np` is a custom
+                numpy implementation of slice sampling. `slice_np_vectorized` is
+                identical to `slice_np`, but if `num_chains>1`, the chains are
+                vectorized for `slice_np_vectorized` whereas they are run sequentially
+                for `slice_np`. The samplers `hmc`, `nuts` or `slice` sample with Pyro.
             thin: The thinning factor for the chain.
             warmup_steps: The initial number of samples to discard.
             num_chains: The number of chains.
