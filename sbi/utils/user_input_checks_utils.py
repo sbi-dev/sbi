@@ -3,22 +3,16 @@
 
 
 import warnings
-from typing import Optional, Sequence, Union
+from typing import Dict, Optional, Sequence, Union
 
 import torch
 from scipy.stats._distn_infrastructure import rv_frozen
 from scipy.stats._multivariate import multi_rv_frozen
 from torch import Tensor, float32
-from torch.distributions import Distribution
-from torch.distributions.constraints import Constraint
+from torch.distributions import Distribution, constraints
 
 
-class CustomPytorchWrapper(Distribution):
-    """Wrap custom prior object to PyTorch distribution object.
-
-    Note that the prior must have .sample and .log_prob methods.
-    """
-
+class CustomPriorWrapper(Distribution):
     def __init__(
         self,
         custom_prior,
@@ -26,17 +20,23 @@ class CustomPytorchWrapper(Distribution):
         batch_shape=torch.Size(),
         event_shape=torch.Size(),
         validate_args=None,
+        arg_constraints: Dict[str, constraints.Constraint] = {},
+        lower_bound: Optional[Tensor] = None,
+        upper_bound: Optional[Tensor] = None,
     ):
+        self.custom_arg_constraints = arg_constraints
+        self.custom_prior = custom_prior
+        self.return_type = return_type
+
+        self.custom_support = build_support(lower_bound, upper_bound)
+
+        self._set_mean_and_variance()
+
         super().__init__(
             batch_shape=batch_shape,
             event_shape=event_shape,
             validate_args=validate_args,
         )
-
-        self.custom_prior = custom_prior
-        self.return_type = return_type
-
-        self._set_mean_and_variance()
 
     def log_prob(self, value) -> Tensor:
         return torch.as_tensor(
@@ -47,6 +47,14 @@ class CustomPytorchWrapper(Distribution):
         return torch.as_tensor(
             self.custom_prior.sample(sample_shape), dtype=self.return_type
         )
+
+    @property
+    def arg_constraints(self) -> Dict[str, constraints.Constraint]:
+        return self.custom_arg_constraints
+
+    @property
+    def support(self) -> constraints.Constraint:
+        return self.custom_support
 
     def _set_mean_and_variance(self):
         """Set mean and variance if available, else estimate from samples."""
@@ -93,15 +101,21 @@ class ScipyPytorchWrapper(Distribution):
         batch_shape=torch.Size(),
         event_shape=torch.Size(),
         validate_args=None,
+        arg_constraints: Dict[str, constraints.Constraint] = {},
+        lower_bound: Optional[Tensor] = None,
+        upper_bound: Optional[Tensor] = None,
     ):
+
+        self.custom_arg_constraints = arg_constraints
+        self.prior_scipy = prior_scipy
+        self.return_type = return_type
+        self.custom_support = build_support(lower_bound, upper_bound)
+
         super().__init__(
             batch_shape=batch_shape,
             event_shape=event_shape,
             validate_args=validate_args,
         )
-
-        self.prior_scipy = prior_scipy
-        self.return_type = return_type
 
     def log_prob(self, value) -> Tensor:
         return torch.as_tensor(self.prior_scipy.logpdf(x=value), dtype=self.return_type)
@@ -112,12 +126,20 @@ class ScipyPytorchWrapper(Distribution):
         )
 
     @property
+    def support(self) -> Optional[constraints.Constraint]:
+        return self.custom_support
+
+    @property
     def mean(self):
-        return self.prior_scipy.mean()
+        return self.prior_scipy.mean
 
     @property
     def variance(self):
-        return self.prior_scipy.var()
+        return self.prior_scipy.var
+
+    @property
+    def arg_constraints(self) -> Dict[str, constraints.Constraint]:
+        return self.custom_arg_constraints
 
 
 class PytorchReturnTypeWrapper(Distribution):
@@ -134,7 +156,9 @@ class PytorchReturnTypeWrapper(Distribution):
         super().__init__(
             batch_shape=batch_shape,
             event_shape=event_shape,
-            validate_args=validate_args,
+            validate_args=prior._validate_args
+            if validate_args is None
+            else validate_args,
         )
 
         self.prior = prior
@@ -174,7 +198,12 @@ class MultipleIndependent(Distribution):
             Uniform(torch.ones(1), 2.0 * torch.ones(1))]
     """
 
-    def __init__(self, dists: Sequence[Distribution], validate_args=None):
+    def __init__(
+        self,
+        dists: Sequence[Distribution],
+        validate_args=None,
+        arg_constraints: Dict[str, constraints.Constraint] = {},
+    ):
         self._check_distributions(dists)
 
         self.dists = dists
@@ -182,6 +211,7 @@ class MultipleIndependent(Distribution):
         # event_shape=[1] or batch_shape=[1]
         self.dims_per_dist = torch.as_tensor([d.sample().numel() for d in self.dists])
         self.ndims = torch.sum(torch.as_tensor(self.dims_per_dist)).item()
+        self.custom_arg_constraints = arg_constraints
 
         super().__init__(
             batch_shape=torch.Size([]),  # batch size was ensured to be <= 1 above.
@@ -190,6 +220,10 @@ class MultipleIndependent(Distribution):
             ),  # Event shape is the sum of all ndims.
             validate_args=validate_args,
         )
+
+    @property
+    def arg_constraints(self) -> Dict[str, constraints.Constraint]:
+        return self.custom_arg_constraints
 
     def _check_distributions(self, dists):
         """Check if dists is Sequence and longer 1 and check every member."""
@@ -292,13 +326,17 @@ class MultipleIndependent(Distribution):
     def support(self):
         # return independent constraints for each distribution.
         return MultipleIndependentConstraints(
-            constraints=[d.support for d in self.dists],
+            multiple_constraints=[d.support for d in self.dists],
             dims_per_constraint=self.dims_per_dist,
         )
 
 
-class MultipleIndependentConstraints(Constraint):
-    def __init__(self, constraints: Sequence[Constraint], dims_per_constraint: list):
+class MultipleIndependentConstraints(constraints.Constraint):
+    def __init__(
+        self,
+        multiple_constraints: Sequence[constraints.Constraint],
+        dims_per_constraint: list,
+    ):
         """Define multiple independent constraints to check support of independent
         joint distributions.
 
@@ -308,9 +346,9 @@ class MultipleIndependentConstraints(Constraint):
                 to match values to constraints.
         """
 
-        for c in constraints:
-            assert isinstance(c, Constraint)
-        self.constraints = constraints
+        for c in multiple_constraints:
+            assert isinstance(c, constraints.Constraint)
+        self.constraints = multiple_constraints
         self.dims_per_constraint = dims_per_constraint
 
     def check(self, value: Tensor) -> Tensor:
@@ -334,3 +372,61 @@ class MultipleIndependentConstraints(Constraint):
             dim_idx += self.dims_per_constraint[idx]
         # Return check across all independent constraints.
         return result.all(-1)
+
+
+def build_support(
+    lower_bound: Optional[Tensor] = None, upper_bound: Optional[Tensor] = None
+) -> constraints.Constraint:
+    """Return support for prior distribution, depending on available bounds.
+
+    Args:
+        lower_bound: lower bound of the prior support, can be None
+        upper_bound: upper bound of the prior support, can be None
+
+    Returns:
+        support: Pytorch constraint object.
+    """
+
+    # Support is real if no bounds are passed.
+    if lower_bound is None and upper_bound is None:
+        support = constraints.real
+        warnings.warn(
+            """No prior bounds were passed, consider passing lower_bound
+            and / or upper_bound if your prior has bounded support."""
+        )
+    # Only lower bound is specified.
+    elif upper_bound is None:
+        num_dimensions = lower_bound.numel()
+        if num_dimensions > 1:
+            support = constraints._IndependentConstraint(
+                constraints.greater_than(lower_bound),
+                1,
+            )
+        else:
+            support = constraints.greater_than(lower_bound)
+    # Only upper bound is specified.
+    elif lower_bound is None:
+        num_dimensions = upper_bound.numel()
+        if num_dimensions > 1:
+            support = constraints._IndependentConstraint(
+                constraints.less_than(upper_bound),
+                1,
+            )
+        else:
+            support = constraints.less_than(upper_bound)
+
+    # Both are specified.
+    else:
+        num_dimensions = lower_bound.numel()
+        assert (
+            num_dimensions == upper_bound.numel()
+        ), "There must be an equal number of independent bounds."
+        if num_dimensions > 1:
+            support = constraints._IndependentConstraint(
+                constraints.interval(lower_bound, upper_bound),
+                1,
+            )
+        else:
+            support = constraints.interval(lower_bound, upper_bound)
+
+    return support

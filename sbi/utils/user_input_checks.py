@@ -4,7 +4,7 @@
 
 import logging
 import warnings
-from typing import Any, Callable, Optional, Sequence, Tuple, Union, cast
+from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union, cast
 
 import torch
 from numpy import ndarray
@@ -16,18 +16,24 @@ from torch.distributions import Distribution, Uniform
 from sbi.utils.sbiutils import warn_on_iid_x, within_support
 from sbi.utils.torchutils import BoxUniform, atleast_2d
 from sbi.utils.user_input_checks_utils import (
-    CustomPytorchWrapper,
+    CustomPriorWrapper,
     MultipleIndependent,
     PytorchReturnTypeWrapper,
     ScipyPytorchWrapper,
 )
 
 
-def process_prior(prior) -> Tuple[Distribution, int, bool]:
+def process_prior(
+    prior, custom_prior_wrapper_kwargs: Optional[Dict] = {}
+) -> Tuple[Distribution, int, bool]:
     """Return PyTorch distribution-like prior from user-provided prior.
 
     Args:
         prior: Prior object with `.sample()` and `.log_prob()` as provided by the user.
+        custom_prior_wrapper_kwargs: kwargs to be passed to the class that wraps a
+            custom prior into a pytorch Distribution, e.g., for passing bounds for a
+            prior with bounded support (lower_bound, upper_bound), or argument constraints
+            (arg_constraints), see pytorch.distributions.Distribution for more info.
 
     Raises:
         AttributeError: If prior objects lacks `.sample()` or `.log_prob()`.
@@ -61,14 +67,20 @@ def process_prior(prior) -> Tuple[Distribution, int, bool]:
 
     # Otherwise it is a custom prior - check for `.sample()` and `.log_prob()`.
     else:
-        return process_custom_prior(prior)
+        return process_custom_prior(prior, custom_prior_wrapper_kwargs)
 
 
-def process_custom_prior(prior) -> Tuple[Distribution, int, bool]:
+def process_custom_prior(
+    prior, custom_prior_wrapper_kwargs: Optional[Dict] = {}
+) -> Tuple[Distribution, int, bool]:
     """Check and return corrected prior object defined by the user.
 
     Args:
         prior: Prior object with `.sample()` and `.log_prob()` as provided by the user.
+        custom_prior_wrapper_kwargs: kwargs to be passed to the class that wraps a
+            custom prior into a pytorch Distribution, e.g., for passing bounds for a
+            prior with bounded support (lower_bound, upper_bound), or argument constraints
+            (arg_constraints), see pytorch.distributions.Distribution for more info.
 
     Returns:
         prior: sbi-compatible prior.
@@ -78,18 +90,26 @@ def process_custom_prior(prior) -> Tuple[Distribution, int, bool]:
 
     check_prior_attributes(prior)
     check_prior_batch_behavior(prior)
-    prior, is_prior_numpy = maybe_wrap_prior_as_pytorch(prior)
+    prior, is_prior_numpy = maybe_wrap_prior_as_pytorch(
+        prior, custom_prior_wrapper_kwargs
+    )
     check_prior_return_type(prior)
     theta_numel = prior.sample().numel()
 
     return prior, theta_numel, is_prior_numpy
 
 
-def maybe_wrap_prior_as_pytorch(prior) -> Tuple[Distribution, bool]:
+def maybe_wrap_prior_as_pytorch(
+    prior, custom_prior_wrapper_kwargs: Optional[Dict[str, Any]] = {}
+) -> Tuple[Distribution, bool]:
     """Check prior return type and maybe wrap as PyTorch.
 
     Args:
         prior: Prior object with `.sample()` and `.log_prob()` as provided by the user.
+        custom_prior_wrapper_kwargs: kwargs to be passed to the class that wraps a
+            custom prior into a pytorch Distribution, e.g., for passing bounds for a
+            prior with bounded support (lower_bound, upper_bound), or argument constraints
+            (arg_constraints), see pytorch.distributions.Distribution for more info.
 
     Raises:
         TypeError: If prior return type is PyTorch or Numpy.
@@ -106,20 +126,23 @@ def maybe_wrap_prior_as_pytorch(prior) -> Tuple[Distribution, bool]:
     if isinstance(theta, Tensor) and isinstance(log_probs, Tensor):
         # XXX: We wrap to get a Distribution. But this might interfere with the fact
         # that the custom prior can be a probabilistic program.
-        prior = CustomPytorchWrapper(
-            custom_prior=prior, event_shape=torch.Size([theta.numel()])
+        prior = CustomPriorWrapper(
+            custom_prior=prior,
+            event_shape=torch.Size([theta.numel()]),
+            **custom_prior_wrapper_kwargs,
         )
         is_prior_numpy = False
     elif isinstance(theta, ndarray) and isinstance(log_probs, ndarray):
         # infer event shape from single numpy sample.
         event_shape = torch.Size([theta.size])
-        prior = CustomPytorchWrapper(custom_prior=prior, event_shape=event_shape)
+        prior = CustomPriorWrapper(
+            custom_prior=prior, event_shape=event_shape, **custom_prior_wrapper_kwargs
+        )
         is_prior_numpy = True
     else:
         raise TypeError(
             f"Prior must return torch.Tensor or ndarray, but returns {type(theta)}"
         )
-
     return cast(Distribution, prior), is_prior_numpy
 
 
