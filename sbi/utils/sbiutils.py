@@ -96,9 +96,8 @@ def z_score_parser(z_score_flag: Optional["str"]) -> Tuple[bool, bool]:
     if type(z_score_flag) is bool:
         # Raise warning if boolean was passed.
         warnings.warn(
-            """Boolean flag for z-scoring is accepted for backwards
-                      compatibility only. Please use 'none', 'independent', or
-                      'structured' to indicate z-scoring option.
+            """Boolean flag for z-scoring is accepted for backwards compatibility only.
+            Please use 'none', 'independent', or 'structured' to indicate z-scoring option.
         """
         )
         z_score_bool, structured_data = z_score_flag, False
