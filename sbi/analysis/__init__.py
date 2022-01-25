@@ -11,4 +11,4 @@ from sbi.analysis.plot import (
     pairplot,
 )
 from sbi.analysis.sensitivity_analysis import ActiveSubspace
-from sbi.analysis.sbc import run_sbc, check_sbc
+from sbi.analysis.sbc import run_sbc, check_sbc, get_nltp
