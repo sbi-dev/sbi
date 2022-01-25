@@ -22,7 +22,7 @@ def run_sbc(
     num_workers: int = 1,
     sbc_batch_size: int = 1,
     show_progress_bar: bool = True,
-) -> Tuple[Tensor, Tensor, Tensor]:
+) -> Tuple[Tensor, Tensor]:
     """Run simulation-based calibration (parallelized across sbc runs).
 
     Returns sbc ranks, log probs of the true parameters under the posterior and samples
@@ -39,7 +39,6 @@ def run_sbc(
 
     Returns:
         ranks: ranks of the ground truth parameters under the inferred posterior.
-        log_probs: log probs of the ground truth parameters under the inferred posterior.
         dap_samples: samples from the data averaged posterior.
     """
     num_sbc_samples = thetas.shape[0]
@@ -104,22 +103,19 @@ def run_sbc(
     # Aggregate results.
     ranks = []
     dap_samples = []
-    log_probs = []
     for out in sbc_outputs:
         ranks.append(out[0])
-        log_probs.append(out[1])
-        dap_samples.append(out[2])
+        dap_samples.append(out[1])
 
     ranks = torch.cat(ranks)
     dap_samples = torch.cat(dap_samples)
-    log_probs = torch.cat(log_probs)
 
-    return ranks, log_probs, dap_samples
+    return ranks, dap_samples
 
 
 def sbc_on_batch(
     thetas: Tensor, xs: Tensor, posterior: NeuralPosterior, num_posterior_samples: int
-) -> Tuple[Tensor, Tensor, Tensor]:
+) -> Tuple[Tensor, Tensor]:
     """Return SBC results for a batch of SBC parameters and data from prior.
 
     Args:
@@ -138,18 +134,10 @@ def sbc_on_batch(
             i.e., a single sample from each approximate posterior.
     """
 
-    log_prob_thetas = torch.zeros(thetas.shape[0])
     dap_samples = torch.zeros_like(thetas)
     ranks = torch.zeros_like(thetas)
-    unnormalized_log_prob = not isinstance(posterior, DirectPosterior)
 
     for idx, (tho, xo) in enumerate(zip(thetas, xs)):
-        # Log prob of true params under posterior.
-        if unnormalized_log_prob:
-            log_prob_thetas[idx] = posterior.potential(tho, x=xo)
-        else:
-            log_prob_thetas[idx] = posterior.log_prob(tho, x=xo)
-
         # Draw posterior samples and save one for the data average posterior.
         ths = posterior.sample((num_posterior_samples,), x=xo, show_progress_bars=False)
 
@@ -160,34 +148,61 @@ def sbc_on_batch(
         for dim in range(thetas.shape[1]):
             ranks[idx, dim] = (ths[:, dim] < tho[dim]).sum().item()
 
-    if unnormalized_log_prob:
-        warnings.warn(
-            """Note that log probs of the true parameters under the posteriors
-        are not normalized because the posterior used is likelihood-based."""
-        )
-
-    return ranks, log_prob_thetas, dap_samples
+    return ranks, dap_samples
 
 
-def check_sbc(
-    ranks: Tensor,
-    log_probs: Tensor,
-    prior_samples: Tensor,
-    dap_samples: Tensor,
-    num_posterior_samples: int,
-    num_c2st_repetitions: int = 1,
-) -> Dict[str, Tensor]:
-    """Return uniformity checks, data averaged posterior checks and NLTP for SBC.
+def get_nltp(thetas: Tensor, xs: Tensor, posterior: NeuralPosterior) -> Tensor:
+    """Return negative log prob of true parameters under the posterior.
 
     NLTP: negative log probs of true parameters under the approximate posterior. Its
     mean over many N gives a lower bound on the posterior accuracy and can be used to
     compare different methods.
 
     Args:
+        thetas: parameters for which to calculate NLTP, sampled from the prior.
+        xs: simulated data corresponding to thetas.
+        posterior: inferred posterior for which to calculate NLTP.
+
+    Returns:
+        nltp: negative log probs of true parameters under approximate posteriors.
+            If N is large, e.g., N>100, then nltp can be used as a comparative measure
+            of posterior accuracy, e.g., for comparing multiple inference methods, or
+            hyperparameter settings (see num_posterior_samplesueckmann et al. 2021,
+            appendix for details).
+            Note that this is interpretable only for normalized log probs, i.e., when
+            using (S)NPE.
+    """
+    nltp = torch.zeros(thetas.shape[0])
+    unnormalized_log_prob = not isinstance(posterior, DirectPosterior)
+
+    for idx, (tho, xo) in enumerate(zip(thetas, xs)):
+        # Log prob of true params under posterior.
+        if unnormalized_log_prob:
+            nltp[idx] = -posterior.potential(tho, x=xo)
+        else:
+            nltp[idx] = -posterior.log_prob(tho, x=xo)
+
+    if unnormalized_log_prob:
+        warnings.warn(
+            """Note that log probs of the true parameters under the posteriors
+        are not normalized because the posterior used is likelihood-based."""
+        )
+
+    return nltp
+
+
+def check_sbc(
+    ranks: Tensor,
+    prior_samples: Tensor,
+    dap_samples: Tensor,
+    num_posterior_samples: int,
+    num_c2st_repetitions: int = 1,
+) -> Dict[str, Tensor]:
+    """Return uniformity checks and data averaged posterior checks for SBC.
+
+    Args:
         ranks: ranks for each sbc run and for each model parameter, i.e.,
             shape (N, dim_parameters)
-        log_probs: log probs of true parameters under approximate posteriors, for each
-            sbc run, shape (N,)
         prior_samples: N samples from the prior
         dap_samples: N samples from the data averaged posterior
         num_posterior_samples: number of posterior samples used for sbc ranking.
@@ -199,10 +214,6 @@ def check_sbc(
         c2st_ranks: C2ST accuracy of between ranks and uniform baseline,
             one for each dim_parameters.
         c2st_dap: C2ST accuracy between prior and dap samples, single value.
-        nltp: mean negative log prob of true parameters under approximate posteriors.
-            If N is large, e.g., N>100, then nltp can be used as a comparative measure
-            of posterior accuracy, e.g., for comparing multiple inference methods, or
-            hyperparameter settings (see num_posterior_samplesueckmann et al. 2021, appendix for details).
     """
     if ranks.shape[0] < 100:
         warnings.warn(
@@ -216,13 +227,11 @@ def check_sbc(
         ranks, num_posterior_samples, num_repetitions=num_c2st_repetitions
     )
     c2st_scores_dap = check_prior_vs_dap(prior_samples, dap_samples)
-    nltp = torch.mean(-log_probs)
 
     return dict(
         ks_pvals=ks_pvals,
         c2st_ranks=c2st_ranks,
         c2st_dap=c2st_scores_dap,
-        nltp=nltp,
     )
 
 
