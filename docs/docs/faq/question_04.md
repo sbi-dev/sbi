@@ -8,7 +8,7 @@ Yes. When creating the inference object in the flexible interface, you can pass 
 `device` as an argument, e.g.,
 
 ```python
-inference = SNPE(prior, device="cuda", density_estimator="maf")
+inference = SNPE(prior, device="cuda", density_estimator="nsf")
 ```
 
 The device is set to `"cpu"` by default, and it can be set to anything, as long as it
@@ -23,8 +23,8 @@ make sure to pass a prior object that was created on that device, e.g.,
 
 Whether or not you reduce your training time when training on a GPU depends on the
 problem at hand. We provide a couple of default density estimators for `SNPE`, `SNLE`
-and `SNRE`, e.g., a mixture density network (`density_estimator="mdn"`) or a Masked
-Autoregressive Flow (`density_estimator="maf"`). For those default density estimators
+and `SNRE`, e.g., a mixture density network (`density_estimator="mdn"`) or a Neural
+Spline Flow (`density_estimator="nsf"`). For those default density estimators
 we do **not** expect a speed up. This is because the underlying neural networks are
 quite shallow and not tall, e.g., they do not have many parameters or matrix
 operations that profit a lot from being executed on the GPU. 
