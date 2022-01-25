@@ -85,7 +85,10 @@ class PosteriorEstimator(NeuralInference, ABC):
         self._summary.update({"rejection_sampling_acceptance_rates": []})  # type:ignore
 
     def append_simulations(
-        self, theta: Tensor, x: Tensor, proposal: Optional[DirectPosterior] = None,
+        self,
+        theta: Tensor,
+        x: Tensor,
+        proposal: Optional[DirectPosterior] = None,
     ) -> "PosteriorEstimator":
         r"""Store parameters and simulation outputs to use them for later training.
 
@@ -285,7 +288,11 @@ class PosteriorEstimator(NeuralInference, ABC):
 
                 batch_loss = torch.mean(
                     self._loss(
-                        theta_batch, x_batch, masks_batch, proposal, calibration_kernel,
+                        theta_batch,
+                        x_batch,
+                        masks_batch,
+                        proposal,
+                        calibration_kernel,
                     )
                 )
 
@@ -316,7 +323,11 @@ class PosteriorEstimator(NeuralInference, ABC):
                     )
                     # Take negative loss here to get validation log_prob.
                     batch_log_prob = -self._loss(
-                        theta_batch, x_batch, masks_batch, proposal, calibration_kernel,
+                        theta_batch,
+                        x_batch,
+                        masks_batch,
+                        proposal,
+                        calibration_kernel,
                     )
                     log_prob_sum += batch_log_prob.sum().item()
 
@@ -439,7 +450,11 @@ class PosteriorEstimator(NeuralInference, ABC):
 
     @abstractmethod
     def _log_prob_proposal_posterior(
-        self, theta: Tensor, x: Tensor, masks: Tensor, proposal: Optional[Any],
+        self,
+        theta: Tensor,
+        x: Tensor,
+        masks: Tensor,
+        proposal: Optional[Any],
     ) -> Tensor:
         raise NotImplementedError
 
