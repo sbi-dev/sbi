@@ -399,7 +399,7 @@ class MCMCPosterior(NeuralPosterior):
             warmup_steps=warmup_steps,
             initial_params={"": initial_params},
             num_chains=num_chains,
-            mp_context="fork",
+            mp_context="spawn",
             disable_progbar=not show_progress_bars,
             transforms={},
         )
