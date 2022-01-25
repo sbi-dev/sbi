@@ -83,7 +83,10 @@ class RatioEstimator(NeuralInference, ABC):
         self._summary.update({"mcmc_times": []})  # type: ignore
 
     def append_simulations(
-        self, theta: Tensor, x: Tensor, from_round: int = 0,
+        self,
+        theta: Tensor,
+        x: Tensor,
+        from_round: int = 0,
     ) -> "RatioEstimator":
         r"""Store parameters and simulation outputs to use them for later training.
 
@@ -193,7 +196,8 @@ class RatioEstimator(NeuralInference, ABC):
 
         if not resume_training:
             self.optimizer = optim.Adam(
-                list(self._neural_net.parameters()), lr=learning_rate,
+                list(self._neural_net.parameters()),
+                lr=learning_rate,
             )
             self.epoch, self._val_log_prob = 0, float("-Inf")
 
@@ -213,7 +217,8 @@ class RatioEstimator(NeuralInference, ABC):
                 loss.backward()
                 if clip_max_norm is not None:
                     clip_grad_norm_(
-                        self._neural_net.parameters(), max_norm=clip_max_norm,
+                        self._neural_net.parameters(),
+                        max_norm=clip_max_norm,
                     )
                 self.optimizer.step()
 
@@ -247,7 +252,10 @@ class RatioEstimator(NeuralInference, ABC):
 
         # Update TensorBoard and summary dict.
         self._summarize(
-            round_=self._round, x_o=None, theta_bank=theta, x_bank=x,
+            round_=self._round,
+            x_o=None,
+            theta_bank=theta,
+            x_bank=x,
         )
 
         # Update description for progress bar.

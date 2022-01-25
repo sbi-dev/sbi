@@ -253,7 +253,11 @@ class SNPE_C(PosteriorEstimator):
             self._maybe_z_scored_prior = self._prior
 
     def _log_prob_proposal_posterior(
-        self, theta: Tensor, x: Tensor, masks: Tensor, proposal: Optional[Any],
+        self,
+        theta: Tensor,
+        x: Tensor,
+        masks: Tensor,
+        proposal: Optional[Any],
     ) -> Tensor:
         """Return the log-probability of the proposal posterior.
 
