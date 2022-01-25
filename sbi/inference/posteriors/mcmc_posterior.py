@@ -48,7 +48,7 @@ class MCMCPosterior(NeuralPosterior):
         thin: int = 10,
         warmup_steps: int = 10,
         num_chains: int = 1,
-        init_strategy: str = "prior",
+        init_strategy: str = "sir",
         init_strategy_num_candidates: int = 1_000,
         device: Optional[str] = None,
         x_shape: Optional[torch.Size] = None,
