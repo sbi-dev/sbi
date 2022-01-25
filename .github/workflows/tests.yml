@@ -33,6 +33,11 @@ jobs:
         pip install torchtestcase
         pip install pytest pytest-cov
         pytest -m "not slow and not gpu" tests/ --cov=sbi --cov-report=xml
+
+    - name: Test with pyright
+      run: |
+        pyright sbi
+      
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v1
       with:
