@@ -8,10 +8,10 @@ import numpy as np
 import torch
 from matplotlib import pyplot as plt
 
-from sbi.utils import conditional_pairplot as utils_conditional_pairplot
-from sbi.utils import pairplot as utils_pairplot
-from sbi.utils import marginal_plot as utils_marginal_plot
 from sbi.utils import conditional_marginal_plot as utils_conditional_marginal_plot
+from sbi.utils import conditional_pairplot as utils_conditional_pairplot
+from sbi.utils import marginal_plot as utils_marginal_plot
+from sbi.utils import pairplot as utils_pairplot
 
 try:
     collectionsAbc = collections.abc

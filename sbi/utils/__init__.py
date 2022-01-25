@@ -8,11 +8,12 @@ from sbi.utils.get_nn_models import classifier_nn, likelihood_nn, posterior_nn
 from sbi.utils.io import get_data_root, get_log_root, get_project_root
 from sbi.utils.kde import KDEWrapper, get_kde
 from sbi.utils.plot import (
-    conditional_pairplot,
-    pairplot,
-    marginal_plot,
     conditional_marginal_plot,
+    conditional_pairplot,
+    marginal_plot,
+    pairplot,
 )
+from sbi.utils.potentialutils import pyro_potential_wrapper, transformed_potential
 from sbi.utils.restriction_estimator import RestrictedPrior, RestrictionEstimator
 from sbi.utils.sbiutils import (
     batched_mixture_mv,
@@ -27,6 +28,7 @@ from sbi.utils.sbiutils import (
     handle_invalid_x,
     logit,
     mask_sims_from_prior,
+    match_theta_and_x_batch_shapes,
     mcmc_transform,
     mog_log_prob,
     standardizing_net,
@@ -36,7 +38,6 @@ from sbi.utils.sbiutils import (
     warn_on_invalid_x_for_snpec_leakage,
     within_support,
     x_shape_from_simulation,
-    match_theta_and_x_batch_shapes,
 )
 from sbi.utils.torchutils import (
     BoxUniform,

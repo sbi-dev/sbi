@@ -5,9 +5,9 @@ from sbi.analysis.conditional_density import (
     eval_conditional_density,
 )
 from sbi.analysis.plot import (
-    conditional_pairplot,
-    pairplot,
-    marginal_plot,
     conditional_marginal_plot,
+    conditional_pairplot,
+    marginal_plot,
+    pairplot,
 )
 from sbi.analysis.sensitivity_analysis import ActiveSubspace
