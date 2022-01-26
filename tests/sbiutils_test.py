@@ -15,11 +15,14 @@ from sbi.utils import (
     get_kde,
     mcmc_transform,
     posterior_nn,
+    likelihood_nn,
+    classifier_nn,
 )
 from sbi.analysis import (
     conditional_corrcoeff,
     conditional_pairplot,
     eval_conditional_density,
+    sensitivity_analysis,
 )
 from sbi.utils.user_input_checks import process_prior
 
@@ -435,3 +438,66 @@ def test_kde(bandwidth, transform, sample_weights):
 
     assert kde_samples.shape == torch.Size((num_draws, num_dim))
     assert kde_vals.shape == torch.Size((num_draws,))
+
+
+def test_z_scoring_structured():
+    """
+    Test that z-scoring string args don't break API.
+    """
+    # Generate some signals for test.
+    import torch
+    import numpy as np
+
+    t = np.arange(0, 1, 0.001)
+    x_sin = np.sin(t * 2 * torch.pi * 5)
+    x = np.vstack([[(x_sin * (i + 1)) + (i * 2)] for i in range(10)])
+    t_batch = torch.tensor(x)
+
+    #### API tests
+    # Go through every permutation of options to test API.
+    for z_x in [True, False, None, "none", "independent", "structured"]:
+        for z_theta in [True, False, None, "none", "independent", "structured"]:
+            # In likelihood and posterior networks.
+            for network in ["mdn", "made", "maf", "nsf"]:
+                for lp in [likelihood_nn, posterior_nn]:
+                    net = lp(
+                        network,
+                        z_score_theta=z_theta,
+                        z_score_x=z_x,
+                        hidden_features=2,
+                        num_transforms=1,
+                    )
+                assert net(t_batch, t_batch)
+
+        # In classifier networks.
+        for network in ["linear", "mlp", "resnet"]:
+            net = classifier_nn(
+                network,
+                z_score_theta=z_theta,
+                z_score_x=z_x,
+                hidden_features=2,
+            )
+            assert net(t_batch, t_batch)
+
+    # Test that it doesn't break what doesn't use structured z-scoring.
+    assert sensitivity_analysis.Destandardize(0, 1)
+
+    # # Uncomment to plot the generated signal.
+    # import matplotlib.pyplot as plt
+    # plt.figure(figsize=(12,4))
+    # plt.subplot(1,3,1)
+    # plt.plot(x.T)
+    # plt.title('original')
+
+    # z_net = utils.standardizing_net(t_batch, structured_dims=False)
+    # x_zindep = z_net(t_batch)
+    # plt.subplot(1,3,2)
+    # plt.plot(x_zindep.T);
+    # plt.title('z-scored: independent dims')
+
+    # z_net = utils.standardizing_net(t_batch, structured_dims=True)
+    # x_zstructured = z_net(t_batch)
+    # plt.subplot(1,3,3)
+    # plt.plot(x_zstructured.T)
+    # plt.title('z-scored: structured dims');
+    # plt.show()

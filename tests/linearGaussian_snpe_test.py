@@ -416,7 +416,7 @@ def test_sample_conditional(set_seed):
         else:
             return linear_gaussian(theta, -likelihood_shift, likelihood_cov)
 
-    net = utils.posterior_nn("maf", hidden_features=20)
+    net = utils.posterior_nn("maf", z_score_x="structured", hidden_features=20)
 
     simulator, prior = prepare_for_sbi(simulator, prior)
 
