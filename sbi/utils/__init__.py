@@ -71,3 +71,4 @@ from sbi.utils.user_input_checks import (
 )
 from sbi.utils.user_input_checks_utils import MultipleIndependent
 from sbi.utils.potentialutils import transformed_potential, pyro_potential_wrapper
+from sbi.utils.posterior_ensemble import NeuralPosteriorEnsemble
