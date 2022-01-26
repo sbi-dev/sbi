@@ -319,7 +319,7 @@ class ActiveSubspace:
             self._val_log_prob = -val_loss / num_validation_examples
             self._validation_log_probs.append(self._val_log_prob)
 
-            print("Training neural network. Epochs trained: ", epoch, end="\r")
+            print("\r", "Training neural network. Epochs trained: ", epoch, end="")
 
         return deepcopy(self._regression_net)
 

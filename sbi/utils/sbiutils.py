@@ -713,11 +713,12 @@ def gradient_ascent(
 
                 if show_progress_bars:
                     print(
-                        f"""Optimizing MAP estimate. Iterations: {iter_+1} /
-                        {num_iter}. Performance in iteration
-                        {divmod(iter_+1, save_best_every)[0] * save_best_every}:
-                        {best_log_prob_iter.item():.2f} (= unnormalized log-prob""",
-                        end="\r",
+                        "\r",
+                        f"Optimizing MAP estimate. Iterations: {iter_+1} / "
+                        f"{num_iter}. Performance in iteration "
+                        f"{divmod(iter_+1, save_best_every)[0] * save_best_every}: "
+                        f"{best_log_prob_iter.item():.2f} (= unnormalized log-prob)",
+                        end="",
                     )
                 argmax_ = theta_transform.inv(best_theta_overall)
                 max_val = best_log_prob_overall
