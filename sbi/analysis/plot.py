@@ -639,6 +639,7 @@ def conditional_pairplot(
 
     Returns: figure and axis of posterior distribution plot
     """
+    device = density._device if hasattr(density, "_device") else "cpu"
 
     # Setting these is required because _pairplot_scaffold will check if opts['diag'] is
     # `None`. This would break if opts has no key 'diag'. Same for 'upper'.
@@ -653,21 +654,24 @@ def conditional_pairplot(
     opts["lower"] = None
 
     dim, limits, eps_margins = prepare_for_conditional_plot(condition, opts)
-
     diag_func = get_conditional_diag_func(opts, limits, eps_margins, resolution)
 
     def upper_func(row, col, **kwargs):
-        p_image = eval_conditional_density(
-            opts["density"],
-            opts["condition"],
-            limits,
-            row,
-            col,
-            resolution=resolution,
-            eps_margins1=eps_margins[row],
-            eps_margins2=eps_margins[col],
-            warn_about_deprecation=False,
-        ).numpy()
+        p_image = (
+            eval_conditional_density(
+                opts["density"],
+                opts["condition"].to(device),
+                limits.to(device),
+                row,
+                col,
+                resolution=resolution,
+                eps_margins1=eps_margins[row],
+                eps_margins2=eps_margins[col],
+                warn_about_deprecation=False,
+            )
+            .to("cpu")
+            .numpy()
+        )
         h = plt.imshow(
             p_image.T,
             origin="lower",
