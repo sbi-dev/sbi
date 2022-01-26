@@ -88,7 +88,7 @@ def test_diff_distributions():
     print(obs_c2st)
 
 
-def test_distributions_overlap_by_one_sigma():
+def test_onesigma_apart_distributions():
 
     ndim = 10
     nsamples = 1024
@@ -109,7 +109,7 @@ def test_distributions_overlap_by_one_sigma():
 
 
 @pytest.mark.slow
-def test_same_distributions_nn():
+def test_same_distributions_mlp():
 
     ndim = 10
     nsamples = 1024
@@ -126,7 +126,7 @@ def test_same_distributions_nn():
 
 
 @pytest.mark.slow
-def test_diff_distributions_flexible():
+def test_diff_distributions_flexible_mlp():
 
     ndim = 10
     nsamples = 1024
@@ -158,7 +158,7 @@ def test_diff_distributions_flexible():
 
 
 @pytest.mark.slow
-def test_distributions_overlap_by_two_sigma_mlp():
+def test_onesigma_apart_distributions_mlp():
 
     ndim = 10
     nsamples = 1024
@@ -176,32 +176,3 @@ def test_distributions_overlap_by_two_sigma_mlp():
     assert (
         0.8 < obs_c2st[0]
     )  # distributions do not overlap, classifiers label with high accuracy
-
-
-def test_interface_with_different_classifyer():
-
-    ndim = 10
-    nsamples = 256
-
-    xnormal = tmvn(loc=torch.zeros(ndim), covariance_matrix=torch.eye(ndim))
-    ynormal = tmvn(loc=10 + torch.zeros(ndim), covariance_matrix=torch.eye(ndim))
-
-    X = xnormal.sample((nsamples,))
-    Y = ynormal.sample((nsamples,))
-
-    exp_c2st = c2st(X, Y)
-    assert 0.9 < exp_c2st[0]
-
-    clf_class_ = MLPClassifier
-    clf_kwargs_ = {
-        "activation": "relu",
-        "hidden_layer_sizes": (10 * ndim, 5 * ndim),
-        "max_iter": 1000,
-        "solver": "adam",
-    }
-
-    obs_c2st = c2st(X, Y, clf_class=clf_class_, clf_kwargs=clf_kwargs_)
-
-    assert obs_c2st != None
-    assert 0.9 < obs_c2st[0]
-    assert torch.allclose(exp_c2st, obs_c2st, rtol=0.1)
