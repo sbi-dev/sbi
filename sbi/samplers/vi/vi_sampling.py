@@ -1,20 +1,13 @@
-from typing_extensions import final
 import torch
 import numpy as np
 
 from typing import Optional
-from torch.distributions import constraints
-from torch.distributions import Uniform
-from torch.distributions.transformed_distribution import TransformedDistribution
-from torch.distributions.transforms import AffineTransform, ExpTransform, PowerTransform
-from torch.distributions.utils import broadcast_all
 
 import warnings
 
 from .vi_quality_controll import gpdfit, GerneralizedParetto
 
 _SAMPLING_METHOD = {}
-_LOGPROB_METHOD = {}
 
 
 def register_sampling_method(
@@ -42,7 +35,6 @@ def get_sampling_method(name: str):
     return _SAMPLING_METHOD[name]
 
 
-# TODO THESE MAY BE REMOVED OR USED
 def paretto_smoothed_weights(weights):
     """This models the largest importance weights as paretto distributed and smooth
     them as their quantiles as proposed in https://arxiv.org/pdf/1507.02646.pdf .

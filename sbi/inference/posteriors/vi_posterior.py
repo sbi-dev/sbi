@@ -1,7 +1,9 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
-from typing import Callable, List, Optional, Union
+from copy import deepcopy
+from typing import Callable, List, Optional, Union, Dict
+from warnings import warn
 
 import torch
 from torch.distributions import Distribution
@@ -20,6 +22,7 @@ from sbi.utils.torchutils import (
 
 from sbi.samplers.vi import (
     adapt_and_check_variational_distributions,
+    check_variational_distribution,
     make_sure_nothing_in_cache,
     get_flow_builder,
     get_VI_method,
@@ -43,7 +46,7 @@ class VIPosterior(NeuralPosterior):
         potential_fn: Callable,
         theta_transform: Optional[TorchTransform] = None,
         q: Union[str, Distribution] = "maf",
-        q_kwargs: dict = dict(),
+        q_kwargs: Dict = dict(),
         vi_method: str = "rKL",
         device: str = "cpu",
     ):
@@ -61,21 +64,14 @@ class VIPosterior(NeuralPosterior):
 
         self._device = device
         self._prior = self.potential_fn.prior
-        self._q_arg = q
-        self._q_kwargs = q_kwargs
         self._optimizer = None
 
         # In contrast to MCMC we want to project into constrained space!
-        theta_transform = theta_transform.inv
-
-        if isinstance(q, Distribution):
-            self.set_q(
-                adapt_and_check_variational_distributions(q, q_kwargs, self._prior)
-            )
-        else:
-            self.set_q(get_flow_builder(q, self._prior.event_shape, theta_transform))
-
+        self.theta_transform = theta_transform.inv
+        self.set_q(q, q_kwargs)
         self.set_vi_method(vi_method)
+
+        self._trained_on = None
 
         self._purpose = (
             "It provides Variational inference to .sample() from the posterior and "
@@ -92,7 +88,7 @@ class VIPosterior(NeuralPosterior):
     @q.setter
     def q(
         self,
-        q: Distribution,
+        q: Union[str, Distribution, NeuralPosterior],
     ):
         """Sets the variational distribution. If the distribution does not admit access
         through "parameters" and "modules" function, please use set_q if you want to
@@ -108,9 +104,8 @@ class VIPosterior(NeuralPosterior):
 
     def set_q(
         self,
-        q: Distribution,
-        parameters: Optional[List] = None,
-        modules: Optional[List] = None,
+        q: Union[str, Distribution, NeuralPosterior],
+        q_kwargs: Dict = {},
     ):
         """Defines the variational family. You can specify over which
         parameters/modules we optimize. This is required for custom distributions which
@@ -126,7 +121,23 @@ class VIPosterior(NeuralPosterior):
 
 
         """
-        # Add checks here! TODO And adding parameters capabilities
+        self._q_arg = q
+        self._q_kwargs = q_kwargs
+        if isinstance(q, Distribution):
+            q = adapt_and_check_variational_distributions(
+                q, q_kwargs, self._prior, self.theta_transform
+            )
+        elif isinstance(q, str):
+            q = get_flow_builder(
+                q, self._prior.event_shape, self.theta_transform, **q_kwargs
+            )
+            check_variational_distribution(q, self._prior)
+        elif isinstance(q, VIPosterior):
+            self._trained_on = q._trained_on
+            self.vi_method = q.vi_method
+            self._device = q._device
+            self._prior = q._prior
+            q = deepcopy(q.q)
         self._q = q
 
     @property
@@ -155,6 +166,7 @@ class VIPosterior(NeuralPosterior):
     def sample(
         self,
         sample_shape: Shape = torch.Size(),
+        x: Optional[Tensor] = None,
         method: str = "naive",
         **kwargs,
     ):
@@ -172,8 +184,19 @@ class VIPosterior(NeuralPosterior):
         Returns:
             Samples from posterior.
         """
+        x = self._x_else_default_x(x)
+        if self._trained_on is None or (x != self._trained_on).all():
+            warn(
+                f"The variational posterior was not fit using observation {x}.\
+                     Please train!"
+            )
+
+        self.potential_fn.set_x(x)
         sampling_function = get_sampling_method(method)
-        num_samples = max(torch.prod(torch.tensor(sample_shape)), 1)
+        if len(sample_shape) == 0:
+            num_samples = 1
+        else:
+            num_samples = torch.prod(torch.tensor(sample_shape))
         samples = sampling_function(num_samples, self.potential_fn, self.q, **kwargs)
         return samples.reshape((*sample_shape, samples.shape[-1]))
 
@@ -191,14 +214,20 @@ class VIPosterior(NeuralPosterior):
         Returns:
             `len($\theta$)`-shaped log-probability.
         """
-        # TODO CHECK FOR TRIANED UNTRAINED AND SO ON...
-        theta = ensure_theta_batched(torch.as_tensor(theta))
-        return self.q.log_prob(theta)
+        x = self._x_else_default_x(x)
+        if self._trained_on is None or (x != self._trained_on).all():
+            warn(
+                f"The variational posterior was not fit using observation {x}.\
+                     Please train!"
+            )
+        with torch.set_grad_enabled(track_gradients):
+            theta = ensure_theta_batched(torch.as_tensor(theta))
+            return self.q.log_prob(theta)
 
     def train(
         self,
         x: Optional[Array] = None,
-        n_particles: Optional[int] = 128,
+        n_particles: Optional[int] = 256,
         learning_rate: float = 1e-3,
         gamma: float = 0.999,
         max_num_iters: Optional[int] = 2000,
@@ -230,14 +259,10 @@ class VIPosterior(NeuralPosterior):
 
         # Init q and the optimizer if necessary
         if retrain_from_scratch or self._optimizer is None:
-            self.set_q(
-                get_flow_builder(
-                    self._q_arg, self._prior.event_shape, self.theta_transform.inv
-                )
-            )
-
+            self.set_q(self._q_arg, self._q_kwargs)
             self._optimizer = self._optimizer_base(
-                self,
+                self.potential_fn,
+                self.q,
                 lr=learning_rate,
                 clip_value=clip_value,
                 gamma=gamma,
@@ -247,7 +272,8 @@ class VIPosterior(NeuralPosterior):
 
         if reset_optimizer or not isinstance(self._optimizer, self._optimizer_base):
             self._optimizer = self._optimizer_base(
-                self,
+                self.potential_fn,
+                self.q,
                 lr=learning_rate,
                 clip_value=clip_value,
                 gamma=gamma,
@@ -257,6 +283,8 @@ class VIPosterior(NeuralPosterior):
 
         # Check context
         x = atleast_2d_float32_tensor(self._x_else_default_x(x)).to(self._device)
+        already_trained = self._trained_on is not None and (x == self._trained_on).all()
+        self._trained_on = x
         if not self.potential_fn.allow_iid_x:
             self._ensure_single_x(x)
 
@@ -271,7 +299,7 @@ class VIPosterior(NeuralPosterior):
             iters = range(max_num_iters)
 
         # Warmup before training
-        if not optimizer.warm_up_was_done:
+        if not optimizer.warm_up_was_done and not already_trained or reset_optimizer:
             if show_progress_bar:
                 iters.set_description("Warmup phase, this takes some seconds...")
             optimizer.warm_up(warm_up_rounds)
@@ -291,7 +319,6 @@ class VIPosterior(NeuralPosterior):
                         print(f"\nConverged with loss: {np.round(mean_loss, 2)}")
                     break
         if show_progress_bar:
-            # TODO ADD QUALTITY CONTROLL
             try:
                 quality_control_fn, quality_control_msg = get_quality_metric(
                     quality_controll_metric
@@ -303,12 +330,11 @@ class VIPosterior(NeuralPosterior):
                     f"Quality controll did not work, we reset the variational \
                          posterior,please check your setting! \n Following error occured {e}"
                 )
-                self.set_q(
-                    get_flow_builder(
-                        self._q_arg, self._prior.event_shape, self.theta_transform.inv
-                    )
+                self.train(
+                    learning_rate=learning_rate * 0.1,
+                    retrain_from_scratch=True,
+                    reset_optimizer=True,
                 )
-                self._optimizer.q = self._q
 
     def map(
         self,
