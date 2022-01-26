@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 import torch
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import KFold, cross_val_score
@@ -13,8 +14,8 @@ from torch.distributions import MultivariateNormal as tmvn
 
 from sbi.utils.metrics import c2st
 
-## c2st related
-## for a small study about c2st see https://github.com/psteinb/c2st/
+## c2st related:
+## for a study about c2st see https://github.com/psteinb/c2st/
 
 
 def nn_c2st(
