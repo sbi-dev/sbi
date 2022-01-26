@@ -8,7 +8,7 @@ Essentially, the class needs two methods:
 - `.sample(sample_shape)`, where sample_shape is a shape tuple, e.g., `(n,)`, and returns a batch of n samples, e.g., of shape (n, 2)` for a two dimenional prior.
 - `.log_prob(value)` method that returns the "log probs" of parameters under the prior, e.g., for a batches of n parameters with shape `(n, ndims)` it should return a log probs array of shape `(n,)`.
 
-For sbi > 0.17.2 this could look like the following:
+For `sbi v0.17.2` and above this could look like the following:
 
 ```python
 class CustomUniformPrior:
@@ -34,4 +34,4 @@ class CustomUniformPrior:
         return log_probs.numpy() if self.return_numpy else log_probs
 ```
 
-If you are running sbi < 0.17.2 and use `SNLE` the code above will produce a `NotImplementedError` (see #581). In this case you need to update to a newer version of `sbi` or use `SNPE` instead. 
+If you are running a version below `sbi v0.17.2` and use `SNLE` the code above will produce a `NotImplementedError` (see [#581](https://github.com/mackelab/sbi/issues/581)). In this case you need to update to a newer version of `sbi` or use `SNPE` instead. 
