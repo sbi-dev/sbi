@@ -99,7 +99,7 @@ def test_onesigma_apart_distributions(set_seed):
     X = xnormal.sample((nsamples,))
     Y = ynormal.sample((nsamples,))
 
-    obs_c2st = c2st(X, Y, seed=set_seed))
+    obs_c2st = c2st(X, Y, seed=set_seed)
 
     assert obs_c2st != None
     print(obs_c2st)
@@ -119,7 +119,7 @@ def test_same_distributions_mlp(set_seed):
     X = xnormal.sample((nsamples,))
     Y = xnormal.sample((nsamples,))
 
-    obs_c2st = nn_c2st(X, Y, seed=set_seed))
+    obs_c2st = nn_c2st(X, Y, seed=set_seed)
 
     assert obs_c2st != None
     assert 0.45 < obs_c2st[0] < 0.55  # only by chance we differentiate the 2 samples
@@ -169,7 +169,7 @@ def test_onesigma_apart_distributions_mlp(set_seed):
     X = xnormal.sample((nsamples,))
     Y = ynormal.sample((nsamples,))
 
-    obs_c2st = nn_c2st(X, Y, seed=set_seed))
+    obs_c2st = nn_c2st(X, Y, seed=set_seed)
 
     assert obs_c2st != None
     print(obs_c2st)
