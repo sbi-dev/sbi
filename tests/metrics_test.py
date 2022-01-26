@@ -52,7 +52,7 @@ def nn_c2st(
     )
 
 
-def test_same_distributions():
+def test_same_distributions(set_seed):
 
     ndim = 10
     nsamples = 1024
@@ -62,13 +62,13 @@ def test_same_distributions():
     X = xnormal.sample((nsamples,))
     Y = xnormal.sample((nsamples,))
 
-    obs_c2st = c2st(X, Y)
+    obs_c2st = c2st(X, Y, seed=set_seed)
 
     assert obs_c2st != None
     assert 0.45 < obs_c2st[0] < 0.55  # only by chance we differentiate the 2 samples
 
 
-def test_diff_distributions():
+def test_diff_distributions(set_seed):
 
     ndim = 10
     nsamples = 1024
@@ -79,7 +79,7 @@ def test_diff_distributions():
     X = xnormal.sample((nsamples,))
     Y = ynormal.sample((nsamples,))
 
-    obs_c2st = c2st(X, Y)
+    obs_c2st = c2st(X, Y, seed=set_seed)
 
     assert obs_c2st != None
     assert (
@@ -88,7 +88,7 @@ def test_diff_distributions():
     print(obs_c2st)
 
 
-def test_onesigma_apart_distributions():
+def test_onesigma_apart_distributions(set_seed):
 
     ndim = 10
     nsamples = 1024
@@ -99,7 +99,7 @@ def test_onesigma_apart_distributions():
     X = xnormal.sample((nsamples,))
     Y = ynormal.sample((nsamples,))
 
-    obs_c2st = c2st(X, Y)
+    obs_c2st = c2st(X, Y, seed=set_seed))
 
     assert obs_c2st != None
     print(obs_c2st)
@@ -109,7 +109,7 @@ def test_onesigma_apart_distributions():
 
 
 @pytest.mark.slow
-def test_same_distributions_mlp():
+def test_same_distributions_mlp(set_seed):
 
     ndim = 10
     nsamples = 1024
@@ -119,14 +119,14 @@ def test_same_distributions_mlp():
     X = xnormal.sample((nsamples,))
     Y = xnormal.sample((nsamples,))
 
-    obs_c2st = nn_c2st(X, Y)
+    obs_c2st = nn_c2st(X, Y, seed=set_seed))
 
     assert obs_c2st != None
     assert 0.45 < obs_c2st[0] < 0.55  # only by chance we differentiate the 2 samples
 
 
 @pytest.mark.slow
-def test_diff_distributions_flexible_mlp():
+def test_diff_distributions_flexible_mlp(set_seed):
 
     ndim = 10
     nsamples = 1024
@@ -137,7 +137,7 @@ def test_diff_distributions_flexible_mlp():
     X = xnormal.sample((nsamples,))
     Y = ynormal.sample((nsamples,))
 
-    obs_c2st = nn_c2st(X, Y, seed=42)
+    obs_c2st = nn_c2st(X, Y, seed=set_seed)
 
     assert obs_c2st != None
     assert 0.95 < obs_c2st[0]
@@ -150,7 +150,7 @@ def test_diff_distributions_flexible_mlp():
         "solver": "adam",
     }
 
-    obs2_c2st = c2st(X, Y, seed=42, clf_class=clf_class, clf_kwargs=clf_kwargs)
+    obs2_c2st = c2st(X, Y, seed=set_seed, clf_class=clf_class, clf_kwargs=clf_kwargs)
 
     assert obs2_c2st != None
     assert 0.95 < obs2_c2st[0]  # only by chance we differentiate the 2 samples
@@ -158,7 +158,7 @@ def test_diff_distributions_flexible_mlp():
 
 
 @pytest.mark.slow
-def test_onesigma_apart_distributions_mlp():
+def test_onesigma_apart_distributions_mlp(set_seed):
 
     ndim = 10
     nsamples = 1024
@@ -169,7 +169,7 @@ def test_onesigma_apart_distributions_mlp():
     X = xnormal.sample((nsamples,))
     Y = ynormal.sample((nsamples,))
 
-    obs_c2st = nn_c2st(X, Y)
+    obs_c2st = nn_c2st(X, Y, seed=set_seed))
 
     assert obs_c2st != None
     print(obs_c2st)
