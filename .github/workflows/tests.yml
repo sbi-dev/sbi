@@ -27,8 +27,16 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -e .[dev]
+    
+    - name: Check formatting with black
+      run: |
+        black --check sbi tests
+    
+    - name: Check imports with isort
+      run: |
+        isort -c sbi tests
 
-    - name: Test with pyright
+    - name: Check types with pyright
       run: |
         pyright sbi
 
