@@ -52,10 +52,10 @@ def nn_c2st(
     )
 
 
-def test_same_distributions_alt():
+def test_same_distributions():
 
     ndim = 10
-    nsamples = 4048
+    nsamples = 1024
 
     xnormal = tmvn(loc=torch.zeros(ndim), covariance_matrix=torch.eye(ndim))
 
@@ -65,14 +65,13 @@ def test_same_distributions_alt():
     obs_c2st = c2st(X, Y)
 
     assert obs_c2st != None
-    assert 0.49 < obs_c2st[0] < 0.51  # only by chance we differentiate the 2 samples
-    print(obs_c2st)
+    assert 0.45 < obs_c2st[0] < 0.55  # only by chance we differentiate the 2 samples
 
 
-def test_diff_distributions_alt():
+def test_diff_distributions():
 
     ndim = 10
-    nsamples = 4048
+    nsamples = 1024
 
     xnormal = tmvn(loc=torch.zeros(ndim), covariance_matrix=torch.eye(ndim))
     ynormal = tmvn(loc=20.0 * torch.ones(ndim), covariance_matrix=torch.eye(ndim))
@@ -89,13 +88,13 @@ def test_diff_distributions_alt():
     print(obs_c2st)
 
 
-def test_distributions_overlap_by_one_sigma_alt():
+def test_distributions_overlap_by_one_sigma():
 
     ndim = 10
-    nsamples = 4048
+    nsamples = 1024
 
     xnormal = tmvn(loc=torch.zeros(ndim), covariance_matrix=torch.eye(ndim))
-    ynormal = tmvn(loc=1.0 * torch.ones(ndim), covariance_matrix=torch.eye(ndim))
+    ynormal = tmvn(loc=torch.ones(ndim), covariance_matrix=torch.eye(ndim))
 
     X = xnormal.sample((nsamples,))
     Y = ynormal.sample((nsamples,))
@@ -105,15 +104,15 @@ def test_distributions_overlap_by_one_sigma_alt():
     assert obs_c2st != None
     print(obs_c2st)
     assert (
-        0.8 < obs_c2st[0]
+        0.85 < obs_c2st[0]
     )  # distributions do not overlap, classifiers label with high accuracy
 
 
 @pytest.mark.slow
-def test_same_distributions_default():
+def test_same_distributions_nn():
 
     ndim = 10
-    nsamples = 4048
+    nsamples = 1024
 
     xnormal = tmvn(loc=torch.zeros(ndim), covariance_matrix=torch.eye(ndim))
 
@@ -123,24 +122,25 @@ def test_same_distributions_default():
     obs_c2st = nn_c2st(X, Y)
 
     assert obs_c2st != None
-    assert 0.49 < obs_c2st[0] < 0.51  # only by chance we differentiate the 2 samples
+    assert 0.45 < obs_c2st[0] < 0.55  # only by chance we differentiate the 2 samples
 
 
 @pytest.mark.slow
-def test_same_distributions_default_flexible_alt():
+def test_diff_distributions_flexible():
 
     ndim = 10
-    nsamples = 4048
+    nsamples = 1024
 
     xnormal = tmvn(loc=torch.zeros(ndim), covariance_matrix=torch.eye(ndim))
+    ynormal = tmvn(loc=20.0 * torch.ones(ndim), covariance_matrix=torch.eye(ndim))
 
     X = xnormal.sample((nsamples,))
-    Y = xnormal.sample((nsamples,))
+    Y = ynormal.sample((nsamples,))
 
     obs_c2st = nn_c2st(X, Y, seed=42)
 
     assert obs_c2st != None
-    assert 0.49 < obs_c2st[0] < 0.51  # only by chance we differentiate the 2 samples
+    assert 0.95 < obs_c2st[0]
 
     clf_class = MLPClassifier
     clf_kwargs = {
@@ -153,39 +153,18 @@ def test_same_distributions_default_flexible_alt():
     obs2_c2st = c2st(X, Y, seed=42, clf_class=clf_class, clf_kwargs=clf_kwargs)
 
     assert obs2_c2st != None
-    assert 0.49 < obs2_c2st[0] < 0.51  # only by chance we differentiate the 2 samples
+    assert 0.95 < obs2_c2st[0]  # only by chance we differentiate the 2 samples
     assert np.allclose(obs2_c2st, obs_c2st)
 
 
 @pytest.mark.slow
-def test_diff_distributions_default():
+def test_distributions_overlap_by_two_sigma_mlp():
 
     ndim = 10
-    nsamples = 4048
+    nsamples = 1024
 
     xnormal = tmvn(loc=torch.zeros(ndim), covariance_matrix=torch.eye(ndim))
-    ynormal = tmvn(loc=20.0 * torch.ones(ndim), covariance_matrix=torch.eye(ndim))
-
-    X = xnormal.sample((nsamples,))
-    Y = ynormal.sample((nsamples,))
-
-    obs_c2st = nn_c2st(X, Y)
-
-    assert obs_c2st != None
-    print(obs_c2st)
-    assert (
-        0.98 < obs_c2st[0]
-    )  # distributions do not overlap, classifiers label with high accuracy
-
-
-@pytest.mark.slow
-def test_distributions_overlap_by_two_sigma_default():
-
-    ndim = 10
-    nsamples = 4048
-
-    xnormal = tmvn(loc=torch.zeros(ndim), covariance_matrix=torch.eye(ndim))
-    ynormal = tmvn(loc=1.0 * torch.ones(ndim), covariance_matrix=torch.eye(ndim))
+    ynormal = tmvn(loc=torch.ones(ndim), covariance_matrix=torch.eye(ndim))
 
     X = xnormal.sample((nsamples,))
     Y = ynormal.sample((nsamples,))
@@ -199,7 +178,7 @@ def test_distributions_overlap_by_two_sigma_default():
     )  # distributions do not overlap, classifiers label with high accuracy
 
 
-def test_with_different_classifyer():
+def test_interface_with_different_classifyer():
 
     ndim = 10
     nsamples = 256
@@ -224,6 +203,5 @@ def test_with_different_classifyer():
     obs_c2st = c2st(X, Y, clf_class=clf_class_, clf_kwargs=clf_kwargs_)
 
     assert obs_c2st != None
-    assert obs_c2st[0] < 1
     assert 0.9 < obs_c2st[0]
     assert torch.allclose(exp_c2st, obs_c2st, rtol=0.1)
