@@ -126,13 +126,17 @@ class DenseNN(DenseNN):
 
 
 def init_affine_coupling(dim, **kwargs):
+    assert dim > 1, "In 1d this would be equivalent to affine flows, use them!"
+    split_dim = dim // 2
     hidden_dims = kwargs.pop("hidden_dims", [5 * dim + 5, 5 * dim + 5])
-    arn = DenseNN(dim, hidden_dims)
-    return [arn], {"log_scale_min_clip": -3.0}
+    arn = DenseNN(split_dim, hidden_dims)
+    return [split_dim, arn], {"log_scale_min_clip": -3.0}
 
 
 def init_spline_coupling(dim, **kwargs):
+    assert dim > 1, "In 1d this would be equivalent to affine flows, use them!"
     hidden_dims = kwargs.pop("hidden_dims", [dim * 10, dim * 10])
+    split_dim = dim // 2
     count_bins = 10
     order = "linear"
     bound = 10
@@ -140,8 +144,12 @@ def init_spline_coupling(dim, **kwargs):
         param_dims = [count_bins, count_bins, (count_bins - 1), count_bins]
     else:
         param_dims = [count_bins, count_bins, (count_bins - 1)]
-    nn = DenseNN(dim, hidden_dims, param_dims)
-    return [dim, nn], {"count_bins": count_bins, "bound": bound, "order": order}
+    nn = DenseNN(split_dim, hidden_dims, param_dims)
+    return [dim, split_dim, nn], {
+        "count_bins": count_bins,
+        "bound": bound,
+        "order": order,
+    }
 
 
 register_transform(
@@ -300,7 +308,12 @@ def gaussian_diag_flow_builder(event_shape, link_flow, **kwargs):
     if "num_flows" in kwargs:
         kwargs.pop("num_flows")
     return build_flow(
-        event_shape, link_flow, transform="affine_autoregressive", num_flows=1, **kwargs
+        event_shape,
+        link_flow,
+        transform="affine_autoregressive",
+        num_flows=1,
+        shuffle=False,
+        **kwargs,
     )
 
 
@@ -311,7 +324,12 @@ def gaussian_flow_builder(event_shape, link_flow, **kwargs):
     if "num_flows" in kwargs:
         kwargs.pop("num_flows")
     return build_flow(
-        event_shape, link_flow, transform="affine_tril", num_flows=1, **kwargs
+        event_shape,
+        link_flow,
+        transform="affine_tril",
+        shuffle=False,
+        num_flows=1,
+        **kwargs,
     )
 
 
@@ -333,7 +351,7 @@ def spline_autoregressive_flow_builder(event_shape, link_flow, **kwargs):
     )
 
 
-@register_flow_builder(name="acf")
+@register_flow_builder(name="mcf")
 def coupling_flow_builder(event_shape, link_flow, **kwargs):
     if "transform" in kwargs:
         kwargs.pop("transform")

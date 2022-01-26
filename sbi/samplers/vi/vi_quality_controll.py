@@ -54,10 +54,24 @@ def get_quality_metric(name: str) -> Tuple[Callable, str]:
     return _QUALITY_METRIC[name], _METRIC_MESSAGE[name]
 
 
-def gpdfit(x, sorted=True, eps=1e-8, return_quadrature=False):
-    """Pytorch version of gpdfit according to
+def gpdfit(x, sorted:bool=True, eps:float=1e-8, return_quadrature=False):
+    """ Maximum aposteriori estimate of a Generalized Paretto distribution.
+
+    Pytorch version of gpdfit according to
     https://github.com/avehtari/PSIS/blob/master/py/psis.py. This function will compute
-    an maximum likelihood (regularized, thus more an MAP) for a Generalized Paretto Distribution."""
+    an MAP (more stable than the MLE estimator).
+    
+    
+    Args:
+        x: Tensor of floats.
+        sorted: [description]
+        eps: [description]
+        return_quadrature: [description]
+    
+    Returns:
+        [type]: [description]
+    
+    """
     if not sorted:
         x, _ = x.sort()
     N = len(x)

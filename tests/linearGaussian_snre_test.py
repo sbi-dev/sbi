@@ -331,12 +331,12 @@ def test_c2st_multi_round_snr_on_linearGaussian_vi(num_trials: int, set_seed):
         ("rejection", "gaussian"),
         ("rKL", "uniform"),
         ("fKL", "uniform"),
-        ("IWELBO", "uniform"),
-        ("renyi_divergence", "uniform"),
+        ("IW", "uniform"),
+        ("alpha", "uniform"),
         ("rKL", "gaussian"),
         ("fKL", "gaussian"),
-        ("IWELBO", "gaussian"),
-        ("renyi_divergence", "gaussian"),
+        ("IW", "gaussian"),
+        ("alpha", "gaussian"),
     ),
 )
 def test_api_sre_sampling_methods(sampling_method: str, prior_str: str, set_seed):

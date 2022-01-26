@@ -1,19 +1,31 @@
-from numpy import isin
 import torch
 from torch import nn
 from torch.distributions import TransformedDistribution, Distribution
 from torch.distributions.transforms import Transform, ComposeTransform
 
-from typing import Optional, Iterable, Callable
+from typing import Optional, Iterable, Callable, Dict
 
 
-def filter_kwrags_for_func(f, kwargs):
+def filter_kwrags_for_func(f: Callable, kwargs: Dict) -> Dict:
+    """This function will filter a dictionary of possible arguments for arguments the
+    function can use.
+
+
+
+    Args:
+        f: Function for which kwargs are filtered
+        kwargs: Possible kwargs for function
+
+    Returns:
+        dict: Subset of kwargs, which the function f can take as aruments.
+
+    """
     args = f.__code__.co_varnames
     new_kwargs = dict([(key, val) for key, val in kwargs.items() if key in args])
     return new_kwargs
 
 
-def get_parameters(t: Transform):
+def get_parameters(t: Transform) -> Iterable:
     """Recursive helper function to determine all possible parameters in a Transformed
     Distribution object"""
     if hasattr(t, "parameters"):
@@ -25,7 +37,7 @@ def get_parameters(t: Transform):
         pass
 
 
-def get_modules(t: Transform):
+def get_modules(t: Transform) -> Iterable:
     """Recursive helper function to determine all modules"""
     if isinstance(t, nn.Module):
         yield t
@@ -72,17 +84,22 @@ def check_parameters_modules_attribute(q: Distribution):
 
 
 def check_sample_shape_and_support(q: Distribution, prior: Distribution):
-    assert all(
+    assert (
         q.event_shape == prior.event_shape
     ), "The event shape of q must match that of the prior"
-    assert all(
-        q.batch_shape == q.batch_shape
+    assert (
+        q.batch_shape == prior.batch_shape
     ), "The batch sahpe of q must match that of the prior"
 
     samples = q.sample((10000,))
     assert all(
         prior.support.check(samples)
     ), "The support of q must match that of the prior"
+
+
+def check_variational_distribution(q: Distribution, prior: Distribution):
+    check_parameters_modules_attribute(q)
+    check_sample_shape_and_support(q, prior)
 
 
 def add_parameters_module_attributes(
@@ -105,29 +122,51 @@ def add_parameter_attributes_to_transformed_distribution(q: TransformedDistribut
 
 
 def adapt_and_check_variational_distributions(
-    q: Distribution, q_kwargs: dict, prior: Distribution
+    q: Distribution, q_kwargs: dict, prior: Distribution, theta_transform: Callable
 ):
     if isinstance(q, TransformedDistribution):
+        if q.support != prior.support:
+            q = TransformedDistribution(q.base_dist, q.transforms + [theta_transform])
         add_parameter_attributes_to_transformed_distribution(q)
+
     else:
         if "parameters" in q_kwargs:
-            parameters = q_kwargs["parameters"]
+            params = q_kwargs["parameters"]
         else:
-            parameters = lambda x: []
+            params = []
+
+        def parameters():
+            return params
 
         if "modules" in q_kwargs:
-            modules = q_kwargs["modules"]
+            mod = q_kwargs["modules"]
         else:
-            modules = lambda x: []
+            mod = []
+
+        def modules():
+            return mod
+
+        # Compatible with deepcopy
+        def __deepcopy__(*args, **kwargs):
+            for key, vals in q.__dict__.items():
+                if isinstance(vals, torch.Tensor):
+                    q.__dict__[key] = vals.clone()
+            return q
+
+        q.__deepcopy__ = __deepcopy__
+
+        q = TransformedDistribution(q, [theta_transform])
         add_parameters_module_attributes(q, parameters, modules)
 
-    check_parameters_modules_attribute(q)
-    check_sample_shape_and_support(q, prior)
+    # check_variational_distribution(q, prior)
+
+    return q
 
 
 def make_sure_nothing_in_cache(q):
     """This may be used before a 'deepcopy' call, as non leaf tensors (which are in the
-    cache) do not support the deepcopy protocol..."""
+    cache) do not support the deepcopy protocol...
+    Unfortunaltly the q.clear_cache() function does only remove a subset of cached tensors."""
     q.clear_cache()
     # The original methods can miss some parts..
     for t in q.transforms:
@@ -138,30 +177,6 @@ def make_sure_nothing_in_cache(q):
         if isinstance(t, torch.distributions.transforms.ComposeTransform):
             for t_i in t.parts:
                 t_i._cached_x_y = None, None
-
-        t_dict = t.__dict__
-        for key in t_dict:
-            if "cache" in key or "det" in key:
-                obj = t_dict[key]
-                if torch.is_tensor(obj):
-                    t_dict[key] = torch.zeros_like(obj)
-
-
-def make_sure_nothing_in_cache_disabled_cache(q):
-    """This may be used before a 'deepcopy' call, as non leaf tensors (which are in the
-    cache) do not support the deepcopy protocol..."""
-    q.clear_cache()
-    # The original methods can miss some parts..
-    for t in q.transforms:
-        t._cached_x_y = None, None
-        t._cache_size = 0
-        # Compose transforms are not cleared correctly using q.clear_cache...
-        if isinstance(t, torch.distributions.transforms.IndependentTransform):
-            t = t.base_transform
-        if isinstance(t, torch.distributions.transforms.ComposeTransform):
-            for t_i in t.parts:
-                t_i._cached_x_y = None, None
-                t_i._cache_size = 0
 
         t_dict = t.__dict__
         for key in t_dict:
