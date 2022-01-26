@@ -10,7 +10,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from sbi import utils as utils
 from sbi.inference.base import NeuralInference
-from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior
+from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior, VIPosterior
 from sbi.inference.potentials import ratio_estimator_based_potential
 from sbi.types import TorchModule
 from sbi.utils import (
@@ -309,7 +309,9 @@ class RatioEstimator(NeuralInference, ABC):
         prior: Optional[Any] = None,
         sample_with: str = "mcmc",
         mcmc_method: str = "slice_np",
+        vi_method: str = "rKL",
         mcmc_parameters: Dict[str, Any] = {},
+        vi_parameters: Dict[str, Any] = {},
         rejection_sampling_parameters: Dict[str, Any] = {},
     ) -> Union[MCMCPosterior, RejectionPosterior]:
         r"""Build posterior from the neural density estimator.
@@ -377,7 +379,13 @@ class RatioEstimator(NeuralInference, ABC):
                 **rejection_sampling_parameters
             )
         elif sample_with == "vi":
-            raise NotImplementedError
+            self._posterior = VIPosterior(
+                potential_fn=potential_fn,
+                theta_transform=theta_transform,
+                vi_method=vi_method,
+                device=device,
+                **vi_parameters,
+            )
         else:
             raise NotImplementedError
 

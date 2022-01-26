@@ -14,6 +14,7 @@ from sbi.inference import (
     likelihood_estimator_based_potential,
     MCMCPosterior,
     RejectionPosterior,
+    VIPosterior,
     prepare_for_sbi,
     simulate_for_sbi,
 )
@@ -295,6 +296,69 @@ def test_c2st_multi_round_snl_on_linearGaussian(num_trials: int, set_seed):
 
 
 @pytest.mark.slow
+@pytest.mark.parametrize("num_trials", (1, 3))
+def test_c2st_multi_round_snl_on_linearGaussian_vi(num_trials: int, set_seed):
+    """Test SNL on linear Gaussian, comparing to ground truth posterior via c2st.
+
+    Args:
+        set_seed: fixture for manual seeding
+    """
+
+    num_dim = 2
+    x_o = zeros((num_trials, num_dim))
+    num_samples = 500
+    num_simulations_per_round = 500 * num_trials
+
+    # likelihood_mean will be likelihood_shift+theta
+    likelihood_shift = -1.0 * ones(num_dim)
+    likelihood_cov = 0.3 * eye(num_dim)
+
+    prior_mean = zeros(num_dim)
+    prior_cov = eye(num_dim)
+    prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
+    gt_posterior = true_posterior_linear_gaussian_mvn_prior(
+        x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
+    )
+    target_samples = gt_posterior.sample((num_samples,))
+
+    simulator, prior = prepare_for_sbi(
+        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov), prior
+    )
+    inference = SNLE(show_progress_bars=False)
+
+    theta, x = simulate_for_sbi(
+        simulator, prior, num_simulations_per_round, simulation_batch_size=50
+    )
+    likelihood_estimator = inference.append_simulations(theta, x).train()
+    potential_fn, theta_transform = likelihood_estimator_based_potential(
+        prior=prior, likelihood_estimator=likelihood_estimator, x_o=x_o
+    )
+    posterior1 = VIPosterior(
+        potential_fn=potential_fn,
+        theta_transform=theta_transform,
+    )
+    posterior1.train()
+
+    theta, x = simulate_for_sbi(
+        simulator, posterior1, num_simulations_per_round, simulation_batch_size=50
+    )
+    likelihood_estimator = inference.append_simulations(theta, x).train()
+    potential_fn, theta_transform = likelihood_estimator_based_potential(
+        prior=prior, likelihood_estimator=likelihood_estimator, x_o=x_o
+    )
+    posterior = VIPosterior(
+        potential_fn=potential_fn,
+        theta_transform=theta_transform,
+    )
+    posterior.train()
+
+    samples = posterior.sample(sample_shape=(num_samples,))
+
+    # Check performance based on c2st accuracy.
+    check_c2st(samples, target_samples, alg="multi-round-snl")
+
+
+@pytest.mark.slow
 @pytest.mark.parametrize(
     "sampling_method, prior_str",
     (
@@ -309,6 +373,14 @@ def test_c2st_multi_round_snl_on_linearGaussian(num_trials: int, set_seed):
         ("hmc", "gaussian"),
         ("rejection", "uniform"),
         ("rejection", "gaussian"),
+        ("rKL", "uniform"),
+        ("fKL", "uniform"),
+        ("IWELBO", "uniform"),
+        ("renyi_divergence", "uniform"),
+        ("rKL", "gaussian"),
+        ("fKL", "gaussian"),
+        ("IWELBO", "gaussian"),
+        ("renyi_divergence", "gaussian"),
     ),
 )
 @pytest.mark.parametrize("init_strategy", ("proposal", "sir"))
@@ -332,8 +404,14 @@ def test_api_snl_sampling_methods(
     num_chains = 3 if sampling_method == "slice_np_vectorized" else 1
     if sampling_method == "rejection":
         sample_with = "rejection"
-    else:
+    elif (
+        "slice" in sampling_method
+        or "nuts" in sampling_method
+        or "hmc" in sampling_method
+    ):
         sample_with = "mcmc"
+    else:
+        sample_with = "vi"
 
     if prior_str == "gaussian":
         prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
@@ -354,7 +432,11 @@ def test_api_snl_sampling_methods(
     )
     if sample_with == "rejection":
         posterior = RejectionPosterior(potential_fn=potential_fn, proposal=prior)
-    else:
+    elif (
+        "slice" in sampling_method
+        or "nuts" in sampling_method
+        or "hmc" in sampling_method
+    ):
         posterior = MCMCPosterior(
             potential_fn,
             proposal=prior,
@@ -364,5 +446,10 @@ def test_api_snl_sampling_methods(
             num_chains=num_chains,
             init_strategy=init_strategy,
         )
+    else:
+        posterior = VIPosterior(
+            potential_fn, theta_transform, vi_method=sampling_method
+        )
+        posterior.train(max_num_iters=10)
 
     posterior.sample(sample_shape=(num_samples,))
