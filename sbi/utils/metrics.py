@@ -56,6 +56,10 @@ def c2st(
         clf_class: a scikit-learn classifier class
         clf_kwargs: key-value arguments dictionary to the class specified by clf_class, e.g. sklearn.ensemble.RandomForestClassifier
 
+    Return:
+        torch.tensor offering the mean accuracy score over the test sets
+        from cross-validation
+
     Example:
     ``` py
     > c2st(X,Y)
