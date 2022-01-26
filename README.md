@@ -96,7 +96,8 @@ M. Durkan's `lfi`. `sbi` runs as a community project; development is coordinated
 
 
 ## Citation
-If you use `sbi` consider citing the [corresponding paper](https://doi.org/10.21105/joss.02505):
+If you use `sbi` consider citing the [sbi software paper](https://doi.org/10.21105/joss.02505), in addition to the original research articles describing the specifc sbi-algorithm(s) you are using: 
+
 ```
 @article{tejero-cantero2020sbi,
   doi = {10.21105/joss.02505},

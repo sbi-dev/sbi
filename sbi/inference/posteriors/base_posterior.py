@@ -2,29 +2,20 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 from abc import ABC, abstractmethod
-from copy import deepcopy
-from functools import partial
-from math import ceil
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
-from warnings import warn
+from typing import Any, Callable, Dict, Optional, Union
 
-import numpy as np
 import torch
 import torch.distributions.transforms as torch_tf
 from torch import Tensor
-from torch import multiprocessing as mp
-from torch import nn
 
 from sbi import utils as utils
-from sbi.analysis import gradient_ascent
 from sbi.types import Array, Shape, TorchTransform
+from sbi.utils import gradient_ascent
 from sbi.utils.torchutils import (
-    ScalarFloat,
-    atleast_2d_float32_tensor,
     ensure_theta_batched,
     process_device,
 )
-from sbi.utils.user_input_checks import check_for_possibly_batched_x_shape, process_x
+from sbi.utils.user_input_checks import process_x
 
 
 class NeuralPosterior(ABC):

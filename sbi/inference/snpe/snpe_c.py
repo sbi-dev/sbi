@@ -100,7 +100,7 @@ class SNPE_C(PosteriorEstimator):
         resume_training: bool = False,
         discard_prior_samples: bool = False,
         use_combined_loss: bool = False,
-        retrain_from_scratch_each_round: bool = False,
+        retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
     ) -> nn.Module:
@@ -133,7 +133,7 @@ class SNPE_C(PosteriorEstimator):
                 using maximum likelihood in addition to training it on all samples using
                 atomic loss. The extra MLE loss helps prevent density leaking with
                 bounded priors.
-            retrain_from_scratch_each_round: Whether to retrain the conditional density
+            retrain_from_scratch: Whether to retrain the conditional density
                 estimator for the posterior from scratch each round.
             show_train_summary: Whether to print the number of epochs and validation
                 loss and leakage after the training.

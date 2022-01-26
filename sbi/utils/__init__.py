@@ -1,5 +1,5 @@
 # flake8: noqa
-from sbi.utils.conditional_density import (
+from sbi.utils.conditional_density_utils import (
     conditional_corrcoeff,
     eval_conditional_density,
     extract_and_transform_mog,
@@ -18,6 +18,7 @@ from sbi.utils.sbiutils import (
     del_entries,
     expit,
     get_simulations_since_round,
+    gradient_ascent,
     handle_invalid_x,
     logit,
     mask_sims_from_prior,
@@ -67,3 +68,4 @@ from sbi.utils.user_input_checks import (
 )
 from sbi.utils.user_input_checks_utils import MultipleIndependent
 from sbi.utils.potentialutils import transformed_potential, pyro_potential_wrapper
+from sbi.utils.tensorboard_output import plot_summary, list_all_logs

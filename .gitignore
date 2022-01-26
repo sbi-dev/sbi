@@ -89,6 +89,7 @@ target/
 
 # IDEs (VSCode, etc.)
 .env
+*.code-workspace
 
 # Class diagram
 *.pyns

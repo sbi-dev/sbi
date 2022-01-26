@@ -2,7 +2,7 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 from functools import partial
 from math import ceil
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, Optional, Union
 from warnings import warn
 
 import numpy as np
@@ -12,7 +12,6 @@ from pyro.infer.mcmc import HMC, NUTS
 from pyro.infer.mcmc.api import MCMC
 from torch import Tensor
 from torch import multiprocessing as mp
-from torch import nn
 
 from sbi import utils as utils
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
@@ -26,14 +25,10 @@ from sbi.samplers.mcmc import (
 )
 from sbi.types import Shape, TorchTransform
 from sbi.utils import (
-    del_entries,
-    mcmc_transform,
     pyro_potential_wrapper,
     transformed_potential,
 )
 from sbi.utils.torchutils import (
-    atleast_2d,
-    atleast_2d_float32_tensor,
     ensure_theta_batched,
 )
 
@@ -53,7 +48,7 @@ class MCMCPosterior(NeuralPosterior):
         thin: int = 10,
         warmup_steps: int = 10,
         num_chains: int = 1,
-        init_strategy: str = "prior",
+        init_strategy: str = "sir",
         init_strategy_num_candidates: int = 1_000,
         device: Optional[str] = None,
         x_shape: Optional[torch.Size] = None,
@@ -64,10 +59,12 @@ class MCMCPosterior(NeuralPosterior):
             proposal: Proposal distribution that is used to initialize the MCMC chain.
             theta_transform: Transformation that will be applied during sampling.
                 Allows to perform MCMC in unconstrained space.
-            method: Method used for MCMC sampling, one of `slice_np`, `slice`,
-                `hmc`, `nuts`. Currently defaults to `slice_np` for a custom numpy
-                implementation of slice sampling; select `hmc`, `nuts` or `slice` for
-                Pyro-based sampling.
+            method: Method used for MCMC sampling, one of `slice_np`,
+                `slice_np_vectorized`, `slice`, `hmc`, `nuts`. `slice_np` is a custom
+                numpy implementation of slice sampling. `slice_np_vectorized` is
+                identical to `slice_np`, but if `num_chains>1`, the chains are
+                vectorized for `slice_np_vectorized` whereas they are run sequentially
+                for `slice_np`. The samplers `hmc`, `nuts` or `slice` sample with Pyro.
             thin: The thinning factor for the chain.
             warmup_steps: The initial number of samples to discard.
             num_chains: The number of chains.
@@ -404,7 +401,7 @@ class MCMCPosterior(NeuralPosterior):
             warmup_steps=warmup_steps,
             initial_params={"": initial_params},
             num_chains=num_chains,
-            mp_context="fork",
+            mp_context="spawn",
             disable_progbar=not show_progress_bars,
             transforms={},
         )

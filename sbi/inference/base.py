@@ -273,7 +273,7 @@ class NeuralInference(ABC):
         calibration_kernel: Optional[Callable] = None,
         exclude_invalid_x: bool = True,
         discard_prior_samples: bool = False,
-        retrain_from_scratch_each_round: bool = False,
+        retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
     ) -> NeuralPosterior:
         raise NotImplementedError
@@ -441,6 +441,14 @@ class NeuralInference(ABC):
 
         Statistics are extracted from the arguments and from entries in self._summary
         created during training.
+
+        Scalar tags:
+            - median_observation_distances
+            - epochs_trained
+            - best_validation_log_prob
+            - validation_log_probs_across_rounds
+            - train_log_probs_across_rounds
+            - epoch_durations_sec_across_rounds
         """
 
         # NB. This is a subset of the logging as done in `GH:conormdurkan/lfi`. A big

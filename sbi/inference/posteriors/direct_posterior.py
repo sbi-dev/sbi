@@ -1,13 +1,8 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
-from functools import partial
-from math import ceil
-from typing import Any, Callable, Dict, List, Optional, Union
-from warnings import warn
+from typing import Callable, Optional, Union
 
 import torch
-from pyro.infer.mcmc import HMC, NUTS
-from pyro.infer.mcmc.api import MCMC
 from torch import Tensor, log, nn
 
 from sbi import utils as utils
@@ -17,14 +12,8 @@ from sbi.inference.potentials.posterior_based_potential import (
 )
 from sbi.samplers.rejection.rejection import rejection_sample_posterior_within_prior
 from sbi.types import Shape
-from sbi.utils import del_entries
 from sbi.utils.sbiutils import match_theta_and_x_batch_shapes, within_support
-from sbi.utils.torchutils import (
-    atleast_2d,
-    atleast_2d_float32_tensor,
-    ensure_theta_batched,
-)
-from sbi.utils.user_input_checks import check_for_possibly_batched_x_shape
+from sbi.utils.torchutils import ensure_theta_batched
 
 
 class DirectPosterior(NeuralPosterior):
