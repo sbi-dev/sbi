@@ -137,6 +137,10 @@ def ensure_numpy(t: Union[np.ndarray, torch.Tensor]) -> np.ndarray:
 
 
 def prepare_for_plot(samples, limits):
+    """
+    Ensures correct formatting for samples and limits, and returns dimension
+    of the samples.
+    """
 
     # Prepare samples
     if type(samples) != list:
@@ -170,20 +174,43 @@ def prepare_for_plot(samples, limits):
     return samples, dim, limits
 
 
-def get_diag_func(samples, limits, opts, **kwargs):
-    if "diag" in opts.keys():
-        plot_type = "diag"
+def prepare_for_conditional_plot(condition, opts):
+    """
+    Ensures correct formatting for limits. Returns the margins just inside
+    the domain boundaries, and the dimension of the samples.
+    """
+    # Dimensions
+    dim = condition.shape[-1]
+
+    # Prepare limits
+    if len(opts["limits"]) == 1:
+        limits = [opts["limits"][0] for _ in range(dim)]
     else:
-        plot_type = "col"
+        limits = opts["limits"]
+    limits = torch.as_tensor(limits)
+
+    # Infer the margin. This is to avoid that we evaluate the posterior **exactly**
+    # at the boundary.
+    limits_diffs = limits[:, 1] - limits[:, 0]
+    eps_margins = limits_diffs / 1e5
+
+    return dim, limits, eps_margins
+
+
+def get_diag_func(samples, limits, opts, **kwargs):
+    """
+    Returns the diag_func which returns the 1D marginal plot for the parameter
+    indexed by row.
+    """
 
     def diag_func(row, **kwargs):
         if len(samples) > 0:
             for n, v in enumerate(samples):
-                if opts[plot_type][n] == "hist":
+                if opts["diag"][n] == "hist":
                     h = plt.hist(
                         v[:, row], color=opts["samples_colors"][n], **opts["hist_diag"]
                     )
-                elif opts[plot_type][n] == "kde":
+                elif opts["diag"][n] == "kde":
                     density = gaussian_kde(
                         v[:, row], bw_method=opts["kde_diag"]["bw_method"]
                     )
@@ -205,6 +232,37 @@ def get_diag_func(samples, limits, opts, **kwargs):
                         )
                 else:
                     pass
+
+    return diag_func
+
+
+def get_conditional_diag_func(opts, limits, eps_margins, resolution):
+    """
+    Returns the diag_func which returns the 1D marginal conditional plot for
+    the parameter indexed by row.
+    """
+
+    def diag_func(row, **kwargs):
+        p_vector = eval_conditional_density(
+            opts["density"],
+            opts["condition"],
+            limits,
+            row,
+            row,
+            resolution=resolution,
+            eps_margins1=eps_margins[row],
+            eps_margins2=eps_margins[row],
+            warn_about_deprecation=False,
+        ).numpy()
+        h = plt.plot(
+            np.linspace(
+                limits[row, 0],
+                limits[row, 1],
+                resolution,
+            ),
+            p_vector,
+            c=opts["samples_colors"][0],
+        )
 
     return diag_func
 
@@ -381,7 +439,7 @@ def pairplot(
                 else:
                     pass
 
-    return _pairplot_scaffold(
+    return _arrange_plots(
         diag_func, upper_func, dim, limits, points, opts, fig=fig, axes=axes
     )
 
@@ -418,7 +476,7 @@ def marginal_plot(
         subset: List containing the dimensions to plot. E.g. subset=[1,3] will plot
             plot only the 1st and 3rd dimension but will discard the 0th and 2nd (and,
             if they exist, the 4th, 5th and so on).
-        diag: Plotting style for diagonal, {hist, cond, None}.
+        diag: Plotting style for 1D marginals, {hist, kde cond, None}.
         figsize: Size of the entire figure.
         labels: List of strings specifying the names of the parameters.
         ticks: Position of the ticks.
@@ -446,7 +504,9 @@ def marginal_plot(
 
     diag_func = get_diag_func(samples, limits, opts, **kwargs)
 
-    return _marginal(diag_func, dim, limits, points, opts, fig=fig, axes=axes)
+    return _arrange_plots(
+        diag_func, None, dim, limits, points, opts, fig=fig, axes=axes
+    )
 
 
 def conditional_marginal_plot(
@@ -512,44 +572,13 @@ def conditional_marginal_plot(
     opts = _update(opts, locals())
     opts = _update(opts, kwargs)
 
-    # Dimensions
-    dim = condition.shape[-1]
+    dim, limits, eps_margins = prepare_for_conditional_plot(condition, opts)
 
-    # Prepare limits
-    if len(opts["limits"]) == 1:
-        limits = [opts["limits"][0] for _ in range(dim)]
-    else:
-        limits = opts["limits"]
-    limits = torch.as_tensor(limits)
+    diag_func = get_conditional_diag_func(opts, limits, eps_margins, resolution)
 
-    # Infer the margin. This is to avoid that we evaluate the posterior **exactly**
-    # at the boundary.
-    limits_diffs = limits[:, 1] - limits[:, 0]
-    eps_margins = limits_diffs / 1e5
-
-    def diag_func(row, **kwargs):
-        p_vector = eval_conditional_density(
-            opts["density"],
-            opts["condition"],
-            limits,
-            row,
-            row,
-            resolution=resolution,
-            eps_margins1=eps_margins[row],
-            eps_margins2=eps_margins[row],
-            warn_about_deprecation=False,
-        ).numpy()
-        h = plt.plot(
-            np.linspace(
-                limits[row, 0],
-                limits[row, 1],
-                resolution,
-            ),
-            p_vector,
-            c=opts["samples_colors"][0],
-        )
-
-    return _marginal(diag_func, dim, limits, points, opts, fig=fig, axes=axes)
+    return _arrange_plots(
+        diag_func, None, dim, limits, points, opts, fig=fig, axes=axes
+    )
 
 
 def conditional_pairplot(
@@ -621,45 +650,11 @@ def conditional_pairplot(
     # the user)
     opts = _update(opts, locals())
     opts = _update(opts, kwargs)
-
-    # Dimensions
-    dim = condition.shape[-1]
-
-    # Prepare limits
-    if len(opts["limits"]) == 1:
-        limits = [opts["limits"][0] for _ in range(dim)]
-    else:
-        limits = opts["limits"]
-    limits = torch.as_tensor(limits)
-
     opts["lower"] = None
 
-    # Infer the margin. This is to avoid that we evaluate the posterior **exactly**
-    # at the boundary.
-    limits_diffs = limits[:, 1] - limits[:, 0]
-    eps_margins = limits_diffs / 1e5
+    dim, limits, eps_margins = prepare_for_conditional_plot(condition, opts)
 
-    def diag_func(row, **kwargs):
-        p_vector = eval_conditional_density(
-            opts["density"],
-            opts["condition"],
-            limits,
-            row,
-            row,
-            resolution=resolution,
-            eps_margins1=eps_margins[row],
-            eps_margins2=eps_margins[row],
-            warn_about_deprecation=False,
-        ).numpy()
-        h = plt.plot(
-            np.linspace(
-                limits[row, 0],
-                limits[row, 1],
-                resolution,
-            ),
-            p_vector,
-            c=opts["samples_colors"][0],
-        )
+    diag_func = get_conditional_diag_func(opts, limits, eps_margins, resolution)
 
     def upper_func(row, col, **kwargs):
         p_image = eval_conditional_density(
@@ -685,28 +680,31 @@ def conditional_pairplot(
             aspect="auto",
         )
 
-    return _pairplot_scaffold(
+    return _arrange_plots(
         diag_func, upper_func, dim, limits, points, opts, fig=fig, axes=axes
     )
 
 
-def _pairplot_scaffold(
+def _arrange_plots(
     diag_func, upper_func, dim, limits, points, opts, fig=None, axes=None
 ):
     """
-    Builds the scaffold for any function that plots parameters in a pairplot setting.
+    Arranges the plots for any function that plots parameters either in a row of 1D
+    marginals or a pairplot setting.
 
     Args:
         diag_func: Plotting function that will be executed for the diagonal elements of
-            the plot. It will be passed the current `row` (i.e. which parameter that is
-            to be plotted) and the `limits` for all dimensions.
+            the plot (or the columns of a row of 1D marginals). It will be passed the
+            current `row` (i.e. which parameter that is to be plotted) and the `limits`
+            for all dimensions.
         upper_func: Plotting function that will be executed for the upper-diagonal
             elements of the plot. It will be passed the current `row` and `col` (i.e.
-            which parameters are to be plotted and the `limits` for all dimensions.
+            which parameters are to be plotted and the `limits` for all dimensions. None
+            if we are in a 1D setting.
         dim: The dimensionality of the density.
         limits: Limits for each parameter.
         points: Additional points to be scatter-plotted.
-        opts: Dictionary built by the functions that call `pairplot_scaffold`. Must
+        opts: Dictionary built by the functions that call `_arrange_plots`. Must
             contain at least `labels`, `subset`, `figsize`, `subplots`,
             `fig_subplots_adjust`, `title`, `title_format`, ..
         fig: matplotlib figure to plot on.
@@ -754,6 +752,10 @@ def _pairplot_scaffold(
         else:
             raise NotImplementedError
         rows = cols = len(subset)
+    flat = upper_func is None
+    if flat:
+        rows = 1
+        opts["lower"] = None
 
     # Create fig and axes if they were not passed.
     if fig is None or axes is None:
@@ -774,8 +776,8 @@ def _pairplot_scaffold(
 
     # Style axes
     row_idx = -1
-    for row in range(dim):
-        if row not in subset:
+    for row in range(rows):
+        if row not in subset and not flat:
             continue
         else:
             row_idx += 1
@@ -787,7 +789,9 @@ def _pairplot_scaffold(
             else:
                 col_idx += 1
 
-            if row == col:
+            if flat:
+                current = "diag"
+            elif row == col:
                 current = "diag"
             elif row < col:
                 current = "upper"
@@ -827,7 +831,7 @@ def _pairplot_scaffold(
 
             # Formatting axes
             if current == "diag":  # off-diagnoals
-                if opts["lower"] is None or col == dim - 1:
+                if opts["lower"] is None or col == dim - 1 or flat:
                     _format_axis(
                         ax,
                         xhide=False,
@@ -858,13 +862,13 @@ def _pairplot_scaffold(
 
             # Diagonals
             if current == "diag":
-                diag_func(row=row, limits=limits)
+                diag_func(row=col, limits=limits)
 
                 if len(points) > 0:
                     extent = ax.get_ylim()
                     for n, v in enumerate(points):
                         h = plt.plot(
-                            [v[:, row], v[:, row]],
+                            [v[:, col], v[:, col]],
                             extent,
                             color=opts["points_colors"][n],
                             **opts["points_diag"],
@@ -889,170 +893,27 @@ def _pairplot_scaffold(
                         )
 
     if len(subset) < dim:
-        for row in range(len(subset)):
-            ax = axes[row, len(subset) - 1]
+        if flat:
+            ax = axes[0, len(subset) - 1]
             x0, x1 = ax.get_xlim()
             y0, y1 = ax.get_ylim()
             text_kwargs = {"fontsize": plt.rcParams["font.size"] * 2.0}
             ax.text(x1 + (x1 - x0) / 8.0, (y0 + y1) / 2.0, "...", **text_kwargs)
-            if row == len(subset) - 1:
-                ax.text(
-                    x1 + (x1 - x0) / 12.0,
-                    y0 - (y1 - y0) / 1.5,
-                    "...",
-                    rotation=-45,
-                    **text_kwargs,
-                )
-
-    return fig, axes
-
-
-def _marginal(diag_func, dim, limits, points, opts, fig=None, axes=None):
-    """
-    Builds the row of plots for any function that plots marginals.
-
-    Args:
-        diag_func: Plotting function that will be executed for the elements of
-            the plot. It will be passed the current `row` (i.e. which parameter that is
-            to be plotted) and the `limits` for all dimensions.
-        dim: The dimensionality of the density.
-        limits: Limits for each parameter.
-        points: Additional points to be scatter-plotted.
-        opts: Dictionary built by the functions that call `_marginal`. Must
-            contain at least `labels`, `subset`, `figsize`, `subplots`,
-            `fig_subplots_adjust`, `title`, `title_format`, ..
-        fig: matplotlib figure to plot on.
-        axes: matplotlib axes corresponding to fig.
-
-    Returns: figure and axis
-    """
-
-    # Prepare points
-    if points is None:
-        points = []
-    if type(points) != list:
-        points = ensure_numpy(points)
-        points = [points]
-    points = [np.atleast_2d(p) for p in points]
-    points = [np.atleast_2d(ensure_numpy(p)) for p in points]
-
-    # TODO: add asserts checking compatibility of dimensions
-
-    # Prepare labels
-    if opts["labels"] == [] or opts["labels"] is None:
-        labels_dim = ["dim {}".format(i + 1) for i in range(dim)]
-    else:
-        labels_dim = opts["labels"]
-
-    # Prepare ticks
-    if opts["ticks"] == [] or opts["ticks"] is None:
-        ticks = None
-    else:
-        if len(opts["ticks"]) == 1:
-            ticks = [opts["ticks"][0] for _ in range(dim)]
         else:
-            ticks = opts["ticks"]
-
-    # Figure out if we subset the plot
-    subset = opts["subset"]
-    if subset is None:
-        cols = dim
-        subset = [i for i in range(dim)]
-    else:
-        if type(subset) == int:
-            subset = [subset]
-        elif type(subset) == list:
-            pass
-        else:
-            raise NotImplementedError
-        cols = len(subset)
-
-    # Create fig and axes if they were not passed.
-    if fig is None or axes is None:
-        fig, axes = plt.subplots(1, cols, figsize=opts["figsize"], **opts["subplots"])
-    else:
-        assert axes.shape == (
-            1,
-            cols,
-        ), f"Passed axes must match subplot shape: {1, cols}."
-    # Cast to ndarray in case of 1D subplots.
-    axes = np.array(axes).reshape(1, cols)
-
-    # Style figure
-    fig.subplots_adjust(**opts["fig_subplots_adjust"])
-    fig.suptitle(opts["title"], **opts["title_format"])
-
-    # Style axes
-    col_idx = -1
-    for col in range(dim):
-        if col not in subset:
-            continue
-        else:
-            col_idx += 1
-
-        ax = axes[0, col_idx]
-        plt.sca(ax)
-
-        # Background color
-        if (
-            "diag" in opts["fig_bg_colors"]
-            and opts["fig_bg_colors"]["diag"] is not None
-        ):
-            ax.set_facecolor(opts["fig_bg_colors"]["diag"])
-
-        # Axes
-        if opts["diag"] is None:
-            ax.axis("off")
-            continue
-
-        # Limits
-        ax.set_xlim((limits[col][0], limits[col][1]))
-
-        # Ticks
-        if ticks is not None:
-            ax.set_xticks((ticks[col][0], ticks[col][1]))
-
-        # Despine
-        ax.spines["right"].set_visible(False)
-        ax.spines["top"].set_visible(False)
-        ax.spines["bottom"].set_position(("outward", opts["despine"]["offset"]))
-
-        # Formatting axes
-
-        _format_axis(
-            ax,
-            xhide=False,
-            xlabel=labels_dim[col],
-            yhide=True,
-            tickformatter=opts["tickformatter"],
-        )
-        if opts["tick_labels"] is not None:
-            ax.set_xticklabels(
-                (
-                    str(opts["tick_labels"][col][0]),
-                    str(opts["tick_labels"][col][1]),
-                )
-            )
-
-        # Diagonals
-        diag_func(row=1, limits=limits)
-
-        if len(points) > 0:
-            extent = ax.get_ylim()
-            for n, v in enumerate(points):
-                h = plt.plot(
-                    [v[:, 1], v[:, 1]],
-                    extent,
-                    color=opts["points_colors"][n],
-                    **opts["points_diag"],
-                )
-
-    if len(subset) < dim:
-        ax = axes[0, len(subset) - 1]
-        x0, x1 = ax.get_xlim()
-        y0, y1 = ax.get_ylim()
-        text_kwargs = {"fontsize": plt.rcParams["font.size"] * 2.0}
-        ax.text(x1 + (x1 - x0) / 8.0, (y0 + y1) / 2.0, "...", **text_kwargs)
+            for row in range(len(subset)):
+                ax = axes[row, len(subset) - 1]
+                x0, x1 = ax.get_xlim()
+                y0, y1 = ax.get_ylim()
+                text_kwargs = {"fontsize": plt.rcParams["font.size"] * 2.0}
+                ax.text(x1 + (x1 - x0) / 8.0, (y0 + y1) / 2.0, "...", **text_kwargs)
+                if row == len(subset) - 1:
+                    ax.text(
+                        x1 + (x1 - x0) / 12.0,
+                        y0 - (y1 - y0) / 1.5,
+                        "...",
+                        rotation=-45,
+                        **text_kwargs,
+                    )
 
     return fig, axes
 
