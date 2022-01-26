@@ -26,36 +26,47 @@ def c2st(
 ) -> Tensor:
     """
     Return accuracy of classifier trained to distinguish samples from supposedly
-    two distributions <X> and <Y>. For details on the method, see [1].
+    two distributions <X> and <Y>. For details on the method, see [1,2].
     If the returned accuracy is 0.5, <X> and <Y> are considered to be from the
     same generating PDF, i.e. they can not be differentiated.
     If the returned accuracy is around 1., <X> and <Y> are considered to be from
     two different generating PDFs.
 
-    Trains classifiers with N-fold cross-validation [2]. By default, a `RandomForestClassifier`
-    by scikit-learn is used. This can be adopted using <clf_class> and
-    <clf_kwargs> as in:
+    Training of the classifier with N-fold cross-validation [3] using sklearn.
+    By default, a `RandomForestClassifier` by from `sklearn.ensemble` is used.
+    This can be changed using <clf_class>.
 
-    ```
+    ``` py
     clf = clf_class(random_state=seed, **clf_kwargs)
+    #...
+    scores = cross_val_score(
+        clf, data, target, cv=shuffle, scoring=scoring, verbose=verbosity
+    )
     ```
+    Further configuration of the classifier can be performed using <clf_kwargs>.
 
     Args:
         X: Samples from one distribution.
         Y: Samples from another distribution.
-        seed: Seed for sklearn
-        n_folds: Number of folds
-        z_score: Z-scoring using X
+        seed: Seed for the sklearn classifier and the KFold cross-validation
+        n_folds: Number of folds to use
+        z_score: Z-scoring using X, i.e. mean and std deviation of X is used to normalize Y using (Y - mean)/std
         noise_scale: If passed, will add Gaussian noise with std noise_scale to samples of X and of Y
         verbosity: control the verbosity of sklearn.model_selection.cross_val_score
         clf_class: a scikit-learn classifier class
-        clf_kwargs: key-value arguments dictuinary to the class specified by clf_class, e.g. sklearn.ensemble.RandomForestClassifier
+        clf_kwargs: key-value arguments dictionary to the class specified by clf_class, e.g. sklearn.ensemble.RandomForestClassifier
 
     Example:
+    ``` py
+    > c2st(X,Y)
+    [0.51904464]
+    #X and Y likely come from the same PDF or ensemble
+    ```
 
     References:
         [1]: http://arxiv.org/abs/1610.06545
-        [2]: https://scikit-learn.org/stable/modules/cross_validation.html
+        [2]: https://www.osti.gov/biblio/826696/
+        [3]: https://scikit-learn.org/stable/modules/cross_validation.html
     """
     if z_score:
         X_mean = torch.mean(X, axis=0)
