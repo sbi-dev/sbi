@@ -31,12 +31,6 @@ class NeuralPosteriorEnsemble:
     ensemble.sample((1,))
     ```
 
-    Args:
-        posteriors: List containing the trained posterior instances that will make up
-        the ensemble.
-        weights: Assign weights to posteriors manually, otherwise they will be
-        weighted with 1/N.
-
     Attributes:
         posteriors: List of the posterior estimators making up the ensemble.
         num_components: Number of posterior estimators.
@@ -44,7 +38,15 @@ class NeuralPosteriorEnsemble:
             posterior is weighted with 1/N.
     """
 
-    def __init__(self, posteriors: List, weights: Optional[List] = None):
+    def __init__(self, posteriors: List, weights: Optional[List] or Tensor = None):
+        """
+
+        Args:
+            posteriors: List containing the trained posterior instances that will make
+                up the ensemble.
+            weights: Assign weights to posteriors manually, otherwise they will be
+                weighted with 1/N.
+        """
         self.posteriors = posteriors
         self.num_components = len(posteriors)
         self.weights = weights
@@ -54,7 +56,7 @@ class NeuralPosteriorEnsemble:
         return self._weights
 
     @weights.setter
-    def weights(self, weights: List[float]):
+    def weights(self, weights: List[float] or Tensor):
         """Set relative weight for each posterior in the ensemble.
 
         Weights are normalised.
@@ -62,13 +64,15 @@ class NeuralPosteriorEnsemble:
         Args:
             weights: Assignes weight to each posterior distribution.
         """
-        if type(weights) == list:
-            weights = torch.tensor(weights) / sum(weights)
-            self._weights = weights
-        else:
+        if type(weights) == None:
             self._weights = torch.tensor(
                 [1.0 / self.num_components for _ in range(self.num_components)]
             )
+        elif type(weights) == Tensor or type(weights) == List:
+            weights = torch.tensor(weights) / sum(weights)
+            self._weights = weights
+        else:
+            raise TypeError
 
     def sample(self, sample_shape: Shape = torch.Size(), **kwargs) -> Tensor:
         r"""Return samples from posterior ensemble.
@@ -77,7 +81,8 @@ class NeuralPosteriorEnsemble:
 
         Args:
             sample_shape: Desired shape of samples that are drawn from posterior
-            ensemble. If sample_shape is multidimensional we simply draw `sample_shape.
+                ensemble. If sample_shape is multidimensional we simply draw
+                `sample_shape.
             numel()` samples and then reshape into the desired shape.
         """
         num_samples = torch.Size(sample_shape).numel()
