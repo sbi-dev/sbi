@@ -305,6 +305,7 @@ def test_c2st_multi_round_snr_on_linearGaussian_vi(num_trials: int, set_seed):
     posterior = VIPosterior(
         potential_fn=potential_fn,
         theta_transform=theta_transform,
+        q=posterior1,
     )
     posterior.train()
 
@@ -397,7 +398,9 @@ def test_api_sre_sampling_methods(sampling_method: str, prior_str: str, set_seed
         )
     else:
         posterior = VIPosterior(
-            potential_fn, theta_transform, vi_method=sampling_method
+            potential_fn=potential_fn,
+            theta_transform=theta_transform,
+            vi_method=sampling_method,
         )
         posterior.train(max_num_iters=10)
 

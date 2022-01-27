@@ -1,3 +1,4 @@
+from pkg_resources import Distribution
 import torch
 import numpy as np
 
@@ -11,6 +12,9 @@ from torch.distributions.utils import broadcast_all
 
 import warnings
 
+from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.inference.potentials.base_potential import BasePotential
+
 
 _QUALITY_METRIC = {}
 _METRIC_MESSAGE = {}
@@ -20,7 +24,7 @@ def register_quality_metric(
     cls: Optional[object] = None,
     name: Optional[str] = None,
     msg: Optional[str] = None,
-):
+) -> None:
     """This method will register a given metric for cheap quality evaluation of
     variational posteriors!
 
@@ -37,7 +41,7 @@ def register_quality_metric(
         else:
             cls_name = name
         if cls_name in _QUALITY_METRIC:
-            raise ValueError(f"The sampling {cls_name} is already registered")
+            raise ValueError(f"The metric {cls_name} is already registered")
         else:
             _QUALITY_METRIC[cls_name] = cls
             _METRIC_MESSAGE[cls_name] = msg
@@ -54,23 +58,24 @@ def get_quality_metric(name: str) -> Tuple[Callable, str]:
     return _QUALITY_METRIC[name], _METRIC_MESSAGE[name]
 
 
-def gpdfit(x, sorted:bool=True, eps:float=1e-8, return_quadrature=False):
-    """ Maximum aposteriori estimate of a Generalized Paretto distribution.
+def gpdfit(
+    x, sorted: bool = True, eps: float = 1e-8, return_quadrature: bool = False
+) -> Tuple:
+    """Maximum aposteriori estimate of a Generalized Paretto distribution.
 
     Pytorch version of gpdfit according to
     https://github.com/avehtari/PSIS/blob/master/py/psis.py. This function will compute
     an MAP (more stable than the MLE estimator).
-    
-    
+
+
     Args:
-        x: Tensor of floats.
-        sorted: [description]
-        eps: [description]
-        return_quadrature: [description]
-    
+        x: Tensor of floats, the data which is used to fit the GPD.
+        sorted: If x is already sorted
+        eps: Numerical stability jitter
+        return_quadrature: Weather to return individual results.
     Returns:
-        [type]: [description]
-    
+        Tuple: Parameters of the Generalized Paretto Distribution.
+
     """
     if not sorted:
         x, _ = x.sort()
@@ -124,7 +129,7 @@ def gpdfit(x, sorted:bool=True, eps:float=1e-8, return_quadrature=False):
         return k, sigma
 
 
-# TODO REMOVE ? THIS is used by parettor smoothed importance sampling (not realy used)
+# NOTE We may remove this if not required
 class GerneralizedParetto(TransformedDistribution):
     r"""
     Samples from a generalized Pareto distribution.
@@ -191,7 +196,15 @@ class GerneralizedParetto(TransformedDistribution):
         return constraints.greater_than(self.mu)
 
 
-def basic_checks(posterior, N=int(1e4)):
+def basic_checks(posterior: NeuralPosterior, N: int = int(1e4)):
+    """Makes some basic checks to ensure the distribution is well defined.
+
+    Args:
+        posterior: Variational posterior object to check.
+        N: Number of samples that are checked.
+
+
+    """
     prior = posterior._prior
     prior_samples = prior.sample((N,))
     samples = posterior.sample((N,))
@@ -207,9 +220,34 @@ def basic_checks(posterior, N=int(1e4)):
     ).all(), "The log probability is not finite for some samples"
 
 
-def psis_diagnostics(potential_function, q, proposal=None, N=int(5e4)):
-    """This will evaluate the posteriors quality, best on importance weights.
-    See https://arxiv.org/pdf/1802.02538.pdf for details"""
+def psis_diagnostics(
+    potential_function: BasePotential,
+    q: Distribution,
+    proposal: Optional[Distribution] = None,
+    N: int = int(5e4),
+) -> float:
+    """This will evaluate the posteriors quality by investingating its importance
+    weights. If q is a perfect posterior approximation then q(theta) ~
+    potential_function(theta) thus logw = log potential_function(theta) - log q must be
+    constant. This function will fit a Generalized Paretto distribution to the tails of
+    w. The shape parameter k serves as metric as detailed in [1].
+
+
+
+    Args:
+        potential_function: Potential function of target.
+        q: Variational distribution, should be proportional to the potential_function
+        proposal: Proposal for samples. Typically this is q.
+        N: Number of samples involved in the test.
+
+    Returns:
+        float: Quality metric
+
+    Reference:
+        [1] _Yes, but Did It Work?: Evaluating Variational Inference_, Yuling Yao, Aki
+        Vehtari, Daniel Simpson, Andrew Gelman, 2018, https://arxiv.org/abs/1802.02538
+
+    """
     M = int(min(N / 5, 3 * np.sqrt(N)))
     with torch.no_grad():
         if proposal is None:
@@ -228,9 +266,28 @@ def psis_diagnostics(potential_function, q, proposal=None, N=int(5e4)):
     return k
 
 
-def proportional_to_joint_diagnostics(potential_function, q, proposal=None, N=int(1e4)):
-    """If we plot logp(x, theta) and logq(theta) side by side they should admit a
-    linear relationship!
+def proportional_to_joint_diagnostics(
+    potential_function: BasePotential,
+    q: Distribution,
+    proposal: Optional[Distribution] = None,
+    N=int(5e4),
+) -> float:
+    """This will evaluate the posteriors quality by investingating its importance
+    weights. If q is a perfect posterior approximation then q(theta) ~
+    potential_function(theta). This we should be able to fit a line to (q(theta),
+    potential_function(theta)), whereas the slope will be the normalizing constant. The
+    quality of a linear fit is thus a direct metric for the quality of q. We use R2
+    statistic.
+
+    Args:
+        potential_function: Potential function of target.
+        q: Variational distribution, should be proportional to the potential_function
+        proposal: Proposal for samples. Typically this is q.
+        N: Number of samples involved in the test.
+
+    Returns:
+        float: Quality metric
+
     """
 
     with torch.no_grad():
@@ -254,7 +311,7 @@ def proportional_to_joint_diagnostics(potential_function, q, proposal=None, N=in
 
 @register_quality_metric(
     name="psis",
-    msg="A good variational posterior will have a score smaller than 0.7. Bad approximations typically admit a score greater than 1. This metric is a measure of 'constantness' for importance weights. \n NOTE: This metric is not sensitive for mode collapse",
+    msg="\t Good: Smaller than 0.5  Bad: Larger than 1.0 \t NOTE: Less sensitive to mode collapse.",
 )
 def psis_q(posterior):
     basic_checks(posterior)
@@ -263,7 +320,7 @@ def psis_q(posterior):
 
 @register_quality_metric(
     name="psis_prior",
-    msg="A good variational posterior will have a score smaller than 0.7. Bad approximations typically admit a score greater than 1. This metric is a measure of 'constantness' for importance weights. NOTE: This may take a while",
+    msg="\t Good: Smaller than 0.5  Bad: Larger than 2.0 \t NOTE: More sensitive to mode collapse.",
 )
 def psis_prior(posterior):
     basic_checks(posterior)
@@ -274,7 +331,7 @@ def psis_prior(posterior):
 
 @register_quality_metric(
     name="proportionality",
-    msg="A good variational posterior will have a score greater near 1. Bad approximations typically admit a score smaller than zero. This metric is a measure of proportionality of p and q. \n NOTE: This metric is not sensitive for mode collapse",
+    msg="\t Good: Larger than 0.5, best is 1.0  Bad: Smaller than 0.5 \t NOTE: Less sensitive to mode collapse.",
 )
 def proportionality(posterior):
     basic_checks(posterior)
