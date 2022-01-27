@@ -24,15 +24,15 @@ class IterateParameters:
         return next(self.iter)
 
 
-def prior_init(prior: Any, transform: nflows.transforms, **kwargs: Any) -> Tensor:
-    """Return a sample from the prior."""
-    prior_samples = prior.sample((1,)).detach()
+def proposal_init(proposal: Any, transform: nflows.transforms, **kwargs: Any) -> Tensor:
+    """Return a sample from the proposal."""
+    prior_samples = proposal.sample((1,)).detach()
     transformed_prior_samples = transform(prior_samples)
     return transformed_prior_samples
 
 
 def sir(
-    prior: Any,
+    proposal: Any,
     potential_fn: Callable,
     transform: nflows.transforms,
     sir_num_batches: int = 10,
@@ -41,11 +41,13 @@ def sir(
 ) -> Tensor:
     r"""Return a sample obtained by sequential importance reweighting.
 
+    See Rubin 1988, "Using the sir algorithm to simulate posterior distributions."
+
     This function can also do `SIR` on the conditional posterior
     $p(\theta_i|\theta_j, x)$ when a `condition` and `dims_to_sample` are passed.
 
     Args:
-        prior: Prior distribution, candidate samples are drawn from it.
+        proposal: Proposal distribution, candidate samples are drawn from it.
         potential_fn: Potential function that the candidate samples are weighted with.
             Note that the function needs to return log probabilities.
         sir_num_batches: Number of candidate batches drawn.
@@ -60,10 +62,10 @@ def sir(
         log_weights = []
         init_param_candidates = []
         for i in range(sir_num_batches):
-            batch_draws = prior.sample((sir_batch_size,)).detach()
+            batch_draws = proposal.sample((sir_batch_size,)).detach()
             transformed_batch_draws = transform(batch_draws)
             init_param_candidates.append(transformed_batch_draws)
-            log_weights.append(potential_fn(transformed_batch_draws.numpy()).detach())
+            log_weights.append(potential_fn(transformed_batch_draws).detach())
         log_weights = torch.cat(log_weights)
         init_param_candidates = torch.cat(init_param_candidates)
 
