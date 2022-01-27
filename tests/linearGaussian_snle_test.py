@@ -311,7 +311,7 @@ def test_c2st_multi_round_snl_on_linearGaussian(num_trials: int, set_seed):
         ("rejection", "gaussian"),
     ),
 )
-@pytest.mark.parametrize("init_strategy", ("prior", "sir"))
+@pytest.mark.parametrize("init_strategy", ("proposal", "sir"))
 def test_api_snl_sampling_methods(
     sampling_method: str, prior_str: str, init_strategy: str, set_seed
 ):

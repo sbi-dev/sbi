@@ -20,7 +20,7 @@ from sbi.samplers.mcmc import (
     Slice,
     SliceSampler,
     SliceSamplerVectorized,
-    prior_init,
+    proposal_init,
     sir,
 )
 from sbi.types import Shape, TorchTransform
@@ -68,9 +68,12 @@ class MCMCPosterior(NeuralPosterior):
             thin: The thinning factor for the chain.
             warmup_steps: The initial number of samples to discard.
             num_chains: The number of chains.
-            init_strategy: The initialisation strategy for chains; `prior` will draw
+            init_strategy: The initialisation strategy for chains; `proposal` will draw
                 init locations from `proposal`, whereas `sir` will use Sequential-
-                Importance-Resampling (using the `proposal` as initial guesses).
+                Importance-Resampling (SIR). SIR initially samples
+                `init_strategy_num_candidates` from the `proposal`, evaluates all of
+                them under the `potential_fn`, and then resamples the initial locations
+                with weights proportional to the `potential_fn`-value.
             init_strategy_num_candidates: Number of candidates to to find init
                 locations in `init_strategy=sir`.
             device: Training device, e.g., "cpu", "cuda" or "cuda:0". If None,
@@ -231,7 +234,10 @@ class MCMCPosterior(NeuralPosterior):
         self.potential_ = self._prepare_potential(method)  # type: ignore
 
         init_fn = self._build_mcmc_init_fn(
-            self.proposal, self.potential_fn, transform=self.theta_transform
+            self.proposal,
+            self.potential_fn,
+            transform=self.theta_transform,
+            init_strategy=init_strategy,  # type: ignore
         )
         initial_params = torch.cat(
             [init_fn() for _ in range(num_chains)]  # type: ignore
@@ -273,7 +279,7 @@ class MCMCPosterior(NeuralPosterior):
         proposal: Any,
         potential_fn: Callable,
         transform: torch_tf.Transform,
-        init_strategy: str = "prior",
+        init_strategy: str,
         **kwargs,
     ) -> Callable:
         """Return function that, when called, creates an initial parameter set for MCMC.
@@ -283,14 +289,20 @@ class MCMCPosterior(NeuralPosterior):
             potential_fn: Potential function that the candidate samples are weighted
                 with.
             init_strategy: Specifies the initialization method. Either of
-                [`prior`|`sir`|`latest_sample`].
+                [`proposal`|`sir`|`latest_sample`].
             kwargs: Passed on to init function. This way, init specific keywords can
                 be set through `mcmc_parameters`. Unused arguments should be absorbed.
 
         Returns: Initialization function.
         """
-        if init_strategy == "prior":
-            return lambda: prior_init(proposal, transform=transform, **kwargs)
+        if init_strategy == "proposal" or init_strategy == "prior":
+            if init_strategy == "prior":
+                warn(
+                    "You set `init_strategy=prior`. As of sbi v0.18.0, this is "
+                    "deprecated and it will be removed in a future release. Use "
+                    "`init_strategy=proposal` instead."
+                )
+            return lambda: proposal_init(proposal, transform=transform, **kwargs)
         elif init_strategy == "sir":
             return lambda: sir(proposal, potential_fn, transform=transform, **kwargs)
         elif init_strategy == "latest_sample":
