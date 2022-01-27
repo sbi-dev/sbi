@@ -22,7 +22,7 @@ except:
 
 def hex2rgb(hex):
     # Pass 16 to the integer function for change of base
-    return [int(hex[i : i + 2], 16) for i in range(1, 6, 2)]
+    return [int(hex[i: i + 2], 16) for i in range(1, 6, 2)]
 
 
 def rgb2hex(RGB):
@@ -610,7 +610,8 @@ def _pairplot_scaffold(
             rows, cols, figsize=opts["figsize"], **opts["subplots"]
         )
     else:
-        assert axes.shape == (rows, cols), f"Passed axes must match subplot shape: {rows, cols}."
+        assert axes.shape == (
+            rows, cols), f"Passed axes must match subplot shape: {rows, cols}."
     # Cast to ndarray in case of 1D subplots.
     axes = np.array(axes).reshape(rows, cols)
 
@@ -807,3 +808,90 @@ def _get_default_opts():
         },
         "title_format": {"fontsize": 16},
     }
+
+
+def get_limits(samples, limits=None):
+
+    """ 
+    Aalculate the limits of parameters from sample distributions.
+
+    Args:
+        samples: torch.tensor, samples from posterior
+    Returns: torch.tensor, limit boundaries
+    """
+
+    if type(samples) != list:
+        samples = ensure_numpy(samples)
+        samples = [samples]
+    else:
+        for i, sample_pack in enumerate(samples):
+            samples[i] = ensure_numpy(samples[i])
+
+    # Dimensionality of the problem.
+    dim = samples[0].shape[1]
+
+    if limits == [] or limits is None:
+        limits = []
+        for d in range(dim):
+            min = +np.inf
+            max = -np.inf
+            for sample in samples:
+                min_ = sample[:, d].min()
+                min = min_ if min_ < min else min
+                max_ = sample[:, d].max()
+                max = max_ if max_ > max else max
+            limits.append([min, max])
+    else:
+        if len(limits) == 1:
+            limits = [limits[0] for _ in range(dim)]
+        else:
+            limits = limits
+    limits = torch.as_tensor(limits)
+
+    return limits
+
+
+def posterior_peaks(samples_filename, return_dict=False, **kwargs):
+    """
+    Returns the maximum-a-posteriori estimate (MAP) from available samples.
+    Smooth the density distribution using gaussian kernel and 
+    return the max value of the distribution.
+    """
+
+    try:
+        samples = torch.load(samples_filename)
+    except:
+        print(f"no input {samples_filename} file")
+        exit(0)
+
+    opts = _get_default_opts()
+    opts = _update(opts, kwargs)
+
+    limits = get_limits(samples)
+
+    samples = samples.numpy()
+    labels = opts['labels']
+
+    peaks = {}
+    n, dim = samples.shape
+    if labels is None:
+        labels = range(dim)
+    for i in range(dim):
+        peaks[labels[i]] = 0
+
+    for row in range(dim):
+        density = gaussian_kde(
+            samples[:, row],
+            bw_method=opts["kde_diag"]["bw_method"])
+        xs = np.linspace(
+            limits[row, 0], limits[row, 1],
+            opts["kde_diag"]["bins"])
+        ys = density(xs)
+
+        # y, x = np.histogram(samples[:, row], bins=bins)
+        peaks[labels[row]] = xs[ys.argmax()]
+
+    if return_dict:
+        return peaks
+    else:
+        return list(peaks.values())
