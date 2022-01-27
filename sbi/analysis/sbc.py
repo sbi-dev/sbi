@@ -23,10 +23,13 @@ def run_sbc(
     sbc_batch_size: int = 1,
     show_progress_bar: bool = True,
 ) -> Tuple[Tensor, Tensor]:
-    """Run simulation-based calibration (parallelized across sbc runs).
+    """Run simulation-based calibration (SBC) (parallelized across sbc runs).
 
     Returns sbc ranks, log probs of the true parameters under the posterior and samples
     from the data averaged posterior, one for each sbc run, respectively.
+
+    SBC is implemented as proposed in Talts et al., "Validating Bayesian Inference
+    Algorithms with Simulation-Based Calibration", https://arxiv.org/abs/1804.06788.
 
     Args:
         thetas: ground-truth parameters for sbc, simulated from the prior.
@@ -154,23 +157,24 @@ def sbc_on_batch(
 def get_nltp(thetas: Tensor, xs: Tensor, posterior: NeuralPosterior) -> Tensor:
     """Return negative log prob of true parameters under the posterior.
 
-    NLTP: negative log probs of true parameters under the approximate posterior. Its
-    mean over many N gives a lower bound on the posterior accuracy and can be used to
-    compare different methods.
+    NLTP: negative log probs of true parameters under the approximate posterior.
+    The expectation of NLTP over samples from the prior and the simulator defines
+    an upper bound for accuracy of the ground-truth posterior (without having
+    access to it, see Lueckmann et al. 2021, Appendix for details).
+    Thus, if the one calculates NLTP for many thetas (say >100), one can use it as a
+    comparable measure of posterior accuracy when comparing inference methods, or
+    settings (even without access to the ground-truth posterior)
+
+    Note that this is interpretable only for normalized log probs, i.e., when
+    using (S)NPE.
 
     Args:
-        thetas: parameters for which to calculate NLTP, sampled from the prior.
+        thetas: parameters (sampled from the prior) for which to calculate NLTP values.
         xs: simulated data corresponding to thetas.
         posterior: inferred posterior for which to calculate NLTP.
 
     Returns:
         nltp: negative log probs of true parameters under approximate posteriors.
-            If N is large, e.g., N>100, then nltp can be used as a comparative measure
-            of posterior accuracy, e.g., for comparing multiple inference methods, or
-            hyperparameter settings (see num_posterior_samplesueckmann et al. 2021,
-            appendix for details).
-            Note that this is interpretable only for normalized log probs, i.e., when
-            using (S)NPE.
     """
     nltp = torch.zeros(thetas.shape[0])
     unnormalized_log_prob = not isinstance(posterior, DirectPosterior)
@@ -236,9 +240,15 @@ def check_sbc(
 
 
 def check_prior_vs_dap(prior_samples: Tensor, dap_samples: Tensor) -> Tensor:
-    """Return the c2st accuracy between prior and data avaraged posterior samples.
+    """Returns the c2st accuracy between prior and data avaraged posterior samples.
 
     c2st is calculated for each dimension separately.
+
+    According to simulation-based calibration, the inference methods is well-calibrated
+    if the data averaged posterior samples follow the same distribution as the prior,
+    i.e., if the c2st score is close to 0.5. If it is not, then this suggests that the
+    inference method is not well-calibrated (see Talts et al, "Simulation-based
+    calibration" for details).
     """
 
     assert prior_samples.shape == dap_samples.shape
@@ -312,7 +322,9 @@ def check_uniformity_c2st(
     # Use variance over repetitions to estimate robustness of c2st.
     if (c2st_scores.std(0) > 0.05).any():
         warnings.warn(
-            "C2ST score variability is larger {0.05}, result may be unreliable."
+            f"""C2ST score variability is larger than {0.05}: std={c2st_scores.std(0)},
+            result may be unreliable. Consider increasing the number of samples.
+            """
         )
 
     # Return the mean over repetitions as c2st score estimate.
