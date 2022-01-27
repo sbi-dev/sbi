@@ -1,7 +1,9 @@
 import torch
-from typing import List, Optional
-from torch import Tensor
+from sbi.utils import gradient_ascent
+
 from sbi.types import Shape
+from torch import Tensor
+from typing import List, Optional, Union, Callable
 
 
 class NeuralPosteriorEnsemble:
@@ -36,6 +38,7 @@ class NeuralPosteriorEnsemble:
         num_components: Number of posterior estimators.
         weights: Weight of each posterior distribution. If none are provided each
             posterior is weighted with 1/N.
+        default_x: Used in `.sample(), .log_prob()` as default conditioning context.
     """
 
     def __init__(self, posteriors: List, weights: Optional[List] or Tensor = None):
@@ -50,6 +53,7 @@ class NeuralPosteriorEnsemble:
         self.posteriors = posteriors
         self.num_components = len(posteriors)
         self.weights = weights
+        self.default_x = None
 
     @property
     def weights(self):
@@ -64,13 +68,12 @@ class NeuralPosteriorEnsemble:
         Args:
             weights: Assignes weight to each posterior distribution.
         """
-        if type(weights) == None:
+        if weights is None:
             self._weights = torch.tensor(
                 [1.0 / self.num_components for _ in range(self.num_components)]
             )
         elif type(weights) == Tensor or type(weights) == List:
-            weights = torch.tensor(weights) / sum(weights)
-            self._weights = weights
+            self._weights = torch.tensor(weights) / sum(weights)
         else:
             raise TypeError
 
@@ -82,7 +85,7 @@ class NeuralPosteriorEnsemble:
         Args:
             sample_shape: Desired shape of samples that are drawn from posterior
                 ensemble. If sample_shape is multidimensional we simply draw
-                `sample_shape.
+                    `sample_shape.
             numel()` samples and then reshape into the desired shape.
         """
         num_samples = torch.Size(sample_shape).numel()
@@ -118,7 +121,7 @@ class NeuralPosteriorEnsemble:
         else:
             return torch.logsumexp(log_weights.expand_as(log_probs) + log_probs, dim=0)
 
-    def set_default_x(self, x: Tensor) -> "NeuralPosteriorEnemble":
+    def set_default_x(self, x: Tensor) -> "NeuralPosteriorEnsemble":
         """Set new default x for `.sample(), .log_prob()` to use as conditioning context.
 
         This is a pure convenience to avoid having to repeatedly specify `x` in calls to
@@ -140,32 +143,73 @@ class NeuralPosteriorEnsemble:
             `NeuralPosteriorEnsemble` that will use a default `x` when not explicitly
             passed.
         """
+        self.default_x = x
         for posterior in self.posteriors:
             posterior.set_default_x(x)
         return self
 
-    def map(self, individually: bool = False, **kwargs) -> Tensor:
+    def ensemble_potential_fn_init(self, x: Optional[Tensor] = None) -> Callable:
+        """Initialises the ensemble potential function.
+
+        The potential functions of every component are combined to produce an
+        ensemble potential.
+
+        Args:
+            x: sets context. If None is provided, the default_x will be used.
+
+        Returns:
+            ensemble_potential_fn: Differentiable potential function of the entire
+            ensemble.
+        """
+        potential_fns = []
+        for posterior in self.posteriors:
+            potential_fn = posterior.potential_fn
+            potential_fn.set_x(posterior._x_else_default_x(x))
+            potential_fns.append(potential_fn)
+
+        def ensemble_potential_fn(theta: Tensor) -> Callable:
+            log_probs = [fn(theta) for fn in potential_fns]
+            log_probs = torch.vstack(log_probs)
+            potential_fn = torch.logsumexp(
+                torch.log(self._weights.reshape(-1, 1)).expand_as(log_probs)
+                + log_probs,
+                dim=0,
+            )
+            return potential_fn
+
+        return ensemble_potential_fn
+
+    def map(
+        self,
+        x: Optional[Tensor] = None,
+        num_iter: int = 1_000,
+        num_to_optimize: int = 100,
+        learning_rate: float = 0.01,
+        init_method: Union[str, Tensor] = "posterior",
+        num_init_samples: int = 1_000,
+        save_best_every: int = 10,
+        show_progress_bars: bool = False,
+        individually: bool = False,
+    ) -> Tensor:
         r"""Returns the average maximum-a-posteriori estimate (MAP).
 
-        Computes MAP estimate for each posterior in the ensemble individually and
-        averages them. All args and kwargs are passed directly through to
-        `posterior.map()`.
+        Computes MAP estimate across the whole ensemble or for each component
+        individually. All args and kwargs are passed directly through to
+        `gradient_ascent`.
 
-        Since `posterior.map()` is computed one by one, the subroutines of each MAP
-        estimate can be interrupted individually (Ctrl-C), when the user sees that the
-        log-probability converges. The best estimate will be saved in `self.posteriors
-        [idx].map_` and added to the average MAP estimate.
+        The routine can be interrupted (individually) with [Ctrl-C], when the user sees
+        that the log-probability converges. The best estimate will be saved in `self.
+        posteriors[idx].map_`.
 
         For more details of how the MAP estimate is obtained see `.map()` docstring of
         self.posteriors[idx].
 
         Args:
-            individually: If true, returns log weights and MAPs individually.
-
-        Kwargs:
             x: Observed data at which to evaluate the MAP.
             num_iter: Number of optimization steps that the algorithm takes
                 to find the MAP.
+            num_to_optimize: From the drawn `num_init_samples`, use the
+                `num_to_optimize` with highest log-probability as the initial points
             learning_rate: Learning rate of the optimizer.
             init_method: How to select the starting parameters for the optimization. If
                 it is a string, it can be either [`posterior`, `prior`], which samples
@@ -173,8 +217,6 @@ class NeuralPosteriorEnsemble:
                 tensor, the tensor will be used as init locations.
             num_init_samples: Draw this number of samples from the posterior and
                 evaluate the log-probability of all of them.
-            num_to_optimize: From the drawn `num_init_samples`, use the
-                `num_to_optimize` with highest log-probability as the initial points
                 for the optimization.
             save_best_every: The best log-probability is computed, saved in the
                 `map`-attribute, and printed every `save_best_every`-th iteration.
@@ -182,20 +224,52 @@ class NeuralPosteriorEnsemble:
                 (thus, the default is `10`.)
             show_progress_bars: Whether or not to show a progressbar for sampling from
                 the posterior.
-            log_prob_kwargs: Will be empty for SNLE and SNRE. Will contain
-                {'norm_posterior': True} for SNPE.
+            individually: If true, returns log weights and MAPs individually.
 
         Returns:
-            The average MAP estimate.
+            The ensemble MAP estimate or individual log_weigths and component MAP
+            estimate if individually == True.
         """
-        maps = []
-        log_weights = torch.log(self._weights).reshape(-1, 1)
-
-        for posterior in self.posteriors:
-            maps.append(posterior.map(**kwargs))
-        maps = torch.stack(maps)
 
         if individually:
+            maps = []
+            log_weights = torch.log(self._weights).reshape(-1, 1)
+
+            for posterior in self.posteriors:
+                maps.append(
+                    posterior.map(
+                        x=x,
+                        num_iter=num_iter,
+                        num_to_optimize=num_to_optimize,
+                        learning_rate=learning_rate,
+                        init_method=init_method,
+                        num_init_samples=num_init_samples,
+                        save_best_every=save_best_every,
+                        show_progress_bars=show_progress_bars,
+                    )
+                )
+            maps = torch.stack(maps)
             return log_weights, maps
+
         else:
-            return torch.logsumexp(log_weights + maps, dim=0)
+            potential_fn = self.ensemble_potential_fn_init(x)
+
+            if init_method == "posterior":
+                inits = self.sample((num_init_samples,))
+            # elif init_method == "proposal":
+            #     inits = self.proposal.sample((num_init_samples,))
+            elif isinstance(init_method, Tensor):
+                inits = init_method
+            else:
+                raise ValueError
+
+            return gradient_ascent(
+                potential_fn=potential_fn,
+                inits=inits,
+                # theta_transform=self.theta_transform,
+                num_iter=num_iter,
+                num_to_optimize=num_to_optimize,
+                learning_rate=learning_rate,
+                save_best_every=save_best_every,
+                show_progress_bars=show_progress_bars,
+            )[0]
