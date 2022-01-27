@@ -14,14 +14,16 @@ from sbi.neural_nets.classifier import (
 from sbi.neural_nets.flow import build_made, build_maf, build_nsf
 from sbi.neural_nets.mdn import build_mdn
 
+from sbiutils import DefaultEmbeddingNet
+
 
 def classifier_nn(
     model: str,
     z_score_theta: bool = True,
     z_score_x: bool = True,
     hidden_features: int = 50,
-    embedding_net_theta: nn.Module = nn.Identity(),
-    embedding_net_x: nn.Module = nn.Identity(),
+    embedding_net_theta: nn.Module = DefaultEmbeddingNet(),
+    embedding_net_x: nn.Module = DefaultEmbeddingNet(),
 ) -> Callable:
     r"""
     Returns a function that builds a classifier for learning density ratios.
@@ -88,7 +90,7 @@ def likelihood_nn(
     hidden_features: int = 50,
     num_transforms: int = 5,
     num_bins: int = 10,
-    embedding_net: nn.Module = nn.Identity(),
+    embedding_net: nn.Module = DefaultEmbeddingNet(),
     num_components: int = 10,
 ) -> Callable:
     r"""
@@ -160,7 +162,7 @@ def posterior_nn(
     hidden_features: int = 50,
     num_transforms: int = 5,
     num_bins: int = 10,
-    embedding_net: nn.Module = nn.Identity(),
+    embedding_net: nn.Module = DefaultEmbeddingNet(),
     num_components: int = 10,
 ) -> Callable:
     r"""
