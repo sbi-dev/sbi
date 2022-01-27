@@ -8,11 +8,11 @@ from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union, cast
 
 import torch
 from numpy import ndarray
+from pyknos.nflows import flows
 from scipy.stats._distn_infrastructure import rv_frozen
 from scipy.stats._multivariate import multi_rv_frozen
 from torch import Tensor, float32, nn
 from torch.distributions import Distribution, Uniform
-from pyknos.nflows import flows
 
 from sbi.types import Array
 from sbi.utils.sbiutils import warn_on_iid_x, within_support
@@ -26,7 +26,7 @@ from sbi.utils.user_input_checks_utils import (
 
 
 def process_prior(
-    prior, custom_prior_wrapper_kwargs: Optional[Dict] = {}
+    prior, custom_prior_wrapper_kwargs: Dict = {}
 ) -> Tuple[Distribution, int, bool]:
     """Return PyTorch distribution-like prior from user-provided prior.
 
@@ -73,7 +73,7 @@ def process_prior(
 
 
 def process_custom_prior(
-    prior, custom_prior_wrapper_kwargs: Optional[Dict] = {}
+    prior, custom_prior_wrapper_kwargs: Dict = {}
 ) -> Tuple[Distribution, int, bool]:
     """Check and return corrected prior object defined by the user.
 
@@ -102,7 +102,7 @@ def process_custom_prior(
 
 
 def maybe_wrap_prior_as_pytorch(
-    prior, custom_prior_wrapper_kwargs: Optional[Dict[str, Any]] = {}
+    prior, custom_prior_wrapper_kwargs: Dict[str, Any] = {}
 ) -> Tuple[Distribution, bool]:
     """Check prior return type and maybe wrap as PyTorch.
 

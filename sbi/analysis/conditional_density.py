@@ -4,22 +4,25 @@
 from typing import Any, Callable, List, Optional, Tuple, Union
 
 import torch
+import torch.distributions.transforms as torch_tf
 from pyknos.mdn.mdn import MultivariateGaussianMDN as mdn
 from torch import Tensor, nn
-import torch.distributions.transforms as torch_tf
 
-from sbi.types import Shape
+from sbi.types import Shape, TorchTransform
 from sbi.utils.conditional_density_utils import (
     ConditionedPotential,
-    conditional_corrcoeff as utils_conditional_corrcoeff,
-    eval_conditional_density as utils_eval_conditional_density,
     RestrictedPriorForConditional,
     RestrictedTransformForConditional,
     condition_mog,
-    extract_and_transform_mog,
 )
+from sbi.utils.conditional_density_utils import (
+    conditional_corrcoeff as utils_conditional_corrcoeff,
+)
+from sbi.utils.conditional_density_utils import (
+    eval_conditional_density as utils_eval_conditional_density,
+)
+from sbi.utils.conditional_density_utils import extract_and_transform_mog
 from sbi.utils.torchutils import atleast_2d_float32_tensor
-from sbi.types import TorchTransform
 
 
 def eval_conditional_density(
@@ -146,7 +149,7 @@ class ConditionedMDN:
         """
         condition = atleast_2d_float32_tensor(condition)
 
-        logits, means, precfs, _ = extract_and_transform_mog(nn=net, context=x_o)
+        logits, means, precfs, _ = extract_and_transform_mog(net=net, context=x_o)
         self.logits, self.means, self.precfs, self.sumlogdiag = condition_mog(
             condition, dims_to_sample, logits, means, precfs
         )

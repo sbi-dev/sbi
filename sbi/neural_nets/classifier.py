@@ -36,8 +36,8 @@ class StandardizeInputs(nn.Module):
 
 
 def build_input_layer(
-    batch_x: Tensor = None,
-    batch_y: Tensor = None,
+    batch_x: Tensor,
+    batch_y: Tensor,
     z_score_x: Optional[str] = "independent",
     z_score_y: Optional[str] = "independent",
     embedding_net_x: nn.Module = nn.Identity(),
@@ -65,14 +65,14 @@ def build_input_layer(
     Returns:
         Input layer that optionally z-scores.
     """
-    z_score_x, structured_x = z_score_parser(z_score_x)
-    if z_score_x:
+    z_score_x_bool, structured_x = z_score_parser(z_score_x)
+    if z_score_x_bool:
         embedding_net_x = nn.Sequential(
             standardizing_net(batch_x, structured_x), embedding_net_x
         )
 
-    z_score_y, structured_y = z_score_parser(z_score_y)
-    if z_score_y:
+    z_score_y_bool, structured_y = z_score_parser(z_score_y)
+    if z_score_y_bool:
         embedding_net_y = nn.Sequential(
             standardizing_net(batch_y, structured_y), embedding_net_y
         )
@@ -85,8 +85,8 @@ def build_input_layer(
 
 
 def build_linear_classifier(
-    batch_x: Tensor = None,
-    batch_y: Tensor = None,
+    batch_x: Tensor,
+    batch_y: Tensor,
     z_score_x: Optional[str] = "independent",
     z_score_y: Optional[str] = "independent",
     embedding_net_x: nn.Module = nn.Identity(),
@@ -142,8 +142,8 @@ def build_linear_classifier(
 
 
 def build_mlp_classifier(
-    batch_x: Tensor = None,
-    batch_y: Tensor = None,
+    batch_x: Tensor,
+    batch_y: Tensor,
     z_score_x: Optional[str] = "independent",
     z_score_y: Optional[str] = "independent",
     hidden_features: int = 50,
@@ -206,8 +206,8 @@ def build_mlp_classifier(
 
 
 def build_resnet_classifier(
-    batch_x: Tensor = None,
-    batch_y: Tensor = None,
+    batch_x: Tensor,
+    batch_y: Tensor,
     z_score_x: Optional[str] = "independent",
     z_score_y: Optional[str] = "independent",
     hidden_features: int = 50,

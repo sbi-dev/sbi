@@ -11,11 +11,11 @@ from sbi import utils as utils
 from sbi.inference import (
     AALR,
     SNRE_B,
-    ratio_estimator_based_potential,
     MCMCPosterior,
     RejectionPosterior,
     VIPosterior,
     prepare_for_sbi,
+    ratio_estimator_based_potential,
     simulate_for_sbi,
 )
 from sbi.simulators.linear_gaussian import (

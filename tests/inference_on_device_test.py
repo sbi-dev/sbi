@@ -31,6 +31,8 @@ from sbi.inference import (
     ratio_estimator_based_potential,
     likelihood_estimator_based_potential,
     posterior_estimator_based_potential,
+    ratio_estimator_based_potential,
+    simulate_for_sbi,
 )
 from sbi.simulators import linear_gaussian, diagonal_linear_gaussian
 from sbi.utils.torchutils import BoxUniform, process_device

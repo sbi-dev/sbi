@@ -12,11 +12,11 @@ from sbi.inference import (
     SNPE,
     SNRE,
     MCMCPosterior,
-    prepare_for_sbi,
-    simulate_for_sbi,
     likelihood_estimator_based_potential,
-    ratio_estimator_based_potential,
     posterior_estimator_based_potential,
+    prepare_for_sbi,
+    ratio_estimator_based_potential,
+    simulate_for_sbi,
 )
 
 

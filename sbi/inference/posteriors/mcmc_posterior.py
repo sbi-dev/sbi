@@ -24,13 +24,8 @@ from sbi.samplers.mcmc import (
     sir,
 )
 from sbi.types import Shape, TorchTransform
-from sbi.utils import (
-    pyro_potential_wrapper,
-    transformed_potential,
-)
-from sbi.utils.torchutils import (
-    ensure_theta_batched,
-)
+from sbi.utils import pyro_potential_wrapper, transformed_potential
+from sbi.utils.torchutils import ensure_theta_batched
 
 
 class MCMCPosterior(NeuralPosterior):
@@ -408,7 +403,7 @@ class MCMCPosterior(NeuralPosterior):
         kernels = dict(slice=Slice, hmc=HMC, nuts=NUTS)
 
         sampler = MCMC(
-            kernel=kernels[mcmc_method](potential_fn=potential_function),  # type:ignore
+            kernel=kernels[mcmc_method](potential_fn=potential_function),
             num_samples=(thin * num_samples) // num_chains + num_chains,
             warmup_steps=warmup_steps,
             initial_params={"": initial_params},

@@ -6,17 +6,17 @@ from __future__ import annotations
 from typing import Callable
 
 import pytest
-from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
 import torch
 from pyknos.mdn.mdn import MultivariateGaussianMDN
-from scipy.stats import beta, multivariate_normal, uniform, lognorm
+from scipy.stats import beta, lognorm, multivariate_normal, uniform
 from torch import Tensor, eye, nn, ones, zeros
 from torch.distributions import Beta, Distribution, Gamma, MultivariateNormal, Uniform
 
 from sbi.inference import SNPE_A, SNPE_C, simulate_for_sbi
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
+from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
-from sbi.utils import within_support, mcmc_transform
+from sbi.utils import mcmc_transform, within_support
 from sbi.utils.torchutils import BoxUniform
 from sbi.utils.user_input_checks import (
     prepare_for_sbi,

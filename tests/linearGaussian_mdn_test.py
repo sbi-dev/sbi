@@ -13,9 +13,9 @@ from sbi.inference import (
     SNPE,
     DirectPosterior,
     MCMCPosterior,
+    likelihood_estimator_based_potential,
     prepare_for_sbi,
     simulate_for_sbi,
-    likelihood_estimator_based_potential,
 )
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,

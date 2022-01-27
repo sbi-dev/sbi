@@ -11,9 +11,9 @@ import torch
 import torch.distributions.transforms as torch_tf
 from pyknos.mdn.mdn import MultivariateGaussianMDN as mdn
 from pyknos.nflows.flows import Flow
-from torch import Tensor, nn
-from sbi.types import TorchTransform
+from torch import Tensor
 
+from sbi.types import TorchTransform
 from sbi.utils.torchutils import (
     BoxUniform,
     ScalarFloat,
@@ -195,9 +195,9 @@ def conditional_corrcoeff(
 
     # `average_correlations` is still a vector containing the upper triangular entries.
     # Below, assemble them into a matrix:
-    av_correlation_matrix = torch.zeros((len(subset), len(subset)), device=device)
+    av_correlation_matrix = torch.zeros((len(subset_), len(subset_)), device=device)
     triu_indices = torch.triu_indices(
-        row=len(subset), col=len(subset), offset=1, device=device
+        row=len(subset_), col=len(subset_), offset=1, device=device
     )
     av_correlation_matrix[triu_indices[0], triu_indices[1]] = average_correlations
 
@@ -349,7 +349,7 @@ def _normalize_probs(probs: Tensor, limits: Tensor) -> Tensor:
 
 
 def extract_and_transform_mog(
-    nn: Flow, context: Tensor = None
+    net: Flow, context: Tensor = None
 ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
     """Extracts the Mixture of Gaussians (MoG) parameters
     from an MDN based DirectPosterior at either the default x or input x.
@@ -371,14 +371,14 @@ def extract_and_transform_mog(
     """
 
     # extract and rescale means, mixture componenets and covariances
-    dist = nn._distribution
-    encoded_x = nn._embedding_net(context)
+    dist = net._distribution
+    encoded_x = net._embedding_net(context)
 
     logits, means, _, sumlogdiag, precfs = dist.get_mixture_components(encoded_x)
     norm_logits = logits - torch.logsumexp(logits, dim=-1, keepdim=True)
 
-    scale = nn._transform._transforms[0]._scale
-    shift = nn._transform._transforms[0]._shift
+    scale = net._transform._transforms[0]._scale
+    shift = net._transform._transforms[0]._shift
 
     means_transformed = (means - shift) / scale
 
@@ -599,7 +599,7 @@ class RestrictedTransformForConditional(torch_tf.Transform):
         self.condition = ensure_theta_batched(condition)
         self.dims_to_sample = dims_to_sample
 
-    def forward(self, theta: Tensor) -> Tensor:
+    def __call__(self, theta: Tensor) -> Tensor:
         r"""
         Transform restricted $\theta$.
         """

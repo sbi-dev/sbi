@@ -16,8 +16,8 @@ from tensorboard.backend.event_processing.event_accumulator import (
     EventAccumulator,
 )
 
-import sbi.inference.base
 from sbi.analysis.plot import _get_default_opts
+from sbi.inference import NeuralInference
 from sbi.utils.io import get_log_root
 
 # creating an alias for annotating, because sbi.inference.base.NeuralInference creates
@@ -62,7 +62,7 @@ def plot_summary(
     size_guidance = deepcopy(DEFAULT_SIZE_GUIDANCE)
     size_guidance.update(scalars=tensorboard_scalar_limit)
 
-    if isinstance(inference, sbi.inference.NeuralInference):
+    if isinstance(inference, NeuralInference):
         log_dir = inference._summary_writer.log_dir
     elif isinstance(inference, Path):
         log_dir = inference
@@ -103,11 +103,11 @@ def plot_summary(
         fig, axes = plt.subplots(
             1, len(tags), figsize=plot_options["figsize"], **plot_options["subplots"]
         )
-    axes = np.atleast_1d(axes)
+    axes = np.atleast_1d(axes)  # type: ignore
 
     ylabel = ylabel or tags
 
-    for i, ax in enumerate(axes):
+    for i, ax in enumerate(axes):  # type: ignore
         ax.plot(scalars[tags[i]]["step"], scalars[tags[i]]["value"], **plot_kwargs)
 
         ax.set_ylabel(ylabel[i], fontsize=fontsize)
@@ -117,7 +117,7 @@ def plot_summary(
 
     plt.subplots_adjust(wspace=0.3)
 
-    return fig, axes
+    return fig, axes  # type: ignore
 
 
 def list_all_logs(inference: _NeuralInference) -> List:

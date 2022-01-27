@@ -19,8 +19,6 @@ from pyro.contrib.conjugate.infer import (
 )
 from pyro.infer import SVI, TraceEnum_ELBO
 from pyro.infer.autoguide import AutoDelta
-
-# from pyro.infer.mcmc.api import MCMC
 from pyro.util import ignore_jit_warnings
 
 from sbi.samplers.mcmc.mcmc import MCMC

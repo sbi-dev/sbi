@@ -8,7 +8,7 @@ import torch
 from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
-from sbi.analysis import check_sbc, run_sbc, get_nltp
+from sbi.analysis import check_sbc, get_nltp, run_sbc
 from sbi.inference import SNPE_C, simulate_for_sbi
 from sbi.simulators import linear_gaussian
 

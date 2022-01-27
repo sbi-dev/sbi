@@ -1,9 +1,9 @@
-import torch
-from sbi.inference import SNPE
-from sbi.analysis import ActiveSubspace
-from sbi.utils import BoxUniform
 import pytest
-from sbi.analysis import conditional_pairplot, conditional_corrcoeff
+import torch
+
+from sbi.analysis import ActiveSubspace, conditional_corrcoeff, conditional_pairplot
+from sbi.inference import SNPE
+from sbi.utils import BoxUniform
 
 
 @pytest.mark.slow

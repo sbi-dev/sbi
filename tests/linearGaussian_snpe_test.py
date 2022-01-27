@@ -12,37 +12,31 @@ from torch.distributions import MultivariateNormal
 
 from sbi import analysis as analysis
 from sbi import utils as utils
-from sbi.analysis import (
-    ConditionedMDN,
-    conditonal_potential,
-)
-
+from sbi.analysis import ConditionedMDN, conditonal_potential
 from sbi.inference import (
     SNPE_A,
     SNPE_B,
     SNPE_C,
-    prepare_for_sbi,
-    simulate_for_sbi,
     DirectPosterior,
-    posterior_estimator_based_potential,
     MCMCPosterior,
     RejectionPosterior,
+    posterior_estimator_based_potential,
+    prepare_for_sbi,
+    simulate_for_sbi,
 )
-
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     samples_true_posterior_linear_gaussian_mvn_prior_different_dims,
     samples_true_posterior_linear_gaussian_uniform_prior,
     true_posterior_linear_gaussian_mvn_prior,
 )
+from tests.sbiutils_test import conditional_of_mvn
 from tests.test_utils import (
     check_c2st,
     get_dkl_gaussian_prior,
     get_normalization_uniform_prior,
     get_prob_outside_uniform_prior,
 )
-
-from tests.sbiutils_test import conditional_of_mvn
 
 
 @pytest.mark.parametrize("snpe_method", [SNPE_A, SNPE_C])

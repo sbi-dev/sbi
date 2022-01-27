@@ -1,7 +1,7 @@
 import pytest
 import torch
-from torch import ones, zeros, eye
-from torch.distributions import Uniform, MultivariateNormal, LogNormal, Exponential
+from torch import eye, ones, zeros
+from torch.distributions import Exponential, LogNormal, MultivariateNormal, Uniform
 from torch.distributions.transforms import (
     AffineTransform,
     ComposeTransform,
@@ -10,7 +10,7 @@ from torch.distributions.transforms import (
     SigmoidTransform,
 )
 
-from sbi.utils import BoxUniform, mcmc_transform, process_prior, MultipleIndependent
+from sbi.utils import BoxUniform, MultipleIndependent, mcmc_transform, process_prior
 from tests.user_input_checks_test import UserNumpyUniform
 
 

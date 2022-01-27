@@ -17,6 +17,11 @@ from torch import Tensor
 
 from sbi.utils import eval_conditional_density
 
+try:
+    collectionsAbc = collections.abc  # type: ignore
+except:
+    collectionsAbc = collections
+
 
 def hex2rgb(hex):
     # Pass 16 to the integer function for change of base
@@ -35,9 +40,9 @@ def _update(d, u):
     # https://stackoverflow.com/a/3233356
     for k, v in six.iteritems(u):
         dv = d.get(k, {})
-        if not isinstance(dv, collectionsAbc.Mapping):
+        if not isinstance(dv, collectionsAbc.Mapping):  # tpye: ignore
             d[k] = v
-        elif isinstance(v, collectionsAbc.Mapping):
+        elif isinstance(v, collectionsAbc.Mapping):  # tpye: ignore
             d[k] = _update(dv, v)
         else:
             d[k] = v
@@ -445,9 +450,7 @@ def pairplot(
 
 
 def marginal_plot(
-    samples: Union[
-        List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor
-    ] = None,
+    samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
     points: Optional[
         Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor]
     ] = None,
@@ -721,7 +724,7 @@ def _arrange_plots(
     if points is None:
         points = []
     if type(points) != list:
-        points = ensure_numpy(points)
+        points = ensure_numpy(points)  # type: ignore
         points = [points]
     points = [np.atleast_2d(p) for p in points]
     points = [np.atleast_2d(ensure_numpy(p)) for p in points]

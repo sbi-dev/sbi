@@ -23,13 +23,8 @@ from sbi.utils.user_input_checks import validate_theta_and_x
 
 
 def build_input_layer(
-<<<<<<< HEAD
-    batch_theta: Tensor = None,
-    z_score_theta: Optional[str] = "independent",
-=======
     batch_theta: Tensor,
-    z_score_theta: bool = True,
->>>>>>> Type fixes such that the codebase passes pyright
+    z_score_theta: Optional[str] = "independent",
     embedding_net_theta: nn.Module = nn.Identity(),
 ) -> nn.Module:
     r"""Builds input layer for the `RestrictionEstimator` with option to z-score.
@@ -51,8 +46,8 @@ def build_input_layer(
     Returns:
         Input layer with optional embedding net and z-scoring.
     """
-    z_score_theta, structured_theta = z_score_parser(z_score_theta)
-    if z_score_theta:
+    z_score_theta_bool, structured_theta = z_score_parser(z_score_theta)
+    if z_score_theta_bool:
         input_layer = nn.Sequential(
             standardizing_net(batch_theta, structured_theta), embedding_net_theta
         )
@@ -153,7 +148,7 @@ class RestrictionEstimator:
         hidden_features: int = 100,
         num_blocks: int = 2,
         dropout_probability: float = 0.5,
-        z_score: bool = True,
+        z_score: Optional[str] = "independent",
         embedding_net: nn.Module = nn.Identity(),
     ) -> None:
         r"""

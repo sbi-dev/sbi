@@ -4,17 +4,17 @@
 from __future__ import annotations
 
 import pytest
+import torch
 from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
-import torch
 
 from sbi import utils as utils
 from sbi.inference import (
     SNLE,
-    likelihood_estimator_based_potential,
     MCMCPosterior,
     RejectionPosterior,
     VIPosterior,
+    likelihood_estimator_based_potential,
     prepare_for_sbi,
     simulate_for_sbi,
 )

@@ -3,13 +3,12 @@
 
 
 import warnings
-from typing import Dict, Optional, Sequence, Union
+from typing import Dict, List, Optional, Sequence, Union
 
 import torch
 from scipy.stats._distn_infrastructure import rv_frozen
 from scipy.stats._multivariate import multi_rv_frozen
 from torch import Tensor, float32
-from torch.distributions import Distribution, constraints
 from torch.distributions import Distribution, Independent, biject_to, constraints
 
 
@@ -210,8 +209,10 @@ class MultipleIndependent(Distribution):
         self.dists = dists
         # numel() instead of event_shape because for all dists both is possible,
         # event_shape=[1] or batch_shape=[1]
-        self.dims_per_dist = torch.as_tensor([d.sample().numel() for d in self.dists])
-        self.ndims = torch.sum(torch.as_tensor(self.dims_per_dist)).item()
+        self.dims_per_dist: Tensor = torch.as_tensor(
+            [d.sample().numel() for d in self.dists]
+        )
+        self.ndims = int(torch.sum(torch.as_tensor(self.dims_per_dist)).item())
         self.custom_arg_constraints = arg_constraints
 
         super().__init__(
@@ -283,7 +284,7 @@ class MultipleIndependent(Distribution):
         log_probs = []
         dims_covered = 0
         for idx, d in enumerate(self.dists):
-            ndims = self.dims_per_dist[idx].item()
+            ndims = int(self.dims_per_dist[idx].item())
             v = value[:, dims_covered : dims_covered + ndims]
             # Reshape here to ensure all returned log_probs are 2D for concatenation.
             log_probs.append(d.log_prob(v).reshape(num_samples, 1))
@@ -368,7 +369,7 @@ def build_support(
         )
     # Only lower bound is specified.
     elif upper_bound is None:
-        num_dimensions = lower_bound.numel()
+        num_dimensions = lower_bound.numel()  # type: ignore
         if num_dimensions > 1:
             support = constraints._IndependentConstraint(
                 constraints.greater_than(lower_bound),

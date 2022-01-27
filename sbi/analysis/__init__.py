@@ -11,6 +11,6 @@ from sbi.analysis.plot import (
     pairplot,
     sbc_rank_plot,
 )
+from sbi.analysis.sbc import check_sbc, get_nltp, run_sbc
 from sbi.analysis.sensitivity_analysis import ActiveSubspace
-from sbi.analysis.sbc import run_sbc, check_sbc, get_nltp
-from sbi.analysis.tensorboard_output import plot_summary, list_all_logs
+from sbi.analysis.tensorboard_output import list_all_logs, plot_summary
