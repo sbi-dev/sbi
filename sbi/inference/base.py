@@ -514,6 +514,42 @@ class NeuralInference(ABC):
     def summary(self):
         return self._summary
 
+    def __getstate__(self) -> Dict:
+        """Returns the state of the object that is supposed to be pickled.
+
+        Attributes that can not be serialized are set to `None`.
+
+        Returns:
+            Dictionary containing the state.
+        """
+        warn(
+            "When the inference object is pickled, the behaviour of the loaded object "
+            "changes in the following two ways: "
+            "1) `.train(..., retrain_from_scratch=True)` is not supported. "
+            "2) When the loaded object calls the `.train()` method, it generates a new "
+            "tensorboard summary writer (instead of appending to the current one)."
+        )
+        dict_to_save = {}
+        unpicklable_attributes = ["_summary_writer", "_build_neural_net"]
+        for key in self.__dict__.keys():
+            if key in unpicklable_attributes:
+                dict_to_save[key] = None
+            else:
+                dict_to_save[key] = self.__dict__[key]
+        return dict_to_save
+
+    def __setstate__(self, state_dict: Dict):
+        """Sets the state when being loaded from pickle.
+
+        Also creates a new summary writer (because the previous one was set to `None`
+        during serializing, see `__get_state__()`).
+
+        Args:
+            state_dict: State to be restored.
+        """
+        state_dict["_summary_writer"] = self._default_summary_writer()
+        self.__dict__ = state_dict
+
 
 def simulate_for_sbi(
     simulator: Callable,
