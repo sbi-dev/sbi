@@ -62,6 +62,7 @@ from sbi.utils.typechecks import (
 )
 from sbi.utils.user_input_checks import (
     check_estimator_arg,
+    process_prior,
     process_x,
     test_posterior_net_for_multi_d_x,
     validate_theta_and_x,
