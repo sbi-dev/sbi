@@ -3,8 +3,12 @@
 
 import pytest
 import torch
+
+from matplotlib.figure import Figure
+from matplotlib.axes import Axes
 from torch.utils.tensorboard import SummaryWriter
 
+from sbi.analysis import plot_summary
 from sbi.inference import (
     SNLE,
     SNPE,
@@ -12,14 +16,12 @@ from sbi.inference import (
     prepare_for_sbi,
     simulate_for_sbi,
 )
-from sbi import utils
-from matplotlib.figure import Figure
-from matplotlib.axes import Axes
+from sbi.utils import BoxUniform
 
 
 def test_plot_summary(tmp_path):
     num_dim = 1
-    prior = utils.BoxUniform(low=-2 * torch.ones(num_dim), high=2 * torch.ones(num_dim))
+    prior = BoxUniform(low=-2 * torch.ones(num_dim), high=2 * torch.ones(num_dim))
 
     summary_writer = SummaryWriter(tmp_path)
 
@@ -32,14 +34,14 @@ def test_plot_summary(tmp_path):
     inference = SNPE(prior=prior, summary_writer=summary_writer)
     theta, x = simulate_for_sbi(simulator, proposal=prior, num_simulations=5)
     _ = inference.append_simulations(theta, x).train(max_num_epochs=1)
-    fig, axes = utils.plot_summary(inference)
+    fig, axes = plot_summary(inference)
     assert isinstance(fig, Figure) and isinstance(axes[0], Axes)
 
     # SNLE
     inference = SNLE(prior=prior, summary_writer=summary_writer)
     theta, x = simulate_for_sbi(simulator, proposal=prior, num_simulations=5)
     _ = inference.append_simulations(theta, x).train(max_num_epochs=1)
-    fig, axes = utils.plot_summary(inference)
+    fig, axes = plot_summary(inference)
     assert isinstance(fig, Figure) and isinstance(axes[0], Axes)
 
     # SNRE
@@ -48,5 +50,5 @@ def test_plot_summary(tmp_path):
     _ = inference.append_simulations(theta, x).train(
         num_atoms=2, max_num_epochs=5, validation_fraction=0.5
     )
-    fig, axes = utils.plot_summary(inference)
+    fig, axes = plot_summary(inference)
     assert isinstance(fig, Figure) and isinstance(axes[0], Axes)
