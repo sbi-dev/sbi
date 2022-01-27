@@ -1,16 +1,25 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
-from typing import Any, Callable, List, Optional, Tuple, Union
+from copy import deepcopy
+from functools import partial
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 from warnings import warn
 
+import numpy as np
 import torch
-from torch import Tensor
-
+import torch.distributions.transforms as torch_tf
 from pyknos.mdn.mdn import MultivariateGaussianMDN as mdn
 from pyknos.nflows.flows import Flow
-from sbi.utils.torchutils import ensure_theta_batched
-from sbi.utils.torchutils import BoxUniform
+from torch import Tensor, nn
+from sbi.types import Shape
+from sbi.utils.torchutils import (
+    BoxUniform,
+    ScalarFloat,
+    atleast_2d_float32_tensor,
+    ensure_theta_batched,
+)
+from sbi.utils.user_input_checks import process_x
 
 
 def eval_conditional_density(
@@ -380,7 +389,6 @@ def extract_and_transform_mog(
 
 
 def condition_mog(
-    prior: Any,
     condition: Tensor,
     dims: List[int],
     logits: Tensor,
@@ -420,17 +428,6 @@ def condition_mog(
     mask = torch.zeros(n_dims, dtype=bool)
     mask[dims] = True
 
-    # Check whether the condition is within the prior bounds.
-    if type(prior) is torch.distributions.uniform.Uniform or type(prior) is BoxUniform:
-        support = prior.support.base_constraint
-        cond_ubound = support.upper_bound[~mask]
-        cond_lbound = support.lower_bound[~mask]
-        within_support = torch.logical_and(
-            cond_lbound <= condition[:, ~mask], cond_ubound >= condition[:, ~mask]
-        )
-        if ~torch.all(within_support):
-            raise ValueError("The chosen condition is not within the prior support.")
-
     y = condition[:, ~mask]
     mu_x = means[:, :, mask]
     mu_y = means[:, :, ~mask]
@@ -462,3 +459,170 @@ def condition_mog(
 
     sumlogdiag = torch.sum(torch.log(torch.diagonal(precfs_xx, dim1=2, dim2=3)), dim=2)
     return logits, means, precfs_xx, sumlogdiag
+
+
+class ConditionedPotential:
+    def __init__(
+        self, potential_fn: Callable, condition: Tensor, dims_to_sample: List[int]
+    ):
+        r"""
+        Return conditional posterior log-probability or $-\infty$ if outside prior.
+
+        Args:
+            theta: Free parameters $\theta_i$, batch dimension 1.
+
+        Returns:
+            Conditional posterior log-probability $\log(p(\theta_i|\theta_j, x))$,
+            masked outside of prior.
+        """
+        self.potential_fn = potential_fn
+        self.condition = condition
+        self.dims_to_sample = dims_to_sample
+        self.device = self.potential_fn.device
+
+    def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
+        r"""
+        Returns the conditional potential $\log(p(\theta_i|\theta_j, x))$.
+
+        Args:
+            theta: Free parameters $\theta_i$, batch dimension 1.
+
+        Returns:
+            Conditional posterior log-probability $\log(p(\theta_i|\theta_j, x))$,
+            masked outside of prior.
+        """
+        theta_ = ensure_theta_batched(torch.as_tensor(theta, dtype=torch.float32))
+
+        # `theta_condition`` will first have all entries of the `condition` and then
+        # override the entries that should be sampled with `theta` (see below).
+        theta_condition = deepcopy(self.condition)
+
+        # In case `theta` is a batch of theta (e.g. multi-chain MCMC), we have to
+        # repeat `theta_condition`` to the same batchsize.
+        theta_condition = theta_condition.repeat(theta_.shape[0], 1)
+        theta_condition[:, self.dims_to_sample] = theta_
+
+        return self.potential_fn(theta_condition, track_gradients=track_gradients)
+
+    def set_x(self, x_o: Optional[Tensor]):
+        """Check the shape of the observed data and, if valid, set it."""
+        if x_o is not None:
+            x_o = process_x(x_o, allow_iid_x=False).to(self.device)
+        self.potential_fn.set_x(x_o)
+
+    @property
+    def x_o(self) -> Tensor:
+        """Return the observed data at which the potential is evaluated."""
+        if self.potential_fn._x_o is not None:
+            return self.potential_fn._x_o
+        else:
+            raise ValueError("No observed data is available.")
+
+    @x_o.setter
+    def x_o(self, x_o: Optional[Tensor]) -> None:
+        """Check the shape of the observed data and, if valid, set it."""
+        self.set_x(x_o)
+
+    def return_x_o(self) -> Optional[Tensor]:
+        """Return the observed data at which the potential is evaluated.
+
+        Difference to the `x_o` property is that it will not raise an error if
+        `self._x_o` is `None`.
+        """
+        return self.potential_fn._x_o
+
+
+class RestrictedPriorForConditional:
+    """
+    Class to restrict a prior to fewer dimensions as needed for conditional sampling.
+
+    The resulting prior samples only from the free dimensions of the conditional.
+
+    This is needed for the the MCMC initialization functions when conditioning.
+    For the prior init, we could post-hoc select the relevant dimensions. But
+    for SIR, we want to evaluate the `potential_fn` of the conditional
+    posterior, which takes only a subset of the full parameter vector theta
+    (only the `dims_to_sample`). This subset is provided by `.sample()` from
+    this class.
+    """
+
+    def __init__(self, full_prior: Any, dims_to_sample: List[int]):
+        self.full_prior = full_prior
+        self.dims_to_sample = dims_to_sample
+
+    def sample(self, *args, **kwargs):
+        """
+        Sample only from the relevant dimension. Other dimensions are filled in
+        by the `ConditionalPotentialFunctionProvider()` during MCMC.
+        """
+        return self.full_prior.sample(*args, **kwargs)[:, self.dims_to_sample]
+
+    def log_prob(self, *args, **kwargs):
+        r"""
+        `log_prob` is same as for the full prior, because we usually evaluate
+        the $\theta$ under the full joint once we have added the condition.
+        """
+        return self.full_prior.log_prob(*args, **kwargs)
+
+
+class RestrictedTransformForConditional(nn.Module):
+    """
+    Class to restrict the transform to fewer dimensions for conditional sampling.
+
+    The resulting transform transforms only the free dimensions of the conditional.
+    Notably, the `log_abs_det` is computed given all dimensions. However, the
+    `log_abs_det` stemming from the fixed dimensions is a constant and drops out during
+    MCMC.
+
+    All methods work in a similar way:
+    `full_theta`` will first have all entries of the `condition` and then override the
+    entries that should be sampled with `theta`. In case `theta` is a batch of `theta`
+    (e.g. multi-chain MCMC), we have to repeat `theta_condition`` to the match the
+    batchsize.
+
+    This is needed for the the MCMC initialization functions when conditioning and
+    when transforming the samples back into the original theta space after sampling.
+    """
+
+    def __init__(
+        self,
+        transform: torch_tf.Transform,
+        condition: Tensor,
+        dims_to_sample: List[int],
+    ) -> None:
+        super().__init__()
+        self.transform = transform
+        self.condition = ensure_theta_batched(condition)
+        self.dims_to_sample = dims_to_sample
+
+    def forward(self, theta: Tensor) -> Tensor:
+        r"""
+        Transform restricted $\theta$.
+        """
+        full_theta = self.condition.repeat(theta.shape[0], 1)
+        full_theta[:, self.dims_to_sample] = theta
+        tf_full_theta = self.transform(full_theta)
+        return tf_full_theta[:, self.dims_to_sample]
+
+    def inv(self, theta: Tensor) -> Tensor:
+        r"""
+        Inverse transform restricted $\theta$.
+        """
+        full_theta = self.condition.repeat(theta.shape[0], 1)
+        full_theta[:, self.dims_to_sample] = theta
+        tf_full_theta = self.transform.inv(full_theta)
+        return tf_full_theta[:, self.dims_to_sample]
+
+    def log_abs_det_jacobian(self, theta1: Tensor, theta2: Tensor) -> Tensor:
+        """
+        Return the `log_abs_det_jacobian` of |dtheta1 / dtheta2|.
+
+        The determinant is summed over all dimensions, not just the `dims_to_sample`
+        ones.
+        """
+        full_theta1 = self.condition.repeat(theta1.shape[0], 1)
+        full_theta1[:, self.dims_to_sample] = theta1
+        full_theta2 = self.condition.repeat(theta2.shape[0], 1)
+        full_theta2[:, self.dims_to_sample] = theta2
+        log_abs_det = self.transform.log_abs_det_jacobian(full_theta1, full_theta2)
+        return log_abs_det

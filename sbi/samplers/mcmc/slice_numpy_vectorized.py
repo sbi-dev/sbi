@@ -80,7 +80,6 @@ class SliceSamplerVectorized:
 
         if self.verbose:
             pbar = tqdm(range(self.num_chains * num_samples))
-            print("Generating MCMC samples")
 
         num_chains_finished = 0
         while num_chains_finished != self.num_chains:

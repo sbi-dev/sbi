@@ -12,7 +12,7 @@ from scipy.stats import beta, multivariate_normal, uniform
 from torch import Tensor, eye, nn, ones, zeros
 from torch.distributions import Beta, Distribution, Gamma, MultivariateNormal, Uniform
 
-from sbi.inference import SNPE_A, SNPE_C, simulate_for_sbi
+from sbi.inference import SNPE_A, SNPE_C, DirectPosterior, simulate_for_sbi
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
 from sbi.utils.torchutils import BoxUniform
@@ -289,25 +289,33 @@ def test_inference_with_user_sbi_problems(
 
     simulator, prior = prepare_for_sbi(user_simulator, user_prior)
     inference = snpe_method(
-        prior,
+        prior=prior,
         density_estimator="mdn_snpe_a" if snpe_method == SNPE_A else "maf",
         show_progress_bars=False,
     )
 
     # Run inference.
     theta, x = simulate_for_sbi(simulator, prior, 100)
-    _ = inference.append_simulations(theta, x).train(max_num_epochs=2)
+    x_o = torch.zeros(x.shape[1])
+    posterior_estimator = inference.append_simulations(theta, x).train(max_num_epochs=2)
 
     # Build posterior.
     if snpe_method == SNPE_A:
         if not isinstance(prior, (MultivariateNormal, BoxUniform, DirectPosterior)):
             with pytest.raises(AssertionError):
                 # SNPE-A does not support priors yet.
-                _ = inference.build_posterior()
+                posterior_estimator = inference.correct_for_proposal()
+                _ = DirectPosterior(
+                    posterior_estimator=posterior_estimator, prior=prior
+                ).set_default_x(x_o)
         else:
-            _ = inference.build_posterior()
+            _ = DirectPosterior(
+                posterior_estimator=posterior_estimator, prior=prior
+            ).set_default_x(x_o)
     else:
-        _ = inference.build_posterior()
+        _ = DirectPosterior(
+            posterior_estimator=posterior_estimator, prior=prior
+        ).set_default_x(x_o)
 
 
 @pytest.mark.parametrize(
@@ -529,12 +537,15 @@ def test_train_with_different_data_and_training_device(
     # Run inference.
     theta, x = simulate_for_sbi(simulator, prior, 100)
     theta, x = theta.to(data_device), x.to(data_device)
+    x_o = torch.zeros(x.shape[1])
     inference = inference.append_simulations(theta, x)
 
-    _ = inference.train(max_num_epochs=2)
+    posterior_estimator = inference.train(max_num_epochs=2)
 
     # Check for default device for inference object
     weights_device = next(inference._neural_net.parameters()).device
     assert torch.device(training_device) == weights_device
 
-    _ = inference.build_posterior()
+    _ = DirectPosterior(
+        posterior_estimator=posterior_estimator, prior=prior
+    ).set_default_x(x_o)

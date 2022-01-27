@@ -54,7 +54,7 @@ def linear_gaussian(
     if num_discarded_dims:
         theta = theta[:, :-num_discarded_dims]
 
-    chol_factor = torch.cholesky(likelihood_cov)
+    chol_factor = torch.linalg.cholesky(likelihood_cov)
 
     return likelihood_shift + theta + torch.mm(chol_factor, torch.randn_like(theta).T).T
 

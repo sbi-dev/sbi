@@ -1,3 +1,34 @@
+# v0.18.0 (next release)
+
+## Breaking changes
+- Posteriors saved under `sbi` `v0.17.2` or older can not be loaded under `sbi` 
+`v0.18.0` or newer.
+- `sample_with` can no longer be passed to `.sample()`. Instead, the user has to rerun
+`.build_posterior(sample_with=...)`. (#573)
+- the `posterior` no longer has the the method `.sample_conditional()`. Using this 
+  feature now requires using the `sampler interface` (see tutorial
+  [here](https://www.mackelab.org/sbi/tutorial/07_conditional_distributions/)) (#573)
+
+## Major changes
+- bugfix for SNPE-C with mixture density networks (#573)
+- new `sampler interface` (#573):
+```python
+from sbi.inference import SNLE, likelihood_estimator_based_potential
+
+inference = SNLE()  # no more prior needed
+likelihood_estimator = inference.append_simulations(theta, x).train()
+
+potential_fn, theta_transform = likelihood_estimator_based_potential(likelihood_estimator, prior, x_o)
+posterior = MCMCPosterior(potential_fn, proposal=prior, theta_transform=theta_transform)
+
+samples = posterior.sample((100,))
+```
+
+## Minor changes
+- pairplot takes `ax` and `fig` (#557)
+- bugfix for rejection sampling (#561)
+
+
 # v0.17.2
 
 ## Minor changes

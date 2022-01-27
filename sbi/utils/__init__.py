@@ -1,9 +1,8 @@
 # flake8: noqa
-from sbi.utils.conditional_density import (
+from sbi.utils.conditional_density_utils import (
     conditional_corrcoeff,
     eval_conditional_density,
     extract_and_transform_mog,
-    condition_mog,
 )
 from sbi.utils.get_nn_models import classifier_nn, likelihood_nn, posterior_nn
 from sbi.utils.io import get_data_root, get_log_root, get_project_root
@@ -19,14 +18,12 @@ from sbi.utils.sbiutils import (
     del_entries,
     expit,
     get_simulations_since_round,
+    gradient_ascent,
     handle_invalid_x,
     logit,
     mask_sims_from_prior,
     mcmc_transform,
     mog_log_prob,
-    optimize_potential_fn,
-    rejection_sample,
-    rejection_sample_posterior_within_prior,
     standardizing_net,
     standardizing_transform,
     warn_if_zscoring_changes_data,
@@ -34,6 +31,7 @@ from sbi.utils.sbiutils import (
     warn_on_invalid_x_for_snpec_leakage,
     within_support,
     x_shape_from_simulation,
+    match_theta_and_x_batch_shapes,
 )
 from sbi.utils.torchutils import (
     BoxUniform,
@@ -69,3 +67,4 @@ from sbi.utils.user_input_checks import (
     validate_theta_and_x,
 )
 from sbi.utils.user_input_checks_utils import MultipleIndependent
+from sbi.utils.potentialutils import transformed_potential, pyro_potential_wrapper

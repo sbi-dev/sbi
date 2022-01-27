@@ -2,33 +2,26 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 
-from typing import Callable, Optional, Union
+from typing import Any, Callable, Optional, Union
 
 import torch
 from torch import Tensor
-from torch.utils.tensorboard import SummaryWriter
 
 import sbi.utils as utils
 from sbi.inference.snpe.snpe_base import PosteriorEstimator
+from sbi.types import TensorboardSummaryWriter
+from sbi.utils import del_entries
 
 
 class SNPE_B(PosteriorEstimator):
     def __init__(
         self,
-        simulator: Callable,
-        prior,
-        num_workers: int = 1,
-        simulation_batch_size: Optional[int] = 1,
-        density_estimator: Union[str, Callable] = "mdn",
-        calibration_kernel: Optional[Callable] = None,
-        retrain_from_scratch_each_round: bool = False,
-        discard_prior_samples: bool = False,
-        exclude_invalid_x: bool = True,
+        prior: Optional[Any] = None,
+        density_estimator: Union[str, Callable] = "maf",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
-        summary_writer: Optional[SummaryWriter] = None,
+        summary_writer: Optional[TensorboardSummaryWriter] = None,
         show_progress_bars: bool = True,
-        show_round_summary: bool = False,
     ):
         r"""SNPE-B [1]. CURRENTLY NOT IMPLEMENTED.
 
@@ -42,21 +35,8 @@ class SNPE_B(PosteriorEstimator):
             "SNPE-B is not yet implemented in the sbi package, see issue #199."
         )
 
-        super().__init__(
-            simulator=simulator,
-            prior=prior,
-            num_workers=num_workers,
-            simulation_batch_size=simulation_batch_size,
-            density_estimator=density_estimator,
-            calibration_kernel=calibration_kernel,
-            retrain_from_scratch_each_round=retrain_from_scratch_each_round,
-            discard_prior_samples=discard_prior_samples,
-            exclude_invalid_x=exclude_invalid_x,
-            device=device,
-            logging_level=logging_level,
-            show_progress_bars=show_progress_bars,
-            show_round_summary=show_round_summary,
-        )
+        kwargs = del_entries(locals(), entries=("self", "__class__", "unused_args"))
+        super().__init__(**kwargs, **unused_args)
 
     def _log_prob_proposal_posterior(
         self, theta: Tensor, x: Tensor, masks: Tensor

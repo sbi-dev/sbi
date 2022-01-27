@@ -8,6 +8,7 @@ import numpy as np
 import torch
 from torch.nn import Module
 from torch.utils.tensorboard import SummaryWriter
+from torch.distributions.transforms import Transform
 
 Array = Union[np.ndarray, torch.Tensor]
 Shape = Union[torch.Size, Tuple[int, ...]]
@@ -27,6 +28,7 @@ transform_types = Optional[
 # Define alias types because otherwise, the documentation by mkdocs became very long and
 # made the website look ugly.
 TensorboardSummaryWriter = NewType("Writer", SummaryWriter)
+TorchTransform = NewType("torch Transform", Transform)
 TorchModule = NewType("Module", Module)
 
 __all__ = [

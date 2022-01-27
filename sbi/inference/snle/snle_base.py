@@ -4,26 +4,28 @@
 
 from abc import ABC
 from copy import deepcopy
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Callable, Dict, Optional, Tuple, Union
 
 import torch
-from torch import Tensor, optim
+from torch import Tensor, nn, optim
 from torch.nn.utils import clip_grad_norm_
 from torch.utils import data
 from torch.utils.tensorboard import SummaryWriter
 
 from sbi import utils as utils
 from sbi.inference import NeuralInference
-from sbi.inference.posteriors.likelihood_based_posterior import LikelihoodBasedPosterior
+from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior
+from sbi.inference.potentials import likelihood_estimator_based_potential
 from sbi.types import TorchModule
 from sbi.utils import check_estimator_arg, validate_theta_and_x, x_shape_from_simulation
 from sbi.utils.sbiutils import mask_sims_from_prior
+from sbi.utils.user_input_checks import process_x
 
 
 class LikelihoodEstimator(NeuralInference, ABC):
     def __init__(
         self,
-        prior,
+        prior: Optional[Any] = None,
         density_estimator: Union[str, Callable] = "maf",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
@@ -34,6 +36,10 @@ class LikelihoodEstimator(NeuralInference, ABC):
         r"""Base class for Sequential Neural Likelihood Estimation methods.
 
         Args:
+            prior: A probability distribution that expresses prior knowledge about the
+                parameters, e.g. which ranges are meaningful for them. Any
+                object with `.log_prob()`and `.sample()` (for example, a PyTorch
+                distribution) can be used.
             density_estimator: If it is a string, use a pre-configured network of the
                 provided type (one of nsf, maf, mdn, made). Alternatively, a function
                 that builds a custom neural network can be provided. The function will
@@ -78,8 +84,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         x: Tensor,
         from_round: int = 0,
     ) -> "LikelihoodEstimator":
-        r"""
-        Store parameters and simulation outputs to use them for later training.
+        r"""Store parameters and simulation outputs to use them for later training.
 
         Data are stored as entries in lists for each type of variable (parameter/data).
 
@@ -119,12 +124,11 @@ class LikelihoodEstimator(NeuralInference, ABC):
         exclude_invalid_x: bool = True,
         resume_training: bool = False,
         discard_prior_samples: bool = False,
-        retrain_from_scratch_each_round: bool = False,
+        retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
-    ) -> LikelihoodBasedPosterior:
-        r"""
-        Train the density estimator to learn the distribution $p(x|\theta)$.
+    ) -> nn.Module:
+        r"""Train the density estimator to learn the distribution $p(x|\theta)$.
 
         Args:
             exclude_invalid_x: Whether to exclude simulation outputs `x=NaN` or `x=±∞`
@@ -136,7 +140,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
             discard_prior_samples: Whether to discard samples simulated in round 1, i.e.
                 from the prior. Training may be sped up by ignoring such less targeted
                 samples.
-            retrain_from_scratch_each_round: Whether to retrain the conditional density
+            retrain_from_scratch: Whether to retrain the conditional density
                 estimator for the posterior from scratch each round.
             show_train_summary: Whether to print the number of epochs and validation
                 loss after the training.
@@ -173,7 +177,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         # arguments, which will build the neural network
         # This is passed into NeuralPosterior, to create a neural posterior which
         # can `sample()` and `log_prob()`. The network is accessible via `.net`.
-        if self._neural_net is None or retrain_from_scratch_each_round:
+        if self._neural_net is None or retrain_from_scratch:
             self._neural_net = self._build_neural_net(
                 theta[self.train_indices], x[self.train_indices]
             )
@@ -259,51 +263,41 @@ class LikelihoodEstimator(NeuralInference, ABC):
     def build_posterior(
         self,
         density_estimator: Optional[TorchModule] = None,
+        prior: Optional[Any] = None,
         sample_with: str = "mcmc",
         mcmc_method: str = "slice_np",
-        mcmc_parameters: Optional[Dict[str, Any]] = None,
-        rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
-    ) -> LikelihoodBasedPosterior:
-        r"""
-        Build posterior from the neural density estimator.
+        mcmc_parameters: Dict[str, Any] = {},
+        rejection_sampling_parameters: Dict[str, Any] = {},
+    ) -> Union[MCMCPosterior, RejectionPosterior]:
+        r"""Build posterior from the neural density estimator.
 
         SNLE trains a neural network to approximate the likelihood $p(x|\theta)$. The
-        `LikelihoodBasedPosterior` class wraps the trained network such that one can
-        directly evaluate the unnormalized posterior log probability
-        $p(\theta|x) \propto p(x|\theta) \cdot p(\theta)$ and draw samples from the
-        posterior with MCMC.
+        posterior wraps the trained network such that one can directly evaluate the
+        unnormalized posterior log probability $p(\theta|x) \propto p(x|\theta) \cdot
+        p(\theta)$ and draw samples from the posterior with MCMC or rejection sampling.
 
         Args:
             density_estimator: The density estimator that the posterior is based on.
                 If `None`, use the latest neural density estimator that was trained.
+            prior: Prior distribution.
             sample_with: Method to use for sampling from the posterior. Must be one of
                 [`mcmc` | `rejection`].
             mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`,
                 `hmc`, `nuts`. Currently defaults to `slice_np` for a custom numpy
                 implementation of slice sampling; select `hmc`, `nuts` or `slice` for
                 Pyro-based sampling.
-            mcmc_parameters: Dictionary overriding the default parameters for MCMC.
-                The following parameters are supported: `thin` to set the thinning
-                factor for the chain, `warmup_steps` to set the initial number of
-                samples to discard, `num_chains` for the number of chains,
-                `init_strategy` for the initialisation strategy for chains; `prior` will
-                draw init locations from prior, whereas `sir` will use
-                Sequential-Importance-Resampling using `init_strategy_num_candidates`
-                to find init locations.
-            rejection_sampling_parameters: Dictionary overriding the default parameters
-                for rejection sampling. The following parameters are supported:
-                `proposal` as the proposal distribtution (default is the prior).
-                `max_sampling_batch_size` as the batchsize of samples being drawn from
-                the proposal at every iteration. `num_samples_to_find_max` as the
-                number of samples that are used to find the maximum of the
-                `potential_fn / proposal` ratio. `num_iter_to_find_max` as the number
-                of gradient ascent iterations to find the maximum of that ratio. `m` as
-                multiplier to that ratio.
-
+            mcmc_parameters: Additional kwargs passed to `MCMCPosterior`.
+            rejection_sampling_parameters: Additional kwargs passed to
+                `RejectionPosterior`.
         Returns:
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods
             (the returned log-probability is unnormalized).
         """
+        if prior is None:
+            assert (
+                self._prior is not None
+            ), "You did not pass a prior. You have to pass the prior either at initialization `inference = SNLE(prior)` or to `.build_posterior(prior=prior)`."
+            prior = self._prior
 
         if density_estimator is None:
             density_estimator = self._neural_net
@@ -313,22 +307,34 @@ class LikelihoodEstimator(NeuralInference, ABC):
             # Otherwise, infer it from the device of the net parameters.
             device = next(density_estimator.parameters()).device.type
 
-        self._posterior = LikelihoodBasedPosterior(
-            method_family="snle",
-            neural_net=density_estimator,
-            prior=self._prior,
-            x_shape=self._x_shape,
-            sample_with=sample_with,
-            mcmc_method=mcmc_method,
-            mcmc_parameters=mcmc_parameters,
-            rejection_sampling_parameters=rejection_sampling_parameters,
-            device=device,
+        potential_fn, theta_transform = likelihood_estimator_based_potential(
+            likelihood_estimator=self._neural_net, prior=prior, x_o=None
         )
 
-        self._posterior._num_trained_rounds = self._round + 1
+        if sample_with == "mcmc":
+            self._posterior = MCMCPosterior(
+                potential_fn=potential_fn,
+                theta_transform=theta_transform,
+                proposal=prior,
+                method=mcmc_method,
+                device=device,
+                x_shape=self._x_shape,
+                **mcmc_parameters
+            )
+        elif sample_with == "rejection":
+            self._posterior = RejectionPosterior(
+                potential_fn=potential_fn,
+                proposal=prior,
+                device=device,
+                x_shape=self._x_shape,
+                **rejection_sampling_parameters
+            )
+        elif sample_with == "vi":
+            raise NotImplementedError
+        else:
+            raise NotImplementedError
 
         # Store models at end of each round.
         self._model_bank.append(deepcopy(self._posterior))
-        self._model_bank[-1].net.eval()
 
         return deepcopy(self._posterior)

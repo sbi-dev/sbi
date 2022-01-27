@@ -29,10 +29,13 @@ from sbi.utils.user_input_checks import prepare_for_sbi
 
 
 def infer(
-    simulator: Callable, prior, method: str, num_simulations: int, num_workers: int = 1
+    simulator: Callable,
+    prior: Any,
+    method: str,
+    num_simulations: int,
+    num_workers: int = 1,
 ) -> NeuralPosterior:
-    r"""
-    Return posterior distribution by running simulation-based inference.
+    r"""Runs simulation-based inference and returns the posterior.
 
     This function provides a simple interface to run sbi. Inference is run for a single
     round and hence the returned posterior $p(\theta|x)$ can be sampled and evaluated
@@ -69,7 +72,7 @@ def infer(
 
     simulator, prior = prepare_for_sbi(simulator, prior)
 
-    inference = method_fun(prior)
+    inference = method_fun(prior=prior)
     theta, x = simulate_for_sbi(
         simulator=simulator,
         proposal=prior,
@@ -94,8 +97,7 @@ class NeuralInference(ABC):
         show_progress_bars: bool = True,
         **unused_args,
     ):
-        r"""
-        Base class for inference methods.
+        r"""Base class for inference methods.
 
         Args:
             prior: A probability distribution that expresses prior knowledge about the
@@ -115,7 +117,8 @@ class NeuralInference(ABC):
                 0.14.0 is more mature, we will remove this argument.
         """
 
-        self._device = process_device(device, prior=prior)
+        self._prior = prior
+        self._device = process_device(device)
 
         if unused_args:
             warn(
@@ -129,7 +132,6 @@ class NeuralInference(ABC):
                 f"further information.",
             )
 
-        self._prior = prior
         self._posterior = None
         self._neural_net = None
         self._x_shape = None
@@ -186,8 +188,7 @@ class NeuralInference(ABC):
     def provide_presimulated(
         self, theta: Tensor, x: Tensor, from_round: int = 0
     ) -> None:
-        r"""
-        Deprecated since sbi 0.14.0.
+        r"""Deprecated since sbi 0.14.0.
 
         Instead of using this, please use `.append_simulations()`. Please consult
         release notes to see how you can update your code:
@@ -223,8 +224,7 @@ class NeuralInference(ABC):
         exclude_invalid_x: bool = True,
         warn_on_invalid: bool = True,
     ) -> Tuple[Tensor, Tensor, Tensor]:
-        r"""
-        Returns all $\theta$, $x$, and prior_masks from rounds >= `starting_round`.
+        r"""Returns all $\theta$, $x$, and prior_masks from rounds >= `starting_round`.
 
         If requested, do not return invalid data.
 
@@ -273,7 +273,7 @@ class NeuralInference(ABC):
         calibration_kernel: Optional[Callable] = None,
         exclude_invalid_x: bool = True,
         discard_prior_samples: bool = False,
-        retrain_from_scratch_each_round: bool = False,
+        retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
     ) -> NeuralPosterior:
         raise NotImplementedError
@@ -514,8 +514,7 @@ def simulate_for_sbi(
     simulation_batch_size: int = 1,
     show_progress_bar: bool = True,
 ) -> Tuple[Tensor, Tensor]:
-    r"""
-    Returns ($\theta, x$) pairs obtained from sampling the proposal and simulating.
+    r"""Returns ($\theta, x$) pairs obtained from sampling the proposal and simulating.
 
     This function performs two steps:
 
@@ -542,8 +541,6 @@ def simulate_for_sbi(
     Returns: Sampled parameters $\theta$ and simulation-outputs $x$.
     """
 
-    check_if_proposal_has_default_x(proposal)
-
     theta = proposal.sample((num_simulations,))
 
     x = simulate_in_batches(
@@ -554,8 +551,7 @@ def simulate_for_sbi(
 
 
 def check_if_proposal_has_default_x(proposal: Any):
-    """
-    Check for validity of the provided proposal distribution.
+    """Check for validity of the provided proposal distribution.
 
     If the proposal is a `NeuralPosterior`, we check if the default_x is set and
     if it matches the `_x_o_training_focused_on`.

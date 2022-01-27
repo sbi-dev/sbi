@@ -7,11 +7,10 @@ from typing import Any, Callable, Dict, Optional, Union
 import torch
 from pyknos.mdn.mdn import MultivariateGaussianMDN as mdn
 from pyknos.nflows.transforms import CompositeTransform
-from torch import Tensor, eye, ones
+from torch import Tensor, eye, nn, ones
 from torch.distributions import MultivariateNormal, Uniform
 
 from sbi import utils as utils
-from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.inference.snpe.snpe_base import PosteriorEstimator
 from sbi.types import TensorboardSummaryWriter
 from sbi.utils import (
@@ -64,9 +63,7 @@ class SNPE_C(PosteriorEstimator):
 
         Args:
             prior: A probability distribution that expresses prior knowledge about the
-                parameters, e.g. which ranges are meaningful for them. Any
-                object with `.log_prob()`and `.sample()` (for example, a PyTorch
-                distribution) can be used.
+                parameters, e.g. which ranges are meaningful for them.
             density_estimator: If it is a string, use a pre-configured network of the
                 provided type (one of nsf, maf, mdn, made). Alternatively, a function
                 that builds a custom neural network can be provided. The function will
@@ -103,12 +100,11 @@ class SNPE_C(PosteriorEstimator):
         resume_training: bool = False,
         discard_prior_samples: bool = False,
         use_combined_loss: bool = False,
-        retrain_from_scratch_each_round: bool = False,
+        retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
-    ) -> DirectPosterior:
-        r"""
-        Return density estimator that approximates the distribution $p(\theta|x)$.
+    ) -> nn.Module:
+        r"""Return density estimator that approximates the distribution $p(\theta|x)$.
 
         Args:
             num_atoms: Number of atoms to use for classification.
@@ -137,7 +133,7 @@ class SNPE_C(PosteriorEstimator):
                 using maximum likelihood in addition to training it on all samples using
                 atomic loss. The extra MLE loss helps prevent density leaking with
                 bounded priors.
-            retrain_from_scratch_each_round: Whether to retrain the conditional density
+            retrain_from_scratch: Whether to retrain the conditional density
                 estimator for the posterior from scratch each round.
             show_train_summary: Whether to print the number of epochs and validation
                 loss and leakage after the training.
@@ -166,16 +162,13 @@ class SNPE_C(PosteriorEstimator):
             # SNPE, we only use the latest data that was passed, i.e. the one from the
             # last proposal.
             proposal = self._proposal_roundwise[-1]
-            if hasattr(proposal, "net"):
-                self.use_non_atomic_loss = (
-                    isinstance(proposal.net._distribution, mdn)
-                    and isinstance(self._neural_net._distribution, mdn)
-                    and check_dist_class(
-                        self._prior, class_to_check=(Uniform, MultivariateNormal)
-                    )[0]
-                )
-            else:
-                self.use_non_atomic_loss = False
+            self.use_non_atomic_loss = (
+                isinstance(proposal.posterior_estimator._distribution, mdn)
+                and isinstance(self._neural_net._distribution, mdn)
+                and check_dist_class(
+                    self._prior, class_to_check=(Uniform, MultivariateNormal)
+                )[0]
+            )
 
             algorithm = "non-atomic" if self.use_non_atomic_loss else "atomic"
             print(f"Using SNPE-C with {algorithm} loss")
@@ -187,8 +180,7 @@ class SNPE_C(PosteriorEstimator):
         return super().train(**kwargs)
 
     def _set_state_for_mog_proposal(self) -> None:
-        """
-        Set state variables that are used at every training step of non-atomic SNPE-C.
+        """Set state variables that are used at each training step of non-atomic SNPE-C.
 
         Three things are computed:
         1) Check if z-scoring was requested. To do so, we check if the `_transform`
@@ -210,8 +202,7 @@ class SNPE_C(PosteriorEstimator):
             )
 
     def _set_maybe_z_scored_prior(self) -> None:
-        r"""
-        Compute and store potentially standardized prior (if z-scoring was requested).
+        r"""Compute and store potentially standardized prior (if z-scoring was done).
 
         The proposal posterior is:
         $pp(\theta|x) = 1/Z * q(\theta|x) * prop(\theta) / p(\theta)$
@@ -262,10 +253,13 @@ class SNPE_C(PosteriorEstimator):
             self._maybe_z_scored_prior = self._prior
 
     def _log_prob_proposal_posterior(
-        self, theta: Tensor, x: Tensor, masks: Tensor, proposal: Optional[Any]
+        self,
+        theta: Tensor,
+        x: Tensor,
+        masks: Tensor,
+        proposal: Optional[Any],
     ) -> Tensor:
-        """
-        Return the log-probability of the proposal posterior.
+        """Return the log-probability of the proposal posterior.
 
         If the proposal is a MoG, the density estimator is a MoG, and the prior is
         either Gaussian or uniform, we use non-atomic loss. Else, use atomic loss (which
@@ -289,8 +283,7 @@ class SNPE_C(PosteriorEstimator):
     def _log_prob_proposal_posterior_atomic(
         self, theta: Tensor, x: Tensor, masks: Tensor
     ):
-        """
-        Return log probability of the proposal posterior for atomic proposals.
+        """Return log probability of the proposal posterior for atomic proposals.
 
         We have two main options when evaluating the proposal posterior.
             (1) Generate atoms from the proposal prior.
@@ -364,10 +357,9 @@ class SNPE_C(PosteriorEstimator):
         return log_prob_proposal_posterior
 
     def _log_prob_proposal_posterior_mog(
-        self, theta: Tensor, x: Tensor, proposal: DirectPosterior
+        self, theta: Tensor, x: Tensor, proposal: "DirectPosterior"
     ) -> Tensor:
-        """
-        Return log-probability of the proposal posterior for MoG proposal.
+        """Return log-probability of the proposal posterior for MoG proposal.
 
         For MoG proposals and MoG density estimators, this can be done in closed form
         and does not require atomic loss (i.e. there will be no leakage issues).
@@ -396,8 +388,10 @@ class SNPE_C(PosteriorEstimator):
         # Evaluate the proposal. MDNs do not have functionality to run the embedding_net
         # and then get the mixture_components (**without** calling log_prob()). Hence,
         # we call them separately here.
-        encoded_x = proposal.net._embedding_net(x)
-        dist = proposal.net._distribution  # defined to avoid ugly black formatting.
+        encoded_x = proposal.posterior_estimator._embedding_net(proposal.default_x)
+        dist = (
+            proposal.posterior_estimator._distribution
+        )  # defined to avoid ugly black formatting.
         logits_p, m_p, prec_p, _, _ = dist.get_mixture_components(encoded_x)
         norm_logits_p = logits_p - torch.logsumexp(logits_p, dim=-1, keepdim=True)
 
@@ -432,8 +426,7 @@ class SNPE_C(PosteriorEstimator):
         means_d: Tensor,
         precisions_d: Tensor,
     ):
-        r"""
-        Returns the MoG parameters of the proposal posterior.
+        r"""Returns the MoG parameters of the proposal posterior.
 
         The proposal posterior is:
         $pp(\theta|x) = 1/Z * q(\theta|x) * prop(\theta) / p(\theta)$
@@ -492,8 +485,7 @@ class SNPE_C(PosteriorEstimator):
     def _precisions_proposal_posterior(
         self, precisions_p: Tensor, precisions_d: Tensor
     ):
-        """
-        Return the precisions and covariances of the proposal posterior.
+        """Return the precisions and covariances of the proposal posterior.
 
         Args:
             precisions_p: Precision matrices of the proposal distribution.
@@ -524,8 +516,7 @@ class SNPE_C(PosteriorEstimator):
         means_d: Tensor,
         precisions_d: Tensor,
     ):
-        """
-        Return the means of the proposal posterior.
+        """Return the means of the proposal posterior.
 
         means_pp = C_ix * (P_i * m_i + P_x * m_x - P_o * m_o).
 
@@ -571,8 +562,7 @@ class SNPE_C(PosteriorEstimator):
         means_d: Tensor,
         precisions_d: Tensor,
     ):
-        """
-        Return the component weights (i.e. logits) of the proposal posterior.
+        """Return the component weights (i.e. logits) of the proposal posterior.
 
         Args:
             means_pp: Means of the proposal posterior.

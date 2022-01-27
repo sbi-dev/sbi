@@ -32,10 +32,11 @@ def pairplot(
     labels: Optional[List[str]] = None,
     ticks: Union[List, torch.Tensor] = [],
     points_colors: List[str] = plt.rcParams["axes.prop_cycle"].by_key()["color"],
+    fig=None,
+    axes=None,
     **kwargs
 ):
-    """
-    Plot samples in a 2D grid showing marginals and pairwise marginals.
+    """Plot samples in a 2D grid showing marginals and pairwise marginals.
 
     Each of the diagonal plots can be interpreted as a 1D-marginal of the distribution
     that the samples were drawn from. Each upper-diagonal plot can be interpreted as a
@@ -55,6 +56,8 @@ def pairplot(
         labels: List of strings specifying the names of the parameters.
         ticks: Position of the ticks.
         points_colors: Colors of the `points`.
+        fig: matplotlib figure to plot on.
+        axes: matplotlib axes corresponding to fig.
         **kwargs: Additional arguments to adjust the plot, see the source code in
             `_get_default_opts()` in `sbi.utils.plot` for more details.
 
@@ -72,6 +75,8 @@ def pairplot(
         ticks=ticks,
         points_colors=points_colors,
         warn_about_deprecation=False,
+        fig=fig,
+        axes=axes,
         **kwargs,
     )
 
@@ -89,10 +94,11 @@ def conditional_pairplot(
     labels: Optional[List[str]] = None,
     ticks: Union[List, torch.Tensor] = [],
     points_colors: List[str] = plt.rcParams["axes.prop_cycle"].by_key()["color"],
+    fig=None,
+    axes=None,
     **kwargs
 ):
-    r"""
-    Plot conditional distribution given all other parameters.
+    r"""Plot conditional distribution given all other parameters.
 
     The conditionals can be interpreted as slices through the `density` at a location
     given by `condition`.
@@ -121,6 +127,8 @@ def conditional_pairplot(
         labels: List of strings specifying the names of the parameters.
         ticks: Position of the ticks.
         points_colors: Colors of the `points`.
+        fig: matplotlib figure to plot on.
+        axes: matplotlib axes corresponding to fig.
         **kwargs: Additional arguments to adjust the plot, see the source code in
             `_get_default_opts()` in `sbi.utils.plot` for more details.
 
@@ -138,5 +146,7 @@ def conditional_pairplot(
         ticks=ticks,
         points_colors=points_colors,
         warn_about_deprecation=False,
+        fig=fig,
+        axes=axes,
         **kwargs,
     )

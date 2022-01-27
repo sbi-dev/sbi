@@ -10,8 +10,8 @@ from torch import eye, ones, zeros
 
 from sbi import utils
 from sbi.inference import SNLE, SNPE, SNRE, prepare_for_sbi, simulate_for_sbi
-from sbi.mcmc.slice_numpy import SliceSampler
-from sbi.mcmc.slice_numpy_vectorized import SliceSamplerVectorized
+from sbi.samplers.mcmc.slice_numpy import SliceSampler
+from sbi.samplers.mcmc.slice_numpy_vectorized import SliceSamplerVectorized
 from sbi.simulators.linear_gaussian import true_posterior_linear_gaussian_mvn_prior
 from tests.test_utils import check_c2st
 

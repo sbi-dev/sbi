@@ -13,7 +13,7 @@ from sbi.utils import del_entries
 class SNLE_A(LikelihoodEstimator):
     def __init__(
         self,
-        prior,
+        prior: Optional[Any] = None,
         density_estimator: Union[str, Callable] = "maf",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
@@ -29,9 +29,8 @@ class SNLE_A(LikelihoodEstimator):
 
         Args:
             prior: A probability distribution that expresses prior knowledge about the
-                parameters, e.g. which ranges are meaningful for them. Any
-                object with `.log_prob()`and `.sample()` (for example, a PyTorch
-                distribution) can be used.
+                parameters, e.g. which ranges are meaningful for them. If `None`, the
+                prior must be passed to `.build_posterior()`.
             density_estimator: If it is a string, use a pre-configured network of the
                 provided type (one of nsf, maf, mdn, made). Alternatively, a function
                 that builds a custom neural network can be provided. The function will
@@ -66,12 +65,11 @@ class SNLE_A(LikelihoodEstimator):
         exclude_invalid_x: bool = True,
         resume_training: bool = False,
         discard_prior_samples: bool = False,
-        retrain_from_scratch_each_round: bool = False,
+        retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
     ) -> NeuralPosterior:
-        r"""
-        Return density estimator that approximates the distribution $p(x|\theta)$.
+        r"""Return density estimator that approximates the distribution $p(x|\theta)$.
 
         Args:
             training_batch_size: Training batch size.
@@ -93,7 +91,7 @@ class SNLE_A(LikelihoodEstimator):
             discard_prior_samples: Whether to discard samples simulated in round 1, i.e.
                 from the prior. Training may be sped up by ignoring such less targeted
                 samples.
-            retrain_from_scratch_each_round: Whether to retrain the conditional density
+            retrain_from_scratch: Whether to retrain the conditional density
                 estimator for the posterior from scratch each round.
             show_train_summary: Whether to print the number of epochs and validation
                 loss and leakage after the training.

@@ -7,7 +7,17 @@ import torch.nn.functional as F
 from torch import zeros
 
 from sbi import utils as utils
-from sbi.inference import SNLE, SNPE, SNRE, prepare_for_sbi, simulate_for_sbi
+from sbi.inference import (
+    SNLE,
+    SNPE,
+    SNRE,
+    MCMCPosterior,
+    prepare_for_sbi,
+    simulate_for_sbi,
+    likelihood_estimator_based_potential,
+    ratio_estimator_based_potential,
+    posterior_estimator_based_potential,
+)
 
 
 # Minimal 2D simulator.
@@ -74,29 +84,48 @@ def test_inference_with_2d_x(embedding, method):
             model="mdn",
             embedding_net=embedding(),
         )
-        sample_kwargs = {"sample_with_mcmc": True}
         num_trials = 1
     elif method == SNLE:
         net_provider = utils.likelihood_nn(model="mdn", embedding_net=embedding())
-        sample_kwargs = {}
         num_trials = 2
     else:
         net_provider = utils.classifier_nn(
             model="mlp",
             embedding_net_x=embedding(),
         )
-        sample_kwargs = {
-            "mcmc_method": "slice_np_vectorized",
-            "mcmc_parameters": {"num_chains": 2},
-        }
         num_trials = 2
 
-    inference = method(prior, net_provider, show_progress_bars=False)
+    if method == SNRE:
+        inference = method(classifier=net_provider, show_progress_bars=False)
+    else:
+        inference = method(density_estimator=net_provider, show_progress_bars=False)
     theta, x = simulate_for_sbi(simulator, prior, num_simulations)
-    _ = inference.append_simulations(theta, x).train(
+    estimator = inference.append_simulations(theta, x).train(
         training_batch_size=100, max_num_epochs=10
     )
     x_o = simulator(theta_o.repeat(num_trials, 1))
-    posterior = inference.build_posterior(**sample_kwargs).set_default_x(x_o)
 
-    posterior.log_prob(posterior.sample((num_samples,), show_progress_bars=False))
+    if method == SNLE:
+        potential_fn, theta_transform = likelihood_estimator_based_potential(
+            estimator, prior, x_o
+        )
+    elif method == SNPE:
+        potential_fn, theta_transform = posterior_estimator_based_potential(
+            estimator, prior, x_o
+        )
+    elif method == SNRE:
+        potential_fn, theta_transform = ratio_estimator_based_potential(
+            estimator, prior, x_o
+        )
+    else:
+        raise NotImplementedError
+
+    posterior = MCMCPosterior(
+        potential_fn=potential_fn,
+        theta_transform=theta_transform,
+        proposal=prior,
+        method="slice_np_vectorized",
+        num_chains=2,
+    )
+
+    posterior.potential(posterior.sample((num_samples,), show_progress_bars=False))

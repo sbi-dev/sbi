@@ -12,7 +12,7 @@ import torch
 from matplotlib import pyplot as plt
 from scipy.stats import gaussian_kde
 
-from sbi.utils.conditional_density import eval_conditional_density
+from sbi.utils import eval_conditional_density
 
 try:
     collectionsAbc = collections.abc
@@ -152,6 +152,8 @@ def pairplot(
     ticks: Union[List, torch.Tensor] = [],
     points_colors: List[str] = plt.rcParams["axes.prop_cycle"].by_key()["color"],
     warn_about_deprecation: bool = True,
+    fig=None,
+    axes=None,
     **kwargs
 ):
     """
@@ -178,6 +180,8 @@ def pairplot(
         warn_about_deprecation: With sbi v0.15.0, we depracated the import of this
             function from `sbi.utils`. Instead, it should be imported from
             `sbi.analysis`.
+        fig: matplotlib figure to plot on.
+        axes: matplotlib axes corresponding to fig.
         **kwargs: Additional arguments to adjust the plot, see the source code in
             `_get_default_opts()` in `sbi.utils.plot` for more details.
 
@@ -378,7 +382,9 @@ def pairplot(
                 else:
                     pass
 
-    return _pairplot_scaffold(diag_func, upper_func, dim, limits, points, opts)
+    return _pairplot_scaffold(
+        diag_func, upper_func, dim, limits, points, opts, fig=fig, axes=axes
+    )
 
 
 def conditional_pairplot(
@@ -395,6 +401,8 @@ def conditional_pairplot(
     ticks: Union[List, torch.Tensor] = [],
     points_colors: List[str] = plt.rcParams["axes.prop_cycle"].by_key()["color"],
     warn_about_deprecation: bool = True,
+    fig=None,
+    axes=None,
     **kwargs
 ):
     r"""
@@ -430,6 +438,8 @@ def conditional_pairplot(
         warn_about_deprecation: With sbi v0.15.0, we depracated the import of this
             function from `sbi.utils`. Instead, it should be imported from
             `sbi.analysis`.
+        fig: matplotlib figure to plot on. 
+        axes: matplotlib axes corresponding to fig.
         **kwargs: Additional arguments to adjust the plot, see the source code in
             `_get_default_opts()` in `sbi.utils.plot` for more details.
 
@@ -524,10 +534,14 @@ def conditional_pairplot(
             aspect="auto",
         )
 
-    return _pairplot_scaffold(diag_func, upper_func, dim, limits, points, opts)
+    return _pairplot_scaffold(
+        diag_func, upper_func, dim, limits, points, opts, fig=fig, axes=axes
+    )
 
 
-def _pairplot_scaffold(diag_func, upper_func, dim, limits, points, opts):
+def _pairplot_scaffold(
+    diag_func, upper_func, dim, limits, points, opts, fig=None, axes=None
+):
     """
     Builds the scaffold for any function that plots parameters in a pairplot setting.
 
@@ -544,6 +558,8 @@ def _pairplot_scaffold(diag_func, upper_func, dim, limits, points, opts):
         opts: Dictionary built by the functions that call `pairplot_scaffold`. Must
             contain at least `labels`, `subset`, `figsize`, `subplots`,
             `fig_subplots_adjust`, `title`, `title_format`, ..
+        fig: matplotlib figure to plot on. 
+        axes: matplotlib axes corresponding to fig.
 
     Returns: figure and axis
     """
@@ -588,7 +604,13 @@ def _pairplot_scaffold(diag_func, upper_func, dim, limits, points, opts):
             raise NotImplementedError
         rows = cols = len(subset)
 
-    fig, axes = plt.subplots(rows, cols, figsize=opts["figsize"], **opts["subplots"])
+    # Create fig and axes if they were not passed.
+    if fig is None or axes is None:
+        fig, axes = plt.subplots(
+            rows, cols, figsize=opts["figsize"], **opts["subplots"]
+        )
+    else:
+        assert axes.shape == (rows, cols), f"Passed axes must match subplot shape: {rows, cols}."
     # Cast to ndarray in case of 1D subplots.
     axes = np.array(axes).reshape(rows, cols)
 

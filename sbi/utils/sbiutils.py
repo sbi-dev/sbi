@@ -17,6 +17,7 @@ import torch.distributions.transforms as torch_tf
 from tqdm.auto import tqdm
 
 from sbi import utils as utils
+from sbi.types import TorchTransform
 from sbi.utils.torchutils import BoxUniform, atleast_2d
 
 
@@ -144,300 +145,6 @@ def standardizing_net(batch_t: Tensor, min_std: float = 1e-7) -> nn.Module:
         )
 
     return Standardize(t_mean, t_std)
-
-
-@torch.no_grad()
-def rejection_sample_posterior_within_prior(
-    posterior_nn: Any,
-    prior: Callable,
-    x: Tensor,
-    num_samples: int,
-    show_progress_bars: bool = False,
-    warn_acceptance: float = 0.01,
-    sample_for_correction_factor: bool = False,
-    max_sampling_batch_size: int = 10_000,
-    **kwargs,
-) -> Tuple[Tensor, Tensor]:
-    r"""Return samples from a posterior $p(\theta|x)$ only within the prior support.
-
-    This is relevant for snpe methods and flows for which the posterior tends to have
-    mass outside the prior support.
-
-    This function could in principle be integrated into `rejection_sample()`. However,
-    to keep the warnings clean, to avoid additional code for integration, and confusing
-    if-cases, we decided to keep two separate functions.
-
-    This function uses rejection sampling with samples from posterior in order to
-        1) obtain posterior samples within the prior support, and
-        2) calculate the fraction of accepted samples as a proxy for correcting the
-           density during evaluation of the posterior.
-
-    Args:
-        posterior_nn: Neural net representing the posterior.
-        prior: Distribution-like object that evaluates probabilities with `log_prob`.
-        x: Conditioning variable $x$ for the posterior $p(\theta|x)$.
-        num_samples: Desired number of samples.
-        show_progress_bars: Whether to show a progressbar during sampling.
-        warn_acceptance: A minimum acceptance rate under which to warn about slowness.
-        sample_for_correction_factor: True if this function was called by
-            `leakage_correction()`. False otherwise. Will be used to adapt the leakage
-             warning and to decide whether we have to search for the maximum.
-        max_sampling_batch_size: Batch size for drawing samples from the posterior.
-            Takes effect only in the second iteration of the loop below, i.e., in case
-            of leakage or `num_samples>max_sampling_batch_size`. Larger batch size
-            speeds up sampling.
-        kwargs: Absorb additional unused arguments that can be passed to
-            `rejection_sample()`. Warn if not empty.
-
-    Returns:
-        Accepted samples and acceptance rate as scalar Tensor.
-    """
-
-    if kwargs:
-        logging.warn(
-            f"You passed arguments to `rejection_sampling_parameters` that "
-            f"are unused when you do not specify a `proposal` in the same "
-            f"dictionary. The unused arguments are: {kwargs}"
-        )
-
-    # Progress bar can be skipped, e.g. when sampling after each round just for
-    # logging.
-    pbar = tqdm(
-        disable=not show_progress_bars,
-        total=num_samples,
-        desc=f"Drawing {num_samples} posterior samples",
-    )
-
-    num_sampled_total, num_remaining = 0, num_samples
-    accepted, acceptance_rate = [], float("Nan")
-    leakage_warning_raised = False
-
-    # To cover cases with few samples without leakage:
-    sampling_batch_size = min(num_samples, max_sampling_batch_size)
-    while num_remaining > 0:
-
-        # Sample and reject.
-        candidates = posterior_nn.sample(sampling_batch_size, context=x).reshape(
-            sampling_batch_size, -1
-        )
-
-        # SNPE-style rejection-sampling when the proposal is the neural net.
-        are_within_prior = within_support(prior, candidates)
-        samples = candidates[are_within_prior]
-
-        accepted.append(samples)
-
-        # Update.
-        num_sampled_total += sampling_batch_size
-        num_remaining -= samples.shape[0]
-        pbar.update(samples.shape[0])
-
-        # To avoid endless sampling when leakage is high, we raise a warning if the
-        # acceptance rate is too low after the first 1_000 samples.
-        acceptance_rate = (num_samples - num_remaining) / num_sampled_total
-
-        # For remaining iterations (leakage or many samples) continue sampling with
-        # fixed batch size.
-        sampling_batch_size = max_sampling_batch_size
-        if (
-            num_sampled_total > 1000
-            and acceptance_rate < warn_acceptance
-            and not leakage_warning_raised
-        ):
-            if sample_for_correction_factor:
-                logging.warning(
-                    f"""Drawing samples from posterior to estimate the normalizing
-                        constant for `log_prob()`. However, only
-                        {acceptance_rate:.0%} posterior samples are within the
-                        prior support. It may take a long time to collect the
-                        remaining {num_remaining} samples.
-                        Consider interrupting (Ctrl-C) and either basing the
-                        estimate of the normalizing constant on fewer samples (by
-                        calling `posterior.leakage_correction(x_o,
-                        num_rejection_samples=N)`, where `N` is the number of
-                        samples you want to base the
-                        estimate on (default N=10000), or not estimating the
-                        normalizing constant at all
-                        (`log_prob(..., norm_posterior=False)`. The latter will
-                        result in an unnormalized `log_prob()`."""
-                )
-            else:
-                logging.warning(
-                    f"""Only {acceptance_rate:.0%} posterior samples are within the
-                        prior support. It may take a long time to collect the
-                        remaining {num_remaining} samples. Consider interrupting
-                        (Ctrl-C) and switching to `sample_with='mcmc'`."""
-                )
-            leakage_warning_raised = True  # Ensure warning is raised just once.
-
-    pbar.close()
-
-    # When in case of leakage a batch size was used there could be too many samples.
-    samples = torch.cat(accepted)[:num_samples]
-    assert (
-        samples.shape[0] == num_samples
-    ), "Number of accepted samples must match required samples."
-
-    return samples, as_tensor(acceptance_rate)
-
-
-def rejection_sample(
-    potential_fn: Callable,
-    proposal: Any,
-    num_samples: int = 1,
-    show_progress_bars: bool = False,
-    warn_acceptance: float = 0.01,
-    max_sampling_batch_size: int = 10_000,
-    num_samples_to_find_max: int = 10_000,
-    num_iter_to_find_max: int = 100,
-    m: float = 1.2,
-) -> Tuple[Tensor, Tensor]:
-    r"""Return samples from a `potential_fn` obtained via rejection sampling.
-
-    This function uses rejection sampling with samples from posterior in order to
-        1) obtain posterior samples within the prior support, and
-        2) calculate the fraction of accepted samples as a proxy for correcting the
-           density during evaluation of the posterior.
-
-    Args:
-        potential_fn: The potential to sample from. The potential should be passed as
-            the logarithm of the desired distribution.
-        proposal: The proposal from which to draw candidate samples. Must have a
-            `sample()` and a `log_prob()` method.
-        num_samples: Desired number of samples.
-        show_progress_bars: Whether to show a progressbar during sampling.
-        warn_acceptance: A minimum acceptance rate under which to warn about slowness.
-        max_sampling_batch_size: Batch size for drawing samples from the posterior.
-            Takes effect only in the second iteration of the loop below, i.e., in case
-            of leakage or `num_samples>max_sampling_batch_size`. Larger batch size
-            speeds up sampling.
-        num_samples_to_find_max: Number of samples that are used to find the maximum
-            of the `potential_fn / proposal` ratio.
-        num_iter_to_find_max: Number of gradient ascent iterations to find the maximum
-            of the `potential_fn / proposal` ratio.
-        m: Multiplier to the maximum ratio between potential function and the
-            proposal. This factor is applied after already having scaled the proposal
-            with the maximum ratio of the `potential_fn / proposal` ratio. A higher
-            value will ensure that the samples are indeed from the correct
-            distribution, but will increase the fraction of rejected samples and thus
-            computation time.
-
-    Returns:
-        Accepted samples and acceptance rate as scalar Tensor.
-    """
-
-    samples_to_find_max = proposal.sample((num_samples_to_find_max,))
-
-    # Define a potential as the ratio between target distribution and proposal.
-    def potential_over_proposal(theta):
-        return potential_fn(theta) - proposal.log_prob(theta)
-
-    # Search for the maximum of the ratio.
-    _, max_log_ratio = optimize_potential_fn(
-        potential_fn=potential_over_proposal,
-        inits=samples_to_find_max,
-        dist_specifying_bounds=proposal,
-        num_iter=num_iter_to_find_max,
-        learning_rate=0.01,
-        num_to_optimize=max(1, int(num_samples_to_find_max / 10)),
-        show_progress_bars=False,
-    )
-
-    if m < 1.0:
-        warnings.warn("A value of m < 1.0 will lead to systematically wrong results.")
-
-    class ScaledProposal:
-        """
-        Proposal for rejection sampling which is strictly larger than the potential_fn.
-        """
-
-        def __init__(self, proposal: Any, max_log_ratio: float, log_m: float):
-            self.proposal = proposal
-            self.max_log_ratio = max_log_ratio
-            self.log_m = log_m
-
-        def sample(self, sample_shape: torch.Size, **kwargs) -> Tensor:
-            """
-            Samples from the `ScaledProposal` are samples from the `proposal`.
-            """
-            return self.proposal.sample((sample_shape,), **kwargs)
-
-        def log_prob(self, theta: Tensor, **kwargs) -> Tensor:
-            """
-            The log-prob is scaled such that the proposal is always above the potential.
-            """
-            return (
-                self.proposal.log_prob(theta, **kwargs)
-                + self.max_log_ratio
-                + self.log_m
-            )
-
-    proposal = ScaledProposal(proposal, max_log_ratio, torch.log(torch.as_tensor(m)))
-
-    with torch.no_grad():
-        # Progress bar can be skipped, e.g. when sampling after each round just for
-        # logging.
-        pbar = tqdm(
-            disable=not show_progress_bars,
-            total=num_samples,
-            desc=f"Drawing {num_samples} posterior samples",
-        )
-
-        num_sampled_total, num_remaining = 0, num_samples
-        accepted, acceptance_rate = [], float("Nan")
-        leakage_warning_raised = False
-
-        # To cover cases with few samples without leakage:
-        sampling_batch_size = min(num_samples, max_sampling_batch_size)
-        while num_remaining > 0:
-
-            # Sample and reject.
-            candidates = proposal.sample(sampling_batch_size).reshape(
-                sampling_batch_size, -1
-            )
-
-            target_proposal_ratio = torch.exp(
-                potential_fn(candidates) - proposal.log_prob(candidates)
-            )
-            uniform_rand = torch.rand(target_proposal_ratio.shape)
-            samples = candidates[target_proposal_ratio > uniform_rand]
-
-            accepted.append(samples)
-
-            # Update.
-            num_sampled_total += sampling_batch_size
-            num_remaining -= samples.shape[0]
-            pbar.update(samples.shape[0])
-
-            # To avoid endless sampling when leakage is high, we raise a warning if the
-            # acceptance rate is too low after the first 1_000 samples.
-            acceptance_rate = (num_samples - num_remaining) / num_sampled_total
-
-            # For remaining iterations (leakage or many samples) continue sampling with
-            # fixed batch size.
-            sampling_batch_size = max_sampling_batch_size
-            if (
-                num_sampled_total > 1000
-                and acceptance_rate < warn_acceptance
-                and not leakage_warning_raised
-            ):
-                logging.warning(
-                    f"""Only {acceptance_rate:.0%} proposal samples were accepted. It
-                        may take a long time to collect the remaining {num_remaining}
-                        samples. Consider interrupting (Ctrl-C) and switching to
-                        `sample_with='mcmc`."""
-                )
-                leakage_warning_raised = True  # Ensure warning is raised just once.
-
-        pbar.close()
-
-        # When in case of leakage a batch size was used there could be too many samples.
-        samples = torch.cat(accepted)[:num_samples]
-        assert (
-            samples.shape[0] == num_samples
-        ), "Number of accepted samples must match required samples."
-
-    return samples, as_tensor(acceptance_rate)
 
 
 def handle_invalid_x(
@@ -616,161 +323,6 @@ def batched_mixture_mv(matrix: Tensor, vector: Tensor) -> Tensor:
     return torch.einsum("bcij,bcj -> bci", matrix, vector)
 
 
-def optimize_potential_fn(
-    potential_fn: Callable,
-    inits: Tensor,
-    dist_specifying_bounds: Optional[Any] = None,
-    num_iter: int = 1_000,
-    num_to_optimize: int = 100,
-    learning_rate: float = 0.01,
-    save_best_every: int = 10,
-    show_progress_bars: bool = False,
-    interruption_note: str = "",
-) -> Tuple[Tensor, Tensor]:
-    """
-    Returns the `argmax` and `max` of a `potential_fn`.
-
-    The method can be interrupted (Ctrl-C) when the user sees that the log-probability
-    converges. The best estimate will be returned.
-
-    The maximum is obtained by running gradient ascent from given starting parameters.
-    After the optimization is done, we select the parameter set that has the highest
-    `potential_fn` value after the optimization.
-
-    Warning: The default values used by this function are not well-tested. They might
-    require hand-tuning for the problem at hand.
-
-    Args:
-        potential_fn: The function on which to optimize.
-        inits: The initial parameters at which to start the gradient ascent steps.
-        dist_specifying_bounds: Distribution the specifies bounds for the optimization.
-            If it is a `sbi.utils.BoxUniform`, we transform the space into
-            unconstrained space and carry out the optimization there.
-        num_iter: Number of optimization steps that the algorithm takes
-            to find the MAP.
-        num_to_optimize: From the drawn `num_init_samples`, use the `num_to_optimize`
-            with highest log-probability as the initial points for the optimization.
-        learning_rate: Learning rate of the optimizer.
-        save_best_every: The best log-probability is computed, saved in the
-            `map`-attribute, and printed every `save_best_every`-th iteration.
-            Computing the best log-probability creates a significant overhead (thus,
-            the default is `10`.)
-        show_progress_bars: Whether or not to show a progressbar for the optimization.
-        interruption_note: The message printed when the user interrupts the
-            optimization.
-
-    Returns:
-        The `argmax` and `max` of the `potential_fn`.
-    """
-
-    # If the prior is `BoxUniform`, define a transformation to optimize in
-    # unbounded space.
-    if dist_specifying_bounds is not None:
-        is_boxuniform, boxuniform = check_dist_class(dist_specifying_bounds, BoxUniform)
-    else:
-        is_boxuniform = False
-
-    if is_boxuniform:
-
-        def tf_inv(theta_t):
-            return utils.expit(
-                theta_t,
-                torch.as_tensor(
-                    boxuniform.support.base_constraint.lower_bound, dtype=float32
-                ),
-                torch.as_tensor(
-                    boxuniform.support.base_constraint.upper_bound, dtype=float32
-                ),
-            )
-
-        def tf(theta):
-            return utils.logit(
-                theta,
-                torch.as_tensor(
-                    boxuniform.support.base_constraint.lower_bound, dtype=float32
-                ),
-                torch.as_tensor(
-                    boxuniform.support.base_constraint.upper_bound, dtype=float32
-                ),
-            )
-
-    else:
-
-        def tf_inv(theta_t):
-            return theta_t
-
-        def tf(theta):
-            return theta
-
-    init_probs = potential_fn(inits).detach()
-
-    # Pick the `num_to_optimize` best init locations.
-    sort_indices = torch.argsort(init_probs, dim=0)
-    sorted_inits = inits[sort_indices]
-    optimize_inits = sorted_inits[-num_to_optimize:]
-
-    # The `_overall` variables store data accross the iterations, whereas the
-    # `_iter` variables contain data exclusively extracted from the current
-    # iteration.
-    best_log_prob_iter = torch.max(init_probs)
-    best_theta_iter = sorted_inits[-1]
-    best_theta_overall = best_theta_iter.detach().clone()
-    best_log_prob_overall = best_log_prob_iter.detach().clone()
-
-    argmax_ = best_theta_overall
-    max_val = best_log_prob_overall
-
-    optimize_inits = tf(optimize_inits)
-    optimize_inits.requires_grad_(True)
-    optimizer = optim.Adam([optimize_inits], lr=learning_rate)
-
-    iter_ = 0
-
-    # Try-except block in case the user interrupts the program and wants to fall
-    # back on the last saved `.map_`. We want to avoid a long error-message here.
-    try:
-
-        while iter_ < num_iter:
-
-            optimizer.zero_grad()
-            probs = potential_fn(tf_inv(optimize_inits)).squeeze()
-            loss = -probs.sum()
-            loss.backward()
-            optimizer.step()
-
-            with torch.no_grad():
-                if iter_ % save_best_every == 0 or iter_ == num_iter - 1:
-                    # Evaluate the optimized locations and pick the best one.
-                    log_probs_of_optimized = potential_fn(tf_inv(optimize_inits))
-                    best_theta_iter = optimize_inits[
-                        torch.argmax(log_probs_of_optimized)
-                    ]
-                    best_log_prob_iter = potential_fn(tf_inv(best_theta_iter))
-                    if best_log_prob_iter > best_log_prob_overall:
-                        best_theta_overall = best_theta_iter.detach().clone()
-                        best_log_prob_overall = best_log_prob_iter.detach().clone()
-
-                if show_progress_bars:
-                    print(
-                        f"""Optimizing MAP estimate. Iterations: {iter_+1} /
-                        {num_iter}. Performance in iteration
-                        {divmod(iter_+1, save_best_every)[0] * save_best_every}:
-                        {best_log_prob_iter.item():.2f} (= unnormalized log-prob""",
-                        end="\r",
-                    )
-                argmax_ = tf_inv(best_theta_overall)
-                max_val = best_log_prob_overall
-
-            iter_ += 1
-
-    except KeyboardInterrupt:
-        interruption = f"Optimization was interrupted after {iter_} iterations. "
-        print(interruption + interruption_note)
-        return argmax_, max_val
-
-    return tf_inv(best_theta_overall), max_val
-
-
 def expit(theta_t: Tensor, lower_bound: Tensor, upper_bound: Tensor) -> Tensor:
     """
     Return the expit() of an input.
@@ -884,13 +436,47 @@ def within_support(distribution: Any, samples: Tensor) -> Tensor:
         return torch.isfinite(distribution.log_prob(samples))
 
 
+def match_theta_and_x_batch_shapes(theta: Tensor, x: Tensor) -> Tuple[Tensor, Tensor]:
+    r"""Return $\theta$ and `x` with batch shape matched to each other.
+    When `x` is just a single observation it is repeated for all entries in the
+    batch of $\theta$s. When there is a batch of multiple `x`, i.e., iid `x`, then
+    individual `x` are repeated in the pattern AABBCC and individual $\theta$ are
+    repeated in the pattern ABCABC to cover all combinations.
+    This is needed in nflows in order to have matching shapes of theta and context
+    `x` when evaluating the neural network.
+    Args:
+        x: (a batch of iid) data
+        theta: a batch of parameters
+    Returns:
+        theta: with shape (theta_batch_size * x_batch_size, *theta_shape)
+        x: with shape (theta_batch_size * x_batch_size, *x_shape)
+    """
+
+    # Theta and x are ensured to have a batch dim, get the shape.
+    theta_batch_size, *theta_shape = theta.shape
+    x_batch_size, *x_shape = x.shape
+
+    # Repeat iid trials as AABBCC.
+    x_repeated = x.repeat_interleave(theta_batch_size, dim=0)
+    # Repeat theta as ABCABC.
+    theta_repeated = theta.repeat(x_batch_size, 1)
+
+    # Double check: batch size for log prob evaluation must match.
+    assert x_repeated.shape == torch.Size([theta_batch_size * x_batch_size, *x_shape])
+    assert theta_repeated.shape == torch.Size(
+        [theta_batch_size * x_batch_size, *theta_shape]
+    )
+
+    return theta_repeated, x_repeated
+
+
 def mcmc_transform(
     prior: Any,
     num_prior_samples_for_zscoring: int = 1000,
     enable_transform: bool = True,
     device: str = "cpu",
     **kwargs,
-) -> torch_tf.Transform:
+) -> TorchTransform:
     """
     Builds a transform that is applied to parameters during MCMC.
 
@@ -915,8 +501,18 @@ def mcmc_transform(
     """
 
     if enable_transform:
-        if hasattr(prior.support, "base_constraint") and hasattr(
-            prior.support.base_constraint, "upper_bound"
+        # Some distributions have a support argument but it raises a
+        # NotImplementedError. We catch this case here.
+        try:
+            _ = prior.support
+            has_support = True
+        except NotImplementedError:
+            has_support = False
+
+        if (
+            has_support
+            and hasattr(prior.support, "base_constraint")
+            and hasattr(prior.support.base_constraint, "upper_bound")
         ):
             transform = biject_to(prior.support)
         else:
@@ -1009,3 +605,128 @@ def mog_log_prob(
     exponent = -0.5 * utils.batched_mixture_vmv(precisions_pp, theta_minus_mean)
 
     return torch.logsumexp(weights + constant + log_det + exponent, dim=-1)
+
+
+def gradient_ascent(
+    potential_fn: Callable,
+    inits: Tensor,
+    theta_transform: Optional[torch_tf.Transform] = None,
+    num_iter: int = 1_000,
+    num_to_optimize: int = 100,
+    learning_rate: float = 0.01,
+    save_best_every: int = 10,
+    show_progress_bars: bool = False,
+    interruption_note: str = "",
+) -> Tuple[Tensor, Tensor]:
+    """Returns the `argmax` and `max` of a `potential_fn` via gradient ascent.
+
+    The method can be interrupted (Ctrl-C) when the user sees that the potential_fn
+    converges. The currently best estimate will be returned.
+
+    The maximum is obtained by running gradient ascent from given starting parameters.
+    After the optimization is done, we select the parameter set that has the highest
+    `potential_fn` value after the optimization.
+
+    Warning: The default values used by this function are not well-tested. They might
+    require hand-tuning for the problem at hand.
+
+    Args:
+        potential_fn: The function on which to optimize.
+        inits: The initial parameters at which to start the gradient ascent steps.
+        theta_transform: If passed, this transformation will be applied during the
+            optimization.
+        num_iter: Number of optimization steps that the algorithm takes
+            to find the MAP.
+        num_to_optimize: From the drawn `num_init_samples`, use the `num_to_optimize`
+            with highest log-probability as the initial points for the optimization.
+        learning_rate: Learning rate of the optimizer.
+        save_best_every: The best log-probability is computed, saved in the
+            `map`-attribute, and printed every `save_best_every`-th iteration.
+            Computing the best log-probability creates a significant overhead (thus,
+            the default is `10`.)
+        show_progress_bars: Whether or not to show a progressbar for the optimization.
+        interruption_note: The message printed when the user interrupts the
+            optimization.
+
+    Returns:
+        The `argmax` and `max` of the `potential_fn`.
+    """
+
+    if theta_transform is None:
+        theta_transform = torch_tf.IndependentTransform(
+            torch_tf.identity_transform, reinterpreted_batch_ndims=1
+        )
+    else:
+        theta_transform = theta_transform
+
+    init_probs = potential_fn(inits).detach()
+
+    # Pick the `num_to_optimize` best init locations.
+    sort_indices = torch.argsort(init_probs, dim=0)
+    sorted_inits = inits[sort_indices]
+    optimize_inits = sorted_inits[-num_to_optimize:]
+
+    # The `_overall` variables store data accross the iterations, whereas the
+    # `_iter` variables contain data exclusively extracted from the current
+    # iteration.
+    best_log_prob_iter = torch.max(init_probs)
+    best_theta_iter = sorted_inits[-1]
+    best_theta_overall = best_theta_iter.detach().clone()
+    best_log_prob_overall = best_log_prob_iter.detach().clone()
+
+    argmax_ = best_theta_overall
+    max_val = best_log_prob_overall
+
+    optimize_inits = theta_transform(optimize_inits)
+    optimize_inits.requires_grad_(True)
+    optimizer = optim.Adam([optimize_inits], lr=learning_rate)
+
+    iter_ = 0
+
+    # Try-except block in case the user interrupts the program and wants to fall
+    # back on the last saved `.map_`. We want to avoid a long error-message here.
+    try:
+
+        while iter_ < num_iter:
+
+            optimizer.zero_grad()
+            probs = potential_fn(theta_transform.inv(optimize_inits)).squeeze()
+            loss = -probs.sum()
+            loss.backward()
+            optimizer.step()
+
+            with torch.no_grad():
+                if iter_ % save_best_every == 0 or iter_ == num_iter - 1:
+                    # Evaluate the optimized locations and pick the best one.
+                    log_probs_of_optimized = potential_fn(
+                        theta_transform.inv(optimize_inits)
+                    )
+                    best_theta_iter = optimize_inits[
+                        torch.argmax(log_probs_of_optimized)
+                    ]
+                    best_log_prob_iter = potential_fn(
+                        theta_transform.inv(best_theta_iter)
+                    )
+                    if best_log_prob_iter > best_log_prob_overall:
+                        best_theta_overall = best_theta_iter.detach().clone()
+                        best_log_prob_overall = best_log_prob_iter.detach().clone()
+
+                if show_progress_bars:
+                    print(
+                        f"""Optimizing MAP estimate. Iterations: {iter_+1} /
+                        {num_iter}. Performance in iteration
+                        {divmod(iter_+1, save_best_every)[0] * save_best_every}:
+                        {best_log_prob_iter.item():.2f} (= unnormalized log-prob""",
+                        end="\r",
+                    )
+                argmax_ = theta_transform.inv(best_theta_overall)
+                max_val = best_log_prob_overall
+
+            iter_ += 1
+
+    except KeyboardInterrupt:
+        interruption = f"Optimization was interrupted after {iter_} iterations. "
+        print(interruption + interruption_note)
+        return argmax_, max_val
+
+    return theta_transform.inv(best_theta_overall), max_val

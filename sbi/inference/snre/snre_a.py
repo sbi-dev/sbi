@@ -12,7 +12,7 @@ from sbi.utils import del_entries
 class SNRE_A(RatioEstimator):
     def __init__(
         self,
-        prior,
+        prior: Optional[Any] = None,
         classifier: Union[str, Callable] = "resnet",
         device: str = "cpu",
         logging_level: Union[int, str] = "warning",
@@ -27,9 +27,8 @@ class SNRE_A(RatioEstimator):
 
         Args:
             prior: A probability distribution that expresses prior knowledge about the
-                parameters, e.g. which ranges are meaningful for them. Any
-                object with `.log_prob()`and `.sample()` (for example, a PyTorch
-                distribution) can be used.
+                parameters, e.g. which ranges are meaningful for them. If `None`, the
+                prior must be passed to `.build_posterior()`.
             classifier: Classifier trained to approximate likelihood ratios. If it is
                 a string, use a pre-configured network of the provided type (one of
                 linear, mlp, resnet). Alternatively, a function that builds a custom
@@ -63,12 +62,11 @@ class SNRE_A(RatioEstimator):
         exclude_invalid_x: bool = True,
         resume_training: bool = False,
         discard_prior_samples: bool = False,
-        retrain_from_scratch_each_round: bool = False,
+        retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
     ) -> NeuralPosterior:
-        r"""
-        Return classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
+        r"""Return classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
 
         Args:
             training_batch_size: Training batch size.
@@ -90,7 +88,7 @@ class SNRE_A(RatioEstimator):
             discard_prior_samples: Whether to discard samples simulated in round 1, i.e.
                 from the prior. Training may be sped up by ignoring such less targeted
                 samples.
-            retrain_from_scratch_each_round: Whether to retrain the conditional density
+            retrain_from_scratch: Whether to retrain the conditional density
                 estimator for the posterior from scratch each round.
             show_train_summary: Whether to print the number of epochs and validation
                 loss and leakage after the training.
@@ -107,8 +105,7 @@ class SNRE_A(RatioEstimator):
         return super().train(**kwargs, num_atoms=2)
 
     def _loss(self, theta: Tensor, x: Tensor, num_atoms: int) -> Tensor:
-        """
-        Returns the binary cross-entropy loss for the trained classifier.
+        """Returns the binary cross-entropy loss for the trained classifier.
 
         The classifier takes as input a $(\theta,x)$ pair. It is trained to predict 1
         if the pair was sampled from the joint $p(\theta,x)$, and to predict 0 if the
