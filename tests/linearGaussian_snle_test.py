@@ -347,10 +347,9 @@ def test_c2st_multi_round_snl_on_linearGaussian_vi(num_trials: int, set_seed):
         prior=prior, likelihood_estimator=likelihood_estimator, x_o=x_o
     )
     posterior = VIPosterior(
-        potential_fn=potential_fn,
-        theta_transform=theta_transform,
+        potential_fn=potential_fn, theta_transform=theta_transform, q=posterior1
     )
-    posterior.train()
+    posterior.train(eps=1e-7)
 
     samples = posterior.sample(sample_shape=(num_samples,))
 

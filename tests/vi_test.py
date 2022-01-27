@@ -7,6 +7,7 @@ import numpy as np
 import pytest
 import torch
 from torch import eye, ones, zeros
+from copy import deepcopy
 
 from sbi import utils
 from sbi.inference import SNLE, SNPE, SNRE, prepare_for_sbi, simulate_for_sbi
@@ -172,3 +173,39 @@ def test_c2st_vi_external_distributions_on_Gaussian(num_dim: int, set_seed):
     samples = torch.as_tensor(samples, dtype=torch.float32)
 
     check_c2st(samples, target_samples, alg="slice_np")
+
+
+@pytest.mark.parametrize("q", ("maf", "nsf", "gaussian_diag", "gaussian", "mcf", "scf"))
+def test_deepcopy_support(q: str, set_seed):
+    """Tests if the variational does support deepcopy.
+
+    Args:
+        q: Different variational posteriors.
+    """
+
+    num_dim = 2
+
+    class FakePotential(BasePotential):
+        def __call__(self, theta, **kwargs):
+            return torch.ones_like(torch.as_tensor(theta, dtype=torch.float32))
+
+        def allow_iid_x(self) -> bool:
+            return True
+
+    potential_fn = FakePotential(prior=MultivariateNormal(zeros(num_dim), eye(num_dim)))
+    theta_transform = torch_tf.identity_transform
+
+    posterior = VIPosterior(
+        potential_fn=potential_fn,
+        theta_transform=theta_transform,
+        q=q,
+    )
+    posterior_copy = deepcopy(posterior)
+    posterior.set_default_x(torch.tensor(np.zeros((num_dim,)).astype(np.float32)))
+    assert posterior._x != posterior_copy._x, "Mhh, something with the copy is strange"
+    posterior_copy = deepcopy(posterior)
+    assert (posterior._x == posterior_copy._x).all(), "Mhh, something with the copy is strange"
+
+    # Produces nonleaf tensors in the cache... -> Can lead to failure of deepcopy.
+    posterior.q.rsample()
+    posterior_copy = deepcopy(posterior)
