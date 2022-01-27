@@ -4,14 +4,13 @@ import matplotlib.pyplot as plt
 import pytest
 import torch
 from torch import Tensor, eye, ones, zeros
-from torch.distributions import Exponential, LogNormal, MultivariateNormal
+from torch.distributions import MultivariateNormal
 from torch.distributions.transforms import IndependentTransform, identity_transform
 
 from sbi.inference import SNPE, SNPE_A
 from sbi.inference.snpe.snpe_a import SNPE_A_MDN
 from sbi.utils import (
     BoxUniform,
-    MultipleIndependent,
     get_kde,
     mcmc_transform,
     posterior_nn,
@@ -361,40 +360,6 @@ def test_gaussian_transforms(snpe_method: str, plot_results: bool = False):
             ax[3].set_title("SNPE-A")
 
         plt.show()
-
-
-@pytest.mark.parametrize(
-    "prior, enable_transform",
-    (
-        (BoxUniform(zeros(5), ones(5)), True),
-        (BoxUniform(zeros(1), ones(1)), True),
-        (BoxUniform(zeros(5), ones(5)), False),
-        (MultivariateNormal(zeros(5), eye(5)), True),
-        (Exponential(rate=ones(1)), True),
-        (LogNormal(zeros(1), ones(1)), True),
-        (
-            MultipleIndependent(
-                [Exponential(rate=ones(1)), BoxUniform(zeros(5), ones(5))]
-            ),
-            True,
-        ),
-    ),
-)
-def test_mcmc_transform(prior, enable_transform):
-    """
-    Test whether the transform for MCMC returns the log_abs_det in the correct shape.
-    """
-
-    num_samples = 1000
-    prior, _, _ = process_prior(prior)
-    tf = mcmc_transform(prior, enable_transform=enable_transform)
-
-    samples = prior.sample((num_samples,))
-    unconstrained_samples = tf(samples)
-    samples_original = tf.inv(unconstrained_samples)
-
-    log_abs_det = tf.log_abs_det_jacobian(samples_original, unconstrained_samples)
-    assert log_abs_det.shape == torch.Size([num_samples])
 
 
 @pytest.mark.parametrize(
