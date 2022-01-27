@@ -207,14 +207,19 @@ class RatioEstimator(NeuralInference, ABC):
 
             # Train for a single epoch.
             self._neural_net.train()
+            train_log_probs_sum = 0
             for batch in train_loader:
                 self.optimizer.zero_grad()
                 theta_batch, x_batch = (
                     batch[0].to(self._device),
                     batch[1].to(self._device),
                 )
-                loss = self._loss(theta_batch, x_batch, num_atoms)
-                loss.backward()
+
+                train_losses = self._loss(theta_batch, x_batch, num_atoms)
+                train_loss = torch.mean(train_losses)
+                train_log_probs_sum -= train_losses.sum().item()
+
+                train_loss.backward()
                 if clip_max_norm is not None:
                     clip_grad_norm_(
                         self._neural_net.parameters(),
@@ -224,19 +229,24 @@ class RatioEstimator(NeuralInference, ABC):
 
             self.epoch += 1
 
+            train_log_prob_average = train_log_probs_sum / (
+                len(train_loader) * train_loader.batch_size
+            )
+            self._summary["train_log_probs"].append(train_log_prob_average)
+
             # Calculate validation performance.
             self._neural_net.eval()
-            loss_sum = 0
+            val_log_prob_sum = 0
             with torch.no_grad():
                 for batch in val_loader:
                     theta_batch, x_batch = (
                         batch[0].to(self._device),
                         batch[1].to(self._device),
                     )
-                    loss = self._loss(theta_batch, x_batch, num_atoms)
-                    loss_sum -= loss.sum().item()
+                    val_losses = self._loss(theta_batch, x_batch, num_atoms)
+                    val_log_prob_sum -= val_losses.sum().item()
                 # Take mean over all validation samples.
-                self._val_log_prob = loss_sum / (
+                self._val_log_prob = val_log_prob_sum / (
                     len(val_loader) * val_loader.batch_size
                 )
                 # Log validation log prob for every epoch.
