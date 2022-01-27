@@ -277,7 +277,8 @@ def test_gaussian_transforms(snpe_method: str, plot_results: bool = False):
         # Set up a SNPE object in order to use the
         # `_automatic_posterior_transformation()`.
         prior = BoxUniform(-5 * ones(2), 5 * ones(2))
-        density_estimator = posterior_nn("mdn", z_score_theta=False, z_score_x=False)
+        # Testing new z-score arg options.
+        density_estimator = posterior_nn("mdn", z_score_theta=None, z_score_x=None)
         inference = SNPE(prior=prior, density_estimator=density_estimator)
         theta_ = torch.rand(100, 2)
         x_ = torch.rand(100, 2)

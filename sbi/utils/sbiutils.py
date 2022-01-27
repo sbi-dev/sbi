@@ -87,8 +87,8 @@ def z_score_parser(z_score_flag: Optional["str"]) -> Tuple[bool, bool]:
 
     Args:
         z_score_flag: str flag for z-scoring method stating whether the data
-        dimensions are "structured" or "independent", or does not require z-scoring
-        ("none" or None).
+            dimensions are "structured" or "independent", or does not require z-scoring
+            ("none" or None).
 
     Returns:
         Flag for whether or not to z-score, and whether data is structured
@@ -96,8 +96,7 @@ def z_score_parser(z_score_flag: Optional["str"]) -> Tuple[bool, bool]:
     if type(z_score_flag) is bool:
         # Raise warning if boolean was passed.
         warnings.warn(
-            """Boolean flag for z-scoring is accepted for backwards compatibility only.
-            Please use 'none', 'independent', or 'structured' to indicate z-scoring option.
+            """Boolean flag for z-scoring is deprecated as of sbi v0.18.0. It will be removed in a future release. Use 'none', 'independent', or 'structured' to indicate z-scoring option.
         """
         )
         z_score_bool, structured_data = z_score_flag, False
@@ -113,8 +112,9 @@ def z_score_parser(z_score_flag: Optional["str"]) -> Tuple[bool, bool]:
 
     else:
         # Return warning due to invalid option, defaults to not z-scoring.
-        warnings.warn("Invalid z-scoring option, defaulting to no z-scoring.")
-        z_score_bool, structured_data = False, False
+        raise ValueError(
+            "Invalid z-scoring option. Use 'none', 'independent', or 'structured'."
+        )
 
     return z_score_bool, structured_data
 
