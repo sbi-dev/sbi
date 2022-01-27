@@ -50,6 +50,7 @@ def test_running_sbc(method=SNPE_C, model="mdn"):
     get_nltp(thetas, xs, posterior)
 
 
+@pytest.mark.slow
 def test_sbc_checks(set_seed):
     """Test the uniformity checks for SBC."""
 
