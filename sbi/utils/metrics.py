@@ -10,8 +10,6 @@ from sklearn.model_selection import KFold, cross_val_score
 from sklearn.neural_network import MLPClassifier
 from torch import Tensor
 
-# from sbi.utils import tensor2numpy
-
 
 def c2st(
     X: Tensor,
