@@ -9,7 +9,7 @@ import pytest
 from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
 import torch
 from pyknos.mdn.mdn import MultivariateGaussianMDN
-from scipy.stats import beta, multivariate_normal, uniform
+from scipy.stats import beta, multivariate_normal, uniform, lognorm
 from torch import Tensor, eye, nn, ones, zeros
 from torch.distributions import Beta, Distribution, Gamma, MultivariateNormal, Uniform
 
@@ -94,6 +94,7 @@ def matrix_simulator(theta):
             dict(lower_bound=zeros(3), upper_bound=ones(3)),
         ),
         (ScipyPytorchWrapper, multivariate_normal(), dict()),
+        (ScipyPytorchWrapper, lognorm(s=1.0), dict()),
         (
             ScipyPytorchWrapper,
             uniform(),

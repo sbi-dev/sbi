@@ -10,6 +10,7 @@ from scipy.stats._distn_infrastructure import rv_frozen
 from scipy.stats._multivariate import multi_rv_frozen
 from torch import Tensor, float32
 from torch.distributions import Distribution, constraints
+from torch.distributions import Distribution, Independent, biject_to, constraints
 
 
 class CustomPriorWrapper(Distribution):
@@ -325,53 +326,7 @@ class MultipleIndependent(Distribution):
     @property
     def support(self):
         # return independent constraints for each distribution.
-        return MultipleIndependentConstraints(
-            multiple_constraints=[d.support for d in self.dists],
-            dims_per_constraint=self.dims_per_dist,
-        )
-
-
-class MultipleIndependentConstraints(constraints.Constraint):
-    def __init__(
-        self,
-        multiple_constraints: Sequence[constraints.Constraint],
-        dims_per_constraint: list,
-    ):
-        """Define multiple independent constraints to check support of independent
-        joint distributions.
-
-        Args:
-            constraints: List of constraints, one for each distribution.
-            dims_per_constraint: List of event dimensions for each distribution, needed
-                to match values to constraints.
-        """
-
-        for c in multiple_constraints:
-            assert isinstance(c, constraints.Constraint)
-        self.constraints = multiple_constraints
-        self.dims_per_constraint = dims_per_constraint
-
-    def check(self, value: Tensor) -> Tensor:
-        """Returns a byte tensor of ``sample_shape + batch_shape`` indicating
-        whether each event in value satisfies its corresponding constraint."""
-
-        if value.ndim < 2:
-            value = value.unsqueeze(0)
-        result = torch.zeros((value.shape[0], len(self.constraints)))
-        dim_idx = 0
-        # For each constraint, select the corresponding values according to its
-        # event dim.
-        for idx, c in enumerate(self.constraints):
-            # reshape and squeeze needed to accommodate different types of
-            # distributions.
-            result[:, idx] = c.check(
-                value[:, dim_idx : (dim_idx + self.dims_per_constraint[idx])].reshape(
-                    -1, self.dims_per_constraint[idx]
-                )
-            ).squeeze()
-            dim_idx += self.dims_per_constraint[idx]
-        # Return check across all independent constraints.
-        return result.all(-1)
+        return constraints.cat([d.support for d in self.dists], dim=1)
 
 
 def build_support(

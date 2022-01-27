@@ -506,7 +506,10 @@ def mcmc_transform(
         try:
             _ = prior.support
             has_support = True
-        except NotImplementedError:
+        except NotImplementedError or AttributeError:
+            # NotImplementedError -> Distribution that inherits from torch dist but
+            # does not implement support.
+            # AttributeError -> Custom distribution that has no support attribute.
             warnings.warn(
                 """The passed prior has no support property, transform will be
                 constructed from mean and std. If the passed prior is supposed to be
@@ -514,15 +517,8 @@ def mcmc_transform(
             )
             has_support = False
 
-        # TODO: implement case for half-bounded priors, e.g., LogNormal.
         # Prior with bounded support, e.g., uniform priors.
-        if has_support and (
-            isinstance(prior.support, constraints.interval) or
-            # support can be hidden in independent constraints (e.g., for BoxUniform,
-            # or custom prior with bounds).
-            (isinstance(prior.support, constraints._IndependentConstraint) 
-            and isinstance(prior.support.base_constraint, constraints.interval))
-        ):
+        if has_support:
             transform = biject_to(prior.support)
         # For all other cases build affine transform with mean and std.
         else:
