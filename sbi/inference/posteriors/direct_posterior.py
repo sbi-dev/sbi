@@ -17,13 +17,8 @@ from sbi.utils.sbiutils import match_theta_and_x_batch_shapes, within_support
 from sbi.utils.torchutils import ensure_theta_batched
 from sbi.neural_nets import flow
 
-
-## old
 import time
-from functools import partial
 from copy import deepcopy
-
-import matplotlib.pyplot as plt
 
 
 class DirectPosterior(NeuralPosterior):
@@ -742,28 +737,6 @@ class DirectPosterior(NeuralPosterior):
                         neural_net.parameters(), max_norm=clip_max_norm
                     )
                 optimizer.step()
-
-            # TODO: move visualization plot.py
-            if visualize_training_interval > 0 and x.shape[1] == 2:
-                if epoch % visualize_training_interval == 0:
-                    with torch.no_grad():
-                        if context is None:
-                            zgrid = (
-                                neural_net.log_prob(xyinput).exp().reshape(steps, steps)
-                            )
-                        else:
-                            zgrid = (
-                                neural_net.log_prob(xyinput, context_batch)
-                                .exp()
-                                .reshape(steps, steps)
-                            )
-
-                    plt.scatter(x[:, 0], x[:, 1], alpha=0.5, s=10)
-                    plt.contour(xgrid.numpy(), ygrid.numpy(), zgrid.numpy())
-                    plt.title(
-                        "epoch {} (loss: {})".format(epoch, batch_loss.sum().item())
-                    )
-                    plt.show()
 
             epoch += 1
 
