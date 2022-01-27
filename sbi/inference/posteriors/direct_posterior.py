@@ -249,7 +249,6 @@ class DirectPosterior(NeuralPosterior):
         context: Optional[Tensor] = None,
         train_px: bool = False,
         x_flow: Optional[TorchModule] = None,
-        visualize_training: int = 0,
         sample_with: Optional[str] = None,
         max_sampling_batch_size: int = 10_000,
         training_batch_size: int = 50,
@@ -274,15 +273,11 @@ class DirectPosterior(NeuralPosterior):
         sampling.
 
         Args:
-            x_range: Conditioning context for posterior $p(\theta|x0 < x < x1)$. Provide a range (upper,lower) for every dimension (resulting shape: n x 2). Set lower and upper bound to ± infinity if context is provided.
+            x_range: Conditioning context for posterior p(theta|x0 < x < x1). Provide interval bounds (upper,lower) for every dimension (resulting shape: n x 2). Set lower and upper bound to ± infinity, if context is provided.
             x_samples: Samples from p(x) provided by first round of SNPE.
-            sample_shape: Desired shape of samples that are drawn from posterior. If
-                sample_shape is multidimensional we simply draw `sample_shape.numel()`
-                samples and then reshape into the desired shape.
-            train_px: Whether to train a density estimator on x_samples to estimate
-                p(x) and use it to sample from p(x_0<x<x_1).
-            x_flow: Optional argument to pass a specific normalizing flow that is used
-                as density estimator.
+            sample_shape: Desired shape of samples that are drawn from posterior. If sample_shape is multidimensional we simply draw `sample_shape.numel()` samples and then reshape into the desired shape.
+            train_px: Whether to train a density estimator on x_samples to estimate p(x) and use it to sample from p(x_0<x<x_1).
+            x_flow: Optional argument to pass a normalizing flow to be used as density estimator.
             show_progress_bars: Whether to show sampling progress monitor.
             sample_with: Method to use for sampling from the posterior. Must be one of
                 [`mcmc` | `rejection`]. With default parameters, `rejection` samples
@@ -360,7 +355,6 @@ class DirectPosterior(NeuralPosterior):
                     clip_max_norm=clip_max_norm,
                     resume_training=resume_training,
                     show_train_summary=show_train_summary,
-                    visualize_training_interval=visualize_training,
                     dataloader_kwargs=dataloader_kwargs,
                     device=device,
                 )
@@ -631,7 +625,6 @@ class DirectPosterior(NeuralPosterior):
         clip_max_norm: Optional[float] = 5.0,
         resume_training: bool = False,
         show_train_summary: bool = False,
-        visualize_training_interval: int = 0,
         dataloader_kwargs: Optional[dict] = None,
         device: str = "cpu",
     ):
@@ -696,19 +689,10 @@ class DirectPosterior(NeuralPosterior):
             optimizer = optim.Adam(list(neural_net.parameters()), lr=learning_rate)
             epoch, _val_log_prob = 0, float("-Inf")
 
-        if visualize_training_interval > 0 and x.shape[1] == 2:
-            steps = 200
-            lx, ly = x.min(dim=0).values.int() - 2
-            ux, uy = x.max(dim=0).values.int() + 2
-            xline = torch.linspace(lx.item(), ux.item(), steps=steps)
-            yline = torch.linspace(ly.item(), uy.item(), steps=steps)
-            xgrid, ygrid = torch.meshgrid(xline, yline)
-            xyinput = torch.cat([xgrid.reshape(-1, 1), ygrid.reshape(-1, 1)], dim=1)
-
         _best_val_log_prob = float("-inf")
         _best_model_state_dict = None
         _epochs_since_last_improvement = 0
-        print("epoch | _val_log_prob | best val_log_prob")
+
         while epoch <= max_num_epochs:
             # Train for a single epoch.
             neural_net.train()
@@ -784,7 +768,7 @@ class DirectPosterior(NeuralPosterior):
             )
             if epoch % 10 == 0:
                 print(
-                    f"{epoch:5} | {_val_log_prob:13.4} | {_best_val_log_prob:17.4}",
+                    f"epoch: {epoch:5}, val_log_prob: {_val_log_prob:13.4}, best val_log_prob: {_best_val_log_prob:17.4}",
                     end="\r",
                 )
             if converged:
