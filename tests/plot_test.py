@@ -18,6 +18,9 @@ from sbi.inference import (
     prepare_for_sbi,
     simulate_for_sbi,
 )
+
+from sbi.analysis import plot_summary
+from sbi.inference import SNLE, SNPE, SNRE, prepare_for_sbi, simulate_for_sbi
 from sbi.utils import BoxUniform
 
 

@@ -5,14 +5,14 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import torch
 import torch.distributions.transforms as torch_tf
-from torch import Tensor, nn
 from pyknos.nflows import flows
+from torch import Tensor, nn
 
 from sbi.inference.potentials.base_potential import BasePotential
+from sbi.types import TorchTransform
 from sbi.utils import mcmc_transform
 from sbi.utils.sbiutils import match_theta_and_x_batch_shapes, within_support
 from sbi.utils.torchutils import ensure_theta_batched
-from sbi.types import TorchTransform
 
 
 def posterior_estimator_based_potential(

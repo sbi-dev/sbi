@@ -3,8 +3,8 @@
 from typing import Any, Callable, Optional, Union
 
 import torch
-from torch import Tensor, log, nn
 from pyknos.nflows import flows
+from torch import Tensor, log, nn
 
 from sbi import utils as utils
 from sbi.inference.posteriors.base_posterior import NeuralPosterior

@@ -7,8 +7,8 @@ from pyro.distributions import Uniform
 from torch import Tensor, ones, tensor
 from torch.distributions import Distribution, Multinomial, MultivariateNormal
 
-from sbi.types import Array
 from sbi.inference.abc.abc_base import ABCBASE
+from sbi.types import Array
 from sbi.utils import KDEWrapper, get_kde, process_x, within_support
 
 

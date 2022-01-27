@@ -3,8 +3,8 @@
 
 from typing import Any, Callable
 
-from pyknos import nflows
 import torch
+import torch.distributions.transforms as torch_tf
 from torch import Tensor
 
 
@@ -23,7 +23,9 @@ class IterateParameters:
         return next(self.iter)
 
 
-def proposal_init(proposal: Any, transform: nflows.transforms, **kwargs: Any) -> Tensor:
+def proposal_init(
+    proposal: Any, transform: torch_tf.Transform, **kwargs: Any
+) -> Tensor:
     """Return a sample from the proposal."""
     prior_samples = proposal.sample((1,)).detach()
     transformed_prior_samples = transform(prior_samples)
@@ -33,7 +35,7 @@ def proposal_init(proposal: Any, transform: nflows.transforms, **kwargs: Any) ->
 def sir(
     proposal: Any,
     potential_fn: Callable,
-    transform: Transform,
+    transform: torch_tf.Transform,
     sir_num_batches: int = 10,
     sir_batch_size: int = 1000,
     **kwargs: Any,

@@ -6,9 +6,9 @@ from typing import NewType, Optional, Sequence, Tuple, TypeVar, Union
 
 import numpy as np
 import torch
+from torch.distributions.transforms import Transform
 from torch.nn import Module
 from torch.utils.tensorboard.writer import SummaryWriter
-from torch.distributions.transforms import Transform
 
 Array = Union[np.ndarray, torch.Tensor]
 Shape = Union[torch.Size, Tuple[int, ...]]

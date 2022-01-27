@@ -430,7 +430,9 @@ class ActiveSubspace:
         if posterior_log_prob_as_property:
             predictions = self._posterior.potential(thetas, track_gradients=True)
         else:
-            assert self._regression_net is not None, "You must call `.train()` first."
+            assert (
+                self._regression_net is not None
+            ), "self._regression_net is None, you must call `.train()` first."
             predictions = self._regression_net.forward(thetas)
         loss = predictions.mean()
         loss.backward()

@@ -6,14 +6,19 @@ import warnings
 from math import pi
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, Union
 
-import torch
 import pyknos.nflows.transforms as transforms
+import torch
+import torch.distributions.transforms as torch_tf
 from pyro.distributions import Empirical
 from torch import Tensor
 from torch import nn as nn
 from torch import ones, optim, zeros
 from torch.distributions import Distribution, Independent, biject_to, constraints
+<<<<<<< HEAD
 import torch.distributions.transforms as torch_tf
+=======
+from tqdm.auto import tqdm
+>>>>>>> Fixups and feedback
 
 from sbi import utils as utils
 from sbi.types import TorchTransform

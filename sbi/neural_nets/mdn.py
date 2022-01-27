@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
+from typing import Optional
 
 from pyknos.mdn.mdn import MultivariateGaussianMDN
 from pyknos.nflows import flows, transforms
@@ -16,8 +17,8 @@ from sbi.utils.sbiutils import DefaultEmbeddingNet
 def build_mdn(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: bool = True,
-    z_score_y: bool = True,
+    z_score_x: Optional[str] = "independent",
+    z_score_y: Optional[str] = "independent",
     hidden_features: int = 50,
     num_components: int = 10,
     embedding_net: nn.Module = nn.Identity(),
@@ -57,13 +58,13 @@ def build_mdn(
 
     transform = transforms.IdentityTransform()
 
-    z_score_x, structured_x = utils.z_score_parser(z_score_x)
-    if z_score_x:
+    z_score_x_bool, structured_x = utils.z_score_parser(z_score_x)
+    if z_score_x_bool:
         transform_zx = utils.standardizing_transform(batch_x, structured_x)
         transform = transforms.CompositeTransform([transform_zx, transform])
 
-    z_score_y, structured_y = utils.z_score_parser(z_score_y)
-    if z_score_y:
+    z_score_y_bool, structured_y = utils.z_score_parser(z_score_y)
+    if z_score_y_bool:
         embedding_net = nn.Sequential(
             utils.standardizing_net(batch_y, structured_y), embedding_net
         )

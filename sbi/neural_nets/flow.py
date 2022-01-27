@@ -3,6 +3,7 @@
 
 
 from functools import partial
+from typing import Optional
 from warnings import warn
 
 from pyknos.nflows import distributions as distributions_
@@ -24,8 +25,8 @@ from sbi.utils.sbiutils import DefaultEmbeddingNet
 def build_made(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: bool = True,
-    z_score_y: bool = True,
+    z_score_x: Optional[str] = "independent",
+    z_score_y: Optional[str] = "independent",
     hidden_features: int = 50,
     num_mixture_components: int = 10,
     embedding_net: nn.Module = nn.Identity(),
@@ -64,17 +65,17 @@ def build_made(
     y_numel = embedding_net(batch_y[:1]).numel()
 
     if x_numel == 1:
-        warn(f"In one-dimensional output space, this flow is limited to Gaussians")
+        warn("In one-dimensional output space, this flow is limited to Gaussians")
 
     transform = transforms.IdentityTransform()
 
-    z_score_x, structured_x = z_score_parser(z_score_x)
-    if z_score_x:
+    z_score_x_bool, structured_x = z_score_parser(z_score_x)
+    if z_score_x_bool:
         transform_zx = standardizing_transform(batch_x, structured_x)
         transform = transforms.CompositeTransform([transform_zx, transform])
 
-    z_score_y, structured_y = z_score_parser(z_score_y)
-    if z_score_y:
+    z_score_y_bool, structured_y = z_score_parser(z_score_y)
+    if z_score_y_bool:
         embedding_net = nn.Sequential(
             standardizing_net(batch_y, structured_y), embedding_net
         )
@@ -101,8 +102,8 @@ def build_made(
 def build_maf(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: bool = True,
-    z_score_y: bool = True,
+    z_score_x: Optional[str] = "independent",
+    z_score_y: Optional[str] = "independent",
     hidden_features: int = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
@@ -141,7 +142,7 @@ def build_maf(
     y_numel = embedding_net(batch_y[:1]).numel()
 
     if x_numel == 1:
-        warn(f"In one-dimensional output space, this flow is limited to Gaussians")
+        warn("In one-dimensional output space, this flow is limited to Gaussians")
 
     transform_list = []
     for _ in range(num_transforms):
@@ -161,14 +162,14 @@ def build_maf(
         ]
         transform_list += block
 
-    z_score_x, structured_x = z_score_parser(z_score_x)
-    if z_score_x:
+    z_score_x_bool, structured_x = z_score_parser(z_score_x)
+    if z_score_x_bool:
         transform_list = [
             standardizing_transform(batch_x, structured_x)
         ] + transform_list
 
-    z_score_y, structured_y = z_score_parser(z_score_y)
-    if z_score_y:
+    z_score_y_bool, structured_y = z_score_parser(z_score_y)
+    if z_score_y_bool:
         embedding_net = nn.Sequential(
             standardizing_net(batch_y, structured_y), embedding_net
         )
@@ -185,8 +186,8 @@ def build_maf(
 def build_nsf(
     batch_x: Tensor,
     batch_y: Tensor,
-    z_score_x: bool = True,
-    z_score_y: bool = True,
+    z_score_x: Optional[str] = "independent",
+    z_score_y: Optional[str] = "independent",
     hidden_features: int = 50,
     num_transforms: int = 5,
     num_bins: int = 10,
@@ -276,15 +277,15 @@ def build_nsf(
             )
         transform_list += block
 
-    z_score_x, structured_x = z_score_parser(z_score_x)
-    if z_score_x:
+    z_score_x_bool, structured_x = z_score_parser(z_score_x)
+    if z_score_x_bool:
         # Prepend standardizing transform to nsf transforms.
         transform_list = [
             standardizing_transform(batch_x, structured_x)
         ] + transform_list
 
-    z_score_y, structured_y = z_score_parser(z_score_y)
-    if z_score_y:
+    z_score_y_bool, structured_y = z_score_parser(z_score_y)
+    if z_score_y_bool:
         # Prepend standardizing transform to y-embedding.
         embedding_net = nn.Sequential(
             standardizing_net(batch_y, structured_y), embedding_net

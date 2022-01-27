@@ -228,7 +228,7 @@ class RatioEstimator(NeuralInference, ABC):
             self.epoch += 1
 
             train_log_prob_average = train_log_probs_sum / (
-                len(train_loader) * train_loader.batch_size
+                len(train_loader) * train_loader.batch_size  # type: ignore
             )
             self._summary["train_log_probs"].append(train_log_prob_average)
 
@@ -245,7 +245,7 @@ class RatioEstimator(NeuralInference, ABC):
                     val_log_prob_sum -= val_losses.sum().item()
                 # Take mean over all validation samples.
                 self._val_log_prob = val_log_prob_sum / (
-                    len(val_loader) * val_loader.batch_size
+                    len(val_loader) * val_loader.batch_size  # type: ignore
                 )
                 # Log validation log prob for every epoch.
                 self._summary["validation_log_probs"].append(self._val_log_prob)

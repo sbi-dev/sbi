@@ -1,7 +1,7 @@
 from typing import Any, Callable, Dict, Optional, Union
 
 import torch
-from torch import nn, Tensor
+from torch import Tensor, nn
 
 from sbi.inference.snre.snre_base import RatioEstimator
 from sbi.types import TensorboardSummaryWriter

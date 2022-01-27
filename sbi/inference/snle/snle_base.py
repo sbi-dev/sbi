@@ -7,11 +7,11 @@ from copy import deepcopy
 from typing import Any, Callable, Dict, Optional, Tuple, Union
 
 import torch
+from pyknos.nflows import flows
 from torch import Tensor, nn, optim
 from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.utils import data
 from torch.utils.tensorboard.writer import SummaryWriter
-from pyknos.nflows import flows
 
 from sbi import utils as utils
 from sbi.inference import NeuralInference
@@ -221,7 +221,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
             self.epoch += 1
 
             train_log_prob_average = train_log_probs_sum / (
-                len(train_loader) * train_loader.batch_size
+                len(train_loader) * train_loader.batch_size  # type: ignore
             )
             self._summary["train_log_probs"].append(train_log_prob_average)
 
@@ -240,7 +240,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
 
             # Take mean over all validation samples.
             self._val_log_prob = val_log_prob_sum / (
-                len(val_loader) * val_loader.batch_size
+                len(val_loader) * val_loader.batch_size  # type: ignore
             )
             # Log validation log prob for every epoch.
             self._summary["validation_log_probs"].append(self._val_log_prob)

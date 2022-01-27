@@ -12,10 +12,10 @@ from sbi.inference import (
     SNPE_A,
     SNPE_C,
     SRE,
-    prepare_for_sbi,
-    simulate_for_sbi,
     DirectPosterior,
     MCMCPosterior,
+    prepare_for_sbi,
+    simulate_for_sbi,
 )
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
