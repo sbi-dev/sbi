@@ -69,4 +69,3 @@ from sbi.utils.user_input_checks import (
 )
 from sbi.utils.user_input_checks_utils import MultipleIndependent
 from sbi.utils.potentialutils import transformed_potential, pyro_potential_wrapper
-from sbi.utils.tensorboard_output import plot_summary, list_all_logs
