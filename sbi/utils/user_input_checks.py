@@ -387,7 +387,7 @@ def check_prior_support(prior):
     """
 
     try:
-        within_support(prior, prior.sample())
+        within_support(prior, prior.sample((1,)))
     except NotImplementedError:
         raise NotImplementedError(
             """The prior must implement the support property or allow to call

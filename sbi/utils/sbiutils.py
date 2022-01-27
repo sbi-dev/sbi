@@ -517,8 +517,23 @@ def mcmc_transform(
             )
             has_support = False
 
-        # Prior with bounded support, e.g., uniform priors.
+        # If the distribution has a `support`, check if the support is bounded.
+        # If it is not bounded, we want to z-score the space. This is not done
+        # by `biject_to()`, so we have to deal with this case separately.
         if has_support:
+            if hasattr(prior.support, "base_constraint"):
+                constraint = prior.support.base_constraint
+            else:
+                constraint = prior.support
+            if isinstance(constraint, constraints._Real):
+                support_is_bounded = False
+            else:
+                support_is_bounded = True
+        else:
+            support_is_bounded = False
+
+        # Prior with bounded support, e.g., uniform priors.
+        if has_support and support_is_bounded:
             transform = biject_to(prior.support)
         # For all other cases build affine transform with mean and std.
         else:
