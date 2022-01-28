@@ -8,25 +8,38 @@
 - the `posterior` no longer has the the method `.sample_conditional()`. Using this 
   feature now requires using the `sampler interface` (see tutorial
   [here](https://www.mackelab.org/sbi/tutorial/07_conditional_distributions/)) (#573)
+- `retrain_from_scratch_each_round` is now called `retrain_from_scratch` (#598, thanks to @jnsbck)
+- API changes that had been introduced in `sbi v0.14.0` and `v0.15.0` are not enforced. Using the interface prior to
+  those changes leads to an error (#645)
 
-## Major changes
+## Major changes and bug fixes
+- new `sampler interface` (#573)
+- posterior quality assurance with simulation-based calibration (SBC) (#501)
+- added `Sequential Neural Variational Inference (SNVI)` (Glöckler et al. 2022) (#609, thanks to @manuelgloeckler)
 - bugfix for SNPE-C with mixture density networks (#573)
-- new `sampler interface` (#573):
-```python
-from sbi.inference import SNLE, likelihood_estimator_based_potential
+- bugfix for sampling-importance resampling (SIR) as `init_strategy` for MCMC (#646)
 
-inference = SNLE()  # no more prior needed
-likelihood_estimator = inference.append_simulations(theta, x).train()
-
-potential_fn, theta_transform = likelihood_estimator_based_potential(likelihood_estimator, prior, x_o)
-posterior = MCMCPosterior(potential_fn, proposal=prior, theta_transform=theta_transform)
-
-samples = posterior.sample((100,))
-```
-
-## Minor changes
+## Enhancements
 - pairplot takes `ax` and `fig` (#557)
 - bugfix for rejection sampling (#561)
+- remove warninig when using multiple transforms with NSF in single dimension (#537)
+- Sampling-importance-resampling (SIR) is now the default `init_strategy` for MCMC (#605)
+- change `mp_context` to allow for multi-chain pyro samplers (#608, thanks to @sethaxen)
+- tutorial on posterior predictive checks (#592, thanks to @LouisRouillard)
+- add FAQ entry for using a custom prior (#595, thanks to @jnsbck)
+- add methods to plot tensorboard data (#593, thanks to @lappalainenj)
+- add option to pass the support for custom priors (#602)
+- plotting method for 1D marginals (#600, thanks to @guymoss)
+- fix GPU issues for `conditional_pairplot` and `ActiveSubspace` (#613)
+- MCMC can be performed in unconstrained space also when using a `MultipleIndependent` distribution as prior (#619)
+- added z-scoring option for structured data (#597, thanks to @rdgao)
+- refactor c2st; change its default classifier to random forest (#503, thanks to @psteinb)
+- MCMC `init_strategy` is now called `proposal` instead of `prior` (#602)
+- inference objects can be serialized with `pickle` (#617)
+- preconfigured fully connected embedding net (#644, thanks to @JuliaLinhart #624)
+- posterior ensembles (#612, thanks to @jnsbck)
+- remove gradients before returning the `posterior` (#631, thanks to @tomMoral)
+- reduce batchsize of rejection sampling if few samples are left (#631, thanks to @tomMoral)
 
 
 # v0.17.2
