@@ -438,7 +438,7 @@ def conditional_pairplot(
         warn_about_deprecation: With sbi v0.15.0, we depracated the import of this
             function from `sbi.utils`. Instead, it should be imported from
             `sbi.analysis`.
-        fig: matplotlib figure to plot on. 
+        fig: matplotlib figure to plot on.
         axes: matplotlib axes corresponding to fig.
         **kwargs: Additional arguments to adjust the plot, see the source code in
             `_get_default_opts()` in `sbi.utils.plot` for more details.
