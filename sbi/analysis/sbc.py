@@ -315,7 +315,7 @@ def check_uniformity_c2st(ranks, num_posterior_samples, num_repetitions: int = 1
     return c2st_scores.mean(0)
 
 
-def local_sbc_test(
+def local_coverage_test(
     xs_test: Tensor,
     xs_train: Tensor,
     xs_ranks: Tensor,
