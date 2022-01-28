@@ -3,7 +3,6 @@
 
 from typing import Any, Callable
 
-import numpy as np
 from pyknos import nflows
 import torch
 from torch import Tensor
@@ -56,8 +55,7 @@ def sir(
     Returns:
         A single sample.
     """
-    init_strategy_num_candidates = sir_num_batches * sir_batch_size
-
+    
     with torch.set_grad_enabled(False):
         log_weights = []
         init_param_candidates = []
@@ -71,16 +69,10 @@ def sir(
 
         # Norm weights in log space
         log_weights -= torch.logsumexp(log_weights, dim=0)
-        probs = np.exp(log_weights.view(-1).numpy().astype(np.float64))
-        probs[np.isnan(probs)] = 0.0
-        probs[np.isinf(probs)] = 0.0
+        probs = torch.exp(log_weights.view(-1))
+        probs[torch.isnan(probs)] = 0.0
+        probs[torch.isinf(probs)] = 0.0
         probs /= probs.sum()
 
-        idxs = np.random.choice(
-            a=np.arange(init_strategy_num_candidates),
-            size=1,
-            replace=False,
-            p=probs,
-        )
-
-        return init_param_candidates[torch.from_numpy(idxs.astype(int)), :]
+        idxs = torch.multinomial(probs, 1, replacement=False)
+        return init_param_candidates[idxs, :]
