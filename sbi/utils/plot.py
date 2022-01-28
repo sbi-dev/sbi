@@ -154,7 +154,7 @@ def pairplot(
     warn_about_deprecation: bool = True,
     fig=None,
     axes=None,
-    **kwargs,
+    **kwargs
 ):
     """
     Plot samples in a 2D grid showing marginals and pairwise marginals.
@@ -277,7 +277,7 @@ def pairplot(
                         plt.axvline(
                             single_sample[row],
                             color=opts["samples_colors"][n],
-                            **opts["scatter_diag"],
+                            **opts["scatter_diag"]
                         )
                 else:
                     pass
@@ -293,7 +293,7 @@ def pairplot(
                             [limits[col][0], limits[col][1]],
                             [limits[row][0], limits[row][1]],
                         ],
-                        **opts["hist_offdiag"],
+                        **opts["hist_offdiag"]
                     )
                     h = plt.imshow(
                         hist.T,
@@ -370,14 +370,14 @@ def pairplot(
                         v[:, col],
                         v[:, row],
                         color=opts["samples_colors"][n],
-                        **opts["scatter_offdiag"],
+                        **opts["scatter_offdiag"]
                     )
                 elif opts["upper"][n] == "plot":
                     h = plt.plot(
                         v[:, col],
                         v[:, row],
                         color=opts["samples_colors"][n],
-                        **opts["plot_offdiag"],
+                        **opts["plot_offdiag"]
                     )
                 else:
                     pass
@@ -403,7 +403,7 @@ def conditional_pairplot(
     warn_about_deprecation: bool = True,
     fig=None,
     axes=None,
-    **kwargs,
+    **kwargs
 ):
     r"""
     Plot conditional distribution given all other parameters.
@@ -610,10 +610,7 @@ def _pairplot_scaffold(
             rows, cols, figsize=opts["figsize"], **opts["subplots"]
         )
     else:
-        assert axes.shape == (
-            rows,
-            cols,
-        ), f"Passed axes must match subplot shape: {rows, cols}."
+        assert axes.shape == (rows, cols), f"Passed axes must match subplot shape: {rows, cols}."
     # Cast to ndarray in case of 1D subplots.
     axes = np.array(axes).reshape(rows, cols)
 
@@ -716,7 +713,7 @@ def _pairplot_scaffold(
                             [v[:, row], v[:, row]],
                             extent,
                             color=opts["points_colors"][n],
-                            **opts["points_diag"],
+                            **opts["points_diag"]
                         )
 
             # Off-diagonals
@@ -734,7 +731,7 @@ def _pairplot_scaffold(
                             v[:, col],
                             v[:, row],
                             color=opts["points_colors"][n],
-                            **opts["points_offdiag"],
+                            **opts["points_offdiag"]
                         )
 
     if len(subset) < dim:
@@ -750,7 +747,7 @@ def _pairplot_scaffold(
                     y0 - (y1 - y0) / 1.5,
                     "...",
                     rotation=-45,
-                    **text_kwargs,
+                    **text_kwargs
                 )
 
     return fig, axes
