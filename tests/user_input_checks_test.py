@@ -13,14 +13,7 @@ from scipy.stats import beta, multivariate_normal, uniform, lognorm
 from torch import Tensor, eye, nn, ones, zeros
 from torch.distributions import Beta, Distribution, Gamma, MultivariateNormal, Uniform
 
-from sbi.inference import (
-    SNLE,
-    SNPE_A,
-    SNPE_C,
-    DirectPosterior,
-    likelihood_estimator_based_potential,
-    simulate_for_sbi,
-)
+from sbi.inference import SNPE_A, SNPE_C, simulate_for_sbi
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
 from sbi.utils import within_support, mcmc_transform
@@ -30,7 +23,6 @@ from sbi.utils.user_input_checks import (
     process_prior,
     process_simulator,
     process_x,
-    validate_theta_and_x,
 )
 from sbi.utils.user_input_checks_utils import (
     CustomPriorWrapper,
@@ -495,124 +487,3 @@ def test_passing_custom_density_estimator(arg):
         density_estimator = arg
     prior = MultivariateNormal(torch.zeros(2), torch.eye(2))
     _ = SNPE_C(prior=prior, density_estimator=density_estimator)
-
-
-@pytest.mark.parametrize("device", ("cpu", "cuda:0"))
-def test_validate_theta_and_x_device(device):
-
-    # Skip GPU test if not available.
-    if device == "cuda:0" and not torch.cuda.is_available():
-        pass
-    else:
-        theta = torch.ones((2, 2), dtype=torch.float32).to(device)
-        x = torch.zeros((2, 10), dtype=torch.float32).to(device)
-
-        assert isinstance(
-            theta, torch.Tensor
-        ), f"{device} based torch.tensor is not an instance of torch.Tensor"
-        assert theta.dtype == torch.float32, (
-            f"{device} based torch.tensor(dtype=torch.float32) yields unexpected dtype"
-            f"{theta.dtype}."
-        )
-        if device == "cuda:0":
-            assert not isinstance(
-                theta, torch.FloatTensor
-            ), f"""{device} based torch.tensor(dtype=torch.float32) must not be 
-            FloatTensor."""
-        else:
-            assert isinstance(
-                theta, torch.FloatTensor
-            ), f"{device} based torch.tensor(dtype=torch.float32) must be FloatTensor."
-        validate_theta_and_x(theta, x)
-
-        with pytest.raises(AssertionError) as _:
-            validate_theta_and_x(theta, x.to(torch.float64))
-
-        plain_ft = torch.FloatTensor((32, 8))
-        assert (
-            plain_ft.dtype == torch.float32
-        ), "FloatTensor does not expose float32 dtype."
-
-
-@pytest.mark.gpu
-@pytest.mark.parametrize("snpe_method", [SNPE_A, SNPE_C])
-@pytest.mark.parametrize("data_device", ("cpu", "cuda:0"))
-@pytest.mark.parametrize("training_device", ("cpu", "cuda:0"))
-def test_train_with_different_data_and_training_device(
-    snpe_method: type, data_device, training_device
-):
-
-    assert torch.cuda.is_available(), "this test requires that cuda is available."
-
-    num_dim = 2
-
-    prior_ = BoxUniform(
-        -torch.ones(num_dim), torch.ones(num_dim), device=training_device
-    )
-    simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior_)
-
-    inference = snpe_method(
-        prior,
-        density_estimator="mdn_snpe_a" if snpe_method == SNPE_A else "maf",
-        show_progress_bars=False,
-        device=training_device,
-    )
-
-    # Run inference.
-    theta, x = simulate_for_sbi(simulator, prior, 100)
-    theta, x = theta.to(data_device), x.to(data_device)
-    x_o = torch.zeros(x.shape[1])
-    inference = inference.append_simulations(theta, x)
-
-    posterior_estimator = inference.train(max_num_epochs=2)
-
-    # Check for default device for inference object
-    weights_device = next(inference._neural_net.parameters()).device
-    assert torch.device(training_device) == weights_device
-
-    _ = DirectPosterior(
-        posterior_estimator=posterior_estimator, prior=prior
-    ).set_default_x(x_o)
-
-
-@pytest.mark.parametrize(
-    "kwargs", ({}, dict(lower_bound=zeros(3), upper_bound=ones(3)))
-)
-def test_custom_prior_evaluation(kwargs):
-    # Build custom prior with bounds.
-    num_dim = 3
-    custom_prior = UserNumpyUniform(zeros(num_dim), ones(num_dim), return_numpy=True)
-    prior, *_ = process_prior(
-        custom_prior,
-        custom_prior_wrapper_kwargs=kwargs,
-    )
-
-    ood_samples = 2 * torch.ones(2, num_dim)
-    assert (
-        prior.log_prob(ood_samples) == torch.tensor([-float("inf"), -float("inf")])
-    ).all()
-    # OOD samples are only detected if prior bounds are passed to custom prior.
-    assert within_support(prior, ood_samples).all() == (len(kwargs) == 0)
-    # within support true for prior samples.
-    assert within_support(prior, prior.sample((2,))).all()
-
-
-def test_custom_prior_snle_inference():
-    """Test inference with SNLE using a custom prior with specified bounds."""
-    # Build custom prior with bounds.
-    num_dim = 3
-    custom_prior = UserNumpyUniform(zeros(num_dim), ones(num_dim), return_numpy=True)
-    prior, *_ = process_prior(
-        custom_prior,
-        custom_prior_wrapper_kwargs=dict(
-            lower_bound=zeros(num_dim), upper_bound=ones(num_dim)
-        ),
-    )
-    # Toy inference to test custom prior with bounded support.
-    trainer = SNLE()
-    estimator = trainer.append_simulations(
-        torch.randn(100, 3), torch.rand(100, 1)
-    ).train(max_num_epochs=1)
-    pf, tf = likelihood_estimator_based_potential(estimator, prior, torch.randn(1, 1))
-    posterior = MCMCPosterior(pf, proposal=prior, theta_transform=tf)
-    posterior.sample((10,))

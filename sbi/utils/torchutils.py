@@ -21,34 +21,38 @@ def process_device(device: str) -> str:
     Throws an AssertionError if the prior is not matching the training device not.
     """
 
-    if not device == "cpu":
-        assert device.startswith("cuda"), f"Invalid device string: {device}."
-        try:
-            torch.zeros(1).to(device)
-            warnings.warn(
-                """GPU was selected as a device for training the neural network. Note
-                   that we expect **no** significant speed ups in training for the
-                   default architectures we provide. Using the GPU will be effective
-                   only for large neural networks with operations that are fast on the
-                   GPU, e.g., for a CNN or RNN `embedding_net`."""
+    if device == "cpu":
+        return "cpu"
+    else:
+        warnings.warn(
+            "GPU was selected as a device for training the neural network. "
+            "Note that we expect **no** significant speed ups in training for the "
+            "default architectures we provide. Using the GPU will be effective "
+            "only for large neural networks with operations that are fast on the "
+            "GPU, e.g., for a CNN or RNN `embedding_net`."
+        )
+        current_gpu_index = torch.cuda.current_device()
+        if device == "cuda":
+            return f"cuda:{current_gpu_index}"
+        else:
+            assert device == f"cuda:{current_gpu_index}", (
+                f"Unrecognized device {device}, "
+                "should be one of [`cpu`, `cuda`, f`cuda:{index}`]"
             )
-        except (RuntimeError, AssertionError):
-            warnings.warn(f"Device {device} not available, falling back to CPU.")
-            device = "cpu"
-
-    return device
+            return device
 
 
 def check_if_prior_on_device(device, prior: Optional[Any] = None):
     if prior is not None:
         prior_device = prior.sample((1,)).device
         training_device = torch.zeros(1, device=device).device
-        assert (
-            prior_device == training_device
-        ), f"""Prior ({prior_device}) device must match training device (
-            {training_device}). When training on GPU make sure to pass a prior
-            initialized on the GPU as well, e.g., `prior = torch.distributions.Normal
-            (torch.zeros(2, device='cuda'), scale=1.0)`."""
+        assert prior_device == training_device, (
+            f"Prior device '{prior_device}' must match training device "
+            f"'{training_device}'. When training on GPU make sure to "
+            "pass a prior initialized on the GPU as well, e.g., "
+            "prior = torch.distributions.Normal"
+            "(torch.zeros(2, device='cuda'), scale=1.0)`."
+        )
 
 
 def tile(x, n):
