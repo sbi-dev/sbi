@@ -377,14 +377,14 @@ def local_sbc_test(
     for dim in range(xs_ranks.shape[1]):
 
         # Normalize ranks
-        xo_ranks = torch.ravel(xs_ranks[:, dim]) / num_posterior_samples
+        xs_ranks = torch.ravel(xs_ranks[:, dim]) / num_posterior_samples
 
-        ### Calculate local test at points of interest xo_test
+        ### Calculate local test at points of interest xs_test
         rank_predictions = torch.zeros(size=(xs_test.shape[0], len(alphas)))
 
         for i, alpha in enumerate(alphas):
             # Fit training samples and PIT indicators/ranks
-            ind_train = [1 * (rank <= alpha) for rank in xo_ranks]
+            ind_train = [1 * (rank <= alpha) for rank in xs_ranks]
             rhat_rank = copy.deepcopy(classifier)
             rhat_rank.fit(X=xs_train, y=ind_train)
 
@@ -408,7 +408,7 @@ def local_sbc_test(
             uniform_predictions_b = torch.zeros(size=(xs_test.shape[0], len(alphas)))
 
             # Sample from uniform distribution instead of using PIT values/ranks
-            uni_sample = Uniform(0, 1).sample((xo_ranks.shape[0],))
+            uni_sample = Uniform(0, 1).sample((xs_ranks.shape[0],))
 
             for i, alpha in enumerate(alphas):
                 # Fit training samples and uniform indicators
