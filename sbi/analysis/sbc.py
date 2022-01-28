@@ -60,7 +60,9 @@ def run_sbc(
             of 100s to give reliable SBC results. We recommend using at least 300."""
         )
 
-    assert thetas.shape[0] == xs.shape[0], "Unequal number of parameters and observations."
+    assert (
+        thetas.shape[0] == xs.shape[0]
+    ), "Unequal number of parameters and observations."
 
     thetas_batches = torch.split(thetas, sbc_batch_size, dim=0)
     xs_batches = torch.split(xs, sbc_batch_size, dim=0)
@@ -79,7 +81,9 @@ def run_sbc(
             )
         ) as _:
             sbc_outputs = Parallel(n_jobs=num_workers)(
-                delayed(sbc_on_batch)(thetas_batch, xs_batch, posterior, num_posterior_samples)
+                delayed(sbc_on_batch)(
+                    thetas_batch, xs_batch, posterior, num_posterior_samples
+                )
                 for thetas_batch, xs_batch in zip(thetas_batches, xs_batches)
             )
     else:
@@ -227,7 +231,9 @@ def check_sbc(
         )
 
     ks_pvals = check_uniformity_frequentist(ranks, num_posterior_samples)
-    c2st_ranks = check_uniformity_c2st(ranks, num_posterior_samples, num_repetitions=num_c2st_repetitions)
+    c2st_ranks = check_uniformity_c2st(
+        ranks, num_posterior_samples, num_repetitions=num_c2st_repetitions
+    )
     c2st_scores_dap = check_prior_vs_dap(prior_samples, dap_samples)
 
     return dict(
@@ -251,7 +257,12 @@ def check_prior_vs_dap(prior_samples: Tensor, dap_samples: Tensor) -> Tensor:
 
     assert prior_samples.shape == dap_samples.shape
 
-    return torch.tensor([c2st(s1.unsqueeze(1), s2.unsqueeze(1)) for s1, s2 in zip(prior_samples.T, dap_samples.T)])
+    return torch.tensor(
+        [
+            c2st(s1.unsqueeze(1), s2.unsqueeze(1))
+            for s1, s2 in zip(prior_samples.T, dap_samples.T)
+        ]
+    )
 
 
 def check_uniformity_frequentist(ranks, num_posterior_samples) -> Tensor:
@@ -269,14 +280,19 @@ def check_uniformity_frequentist(ranks, num_posterior_samples) -> Tensor:
             one for each dim_parameters.
     """
     kstest_pvals = torch.tensor(
-        [kstest(rks, uniform(loc=0, scale=num_posterior_samples).cdf)[1] for rks in ranks.T],
+        [
+            kstest(rks, uniform(loc=0, scale=num_posterior_samples).cdf)[1]
+            for rks in ranks.T
+        ],
         dtype=torch.float32,
     )
 
     return kstest_pvals
 
 
-def check_uniformity_c2st(ranks, num_posterior_samples, num_repetitions: int = 1) -> Tensor:
+def check_uniformity_c2st(
+    ranks, num_posterior_samples, num_repetitions: int = 1
+) -> Tensor:
     """Return c2st scores for uniformity of the ranks.
 
     Run a c2st between ranks and uniform samples.
@@ -297,13 +313,9 @@ def check_uniformity_c2st(ranks, num_posterior_samples, num_repetitions: int = 1
             [
                 c2st(
                     rks.unsqueeze(1),
-<<<<<<< HEAD
                     Uniform(zeros(1), num_posterior_samples * ones(1)).sample(
                         torch.Size((ranks.shape[0],))
                     ),
-=======
-                    Uniform(zeros(1), num_posterior_samples * ones(1)).sample((ranks.shape[0],)),
->>>>>>> 90fc8dd (add local coverage test)
                 )
                 for rks in ranks.T
             ]
@@ -329,7 +341,9 @@ def local_coverage_test(
     xs_ranks: Tensor,
     num_posterior_samples: int = 1000,
     alphas: Tensor = torch.linspace(0.05, 0.95, 21),
-    classifier: Callable = LogisticRegression(penalty="none", solver="saga", max_iter=10000),
+    classifier: Callable = LogisticRegression(
+        penalty="none", solver="saga", max_iter=10000
+    ),
     null_distr_samples: int = 300,
 ) -> Tuple[List[Tensor], List[Tensor], List[Tensor], List[Tensor]]:
     """Compute local coverage tests using the ranks computed by sbc.
@@ -401,7 +415,9 @@ def local_coverage_test(
 
         ### Refit the classifier using Uniform(0,1) values in place of true PIT values/rank
         T_uni = torch.zeros(size=(null_distr_samples, xs_test.shape[0]))
-        uniform_predictions = torch.zeros(size=(null_distr_samples, xs_test.shape[0], len(alphas)))
+        uniform_predictions = torch.zeros(
+            size=(null_distr_samples, xs_test.shape[0], len(alphas))
+        )
 
         for b in range(null_distr_samples):
 
@@ -437,4 +453,9 @@ def local_coverage_test(
         global_pvalue = torch.mean(1.0 * (S_rank < S_uni))
         global_pvalues_per_dim.append(global_pvalue)
 
-    return global_pvalues_per_dim, local_pvalues_per_dim, rank_predictions_per_dim, uniform_predictions_per_dim
+    return (
+        global_pvalues_per_dim,
+        local_pvalues_per_dim,
+        rank_predictions_per_dim,
+        uniform_predictions_per_dim,
+    )
