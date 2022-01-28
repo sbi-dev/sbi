@@ -980,61 +980,65 @@ def _get_default_opts():
 
 
 def plot_p_values_local_test(
-    xs_test: torch.Tensor, 
-    local_pvalues: torch.Tensor, 
-    xs_dim: int = 0
-    ) -> None:
+    xs_test: torch.Tensor, local_pvalues: torch.Tensor, xs_dim: int = 0
+) -> None:
     """Plot one dimension of test observations against their p-values computed by the local coverage test.
 
     Parameters
     ----------
-    xs_test: 
+    xs_test:
         Test observations the posterior will be evaluated at.
         xs_test should be equivalent to the xs_test used for local_coverage_test().
     local_pvalues:
-        List of p-values per dimension for each observation. 
+        List of p-values per dimension for each observation.
         local_pvalues should be equivalent to local_pvalues returned by local_coverage_test().
-    xs_dim: 
+    xs_dim:
         Specify dimension to be plotted on the x-axis if xs is multidimensional.
     """
-    xs_test = torch.ravel(xs_test[:,xs_dim])
+    xs_test = torch.ravel(xs_test[:, xs_dim])
     ind = np.argsort(xs_test)
-    
+
     for dim in range(len(local_pvalues)):
-        plt.scatter(xs_test[ind], torch.ravel(local_pvalues[dim])[ind], s=10, label='theta dim '+str(dim))
-    plt.xlabel('xs')
-    plt.ylabel('p-values')
-    plt.title('P-values per test observation')
-    plt.legend();
+        plt.scatter(
+            xs_test[ind],
+            torch.ravel(local_pvalues[dim])[ind],
+            s=10,
+            label="theta dim " + str(dim),
+        )
+    plt.xlabel("xs")
+    plt.ylabel("p-values")
+    plt.title("P-values per test observation")
+    plt.legend()
 
 
-def pp_plots_local_coverage(n_plots: int, 
-    xs_test: Tensor, 
-    rank_predictions: Tensor, 
+def pp_plots_local_coverage(
+    n_plots: int,
+    xs_test: Tensor,
+    rank_predictions: Tensor,
     uniform_predictions: Tensor,
     local_pvalues: Tensor,
-    theta_dim = 0, 
-    alphas: Tensor = torch.linspace(0.05, 0.95, 21), 
+    theta_dim=0,
+    alphas: Tensor = torch.linspace(0.05, 0.95, 21),
     conf_alpha: float = 0.05,
-    plot_significant_obs: bool = False
-    ) -> None:
+    plot_significant_obs: bool = False,
+) -> None:
     """PP-plots for alpha and xs_test rank predictions.
 
     Parameters
     ----------
     n_plots:
         Number of subplots. xs_test observations used for plotting are randomly chosen.
-    xs_test: 
+    xs_test:
         Test observations the posterior will be evaluated at.
         xs_test should be equivalent to the xs_test used for local_coverage_test().
     rank_predictions:
-        Alpha predictions using ranks for each observation xs_test. 
+        Alpha predictions using ranks for each observation xs_test.
         rank_predictions should be equivalent to the output rank_predictions of local_test().
     uniform_predictions:
-        Alpha predictions using the uniform distribution for each observation xs_test. 
+        Alpha predictions using the uniform distribution for each observation xs_test.
         uniform_predictions should be equivalent to the output uniform_predictions of local_test().
     local_pvalues:
-        List of p-values per dimension for each observation. 
+        List of p-values per dimension for each observation.
         local_pvalues should be equivalent to local_pvalues returned by local_coverage_test().
     theta_dim:
         Choose dimension of theta if theta is multidimensional.
@@ -1050,24 +1054,33 @@ def pp_plots_local_coverage(n_plots: int,
         xs_idx = torch.where(local_pvalues[theta_dim] < conf_alpha)[0]
         n_plots = len(xs_idx)
         if n_plots == 0:
-            print('no significant p-values for this theta dimension found')
+            print("no significant p-values for this theta dimension found")
             return
     else:
         xs_idx = np.random.randint(0, n_plots, size=(n_plots,))
 
     # compute confidence bands
-    lower_band = torch.quantile(uniform_predictions[theta_dim], q=conf_alpha/2, axis=0)
-    upper_band = torch.quantile(uniform_predictions[theta_dim], q=1-conf_alpha/2, axis=0)
+    lower_band = torch.quantile(
+        uniform_predictions[theta_dim], q=conf_alpha / 2, axis=0
+    )
+    upper_band = torch.quantile(
+        uniform_predictions[theta_dim], q=1 - conf_alpha / 2, axis=0
+    )
 
     n_yplots = 5
-    n_xplots = int(np.ceil(n_plots/n_yplots))
-    fig, axs = plt.subplots(n_xplots, n_yplots, figsize=(20, n_xplots*4))
+    n_xplots = int(np.ceil(n_plots / n_yplots))
+    fig, axs = plt.subplots(n_xplots, n_yplots, figsize=(20, n_xplots * 4))
 
     for idx, ax in zip(xs_idx, axs.ravel()[:n_plots]):
 
-        ax.scatter(alphas, rank_predictions[theta_dim][idx], color='darkblue', s=10)
-        ax.plot(alphas, alphas, '--', color='darkred')
+        ax.scatter(alphas, rank_predictions[theta_dim][idx], color="darkblue", s=10)
+        ax.plot(alphas, alphas, "--", color="darkred")
         ax.fill_between(alphas, lower_band[idx], upper_band[idx], alpha=0.2)
-        ax.set_title('obs: ' + str(np.round(xs_test[idx].tolist(), 3).tolist()) + ', p-value:' + str(np.round(local_pvalues[theta_dim][idx].item(), 4)))
-        
-    plt.tight_layout();
+        ax.set_title(
+            "obs: "
+            + str(np.round(xs_test[idx].tolist(), 3).tolist())
+            + ", p-value:"
+            + str(np.round(local_pvalues[theta_dim][idx].item(), 4))
+        )
+
+    plt.tight_layout()
