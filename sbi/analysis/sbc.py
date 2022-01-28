@@ -332,10 +332,10 @@ def local_sbc_test(
     classifier: Callable = LogisticRegression(penalty="none", solver="saga", max_iter=10000),
     null_distr_samples: int = 300,
 ) -> Tuple[List[Tensor], List[Tensor], List[Tensor], List[Tensor]]:
-    """Compute local coverage tests using the ranks computed by sbc. 
-    
+    """Compute local coverage tests using the ranks computed by sbc.
+
     Returns for each dimension of theta the global and local p-values as well as quantile predictions based on sbc ranks at test points xs_test and quantile predictions based on uniform samples at test points xs_test.
-    
+
     The local coverage test is implemented as proposed in Zhao et al., "Validating Conditional Density Models and Bayesian Inference Algorithms", https://proceedings.mlr.press/v161/zhao21b/zhao21b.pdf.
 
     Parameters
