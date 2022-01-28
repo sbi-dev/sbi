@@ -558,7 +558,7 @@ def _pairplot_scaffold(
         opts: Dictionary built by the functions that call `pairplot_scaffold`. Must
             contain at least `labels`, `subset`, `figsize`, `subplots`,
             `fig_subplots_adjust`, `title`, `title_format`, ..
-        fig: matplotlib figure to plot on.
+        fig: matplotlib figure to plot on. 
         axes: matplotlib axes corresponding to fig.
 
     Returns: figure and axis
