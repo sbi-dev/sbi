@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
-from typing import Optional
+from typing import Any, Dict, Optional
 
 import numpy as np
 import torch
@@ -16,10 +16,7 @@ def c2st(
     Y: Tensor,
     seed: int = 1,
     n_folds: int = 5,
-    scoring: str = "accuracy",
-    z_score: bool = True,
-    noise_scale: Optional[float] = None,
-    verbosity: int = 0,
+    metric: str = "accuracy",
     classifier: str = "rf",
 ) -> Tensor:
     """
@@ -34,18 +31,20 @@ def c2st(
     By default, a `RandomForestClassifier` by from `sklearn.ensemble` is used
     (<classifier> = 'rf'). Alternatively, a multi-layer perceptron is available
     (<classifier> = 'mlp'). For a small study on the pros and cons for this
-    choice see [4].
+    choice see [4]. Before both samples are ingested, they are normalized (z scored)
+    under the assumption that each dimension in X follows a normal distribution, i.e.
+    the mean(X) is subtracted from X and this difference is divided by std(X)
+    for every dimension.
+
     If you need a more flexible interface which is able to take a sklearn
-    compatible classifier, see the `c2st_` method in this module.
+    compatible classifier and more, see the `c2st_` method in this module.
 
     Args:
         X: Samples from one distribution.
         Y: Samples from another distribution.
         seed: Seed for the sklearn classifier and the KFold cross-validation
         n_folds: Number of folds to use
-        z_score: Z-scoring using X, i.e. mean and std deviation of X is used to normalize Y using (Y - mean)/std
-        noise_scale: If passed, will add Gaussian noise with std noise_scale to samples of X and of Y
-        verbosity: control the verbosity of sklearn.model_selection.cross_val_score
+        metric: sklearn compliant metric to use for the scoring parameter of cross_val_score
         classifier: classification architecture to use, possible values: 'rf' or 'mlp'
 
     Return:
@@ -67,8 +66,10 @@ def c2st(
         [4]: https://github.com/psteinb/c2st/
     """
 
+    # the default configuration
     clf_class = RandomForestClassifier
     clf_kwargs = {}
+
     if "mlp" in classifier.lower():
         ndim = X.shape[-1]
         clf_class = MLPClassifier
@@ -80,16 +81,17 @@ def c2st(
             "early_stopping": True,
             "n_iter_no_change": 50,
         }
-    elif "rf" in classifier.lower():
-        # keep this section for later use
-        pass
+
+    noise_scale = None
+    z_score = True
+    verbosity = 0
 
     scores_ = c2st_scores(
         X,
         Y,
         seed=seed,
         n_folds=n_folds,
-        scoring=scoring,
+        metric=metric,
         z_score=z_score,
         noise_scale=noise_scale,
         verbosity=verbosity,
@@ -97,6 +99,7 @@ def c2st(
         clf_kwargs=clf_kwargs,
     )
 
+    # TODO: unclear why np.asarray needs to be used here
     scores = np.asarray(np.mean(scores_)).astype(np.float32)
     value = torch.from_numpy(np.atleast_1d(scores))
     return value
@@ -107,12 +110,12 @@ def c2st_scores(
     Y: Tensor,
     seed: int = 1,
     n_folds: int = 5,
-    scoring: str = "accuracy",
+    metric: str = "accuracy",
     z_score: bool = True,
     noise_scale: Optional[float] = None,
     verbosity: int = 0,
-    clf_class=RandomForestClassifier,
-    clf_kwargs={},
+    clf_class: Any = RandomForestClassifier,
+    clf_kwargs: Dict[str, Any] = {},
 ) -> Tensor:
     """
     Return accuracy of classifier trained to distinguish samples from supposedly
@@ -142,16 +145,17 @@ def c2st_scores(
     Args:
         X: Samples from one distribution.
         Y: Samples from another distribution.
-        seed: Seed for the sklearn classifier and the KFold cross-validation
-        n_folds: Number of folds to use
-        z_score: Z-scoring using X, i.e. mean and std deviation of X is used to normalize Y using (Y - mean)/std
-        noise_scale: If passed, will add Gaussian noise with std noise_scale to samples of X and of Y
+        seed: Seed for the sklearn classifier and the KFold cross validation
+        n_folds: Number of folds to use for cross validation
+        metric: sklearn compliant metric to use for the scoring parameter of cross_val_score
+        z_score: Z-scoring using X, i.e. mean and std deviation of X is used to normalize Y, i.e. Y=(Y - mean)/std
+        noise_scale: If passed, will add Gaussian noise with standard deviation <noise_scale> to samples of X and of Y
         verbosity: control the verbosity of sklearn.model_selection.cross_val_score
         clf_class: a scikit-learn classifier class
         clf_kwargs: key-value arguments dictionary to the class specified by clf_class, e.g. sklearn.ensemble.RandomForestClassifier
 
     Return:
-        np.ndarray containing the calculated <scoring> scores over the test set
+        np.ndarray containing the calculated <metric> scores over the test set
         folds from cross-validation
 
     Example:
@@ -192,7 +196,7 @@ def c2st_scores(
 
     shuffle = KFold(n_splits=n_folds, shuffle=True, random_state=seed)
     scores = cross_val_score(
-        clf, data, target, cv=shuffle, scoring=scoring, verbose=verbosity
+        clf, data, target, cv=shuffle, scoring=metric, verbose=verbosity
     )
 
     return scores

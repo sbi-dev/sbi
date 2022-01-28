@@ -15,120 +15,130 @@ from sbi.utils.metrics import c2st, c2st_scores
 ## for a study about c2st see https://github.com/psteinb/c2st/
 
 
-def test_same_distributions(set_seed):
+@pytest.mark.parametrize(
+    "dist_sigma, c2st_lowerbound, c2st_upperbound,",
+    [
+        (
+            0.0,
+            0.45,
+            0.55,
+        ),  # both samples are identical, the mean accuracy should be around 0.5
+        (
+            1.0,
+            0.85,
+            1.0,
+        ),  # both samples are rather close, the mean accuracy should be larger than 0.5 and be lower than 1.
+        (
+            20.0,
+            0.98,
+            1.0,
+        ),  # both samples are very far apart, the mean accuracy should close to 1.
+    ],
+)
+def test_c2st_with_different_distributions(
+    dist_sigma, c2st_lowerbound, c2st_upperbound, set_seed
+):
 
     ndim = 10
     nsamples = 1024
 
-    xnormal = tmvn(loc=torch.zeros(ndim), covariance_matrix=torch.eye(ndim))
+    refdist = tmvn(loc=torch.zeros(ndim), covariance_matrix=torch.eye(ndim))
+    otherdist = tmvn(
+        loc=dist_sigma + torch.zeros(ndim), covariance_matrix=torch.eye(ndim)
+    )
 
-    X = xnormal.sample((nsamples,))
-    Y = xnormal.sample((nsamples,))
+    X = refdist.sample((nsamples,))
+    Y = otherdist.sample((nsamples,))
 
-    obs_c2st = c2st(X, Y, seed=set_seed)
+    obs_c2st = c2st(X, Y)
 
-    assert obs_c2st != None
-    assert 0.45 < obs_c2st[0] < 0.55  # only by chance we differentiate the 2 samples
-
-
-def test_diff_distributions(set_seed):
-
-    ndim = 10
-    nsamples = 1024
-
-    xnormal = tmvn(loc=torch.zeros(ndim), covariance_matrix=torch.eye(ndim))
-    ynormal = tmvn(loc=20.0 * torch.ones(ndim), covariance_matrix=torch.eye(ndim))
-
-    X = xnormal.sample((nsamples,))
-    Y = ynormal.sample((nsamples,))
-
-    obs_c2st = c2st(X, Y, seed=set_seed)
-
-    assert obs_c2st != None
-    assert (
-        0.98 < obs_c2st[0]
-    )  # distributions do not overlap, classifiers label with high accuracy
-    print(obs_c2st)
-
-
-def test_onesigma_apart_distributions(set_seed):
-
-    ndim = 10
-    nsamples = 1024
-
-    xnormal = tmvn(loc=torch.zeros(ndim), covariance_matrix=torch.eye(ndim))
-    ynormal = tmvn(loc=torch.ones(ndim), covariance_matrix=torch.eye(ndim))
-
-    X = xnormal.sample((nsamples,))
-    Y = ynormal.sample((nsamples,))
-
-    obs_c2st = c2st(X, Y, seed=set_seed)
-
-    assert obs_c2st != None
-    print(obs_c2st)
-    assert (
-        0.85 < obs_c2st[0]
-    )  # distributions do not overlap, classifiers label with high accuracy
+    assert len(obs_c2st) > 0
+    assert c2st_lowerbound < obs_c2st[0]
+    assert obs_c2st[0] <= c2st_upperbound
 
 
 @pytest.mark.slow
-def test_same_distributions_mlp(set_seed):
+@pytest.mark.parametrize(
+    "dist_sigma, c2st_lowerbound, c2st_upperbound,",
+    [
+        (
+            0.0,
+            0.45,
+            0.55,
+        ),  # both samples are identical, the mean accuracy should be around 0.5
+        (
+            1.0,
+            0.85,
+            1.0,
+        ),  # both samples are rather close, the mean accuracy should be larger than 0.5 and be lower than 1.
+        (
+            20.0,
+            0.98,
+            1.0,
+        ),  # both samples are very far apart, the mean accuracy should close to 1.
+    ],
+)
+def test_c2st_with_different_distributions_mlp(
+    dist_sigma, c2st_lowerbound, c2st_upperbound, set_seed
+):
 
     ndim = 10
     nsamples = 1024
 
-    xnormal = tmvn(loc=torch.zeros(ndim), covariance_matrix=torch.eye(ndim))
+    refdist = tmvn(loc=torch.zeros(ndim), covariance_matrix=torch.eye(ndim))
+    otherdist = tmvn(
+        loc=dist_sigma + torch.zeros(ndim), covariance_matrix=torch.eye(ndim)
+    )
 
-    X = xnormal.sample((nsamples,))
-    Y = xnormal.sample((nsamples,))
+    X = refdist.sample((nsamples,))
+    Y = otherdist.sample((nsamples,))
 
-    obs_c2st = c2st(X, Y, seed=set_seed, classifier="mlp")
+    obs_c2st = c2st(X, Y, classifier="mlp")
 
-    assert obs_c2st != None
-    assert 0.45 < obs_c2st[0] < 0.55  # only by chance we differentiate the 2 samples
+    assert len(obs_c2st) > 0
+    assert c2st_lowerbound < obs_c2st[0]
+    assert obs_c2st[0] <= c2st_upperbound
 
 
 @pytest.mark.slow
-def test_diff_distributions_flexible_mlp(set_seed):
+@pytest.mark.parametrize(
+    "dist_sigma, c2st_lowerbound, c2st_upperbound,",
+    [
+        (
+            0.0,
+            0.45,
+            0.55,
+        ),  # both samples are identical, the mean accuracy should be around 0.5
+        (
+            1.0,
+            0.85,
+            1.0,
+        ),  # both samples are rather close, the mean accuracy should be larger than 0.5 and be lower than 1.
+        (
+            20.0,
+            0.98,
+            1.0,
+        ),  # both samples are very far apart, the mean accuracy should close to 1.
+    ],
+)
+def test_c2st_scores(dist_sigma, c2st_lowerbound, c2st_upperbound, set_seed):
 
     ndim = 10
     nsamples = 1024
 
     xnormal = tmvn(loc=torch.zeros(ndim), covariance_matrix=torch.eye(ndim))
-    ynormal = tmvn(loc=20.0 * torch.ones(ndim), covariance_matrix=torch.eye(ndim))
+    ynormal = tmvn(
+        loc=dist_sigma + torch.zeros(ndim), covariance_matrix=torch.eye(ndim)
+    )
 
     X = xnormal.sample((nsamples,))
     Y = ynormal.sample((nsamples,))
 
-    obs_c2st = c2st(X, Y, seed=set_seed, classifier="rf")
+    obs_c2st = c2st_scores(X, Y)
 
-    assert obs_c2st != None
-    assert 0.95 < obs_c2st[0]
-
-    obs2_c2st = c2st(X, Y, seed=set_seed, classifier="mlp")
-
-    assert obs2_c2st != None
-    assert 0.95 < obs2_c2st[0]  # only by chance we differentiate the 2 samples
-    assert np.allclose(obs2_c2st, obs_c2st, atol=0.01)
-
-
-def test_c2st_scores(set_seed):
-
-    ndim = 10
-    nsamples = 1024
-
-    xnormal = tmvn(loc=torch.zeros(ndim), covariance_matrix=torch.eye(ndim))
-    ynormal = tmvn(loc=20 * torch.ones(ndim), covariance_matrix=torch.eye(ndim))
-
-    X = xnormal.sample((nsamples,))
-    Y = ynormal.sample((nsamples,))
-
-    obs_c2st = c2st_scores(X, Y, seed=set_seed)
-
-    print(obs_c2st)
-    assert (
-        0.9 < obs_c2st.mean()
-    )  # distributions do not overlap, classifiers label with high accuracy
+    assert hasattr(obs_c2st, "mean")
+    assert c2st_lowerbound < obs_c2st.mean()
+    assert obs_c2st.mean() <= c2st_upperbound
 
     clf_class = MLPClassifier
     clf_kwargs = {
@@ -140,11 +150,10 @@ def test_c2st_scores(set_seed):
         "n_iter_no_change": 20,
     }
 
-    obs2_c2st = c2st_scores(
-        X, Y, seed=set_seed, clf_class=clf_class, clf_kwargs=clf_kwargs
-    )
+    obs2_c2st = c2st_scores(X, Y, clf_class=clf_class, clf_kwargs=clf_kwargs)
 
-    assert (
-        0.9 < obs2_c2st.mean()
-    )  # distributions do not overlap, classifiers label with high accuracy
+    assert hasattr(obs2_c2st, "mean")
+    assert c2st_lowerbound < obs2_c2st.mean()
+    assert obs2_c2st.mean() <= c2st_upperbound
+
     assert np.allclose(obs2_c2st, obs_c2st, atol=0.05)
