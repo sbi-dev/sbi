@@ -845,7 +845,7 @@ class DefaultEmbeddingNet(nn.Module):
 
     def forward(self, x: Tensor) -> Tensor:
         if self.linear is None:
-            num_features = x[0].numel()
+            num_features = x.shape[-1]
             self.linear = nn.Linear(num_features, num_features)
 
         x = self.linear(x)
