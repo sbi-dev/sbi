@@ -1,9 +1,11 @@
+import copy
 import warnings
-from typing import Dict, Tuple
+from typing import Callable, Dict, List, Tuple
 
 import torch
 from joblib import Parallel, delayed
 from scipy.stats import kstest, uniform
+from sklearn.linear_model import LogisticRegression
 from torch import Tensor, ones, zeros
 from torch.distributions import Uniform
 from tqdm.auto import tqdm
@@ -57,9 +59,7 @@ def run_sbc(
             of 100s to give reliable SBC results. We recommend using at least 300."""
         )
 
-    assert (
-        thetas.shape[0] == xs.shape[0]
-    ), "Unequal number of parameters and observations."
+    assert thetas.shape[0] == xs.shape[0], "Unequal number of parameters and observations."
 
     thetas_batches = torch.split(thetas, sbc_batch_size, dim=0)
     xs_batches = torch.split(xs, sbc_batch_size, dim=0)
@@ -78,9 +78,7 @@ def run_sbc(
             )
         ) as progress_bar:
             sbc_outputs = Parallel(n_jobs=num_workers)(
-                delayed(sbc_on_batch)(
-                    thetas_batch, xs_batch, posterior, num_posterior_samples
-                )
+                delayed(sbc_on_batch)(thetas_batch, xs_batch, posterior, num_posterior_samples)
                 for thetas_batch, xs_batch in zip(thetas_batches, xs_batches)
             )
     else:
@@ -227,9 +225,7 @@ def check_sbc(
         )
 
     ks_pvals = check_uniformity_frequentist(ranks, num_posterior_samples)
-    c2st_ranks = check_uniformity_c2st(
-        ranks, num_posterior_samples, num_repetitions=num_c2st_repetitions
-    )
+    c2st_ranks = check_uniformity_c2st(ranks, num_posterior_samples, num_repetitions=num_c2st_repetitions)
     c2st_scores_dap = check_prior_vs_dap(prior_samples, dap_samples)
 
     return dict(
@@ -253,12 +249,7 @@ def check_prior_vs_dap(prior_samples: Tensor, dap_samples: Tensor) -> Tensor:
 
     assert prior_samples.shape == dap_samples.shape
 
-    return torch.tensor(
-        [
-            c2st(s1.unsqueeze(1), s2.unsqueeze(1))
-            for s1, s2 in zip(prior_samples.T, dap_samples.T)
-        ]
-    )
+    return torch.tensor([c2st(s1.unsqueeze(1), s2.unsqueeze(1)) for s1, s2 in zip(prior_samples.T, dap_samples.T)])
 
 
 def check_uniformity_frequentist(ranks, num_posterior_samples) -> Tensor:
@@ -276,19 +267,14 @@ def check_uniformity_frequentist(ranks, num_posterior_samples) -> Tensor:
             one for each dim_parameters.
     """
     kstest_pvals = torch.tensor(
-        [
-            kstest(rks, uniform(loc=0, scale=num_posterior_samples).cdf)[1]
-            for rks in ranks.T
-        ],
+        [kstest(rks, uniform(loc=0, scale=num_posterior_samples).cdf)[1] for rks in ranks.T],
         dtype=torch.float32,
     )
 
     return kstest_pvals
 
 
-def check_uniformity_c2st(
-    ranks, num_posterior_samples, num_repetitions: int = 1
-) -> Tensor:
+def check_uniformity_c2st(ranks, num_posterior_samples, num_repetitions: int = 1) -> Tensor:
     """Return c2st scores for uniformity of the ranks.
 
     Run a c2st between ranks and uniform samples.
@@ -309,9 +295,7 @@ def check_uniformity_c2st(
             [
                 c2st(
                     rks.unsqueeze(1),
-                    Uniform(zeros(1), num_posterior_samples * ones(1)).sample(
-                        (ranks.shape[0],)
-                    ),
+                    Uniform(zeros(1), num_posterior_samples * ones(1)).sample((ranks.shape[0],)),
                 )
                 for rks in ranks.T
             ]
@@ -329,3 +313,120 @@ def check_uniformity_c2st(
 
     # Return the mean over repetitions as c2st score estimate.
     return c2st_scores.mean(0)
+
+
+def local_sbc_test(
+    xs_test: Tensor,
+    xs_train: Tensor,
+    xs_ranks: Tensor,
+    num_posterior_samples: int = 1000,
+    alphas: Tensor = torch.linspace(0.05, 0.95, 21),
+    classifier: Callable = LogisticRegression(penalty="none", solver="saga", max_iter=10000),
+    null_distr_samples: int = 300,
+) -> Tuple[List[Tensor], List[Tensor], List[Tensor], List[Tensor]]:
+    """Compute local coverage tests using the ranks computed by sbc. 
+    
+    Returns for each dimension of theta the global and local p-values as well as quantile predictions based on sbc ranks at test points xs_test and quantile predictions based on uniform samples at test points xs_test.
+    
+    The local coverage test is implemented as proposed in Zhao et al., "Validating Conditional Density Models and Bayesian Inference Algorithms", https://proceedings.mlr.press/v161/zhao21b/zhao21b.pdf.
+
+    Parameters
+    ----------
+    xs_test:
+        Test observations the posterior will be evaluated at.
+    xs_train:
+        Training observations used as input to run_sbc.
+    xs_ranks:
+        Ranks returned by run_sbc.
+    num_posterior_samples:
+        Number of posterior samples used for run_sbc.
+    alphas:
+        Posterior quantiles that will be compared to the normalized sbc ranks.
+        A linspace from 0 to 1 might lead to errors due to no ranks being smaller/larger than 0/1.
+    classifier:
+        Regression classifier that will be used for predicting the posterior
+        quantiles at the test observations based on normalized sbc ranks or uniform samples.
+    null_distr_samples:
+        Determines how many uniform test statistics will be used for computing the p-values.
+        Reasonable values for null_distr_samples might lie in (200, 1000).
+
+    Returns
+    -------
+    global_pvalues_per_dim:
+        List of p-values per dimension of theta averaged over all test observations. These values are supposed to not be significant if the posterior is correct.
+    local_pvalues_per_dim:
+        List of p-values per dimension of theta and test observation. These values are supposed to not be significant if the posterior is correct.
+    rank_predictions_per_dim:
+        List of posterior quantile predictions per alpha per dimension of theta, xs_test point and alpha quantile. The predictions are based on the normalized sbc ranks.
+    uniform_predictions_per_dim:
+        List of alpha predictions per dimension of theta, null_distr_samples value, xs_test point and alpha quantile. The predictions are based on uniform distribution samples.
+    """
+    rank_predictions_per_dim = []
+    uniform_predictions_per_dim = []
+    local_pvalues_per_dim = []
+    global_pvalues_per_dim = []
+
+    for dim in range(xs_ranks.shape[1]):
+
+        # Normalize ranks
+        xo_ranks = torch.ravel(xs_ranks[:, dim]) / num_posterior_samples
+
+        ### Calculate local test at points of interest xo_test
+        rank_predictions = torch.zeros(size=(xs_test.shape[0], len(alphas)))
+
+        for i, alpha in enumerate(alphas):
+            # Fit training samples and PIT indicators/ranks
+            ind_train = [1 * (rank <= alpha) for rank in xo_ranks]
+            rhat_rank = copy.deepcopy(classifier)
+            rhat_rank.fit(X=xs_train, y=ind_train)
+
+            # Predict on test samples
+            pred = rhat_rank.predict_proba(xs_test)[:, 1]
+            rank_predictions[:, i] = torch.FloatTensor(pred)
+
+        # Compute test statistic T for the rank predictions
+        T_rank = torch.mean((rank_predictions - alphas) ** 2, dim=1)
+        # Compute test statistic S for the rank predictions
+        S_rank = torch.mean(T_rank)
+
+        rank_predictions_per_dim.append(rank_predictions)
+
+        ### Refit the classifier using Uniform(0,1) values in place of true PIT values/rank
+        T_uni = torch.zeros(size=(null_distr_samples, xs_test.shape[0]))
+        uniform_predictions = torch.zeros(size=(null_distr_samples, xs_test.shape[0], len(alphas)))
+
+        for b in range(null_distr_samples):
+
+            uniform_predictions_b = torch.zeros(size=(xs_test.shape[0], len(alphas)))
+
+            # Sample from uniform distribution instead of using PIT values/ranks
+            uni_sample = Uniform(0, 1).sample((xo_ranks.shape[0],))
+
+            for i, alpha in enumerate(alphas):
+                # Fit training samples and uniform indicators
+                ind_train = [1 * (sample <= alpha) for sample in uni_sample]
+                rhat_uni = copy.deepcopy(classifier)
+                rhat_uni.fit(X=xs_train, y=ind_train)
+
+                # Predict on test samples
+                preds = rhat_uni.predict_proba(xs_test)[:, 1]
+                uniform_predictions_b[:, i] = torch.FloatTensor(preds)
+
+            # Compute test statistic T for uniform samples
+            T_uni[b] = torch.mean((uniform_predictions_b - alphas) ** 2, dim=1)
+            # Save predictions in order to compute confidence bands
+            uniform_predictions[b] = uniform_predictions_b
+
+        # Compute test statistic S for uniform samples
+        S_uni = torch.mean(T_uni, dim=1)
+
+        uniform_predictions_per_dim.append(uniform_predictions)
+
+        # Compute local p-value
+        local_pvalues = torch.mean(1.0 * (T_rank < T_uni), dim=0)
+        local_pvalues_per_dim.append(local_pvalues)
+        # Compute global p-value
+        global_pvalue = torch.mean(1.0 * (S_rank < S_uni))
+        global_pvalues_per_dim.append(global_pvalue)
+
+    return global_pvalues_per_dim, local_pvalues_per_dim, rank_predictions_per_dim, uniform_predictions_per_dim
