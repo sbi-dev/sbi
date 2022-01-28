@@ -8,11 +8,14 @@ import matplotlib as mpl
 import numpy as np
 import six
 import torch
-from torch import Tensor
 from matplotlib import pyplot as plt
+<<<<<<< HEAD
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from scipy.stats import binom, gaussian_kde
+=======
+from scipy.stats import gaussian_kde
+>>>>>>> 7456994 (apply isort)
 from torch import Tensor
 
 from sbi.analysis import eval_conditional_density
