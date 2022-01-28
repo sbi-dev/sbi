@@ -43,7 +43,7 @@ def test_mcabc_inference_on_linear_gaussian(
 
     phat = inferer(
         x_o,
-        100000,
+        120000,
         quantile=0.01,
         lra=lra,
         sass=sass,
@@ -82,7 +82,7 @@ def test_smcabc_inference_on_linear_gaussian(
     kde=False,
     kde_bandwidth="cv",
     transform=False,
-    num_simulations=120000,
+    num_simulations=20000,
 ):
     x_o = zeros((1, num_dim))
     num_samples = 1000
@@ -151,7 +151,7 @@ def test_smcabc_sass_lra(lra, sass_expansion_degree, set_seed):
         sass=True,
         sass_expansion_degree=sass_expansion_degree,
         prior_type="gaussian",
-        num_simulations=120000,
+        num_simulations=20000,
     )
 
 

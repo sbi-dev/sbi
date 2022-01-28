@@ -7,7 +7,7 @@ from sbi.utils.conditional_density_utils import (
 from sbi.utils.get_nn_models import classifier_nn, likelihood_nn, posterior_nn
 from sbi.utils.io import get_data_root, get_log_root, get_project_root
 from sbi.utils.kde import KDEWrapper, get_kde
-from sbi.utils.plot import conditional_pairplot, pairplot
+from sbi.utils.potentialutils import pyro_potential_wrapper, transformed_potential
 from sbi.utils.restriction_estimator import RestrictedPrior, RestrictionEstimator
 from sbi.utils.sbiutils import (
     batched_mixture_mv,
@@ -22,6 +22,7 @@ from sbi.utils.sbiutils import (
     handle_invalid_x,
     logit,
     mask_sims_from_prior,
+    match_theta_and_x_batch_shapes,
     mcmc_transform,
     mog_log_prob,
     standardizing_net,
@@ -31,7 +32,6 @@ from sbi.utils.sbiutils import (
     warn_on_invalid_x_for_snpec_leakage,
     within_support,
     x_shape_from_simulation,
-    match_theta_and_x_batch_shapes,
 )
 from sbi.utils.torchutils import (
     BoxUniform,
@@ -62,10 +62,10 @@ from sbi.utils.typechecks import (
 )
 from sbi.utils.user_input_checks import (
     check_estimator_arg,
+    process_prior,
     process_x,
     test_posterior_net_for_multi_d_x,
     validate_theta_and_x,
 )
 from sbi.utils.user_input_checks_utils import MultipleIndependent
 from sbi.utils.potentialutils import transformed_potential, pyro_potential_wrapper
-from sbi.utils.tensorboard_output import plot_summary, list_all_logs

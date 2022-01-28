@@ -6,15 +6,24 @@ from __future__ import annotations
 from typing import Callable
 
 import pytest
+from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
 import torch
 from pyknos.mdn.mdn import MultivariateGaussianMDN
 from scipy.stats import beta, multivariate_normal, uniform
 from torch import Tensor, eye, nn, ones, zeros
 from torch.distributions import Beta, Distribution, Gamma, MultivariateNormal, Uniform
 
-from sbi.inference import SNPE_A, SNPE_C, DirectPosterior, simulate_for_sbi
+from sbi.inference import (
+    SNLE,
+    SNPE_A,
+    SNPE_C,
+    DirectPosterior,
+    likelihood_estimator_based_potential,
+    simulate_for_sbi,
+)
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
+from sbi.utils import within_support, mcmc_transform
 from sbi.utils.torchutils import BoxUniform
 from sbi.utils.user_input_checks import (
     prepare_for_sbi,
@@ -24,7 +33,7 @@ from sbi.utils.user_input_checks import (
     validate_theta_and_x,
 )
 from sbi.utils.user_input_checks_utils import (
-    CustomPytorchWrapper,
+    CustomPriorWrapper,
     MultipleIndependent,
     PytorchReturnTypeWrapper,
     ScipyPytorchWrapper,
@@ -77,24 +86,30 @@ def matrix_simulator(theta):
 
 
 @pytest.mark.parametrize(
-    "wrapper, prior",
+    "wrapper, prior, kwargs",
     (
         (
-            CustomPytorchWrapper,
+            CustomPriorWrapper,
             UserNumpyUniform(zeros(3), ones(3), return_numpy=True),
+            dict(lower_bound=zeros(3), upper_bound=ones(3)),
         ),
-        (ScipyPytorchWrapper, multivariate_normal()),
-        (ScipyPytorchWrapper, uniform()),
-        (ScipyPytorchWrapper, beta(a=1, b=1)),
+        (ScipyPytorchWrapper, multivariate_normal(), dict()),
+        (
+            ScipyPytorchWrapper,
+            uniform(),
+            dict(lower_bound=zeros(1), upper_bound=ones(1)),
+        ),
+        (ScipyPytorchWrapper, beta(a=1, b=1), dict()),
         (
             PytorchReturnTypeWrapper,
             BoxUniform(zeros(3, dtype=torch.float64), ones(3, dtype=torch.float64)),
+            dict(),
         ),
     ),
 )
-def test_prior_wrappers(wrapper, prior):
+def test_prior_wrappers(wrapper, prior, kwargs):
     """Test prior wrappers to pytorch distributions."""
-    prior = wrapper(prior)
+    prior = wrapper(prior, **kwargs)
 
     # use 2 here to test for minimal case >1
     batch_size = 2
@@ -109,6 +124,11 @@ def test_prior_wrappers(wrapper, prior):
 
     # Test return type
     assert prior.sample().dtype == torch.float32
+
+    # Test support check.
+    within_support(prior, prior.sample((2,)))
+    # Test transform
+    mcmc_transform(prior)
 
 
 def test_reinterpreted_batch_dim_prior():
@@ -148,7 +168,10 @@ def test_reinterpreted_batch_dim_prior():
 )
 def test_process_prior(prior):
 
-    prior, parameter_dim, numpy_simulator = process_prior(prior)
+    prior, parameter_dim, numpy_simulator = process_prior(
+        prior,
+        custom_prior_wrapper_kwargs=dict(lower_bound=zeros(3), upper_bound=ones(3)),
+    )
 
     batch_size = 2
     theta = prior.sample((batch_size,))
@@ -549,3 +572,46 @@ def test_train_with_different_data_and_training_device(
     _ = DirectPosterior(
         posterior_estimator=posterior_estimator, prior=prior
     ).set_default_x(x_o)
+
+
+@pytest.mark.parametrize(
+    "kwargs", ({}, dict(lower_bound=zeros(3), upper_bound=ones(3)))
+)
+def test_custom_prior_evaluation(kwargs):
+    # Build custom prior with bounds.
+    num_dim = 3
+    custom_prior = UserNumpyUniform(zeros(num_dim), ones(num_dim), return_numpy=True)
+    prior, *_ = process_prior(
+        custom_prior,
+        custom_prior_wrapper_kwargs=kwargs,
+    )
+
+    ood_samples = 2 * torch.ones(2, num_dim)
+    assert (
+        prior.log_prob(ood_samples) == torch.tensor([-float("inf"), -float("inf")])
+    ).all()
+    # OOD samples are only detected if prior bounds are passed to custom prior.
+    assert within_support(prior, ood_samples).all() == (len(kwargs) == 0)
+    # within support true for prior samples.
+    assert within_support(prior, prior.sample((2,))).all()
+
+
+def test_custom_prior_snle_inference():
+    """Test inference with SNLE using a custom prior with specified bounds."""
+    # Build custom prior with bounds.
+    num_dim = 3
+    custom_prior = UserNumpyUniform(zeros(num_dim), ones(num_dim), return_numpy=True)
+    prior, *_ = process_prior(
+        custom_prior,
+        custom_prior_wrapper_kwargs=dict(
+            lower_bound=zeros(num_dim), upper_bound=ones(num_dim)
+        ),
+    )
+    # Toy inference to test custom prior with bounded support.
+    trainer = SNLE()
+    estimator = trainer.append_simulations(
+        torch.randn(100, 3), torch.rand(100, 1)
+    ).train(max_num_epochs=1)
+    pf, tf = likelihood_estimator_based_potential(estimator, prior, torch.randn(1, 1))
+    posterior = MCMCPosterior(pf, proposal=prior, theta_transform=tf)
+    posterior.sample((10,))

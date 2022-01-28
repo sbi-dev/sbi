@@ -16,9 +16,9 @@ from tensorboard.backend.event_processing.event_accumulator import (
     EventAccumulator,
 )
 
-from sbi.utils.plot import _get_default_opts
-from sbi.utils.io import get_log_root
 import sbi.inference.base
+from sbi.analysis.plot import _get_default_opts
+from sbi.utils.io import get_log_root
 
 # creating an alias for annotating, because sbi.inference.base.NeuralInference creates
 # a circular import error
