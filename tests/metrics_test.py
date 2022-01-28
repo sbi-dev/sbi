@@ -14,26 +14,31 @@ from sbi.utils.metrics import c2st, c2st_scores
 ## c2st related:
 ## for a study about c2st see https://github.com/psteinb/c2st/
 
+TESTCASECONFIG = [
+    (
+        # both samples are identical, the mean accuracy should be around 0.5
+        0.0,  # dist_sigma
+        0.45,  # c2st_lowerbound
+        0.55,  # c2st_upperbound
+    ),
+    (
+        # both samples are rather close, the mean accuracy should be larger than 0.5 and be lower than 1.
+        1.0,
+        0.85,
+        1.0,
+    ),
+    (
+        # both samples are very far apart, the mean accuracy should close to 1.
+        20.0,
+        0.98,
+        1.0,
+    ),
+]
+
 
 @pytest.mark.parametrize(
     "dist_sigma, c2st_lowerbound, c2st_upperbound,",
-    [
-        (
-            0.0,
-            0.45,
-            0.55,
-        ),  # both samples are identical, the mean accuracy should be around 0.5
-        (
-            1.0,
-            0.85,
-            1.0,
-        ),  # both samples are rather close, the mean accuracy should be larger than 0.5 and be lower than 1.
-        (
-            20.0,
-            0.98,
-            1.0,
-        ),  # both samples are very far apart, the mean accuracy should close to 1.
-    ],
+    TESTCASECONFIG,
 )
 def test_c2st_with_different_distributions(
     dist_sigma, c2st_lowerbound, c2st_upperbound, set_seed
@@ -60,23 +65,7 @@ def test_c2st_with_different_distributions(
 @pytest.mark.slow
 @pytest.mark.parametrize(
     "dist_sigma, c2st_lowerbound, c2st_upperbound,",
-    [
-        (
-            0.0,
-            0.45,
-            0.55,
-        ),  # both samples are identical, the mean accuracy should be around 0.5
-        (
-            1.0,
-            0.85,
-            1.0,
-        ),  # both samples are rather close, the mean accuracy should be larger than 0.5 and be lower than 1.
-        (
-            20.0,
-            0.98,
-            1.0,
-        ),  # both samples are very far apart, the mean accuracy should close to 1.
-    ],
+    TESTCASECONFIG,
 )
 def test_c2st_with_different_distributions_mlp(
     dist_sigma, c2st_lowerbound, c2st_upperbound, set_seed
@@ -103,23 +92,7 @@ def test_c2st_with_different_distributions_mlp(
 @pytest.mark.slow
 @pytest.mark.parametrize(
     "dist_sigma, c2st_lowerbound, c2st_upperbound,",
-    [
-        (
-            0.0,
-            0.45,
-            0.55,
-        ),  # both samples are identical, the mean accuracy should be around 0.5
-        (
-            1.0,
-            0.85,
-            1.0,
-        ),  # both samples are rather close, the mean accuracy should be larger than 0.5 and be lower than 1.
-        (
-            20.0,
-            0.98,
-            1.0,
-        ),  # both samples are very far apart, the mean accuracy should close to 1.
-    ],
+    TESTCASECONFIG,
 )
 def test_c2st_scores(dist_sigma, c2st_lowerbound, c2st_upperbound, set_seed):
 
