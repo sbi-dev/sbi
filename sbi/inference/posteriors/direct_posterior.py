@@ -259,50 +259,22 @@ class DirectPosterior(NeuralPosterior):
         clip_max_norm: Optional[float] = 5.0,
         resume_training: bool = False,
         show_train_summary: bool = False,
-        visualize_training_interval: int = 0,
         dataloader_kwargs: Optional[dict] = None,
         device: str = "cpu",
-    ) -> Tensor:
-
+    ) -> Tuple[Tensor, Tensor]:
         r"""
         Return samples from posterior distribution given an observation range, $p(\theta|x_0 < x < x_1)$.
 
-        Samples are obtained either with rejection sampling or MCMC. Rejection sampling
-        will be a lot faster if leakage is rather low. If leakage is high (e.g. over
-        99%, which can happen in multi-round SNPE), MCMC can be faster than rejection
-        sampling.
-
         Args:
-            x_range: Conditioning context for posterior p(theta|x0 < x < x1). Provide interval bounds (upper,lower) for every dimension (resulting shape: n x 2). Set lower and upper bound to ± infinity, if context is provided.
+            x_range: Conditioning context for posterior p(theta|x0 < x < x1). Provide interval bounds (upper,lower) for every dimension (resulting shape: d x 2). Set lower and upper bound to ± infinity, if context is provided.
             x_samples: Samples from p(x) provided by first round of SNPE.
             sample_shape: Desired shape of samples that are drawn from posterior. If sample_shape is multidimensional we simply draw `sample_shape.numel()` samples and then reshape into the desired shape.
+            context: Provide context (fixed dimensions) when only specifying intervals for a subset of the dimensions of x.
             train_px: Whether to train a density estimator on x_samples to estimate p(x) and use it to sample from p(x_0<x<x_1).
             x_flow: Optional argument to pass a normalizing flow to be used as density estimator.
             show_progress_bars: Whether to show sampling progress monitor.
-            sample_with: Method to use for sampling from the posterior. Must be one of
-                [`mcmc` | `rejection`]. With default parameters, `rejection` samples
-                from the posterior estimated by the neural net and rejects only if the
-                samples are outside of the prior support.
-            mcmc_method: Optional parameter to override `self.mcmc_method`.
-            mcmc_parameters: Dictionary overriding the default parameters for MCMC.
-                The following parameters are supported: `thin` to set the thinning
-                factor for the chain, `warmup_steps` to set the initial number of
-                samples to discard, `num_chains` for the number of chains,
-                `init_strategy` for the initialisation strategy for chains; `prior`
-                will draw init locations from prior, whereas `sir` will use Sequential-
-                Importance-Resampling using `init_strategy_num_candidates` to find init
-                locations.
-            rejection_sampling_parameters: Dictionary overriding the default parameters
-                for rejection sampling. The following parameters are supported:
-                `proposal` as the proposal distribtution (default is the trained
-                neural net). `max_sampling_batch_size` as the batchsize of samples
-                being drawn from the proposal at every iteration.
-                `num_samples_to_find_max` as the number of samples that are used to
-                find the maximum of the `potential_fn / proposal` ratio.
-                `num_iter_to_find_max` as the number of gradient ascent iterations to
-                find the maximum of that ratio. `m` as multiplier to that ratio.
-            sample_with_mcmc: Deprecated since `sbi v0.17.0`. Use `sample_with=mcmc`
-                instead.
+            sample_with: This argument only exists to keep backward-compatibility with
+                `sbi` v0.17.2 or older. If it is set, we instantly raise an error.
 
         Returns:
             x_accepted: Accepted observations.
@@ -326,12 +298,16 @@ class DirectPosterior(NeuralPosterior):
 
         if context is not None:
             assert (
-                train_px or (x_flow is not None),
-                "Providing context requires a flow to be passed as argument (x_flow) or trained (train_px=True).",
-            )
+                train_px
+            ), "Providing context requires a flow to be trained, set train_px=True."
+
             assert (
                 range_xs.shape[1] + context.shape[1] == x_samples.shape[1]
-            ), "Please specify context to condition on for all dimensions of your samples. "
+            ), "Please specify either a range or context all dimensions of your samples. "
+        else:
+            assert (
+                range_xs.shape[1] == x_samples.shape[1]
+            ), "When not providing context, please specify a range for all dimensions of your samples. "
 
         if train_px:  # density estimation of p(x)
             if x_flow is None:
@@ -491,7 +467,17 @@ class DirectPosterior(NeuralPosterior):
             log_prob_kwargs={"norm_posterior": False},
         )
 
-    def _get_mask(self, x_range):
+    def _get_mask(self, x_range: Tensor) -> Tensor:
+        r"""
+        Return binary mask based on x_range.
+
+        Args:
+            x_range: Conditioning context for posterior p(theta|x0 < x < x1). Provide interval bounds (upper,lower) for every dimension (resulting shape: d x 2). Set lower and upper bound to ± infinity, if context is provided.
+
+        Returns:
+            mask: Binary mask, same shape as x_range.
+        """
+
         if x_range.type() != "torch.FloatTensor":
             x_range = x_range.float()
         mask = torch.logical_not(
