@@ -2,20 +2,25 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 from __future__ import annotations
+from typing import Optional, Tuple
+from contextlib import nullcontext
 
 import pytest
 import torch
 from torch import eye, ones, zeros
+import torch.nn as nn
 from torch.distributions import MultivariateNormal
 
 from sbi import utils as utils
 from sbi.inference import (
+    NeuralInference,
     SNLE,
     SNPE_A,
     SNPE_C,
     SNRE_A,
     SNRE_B,
     simulate_for_sbi,
+    DirectPosterior,
     MCMCPosterior,
     RejectionPosterior,
     DirectPosterior,
@@ -23,8 +28,14 @@ from sbi.inference import (
     likelihood_estimator_based_potential,
     posterior_estimator_based_potential,
 )
-from sbi.simulators import linear_gaussian
+from sbi.simulators import linear_gaussian, diagonal_linear_gaussian
 from sbi.utils.torchutils import BoxUniform, process_device
+from sbi.utils.user_input_checks import (
+    validate_theta_and_x,
+    prepare_for_sbi,
+    check_embedding_net_device,
+)
+from sbi.utils.get_nn_models import posterior_nn, likelihood_nn, classifier_nn
 
 
 @pytest.mark.slow
@@ -162,6 +173,242 @@ def test_training_and_mcmc_on_device(
 
 
 @pytest.mark.gpu
-@pytest.mark.parametrize("device", ["cpu", "cuda", "cuda:0", "cuda:42"])
-def test_process_device(device: str):
-    process_device(device)
+@pytest.mark.parametrize(
+    "device_input, device_target",
+    [
+        ("cpu", "cpu"),
+        ("cuda", "cuda:0"),
+        ("cuda:0", "cuda:0"),
+        pytest.param("cuda:42", None, marks=pytest.mark.xfail),
+        pytest.param("qwerty", None, marks=pytest.mark.xfail),
+    ],
+)
+def test_process_device(device_input: str, device_target: Optional[str]) -> None:
+    device_output = process_device(device_input)
+    assert device_output == device_target, (
+        f"Failure when processing device '{device_input}': "
+        f"result should have been '{device_target}' and is "
+        f"instead '{device_output}'"
+    )
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize("device_datum", ["cpu", "cuda"])
+@pytest.mark.parametrize("device_embedding_net", ["cpu", "cuda"])
+def test_check_embedding_net_device(
+    device_datum: str, device_embedding_net: str
+) -> None:
+
+    datum = torch.zeros((1, 1)).to(device_datum)
+    embedding_net = nn.Linear(in_features=1, out_features=1).to(device_embedding_net)
+
+    if device_datum != device_embedding_net:
+        with pytest.warns(UserWarning):
+            check_embedding_net_device(datum=datum, embedding_net=embedding_net)
+    else:
+        check_embedding_net_device(datum=datum, embedding_net=embedding_net)
+
+    output_device_net = [p.device for p in embedding_net.parameters()][0]
+    assert datum.device == output_device_net, (
+        f"Failure when processing embedding_net: "
+        f"device should have been set to should have been '{datum.device}' but is "
+        f"still '{output_device_net}'"
+    )
+
+
+@pytest.mark.parametrize(
+    "shape_x",
+    [
+        (3, 1),
+    ],
+)
+@pytest.mark.parametrize(
+    "shape_theta", [(3, 2), pytest.param((2, 1), marks=pytest.mark.xfail)]
+)
+def test_validate_theta_and_x_shapes(
+    shape_x: Tuple[int], shape_theta: Tuple[int]
+) -> None:
+    x = torch.empty(shape_x)
+    theta = torch.empty(shape_theta)
+
+    validate_theta_and_x(theta, x, training_device="cpu")
+
+
+def test_validate_theta_and_x_tensor() -> None:
+    x = torch.empty((1, 1))
+    theta = torch.ones((1, 1)).tolist()
+
+    with pytest.raises(Exception):
+        validate_theta_and_x(theta, x, training_device="cpu")
+
+
+def test_validate_theta_and_x_type() -> None:
+    x = torch.empty((1, 1))
+    theta = torch.empty((1, 1), dtype=int)
+
+    with pytest.raises(Exception):
+        validate_theta_and_x(theta, x, training_device="cpu")
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize("training_device", ["cpu", "cuda:0"])
+@pytest.mark.parametrize("data_device", ["cpu", "cuda:0"])
+def test_validate_theta_and_x_device(training_device: str, data_device: str) -> None:
+    theta = torch.empty((1, 1)).to(data_device)
+    x = torch.empty((1, 1)).to(data_device)
+
+    if training_device != data_device:
+        with pytest.warns(UserWarning):
+            theta, x = validate_theta_and_x(theta, x, training_device=training_device)
+    else:
+        theta, x = validate_theta_and_x(theta, x, training_device=training_device)
+
+    assert str(theta.device) == training_device, (
+        f"Data should have its device converted from '{data_device}' "
+        f"to training_device '{training_device}'."
+    )
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize("inference_method", [SNPE_A, SNPE_C, SNRE_A, SNRE_B, SNLE])
+@pytest.mark.parametrize("data_device", ("cpu", "cuda:0"))
+@pytest.mark.parametrize("training_device", ("cpu", "cuda:0"))
+def test_train_with_different_data_and_training_device(
+    inference_method: NeuralInference, data_device: str, training_device: str
+) -> None:
+
+    assert torch.cuda.is_available(), "this test requires that cuda is available."
+
+    num_dim = 2
+    prior_ = BoxUniform(
+        -torch.ones(num_dim), torch.ones(num_dim), device=training_device
+    )
+    simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior_)
+
+    inference = inference_method(
+        prior,
+        **(
+            dict(classifier="resnet")
+            if inference_method in [SNRE_A, SNRE_B]
+            else dict(
+                density_estimator=(
+                    "mdn_snpe_a" if inference_method == SNPE_A else "maf"
+                )
+            )
+        ),
+        show_progress_bars=False,
+        device=training_device,
+    )
+
+    theta, x = simulate_for_sbi(simulator, prior, 32)
+    theta, x = theta.to(data_device), x.to(data_device)
+    x_o = torch.zeros(x.shape[1])
+    inference = inference.append_simulations(theta, x)
+
+    posterior_estimator = inference.train(max_num_epochs=2)
+
+    # Check for default device for inference object
+    weights_device = next(inference._neural_net.parameters()).device
+    assert torch.device(training_device) == weights_device
+
+    _ = DirectPosterior(
+        posterior_estimator=posterior_estimator, prior=prior
+    ).set_default_x(x_o)
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize("inference_method", [SNPE_A, SNPE_C, SNRE_A, SNRE_B, SNLE])
+@pytest.mark.parametrize("prior_device", ("cpu", "cuda"))
+@pytest.mark.parametrize("embedding_net_device", ("cpu", "cuda"))
+@pytest.mark.parametrize("data_device", ("cpu", "cuda"))
+@pytest.mark.parametrize("training_device", ("cpu", "cuda"))
+def test_embedding_nets_integration_training_device(
+    inference_method: NeuralInference,
+    prior_device: str,
+    embedding_net_device: str,
+    data_device: str,
+    training_device: str,
+) -> None:
+
+    # add other methods
+
+    D_theta = 2
+    D_x = 3
+    samples_per_round = 32
+    num_rounds = 2
+
+    x_o = torch.ones((1, D_x))
+
+    prior = utils.BoxUniform(
+        low=-torch.ones((D_theta,)), high=torch.ones((D_theta,)), device=prior_device
+    )
+
+    if inference_method in [SNRE_A, SNRE_B]:
+        embedding_net_theta = nn.Linear(in_features=D_theta, out_features=2).to(
+            embedding_net_device
+        )
+        embedding_net_x = nn.Linear(in_features=D_x, out_features=2).to(
+            embedding_net_device
+        )
+        nn_kwargs = dict(
+            classifier=classifier_nn(
+                model="resnet",
+                embedding_net_x=embedding_net_x,
+                embedding_net_theta=embedding_net_theta,
+                hidden_features=4,
+            )
+        )
+    elif inference_method == SNLE:
+        embedding_net = nn.Linear(in_features=D_theta, out_features=2).to(
+            embedding_net_device
+        )
+        nn_kwargs = dict(
+            density_estimator=likelihood_nn(
+                model="maf",
+                embedding_net=embedding_net,
+                hidden_features=4,
+                num_transforms=2,
+            )
+        )
+    else:
+        embedding_net = nn.Linear(in_features=D_x, out_features=2).to(
+            embedding_net_device
+        )
+        nn_kwargs = dict(
+            density_estimator=posterior_nn(
+                model="mdn_snpe_a" if inference_method == SNPE_A else "maf",
+                embedding_net=embedding_net,
+                hidden_features=4,
+                num_transforms=2,
+            )
+        )
+
+    with pytest.raises(Exception) if prior_device != training_device else nullcontext():
+        inference = inference_method(prior=prior, **nn_kwargs, device=training_device)
+
+    if prior_device != training_device:
+        pytest.xfail("We do not correct the case of invalid prior device")
+
+    theta = prior.sample((samples_per_round,)).to(data_device)
+
+    proposal = prior
+    for round_idx in range(num_rounds):
+        X = (
+            MultivariateNormal(torch.zeros((D_x,)), torch.eye(D_x))
+            .sample((samples_per_round,))
+            .to(data_device)
+        )
+
+        with pytest.warns(
+            UserWarning
+        ) if data_device != training_device else nullcontext():
+            density_estimator_append = inference.append_simulations(theta, X)
+
+        with pytest.warns(UserWarning) if (round_idx == 0) and (
+            embedding_net_device != training_device
+        ) else nullcontext():
+            density_estimator_train = density_estimator_append.train(max_num_epochs=2)
+
+        posterior = inference.build_posterior(density_estimator_train)
+        proposal = posterior.set_default_x(x_o)
+        theta = proposal.sample((samples_per_round,))

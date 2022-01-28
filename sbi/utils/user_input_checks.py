@@ -213,7 +213,7 @@ def check_prior_batch_dims(prior) -> None:
             using `torch.distributions.Independent` to reinterpret batch dimensions as
             event dimensions, or use the `MultipleIndependent` distribution we provide.
 
-            To use `sbi.utils.MultipleIndependent`, just pass a list of priors, e.g. to 
+            To use `sbi.utils.MultipleIndependent`, just pass a list of priors, e.g. to
             specify a uniform prior over two parameters, pass as prior:
                 prior = [
                             Uniform(torch.zeros(1), torch.ones(1)),
@@ -269,7 +269,7 @@ def check_for_possibly_batched_x_shape(x_shape):
                     of sbi might not provide stable support for this and result in
                     shape mismatches.
 
-            NOTE: below we use list notation to reduce clutter, but `x` should be of 
+            NOTE: below we use list notation to reduce clutter, but `x` should be of
             type torch.Tensor or ndarray.
 
             For example:
@@ -327,7 +327,7 @@ def check_prior_attributes(prior) -> None:
     except:  # Catch any other error.
         raise ValueError(
             f"""Something went wrong when sampling a batch of parameters
-            from the prior as `prior.sample(({num_samples}, ))`. Consider using a 
+            from the prior as `prior.sample(({num_samples}, ))`. Consider using a
             PyTorch distribution."""
         )
     try:
@@ -393,6 +393,27 @@ def check_prior_support(prior):
             """The prior must implement the support property or allow to call
             .log_prob() outside of support."""
         )
+
+
+def check_embedding_net_device(embedding_net: nn.Module, datum: torch.Tensor) -> None:
+    datum_device = datum.device
+    embedding_net_devices = [p.device for p in embedding_net.parameters()]
+    if len(embedding_net_devices) > 0:
+        embedding_net_device = embedding_net_devices[0]
+        if embedding_net_device != datum_device:
+            warnings.warn(
+                "Mismatch between the device of the data fed "
+                "to the embedding_net and the device of the "
+                "embedding_net's weights. Fed data has device "
+                f"'{datum_device}' vs embedding_net weights have "
+                f"device '{embedding_net_device}'. "
+                "Automatically switching the embedding_net's device to "
+                f"'{datum_device}', which could otherwise be done manually "
+                f"""using the line `embedding_net.to('{datum_device}')`."""
+            )
+            embedding_net.to(datum_device)
+    else:
+        pass
 
 
 def process_simulator(
@@ -629,13 +650,20 @@ def validate_theta_and_x(
     assert theta.dtype == float32, "Type of parameters must be float32."
     assert x.dtype == float32, "Type of simulator outputs must be float32."
 
-    simulations_device = f"{x.device.type}:{x.device.index}"
-    if "cpu" not in simulations_device and "cpu" in training_device:
-        logging.warning(
-            f"""Simulations are on {simulations_device} but training device is
-            set to {training_device}, moving data to device to {training_device}."""
+    if str(x.device) != training_device:
+        warnings.warn(
+            f"Data x has device '{x.device}' "
+            f"different from the training_device '{training_device}', "
+            f"moving x to the training_device '{training_device}'."
         )
         x = x.to(training_device)
+
+    if str(theta.device) != training_device:
+        warnings.warn(
+            f"Parameters theta has device '{theta.device}' "
+            f"different from the training_device '{training_device}', "
+            f"moving theta to the training_device '{training_device}'."
+        )
         theta = theta.to(training_device)
 
     return theta, x

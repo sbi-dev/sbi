@@ -24,7 +24,7 @@ from sbi.utils import (
     warn_on_invalid_x_for_snpec_leakage,
 )
 from sbi.utils.sbiutils import get_simulations_since_round
-from sbi.utils.torchutils import process_device
+from sbi.utils.torchutils import process_device, check_if_prior_on_device
 from sbi.utils.user_input_checks import prepare_for_sbi
 
 
@@ -117,8 +117,9 @@ class NeuralInference(ABC):
                 0.14.0 is more mature, we will remove this argument.
         """
 
-        self._prior = prior
         self._device = process_device(device)
+        check_if_prior_on_device(self._device, prior)
+        self._prior = prior
 
         if unused_args:
             warn(

@@ -8,6 +8,8 @@ from torch import Tensor, nn
 
 import sbi.utils as utils
 
+from sbi.utils.user_input_checks import check_embedding_net_device
+
 
 def build_mdn(
     batch_x: Tensor = None,
@@ -43,6 +45,13 @@ def build_mdn(
     """
     x_numel = batch_x[0].numel()
     # Infer the output dimensionality of the embedding_net by making a forward pass.
+    assert batch_x.device == batch_y.device, (
+        "Mismatch in fed data's device: "
+        f"batch_x has device '{batch_x.device}' whereas "
+        f"batch_x has device '{batch_x.device}'. Please "
+        "call the build function using data from a common device."
+    )
+    check_embedding_net_device(embedding_net=embedding_net, datum=batch_y)
     y_numel = embedding_net(batch_y[:1]).numel()
 
     transform = transforms.IdentityTransform()
