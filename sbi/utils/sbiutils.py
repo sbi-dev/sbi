@@ -830,3 +830,24 @@ def gradient_ascent(
         return argmax_, max_val
 
     return theta_transform.inv(best_theta_overall), max_val
+
+
+class DefaultEmbeddingNet(nn.Module):
+    def __init__(self):
+        """Class for default embedding net:
+        Small Neural Net that maps the context onto the flow via a basic Linear
+        Layer with same input/output dimensions and a non-linear activation
+        function.
+        """
+        super().__init__()
+        self.activation = nn.ReLU()
+        self.linear = None
+
+    def forward(self, x: Tensor) -> Tensor:
+        if self.linear is None:
+            num_features = x[0].numel()
+            self.linear = nn.Linear(num_features, num_features)
+
+        x = self.linear(x)
+        x = self.activation(x)
+        return x
