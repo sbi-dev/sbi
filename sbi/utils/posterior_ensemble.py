@@ -2,9 +2,10 @@ import torch
 from sbi.utils import gradient_ascent
 from sbi.utils.torchutils import ensure_theta_batched
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
-from sbi.utils.user_input_checks import process_x
-from sbi.utils.sbiutils import match_theta_and_x_batch_shapes, within_support
-from sbi.inference.potentials.base_potential import BasePotential
+
+# from sbi.utils.user_input_checks import process_x
+# from sbi.utils.sbiutils import match_theta_and_x_batch_shapes, within_support
+# from sbi.inference.potentials.base_potential import BasePotential
 
 from sbi.types import Shape
 from torch import Tensor
@@ -266,6 +267,59 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
             )[0]
 
 
+class EnsemblePotentialProvider:
+    def __init__(
+        self,
+        posteriors: List,
+        weights: Tensor,
+        x_o: Optional[Tensor],
+        device: str = "cpu",
+    ):
+        r"""Returns the potential for ensemlbe based posteriors.
+
+        The potential is the same as the sum of the weighted log-probabilities of each
+        component posterior.
+
+        Args:
+            posteriors: List containing the trained posterior instances that will make
+                up the ensemble.
+            weights: Weights of the ensemble components.
+            x_o: The observed data at which to evaluate the posterior.
+
+        Returns:
+            The potential function.
+        """
+        self._weights = weights
+        self.potential_fns = []
+        for posterior in posteriors:
+            potential_fn = posterior.potential_fn
+            potential_fn.set_x(posterior._x_else_default_x(x_o))
+            self.potential_fns.append(potential_fn)
+
+    def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
+        r"""Returns the potential for posterior-based methods.
+
+        Args:
+            theta: The parameter set at which to evaluate the potential function.
+            track_gradients: Whether to track the gradients.
+
+        Returns:
+            The potential.
+        """
+        theta = ensure_theta_batched(torch.as_tensor(theta))
+
+        log_probs = [
+            fn(theta, track_gradients=track_gradients) for fn in self.potential_fns
+        ]
+        log_probs = torch.vstack(log_probs)
+        ensemble_log_probs = torch.logsumexp(
+            torch.log(self._weights.reshape(-1, 1)).expand_as(log_probs) + log_probs,
+            dim=0,
+        )
+        return ensemble_log_probs
+
+
+# TODO: IMPLEMENT PROPER CLASS
 # class EnsemblePotentialProvider(BasePotential):
 #     def __init__(self, posteriors, x_o: Optional[Tensor], device: str = "cpu"):
 #         super().__init__(None, x_o, device)
@@ -317,41 +371,3 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
 #             #     torch.tensor(float("-inf"), dtype=torch.float32, device=self.device),
 #             # )
 #         return posterior_log_prob
-
-
-class EnsemblePotentialProvider:
-    def __init__(
-        self,
-        posteriors: List,
-        weights: Tensor,
-        x_o: Optional[Tensor],
-        device: str = "cpu",
-    ):
-        self._weights = weights
-        self.potential_fns = []
-        for posterior in posteriors:
-            potential_fn = posterior.potential_fn
-            potential_fn.set_x(posterior._x_else_default_x(x_o))
-            self.potential_fns.append(potential_fn)
-
-    def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
-        r"""Returns the potential for posterior-based methods.
-
-        Args:
-            theta: The parameter set at which to evaluate the potential function.
-            track_gradients: Whether to track the gradients.
-
-        Returns:
-            The potential.
-        """
-        theta = ensure_theta_batched(torch.as_tensor(theta))
-
-        log_probs = [
-            fn(theta, track_gradients=track_gradients) for fn in self.potential_fns
-        ]
-        log_probs = torch.vstack(log_probs)
-        ensemble_log_probs = torch.logsumexp(
-            torch.log(self._weights.reshape(-1, 1)).expand_as(log_probs) + log_probs,
-            dim=0,
-        )
-        return ensemble_log_probs
