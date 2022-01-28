@@ -9,9 +9,9 @@ import matplotlib as mpl
 import numpy as np
 import six
 import torch
-from torch import Tensor
 from matplotlib import pyplot as plt
 from scipy.stats import gaussian_kde
+from torch import Tensor
 
 from sbi.utils import eval_conditional_density
 
