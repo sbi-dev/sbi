@@ -1,12 +1,13 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
+from typing import Optional
 
 import torch
 from pyknos.nflows.nn import nets
 from torch import Tensor, nn, relu
 
-from sbi.utils.sbiutils import standardizing_net
+from sbi.utils.sbiutils import standardizing_net, z_score_parser
 
 
 class StandardizeInputs(nn.Module):
@@ -34,8 +35,8 @@ class StandardizeInputs(nn.Module):
 def build_input_layer(
     batch_x: Tensor = None,
     batch_y: Tensor = None,
-    z_score_x: bool = True,
-    z_score_y: bool = True,
+    z_score_x: Optional[str] = "independent",
+    z_score_y: Optional[str] = "independent",
     embedding_net_x: nn.Module = nn.Identity(),
     embedding_net_y: nn.Module = nn.Identity(),
 ) -> nn.Module:
@@ -46,8 +47,14 @@ def build_input_layer(
     Args:
         batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
         batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
-        z_score_x: Whether to z-score xs passing into the network.
-        z_score_y: Whether to z-score ys passing into the network.
+        z_score_x: Whether to z-score xs passing into the network, can be one of:
+            - `none`, or None: do not z-score.
+            - `independent`: z-score each dimension independently.
+            - `structured`: treat dimensions as related, therefore compute mean and std
+            over the entire batch, instead of per-dimension. Should be used when each
+            sample is, for example, a time series or an image.
+        z_score_y: Whether to z-score ys passing into the network, same options as
+            z_score_x.
         hidden_features: Number of hidden features.
         embedding_net_x: Optional embedding network for x.
         embedding_net_y: Optional embedding network for y.
@@ -55,11 +62,17 @@ def build_input_layer(
     Returns:
         Input layer that optionally z-scores.
     """
+    z_score_x, structured_x = z_score_parser(z_score_x)
     if z_score_x:
-        embedding_net_x = nn.Sequential(standardizing_net(batch_x), embedding_net_x)
+        embedding_net_x = nn.Sequential(
+            standardizing_net(batch_x, structured_x), embedding_net_x
+        )
 
+    z_score_y, structured_y = z_score_parser(z_score_y)
     if z_score_y:
-        embedding_net_y = nn.Sequential(standardizing_net(batch_y), embedding_net_y)
+        embedding_net_y = nn.Sequential(
+            standardizing_net(batch_y, structured_y), embedding_net_y
+        )
 
     input_layer = StandardizeInputs(
         embedding_net_x, embedding_net_y, dim_x=batch_x.shape[1], dim_y=batch_y.shape[1]
@@ -71,8 +84,8 @@ def build_input_layer(
 def build_linear_classifier(
     batch_x: Tensor = None,
     batch_y: Tensor = None,
-    z_score_x: bool = True,
-    z_score_y: bool = True,
+    z_score_x: Optional[str] = "independent",
+    z_score_y: Optional[str] = "independent",
     embedding_net_x: nn.Module = nn.Identity(),
     embedding_net_y: nn.Module = nn.Identity(),
     **kwargs
@@ -84,8 +97,14 @@ def build_linear_classifier(
     Args:
         batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
         batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
-        z_score_x: Whether to z-score xs passing into the network.
-        z_score_y: Whether to z-score ys passing into the network.
+        z_score_x: Whether to z-score xs passing into the network, can be one of:
+            - `none`, or None: do not z-score.
+            - `independent`: z-score each dimension independently.
+            - `structured`: treat dimensions as related, therefore compute mean and std
+            over the entire batch, instead of per-dimension. Should be used when each
+            sample is, for example, a time series or an image.
+        z_score_y: Whether to z-score ys passing into the network, same options as
+            z_score_x.
         embedding_net_x: Optional embedding network for x.
         embedding_net_y: Optional embedding network for y.
         kwargs: Additional arguments that are passed by the build function but are not
@@ -113,8 +132,8 @@ def build_linear_classifier(
 def build_mlp_classifier(
     batch_x: Tensor = None,
     batch_y: Tensor = None,
-    z_score_x: bool = True,
-    z_score_y: bool = True,
+    z_score_x: Optional[str] = "independent",
+    z_score_y: Optional[str] = "independent",
     hidden_features: int = 50,
     embedding_net_x: nn.Module = nn.Identity(),
     embedding_net_y: nn.Module = nn.Identity(),
@@ -126,8 +145,14 @@ def build_mlp_classifier(
     Args:
         batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
         batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
-        z_score_x: Whether to z-score xs passing into the network.
-        z_score_y: Whether to z-score ys passing into the network.
+        z_score_x: Whether to z-score xs passing into the network, can be one of:
+            - `none`, or None: do not z-score.
+            - `independent`: z-score each dimension independently.
+            - `structured`: treat dimensions as related, therefore compute mean and std
+            over the entire batch, instead of per-dimension. Should be used when each
+            sample is, for example, a time series or an image.
+        z_score_y: Whether to z-score ys passing into the network, same options as
+            z_score_x.
         hidden_features: Number of hidden features.
         embedding_net_x: Optional embedding network for x.
         embedding_net_y: Optional embedding network for y.
@@ -162,8 +187,8 @@ def build_mlp_classifier(
 def build_resnet_classifier(
     batch_x: Tensor = None,
     batch_y: Tensor = None,
-    z_score_x: bool = True,
-    z_score_y: bool = True,
+    z_score_x: Optional[str] = "independent",
+    z_score_y: Optional[str] = "independent",
     hidden_features: int = 50,
     embedding_net_x: nn.Module = nn.Identity(),
     embedding_net_y: nn.Module = nn.Identity(),
@@ -175,8 +200,14 @@ def build_resnet_classifier(
     Args:
         batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
         batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
-        z_score_x: Whether to z-score xs passing into the network.
-        z_score_y: Whether to z-score ys passing into the network.
+        z_score_x: Whether to z-score xs passing into the network, can be one of:
+            - `none`, or None: do not z-score.
+            - `independent`: z-score each dimension independently.
+            - `structured`: treat dimensions as related, therefore compute mean and std
+            over the entire batch, instead of per-dimension. Should be used when each
+            sample is, for example, a time series or an image.
+        z_score_y: Whether to z-score ys passing into the network, same options as
+            z_score_x.
         hidden_features: Number of hidden features.
         embedding_net_x: Optional embedding network for x.
         embedding_net_y: Optional embedding network for y.

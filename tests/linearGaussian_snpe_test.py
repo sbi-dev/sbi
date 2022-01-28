@@ -255,7 +255,10 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str, set_seed):
     target_samples = gt_posterior.sample((num_samples,))
 
     if method_str == "snpe_c_non_atomic":
-        density_estimator = utils.posterior_nn("mdn", num_components=5)
+        # Test whether SNPE works properly with structured z-scoring.
+        density_estimator = utils.posterior_nn(
+            "mdn", z_score_x="structured", num_components=5
+        )
         method_str = "snpe_c"
     elif method_str == "snpe_a":
         density_estimator = "mdn_snpe_a"
@@ -416,7 +419,8 @@ def test_sample_conditional(set_seed):
         else:
             return linear_gaussian(theta, -likelihood_shift, likelihood_cov)
 
-    net = utils.posterior_nn("maf", hidden_features=20)
+    # Test whether SNPE works properly with structured z-scoring.
+    net = utils.posterior_nn("maf", z_score_x="structured", hidden_features=20)
 
     simulator, prior = prepare_for_sbi(simulator, prior)
 

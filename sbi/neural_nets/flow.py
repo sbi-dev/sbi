@@ -10,7 +10,11 @@ from pyknos.nflows import flows, transforms
 from pyknos.nflows.nn import nets
 from torch import Tensor, nn, relu, tanh, tensor, uint8
 
-from sbi.utils.sbiutils import standardizing_net, standardizing_transform
+from sbi.utils.sbiutils import (
+    standardizing_net,
+    standardizing_transform,
+    z_score_parser,
+)
 from sbi.utils.torchutils import create_alternating_binary_mask
 
 
@@ -29,8 +33,14 @@ def build_made(
     Args:
         batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
         batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
-        z_score_x: Whether to z-score xs passing into the network.
-        z_score_y: Whether to z-score ys passing into the network.
+        z_score_x: Whether to z-score xs passing into the network, can be one of:
+            - `none`, or None: do not z-score.
+            - `independent`: z-score each dimension independently.
+            - `structured`: treat dimensions as related, therefore compute mean and std
+            over the entire batch, instead of per-dimension. Should be used when each
+            sample is, for example, a time series or an image.
+        z_score_y: Whether to z-score ys passing into the network, same options as
+            z_score_x.
         hidden_features: Number of hidden features.
         num_mixture_components: Number of mixture components.
         embedding_net: Optional embedding network for y.
@@ -49,12 +59,16 @@ def build_made(
 
     transform = transforms.IdentityTransform()
 
+    z_score_x, structured_x = z_score_parser(z_score_x)
     if z_score_x:
-        transform_zx = standardizing_transform(batch_x)
+        transform_zx = standardizing_transform(batch_x, structured_x)
         transform = transforms.CompositeTransform([transform_zx, transform])
 
+    z_score_y, structured_y = z_score_parser(z_score_y)
     if z_score_y:
-        embedding_net = nn.Sequential(standardizing_net(batch_y), embedding_net)
+        embedding_net = nn.Sequential(
+            standardizing_net(batch_y, structured_y), embedding_net
+        )
 
     distribution = distributions_.MADEMoG(
         features=x_numel,
@@ -90,8 +104,14 @@ def build_maf(
     Args:
         batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
         batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
-        z_score_x: Whether to z-score xs passing into the network.
-        z_score_y: Whether to z-score ys passing into the network.
+        z_score_x: Whether to z-score xs passing into the network, can be one of:
+            - `none`, or None: do not z-score.
+            - `independent`: z-score each dimension independently.
+            - `structured`: treat dimensions as related, therefore compute mean and std
+            over the entire batch, instead of per-dimension. Should be used when each
+            sample is, for example, a time series or an image.
+        z_score_y: Whether to z-score ys passing into the network, same options as
+            z_score_x.
         hidden_features: Number of hidden features.
         num_transforms: Number of transforms.
         embedding_net: Optional embedding network for y.
@@ -126,11 +146,17 @@ def build_maf(
         ]
         transform_list += block
 
+    z_score_x, structured_x = z_score_parser(z_score_x)
     if z_score_x:
-        transform_list = [standardizing_transform(batch_x)] + transform_list
+        transform_list = [
+            standardizing_transform(batch_x, structured_x)
+        ] + transform_list
 
+    z_score_y, structured_y = z_score_parser(z_score_y)
     if z_score_y:
-        embedding_net = nn.Sequential(standardizing_net(batch_y), embedding_net)
+        embedding_net = nn.Sequential(
+            standardizing_net(batch_y, structured_y), embedding_net
+        )
 
     # Combine transforms.
     transform = transforms.CompositeTransform(transform_list)
@@ -159,8 +185,14 @@ def build_nsf(
     Args:
         batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
         batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
-        z_score_x: Whether to z-score xs passing into the network.
-        z_score_y: Whether to z-score ys passing into the network.
+        z_score_x: Whether to z-score xs passing into the network, can be one of:
+            - `none`, or None: do not z-score.
+            - `independent`: z-score each dimension independently.
+            - `structured`: treat dimensions as related, therefore compute mean and std
+            over the entire batch, instead of per-dimension. Should be used when each
+            sample is, for example, a time series or an image.
+        z_score_y: Whether to z-score ys passing into the network, same options as
+            z_score_x.
         hidden_features: Number of hidden features.
         num_transforms: Number of transforms.
         num_bins: Number of bins used for the splines.
@@ -228,12 +260,19 @@ def build_nsf(
             )
         transform_list += block
 
+    z_score_x, structured_x = z_score_parser(z_score_x)
     if z_score_x:
         # Prepend standardizing transform to nsf transforms.
-        transform_list = [standardizing_transform(batch_x)] + transform_list
+        transform_list = [
+            standardizing_transform(batch_x, structured_x)
+        ] + transform_list
+
+    z_score_y, structured_y = z_score_parser(z_score_y)
     if z_score_y:
         # Prepend standardizing transform to y-embedding.
-        embedding_net = nn.Sequential(standardizing_net(batch_y), embedding_net)
+        embedding_net = nn.Sequential(
+            standardizing_net(batch_y, structured_y), embedding_net
+        )
 
     distribution = distributions_.StandardNormal((x_numel,))
 

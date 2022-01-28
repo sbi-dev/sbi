@@ -91,6 +91,7 @@ def test_inference_with_2d_x(embedding, method):
     else:
         net_provider = utils.classifier_nn(
             model="mlp",
+            z_score_theta="structured",  # Test that structured z-scoring works.
             embedding_net_x=embedding(),
         )
         num_trials = 2

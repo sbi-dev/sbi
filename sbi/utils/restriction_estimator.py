@@ -16,6 +16,7 @@ from sbi.utils.sbiutils import (
     get_simulations_since_round,
     handle_invalid_x,
     standardizing_net,
+    z_score_parser,
 )
 from sbi.utils.user_input_checks import validate_theta_and_x
 
@@ -32,14 +33,21 @@ def build_input_layer(
     Args:
         batch_theta: Batch of $\theta$s, used to infer dimensionality and (optional)
             z-scoring.
-        z_score_theta: Whether to z-score $\theta$s passing into the network.
+        z_score_theta: Whether to z-score $\theta$s passing into the network, can take one of the following:
+            - `none`, None: do not z-score
+            - `independent`: z-score each dimension independently
+            - `structured`: treat dimensions as related, therefore compute mean and std
+            over the entire batch, instead of per-dimension.
         embedding_net_theta: Optional embedding network for $\theta$s.
 
     Returns:
         Input layer with optional embedding net and z-scoring.
     """
+    z_score_theta, structured_theta = z_score_parser(z_score_theta)
     if z_score_theta:
-        input_layer = nn.Sequential(standardizing_net(batch_theta), embedding_net_theta)
+        input_layer = nn.Sequential(
+            standardizing_net(batch_theta, structured_theta), embedding_net_theta
+        )
     else:
         input_layer = embedding_net_theta
 

@@ -24,8 +24,14 @@ def build_mdn(
     Args:
         batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
         batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
-        z_score_x: Whether to z-score xs passing into the network.
-        z_score_y: Whether to z-score ys passing into the network.
+        z_score_x: Whether to z-score xs passing into the network, can be one of:
+            - `none`, or None: do not z-score.
+            - `independent`: z-score each dimension independently.
+            - `structured`: treat dimensions as related, therefore compute mean and std
+            over the entire batch, instead of per-dimension. Should be used when each
+            sample is, for example, a time series or an image.
+        z_score_y: Whether to z-score ys passing into the network, same options as
+            z_score_x.
         hidden_features: Number of hidden features.
         num_components: Number of components.
         embedding_net: Optional embedding network for y.
@@ -41,12 +47,16 @@ def build_mdn(
 
     transform = transforms.IdentityTransform()
 
+    z_score_x, structured_x = utils.z_score_parser(z_score_x)
     if z_score_x:
-        transform_zx = utils.standardizing_transform(batch_x)
+        transform_zx = utils.standardizing_transform(batch_x, structured_x)
         transform = transforms.CompositeTransform([transform_zx, transform])
 
+    z_score_y, structured_y = utils.z_score_parser(z_score_y)
     if z_score_y:
-        embedding_net = nn.Sequential(utils.standardizing_net(batch_y), embedding_net)
+        embedding_net = nn.Sequential(
+            utils.standardizing_net(batch_y, structured_y), embedding_net
+        )
 
     distribution = MultivariateGaussianMDN(
         features=x_numel,
