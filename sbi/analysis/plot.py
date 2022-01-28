@@ -980,14 +980,18 @@ def _get_default_opts():
 
 def sbc_rank_plot(
     ranks,
+    num_posterior_samples,
     num_bins=100,
     num_repeats=50,
+    plot_type="cdf",
     parameter_labels=None,
     ranks_labels=None,
     colors=None,
     line_alpha=0.8,
     show_uniform_region=True,
     uniform_region_alpha=0.2,
+    num_cols=4,
+    params_in_subplots=False,
     fig=None,
     ax=None,
     figsize=None,
@@ -1018,27 +1022,33 @@ def sbc_rank_plot(
         ranks = [ranks]
     else:
         assert isinstance(ranks, List)
+        assert isinstance(ranks[0], (Tensor, np.ndarray))
 
     num_sbc_runs, num_parameters = ranks[0].shape
     num_ranks = len(ranks)
+
+    # For multiple methods, and for the hist plots plot each param in a separate subplot
+    if num_ranks > 1 or plot_type == "hist":
+        params_in_subplots = True
 
     for ranki in ranks:
         assert (
             ranki.shape == ranks[0].shape
         ), "all ranks in list must have the same shape."
 
+    num_rows = int(np.ceil(num_parameters / num_cols))
     if figsize is None:
-        figsize = (num_parameters * 4, 5) if num_ranks > 1 else (8, 5)
+        figsize = (num_parameters * 4, num_rows * 5) if params_in_subplots else (8, 5)
 
     if parameter_labels is None:
         parameter_labels = [f"dim {i+1}" for i in range(num_parameters)]
     if ranks_labels is None:
         ranks_labels = [f"rank set {i+1}" for i in range(num_ranks)]
 
-    # Plot one row subplot for each parameter, different "methods" in each subplot.
-    if num_ranks > 1:
+    # Plot one row subplot for each parameter, different "methods" on top of each other.
+    if params_in_subplots:
         if fig is None or ax is None:
-            fig, ax = plt.subplots(1, num_parameters, figsize=figsize)
+            fig, ax = plt.subplots(num_rows, num_parameters, figsize=figsize)
         else:
             assert ax.shape == (
                 num_parameters,
@@ -1046,24 +1056,47 @@ def sbc_rank_plot(
 
         for ii, ranki in enumerate(ranks):
             for jj in range(num_parameters):
-                plt.sca(ax[jj])
+                col_idx = jj if num_rows == 1 else jj % num_rows
+                plt.sca(ax[col_idx] if num_rows == 1 else ax[num_rows, col_idx])
 
-                plot_ranks_as_cdfs(
-                    ranki[:, jj],
-                    num_bins,
-                    num_repeats,
-                    label=ranks_labels[ii],
-                    color=f"C{ii}" if colors is None else colors[ii],
-                    xlabel=f"posterior rank {parameter_labels[jj]}",
-                    # Show legend and ylabel only in first subplot.
-                    show_ylabel=jj == 0,
-                    show_legend=jj == 0,
-                    alpha=line_alpha,
-                )
-                if ii == 0 and show_uniform_region:
-                    plot_cdf_region_expected_under_uniformity(
-                        num_sbc_runs, num_bins, num_repeats, alpha=0.1
+                if plot_type == "cdf":
+                    plot_ranks_as_cdf(
+                        ranki[:, jj],
+                        num_bins,
+                        num_repeats,
+                        label=ranks_labels[ii],
+                        color=f"C{ii}" if colors is None else colors[ii],
+                        xlabel=f"posterior rank {parameter_labels[jj]}",
+                        # Show legend and ylabel only in first subplot.
+                        show_ylabel=jj == 0,
+                        show_legend=jj == 0,
+                        alpha=line_alpha,
                     )
+                    if ii == 0 and show_uniform_region:
+                        plot_cdf_region_expected_under_uniformity(
+                            num_sbc_runs, num_bins, num_repeats, alpha=0.1
+                        )
+                elif plot_type == "hist":
+                    plot_ranks_as_hist(
+                        ranki[:, jj],
+                        num_bins,
+                        num_posterior_samples,
+                        label=ranks_labels[ii],
+                        color=f"C{ii}" if colors is None else colors[ii],
+                        xlabel=f"posterior rank {parameter_labels[jj]}",
+                        # Show legend and ylabel only in first subplot.
+                        show_ylabel=False,
+                        show_legend=jj == 0,
+                        alpha=line_alpha,
+                    )
+                    # TODO: fix uniform region plotting.
+                #                     plot_hist_region_expected_under_uniformity(num_sbc_runs,
+                #                                                                num_bins,
+                #                                                                num_posterior_samples,
+                #                                                                alpha=0.1)
+                else:
+                    pass
+                    # TODO: raise ValueError(f"plot_type {plot_type} not defined, use one in {plot_types}")
 
     # When there is only one set of ranks show all params in a single subplot.
     else:
@@ -1073,7 +1106,7 @@ def sbc_rank_plot(
         plt.sca(ax)
         ranki = ranks[0]
         for jj in range(num_parameters):
-            plot_ranks_as_cdfs(
+            plot_ranks_as_cdf(
                 ranki[:, jj],
                 num_bins,
                 num_repeats,
@@ -1093,18 +1126,70 @@ def sbc_rank_plot(
     return fig, ax
 
 
-def plot_ranks_as_cdfs(
-    ranks,
-    num_bins,
-    num_repeats,
-    label=None,
-    color=None,
+def plot_ranks_as_hist(
+    ranks: Tensor,
+    num_bins: int,
+    num_posterior_samples: int,
+    label: str = None,
+    color: str = None,
     alpha: float = 0.8,
-    xlabel=None,
-    show_ylabel=False,
-    show_legend=False,
+    xlabel: str = None,
+    show_ylabel: bool = False,
+    show_legend: bool = False,
+    num_ticks: int = 5,
+    xlim_offset_factor: float = 0.1,
+    legend_kwargs: dict = {},
+) -> None:
+    """Plot ranks as empirical CDFs.
+
+    Args:
+        ranks:
+        num_bins:
+        num_repeats:
+        label:
+        color:
+        alpha:
+        xlabel:
+        show_ylabel:
+        show_legend:
+        num_ticks:
+        legend_kwargs:
+
+    """
+    xlim_offset = int(num_posterior_samples * xlim_offset_factor)
+    plt.hist(
+        ranks,
+        bins=num_bins,
+        label=label,
+        color=color,
+        alpha=alpha,
+        density=True,
+    )
+
+    if show_ylabel:
+        plt.ylabel("counts")
+    else:
+        plt.yticks([])
+    if show_legend and label:
+        plt.legend(loc=2, handlelength=0.8, **legend_kwargs)
+
+    plt.xlim(-xlim_offset, num_posterior_samples + xlim_offset)
+    plt.xticks(np.linspace(0, num_posterior_samples, num_ticks))
+    plt.xlabel("posterior rank" if xlabel is None else xlabel)
+
+
+def plot_ranks_as_cdfs(
+    ranks: Tensor,
+    num_bins: int,
+    num_repeats: int,
+    label: str = None,
+    color: str = None,
+    alpha: float = 0.8,
+    xlabel: str = None,
+    show_ylabel: bool = False,
+    show_legend: bool = False,
     num_ticks: int = 3,
-    legend_kwargs=dict(),
+    legend_kwargs: dict = {},
 ) -> None:
     """Plot ranks as empirical CDFs.
 
@@ -1151,7 +1236,11 @@ def plot_ranks_as_cdfs(
 
 
 def plot_cdf_region_expected_under_uniformity(
-    num_sbc_runs, num_bins, num_repeats, alpha: float = 0.1, color="grey"
+    num_sbc_runs: int,
+    num_bins: int,
+    num_repeats: int,
+    alpha: float = 0.1,
+    color="grey",
 ):
     """Plot region of empirical cdfs expected under uniformity."""
 
@@ -1173,3 +1262,26 @@ def plot_cdf_region_expected_under_uniformity(
         color=color,
         alpha=alpha,
     )
+
+
+def plot_hist_region_expected_under_uniformity(
+    num_sbc_runs: int,
+    num_bins: int,
+    num_posterior_samples: int,
+    alpha: float = 0.1,
+    color="grey",
+):
+    """Plot region of empirical cdfs expected under uniformity."""
+
+    lower = binom(num_sbc_runs, p=1 / (num_bins + 1)).ppf(0.005)
+    upper = binom(num_sbc_runs, p=1 / (num_bins + 1)).ppf(0.995)
+        
+    # Plot grey area with expected ECDF.
+    plt.fill_between(
+        x=np.linspace(0, num_bins, num_posterior_samples),
+        y1=np.repeat(lower, num_posterior_samples),
+        y2=np.repeat(upper, num_posterior_samples),
+        color=color,
+        alpha=alpha,
+    )
+
