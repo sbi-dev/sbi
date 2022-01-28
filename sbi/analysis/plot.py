@@ -243,17 +243,21 @@ def get_conditional_diag_func(opts, limits, eps_margins, resolution):
     """
 
     def diag_func(row, **kwargs):
-        p_vector = eval_conditional_density(
-            opts["density"],
-            opts["condition"],
-            limits,
-            row,
-            row,
-            resolution=resolution,
-            eps_margins1=eps_margins[row],
-            eps_margins2=eps_margins[row],
-            warn_about_deprecation=False,
-        ).numpy()
+        p_vector = (
+            eval_conditional_density(
+                opts["density"],
+                opts["condition"],
+                limits,
+                row,
+                row,
+                resolution=resolution,
+                eps_margins1=eps_margins[row],
+                eps_margins2=eps_margins[row],
+                warn_about_deprecation=False,
+            )
+            .to("cpu")
+            .numpy()
+        )
         h = plt.plot(
             np.linspace(
                 limits[row, 0],
