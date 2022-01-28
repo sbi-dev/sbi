@@ -18,6 +18,7 @@ from sbi.inference import (
     simulate_for_sbi,
     MCMCPosterior,
     RejectionPosterior,
+    DirectPosterior,
     ratio_estimator_based_potential,
     likelihood_estimator_based_potential,
     posterior_estimator_based_potential,
@@ -32,11 +33,14 @@ from sbi.utils.torchutils import BoxUniform, process_device
     "method, model, mcmc_method",
     [
         (SNPE_C, "mdn", "rejection"),
-        (SNPE_C, "maf", "rejection"),
+        (SNPE_C, "maf", "slice"),
+        (SNPE_C, "maf", "direct"),
         (SNLE, "maf", "slice"),
         (SNLE, "nsf", "slice_np"),
+        (SNLE, "nsf", "rejection"),
         (SNRE_A, "mlp", "slice_np_vectorized"),
         (SNRE_B, "resnet", "nuts"),
+        (SNRE_B, "resnet", "rejection"),
     ],
 )
 @pytest.mark.parametrize("data_device", ("cpu", "cuda:0"))
@@ -136,6 +140,10 @@ def test_training_and_mcmc_on_device(
                 potential_fn=potential_fn,
                 device=training_device,
             )
+        elif mcmc_method == "direct":
+            posterior = DirectPosterior(
+                posterior_estimator=estimator, prior=prior
+            ).set_default_x(x_o)
         else:
             posterior = MCMCPosterior(
                 potential_fn=potential_fn,

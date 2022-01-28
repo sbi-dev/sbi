@@ -252,7 +252,7 @@ class NeuralInference(ABC):
         # Check for NaNs in simulations.
         is_valid_x, num_nans, num_infs = handle_invalid_x(x, exclude_invalid_x)
         # Check for problematic z-scoring
-        warn_if_zscoring_changes_data(x)
+        warn_if_zscoring_changes_data(x[is_valid_x])
         if warn_on_invalid:
             warn_on_invalid_x(num_nans, num_infs, exclude_invalid_x)
             warn_on_invalid_x_for_snpec_leakage(
@@ -420,8 +420,9 @@ class NeuralInference(ABC):
     def _maybe_show_progress(show=bool, epoch=int) -> None:
         if show:
             # end="\r" deletes the print statement when a new one appears.
-            # https://stackoverflow.com/questions/3419984/
-            print("Training neural network. Epochs trained: ", epoch, end="\r")
+            # https://stackoverflow.com/questions/3419984/. `\r` in the beginning due
+            # to #330.
+            print("\r", "Training neural network. Epochs trained: ", epoch, end="")
 
     def _report_convergence_at_end(
         self, epoch: int, stop_after_epochs: int, max_num_epochs: int

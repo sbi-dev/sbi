@@ -27,7 +27,7 @@ class Destandardize(nn.Module):
         self.register_buffer("_std", std)
 
     def forward(self, tensor):
-        return tensor * self.std + self.mean
+        return tensor * self._std + self._mean
 
 
 def destandardizing_net(batch_t: Tensor, min_std: float = 1e-7) -> nn.Module:
@@ -110,12 +110,13 @@ class ActiveSubspace:
             posterior: Posterior distribution obtained with `SNPE`, `SNLE`, or `SNRE`.
                 Needs to have a `.sample()` method. If we want to analyse the
                 sensitivity of the posterior probability, it also must have a
-                `.log_prob()` method.
+                `.potential()` method.
         """
         self._posterior = posterior
         self._regression_net = None
         self._theta = None
         self._emergent_property = None
+        self._device = posterior._device
         self._validation_log_probs = []
 
     def add_property(
@@ -279,7 +280,9 @@ class ActiveSubspace:
         )
 
         if self._regression_net is None:
-            self._regression_net = self._build_nn(self._theta[train_indices])
+            self._regression_net = self._build_nn(self._theta[train_indices]).to(
+                self._device
+            )
 
         optimizer = optim.Adam(
             list(self._regression_net.parameters()),
@@ -295,8 +298,8 @@ class ActiveSubspace:
             self._regression_net.train()
             for parameters, observations in train_loader:
                 optimizer.zero_grad()
-                outputs = self._regression_net(parameters)
-                loss = criterion(outputs, observations)
+                outputs = self._regression_net(parameters.to(self._device))
+                loss = criterion(outputs, observations.to(self._device))
                 loss.backward()
                 if clip_max_norm is not None:
                     clip_grad_norm_(
@@ -313,13 +316,13 @@ class ActiveSubspace:
             val_loss = 0.0
             with torch.no_grad():
                 for parameters, observations in val_loader:
-                    outputs = self._regression_net(parameters)
-                    loss = criterion(outputs, observations)
+                    outputs = self._regression_net(parameters.to(self._device))
+                    loss = criterion(outputs, observations.to(self._device))
                     val_loss += loss.item()
             self._val_log_prob = -val_loss / num_validation_examples
             self._validation_log_probs.append(self._val_log_prob)
 
-            print("Training neural network. Epochs trained: ", epoch, end="\r")
+            print("\r", "Training neural network. Epochs trained: ", epoch, end="")
 
         return deepcopy(self._regression_net)
 
@@ -422,7 +425,7 @@ class ActiveSubspace:
         thetas.requires_grad = True
 
         if posterior_log_prob_as_property:
-            predictions = self._posterior.log_prob(thetas, track_gradients=True)
+            predictions = self._posterior.potential(thetas, track_gradients=True)
         else:
             predictions = self._regression_net.forward(thetas)
         loss = predictions.mean()
@@ -482,6 +485,7 @@ class ActiveSubspace:
         Returns:
             Projected parameters of shape `(theta.shape[0], num_dimensions)`.
         """
+        theta = theta.to(self._device)
         if self._gradients_are_normed:
             theta = (theta - self._prior_mean) / self._prior_scale
 

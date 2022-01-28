@@ -12,7 +12,7 @@ from pyro.distributions import Empirical
 from torch import Tensor, as_tensor, float32
 from torch import nn as nn
 from torch import ones, optim, zeros
-from torch.distributions import Distribution, Independent, biject_to
+from torch.distributions import Distribution, Independent, biject_to, constraints
 import torch.distributions.transforms as torch_tf
 from tqdm.auto import tqdm
 
@@ -507,14 +507,24 @@ def mcmc_transform(
             _ = prior.support
             has_support = True
         except NotImplementedError:
+            warnings.warn(
+                """The passed prior has no support property, transform will be
+                constructed from mean and std. If the passed prior is supposed to be
+                bounded consider implementing the prior.support property."""
+            )
             has_support = False
 
-        if (
-            has_support
-            and hasattr(prior.support, "base_constraint")
-            and hasattr(prior.support.base_constraint, "upper_bound")
+        # TODO: implement case for half-bounded priors, e.g., LogNormal.
+        # Prior with bounded support, e.g., uniform priors.
+        if has_support and (
+            isinstance(prior.support, constraints.interval) or
+            # support can be hidden in independent constraints (e.g., for BoxUniform,
+            # or custom prior with bounds).
+            (isinstance(prior.support, constraints._IndependentConstraint) 
+            and isinstance(prior.support.base_constraint, constraints.interval))
         ):
             transform = biject_to(prior.support)
+        # For all other cases build affine transform with mean and std.
         else:
             if hasattr(prior, "mean") and hasattr(prior, "stddev"):
                 prior_mean = prior.mean.to(device)
@@ -713,11 +723,12 @@ def gradient_ascent(
 
                 if show_progress_bars:
                     print(
-                        f"""Optimizing MAP estimate. Iterations: {iter_+1} /
-                        {num_iter}. Performance in iteration
-                        {divmod(iter_+1, save_best_every)[0] * save_best_every}:
-                        {best_log_prob_iter.item():.2f} (= unnormalized log-prob""",
-                        end="\r",
+                        "\r",
+                        f"Optimizing MAP estimate. Iterations: {iter_+1} / "
+                        f"{num_iter}. Performance in iteration "
+                        f"{divmod(iter_+1, save_best_every)[0] * save_best_every}: "
+                        f"{best_log_prob_iter.item():.2f} (= unnormalized log-prob)",
+                        end="",
                     )
                 argmax_ = theta_transform.inv(best_theta_overall)
                 max_val = best_log_prob_overall

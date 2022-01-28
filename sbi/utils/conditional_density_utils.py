@@ -84,11 +84,13 @@ def eval_conditional_density(
         float(limits[dim1, 0] + eps_margins1),
         float(limits[dim1, 1] - eps_margins1),
         resolution,
+        device=condition.device,
     )
     theta_grid_dim2 = torch.linspace(
         float(limits[dim2, 0] + eps_margins2),
         float(limits[dim2, 1] - eps_margins2),
         resolution,
+        device=condition.device,
     )
 
     if dim1 == dim2:
@@ -160,7 +162,7 @@ def conditional_corrcoeff(
             "`from sbi.analysis import conditional_corrcoeff`."
         )
 
-    condition = ensure_theta_batched(condition)
+    device = density._device if hasattr(density, "_device") else "cpu"
 
     if subset is None:
         subset = range(condition.shape[1])
@@ -173,14 +175,14 @@ def conditional_corrcoeff(
                     _compute_corrcoeff(
                         eval_conditional_density(
                             density,
-                            cond,
-                            limits,
+                            cond.to(device),
+                            limits.to(device),
                             dim1=dim1,
                             dim2=dim2,
                             resolution=resolution,
                             warn_about_deprecation=False,
                         ),
-                        limits[[dim1, dim2]],
+                        limits[[dim1, dim2]].to(device),
                     )
                     for dim1 in subset
                     for dim2 in subset
@@ -193,8 +195,10 @@ def conditional_corrcoeff(
 
     # `average_correlations` is still a vector containing the upper triangular entries.
     # Below, assemble them into a matrix:
-    av_correlation_matrix = torch.zeros((len(subset), len(subset)))
-    triu_indices = torch.triu_indices(row=len(subset), col=len(subset), offset=1)
+    av_correlation_matrix = torch.zeros((len(subset), len(subset)), device=device)
+    triu_indices = torch.triu_indices(
+        row=len(subset), col=len(subset), offset=1, device=device
+    )
     av_correlation_matrix[triu_indices[0], triu_indices[1]] = average_correlations
 
     # Make the matrix symmetric by copying upper diagonal to lower diagonal.
@@ -293,7 +297,7 @@ def _expected_value_f_of_x(
     limits = ensure_theta_batched(limits)
 
     x_values_over_which_we_integrate = [
-        torch.linspace(lim[0], lim[1], prob.shape[0])
+        torch.linspace(lim[0], lim[1], prob.shape[0], device=probs.device)
         for lim, prob in zip(torch.flip(limits, [0]), probs)
     ]  # See #403 and #404 for flip().
     grids = list(torch.meshgrid(x_values_over_which_we_integrate))
