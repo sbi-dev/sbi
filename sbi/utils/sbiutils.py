@@ -833,21 +833,23 @@ def gradient_ascent(
 
 
 class DefaultEmbeddingNet(nn.Module):
-    def __init__(self):
+    def __init__(self, input=None):
         """Class for default embedding net:
         Small Neural Net that maps the context onto the flow via a basic Linear
         Layer with same input/output dimensions and a non-linear activation
         function.
+
+        Args:
+        input: Tensor used to infer dimensionality (number of features for the Linear Layer.
         """
         super().__init__()
         self.activation = nn.ReLU()
         self.linear = None
-
-    def forward(self, x: Tensor) -> Tensor:
-        if self.linear is None:
-            num_features = x.shape[-1]
+        if input is not None:
+            num_features = input.shape[-1]
             self.linear = nn.Linear(num_features, num_features)
 
+    def forward(self, x: Tensor) -> Tensor:
         x = self.linear(x)
         x = self.activation(x)
         return x
