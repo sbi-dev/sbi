@@ -1,15 +1,13 @@
 import torch
-from sbi.utils import gradient_ascent
+from sbi.utils import gradient_ascent, mcmc_transform
 from sbi.utils.torchutils import ensure_theta_batched
+from sbi.utils.user_input_checks import process_x
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.inference.potentials.base_potential import BasePotential
 
-# from sbi.utils.user_input_checks import process_x
-# from sbi.utils.sbiutils import match_theta_and_x_batch_shapes, within_support
-# from sbi.inference.potentials.base_potential import BasePotential
-
-from sbi.types import Shape
 from torch import Tensor
-from typing import List, Optional, Union, Callable
+from typing import List, Optional, Union, Callable, Tuple, Any
+from sbi.types import Shape, TorchTransform
 
 
 class NeuralPosteriorEnsemble(NeuralPosterior):
@@ -60,6 +58,32 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
         self.num_components = len(posteriors)
         self.weights = weights
         self.potential_fn = None
+
+        self.prior = self.ensure_same_prior(posteriors)
+        self.device = self.ensure_same_device(posteriors)
+
+    def ensure_same_prior(self, posteriors):
+        priors = [posterior.prior for posterior in posteriors]
+
+        # assert same type
+        same_type = all(isinstance(prior, type(priors[0])) for prior in priors)
+        compare_params = lambda dist_x, dist_y: all(
+            [x == y for x, y in zip(dist_x.__dict__, dist_y.__dict__)]
+        )
+        if same_type:
+            # assert same parameters
+            same_params = all(compare_params(prior, priors[0]) for prior in priors)
+        same_prior = same_type and same_params
+        assert same_prior, "Only supported if all priors are the same."
+
+        return priors[0]
+
+    def ensure_same_device(self, posteriors):
+        devices = [posterior._device for posterior in posteriors]
+        assert all(
+            device == devices[0] for device in devices
+        ), "Only supported if all posteriors are on the same device."
+        return devices[0]
 
     @property
     def weights(self):
@@ -117,6 +141,11 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
             `(len(θ),)`-shaped average log posterior probability $\log p(\theta|x)$ for
             θ in the support of the prior, -∞ (corresponding to 0 probability) outside.
         """
+        assert all(
+            isinstance(posterior, type(self.posteriors[0]))
+            for posterior in self.posteriors
+        )
+
         log_probs = torch.stack(
             [posterior.log_prob(theta, **kwargs) for posterior in self.posteriors]
         )
@@ -151,7 +180,9 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
         """
         for posterior in self.posteriors:
             posterior.set_default_x(x)
-        self.potential_fn = EnsemblePotentialProvider(self.posteriors, self._weights, x)
+        self.potential_fn, self.theta_transform = posterior_estimator_based_potential(
+            self.posteriors, self._weights, self.prior, x
+        )
         return self
 
     def potential(
@@ -166,7 +197,9 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
                 This can be helpful for e.g. sensitivity analysis, but increases memory
                 consumption.
         """
-        self.potential_fn = EnsemblePotentialProvider(self.posteriors, self._weights, x)
+        self.potential_fn, self.theta_transform = posterior_estimator_based_potential(
+            self.posteriors, self._weights, self.prior, x
+        )
         theta = ensure_theta_batched(torch.as_tensor(theta))
 
         return self.potential_fn(
@@ -248,8 +281,8 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
         else:
             if init_method == "posterior":
                 inits = self.sample((num_init_samples,))
-            # elif init_method == "proposal":
-            #     inits = self.proposal.sample((num_init_samples,))
+            elif init_method == "proposal":
+                inits = self.proposal.sample((num_init_samples,))
             elif isinstance(init_method, Tensor):
                 inits = init_method
             else:
@@ -258,7 +291,7 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
             return gradient_ascent(
                 potential_fn=self.potential_fn,
                 inits=inits,
-                # theta_transform=self.theta_transform,
+                theta_transform=self.theta_transform,
                 num_iter=num_iter,
                 num_to_optimize=num_to_optimize,
                 learning_rate=learning_rate,
@@ -267,10 +300,46 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
             )[0]
 
 
-class EnsemblePotentialProvider:
+def posterior_estimator_based_potential(
+    posteriors: List,
+    weights: Tensor,
+    prior: Any,
+    x_o: Optional[Tensor],
+) -> Tuple[Callable, TorchTransform]:
+    r"""Returns the potential for posterior-based methods.
+
+    It also returns a transformation that can be used to transform the potential into
+    unconstrained space.
+
+    The potential is the same as the log-probability of the `posterior_estimator`, but
+    it is set to $-\inf$ outside of the prior bounds.
+
+    Args:
+        posterior_estimator: The neural network modelling the posterior.
+        x_o: The observed data at which to evaluate the posterior.
+
+    Returns:
+        The potential function and a transformation that maps
+        to unconstrained space.
+    """
+
+    device = str(next(posteriors[0].posterior_estimator.parameters()).device)
+
+    potential_fn = EnsemblePotentialProvider(
+        posteriors, prior, weights, x_o, device=device
+    )
+    theta_transform = mcmc_transform(prior, device=device)
+
+    return potential_fn, theta_transform
+
+
+class EnsemblePotentialProvider(BasePotential):
+    allow_iid_x = False  # type: ignore
+
     def __init__(
         self,
         posteriors: List,
+        prior: Any,
         weights: Tensor,
         x_o: Optional[Tensor],
         device: str = "cpu",
@@ -291,10 +360,24 @@ class EnsemblePotentialProvider:
         """
         self._weights = weights
         self.potential_fns = []
+        self.posteriors = posteriors
         for posterior in posteriors:
             potential_fn = posterior.potential_fn
-            potential_fn.set_x(posterior._x_else_default_x(x_o))
             self.potential_fns.append(potential_fn)
+
+        super().__init__(prior, x_o, device)
+
+        self.prior = prior
+        self.device = device
+        self.set_x(x_o)
+
+    def set_x(self, x_o: Optional[Tensor]):
+        """Check the shape of the observed data and, if valid, set it."""
+        if x_o is not None:
+            x_o = process_x(x_o, allow_iid_x=False).to(self.device)
+        self._x_o = x_o
+        for comp_posterior, comp_potential in zip(self.posteriors, self.potential_fns):
+            comp_potential.set_x(comp_posterior._x_else_default_x(x_o))
 
     def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
         r"""Returns the potential for posterior-based methods.
@@ -307,6 +390,7 @@ class EnsemblePotentialProvider:
             The potential.
         """
         theta = ensure_theta_batched(torch.as_tensor(theta))
+        theta = theta.to(self.device)
 
         log_probs = [
             fn(theta, track_gradients=track_gradients) for fn in self.potential_fns
@@ -317,57 +401,3 @@ class EnsemblePotentialProvider:
             dim=0,
         )
         return ensemble_log_probs
-
-
-# TODO: IMPLEMENT PROPER CLASS
-# class EnsemblePotentialProvider(BasePotential):
-#     def __init__(self, posteriors, x_o: Optional[Tensor], device: str = "cpu"):
-#         super().__init__(None, x_o, device)
-#         self.posteriors = posteriors
-
-#     def set_x(self, x_o: Optional[Tensor]):
-#         """
-#         Check the shape of the observed data and, if valid, set it.
-#         """
-#         if x_o is not None:
-#             x_o = process_x(x_o, allow_iid_x=self.allow_iid_x).to(self.device)
-#         self._x_o = x_o
-#         for posterior in self.posteriors:
-#             potential_fn = posterior.potential_fn
-#             potential_fn.set_x(posterior._x_else_default_x(x_o))
-
-#     def __call__(self, theta: Tensor, track_gradients: bool = True):
-#         theta = ensure_theta_batched(torch.as_tensor(theta))
-#         theta, x_repeated = match_theta_and_x_batch_shapes(theta, self.x_o)
-#         theta, x_repeated = theta.to(self.device), x_repeated.to(self.device)
-
-#         potential_fns = []
-#         for posterior in self.posteriors:
-#             potential_fns.append(posterior.potential_fn)
-
-#         def ensemble_potential_fn(theta: Tensor, track_gradients: bool) -> Callable:
-#             log_probs = [
-#                 fn(theta, track_gradients=track_gradients) for fn in potential_fns
-#             ]
-#             log_probs = torch.vstack(log_probs)
-#             potential_fn = torch.logsumexp(
-#                 torch.log(self._weights.reshape(-1, 1)).expand_as(log_probs)
-#                 + log_probs,
-#                 dim=0,
-#             )
-#             return potential_fn
-
-#         with torch.set_grad_enabled(track_gradients):
-#             posterior_log_prob = self.posterior_estimator.log_prob(
-#                 theta, context=x_repeated
-#             )
-
-#             # # Force probability to be zero outside prior support.
-#             # in_prior_support = within_support(self.prior, theta)
-
-#             # posterior_log_prob = torch.where(
-#             #     in_prior_support,
-#             #     posterior_log_prob,
-#             #     torch.tensor(float("-inf"), dtype=torch.float32, device=self.device),
-#             # )
-#         return posterior_log_prob
