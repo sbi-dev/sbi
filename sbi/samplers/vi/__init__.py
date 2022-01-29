@@ -8,6 +8,7 @@ from .vi_sampling import (
 from .vi_quality_controll import get_quality_metric
 from .vi_utils import (
     make_sure_nothing_in_cache,
+    move_all_tensor_to_device,
     adapt_and_check_variational_distributions,
     check_variational_distribution,
     docstring_parameter,

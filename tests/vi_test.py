@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import numpy as np
+from pkg_resources import Distribution
 import pytest
 import torch
 from torch import eye, ones, zeros
@@ -114,7 +115,7 @@ def test_c2st_vi_flows_on_Gaussian(num_dim: int, q: str, set_seed):
         potential_fn=potential_fn, theta_transform=theta_transform, q=q
     )
     posterior.set_default_x(torch.tensor(np.zeros((num_dim,)).astype(np.float32)))
-    posterior.train(min_num_iters=500, learning_rate=1e-2, eps=1e-8)
+    posterior.train(min_num_iters=1000, learning_rate=1e-2, eps=1e-8)
     samples = posterior.sample((num_samples,))
     samples = torch.as_tensor(samples, dtype=torch.float32)
 
@@ -204,8 +205,72 @@ def test_deepcopy_support(q: str, set_seed):
     posterior.set_default_x(torch.tensor(np.zeros((num_dim,)).astype(np.float32)))
     assert posterior._x != posterior_copy._x, "Mhh, something with the copy is strange"
     posterior_copy = deepcopy(posterior)
-    assert (posterior._x == posterior_copy._x).all(), "Mhh, something with the copy is strange"
+    assert (
+        posterior._x == posterior_copy._x
+    ).all(), "Mhh, something with the copy is strange"
 
     # Produces nonleaf tensors in the cache... -> Can lead to failure of deepcopy.
     posterior.q.rsample()
     posterior_copy = deepcopy(posterior)
+
+
+@pytest.mark.slow
+@pytest.mark.gpu
+@pytest.mark.parametrize("num_dim", (1, 2))
+@pytest.mark.parametrize("q", ("maf", "nsf", "gaussian_diag", "gaussian", "mcf", "scf"))
+@pytest.mark.parametrize("vi_method", ("rKL", "fKL", "IW", "alpha"))
+@pytest.mark.parametrize("sampling_method", ("naive", "sir"))
+def test_vi_on_gpu(
+    num_dim: int, q: Distribution, vi_method: str, sampling_method: str, set_seed
+):
+    """Test VI on Gaussian, comparing to ground truth target via c2st.
+
+    Args:
+        num_dim: parameter dimension of the gaussian model
+        vi_method: different vi methods
+        sampling_method: Different sampling methods
+        set_seed: fixture for manual seeding
+    """
+
+    device = "cuda:0"
+
+    if num_dim == 1 and q in ["mcf", "scf"]:
+        return
+
+    # Good run where everythink is one the correct device.
+    class FakePotential(BasePotential):
+        def __call__(self, theta, **kwargs):
+            return torch.ones(len(theta), dtype=torch.float32, device=device)
+
+        def allow_iid_x(self) -> bool:
+            return True
+
+    potential_fn = FakePotential(
+        prior=MultivariateNormal(
+            zeros(num_dim, device=device), eye(num_dim, device=device)
+        ),
+        device=device,
+    )
+    theta_transform = torch_tf.identity_transform
+
+    posterior = VIPosterior(
+        potential_fn=potential_fn, theta_transform=theta_transform, q=q, device=device
+    )
+    posterior.set_default_x(
+        torch.tensor(np.zeros((num_dim,)).astype(np.float32)).to(device)
+    )
+    posterior.vi_method = vi_method
+
+    samples = posterior.sample()
+    logprobs = posterior.log_prob(samples)
+
+    print(samples)
+    assert str(samples.device) == device, "The devices does not match"
+    assert str(logprobs.device) == device, "The devices does not match"
+
+    posterior.train(min_num_iters=9, max_num_iters=10, warm_up_rounds=10)
+    samples = posterior.sample((1,), method=sampling_method)
+    logprobs = posterior.log_prob(samples)
+
+    assert str(samples.device) == device, "The devices after training does not match"
+    assert str(logprobs.device) == device, "The devices after training does not match"

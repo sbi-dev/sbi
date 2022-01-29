@@ -191,7 +191,7 @@ def importance_resampling(
             logp = potential_fn(thetas)
             logq = proposal.log_prob(thetas)
             weights = (logp - logq).reshape(batch_size, K).softmax(-1).cumsum(-1)
-            u = torch.rand(batch_size, 1)
+            u = torch.rand(batch_size, 1, device=thetas.device)
             mask = torch.cumsum(weights >= u, -1) == 1
             samples = thetas.reshape(batch_size, K, -1)[mask]
             final_samples.append(samples)

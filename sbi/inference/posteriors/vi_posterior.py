@@ -24,6 +24,7 @@ from sbi.samplers.vi import (
     adapt_and_check_variational_distributions,
     check_variational_distribution,
     make_sure_nothing_in_cache,
+    move_all_tensor_to_device,
     get_flow_builder,
     get_VI_method,
     get_sampling_method,
@@ -89,6 +90,9 @@ class VIPosterior(NeuralPosterior):
         """
         super().__init__(potential_fn, theta_transform, device)
 
+        self.potential_fn.device = device
+        # Especially the prior may be on another device
+        move_all_tensor_to_device(self.potential_fn, device)
         self._device = device
         self._prior = self.potential_fn.prior
         self._optimizer = None
@@ -154,15 +158,20 @@ class VIPosterior(NeuralPosterior):
             )
         elif isinstance(q, str):
             q = get_flow_builder(
-                q, self._prior.event_shape, self.link_transform, **q_kwargs
+                q,
+                self._prior.event_shape,
+                self.link_transform,
+                device=self._device,
+                **q_kwargs,
             )
-            check_variational_distribution(q, self._prior)
+            # check_variational_distribution(q, self._prior)
         elif isinstance(q, VIPosterior):
             self._trained_on = q._trained_on
             self.vi_method = q.vi_method
             self._device = q._device
             self._prior = q._prior
             q = deepcopy(q.q)
+        move_all_tensor_to_device(q, self._device)
         self._q = q
 
     @property
@@ -291,7 +300,9 @@ class VIPosterior(NeuralPosterior):
             reset_optimizer: Reset the divergence optimizer
             show_progress_bar: If any progress report should be displayed.
             quality_controll_metric: Which metric to use for evaluate the quality.
-
+            kwargs: Hyperparameters
+                retain_graph: Boolean which decides weather to retain the computation
+                    graph. This may be required for some 'exotic' user-specified q's.
         Returns:
             NeuralPosterior: The VIPosterior (can be used to chain calls).
         """
@@ -330,6 +341,7 @@ class VIPosterior(NeuralPosterior):
         # Optimize
         self._optimizer.update({**locals(), **kwargs})
         optimizer = self._optimizer
+        optimizer.to(self._device)
         optimizer.reset_loss_stats()
 
         if show_progress_bar:
@@ -363,7 +375,7 @@ class VIPosterior(NeuralPosterior):
                     quality_controll_metric
                 )
                 metric = round(float(quality_control_fn(self)), 3)
-                print(f"Quality Score: {metric} \n" + quality_control_msg)
+                print(f"Quality Score: {metric} " + quality_control_msg)
             except Exception as e:
                 print(
                     f"Quality controll did not work, we reset the variational \
