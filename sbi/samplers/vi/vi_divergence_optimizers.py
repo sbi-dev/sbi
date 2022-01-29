@@ -19,10 +19,10 @@ from sbi.inference.potentials.base_potential import BasePotential
 from .vi_utils import (
     filter_kwrags_for_func,
     make_sure_nothing_in_cache,
+    move_all_tensor_to_device,
 )
 
 from .vi_sampling import clamp_weights, paretto_smoothed_weights
-
 
 _VI_method = {}
 
@@ -67,11 +67,13 @@ class DivergenceOptimizer(ABC):
         self.potential_fn = potential_fn
         self.q = q
         self.prior = potential_fn.prior
+        self.device = potential_fn.device
+        self.to(self.device)
 
         self.n_particles = n_particles
         self.clip_value = clip_value
-        self.device = potential_fn.device
         self.learning_rate = kwargs.get("lr", 1e-3)
+        self.retain_graph = kwargs.get("retain_graph", False)
         self._kwargs = kwargs
 
         # This prevents error that would stop optimization.
@@ -130,8 +132,10 @@ class DivergenceOptimizer(ABC):
         """This will move all parameters to the correct device, both for likelihood and
         posterior"""
         self.device = device
-        for para in self.q.parameters():
-            para.to(device)
+        # These just ensure that everythink must be on the same device!
+        move_all_tensor_to_device(self.potential_fn, self.device)
+        move_all_tensor_to_device(self.q, self.device)
+        move_all_tensor_to_device(self.prior, self.device)
 
     def warm_up(self, num_steps: int, method: str = "prior"):
         """This initializes q, either to follow the prior or the base distribution
@@ -150,6 +154,7 @@ class DivergenceOptimizer(ABC):
             )
         else:
             NotImplementedError("We only implement methods 'prior' or 'identity'")
+
         for _ in range(num_steps):
             self._optimizer.zero_grad()
             if self.q.has_rsample:
@@ -160,7 +165,7 @@ class DivergenceOptimizer(ABC):
             else:
                 samples = p.sample((256,))
                 loss = -torch.mean(self.q.log_prob(samples))
-            loss.backward()
+            loss.backward(retain_graph=self.retain_graph)
             self._optimizer.step()
         # Denote that warmup was already done
         self.warm_up_was_done = True
@@ -207,13 +212,13 @@ class DivergenceOptimizer(ABC):
         """
         self._optimizer.zero_grad()
         surrogate_loss, loss = self.loss(x_obs.to(self.device))
-        surrogate_loss.backward()
+        surrogate_loss.backward(retain_graph=self.retain_graph)
         if not torch.isfinite(surrogate_loss):
             self.resolve_state()
         nn.utils.clip_grad_norm_(self.q.parameters(), self.clip_value)
         self._optimizer.step()
         self._scheduler.step()
-        self.update_loss_stats(loss)
+        self.update_loss_stats(loss.cpu())
         if (self.num_step % 50) == 0:
             self.update_state()
 
@@ -293,6 +298,8 @@ class DivergenceOptimizer(ABC):
         """Updates the hyperparameters and scheduler/optimizer kwargs"""
         paras = self.__dict__
         for key, val in kwargs.items():
+            if key == "retain_graph":
+                self.retain_graph = val
             if key in self.HYPER_PARAMETERS:
                 paras[key] = val
 

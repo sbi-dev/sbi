@@ -83,8 +83,8 @@ def gpdfit(
     PRIOR = 3
     M = 30 + int(np.sqrt(N))
 
-    bs = torch.arange(1, M + 1)
-    bs = 1 - np.sqrt(M / (bs - 0.5))
+    bs = torch.arange(1, M + 1, device=x.device)
+    bs = 1 - torch.sqrt(M / (bs - 0.5))
     bs /= PRIOR * x[int(N / 4 + 0.5) - 1]
     bs += 1 / x[-1]
 

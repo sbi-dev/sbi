@@ -2,6 +2,8 @@ from os import remove
 from numpy import isin
 import torch
 from torch import nn
+from torch.nn import Module
+from torch import Tensor
 from torch.distributions import TransformedDistribution, Distribution
 from torch.distributions.transforms import (
     Transform,
@@ -11,7 +13,7 @@ from torch.distributions.transforms import (
 
 from copy import deepcopy
 
-from typing import Optional, Iterable, Callable, Dict
+from typing import Optional, List, Tuple, Generator, Callable, Dict, Iterable
 
 
 def docstring_parameter(*sub, base_doc: str = None) -> Callable:
@@ -159,7 +161,7 @@ def check_sample_shape_and_support(q: Distribution, prior: Distribution) -> None
     ), "The batch sahpe of q must match that of the prior"
 
     samples = q.sample((2,))
-    samples_prior = prior.sample((2,))
+    samples_prior = prior.sample((2,)).to(samples.device)
     assert all(
         prior.support.check(samples)
     ), "The support of q must match that of the prior"
@@ -284,6 +286,28 @@ def adapt_and_check_variational_distributions(
     check_variational_distribution(q, prior)
 
     return q
+
+
+def move_all_tensor_to_device(obj, device):
+    if isinstance(obj, Module):
+        obj.to(device)
+    elif isinstance(obj, List) or isinstance(obj, Tuple) or isinstance(obj, Generator):
+        for o in obj:
+            move_all_tensor_to_device(o, device)
+    elif isinstance(obj, Dict):
+        for k, o in obj.items():
+            if isinstance(o, Tensor):
+                obj[k] = o.to(device)
+            else:
+                move_all_tensor_to_device(o, device)
+    elif hasattr(obj, "__dict__"):
+        for k, o in obj.__dict__.items():
+            if isinstance(o, Tensor):
+                setattr(obj, k, o.to(device))
+            else:
+                move_all_tensor_to_device(o, device)
+    else:
+        return
 
 
 def make_sure_nothing_in_cache(q: TransformedDistribution) -> None:
