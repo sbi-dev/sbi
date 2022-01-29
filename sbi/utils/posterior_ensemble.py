@@ -6,11 +6,8 @@ from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.base_potential import BasePotential
 
 from torch import Tensor
-from typing import List, Optional, Union, Callable, Tuple, Any
+from typing import List, Optional, Union, Any
 from sbi.types import Shape, TorchTransform
-
-
-# TODO: Write DOCSTRINGS and rewrite old docstrings :)
 
 
 class NeuralPosteriorEnsemble(NeuralPosterior):
@@ -49,7 +46,7 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
             posterior is weighted with 1/N.
         potential_fn: Potential function of the ensemble.
         prior: Prior distribution that is the same for all posteriors. If it is not the
-        same, then `prior = None`.
+            same, then `prior = None`.
         device: Device which the component distributions sit on.
         default_x: Used in `.sample(), .log_prob()` as default conditioning context.
     """
@@ -214,7 +211,7 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
             return torch.logsumexp(log_weights.expand_as(log_probs) + log_probs, dim=0)
 
     def set_default_x(self, x: Tensor) -> "NeuralPosteriorEnsemble":
-        """Set new default x for `.sample(), .log_prob()` to use as conditioning context.
+        r"""Set new default x for `.sample(), .log_prob()` to use as conditioning context.
 
         This is a pure convenience to avoid having to repeatedly specify `x` in calls to
         `.sample()` and `.log_prob()` - only θ needs to be passed.
@@ -358,6 +355,23 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
 
 
 class EnsemblePotentialProvider(BasePotential):
+    r"""Provides `NeuralPosteriorEnsemble` with a `potential_fn` attribute.
+
+    The potential is the same as the sum of the weighted log-probabilities of each
+    component posterior.
+
+    This class was modelled off of `PosteriorBasedPotential` and should provide similar
+    functionality.
+
+    Attributes:
+        posteriors: List of the posterior estimators making up the ensemble.
+        weights: Weight of each posterior distribution. If none are provided each
+            posterior is weighted with 1/N.
+        prior: Prior distribution that is the same for all posteriors. If it is not the
+            same, then `prior = None`.
+        device: Device which the component distributions sit on.
+        x_o: Used as conditioning context for `potential_fn`.
+    """
     allow_iid_x = False  # type: ignore
 
     def __init__(
@@ -368,19 +382,15 @@ class EnsemblePotentialProvider(BasePotential):
         x_o: Optional[Tensor],
         device: str = "cpu",
     ):
-        r"""Returns the potential for ensemlbe based posteriors.
-
-        The potential is the same as the sum of the weighted log-probabilities of each
-        component posterior.
-
+        r"""
         Args:
             posteriors: List containing the trained posterior instances that will make
                 up the ensemble.
             weights: Weights of the ensemble components.
+            prior: Prior distribution that is the same for all posteriors. If it is not
+                the same, then `prior = None`.
             x_o: The observed data at which to evaluate the posterior.
-
-        Returns:
-            The potential function.
+            device: Device which the component distributions sit on.
         """
         self.posteriors = posteriors
         self._weights = weights
