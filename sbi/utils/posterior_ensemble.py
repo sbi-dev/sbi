@@ -48,7 +48,8 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
         weights: Weight of each posterior distribution. If none are provided each
             posterior is weighted with 1/N.
         potential_fn: Potential function of the ensemble.
-        prior: Prior distribution that is the same for all posteriors.
+        prior: Prior distribution that is the same for all posteriors. If it is not the
+        same, then `prior = None`.
         device: Device which the component distributions sit on.
         default_x: Used in `.sample(), .log_prob()` as default conditioning context.
     """
@@ -57,26 +58,32 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
         self,
         posteriors: List,
         weights: Optional[Union[List[float], Tensor]] = None,
-        # theta_transform: Optional[TorchTransform] = None,
+        theta_transform: Optional[TorchTransform] = None,
     ):
         """
-
         Args:
             posteriors: List containing the trained posterior instances that will make
                 up the ensemble.
             weights: Assign weights to posteriors manually, otherwise they will be
                 weighted with 1/N.
-            theta_transform:
+            theta_transform: If passed, this transformation will be applied during the
+            optimization.
         """
         self.posteriors = posteriors
         self.num_components = len(posteriors)
         self.weights = weights
         self.potential_fn = None  # will be set when context is provided.
 
-        self.prior = self.ensure_same_prior(posteriors)
         self.device = self.ensure_same_device(posteriors)
 
-    def ensure_same_prior(self, posteriors: List) -> "Prior Distribution":
+        self.prior = None
+        if theta_transform is not None:
+            self.theta_transform = theta_transform
+        elif self.same_component_priors():
+            self.prior = self.posteriors[0].prior
+            self.theta_transform = mcmc_transform(self.prior, device=self.device)
+
+    def same_component_priors(self) -> bool:
         """Ensures that all posteriors in the ensemble are based off of the same prior
         distribution.
 
@@ -89,9 +96,8 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
 
         Returns:
             A prior distribution, that is the same for all posteriors.
-
         """
-        priors = [posterior.prior for posterior in posteriors]
+        priors = [posterior.prior for posterior in self.posteriors]
 
         # assert same type
         same_type = all(isinstance(prior, type(priors[0])) for prior in priors)
@@ -110,9 +116,7 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
             same_params = all(compare_params(prior, priors[0]) for prior in priors)
 
         same_prior = same_type and same_params
-        assert same_prior, "Only supported if all priors are the same."
-
-        return priors[0]
+        return same_prior
 
     def ensure_same_device(self, posteriors):
         """Ensures that all posteriors in the ensemble are on the same device.
@@ -126,7 +130,6 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
 
         Returns:
             A device string, that is the same for all posteriors.
-
         """
         devices = [posterior._device for posterior in posteriors]
         assert all(
@@ -234,7 +237,7 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
         """
         for posterior in self.posteriors:
             posterior.set_default_x(x)
-        self.potential_fn, self.theta_transform = posterior_estimator_based_potential(
+        self.potential_fn = EnsemblePotentialProvider(
             self.posteriors, self._weights, self.prior, x
         )
         return self
@@ -251,7 +254,7 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
                 This can be helpful for e.g. sensitivity analysis, but increases memory
                 consumption.
         """
-        self.potential_fn, self.theta_transform = posterior_estimator_based_potential(
+        self.potential_fn = EnsemblePotentialProvider(
             self.posteriors, self._weights, self.prior, x
         )
         theta = ensure_theta_batched(torch.as_tensor(theta))
@@ -354,47 +357,14 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
             )[0]
 
 
-def posterior_estimator_based_potential(
-    posteriors: List,
-    weights: Tensor,
-    prior: Any,
-    x_o: Optional[Tensor],
-) -> Tuple[Callable, TorchTransform]:
-    r"""Returns the potential for posterior-based methods.
-
-    It also returns a transformation that can be used to transform the potential into
-    unconstrained space.
-
-    The potential is the same as the log-probability of the `posterior_estimator`, but
-    it is set to $-\inf$ outside of the prior bounds.
-
-    Args:
-        posterior_estimator: The neural network modelling the posterior.
-        x_o: The observed data at which to evaluate the posterior.
-
-    Returns:
-        The potential function and a transformation that maps
-        to unconstrained space.
-    """
-
-    device = str(next(posteriors[0].posterior_estimator.parameters()).device)
-
-    potential_fn = EnsemblePotentialProvider(
-        posteriors, prior, weights, x_o, device=device
-    )
-    theta_transform = mcmc_transform(prior, device=device)
-
-    return potential_fn, theta_transform
-
-
 class EnsemblePotentialProvider(BasePotential):
     allow_iid_x = False  # type: ignore
 
     def __init__(
         self,
         posteriors: List,
-        prior: Any,
         weights: Tensor,
+        prior: Any,
         x_o: Optional[Tensor],
         device: str = "cpu",
     ):
