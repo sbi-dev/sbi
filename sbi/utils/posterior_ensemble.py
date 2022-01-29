@@ -10,15 +10,20 @@ from typing import List, Optional, Union, Callable, Tuple, Any
 from sbi.types import Shape, TorchTransform
 
 
+# TODO: Write DOCSTRINGS and rewrite old docstrings :)
+
+
 class NeuralPosteriorEnsemble(NeuralPosterior):
-    r"""Wrapper class to bundle together different posterior instances into an ensemble.
+    r"""Wrapper class for bundling together different posterior instances into an
+    ensemble.
 
     This class creates a posterior ensemble from a set of N different, already trained
     posterior estimators $p_{i}(\theta|x_o)$, where $i \in \{i,...,N\}$.
 
     It can wrap all posterior classes available in sbi and even a mixture of different
     posteriors, i.e. obtained via SNLE and SNPE at the same time, since it only
-    provides a pass-through to the class-methods of each posterior in the ensemble.
+    provides a pass-through to the class-methods of each posterior in the ensemble. The
+    only constraint is, that the individual posteriors have the same prior.
 
     So far `log_prob()`, `sample()` and `map()` functionality are supported.
 
@@ -42,10 +47,18 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
         num_components: Number of posterior estimators.
         weights: Weight of each posterior distribution. If none are provided each
             posterior is weighted with 1/N.
+        potential_fn: Potential function of the ensemble.
+        prior: Prior distribution that is the same for all posteriors.
+        device: Device which the component distributions sit on.
         default_x: Used in `.sample(), .log_prob()` as default conditioning context.
     """
 
-    def __init__(self, posteriors: List, weights: Optional[List] or Tensor = None):
+    def __init__(
+        self,
+        posteriors: List,
+        weights: Optional[Union[List[float], Tensor]] = None,
+        # theta_transform: Optional[TorchTransform] = None,
+    ):
         """
 
         Args:
@@ -53,32 +66,68 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
                 up the ensemble.
             weights: Assign weights to posteriors manually, otherwise they will be
                 weighted with 1/N.
+            theta_transform:
         """
         self.posteriors = posteriors
         self.num_components = len(posteriors)
         self.weights = weights
-        self.potential_fn = None
+        self.potential_fn = None  # will be set when context is provided.
 
         self.prior = self.ensure_same_prior(posteriors)
         self.device = self.ensure_same_device(posteriors)
 
-    def ensure_same_prior(self, posteriors):
+    def ensure_same_prior(self, posteriors: List) -> "Prior Distribution":
+        """Ensures that all posteriors in the ensemble are based off of the same prior
+        distribution.
+
+        Args:
+            posteriors: List containing the trained posterior instances that will make
+                up the ensemble.
+
+        Raises:
+            AssertionError if ensemble components have different priors.
+
+        Returns:
+            A prior distribution, that is the same for all posteriors.
+
+        """
         priors = [posterior.prior for posterior in posteriors]
 
         # assert same type
         same_type = all(isinstance(prior, type(priors[0])) for prior in priors)
-        compare_params = lambda dist_x, dist_y: all(
-            [x == y for x, y in zip(dist_x.__dict__, dist_y.__dict__)]
-        )
+
+        def compare_params(dist_x, dist_y):
+            all_equal = True
+            for x, y in zip(dist_x.__dict__.values(), dist_y.__dict__.values()):
+                if type(x) == Tensor:
+                    all_equal = all_equal and torch.equal(x, y)
+                else:
+                    all_equal = all_equal and (x == y)
+            return all_equal
+
         if same_type:
             # assert same parameters
             same_params = all(compare_params(prior, priors[0]) for prior in priors)
+
         same_prior = same_type and same_params
         assert same_prior, "Only supported if all priors are the same."
 
         return priors[0]
 
     def ensure_same_device(self, posteriors):
+        """Ensures that all posteriors in the ensemble are on the same device.
+
+        Args:
+            posteriors: List containing the trained posterior instances that will make
+                up the ensemble.
+
+        Raises:
+            AssertionError if ensemble components have different device variables.
+
+        Returns:
+            A device string, that is the same for all posteriors.
+
+        """
         devices = [posterior._device for posterior in posteriors]
         assert all(
             device == devices[0] for device in devices
@@ -115,15 +164,17 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
         Args:
             sample_shape: Desired shape of samples that are drawn from posterior
                 ensemble. If sample_shape is multidimensional we simply draw
-                    `sample_shape.
-            numel()` samples and then reshape into the desired shape.
+                `sample_shape.numel()` samples and then reshape into the desired shape.
+
+        Returns:
+            Samples drawn from the ensemble distribution.
         """
         num_samples = torch.Size(sample_shape).numel()
         idxs = torch.multinomial(self._weights, num_samples, replacement=True)
         samples = []
-        for c, n in torch.vstack(idxs.unique(return_counts=True)).T:
-            sample_shape_c = torch.Size((n,))
-            samples.append(self.posteriors[c].sample(sample_shape_c, **kwargs))
+        for comp_idx, sample_size in torch.vstack(idxs.unique(return_counts=True)).T:
+            sample_shape_c = torch.Size((sample_size,))
+            samples.append(self.posteriors[comp_idx].sample(sample_shape_c, **kwargs))
         return torch.vstack(samples).reshape(*sample_shape, -1)
 
     def log_prob(self, theta: Tensor, individually: bool = False, **kwargs) -> Tensor:
@@ -137,6 +188,9 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
             theta: Parameters $\theta$.
             individually: If true, returns log weights and log_probs individually.
 
+        Raises:
+            AssertionError if posterior estimators are a mixture of different methods.
+
         Returns:
             `(len(θ),)`-shaped average log posterior probability $\log p(\theta|x)$ for
             θ in the support of the prior, -∞ (corresponding to 0 probability) outside.
@@ -144,7 +198,7 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
         assert all(
             isinstance(posterior, type(self.posteriors[0]))
             for posterior in self.posteriors
-        )
+        ), "`log_prob()` only works for ensembles of the same type of posterior."
 
         log_probs = torch.stack(
             [posterior.log_prob(theta, **kwargs) for posterior in self.posteriors]
@@ -358,9 +412,9 @@ class EnsemblePotentialProvider(BasePotential):
         Returns:
             The potential function.
         """
+        self.posteriors = posteriors
         self._weights = weights
         self.potential_fns = []
-        self.posteriors = posteriors
         for posterior in posteriors:
             potential_fn = posterior.potential_fn
             self.potential_fns.append(potential_fn)
