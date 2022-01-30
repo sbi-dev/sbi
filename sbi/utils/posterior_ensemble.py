@@ -73,14 +73,15 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
 
         self.device = self.ensure_same_device(posteriors)
 
-        self.prior = None
+        self.prior = self.common_prior()
         if theta_transform is not None:
             self.theta_transform = theta_transform
-        elif self.same_component_priors():
-            self.prior = self.posteriors[0].prior
+        elif self.prior is not None:
             self.theta_transform = mcmc_transform(self.prior, device=self.device)
+        else:
+            self.theta_transform = None
 
-    def same_component_priors(self) -> bool:
+    def common_prior(self) -> bool:
         """Ensures that all posteriors in the ensemble are based off of the same prior
         distribution.
 
@@ -92,9 +93,14 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
             AssertionError if ensemble components have different priors.
 
         Returns:
-            A prior distribution, that is the same for all posteriors.
+            A prior distribution, if it is the same for all posteriors.
         """
-        priors = [posterior.prior for posterior in self.posteriors]
+        try:
+            # for SNPE
+            priors = [posterior.prior for posterior in self.posteriors]
+        except AttributeError:
+            # for SNLE and SNRE
+            priors = [posterior.proposal for posterior in self.posteriors]
 
         # assert same type
         same_type = all(isinstance(prior, type(priors[0])) for prior in priors)
@@ -113,7 +119,10 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
             same_params = all(compare_params(prior, priors[0]) for prior in priors)
 
         same_prior = same_type and same_params
-        return same_prior
+        if same_prior:
+            return priors[0]
+        else:
+            return None
 
     def ensure_same_device(self, posteriors):
         """Ensures that all posteriors in the ensemble are on the same device.
