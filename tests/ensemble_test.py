@@ -1,19 +1,24 @@
-from sbi.utils.posterior_ensemble import NeuralPosteriorEnsemble
+from __future__ import annotations
+
+import pytest
+from torch import eye, ones, zeros
+from torch.distributions import MultivariateNormal
+
 from joblib import Parallel, delayed
+
+from sbi.utils.posterior_ensemble import NeuralPosteriorEnsemble
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     true_posterior_linear_gaussian_mvn_prior,
 )
-from tests.test_utils import (
-    check_c2st,
-    get_dkl_gaussian_prior,
-)
-import pytest
-from torch import eye, ones, zeros
-from torch.distributions import MultivariateNormal
 from sbi.inference import (
     infer,
     prepare_for_sbi,
+)
+
+from tests.test_utils import (
+    check_c2st,
+    get_dkl_gaussian_prior,
 )
 
 
