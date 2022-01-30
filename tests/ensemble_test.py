@@ -20,12 +20,7 @@ from sbi.inference import (
 @pytest.mark.parametrize("inference_method", ["SNLE_A", "SNRE_A", "SNPE_C"])
 @pytest.mark.parametrize(
     "num_dim, num_trials",
-    (
-        (2, 1),
-        # no iid x in snpe.
-        pytest.param(1, 2, marks=pytest.mark.xfail),
-        pytest.param(2, 2, marks=pytest.mark.xfail),
-    ),
+    ((2, 1),),
 )
 def test_c2st_posterior_ensemble_on_linearGaussian(
     inference_method, num_dim: int, num_trials: int, set_seed
@@ -71,20 +66,22 @@ def test_c2st_posterior_ensemble_on_linearGaussian(
     samples = posterior.sample((num_samples,))
 
     # Compute the c2st and assert it is near chance level of 0.5.
-    check_c2st(samples, target_samples, alg="snpe_c")
+    check_c2st(
+        samples, target_samples, alg="{} posterior ensemble".format(inference_method)
+    )
 
     map_ = posterior.map(num_init_samples=1_000, show_progress_bars=False)
 
     # Checks for log_prob()
     # For the Gaussian prior, we compute the KLd between ground truth and posterior.
-    dkl = get_dkl_gaussian_prior(
-        posterior, x_o[0], likelihood_shift, likelihood_cov, prior_mean, prior_cov
-    )
-
-    max_dkl = 0.15
-
-    assert (
-        dkl < max_dkl
-    ), f"D-KL={dkl} is more than 2 stds above the average performance."
+    # This step os skipped for SNL since the probabilities are not normalised.
+    if "snle" not in inference_method.lower():
+        dkl = get_dkl_gaussian_prior(
+            posterior, x_o[0], likelihood_shift, likelihood_cov, prior_mean, prior_cov
+        )
+        max_dkl = 0.15
+        assert (
+            dkl < max_dkl
+        ), f"D-KL={dkl} is more than 2 stds above the average performance."
 
     assert ((map_ - gt_posterior.mean) ** 2).sum() < 0.5
