@@ -117,9 +117,9 @@ def build_linear_classifier(
         Neural network.
     """
     # Initialize default embedding net
-    if type(embedding_net_x == DefaultEmbeddingNet):
+    if 'DefaultEmbeddingNet' in str(embedding_net_x):
         embedding_net_x = DefaultEmbeddingNet(batch_x)
-    if type(embedding_net_y == DefaultEmbeddingNet):
+    if 'DefaultEmbeddingNet' in str(embedding_net_y):
         embedding_net_y = DefaultEmbeddingNet(batch_y)
 
     check_data_device(batch_x, batch_y)
@@ -173,9 +173,9 @@ def build_mlp_classifier(
         Neural network.
     """
     # Initialize default embedding net
-    if type(embedding_net_x == DefaultEmbeddingNet):
+    if 'DefaultEmbeddingNet' in str(embedding_net_x):
         embedding_net_x = DefaultEmbeddingNet(batch_x)
-    if type(embedding_net_y == DefaultEmbeddingNet):
+    if 'DefaultEmbeddingNet' in str(embedding_net_y):
         embedding_net_y = DefaultEmbeddingNet(batch_y)
 
     check_data_device(batch_x, batch_y)
@@ -237,9 +237,9 @@ def build_resnet_classifier(
         Neural network.
     """
     # Initialize default embedding net
-    if type(embedding_net_x == DefaultEmbeddingNet):
+    if 'DefaultEmbeddingNet' in str(embedding_net_x):
         embedding_net_x = DefaultEmbeddingNet(batch_x)
-    if type(embedding_net_y == DefaultEmbeddingNet):
+    if 'DefaultEmbeddingNet' in str(embedding_net_y):
         embedding_net_y = DefaultEmbeddingNet(batch_y)
 
     check_data_device(batch_x, batch_y)

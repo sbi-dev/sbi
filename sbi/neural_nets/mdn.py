@@ -46,7 +46,7 @@ def build_mdn(
         Neural network.
     """
     # Initialize default embedding net
-    if type(embedding_net == DefaultEmbeddingNet):
+    if 'DefaultEmbeddingNet' in str(embedding_net):
         embedding_net = DefaultEmbeddingNet(batch_y)
 
     x_numel = batch_x[0].numel()

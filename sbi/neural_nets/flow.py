@@ -54,7 +54,7 @@ def build_made(
         Neural network.
     """
     # Initialize default embedding net
-    if type(embedding_net == DefaultEmbeddingNet):
+    if 'DefaultEmbeddingNet' in str(embedding_net):
         embedding_net = DefaultEmbeddingNet(batch_y)
 
     x_numel = batch_x[0].numel()
@@ -131,7 +131,7 @@ def build_maf(
         Neural network.
     """
     # Initialize default embedding net
-    if type(embedding_net == DefaultEmbeddingNet):
+    if 'DefaultEmbeddingNet' in str(embedding_net):
         embedding_net = DefaultEmbeddingNet(batch_y)
 
     x_numel = batch_x[0].numel()
@@ -219,7 +219,7 @@ def build_nsf(
         Neural network.
     """
     # Initialize default embedding net
-    if type(embedding_net == DefaultEmbeddingNet):
+    if 'DefaultEmbeddingNet' in str(embedding_net):
         embedding_net = DefaultEmbeddingNet(batch_y)
 
     x_numel = batch_x[0].numel()
