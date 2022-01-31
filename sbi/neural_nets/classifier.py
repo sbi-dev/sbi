@@ -116,11 +116,11 @@ def build_linear_classifier(
     Returns:
         Neural network.
     """
-    # Initialize default embedding net
-    if 'DefaultEmbeddingNet' in str(embedding_net_x):
-        embedding_net_x = DefaultEmbeddingNet(batch_x)
-    if 'DefaultEmbeddingNet' in str(embedding_net_y):
-        embedding_net_y = DefaultEmbeddingNet(batch_y)
+    # Initialize default embedding net with linear layer
+    if isinstance(embedding_net_x, DefaultEmbeddingNet):
+        embedding_net_x.build_network(batch_x)
+    if isinstance(embedding_net_y, DefaultEmbeddingNet):
+        embedding_net_y.build_network(batch_y)
 
     check_data_device(batch_x, batch_y)
     check_embedding_net_device(embedding_net=embedding_net_x, datum=batch_y)
@@ -172,11 +172,11 @@ def build_mlp_classifier(
     Returns:
         Neural network.
     """
-    # Initialize default embedding net
-    if 'DefaultEmbeddingNet' in str(embedding_net_x):
-        embedding_net_x = DefaultEmbeddingNet(batch_x)
-    if 'DefaultEmbeddingNet' in str(embedding_net_y):
-        embedding_net_y = DefaultEmbeddingNet(batch_y)
+    # Initialize default embedding net with linear layer
+    if isinstance(embedding_net_x, DefaultEmbeddingNet):
+        embedding_net_x.build_network(batch_x)
+    if isinstance(embedding_net_y, DefaultEmbeddingNet):
+        embedding_net_y.build_network(batch_y)
 
     check_data_device(batch_x, batch_y)
     check_embedding_net_device(embedding_net=embedding_net_x, datum=batch_y)
@@ -236,11 +236,11 @@ def build_resnet_classifier(
     Returns:
         Neural network.
     """
-    # Initialize default embedding net
-    if 'DefaultEmbeddingNet' in str(embedding_net_x):
-        embedding_net_x = DefaultEmbeddingNet(batch_x)
-    if 'DefaultEmbeddingNet' in str(embedding_net_y):
-        embedding_net_y = DefaultEmbeddingNet(batch_y)
+    # Initialize default embedding net with linear layer
+    if isinstance(embedding_net_x, DefaultEmbeddingNet):
+        embedding_net_x.build_network(batch_x)
+    if isinstance(embedding_net_y, DefaultEmbeddingNet):
+        embedding_net_y.build_network(batch_y)
 
     check_data_device(batch_x, batch_y)
     check_embedding_net_device(embedding_net=embedding_net_x, datum=batch_y)
