@@ -44,7 +44,8 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
         num_components: Number of posterior estimators.
         weights: Weight of each posterior distribution. If none are provided each
             posterior is weighted with 1/N.
-        potential_fn: Potential function of the ensemble.
+        potential_fn: Potential function of the ensemble. Will only be set once
+        `potential()` is called.
         prior: Prior distribution that is the same for all posteriors. If it is not the
             same, then `prior = None`.
         device: Device which the component distributions sit on.
