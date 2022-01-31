@@ -447,7 +447,7 @@ def test_api_snl_sampling_methods(
         )
     else:
         posterior = VIPosterior(
-            potential_fn, theta_transform, vi_method=sampling_method
+            potential_fn, theta_transform=theta_transform, vi_method=sampling_method
         )
         posterior.train(max_num_iters=10)
 

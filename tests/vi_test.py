@@ -2,6 +2,8 @@
 # THESTED HERE!!!!
 
 from __future__ import annotations
+from pydoc import cli
+from tabnanny import check
 
 import numpy as np
 from pkg_resources import Distribution
@@ -35,7 +37,11 @@ def test_c2st_vi_on_Gaussian(
         sampling_method: Different sampling methods
         set_seed: fixture for manual seeding
     """
-    num_samples = 500
+
+    if sampling_method == "naive" and vi_method == "IW":
+        return  # This is not meant to perform goood ...
+
+    num_samples = 2000
 
     likelihood_shift = -1.0 * ones(num_dim)
     likelihood_cov = 0.3 * eye(num_dim)
@@ -57,13 +63,14 @@ def test_c2st_vi_on_Gaussian(
         def allow_iid_x(self) -> bool:
             return True
 
-    potential_fn = TractablePotential(prior=MultivariateNormal(prior_mean, prior_cov))
+    prior = MultivariateNormal(prior_mean, prior_cov)
+    potential_fn = TractablePotential(prior=prior)
     theta_transform = torch_tf.identity_transform
 
-    posterior = VIPosterior(potential_fn=potential_fn, theta_transform=theta_transform)
+    posterior = VIPosterior(potential_fn, prior, theta_transform=theta_transform)
     posterior.set_default_x(torch.tensor(np.zeros((num_dim,)).astype(np.float32)))
     posterior.vi_method = vi_method
-    posterior.train(min_num_iters=500, learning_rate=1e-2)
+    posterior.train()
     samples = posterior.sample((num_samples,), method=sampling_method)
     samples = torch.as_tensor(samples, dtype=torch.float32)
 
@@ -86,7 +93,7 @@ def test_c2st_vi_flows_on_Gaussian(num_dim: int, q: str, set_seed):
     if num_dim == 1 and q in ["mcf", "scf"]:
         return
 
-    num_samples = 500
+    num_samples = 2000
 
     likelihood_shift = -1.0 * ones(num_dim)
     likelihood_cov = 0.3 * eye(num_dim)
@@ -108,19 +115,17 @@ def test_c2st_vi_flows_on_Gaussian(num_dim: int, q: str, set_seed):
         def allow_iid_x(self) -> bool:
             return True
 
-    potential_fn = TractablePotential(prior=MultivariateNormal(prior_mean, prior_cov))
+    prior = MultivariateNormal(prior_mean, prior_cov)
+    potential_fn = TractablePotential(prior=prior)
     theta_transform = torch_tf.identity_transform
-
-    posterior = VIPosterior(
-        potential_fn=potential_fn, theta_transform=theta_transform, q=q
-    )
+    
+    posterior = VIPosterior(potential_fn, prior, theta_transform=theta_transform, q=q)
     posterior.set_default_x(torch.tensor(np.zeros((num_dim,)).astype(np.float32)))
-    posterior.train(min_num_iters=1000, learning_rate=1e-2, eps=1e-8)
+    posterior.train(n_particles=1000, eps=1e-8)
     samples = posterior.sample((num_samples,))
     samples = torch.as_tensor(samples, dtype=torch.float32)
 
     check_c2st(samples, target_samples, alg="slice_np")
-
 
 @pytest.mark.slow
 @pytest.mark.parametrize("num_dim", (1, 2))
@@ -133,7 +138,7 @@ def test_c2st_vi_external_distributions_on_Gaussian(num_dim: int, set_seed):
         sampling_method: Different sampling methods
         set_seed: fixture for manual seeding
     """
-    num_samples = 500
+    num_samples = 2000
 
     likelihood_shift = -1.0 * ones(num_dim)
     likelihood_cov = 0.3 * eye(num_dim)
@@ -155,21 +160,23 @@ def test_c2st_vi_external_distributions_on_Gaussian(num_dim: int, set_seed):
         def allow_iid_x(self) -> bool:
             return True
 
-    potential_fn = TractablePotential(prior=MultivariateNormal(prior_mean, prior_cov))
+    prior = MultivariateNormal(prior_mean, prior_cov)
+    potential_fn = TractablePotential(prior=prior)
     theta_transform = torch_tf.identity_transform
 
     mu = zeros(num_dim, requires_grad=True)
-    scale = torch.eye(num_dim, requires_grad=True)
-    q = MultivariateNormal(mu, scale_tril=scale)
-
+    scale = ones(num_dim, requires_grad=True)
+    q = torch.distributions.Independent(torch.distributions.Normal(mu, scale), 1)
     posterior = VIPosterior(
-        potential_fn=potential_fn,
+        potential_fn,
+        prior,
         theta_transform=theta_transform,
         q=q,
-        q_kwargs={"parameters": [mu, scale]},
+        vi_method="rKL",
+        parameters=[mu, scale],
     )
-    posterior.set_default_x(torch.tensor(np.zeros((num_dim,)).astype(np.float32)))
-    posterior.train(eps=1e-7)
+    posterior.set_default_x(x_o)
+    posterior.train(check_for_convergence=False)
     samples = posterior.sample((num_samples,))
     samples = torch.as_tensor(samples, dtype=torch.float32)
 
@@ -193,11 +200,13 @@ def test_deepcopy_support(q: str, set_seed):
         def allow_iid_x(self) -> bool:
             return True
 
-    potential_fn = FakePotential(prior=MultivariateNormal(zeros(num_dim), eye(num_dim)))
+    prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
+    potential_fn = FakePotential(prior=prior)
     theta_transform = torch_tf.identity_transform
 
     posterior = VIPosterior(
-        potential_fn=potential_fn,
+        potential_fn,
+        prior,
         theta_transform=theta_transform,
         q=q,
     )
@@ -214,63 +223,82 @@ def test_deepcopy_support(q: str, set_seed):
     posterior_copy = deepcopy(posterior)
 
 
-@pytest.mark.slow
-@pytest.mark.gpu
-@pytest.mark.parametrize("num_dim", (1, 2))
-@pytest.mark.parametrize("q", ("maf", "nsf", "gaussian_diag", "gaussian", "mcf", "scf"))
-@pytest.mark.parametrize("vi_method", ("rKL", "fKL", "IW", "alpha"))
-@pytest.mark.parametrize("sampling_method", ("naive", "sir"))
-def test_vi_on_gpu(
-    num_dim: int, q: Distribution, vi_method: str, sampling_method: str, set_seed
-):
-    """Test VI on Gaussian, comparing to ground truth target via c2st.
+def test_vi_posterior_inferface():
+    num_dim = 2
 
-    Args:
-        num_dim: parameter dimension of the gaussian model
-        vi_method: different vi methods
-        sampling_method: Different sampling methods
-        set_seed: fixture for manual seeding
-    """
-
-    device = "cuda:0"
-
-    if num_dim == 1 and q in ["mcf", "scf"]:
-        return
-
-    # Good run where everythink is one the correct device.
     class FakePotential(BasePotential):
         def __call__(self, theta, **kwargs):
-            return torch.ones(len(theta), dtype=torch.float32, device=device)
+            return torch.ones_like(torch.as_tensor(theta[:,0], dtype=torch.float32))
 
         def allow_iid_x(self) -> bool:
             return True
 
-    potential_fn = FakePotential(
-        prior=MultivariateNormal(
-            zeros(num_dim, device=device), eye(num_dim, device=device)
-        ),
-        device=device,
-    )
+    prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
+    potential_fn = FakePotential(prior=prior)
     theta_transform = torch_tf.identity_transform
 
     posterior = VIPosterior(
-        potential_fn=potential_fn, theta_transform=theta_transform, q=q, device=device
+        potential_fn,
+        theta_transform=theta_transform,
     )
-    posterior.set_default_x(
-        torch.tensor(np.zeros((num_dim,)).astype(np.float32)).to(device)
-    )
-    posterior.vi_method = vi_method
+    posterior.set_default_x(torch.zeros((1,num_dim)))
 
-    samples = posterior.sample()
-    logprobs = posterior.log_prob(samples)
+    posterior2 = VIPosterior(potential_fn)
 
-    print(samples)
-    assert str(samples.device) == device, "The devices does not match"
-    assert str(logprobs.device) == device, "The devices does not match"
+    # Raising errors if untrained
+    assert (
+        isinstance(posterior.q.support, type(posterior2.q.support))
+    ), "The support indicated by 'theta_transform' is different than that of the 'prior'."
 
-    posterior.train(min_num_iters=9, max_num_iters=10, warm_up_rounds=10)
-    samples = posterior.sample((1,), method=sampling_method)
-    logprobs = posterior.log_prob(samples)
+    with pytest.raises(Exception) as execinfo:
+        posterior.sample()
 
-    assert str(samples.device) == device, "The devices after training does not match"
-    assert str(logprobs.device) == device, "The devices after training does not match"
+    assert (
+        "The variational posterior was not fit" in execinfo.value.args[0]
+    ), "An expected error was raised but the error message is different than expected..."
+
+    with pytest.raises(Exception) as execinfo:
+        posterior.log_prob(prior.sample())
+
+    assert (
+        "The variational posterior was not fit" in execinfo.value.args[0]
+    ), "An expected error was raised but the error message is different than expected..."
+
+    # Passing Hyperparameters in train
+    posterior.train(max_num_iters=20)
+
+    posterior.train(max_num_iters=20, optimizer=torch.optim.SGD)
+    assert isinstance(
+        posterior._optimizer._optimizer, torch.optim.SGD
+    ), "Assert chaning the optimizer base class did not work"
+    posterior.train(max_num_iters=20, stick_the_landing=True)
+    
+    assert posterior._optimizer.stick_the_landing, "The sticking_the_landing argument is not correctly passed."
+
+    posterior.vi_method = "alpha"
+    posterior.train(max_num_iters=20)
+    posterior.train(max_num_iters=20, alpha=0.9)
+
+    assert posterior._optimizer.alpha == 0.9, "The Hyperparameter alpha is not passed to the corresponding optmizer"
+    
+    posterior.vi_method = "IW"
+    posterior.train(max_num_iters=20)
+    posterior.train(max_num_iters=20, K=32)
+
+    assert posterior._optimizer.K == 32, "The Hyperparameter K is not passed to the corresponding optmizer"
+    
+    # Passing Hyperparameters in sample
+    posterior.sample()
+    posterior.sample(method="sir")
+    posterior.sample(method="sir", K = 128)
+
+    # Testing evaluate
+    posterior.evaluate()
+    posterior.evaluate("prop")
+    posterior.evaluate("prop_prior")
+
+    # Test log_prob and potential
+    posterior.log_prob(posterior.sample())
+    posterior.potential(posterior.sample())
+
+    

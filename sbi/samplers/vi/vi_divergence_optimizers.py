@@ -1,11 +1,20 @@
+from __future__ import annotations
+
 import torch
 from torch.distributions import Distribution
 from torch import Tensor
 from torch import nn
-from torch.optim import Adam, Optimizer
-from torch.optim.lr_scheduler import ExponentialLR
+from torch.optim import SGD, Adam, Adadelta, RMSprop, Adagrad, Adamax, AdamW, ASGD
+from torch.optim.lr_scheduler import (
+    CosineAnnealingLR,
+    ExponentialLR,
+    CosineAnnealingWarmRestarts,
+    CyclicLR,
+    LambdaLR,
+    StepLR,
+)
 
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Callable, Dict, Union, Type
 from sbi.types import Array
 
 
@@ -16,13 +25,12 @@ from copy import deepcopy
 from sbi.inference.potentials.base_potential import BasePotential
 
 
-from .vi_utils import (
+from sbi.samplers.vi.vi_utils import (
     filter_kwrags_for_func,
-    make_sure_nothing_in_cache,
+    make_object_deepcopy_compatible,
     move_all_tensor_to_device,
 )
 
-from .vi_sampling import clamp_weights, paretto_smoothed_weights
 
 _VI_method = {}
 
@@ -30,43 +38,63 @@ _VI_method = {}
 class DivergenceOptimizer(ABC):
     """This is a wrapper round a PyTorch optimizer and scheduler, which will be used to
     learn the variational distribution. It further contains some methods to evaluate
-    convergence and to recover a valid state if something wents wrong.
+    convergence and to recover a valid state if something went wrong.
 
-    This class contains one abstract method '_generate_loss_function' which must be
+    This class contains one abstract method `_generate_loss_function` which must be
     implemented und determines the loss function used within variational inference."""
 
     def __init__(
         self,
         potential_fn: BasePotential,
         q: Distribution,
+        prior: Optional[Distribution] = None,
         n_particles: int = 256,
         clip_value: float = 5.0,
-        optimizer: Optional[Optimizer] = Adam,
-        scheduler: Optional[object] = ExponentialLR,
+        optimizer: Type[
+            Union[SGD, Adam, Adadelta, RMSprop, Adagrad, Adamax, AdamW, ASGD]
+        ] = Adam,
+        scheduler: Type[
+            Union[
+                CosineAnnealingLR,
+                ExponentialLR,
+                CosineAnnealingWarmRestarts,
+                CyclicLR,
+                LambdaLR,
+                StepLR,
+            ]
+        ] = ExponentialLR,
         eps: float = 1e-5,
         **kwargs,
     ):
         """This is a wrapper around a PyTorch optimizer which is used to minimize some
-         loss for variational inference.
+            loss for variational inference.
 
         Args:
             potential_fn: Potential function of the target i.e. the posterior density up
                 to normalization constant.
             q: Variational distribution
+            prior: Prior distribution, which will be used within the warmup, if given.
+                Note that this will not affect the potential_fn, so make sure to have
+                the same prior within it.
             n_particles: Number of samples used to estimate gradients.
             clip_value: Norm value on which gradients are clipped.
-            optimizer: Base class for an pytorch optimizer.
-            scheduler: Base class for an pytorch scheduler.
+            optimizer: Base class for an pytorch optimizer. We support on of [SGD, Adam,
+                Adadelta, RMSprop, Adagrad, Adamax, AdamW, ASGD].
+            scheduler: Base class for an pytorch scheduler. We support on of
+                [CosineAnnealingLR, ExponentialLR, CosineAnnealingWarmRestarts,
+                CyclicLR, LambdaLR, StepLR]. Note that you may have to pass additional
+                arguments of the scheduling method, this can be passed within the
+                keyword arguments.
             eps: This value determines the sensitivity of the convergence checks.
             kwargs: All additional arguments associated with optimizer, scheduler such
-                as learning_rate.
-
+                as learning_rates, gamma-values and so on. We refer to the documentation
+                of each of the supported optimizers or schedulers for details.
 
         """
 
         self.potential_fn = potential_fn
         self.q = q
-        self.prior = potential_fn.prior
+        self.prior = prior
         self.device = potential_fn.device
         self.to(self.device)
 
@@ -78,7 +106,8 @@ class DivergenceOptimizer(ABC):
 
         # This prevents error that would stop optimization.
         self.q.set_default_validate_args(False)
-        self.prior.set_default_validate_args(False)
+        if prior is not None:
+            self.prior.set_default_validate_args(False)
 
         # Manage modules if present.
         if hasattr(self.q, "modules"):
@@ -89,7 +118,7 @@ class DivergenceOptimizer(ABC):
 
         # Ensure that distribution has parameters and that these are on the right device
         if not hasattr(self.q, "parameters"):
-            raise ValueError("Your distribution has not parameters please add them!")
+            raise ValueError("Your distribution has not parameters please add them.")
         self.to(self.device)
 
         # Keep a state to resolve invalid values
@@ -97,63 +126,63 @@ class DivergenceOptimizer(ABC):
 
         # Init optimizer and scheduler with correct arguments
         opt_kwargs = filter_kwrags_for_func(optimizer.__init__, kwargs)
+        kwargs.pop("lr")  # This is just because CyclicLR Scheduler ...
         scheduler_kwargs = filter_kwrags_for_func(scheduler.__init__, kwargs)
-        scheduler_kwargs["gamma"] = scheduler_kwargs.get("gamma", 1.0)
+
         self._optimizer = optimizer(self.q.parameters(), **opt_kwargs)
         self._scheduler = scheduler(self._optimizer, **scheduler_kwargs)
-        self._scheduler._step_count = 2  # Prevents  warning...
-
         # Loss and summary
         self.eps = eps
         self.num_step = 0
         self.warm_up_was_done = False
-        self.losses = np.ones(2000)
-        self.moving_average = np.ones(2000)
-        self.moving_std = np.ones(2000)
-        self.moving_slope = np.ones(2000)
+        self.losses = torch.ones(2000)
+        self.moving_average = torch.ones(2000)
+        self.moving_std = torch.ones(2000)
+        self.moving_slope = torch.ones(2000)
 
         # Hyperparameters to change adaptively
         self.HYPER_PARAMETERS = ["n_particles", "clip_value", "eps"]
 
     @abstractmethod
-    def _generate_loss_function(self):
+    def _generate_loss_function(self) -> None:
         """This generates the loss function that will be used. Especially it must set
-        the '_loss' attribute to an Callable loss function."""
+        the `_loss` attribute to a Callable loss function."""
         pass
 
-    def _loss(self, *args, **kwargs):
-        """This should be overwritten based on the '_generate_loss_function'. And is
-        the function that is evalute as loss."""
+    def _loss(self, *args, **kwargs) -> Tuple[Tensor, Tensor]:
+        """This should be overwritten based on the `_generate_loss_function`. And is
+        the function that is evaluate to compute the loss."""
         raise NotImplementedError(
-            "I should have been overwritten by the '_generate_loss_function'."
+            "I should have been overwritten by the `_generate_loss_function`."
         )
 
-    def to(self, device: str):
+    def to(self, device: str) -> None:
         """This will move all parameters to the correct device, both for likelihood and
         posterior"""
         self.device = device
-        # These just ensure that everythink must be on the same device!
+        # These just ensure that everythink must be on the same device.
         move_all_tensor_to_device(self.potential_fn, self.device)
         move_all_tensor_to_device(self.q, self.device)
-        move_all_tensor_to_device(self.prior, self.device)
+        if self.prior is not None:
+            move_all_tensor_to_device(self.prior, self.device)
 
-    def warm_up(self, num_steps: int, method: str = "prior"):
+    def warm_up(self, num_steps: int, method: str = "prior") -> None:
         """This initializes q, either to follow the prior or the base distribution
-        of the flow. This can increase training stability!
+        of the flow. This can increase training stability.
 
         Args:
             num_steps: Number of steps to train.
             method: Method for warmup.
 
         """
-        if method == "prior":
+        if method == "prior" and self.prior is not None:
             p = self.prior
         elif method == "identity":
             p = torch.distributions.TransformedDistribution(
                 self.q.base_dist, self.q.transforms[-1]
             )
         else:
-            NotImplementedError("We only implement methods 'prior' or 'identity'")
+            NotImplementedError("We only implement methods `prior` or `identity`")
 
         for _ in range(num_steps):
             self._optimizer.zero_grad()
@@ -170,7 +199,7 @@ class DivergenceOptimizer(ABC):
         # Denote that warmup was already done
         self.warm_up_was_done = True
 
-    def update_state(self):
+    def update_state(self) -> None:
         """This updates the current state."""
         for state_para, para in zip(self.state_dict, self.q.parameters()):
             if torch.isfinite(para).all():
@@ -178,7 +207,7 @@ class DivergenceOptimizer(ABC):
             else:
                 nn.init.uniform_(para, a=-0.5, b=0.5)
 
-    def resolve_state(self, warm_up_rounds=200):
+    def resolve_state(self, warm_up_rounds: int = 100) -> None:
         """In case the parameters become nan, this method will try to fix the current
         state
 
@@ -190,10 +219,10 @@ class DivergenceOptimizer(ABC):
         self._optimizer.__init__(self.q.parameters(), self.learning_rate)
         self.warm_up(warm_up_rounds)
 
-    def loss(self, x_obs):
+    def loss(self, x_o: Tensor) -> Tuple[Tensor, Tensor]:
         """Computes the loss function which is optimized.
         Args:
-            x_obs: Observed data as input.
+            x_o: Observed data as input.
 
         Returns:
             surrogated_loss : The loss that will be differentiated, hence this must be
@@ -201,17 +230,17 @@ class DivergenceOptimizer(ABC):
             loss : This loss will be displayed and used to determine convergence. This
                 should not  be differentiable.
         """
-        return self._loss(x_obs)
+        return self._loss(x_o)
 
-    def step(self, x_obs) -> None:
+    def step(self, x_o: Tensor) -> None:
         """Performs one gradient step
 
         Args:
-            x_obs: Observation which is used.
+            x_o: Observation which is used.
 
         """
         self._optimizer.zero_grad()
-        surrogate_loss, loss = self.loss(x_obs.to(self.device))
+        surrogate_loss, loss = self.loss(x_o.to(self.device))
         surrogate_loss.backward(retain_graph=self.retain_graph)
         if not torch.isfinite(surrogate_loss):
             self.resolve_state()
@@ -224,7 +253,7 @@ class DivergenceOptimizer(ABC):
 
     def converged(self, considered_values: int = 50) -> bool:
         """Determines convergence based on a estimate of the slope of the loss
-        function. If it is smaller than 'eps' then this function will return true.
+        function. If it is smaller than `eps` then this function will return true.
 
         Args:
             considered_values: Window over which we will average.
@@ -241,15 +270,15 @@ class DivergenceOptimizer(ABC):
             ].mean()
             return abs(m) < self.eps
 
-    def reset_loss_stats(self):
+    def reset_loss_stats(self) -> None:
         """This will reset the loss statistics."""
-        self.losses = np.ones(2000)
-        self.moving_average = np.ones(2000)
-        self.moving_std = np.ones(2000)
-        self.moving_slope = np.ones(2000)
+        self.losses = torch.ones(2000)
+        self.moving_average = torch.ones(2000)
+        self.moving_std = torch.ones(2000)
+        self.moving_slope = torch.ones(2000)
         self.num_step = 0
 
-    def update_loss_stats(self, loss, window: int = 20) -> None:
+    def update_loss_stats(self, loss: Tensor, window: int = 20) -> None:
         """Updates current loss statistics of the optimizer
 
         Args:
@@ -257,15 +286,15 @@ class DivergenceOptimizer(ABC):
             window: Window size for running statistics
         """
         if self.num_step >= len(self.losses):
-            self.losses = np.append(self.losses, np.zeros(2000))
-            self.moving_average = np.append(self.moving_average, np.zeros(2000))
-            self.moving_std = np.append(self.moving_std, np.zeros(2000))
-            self.moving_slope = np.append(self.moving_slope, np.zeros(2000))
+            self.losses = torch.hstack([self.losses, torch.zeros(2000)])
+            self.moving_average = torch.hstack([self.moving_average, torch.zeros(2000)])
+            self.moving_std = torch.hstack([self.moving_std, torch.zeros(2000)])
+            self.moving_slope = torch.hstack([self.moving_slope, torch.zeros(2000)])
 
         if self.num_step == 0:
             self.losses[self.num_step] = loss
             self.moving_average[self.num_step] = loss
-        elif not np.isfinite(loss):
+        elif not torch.isfinite(loss):
             loss = self.losses[self.num_step - 1]
             self.moving_average[self.num_step] = self.moving_average[self.num_step - 1]
             self.moving_std[self.num_step] = self.moving_std[self.num_step - 1]
@@ -294,12 +323,15 @@ class DivergenceOptimizer(ABC):
             self.moving_std[self.num_step - 1],
         )
 
-    def update(self, kwargs: dict):
+    def update(self, kwargs: Dict):
         """Updates the hyperparameters and scheduler/optimizer kwargs"""
+        # print(kwargs)
         paras = self.__dict__
         for key, val in kwargs.items():
             if key == "retain_graph":
                 self.retain_graph = val
+            if key == "learning_rate":
+                self.learning_rate = val
             if key in self.HYPER_PARAMETERS:
                 paras[key] = val
 
@@ -311,20 +343,29 @@ class DivergenceOptimizer(ABC):
 
         if "self" in kwargs:
             kwargs.pop("self")
-        opt_kwargs = filter_kwrags_for_func(type(self._optimizer).__init__, kwargs)
-        scheduler_kwargs = filter_kwrags_for_func(
-            type(self._scheduler).__init__, kwargs
-        )
-        scheduler_kwargs["gamma"] = scheduler_kwargs.get("gamma", 1.0)
-        self._optimizer = type(self._optimizer)(self.q.parameters(), **opt_kwargs)
-        self._scheduler = type(self._scheduler)(self._optimizer, **scheduler_kwargs)
-        self._scheduler._step_count = 2
+
+        if "optimizer" in kwargs:
+            opt_type = kwargs.pop("optimizer")
+        else:
+            opt_type = type(self._optimizer)
+        if "scheduler" in kwargs:
+            sched_type = kwargs.pop("scheduler")
+        else:
+            sched_type = type(self._scheduler)
+
+        kwargs["lr"] = self.learning_rate
+        opt_kwargs = filter_kwrags_for_func(opt_type.__init__, kwargs)
+        kwargs.pop("lr")  # This is just because CyclicLR Scheduler ...
+        scheduler_kwargs = filter_kwrags_for_func(sched_type.__init__, kwargs)
+
+        self._optimizer = opt_type(self.q.parameters(), **opt_kwargs)
+        self._scheduler = sched_type(self._optimizer, **scheduler_kwargs)
 
 
 def register_VI_method(
-    cls: Optional[object] = None,
+    cls: Optional["DivergenceOptimizer"] = None,
     name: Optional[str] = None,
-):
+) -> Callable:
     """Registers a new VI method, by adding a new Divergence Optimizer class
 
 
@@ -335,7 +376,7 @@ def register_VI_method(
 
     """
 
-    def _register(cls):
+    def _register(cls: "DivergenceOptimizer") -> "DivergenceOptimizer":
         if name is None:
             cls_name = cls.__name__
         else:
@@ -352,7 +393,7 @@ def register_VI_method(
         return _register(cls)
 
 
-def get_VI_method(name: str) -> DivergenceOptimizer:
+def get_VI_method(name: str):
     """Returns a specific DivergenceOptimizer using the specified VI method.
 
     Args:
@@ -372,15 +413,15 @@ def get_default_VI_method() -> List[str]:
 @register_VI_method(name="rKL")
 class ElboOptimizer(DivergenceOptimizer):
     r"""This will learn the variational posterior by minimizing the reverse KL
-    divergence between q and p i.e. D_KL(q(theta)||p(theta|x_o)), by maximizing the
+    divergence between q and p i.e. $D_KL(q(\theta)||p(\theta|x_o))$, by maximizing the
     ELBO (Evidence Lower Bound).
     """
 
-    def __init__(self, *args, reduce_variance: bool = False, **kwargs):
-        """See 'DivergenceOptimizer' for all the base arguments.
+    def __init__(self, *args, stick_the_landing: bool = False, **kwargs):
+        """See `DivergenceOptimizer` for all the base arguments.
 
         Args:
-            reduce_variance: This will reduce the variance of the estimator, especially
+            stick_the_landing: This will reduce the variance of the estimator,especially
                 near convergence. Yet for normalizing flows this adds additional cost as
                 it requires to evaluate the inverse pass which often can be avoided
                 through caching. See [1] for details.
@@ -393,15 +434,15 @@ class ElboOptimizer(DivergenceOptimizer):
         """
         super().__init__(*args, **kwargs)
 
-        self.reduce_variance = reduce_variance
-        make_sure_nothing_in_cache(self.q)
+        self.stick_the_landing = stick_the_landing
+        make_object_deepcopy_compatible(self.q)
         self._surrogate_q = deepcopy(self.q)
 
         self._generate_loss_function()
         self.eps = 1e-5
-        self.HYPER_PARAMETERS += ["reduce_variance"]
+        self.HYPER_PARAMETERS += ["stick_the_landing"]
 
-    def _generate_loss_function(self):
+    def _generate_loss_function(self) -> None:
         """Generates the loss function depending on the input parameters."""
         if self.q.has_rsample:
             self._loss = self.loss_rsample
@@ -410,28 +451,28 @@ class ElboOptimizer(DivergenceOptimizer):
                 "Currently only reparameterizable distributions are supported."
             )
 
-    def loss_rsample(self, x_obs):
+    def loss_rsample(self, x_o: Tensor) -> Tuple[Tensor, Tensor]:
         """Computes the ELBO"""
-        elbo_particles = self.generate_elbo_particles(x_obs)
+        elbo_particles = self.generate_elbo_particles(x_o)
         loss = -elbo_particles.mean()
         return loss, loss.clone().detach()
 
-    def generate_elbo_particles(self, x_obs, num_samples=None):
+    def generate_elbo_particles(self, x_o: Tensor, num_samples: int = None) -> Tensor:
         """Generates individual ELBO particles i.e. logp(theta, x_o) - logq(theta)."""
         if num_samples is None:
             num_samples = self.n_particles
         samples = self.q.rsample((num_samples,))
-        if self.reduce_variance:
+        if self.stick_the_landing:
             self.update_surrogate_q()
             log_q = self._surrogate_q.log_prob(samples)
         else:
             log_q = self.q.log_prob(samples)
-        self.potential_fn.x_o = x_obs
+        self.potential_fn.x_o = x_o
         log_potential = self.potential_fn(samples)
         elbo = log_potential - log_q
         return elbo
 
-    def update_surrogate_q(self):
+    def update_surrogate_q(self) -> None:
         """Updates the surrogate with new parameters."""
         for param, param_surro in zip(
             self.q.parameters(), self._surrogate_q.parameters()
@@ -446,7 +487,7 @@ class IWElboOptimizer(ElboOptimizer):
     ELBO, which is an tighter bound to the evidence but also promotes a support covering
     behaviour.
 
-    NOTE: You may want to turn on 'reduce_variance' here as this loss leads to gradient
+    NOTE: You may want to turn on `stick_the_landing` here as this loss leads to gradient
     estimates with vanishing signal to noise ratio. This is relevant for large K,
     especially K > n_particles.
 
@@ -458,8 +499,8 @@ class IWElboOptimizer(ElboOptimizer):
         Salakhutdinov, 2016, https://arxiv.org/abs/1509.00519.
     """
 
-    def __init__(self, *args, K=8, dreg=False, **kwargs):
-        """See 'DivergenceOptimizer' for all the base arguments.
+    def __init__(self, *args, K: int = 8, dreg: bool = False, **kwargs):
+        """See `DivergenceOptimizer` for all the base arguments.
 
 
 
@@ -467,7 +508,7 @@ class IWElboOptimizer(ElboOptimizer):
             K: Number of samples used within estimating a single gradient. In total
                 n_particles x K samples are used.
             dreg: Doubly reparmeterized gradient estimator as proposed in [1]. It is
-                based on the 'reduced_variance' already present, but leads to an
+                based on the `stick_the_landing` already present but leads to an
                 unbiased estimate on this objective in contrast.
 
         References:
@@ -484,20 +525,20 @@ class IWElboOptimizer(ElboOptimizer):
         self.dreg = dreg
         self.HYPER_PARAMETERS += ["K", "dreg"]
         if dreg:
-            self.reduce_variance = True
+            self.stick_the_landing = True
 
-    def loss_rsample(self, x_obs: Tensor) -> Tuple[Tensor, Tensor]:
+    def loss_rsample(self, x_o: Tensor) -> Tuple[Tensor, Tensor]:
         """Computes the IWELBO loss.
 
         Args:
-            x_obs: Observation
+            x_o: Observation
 
         Returns:
             surrogate_loss: Loss to differentiate.
             loss: Loss to diplay.
 
         """
-        elbo_particles = self.generate_elbo_particles(x_obs, self.n_particles * self.K)
+        elbo_particles = self.generate_elbo_particles(x_o, self.n_particles * self.K)
         elbo_particles = elbo_particles.reshape(self.n_particles, self.K)
         weights = self.get_importance_weight(elbo_particles.clone().detach())
         surrogate_loss = -(weights * elbo_particles).sum(-1).mean(0)
@@ -525,11 +566,11 @@ class IWElboOptimizer(ElboOptimizer):
 
 @register_VI_method(name="fKL")
 class ForwardKLOptimizer(DivergenceOptimizer):
-    """This learns the variational posterior by minimizeing the forward KL divergence
-    i.e. D_KL(p(theta|x_o)|| q(theta)). The typically necessary samples from the
-    posterior are not required by using importance sampling tenchniques.
+    """This learns the variational posterior by minimizing the forward KL divergence
+    i.e. $D_KL(p(\theta|x_o)|| q(\theta))$. The typically necessary samples from the
+    posterior are not required by using importance sampling techniques.
 
-    NOTE: Whereas in the previous cases n_particles mainly reduces the variance, in this
+    NOTE: Whereas in the rKL and IWELBO n_particles mainly reduces the variance, in this
     case it also decrease the bias. Using n_particles=1 is not usefull.
 
     References:
@@ -543,62 +584,40 @@ class ForwardKLOptimizer(DivergenceOptimizer):
         self,
         *args,
         proposal: str = "q",
-        is_method: str = "identity",
+        weight_transform: Callable = lambda x: x,
         **kwargs,
     ):
-        """See 'DivergenceOptimizer' for base arguments.
+        """See `DivergenceOptimizer` for base arguments.
 
         Args:
-            proposal: The proposal used we currently support only ['q']
-            is_method: Importance sampling method we currently support ['identity',
-                'clamped', 'paretto_smoothed'].
+            proposal: The proposal used we currently support only [`q`]
+            weight_transform: This is a transformation that is applied to the importance
+                weight $w(\theta) = p(\theta, x_o)/q(\theta)$. For example it may be
+                usefull to clamp the weights by a certain rule to reduce variance.
 
 
         """
         super().__init__(*args, **kwargs)
 
-        self.alpha = 1.0
         self.proposal = proposal
-        self.is_method = is_method
+        self.weight_transform = weight_transform
         self._generate_loss_function()
         self._loss_name = "forward_kl"
-        self.HYPER_PARAMETERS += ["is_method", "proposal"]
-        self.eps = 5e-5
+        self.HYPER_PARAMETERS += ["weight_transform", "proposal"]
+        self.eps = 1e-5
 
-    def _generate_loss_function(self):
+    def _generate_loss_function(self) -> None:
         """This generates the loss function."""
         if self.proposal == "q":
             self._loss = self._loss_q_proposal
         else:
             raise NotImplementedError("Unknown loss.")
 
-    def weight_f(self, weights: Tensor) -> Tensor:
-        """This applies a weight transform to the importance weights.
-
-        Args:
-            weights: Importance weights to process.
-
-        Returns:
-            Tensor : Processed importance weights.
-
-        """
-        if self.is_method == "identity":
-            return weights
-        elif self.is_method == "clamped":
-            return clamp_weights(weights)
-        elif self.is_method == "paretto_smoothed":
-            return paretto_smoothed_weights(weights)
-        else:
-            raise NotImplementedError(
-                "We only supprot the IS methods 'identity', 'clamped'\
-                or 'paretto-smoothed'"
-            )
-
-    def _loss_q_proposal(self, x_obs: Tensor) -> Tuple[Tensor, Tensor]:
+    def _loss_q_proposal(self, x_o: Tensor) -> Tuple[Tensor, Tensor]:
         """This gives an importance sampling estimate of the forward KL divergence.
 
         Args:
-            x_obs: Obsevation.
+            x_o: Observation.
 
         Returns:
             Tuple[Tensor, Tensor]: Surrogate loss to differentiate and to display.
@@ -608,11 +627,11 @@ class ForwardKLOptimizer(DivergenceOptimizer):
         if hasattr(self.q, "clear_cache"):
             self.q.clear_cache()
         logq = self.q.log_prob(samples)
-        self.potential_fn.x_o = x_obs
+        self.potential_fn.x_o = x_o
         logp = self.potential_fn(samples)
         with torch.no_grad():
             logweights = logp - logq
-            weights = self.weight_f(logweights.exp())
+            weights = self.weight_transform(logweights.exp())
             weights /= weights.sum()
 
         surrogate = -torch.sum(weights * logq)
@@ -624,30 +643,37 @@ class ForwardKLOptimizer(DivergenceOptimizer):
 class RenyiDivergenceOptimizer(ElboOptimizer):
     r"""This learns the variational posterior by minimizing Renyi alpha divergences. For
     alpha=0 we obtain this is equivalent to the IWELBO with n_particles=1 and
-    K=n_particles. For alpha=1 this is equivalent to the 'ElboOptimizer'.
+    K=n_particles. For alpha=1 this is equivalent to the `ElboOptimizer`.
 
     NOTE: For alpha < 1 the divergence is more mass covering, for alpha > 1 the
     divergence is more mode seeking.
 
     NOTE: For small alpha, you i.e. alpha=0.1 you may require to
-    turn on reduce_variance or dreg.
+    turn on stick_the_landing or dreg.
 
     References:
         [1] _Rényi Divergence Variational Inference_, Yingzhen Li, Richard E. Turner,
             2016,https://arxiv.org/abs/1602.02311.
     """
 
-    def __init__(self, *args, alpha=0.5, unbiased=False, dreg=False, **kwargs):
-        """See 'ElboOptimizer' for the base arguments.
+    def __init__(
+        self,
+        *args,
+        alpha: float = 0.5,
+        unbiased: bool = False,
+        dreg: bool = False,
+        **kwargs,
+    ):
+        """See `ElboOptimizer` for the base arguments.
 
         Args:
             alpha: Determines the alpha divergence to which is used. For alpha < 1 the
                 divergence is more mass covering, for alpha > 1 the divergence is more
                 mode seeking.
             unbiased: We use the biased bound as proposed in [1], but one can also use
-                unbiased one.
+                an unbiased one.
             dreg: Doubly reparmeterized gradient estimator as proposed in [2]. It is
-                based on the 'reduced_variance' already present, but leads to an
+                based on the `reduced_variance` already present, but leads to an
                 unbiased estimate on this objective in contrast.
 
         Reference:
@@ -665,9 +691,9 @@ class RenyiDivergenceOptimizer(ElboOptimizer):
         self.eps = 1e-5
         self.dreg = dreg
         if dreg:
-            self.reduce_variance = True
+            self.stick_the_landing = True
 
-    def _generate_loss_function(self):
+    def _generate_loss_function(self) -> None:
         if isinstance(self.alpha, float):
             if self.q.has_rsample:
                 if not self.unbiased:
@@ -679,17 +705,17 @@ class RenyiDivergenceOptimizer(ElboOptimizer):
                     "Currently we only support reparameterizable distributions"
                 )
 
-    def loss_alpha_unbiased(self, x_obs):
+    def loss_alpha_unbiased(self, x_o: Tensor) -> Tuple[Tensor, Tensor]:
         """Unbiased estimate of a surrogate RVB"""
-        elbo_particles = self.generate_elbo_particles(x_obs) * (1 - self.alpha)
+        elbo_particles = self.generate_elbo_particles(x_o) * (1 - self.alpha)
         _, mean_log_weights = self.get_importance_weight(elbo_particles)
         surrogate_loss = -torch.exp(mean_log_weights)
         loss = -mean_log_weights / (1 - self.alpha)
         return surrogate_loss, loss.clone().detach()
 
-    def loss_alpha(self, x_obs):
+    def loss_alpha(self, x_o: Tensor) -> Tuple[Tensor, Tensor]:
         """Renjy variation bound (RVB)."""
-        elbo_particles = self.generate_elbo_particles(x_obs)
+        elbo_particles = self.generate_elbo_particles(x_o)
         weights, mean_log_weights = self.get_importance_weight(
             elbo_particles.clone().detach()
         )
@@ -697,7 +723,7 @@ class RenyiDivergenceOptimizer(ElboOptimizer):
         loss = -mean_log_weights / (1 - self.alpha)
         return surrogate_loss, loss
 
-    def get_importance_weight(self, elbo_particles):
+    def get_importance_weight(self, elbo_particles: Tensor) -> Tuple[Tensor, Tensor]:
         """Computes the importance weights for the gradients"""
         logweights = (1 - self.alpha) * elbo_particles
         mean_log_weights = torch.logsumexp(logweights, 0) - np.log(self.n_particles)
