@@ -4,6 +4,7 @@ import torch
 from torch import Tensor
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.types import Shape, TorchTransform
 from sbi.utils import gradient_ascent, mcmc_transform
@@ -71,17 +72,25 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
         self.posteriors = posteriors
         self.num_components = len(posteriors)
         self.weights = weights
-        self.potential_fn = None  # will be set when context is provided.
 
-        self.device = self.ensure_same_device(posteriors)
-
+        device = self.ensure_same_device(posteriors)
         self.prior = self.common_prior()
+
         if theta_transform is not None:
-            self.theta_transform = theta_transform
+            theta_transform = theta_transform
         elif self.prior is not None:
-            self.theta_transform = mcmc_transform(self.prior, device=self.device)
+            theta_transform = mcmc_transform(self.prior, device=device)
         else:
-            self.theta_transform = None
+            theta_transform = None
+
+        potential_fn = EnsemblePotential(posteriors, self._weights, self.prior, None)
+
+        super().__init__(
+            potential_fn=potential_fn,
+            theta_transform=theta_transform,
+            device=device,
+            x_shape=self.posteriors[0]._x_shape,
+        )
 
     def common_prior(self) -> Optional[bool]:
         """Sets ensemble prior if all ensemble posteriors have the same prior.
@@ -246,7 +255,7 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
         else:
             return torch.logsumexp(log_weights.expand_as(log_probs) + log_probs, dim=0)
 
-    def set_default_x(self, x: Tensor) -> "NeuralPosteriorEnsemble":
+    def set_default_x(self, x: Tensor) -> "NeuralPosterior":
         r"""Set new default x for `.sample(), .log_prob()` to use as conditioning context.
 
         This is a pure convenience to avoid having to repeatedly specify `x` in calls to
@@ -268,8 +277,13 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
             `NeuralPosteriorEnsemble` that will use a default `x` when not explicitly
             passed.
         """
+        self._x = process_x(
+            x, x_shape=self._x_shape, allow_iid_x=self.potential_fn.allow_iid_x
+        ).to(self._device)
+
         for posterior in self.posteriors:
             posterior.set_default_x(x)
+
         return self
 
     def potential(
@@ -284,9 +298,8 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
                 This can be helpful for e.g. sensitivity analysis, but increases memory
                 consumption.
         """
-        self.potential_fn = EnsemblePotential(
-            self.posteriors, self._weights, self.prior, x
-        )
+        self.potential_fn.set_x(self._x_else_default_x(x))
+
         theta = ensure_theta_batched(torch.as_tensor(theta))
 
         return self.potential_fn(
@@ -366,8 +379,10 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
             return log_weights, maps
 
         else:
+            self.potential_fn.set_x(self._x_else_default_x(x))
+
             if init_method == "posterior":
-                inits = self.sample((num_init_samples,))
+                inits = self.sample((num_init_samples,), self._x_else_default_x(x))
             elif init_method == "proposal":
                 inits = self.proposal.sample((num_init_samples,))
             elif isinstance(init_method, Tensor):
@@ -405,7 +420,6 @@ class EnsemblePotential(BasePotential):
         device: Device which the component distributions sit on.
         x_o: Used as conditioning context for `potential_fn`.
     """
-    allow_iid_x = False  # type: ignore
 
     def __init__(
         self,
@@ -425,8 +439,10 @@ class EnsemblePotential(BasePotential):
             x_o: The observed data at which to evaluate the posterior.
             device: Device which the component distributions sit on.
         """
+        self.posteriors = posteriors
         self._weights = weights
         self.potential_fns = []
+
         for posterior in posteriors:
             potential_fn = posterior.potential_fn
             self.potential_fns.append(potential_fn)
@@ -436,6 +452,14 @@ class EnsemblePotential(BasePotential):
         self.prior = prior
         self.device = device
         self.set_x(x_o)
+
+    def allow_iid_x(self) -> bool:
+        if any(isinstance(posterior, DirectPosterior) for posterior in self.posteriors):
+            # in case there is different kinds of posteriors, this will produce an error
+            # in `set_x()`
+            return False  # type: ignore
+        else:
+            return True
 
     def set_x(self, x_o: Optional[Tensor]):
         """Check the shape of the observed data and, if valid, set it."""
