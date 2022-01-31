@@ -1,18 +1,18 @@
+from typing import Any, List, Optional, Union
+
 import torch
+from torch import Tensor
+
+from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.inference.potentials.base_potential import BasePotential
+from sbi.types import Shape, TorchTransform
 from sbi.utils import gradient_ascent, mcmc_transform
 from sbi.utils.torchutils import ensure_theta_batched
 from sbi.utils.user_input_checks import process_x
-from sbi.inference.posteriors.base_posterior import NeuralPosterior
-from sbi.inference.potentials.base_potential import BasePotential
-
-from torch import Tensor
-from typing import List, Optional, Union, Any
-from sbi.types import Shape, TorchTransform
 
 
 class NeuralPosteriorEnsemble(NeuralPosterior):
-    r"""Wrapper class for bundling together different posterior instances into an
-    ensemble.
+    r"""Wrapper for bundling together different posterior instances into an ensemble.
 
     This class creates a posterior ensemble from a set of N different, already trained
     posterior estimators $p_{i}(\theta|x_o)$, where $i \in \{i,...,N\}$.
@@ -64,7 +64,8 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
             weights: Assign weights to posteriors manually, otherwise they will be
                 weighted with 1/N.
             theta_transform: If passed, this transformation will be applied during the
-            optimization.
+            optimization performed when obtaining the map. It does not affect the .
+            sample() and .log_prob() methods.
         """
         self.posteriors = posteriors
         self.num_components = len(posteriors)
@@ -81,9 +82,8 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
         else:
             self.theta_transform = None
 
-    def common_prior(self) -> bool:
-        """Ensures that all posteriors in the ensemble are based off of the same prior
-        distribution.
+    def common_prior(self) -> Optional[bool]:
+        """Sets ensemble prior if all ensemble posteriors have the same prior.
 
         Args:
             posteriors: List containing the trained posterior instances that will make
@@ -124,7 +124,7 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
         else:
             return None
 
-    def ensure_same_device(self, posteriors):
+    def ensure_same_device(self, posteriors: List) -> str:
         """Ensures that all posteriors in the ensemble are on the same device.
 
         Args:
@@ -144,14 +144,17 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
         return devices[0]
 
     @property
-    def weights(self):
+    def weights(self) -> Tensor:
         return self._weights
 
     @weights.setter
-    def weights(self, weights: List[float] or Tensor):
+    def weights(self, weights: Optional[Union[List[float], Tensor]]) -> Tensor:
         """Set relative weight for each posterior in the ensemble.
 
         Weights are normalised.
+
+        Raises:
+            TypeError if weights are provided in an unsupported format.
 
         Args:
             weights: Assignes weight to each posterior distribution.
@@ -165,8 +168,15 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
         else:
             raise TypeError
 
-    def sample(self, sample_shape: Shape = torch.Size(), **kwargs) -> Tensor:
+    def sample(
+        self, sample_shape: Shape = torch.Size(), x: Optional[Tensor] = None, **kwargs
+    ) -> Tensor:
         r"""Return samples from posterior ensemble.
+
+        The samples are drawn according to their assigned weight. The number of samples
+        for each distributino is drawn from a corresponding multinomial distribution.
+        Then each component posterior is sampled individually and all samples are
+        aggregated afterwards.
 
         All kwargs are passed directly through to `posterior.sample()`.
 
@@ -174,19 +184,33 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
             sample_shape: Desired shape of samples that are drawn from posterior
                 ensemble. If sample_shape is multidimensional we simply draw
                 `sample_shape.numel()` samples and then reshape into the desired shape.
+            x: Conditioning context. If none is provided and no default context is set,
+                an error will be raised.
 
         Returns:
             Samples drawn from the ensemble distribution.
         """
         num_samples = torch.Size(sample_shape).numel()
-        idxs = torch.multinomial(self._weights, num_samples, replacement=True)
+        posterior_indizes = torch.multinomial(
+            self._weights, num_samples, replacement=True
+        )
         samples = []
-        for comp_idx, sample_size in torch.vstack(idxs.unique(return_counts=True)).T:
+        for posterior_index, sample_size in torch.vstack(
+            posterior_indizes.unique(return_counts=True)
+        ).T:
             sample_shape_c = torch.Size((sample_size,))
-            samples.append(self.posteriors[comp_idx].sample(sample_shape_c, **kwargs))
+            samples.append(
+                self.posteriors[posterior_index].sample(sample_shape_c, x=x, **kwargs)
+            )
         return torch.vstack(samples).reshape(*sample_shape, -1)
 
-    def log_prob(self, theta: Tensor, individually: bool = False, **kwargs) -> Tensor:
+    def log_prob(
+        self,
+        theta: Tensor,
+        x: Optional[Tensor] = None,
+        individually: bool = False,
+        **kwargs,
+    ) -> Tensor:
         r"""Returns the average log-probability of the posterior ensemble
 
         $\sum_{i}^{N} w_{i} p_i(\theta|x)$.
@@ -195,6 +219,8 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
 
         Args:
             theta: Parameters $\theta$.
+            x: Conditioning context.If none is provided and no default context is set,
+                an error will be raised.
             individually: If true, returns log weights and log_probs individually.
 
         Raises:
@@ -210,7 +236,7 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
         ), "`log_prob()` only works for ensembles of the same type of posterior."
 
         log_probs = torch.stack(
-            [posterior.log_prob(theta, **kwargs) for posterior in self.posteriors]
+            [posterior.log_prob(theta, x=x, **kwargs) for posterior in self.posteriors]
         )
         log_weights = torch.log(self._weights).reshape(-1, 1)
 
@@ -243,9 +269,6 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
         """
         for posterior in self.posteriors:
             posterior.set_default_x(x)
-        self.potential_fn = EnsemblePotentialProvider(
-            self.posteriors, self._weights, self.prior, x
-        )
         return self
 
     def potential(
@@ -260,7 +283,7 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
                 This can be helpful for e.g. sensitivity analysis, but increases memory
                 consumption.
         """
-        self.potential_fn = EnsemblePotentialProvider(
+        self.potential_fn = EnsemblePotential(
             self.posteriors, self._weights, self.prior, x
         )
         theta = ensure_theta_batched(torch.as_tensor(theta))
@@ -363,7 +386,7 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
             )[0]
 
 
-class EnsemblePotentialProvider(BasePotential):
+class EnsemblePotential(BasePotential):
     r"""Provides `NeuralPosteriorEnsemble` with a `potential_fn` attribute.
 
     The potential is the same as the sum of the weighted log-probabilities of each
