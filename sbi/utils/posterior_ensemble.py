@@ -424,7 +424,6 @@ class EnsemblePotential(BasePotential):
             x_o: The observed data at which to evaluate the posterior.
             device: Device which the component distributions sit on.
         """
-        self.posteriors = posteriors
         self._weights = weights
         self.potential_fns = []
         for posterior in posteriors:
@@ -442,8 +441,8 @@ class EnsemblePotential(BasePotential):
         if x_o is not None:
             x_o = process_x(x_o, allow_iid_x=False).to(self.device)
         self._x_o = x_o
-        for comp_posterior, comp_potential in zip(self.posteriors, self.potential_fns):
-            comp_potential.set_x(comp_posterior._x_else_default_x(x_o))
+        for comp_potential in self.potential_fns:
+            comp_potential.set_x(x_o)
 
     def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
         r"""Returns the potential for posterior-based methods.
