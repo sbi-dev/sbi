@@ -86,6 +86,13 @@
       filters: [ "!^_", "^__", "!^__class__" ]
       inherited_members: true
 
+::: sbi.inference.posteriors.vi_posterior.VIPosterior
+    rendering:
+      show_root_heading: true
+    selection:
+      filters: [ "!^_", "^__", "!^__class__" ]
+      inherited_members: true
+
 ## Models
 
 ::: sbi.utils.get_nn_models.posterior_nn

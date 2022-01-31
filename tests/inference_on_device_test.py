@@ -7,9 +7,12 @@ from contextlib import nullcontext
 
 import pytest
 import torch
+import numpy as np
 from torch import eye, ones, zeros
 import torch.nn as nn
 from torch.distributions import MultivariateNormal
+from torch.distributions import MultivariateNormal, Distribution
+import torch.distributions.transforms as torch_tf
 
 from sbi import utils as utils
 from sbi.inference import (
@@ -24,6 +27,7 @@ from sbi.inference import (
     MCMCPosterior,
     RejectionPosterior,
     DirectPosterior,
+    VIPosterior,
     ratio_estimator_based_potential,
     likelihood_estimator_based_potential,
     posterior_estimator_based_potential,
@@ -36,6 +40,7 @@ from sbi.utils.user_input_checks import (
     check_embedding_net_device,
 )
 from sbi.utils.get_nn_models import posterior_nn, likelihood_nn, classifier_nn
+from sbi.inference.potentials.base_potential import BasePotential
 
 
 @pytest.mark.slow
@@ -432,7 +437,7 @@ def test_nograd_after_inference_train(inference_method: NeuralInference) -> None
                 )
             )
         ),
-        show_progress_bars=False
+        show_progress_bars=False,
     )
 
     theta, x = simulate_for_sbi(simulator, prior, 32)
@@ -446,3 +451,58 @@ def test_nograd_after_inference_train(inference_method: NeuralInference) -> None
 
     check_no_grad(posterior_estimator)
     check_no_grad(inference._neural_net)
+
+
+@pytest.mark.slow
+@pytest.mark.gpu
+@pytest.mark.parametrize("num_dim", (1, 2))
+@pytest.mark.parametrize("q", ("maf", "nsf", "gaussian_diag", "gaussian", "mcf", "scf"))
+@pytest.mark.parametrize("vi_method", ("rKL", "fKL", "IW", "alpha"))
+@pytest.mark.parametrize("sampling_method", ("naive", "sir"))
+def test_vi_on_gpu(
+    num_dim: int, q: Distribution, vi_method: str, sampling_method: str, set_seed
+):
+    """Test VI on Gaussian, comparing to ground truth target via c2st.
+
+    Args:
+        num_dim: parameter dimension of the gaussian model
+        vi_method: different vi methods
+        sampling_method: Different sampling methods
+        set_seed: fixture for manual seeding
+    """
+
+    device = "cuda:0"
+
+    if num_dim == 1 and q in ["mcf", "scf"]:
+        return
+
+    # Good run where everythink is one the correct device.
+    class FakePotential(BasePotential):
+        def __call__(self, theta, **kwargs):
+            return torch.ones(len(theta), dtype=torch.float32, device=device)
+
+        def allow_iid_x(self) -> bool:
+            return True
+
+    potential_fn = FakePotential(
+        prior=MultivariateNormal(
+            zeros(num_dim, device=device), eye(num_dim, device=device)
+        ),
+        device=device,
+    )
+    theta_transform = torch_tf.identity_transform
+
+    posterior = VIPosterior(
+        potential_fn=potential_fn, theta_transform=theta_transform, q=q, device=device
+    )
+    posterior.set_default_x(
+        torch.tensor(np.zeros((num_dim,)).astype(np.float32)).to(device)
+    )
+    posterior.vi_method = vi_method
+
+    posterior.train(min_num_iters=9, max_num_iters=10, warm_up_rounds=10)
+    samples = posterior.sample((1,), method=sampling_method)
+    logprobs = posterior.log_prob(samples)
+
+    assert str(samples.device) == device, "The devices after training does not match"
+    assert str(logprobs.device) == device, "The devices after training does not match"

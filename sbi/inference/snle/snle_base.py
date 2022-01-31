@@ -296,12 +296,16 @@ class LikelihoodEstimator(NeuralInference, ABC):
                 If `None`, use the latest neural density estimator that was trained.
             prior: Prior distribution.
             sample_with: Method to use for sampling from the posterior. Must be one of
-                [`mcmc` | `rejection`].
+                [`mcmc` | `rejection` | `vi`].
             mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`,
                 `hmc`, `nuts`. Currently defaults to `slice_np` for a custom numpy
                 implementation of slice sampling; select `hmc`, `nuts` or `slice` for
                 Pyro-based sampling.
+            vi_method: Method used for VI, one of [`rKL`, `fKL`, `IW`, `alpha`]. Note
+                some of the methods admit a `mode seeking` property (e.g. rKL) whereas
+                some admit a `mass covering` one (e.g fKL).
             mcmc_parameters: Additional kwargs passed to `MCMCPosterior`.
+            vi_parameters: Additional kwargs passed to `VIPosterior`.
             rejection_sampling_parameters: Additional kwargs passed to
                 `RejectionPosterior`.
         Returns:
@@ -349,8 +353,10 @@ class LikelihoodEstimator(NeuralInference, ABC):
             self._posterior = VIPosterior(
                 potential_fn=potential_fn,
                 theta_transform=theta_transform,
+                prior=prior,
                 vi_method=vi_method,
                 device=device,
+                x_shape=self._x_shape,
                 **vi_parameters,
             )
         else:
