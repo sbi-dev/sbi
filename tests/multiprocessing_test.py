@@ -25,8 +25,9 @@ def slow_linear_gaussian(theta):
 
 
 @pytest.mark.slow
+@pytest.mark.parametrize("num_workers", [10, -2])
 @pytest.mark.parametrize("sim_batch_size", ((1, 10, 100)))
-def test_benchmarking_sp(sim_batch_size):
+def test_benchmarking_sp(sim_batch_size, num_workers):
 
     num_simulations = 100
     theta = torch.zeros(num_simulations, 2)
@@ -47,7 +48,7 @@ def test_benchmarking_sp(sim_batch_size):
         slow_linear_gaussian,
         theta,
         sim_batch_size,
-        num_workers=10,
+        num_workers=num_workers,
         show_progress_bars=show_pbar,
     )
     toc_joblib = time.time() - tic
