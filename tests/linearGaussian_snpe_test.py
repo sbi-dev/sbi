@@ -68,7 +68,7 @@ def test_c2st_snpe_on_linearGaussian(
 
     x_o = zeros(num_trials, num_dim)
     num_samples = 1000
-    num_simulations = 2500
+    num_simulations = 2600
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(num_dim)
@@ -513,7 +513,7 @@ def test_mdn_conditional_density(num_dim: int = 3, cond_dim: int = 1):
 
     x_o = zeros(1, num_dim)
     num_samples = 1000
-    num_simulations = 2500
+    num_simulations = 2600
     condition = 0.1 * ones(1, num_dim)
 
     dims = list(range(num_dim))

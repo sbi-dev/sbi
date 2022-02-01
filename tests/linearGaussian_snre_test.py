@@ -80,7 +80,7 @@ def test_c2st_sre_on_linearGaussian(set_seed):
     x_dim = 2
     discard_dims = theta_dim - x_dim
     num_samples = 1000
-    num_simulations = 1000
+    num_simulations = 2100
 
     likelihood_shift = -1.0 * ones(
         x_dim
@@ -161,7 +161,7 @@ def test_c2st_sre_variants_on_linearGaussian(
 
     x_o = zeros(num_trials, num_dim)
     num_samples = 500
-    num_simulations = 2500 if num_trials == 1 else 40000
+    num_simulations = 2600 if num_trials == 1 else 40500
 
     # `likelihood_mean` will be `likelihood_shift + theta`.
     likelihood_shift = -1.0 * ones(num_dim)
@@ -278,7 +278,7 @@ def test_api_sre_sampling_methods(sampling_method: str, prior_str: str, set_seed
     num_dim = 2
     num_samples = 10
     num_trials = 2
-    num_simulations = 1000
+    num_simulations = 2100
     x_o = zeros((num_trials, num_dim))
     # Test for multiple chains is cheap when vectorized.
     num_chains = 3 if sampling_method == "slice_np_vectorized" else 1
