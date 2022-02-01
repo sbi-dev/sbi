@@ -9,16 +9,15 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 import torch
 import pyknos.nflows.transforms as transforms
 from pyro.distributions import Empirical
-from torch import Tensor, as_tensor, float32
+from torch import Tensor
 from torch import nn as nn
 from torch import ones, optim, zeros
 from torch.distributions import Distribution, Independent, biject_to, constraints
 import torch.distributions.transforms as torch_tf
-from tqdm.auto import tqdm
 
 from sbi import utils as utils
 from sbi.types import TorchTransform
-from sbi.utils.torchutils import BoxUniform, atleast_2d
+from sbi.utils.torchutils import atleast_2d
 
 
 def warn_if_zscoring_changes_data(x: Tensor, duplicate_tolerance: float = 0.1) -> None:
@@ -96,8 +95,9 @@ def z_score_parser(z_score_flag: Optional["str"]) -> Tuple[bool, bool]:
     if type(z_score_flag) is bool:
         # Raise warning if boolean was passed.
         warnings.warn(
-            """Boolean flag for z-scoring is deprecated as of sbi v0.18.0. It will be removed in a future release. Use 'none', 'independent', or 'structured' to indicate z-scoring option.
-        """
+            "Boolean flag for z-scoring is deprecated as of sbi v0.18.0. It will be "
+            "removed in a future release. Use 'none', 'independent', or 'structured' "
+            "to indicate z-scoring option."
         )
         z_score_bool, structured_data = z_score_flag, False
 

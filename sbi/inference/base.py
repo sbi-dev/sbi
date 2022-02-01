@@ -177,13 +177,13 @@ class NeuralInference(ABC):
         f"https://github.com/mackelab/sbi/pull/378.",
         """
         raise NameError(
-            f"The inference object is no longer callable as of `sbi` v0.14.0. "
-            f"Please consult the release notes for a tutorial on how to adapt your "
-            f"code: https://github.com/mackelab/sbi/releases/tag/v0.14.0"
-            f"For more information, visit our website: "
-            f"https://www.mackelab.org/sbi/tutorial/02_flexible_interface/ or "
-            f"see the corresponding pull request on github: "
-            f"https://github.com/mackelab/sbi/pull/378.",
+            "The inference object is no longer callable as of `sbi` v0.14.0. "
+            "Please consult the release notes for a tutorial on how to adapt your "
+            "code: https://github.com/mackelab/sbi/releases/tag/v0.14.0"
+            "For more information, visit our website: "
+            "https://www.mackelab.org/sbi/tutorial/02_flexible_interface/ or "
+            "see the corresponding pull request on github: "
+            "https://github.com/mackelab/sbi/pull/378.",
         )
 
     def provide_presimulated(
@@ -208,15 +208,15 @@ class NeuralInference(ABC):
                 that the data came from the first round, i.e. the prior.
         """
         raise NameError(
-            f"Deprecated since sbi 0.14.0. "
-            f"Instead of using this, please use `.append_simulations()`. Please "
-            f"consult release notes to see how you can update your code: "
-            f"https://github.com/mackelab/sbi/releases/tag/v0.14.0"
-            f"More information can be found under the corresponding pull request on "
-            f"github: "
-            f"https://github.com/mackelab/sbi/pull/378"
-            f"and tutorials: "
-            f"https://www.mackelab.org/sbi/tutorial/02_flexible_interface/",
+            "Deprecated since sbi 0.14.0. "
+            "Instead of using this, please use `.append_simulations()`. Please "
+            "consult release notes to see how you can update your code: "
+            "https://github.com/mackelab/sbi/releases/tag/v0.14.0"
+            "More information can be found under the corresponding pull request on "
+            "github: "
+            "https://github.com/mackelab/sbi/pull/378"
+            "and tutorials: "
+            "https://www.mackelab.org/sbi/tutorial/02_flexible_interface/",
         )
 
     def get_simulations(
@@ -295,7 +295,7 @@ class NeuralInference(ABC):
             resume_training: Whether the current call is resuming training so that no
                 new training and validation indices into the dataset have to be created.
             dataloader_kwargs: Additional or updated kwargs to be passed to the training
-                and validation dataloaders (like, e.g., a collate_fn)
+                and validation dataloaders (like, e.g., a collate_fn).
 
         Returns:
             Tuple of dataloaders for training and validation.
@@ -325,22 +325,16 @@ class NeuralInference(ABC):
             "drop_last": True,
             "sampler": data.sampler.SubsetRandomSampler(self.train_indices),
         }
-        train_loader_kwargs = (
-            dict(train_loader_kwargs, **dataloader_kwargs)
-            if dataloader_kwargs is not None
-            else train_loader_kwargs
-        )
         val_loader_kwargs = {
             "batch_size": min(training_batch_size, num_validation_examples),
             "shuffle": False,
             "drop_last": True,
             "sampler": data.sampler.SubsetRandomSampler(self.val_indices),
         }
-        val_loader_kwargs = (
-            dict(val_loader_kwargs, **dataloader_kwargs)
-            if dataloader_kwargs is not None
-            else val_loader_kwargs
-        )
+        if dataloader_kwargs is not None:
+            train_loader_kwargs = dict(train_loader_kwargs, **dataloader_kwargs)
+            val_loader_kwargs = dict(val_loader_kwargs, **dataloader_kwargs)
+
         train_loader = data.DataLoader(dataset, **train_loader_kwargs)
         val_loader = data.DataLoader(dataset, **val_loader_kwargs)
 
