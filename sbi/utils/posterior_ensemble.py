@@ -7,8 +7,8 @@ import torch
 from torch import Tensor
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
-from sbi.inference.potentials.posterior_based_potential import PosteriorBasedPotential
 from sbi.inference.potentials.base_potential import BasePotential
+from sbi.inference.potentials.posterior_based_potential import PosteriorBasedPotential
 from sbi.types import Shape, TorchTransform
 from sbi.utils import gradient_ascent
 from sbi.utils.torchutils import ensure_theta_batched
