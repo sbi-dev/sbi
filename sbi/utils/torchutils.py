@@ -42,8 +42,17 @@ def process_device(device: str) -> str:
             return device
 
 
-def check_if_prior_on_device(device, prior: Optional[Any] = None):
-    if prior is not None:
+def check_if_prior_on_device(device: torch.device, prior: Optional[Any] = None) -> None:
+    """Try to sample from the prior, and check that the returned data is on the correct
+    trainin device. If the prior is `None`, simplys pass.
+
+    Args:
+        device: target torch training device
+        prior: any simulator outputing torch `Tensor`
+    """
+    if prior is None:
+        pass
+    else:
         prior_device = prior.sample((1,)).device
         training_device = torch.zeros(1, device=device).device
         assert prior_device == training_device, (
