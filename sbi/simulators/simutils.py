@@ -47,7 +47,7 @@ def simulate_in_batches(
         # as of PyTorch 1.4.0, see https://github.com/microsoft/pyright/issues/291
         batches = torch.split(theta, sim_batch_size, dim=0)
 
-        if num_workers > 1:
+        if num_workers != 1:
             # Parallelize the sequence of batches across workers.
             # We use the solution proposed here: https://stackoverflow.com/a/61689175
             # to update the pbar only after the workers finished a task.
