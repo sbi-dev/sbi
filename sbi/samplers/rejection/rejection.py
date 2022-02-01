@@ -7,7 +7,6 @@ import torch.distributions.transforms as torch_tf
 from torch import Tensor, as_tensor
 from tqdm.auto import tqdm
 
-from sbi import utils as utils
 from sbi.utils import gradient_ascent, within_support
 
 
@@ -150,9 +149,13 @@ def rejection_sample(
             # acceptance rate is too low after the first 1_000 samples.
             acceptance_rate = (num_samples - num_remaining) / num_sampled_total
 
-            # For remaining iterations (leakage or many samples) continue sampling with
-            # fixed batch size.
-            sampling_batch_size = max_sampling_batch_size
+            # For remaining iterations (leakage or many samples) continue
+            # sampling with fixed batch size, reduced in cased the number
+            # of remaining samples is low.
+            sampling_batch_size = min(
+                max_sampling_batch_size,
+                max(int(1.5 * num_remaining / acceptance_rate), 100)
+            )
             if (
                 num_sampled_total > 1000
                 and acceptance_rate < warn_acceptance
