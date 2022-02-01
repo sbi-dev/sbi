@@ -26,7 +26,6 @@ from sbi.utils import (
     x_shape_from_simulation,
 )
 from sbi.utils.sbiutils import ImproperEmpirical, mask_sims_from_prior
-from sbi.utils.user_input_checks import process_x
 
 
 class PosteriorEstimator(NeuralInference, ABC):
@@ -350,6 +349,9 @@ class PosteriorEstimator(NeuralInference, ABC):
         if show_train_summary:
             print(self._describe_round(self._round, self._summary))
 
+        # Avoid keeping the gradients in the resulting network, which can
+        # cause memory leakage when benchmarking.
+        self._neural_net.zero_grad()
         return deepcopy(self._neural_net)
 
     def build_posterior(
@@ -392,9 +394,11 @@ class PosteriorEstimator(NeuralInference, ABC):
             (the returned log-probability is unnormalized).
         """
         if prior is None:
-            assert (
-                self._prior is not None
-            ), "You did not pass a prior. You have to pass the prior either at initialization `inference = SNPE(prior)` or to `.build_posterior(prior=prior)`."
+            assert self._prior is not None, (
+                "You did not pass a prior. You have to pass the prior either at "
+                "initialization `inference = SNPE(prior)` or to "
+                "`.build_posterior(prior=prior)`."
+            )
             prior = self._prior
 
         if density_estimator is None:
