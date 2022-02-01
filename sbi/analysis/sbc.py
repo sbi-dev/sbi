@@ -64,7 +64,7 @@ def run_sbc(
     thetas_batches = torch.split(thetas, sbc_batch_size, dim=0)
     xs_batches = torch.split(xs, sbc_batch_size, dim=0)
 
-    if num_workers > 1:
+    if num_workers != 1:
         # Parallelize the sequence of batches across workers.
         # We use the solution proposed here: https://stackoverflow.com/a/61689175
         # to update the pbar only after the workers finished a task.
