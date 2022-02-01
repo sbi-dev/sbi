@@ -16,7 +16,7 @@ from sbi.utils.sbiutils import (
     z_score_parser,
 )
 from sbi.utils.torchutils import create_alternating_binary_mask
-from sbi.utils.user_input_checks import check_embedding_net_device
+from sbi.utils.user_input_checks import check_embedding_net_device, check_data_device
 
 
 def build_made(
@@ -53,12 +53,7 @@ def build_made(
     """
     x_numel = batch_x[0].numel()
     # Infer the output dimensionality of the embedding_net by making a forward pass.
-    assert batch_x.device == batch_y.device, (
-        "Mismatch in fed data's device: "
-        f"batch_x has device '{batch_x.device}' whereas "
-        f"batch_x has device '{batch_x.device}'. Please "
-        "call the build function using data from a common device."
-    )
+    check_data_device(batch_x, batch_y)
     check_embedding_net_device(embedding_net=embedding_net, datum=batch_y)
     y_numel = embedding_net(batch_y[:1]).numel()
 
@@ -131,12 +126,7 @@ def build_maf(
     """
     x_numel = batch_x[0].numel()
     # Infer the output dimensionality of the embedding_net by making a forward pass.
-    assert batch_x.device == batch_y.device, (
-        "Mismatch in fed data's device: "
-        f"batch_x has device '{batch_x.device}' whereas "
-        f"batch_x has device '{batch_x.device}'. Please "
-        "call the build function using data from a common device."
-    )
+    check_data_device(batch_x, batch_y)
     check_embedding_net_device(embedding_net=embedding_net, datum=batch_y)
     y_numel = embedding_net(batch_y[:1]).numel()
 
@@ -220,12 +210,7 @@ def build_nsf(
     """
     x_numel = batch_x[0].numel()
     # Infer the output dimensionality of the embedding_net by making a forward pass.
-    assert batch_x.device == batch_y.device, (
-        "Mismatch in fed data's device: "
-        f"batch_x has device '{batch_x.device}' whereas "
-        f"batch_x has device '{batch_x.device}'. Please "
-        "call the build function using data from a common device."
-    )
+    check_data_device(batch_x, batch_y)
     check_embedding_net_device(embedding_net=embedding_net, datum=batch_y)
     y_numel = embedding_net(batch_y[:1]).numel()
 

@@ -396,6 +396,14 @@ def check_prior_support(prior):
 
 
 def check_embedding_net_device(embedding_net: nn.Module, datum: torch.Tensor) -> None:
+    """Checks if the device for the `embedding_net`'s weights is the same as the device
+    for the fed `datum`. In case of discrepancy, warn the user and move the
+    embedding_net` to  the `datum`'s device.
+
+    Args:
+        embedding_net: torch `Module` embedding data
+        datum torch `Tensor` from the training device
+    """
     datum_device = datum.device
     embedding_net_devices = [p.device for p in embedding_net.parameters()]
     if len(embedding_net_devices) > 0:
@@ -414,6 +422,22 @@ def check_embedding_net_device(embedding_net: nn.Module, datum: torch.Tensor) ->
             embedding_net.to(datum_device)
     else:
         pass
+
+
+def check_data_device(datum_1: torch.Tensor, datum_2: torch.Tensor) -> None:
+    """Checks if two tensors have the seme device. Fails if there is a device
+    discrepancy
+
+    Args:
+        datum_1: torch `Tensor`
+        datum_2: torch `Tensor`
+    """
+    assert datum_1.device == datum_2.device, (
+        "Mismatch in fed data's device: "
+        f"datum_1 has device '{datum_1.device}' whereas "
+        f"datum_2 has device '{datum_2.device}'. Please "
+        "use data from a common device."
+    )
 
 
 def process_simulator(

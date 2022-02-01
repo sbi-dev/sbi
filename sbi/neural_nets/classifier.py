@@ -8,7 +8,7 @@ from pyknos.nflows.nn import nets
 from torch import Tensor, nn, relu
 
 from sbi.utils.sbiutils import standardizing_net, z_score_parser
-from sbi.utils.user_input_checks import check_embedding_net_device
+from sbi.utils.user_input_checks import check_embedding_net_device, check_data_device
 
 
 class StandardizeInputs(nn.Module):
@@ -115,12 +115,7 @@ def build_linear_classifier(
         Neural network.
     """
 
-    assert batch_x.device == batch_y.device, (
-        "Mismatch in fed data's device: "
-        f"batch_x has device '{batch_x.device}' whereas "
-        f"batch_x has device '{batch_x.device}'. Please "
-        "call the build function using data from a common device."
-    )
+    check_data_device(batch_x, batch_y)
     check_embedding_net_device(embedding_net=embedding_net_x, datum=batch_y)
     check_embedding_net_device(embedding_net=embedding_net_y, datum=batch_y)
 
@@ -171,12 +166,7 @@ def build_mlp_classifier(
         Neural network.
     """
 
-    assert batch_x.device == batch_y.device, (
-        "Mismatch in fed data's device: "
-        f"batch_x has device '{batch_x.device}' whereas "
-        f"batch_x has device '{batch_x.device}'. Please "
-        "call the build function using data from a common device."
-    )
+    check_data_device(batch_x, batch_y)
     check_embedding_net_device(embedding_net=embedding_net_x, datum=batch_y)
     check_embedding_net_device(embedding_net=embedding_net_y, datum=batch_y)
 
@@ -235,12 +225,7 @@ def build_resnet_classifier(
         Neural network.
     """
 
-    assert batch_x.device == batch_y.device, (
-        "Mismatch in fed data's device: "
-        f"batch_x has device '{batch_x.device}' whereas "
-        f"batch_x has device '{batch_x.device}'. Please "
-        "call the build function using data from a common device."
-    )
+    check_data_device(batch_x, batch_y)
     check_embedding_net_device(embedding_net=embedding_net_x, datum=batch_y)
     check_embedding_net_device(embedding_net=embedding_net_y, datum=batch_y)
 
