@@ -160,7 +160,7 @@ class NeuralPosterior(ABC):
         self.potential_fn.set_x(self._x_else_default_x(x))
 
         if init_method == "posterior":
-            inits = self.sample((num_init_samples,))
+            inits = self.sample((num_init_samples,), self._x_else_default_x(x))
         elif init_method == "proposal":
             inits = self.proposal.sample((num_init_samples,))  # type: ignore
         elif isinstance(init_method, Tensor):

@@ -1,13 +1,16 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+
 from typing import Any, List, Optional, Union
 
 import torch
 from torch import Tensor
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
-from sbi.inference.posteriors.direct_posterior import DirectPosterior
+from sbi.inference.potentials.posterior_based_potential import PosteriorBasedPotential
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.types import Shape, TorchTransform
-from sbi.utils import gradient_ascent, mcmc_transform
+from sbi.utils import gradient_ascent
 from sbi.utils.torchutils import ensure_theta_batched
 from sbi.utils.user_input_checks import process_x
 
@@ -45,12 +48,10 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
         num_components: Number of posterior estimators.
         weights: Weight of each posterior distribution. If none are provided each
             posterior is weighted with 1/N.
-        potential_fn: Potential function of the ensemble. Will only be set once
-        `potential()` is called.
-        prior: Prior distribution that is the same for all posteriors. If it is not the
-            same, then `prior = None`.
-        device: Device which the component distributions sit on.
-        default_x: Used in `.sample(), .log_prob()` as default conditioning context.
+        priors: Prior distributions of all posterior components.
+        theta_transform: If passed, this transformation will be applied during the
+                optimization performed when obtaining the map. It does not affect the
+                `.sample()` and `.log_prob()` methods.
     """
 
     def __init__(
@@ -59,31 +60,33 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
         weights: Optional[Union[List[float], Tensor]] = None,
         theta_transform: Optional[TorchTransform] = None,
     ):
-        """
+        r"""
         Args:
             posteriors: List containing the trained posterior instances that will make
                 up the ensemble.
             weights: Assign weights to posteriors manually, otherwise they will be
                 weighted with 1/N.
             theta_transform: If passed, this transformation will be applied during the
-            optimization performed when obtaining the map. It does not affect the .
-            sample() and .log_prob() methods.
+                optimization performed when obtaining the map. It does not affect the
+                `.sample()` and `.log_prob()` methods.
         """
         self.posteriors = posteriors
         self.num_components = len(posteriors)
         self.weights = weights
+        self.theta_transform = theta_transform
+        self.priors = []
 
         device = self.ensure_same_device(posteriors)
-        self.prior = self.common_prior()
 
-        if theta_transform is not None:
-            theta_transform = theta_transform
-        elif self.prior is not None:
-            theta_transform = mcmc_transform(self.prior, device=device)
-        else:
-            theta_transform = None
+        potential_fns = []
+        for posterior in posteriors:
+            potential = posterior.potential_fn
+            potential_fns.append(potential)
+            self.priors.append(potential.prior)
 
-        potential_fn = EnsemblePotential(posteriors, self._weights, self.prior, None)
+        potential_fn = EnsemblePotential(
+            potential_fns, self._weights, self.priors, None
+        )
 
         super().__init__(
             potential_fn=potential_fn,
@@ -91,48 +94,6 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
             device=device,
             x_shape=self.posteriors[0]._x_shape,
         )
-
-    def common_prior(self) -> Optional[bool]:
-        """Sets ensemble prior if all ensemble posteriors have the same prior.
-
-        Args:
-            posteriors: List containing the trained posterior instances that will make
-                up the ensemble.
-
-        Raises:
-            AssertionError if ensemble components have different priors.
-
-        Returns:
-            A prior distribution, if it is the same for all posteriors.
-        """
-        try:
-            # for SNPE
-            priors = [posterior.prior for posterior in self.posteriors]
-        except AttributeError:
-            # for SNLE and SNRE
-            priors = [posterior.proposal for posterior in self.posteriors]
-
-        # assert same type
-        same_type = all(isinstance(prior, type(priors[0])) for prior in priors)
-
-        def compare_params(dist_x, dist_y):
-            all_equal = True
-            for x, y in zip(dist_x.__dict__.values(), dist_y.__dict__.values()):
-                if type(x) == Tensor:
-                    all_equal = all_equal and torch.equal(x, y)
-                else:
-                    all_equal = all_equal and (x == y)
-            return all_equal
-
-        if same_type:
-            # assert same parameters
-            same_params = all(compare_params(prior, priors[0]) for prior in priors)
-
-        same_prior = same_type and same_params
-        if same_prior:
-            return priors[0]
-        else:
-            return None
 
     def ensure_same_device(self, posteriors: List) -> str:
         """Ensures that all posteriors in the ensemble are on the same device.
@@ -412,49 +373,39 @@ class EnsemblePotential(BasePotential):
     functionality.
 
     Attributes:
-        posteriors: List of the posterior estimators making up the ensemble.
-        weights: Weight of each posterior distribution. If none are provided each
-            posterior is weighted with 1/N.
-        prior: Prior distribution that is the same for all posteriors. If it is not the
-            same, then `prior = None`.
-        device: Device which the component distributions sit on.
-        x_o: Used as conditioning context for `potential_fn`.
+        potential_fns: List of the potential_fns from each posterior component.
+        weights: Weights of each posterior distribution.
     """
 
     def __init__(
         self,
-        posteriors: List,
+        potential_fns: List,
         weights: Tensor,
-        prior: Any,
+        priors: List[Any],
         x_o: Optional[Tensor],
         device: str = "cpu",
     ):
         r"""
         Args:
-            posteriors: List containing the trained posterior instances that will make
-                up the ensemble.
-            weights: Weights of the ensemble components.
-            prior: Prior distribution that is the same for all posteriors. If it is not
-                the same, then `prior = None`.
-            x_o: The observed data at which to evaluate the posterior.
+            potential_fns: List of the potential_fns from each posterior component.
+            weights: Weights of each posterior distribution.
+            priors: List of prior distributions.
+            x_o: Used as conditioning context for `potential_fn`.
             device: Device which the component distributions sit on.
         """
-        self.posteriors = posteriors
         self._weights = weights
-        self.potential_fns = []
+        self.potential_fns = potential_fns
 
-        for posterior in posteriors:
-            potential_fn = posterior.potential_fn
-            self.potential_fns.append(potential_fn)
+        # list of priors potential_fn.prior
+        super().__init__(priors, x_o, device)
 
-        super().__init__(prior, x_o, device)
-
-        self.prior = prior
-        self.device = device
-        self.set_x(x_o)
+        # self.set_x(x_o) # TODO: YES OR NO ? WILL IT BE DONE IN SUPER?
 
     def allow_iid_x(self) -> bool:
-        if any(isinstance(posterior, DirectPosterior) for posterior in self.posteriors):
+        if any(
+            isinstance(potential, PosteriorBasedPotential)
+            for potential in self.potential_fns
+        ):
             # in case there is different kinds of posteriors, this will produce an error
             # in `set_x()`
             return False  # type: ignore

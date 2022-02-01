@@ -1,3 +1,6 @@
+# This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
+# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+
 from __future__ import annotations
 
 import pytest
@@ -82,3 +85,7 @@ def test_c2st_posterior_ensemble_on_linearGaussian(
         ), f"D-KL={dkl} is more than 2 stds above the average performance."
 
     assert ((map_ - gt_posterior.mean) ** 2).sum() < 0.5
+
+    # test individual log_prob and map
+    posterior.log_prob(samples, individually=True)
+    posterior.map(x_o, num_iter=2, individually=True)
