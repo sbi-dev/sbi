@@ -429,7 +429,7 @@ def test_sample_conditional(set_seed):
     # We need a pretty big dataset to properly model the bimodality.
     theta, x = simulate_for_sbi(simulator, prior, 10000)
     posterior_estimator = inference.append_simulations(theta, x).train(
-        max_num_epochs=50
+        max_num_epochs=60
     )
 
     posterior = DirectPosterior(

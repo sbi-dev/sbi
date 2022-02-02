@@ -77,7 +77,7 @@ def test_inference_with_nan_simulator(
     likelihood_cov = 0.3 * eye(num_dim)
     x_o = zeros(1, num_dim)
     num_samples = 500
-    num_simulations = 2000
+    num_simulations = 5000
 
     def linear_gaussian_nan(
         theta, likelihood_shift=likelihood_shift, likelihood_cov=likelihood_cov
@@ -146,7 +146,7 @@ def test_inference_with_restriction_estimator(set_seed):
     num_rounds = 2
 
     for r in range(num_rounds):
-        theta, x = simulate_for_sbi(simulator, proposals[-1], 1000)
+        theta, x = simulate_for_sbi(simulator, proposals[-1], 2000)
         restriction_estimator.append_simulations(theta, x)
         if r < num_rounds - 1:
             _ = restriction_estimator.train()
