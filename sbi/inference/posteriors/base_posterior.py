@@ -3,6 +3,7 @@
 
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, Optional, Union
+from warnings import warn
 
 import torch
 import torch.distributions.transforms as torch_tf
@@ -51,6 +52,7 @@ class NeuralPosterior(ABC):
         else:
             self.theta_transform = theta_transform
 
+        self._map = None
         self._purpose = ""
         self._x_shape = x_shape
 
@@ -103,7 +105,8 @@ class NeuralPosterior(ABC):
         self.set_default_x(x)
 
     def set_default_x(self, x: Tensor) -> "NeuralPosterior":
-        r"""Set new default x for `.sample(), .log_prob` to use as conditioning context.
+        """Set new default x for `.sample(), .log_prob` to use as conditioning context.
+        Reset the MAP stored for the old default x if applicable.
 
         This is a pure convenience to avoid having to repeatedly specify `x` in calls to
         `.sample()` and `.log_prob()` - only $\theta$ needs to be passed.
@@ -124,6 +127,7 @@ class NeuralPosterior(ABC):
         self._x = process_x(
             x, x_shape=self._x_shape, allow_iid_x=self.potential_fn.allow_iid_x
         ).to(self._device)
+        self._map = None
         return self
 
     def _x_else_default_x(self, x: Optional[Array]) -> Tensor:
@@ -150,30 +154,51 @@ class NeuralPosterior(ABC):
         num_init_samples: int = 1_000,
         save_best_every: int = 10,
         show_progress_bars: bool = False,
+        force_update: bool = False,
+        warn_about_cached: bool = True,
     ) -> Tensor:
         """See child classes for docstring."""
-        self.potential_fn.set_x(self._x_else_default_x(x))
 
-        if init_method == "posterior":
-            inits = self.sample((num_init_samples,), self._x_else_default_x(x))
-        elif init_method == "proposal":
-            inits = self.proposal.sample((num_init_samples,))  # type: ignore
-        elif isinstance(init_method, Tensor):
-            inits = init_method
+        def calculate_map(x):
+            self.potential_fn.set_x(self._x_else_default_x(x))
+            if init_method == "posterior":
+                inits = self.sample((num_init_samples,))
+            elif init_method == "proposal":
+                inits = self.proposal.sample((num_init_samples,))  # type: ignore
+            elif isinstance(init_method, Tensor):
+                inits = init_method
+            else:
+                raise ValueError
+            return gradient_ascent(
+                potential_fn=self.potential_fn,
+                inits=inits,
+                theta_transform=self.theta_transform,
+                num_iter=num_iter,
+                num_to_optimize=num_to_optimize,
+                learning_rate=learning_rate,
+                save_best_every=save_best_every,
+                show_progress_bars=show_progress_bars,
+            )[0]
+
+        # Check if the provided x matches the default x (short-circuit on identity).
+        if x is None:
+            is_new_x = self.default_x is None
         else:
-            raise ValueError
+            is_new_x = self.default_x is None or (
+                x is not self.default_x and (x != self.default_x).any()
+            )
+        not_saved_at_default_x = self._map is None
 
-        self.map_ = gradient_ascent(
-            potential_fn=self.potential_fn,
-            inits=inits,
-            theta_transform=self.theta_transform,
-            num_iter=num_iter,
-            num_to_optimize=num_to_optimize,
-            learning_rate=learning_rate,
-            save_best_every=save_best_every,
-            show_progress_bars=show_progress_bars,
-        )[0]
-        return self.map_
+        if is_new_x:  # Calculate at x; don't save.
+            return calculate_map(x)
+        elif not_saved_at_default_x or force_update:  # Calculate at default_x; save.
+            self._map = calculate_map(self.default_x)
+            return self._map
+        if warn_about_cached:
+            warn(
+                "Using saved value of map from previous calculation. To calculate MAP with new arguments, use 'force_update = True'."
+            )
+        return self._map
 
     def __repr__(self):
         desc = f"""{self.__class__.__name__} sampler for potential_fn=<{self.potential_fn.__class__.__name__}>"""

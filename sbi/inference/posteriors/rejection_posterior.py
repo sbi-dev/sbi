@@ -173,6 +173,8 @@ class RejectionPosterior(NeuralPosterior):
         num_init_samples: int = 1_000,
         save_best_every: int = 10,
         show_progress_bars: bool = False,
+        force_update: bool = False,
+        warn_about_cached: bool = True,
     ) -> Tensor:
         r"""Returns the maximum-a-posteriori estimate (MAP).
 
@@ -209,6 +211,10 @@ class RejectionPosterior(NeuralPosterior):
                 (thus, the default is `10`.)
             show_progress_bars: Whether or not to show a progressbar for sampling from
                 the posterior.
+            force_update: Whether or not to re-calculate the MAP when x is unchanged and
+                have a cached value.
+            warn_about_cached: Whether or not to show warning that we are using the
+                stored value for the MAP.
             log_prob_kwargs: Will be empty for SNLE and SNRE. Will contain
                 {'norm_posterior': True} for SNPE.
 
@@ -224,4 +230,6 @@ class RejectionPosterior(NeuralPosterior):
             num_init_samples=num_init_samples,
             save_best_every=save_best_every,
             show_progress_bars=show_progress_bars,
+            force_update=force_update,
+            warn_about_cached=warn_about_cached,
         )
