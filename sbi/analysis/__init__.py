@@ -9,6 +9,7 @@ from sbi.analysis.plot import (
     conditional_pairplot,
     marginal_plot,
     pairplot,
+    sbc_rank_plot,
 )
 from sbi.analysis.sensitivity_analysis import ActiveSubspace
 from sbi.analysis.sbc import run_sbc, check_sbc, get_nltp
