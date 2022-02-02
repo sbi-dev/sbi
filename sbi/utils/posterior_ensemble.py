@@ -399,8 +399,6 @@ class EnsemblePotential(BasePotential):
         # list of priors potential_fn.prior
         super().__init__(priors, x_o, device)
 
-        # self.set_x(x_o) # TODO: YES OR NO ? WILL IT BE DONE IN SUPER?
-
     def allow_iid_x(self) -> bool:
         if any(
             isinstance(potential, PosteriorBasedPotential)
@@ -408,7 +406,7 @@ class EnsemblePotential(BasePotential):
         ):
             # in case there is different kinds of posteriors, this will produce an error
             # in `set_x()`
-            return False  # type: ignore
+            return False
         else:
             return True
 
