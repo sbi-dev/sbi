@@ -13,6 +13,7 @@ from sbi.neural_nets.classifier import (
 )
 from sbi.neural_nets.flow import build_made, build_maf, build_nsf
 from sbi.neural_nets.mdn import build_mdn
+from sbi.neural_nets.mnle import build_mnle
 
 
 def classifier_nn(
@@ -157,6 +158,8 @@ def likelihood_nn(
             return build_maf(batch_x=batch_x, batch_y=batch_theta, **kwargs)
         elif model == "nsf":
             return build_nsf(batch_x=batch_x, batch_y=batch_theta, **kwargs)
+        elif model == "mnle":
+            return build_mnle(batch_x=batch_x, batch_y=batch_theta, **kwargs)
         else:
             raise NotImplementedError
 
