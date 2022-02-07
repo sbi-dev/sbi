@@ -145,7 +145,7 @@ def test_c2st_and_map_snl_on_linearGaussian_different(
         set_seed: fixture for manual seeding
     """
     num_samples = 500
-    num_simulations = 3100
+    num_simulations = 3000
     trials_to_test = [1]
 
     # likelihood_mean will be likelihood_shift+theta
@@ -326,7 +326,7 @@ def test_api_snl_sampling_methods(
     num_dim = 2
     num_samples = 10
     num_trials = 2
-    num_simulations = 3100
+    num_simulations = 1000
     x_o = zeros((num_trials, num_dim))
     # Test for multiple chains is cheap when vectorized.
     num_chains = 3 if sampling_method == "slice_np_vectorized" else 1

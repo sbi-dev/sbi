@@ -146,7 +146,7 @@ def test_inference_with_restriction_estimator(set_seed):
     num_rounds = 2
 
     for r in range(num_rounds):
-        theta, x = simulate_for_sbi(simulator, proposals[-1], 2000)
+        theta, x = simulate_for_sbi(simulator, proposals[-1], 1000)
         restriction_estimator.append_simulations(theta, x)
         if r < num_rounds - 1:
             _ = restriction_estimator.train()

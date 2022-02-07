@@ -292,7 +292,7 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str, set_seed):
         ).set_default_x(x_o)
     elif method_str == "snpe_c":
         inference = SNPE_C(**creation_args)
-        theta, x = simulate_for_sbi(simulator, prior, 1000, simulation_batch_size=50)
+        theta, x = simulate_for_sbi(simulator, prior, 900, simulation_batch_size=50)
         posterior_estimator = inference.append_simulations(theta, x).train()
         posterior1 = DirectPosterior(
             prior=prior, posterior_estimator=posterior_estimator
