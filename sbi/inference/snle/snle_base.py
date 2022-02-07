@@ -314,7 +314,8 @@ class LikelihoodEstimator(NeuralInference, ABC):
             device = self._device
         else:
             # Otherwise, infer it from the device of the net parameters.
-            device = next(density_estimator.parameters()).device.type
+            self._neural_net = density_estimator
+            device = next(self._neural_net.parameters()).device.type
 
         potential_fn, theta_transform = likelihood_estimator_based_potential(
             likelihood_estimator=self._neural_net, prior=prior, x_o=None

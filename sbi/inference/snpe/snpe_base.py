@@ -403,7 +403,8 @@ class PosteriorEstimator(NeuralInference, ABC):
             device = self._device
         else:
             # Otherwise, infer it from the device of the net parameters.
-            device = next(density_estimator.parameters()).device.type
+            self._neural_net = density_estimator
+            device = next(self._neural_net.parameters()).device.type
 
         potential_fn, theta_transform = posterior_estimator_based_potential(
             posterior_estimator=self._neural_net, prior=prior, x_o=None
