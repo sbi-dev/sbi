@@ -342,15 +342,16 @@ class RatioEstimator(NeuralInference, ABC):
             prior = self._prior
 
         if density_estimator is None:
-            density_estimator = self._neural_net
+            ratio_estimator = self._neural_net
             # If internal net is used device is defined.
             device = self._device
         else:
+            ratio_estimator = density_estimator
             # Otherwise, infer it from the device of the net parameters.
             device = next(density_estimator.parameters()).device.type
 
         potential_fn, theta_transform = ratio_estimator_based_potential(
-            ratio_estimator=self._neural_net, prior=prior, x_o=None
+            ratio_estimator=ratio_estimator, prior=prior, x_o=None
         )
 
         if sample_with == "mcmc":

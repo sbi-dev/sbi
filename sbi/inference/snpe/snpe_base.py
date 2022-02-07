@@ -398,15 +398,16 @@ class PosteriorEstimator(NeuralInference, ABC):
             prior = self._prior
 
         if density_estimator is None:
-            density_estimator = self._neural_net
+            posterior_estimator = self._neural_net
             # If internal net is used device is defined.
             device = self._device
         else:
+            posterior_estimator = density_estimator
             # Otherwise, infer it from the device of the net parameters.
             device = next(density_estimator.parameters()).device.type
 
         potential_fn, theta_transform = posterior_estimator_based_potential(
-            posterior_estimator=self._neural_net, prior=prior, x_o=None
+            posterior_estimator=posterior_estimator, prior=prior, x_o=None
         )
 
         if sample_with == "rejection":
@@ -419,7 +420,7 @@ class PosteriorEstimator(NeuralInference, ABC):
                 )
             else:
                 self._posterior = DirectPosterior(
-                    posterior_estimator=self._neural_net,
+                    posterior_estimator=posterior_estimator,
                     prior=prior,
                     x_shape=self._x_shape,
                     device=device,
