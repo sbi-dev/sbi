@@ -417,7 +417,7 @@ def test_z_scoring_structured():
     t = np.arange(0, 1, 0.001)
     x_sin = np.sin(t * 2 * torch.pi * 5)
     x = np.vstack([[(x_sin * (i + 1)) + (i * 2)] for i in range(10)])
-    t_batch = torch.tensor(x)
+    t_batch = torch.FloatTensor(x)
 
     #### API tests
     # Go through every permutation of options to test API.

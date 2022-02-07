@@ -83,7 +83,7 @@ def test_c2st_snl_on_linearGaussian(set_seed):
 
     x_o = zeros(1, x_dim)
     num_samples = 1000
-    num_simulations = 1000
+    num_simulations = 3100
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(x_dim)
@@ -145,7 +145,7 @@ def test_c2st_and_map_snl_on_linearGaussian_different(
         set_seed: fixture for manual seeding
     """
     num_samples = 500
-    num_simulations = 1000
+    num_simulations = 3000
     trials_to_test = [1]
 
     # likelihood_mean will be likelihood_shift+theta
@@ -239,7 +239,7 @@ def test_c2st_multi_round_snl_on_linearGaussian(num_trials: int, set_seed):
     num_dim = 2
     x_o = zeros((num_trials, num_dim))
     num_samples = 500
-    num_simulations_per_round = 500 * num_trials
+    num_simulations_per_round = 600 * num_trials
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(num_dim)

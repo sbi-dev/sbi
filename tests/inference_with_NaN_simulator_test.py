@@ -77,7 +77,7 @@ def test_inference_with_nan_simulator(
     likelihood_cov = 0.3 * eye(num_dim)
     x_o = zeros(1, num_dim)
     num_samples = 500
-    num_simulations = 2000
+    num_simulations = 5000
 
     def linear_gaussian_nan(
         theta, likelihood_shift=likelihood_shift, likelihood_cov=likelihood_cov

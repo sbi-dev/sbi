@@ -68,7 +68,7 @@ def test_c2st_snpe_on_linearGaussian(
 
     x_o = zeros(num_trials, num_dim)
     num_samples = 1000
-    num_simulations = 2500
+    num_simulations = 2600
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(num_dim)
@@ -292,7 +292,7 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str, set_seed):
         ).set_default_x(x_o)
     elif method_str == "snpe_c":
         inference = SNPE_C(**creation_args)
-        theta, x = simulate_for_sbi(simulator, prior, 500, simulation_batch_size=50)
+        theta, x = simulate_for_sbi(simulator, prior, 900, simulation_batch_size=50)
         posterior_estimator = inference.append_simulations(theta, x).train()
         posterior1 = DirectPosterior(
             prior=prior, posterior_estimator=posterior_estimator
@@ -429,7 +429,7 @@ def test_sample_conditional(set_seed):
     # We need a pretty big dataset to properly model the bimodality.
     theta, x = simulate_for_sbi(simulator, prior, 10000)
     posterior_estimator = inference.append_simulations(theta, x).train(
-        max_num_epochs=50
+        max_num_epochs=60
     )
 
     posterior = DirectPosterior(
@@ -513,7 +513,7 @@ def test_mdn_conditional_density(num_dim: int = 3, cond_dim: int = 1):
 
     x_o = zeros(1, num_dim)
     num_samples = 1000
-    num_simulations = 2500
+    num_simulations = 2600
     condition = 0.1 * ones(1, num_dim)
 
     dims = list(range(num_dim))
