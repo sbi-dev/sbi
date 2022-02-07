@@ -309,15 +309,16 @@ class LikelihoodEstimator(NeuralInference, ABC):
             prior = self._prior
 
         if density_estimator is None:
-            density_estimator = self._neural_net
+            likelihood_estimator = self._neural_net
             # If internal net is used device is defined.
             device = self._device
         else:
+            likelihood_estimator = density_estimator
             # Otherwise, infer it from the device of the net parameters.
             device = next(density_estimator.parameters()).device.type
 
         potential_fn, theta_transform = likelihood_estimator_based_potential(
-            likelihood_estimator=self._neural_net, prior=prior, x_o=None
+            likelihood_estimator=likelihood_estimator, prior=prior, x_o=None
         )
 
         if sample_with == "mcmc":
