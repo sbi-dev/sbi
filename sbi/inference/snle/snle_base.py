@@ -17,9 +17,12 @@ from sbi import utils as utils
 from sbi.inference import NeuralInference
 from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior, VIPosterior
 from sbi.inference.potentials import likelihood_estimator_based_potential
-from sbi.utils import check_estimator_arg, validate_theta_and_x, x_shape_from_simulation
-from sbi.utils.sbiutils import mask_sims_from_prior
-from sbi.utils.user_input_checks import process_x
+from sbi.utils import (
+    check_estimator_arg,
+    mask_sims_from_prior,
+    validate_theta_and_x,
+    x_shape_from_simulation,
+)
 
 
 class LikelihoodEstimator(NeuralInference, ABC):
@@ -114,7 +117,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
         stop_after_epochs: int = 20,
-        max_num_epochs: int = 2**31 - 1,
+        max_num_epochs: int = 2 ** 31 - 1,
         clip_max_norm: Optional[float] = 5.0,
         exclude_invalid_x: bool = True,
         resume_training: bool = False,

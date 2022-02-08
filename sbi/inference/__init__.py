@@ -19,7 +19,12 @@ from sbi.inference.base import (  # noqa: F401
     infer,
     simulate_for_sbi,
 )
+from sbi.inference.snle.mnle import MNLE
 from sbi.inference.snle.snle_a import SNLE_A
+<<<<<<< HEAD
+=======
+# Unimplemented: don't export
+>>>>>>> add mnle as snle child, add mixed potential, update tests.
 from sbi.inference.snpe.snpe_a import SNPE_A
 from sbi.inference.snpe.snpe_b import SNPE_B
 from sbi.inference.snpe.snpe_c import SNPE_C  # noqa: F401
@@ -51,6 +56,7 @@ from sbi.inference.posteriors.rejection_posterior import RejectionPosterior
 from sbi.inference.posteriors.vi_posterior import VIPosterior
 from sbi.inference.potentials.likelihood_based_potential import (
     likelihood_estimator_based_potential,
+    mixed_likelihood_estimator_based_potential,
 )
 from sbi.inference.potentials.posterior_based_potential import (
     posterior_estimator_based_potential,

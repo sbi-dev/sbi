@@ -8,6 +8,7 @@ import torch.distributions.transforms as torch_tf
 from torch import Tensor, nn
 
 from sbi.inference.potentials.base_potential import BasePotential
+from sbi.neural_nets.mnle import MixedDensityEstimator
 from sbi.types import TorchTransform
 from sbi.utils import mcmc_transform
 from sbi.utils.sbiutils import match_theta_and_x_batch_shapes
@@ -137,3 +138,61 @@ def _log_likelihoods_over_trials(
         ).sum(0)
 
     return log_likelihood_trial_sum
+
+
+def mixed_likelihood_estimator_based_potential(
+    likelihood_estimator: nn.Module,
+    prior: Any,
+    x_o: Optional[Tensor],
+) -> Tuple[Callable, TorchTransform]:
+    r"""Returns potential $\log(p(x_o|\theta)p(\theta))$ for likelihood-based methods.
+
+    It also returns a transformation that can be used to transform the potential into
+    unconstrained space.
+
+    Args:
+        likelihood_estimator: The neural network modelling the likelihood.
+        prior: The prior distribution.
+        x_o: The observed data at which to evaluate the likelihood.
+
+    Returns:
+        The potential function $p(x_o|\theta)p(\theta)$ and a transformation that maps
+        to unconstrained space.
+    """
+
+    assert isinstance(
+        likelihood_estimator, MixedDensityEstimator
+    ), f"net must be of type MixedDensityEstimator but is {type(likelihood_estimator)}."
+    device = str(next(likelihood_estimator.discrete_net.parameters()).device)
+
+    potential_fn = MixedLikelihoodBasedPotential(
+        likelihood_estimator, prior, x_o, device=device
+    )
+    theta_transform = mcmc_transform(prior, device=device)
+
+    return potential_fn, theta_transform
+
+
+class MixedLikelihoodBasedPotential(LikelihoodBasedPotential):
+    def __init__(
+        self,
+        likelihood_estimator: nn.Module,
+        prior: Any,
+        x_o: Optional[Tensor],
+        device: str = "cpu",
+    ):
+        super().__init__(likelihood_estimator, prior, x_o, device)
+
+    def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
+
+        # Calculate likelihood in one batch.
+        with torch.set_grad_enabled(track_gradients):
+            log_likelihood_trial_batch = self.likelihood_estimator.log_prob_iid(
+                self.x_o, theta
+            )
+            # Reshape to (x-trials x parameters), sum over trial-log likelihoods.
+            log_likelihood_trial_sum = log_likelihood_trial_batch.reshape(
+                self.x_o.shape[0], -1
+            ).sum(0)
+
+        return log_likelihood_trial_sum
