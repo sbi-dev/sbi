@@ -2,7 +2,6 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 import warnings
-from typing import Optional
 
 import torch
 from torch import Tensor, nn, unique
@@ -10,7 +9,7 @@ from torch.distributions import Categorical
 from torch.nn import Sigmoid, Softmax
 
 from sbi.neural_nets.flow import build_nsf
-from sbi.utils.sbiutils import standardizing_net
+from sbi.utils.sbiutils import match_theta_and_x_batch_shapes, standardizing_net
 from sbi.utils.user_input_checks import check_data_device
 
 
@@ -67,14 +66,14 @@ def build_mnle(
         hidden_features=hidden_features,
     )
 
-    return MNLE(
+    return MixedDensityEstimator(
         discrete_net=disc_nle,
         continuous_net=cont_nle,
         log_transform_x=log_transform_x,
     )
 
 
-class MNLE(nn.Module):
+class MixedDensityEstimator(nn.Module):
     """Class for Mixed Neural Likelihood Estimation.
 
     MNLE combines a Categorical net and a flow over continuous data to model data with
@@ -97,11 +96,11 @@ class MNLE(nn.Module):
                 logarithmic domain before training. This is helpful for bounded data, e.
                 g.,for reaction times.
         """
-        super(MNLE, self).__init__()
+        super(MixedDensityEstimator, self).__init__()
 
-        self.choice_net = discrete_net
-        self.rt_net = continuous_net
-        self.use_log_rts = log_transform_x
+        self.discrete_net = discrete_net
+        self.continuous_net = continuous_net
+        self.log_transform_x = log_transform_x
 
     def forward(self, x):
         # the input x consists of parameters theta
@@ -127,17 +126,17 @@ class MNLE(nn.Module):
         with torch.set_grad_enabled(track_gradients):
 
             # Sample choices given parameters, from BernoulliMN.
-            choices = self.choice_net.sample(num_samples, context=theta).reshape(
+            choices = self.discrete_net.sample(num_samples, context=theta).reshape(
                 num_samples, 1
             )
             # Pass num_samples=1 because the choices in the context contains
             # num_samples elements already.
-            rts = self.rt_net.sample(
+            rts = self.continuous_net.sample(
                 num_samples=1,
                 # repeat the single theta to match number of sampled choices.
                 context=torch.cat((theta.repeat(num_samples, 1), choices), dim=1),
             ).reshape(num_samples, 1)
-            if self.use_log_rts:
+            if self.log_transform_x:
                 rts = rts.exp()
 
         return torch.cat((rts, choices), dim=1)
@@ -157,13 +156,13 @@ class MNLE(nn.Module):
         theta = context
         num_parameters = theta.shape[0]
 
-        disc_log_prob = self.choice_net.log_prob(x=disc_x, context=theta).reshape(
+        disc_log_prob = self.discrete_net.log_prob(x=disc_x, context=theta).reshape(
             num_parameters
         )
 
         # Get rt log probs from rt net.
-        cont_log_prob = self.rt_net.log_prob(
-            torch.log(cont_x) if self.use_log_rts else cont_x,
+        cont_log_prob = self.continuous_net.log_prob(
+            torch.log(cont_x) if self.log_transform_x else cont_x,
             context=torch.cat((theta, disc_x), dim=1),
         )
 
@@ -171,73 +170,74 @@ class MNLE(nn.Module):
         lp_combined = (disc_log_prob + cont_log_prob).reshape(num_parameters)
 
         # Maybe add log abs det jacobian of RTs: log(1/rt) = - log(rt)
-        if self.use_log_rts:
+        if self.log_transform_x:
             lp_combined -= torch.log(cont_x).squeeze()
 
         return lp_combined
 
-    def log_prob_iidtrials(self, x, context):
+    def log_prob_iid(self, x, theta):
+        """Return log prob given a batch of iid x and a different batch of theta.
 
-        # Extract unique values to undo trial-parameter-batch matching.
-        theta = torch.unique(context, sorted=False, dim=0)
-        num_parameters = theta.shape[0]
-        num_categories = self.choice_net.num_categories
-        x_unique = torch.unique(x, sorted=False, dim=0)
-        num_trials = x_unique.shape[0]
+        Args:
+            x: batch of iid data, data observed given the same underlying parameters or
+                experimental conditions.
+            theta: batch of parameters to be evaluated, i.e., each batch entry will be
+                evaluated for the entire batch of iid x.
 
-        assert x_unique.ndim > 1
+        Returns:
+            Tensor: log probs with shape (num_trials, num_parameters), i.e., the log
+                prob for each theta for each trial.
+        """
+
+        batch_size = theta.shape[0]
+        num_trials = x.shape[0]
+        theta_repeated, x_repeated = match_theta_and_x_batch_shapes(theta, x)
+        net_device = next(self.discrete_net.parameters()).device
         assert (
-            x_unique.shape[1] == 2
-        ), "MNLE assumes x to have two columns: [rts; choices]"
+            net_device == x.device and x.device == theta.device
+        ), f"device mismatch: net, x, theta: {net_device}, {x.device}, {theta.device}."
 
-        rts_repeated = x[:, 0:1]
-        choices_repeated = x[:, 1:2]
-        rts = x_unique[:, 0:1]
-        choices = x_unique[:, 1:2]
+        x_cont_repeated = x_repeated[:, :-1]
+        x_cont = x[:, :-1]
+        x_disc_repeated = x_repeated[:, -1:]
+        x_disc = x[:, -1:]
 
-        # Get choice log probs from categorical net.
-        # Apply efficiency trick due to discreteness of categories:
-        # For iid trials the log probs are identical for each category.
-        # Calculate lp for all but one possible category once for each parameter.
-        log_prob_per_cat = torch.zeros(num_categories, num_parameters)
-        log_prob_per_cat[:-1, :] = self.choice_net.log_prob(
-            # repeat categories for parameters
-            torch.repeat_interleave(
-                torch.arange(num_categories - 1), num_parameters, dim=0
-            ),
-            # repeat parameters for categories
-            theta.repeat(num_categories - 1, 1),
-        ).reshape(-1, num_parameters)
-        # infer the last category lp from the softmax condition.
-        log_prob_per_cat[-1, :] = torch.log(1 - log_prob_per_cat.exp().sum(0))
+        log_prob_per_cat = torch.zeros(self.discrete_net.num_categories, batch_size)
+        # repeat categories for parameters
+        repeated_categories = torch.repeat_interleave(
+            torch.arange(self.discrete_net.num_categories - 1), batch_size, dim=0
+        )
+        # repeat parameters for categories
+        repeated_theta = theta.repeat(self.discrete_net.num_categories - 1, 1)
+        log_prob_per_cat[:-1, :] = self.discrete_net.log_prob(
+            repeated_categories,
+            repeated_theta,
+        ).reshape(-1, batch_size)
+        # infer the last category logprob from sum to one.
+        log_prob_per_cat[-1, :] = torch.log(1 - log_prob_per_cat[:-1, :].exp().sum(0))
 
         # fill in lps for each occurred category
-        lp_choices = log_prob_per_cat[
-            choices.type_as(torch.zeros(1, dtype=torch.int)).squeeze()
+        log_probs_discrete = log_prob_per_cat[
+            x_disc.type_as(torch.zeros(1, dtype=torch.long)).squeeze()
         ].reshape(-1)
 
-        # Get rt log probs from rt net.
-        lp_rts = self.rt_net.log_prob(
-            torch.log(rts_repeated) if self.use_log_rts else rts_repeated,
-            context=torch.cat((context, choices_repeated), dim=1),
+        # Get repeat discrete data and theta to match in batch shape for flow eval.
+        log_probs_cont = self.continuous_net.log_prob(
+            torch.log(x_cont_repeated) if self.log_transform_x else x_cont_repeated,
+            context=torch.cat((theta_repeated, x_disc_repeated), dim=1),
         )
 
         # Combine into joint lp with first dim over trials.
-        lp_combined = (lp_choices + lp_rts).reshape(num_trials, num_parameters)
-
-        # Maybe add log abs det jacobian of RTs: log(1/rt) = - log(rt)
-        if self.use_log_rts:
-            lp_combined -= torch.log(rts)
-        # Set to lower bound where reaction happend before non-decision time tau.
-        log_likelihood_trial_batch = torch.where(
-            # If rt < tau the likelihood should be zero (or at lower bound).
-            rts.repeat(1, num_parameters) > theta[:, -1],
-            lp_combined,
-            1e-19 * torch.ones_like(lp_combined),
+        log_probs_combined = (log_probs_discrete + log_probs_cont).reshape(
+            num_trials, batch_size
         )
 
+        # Maybe add log abs det jacobian of RTs: log(1/rt) = - log(rt)
+        if self.log_transform_x:
+            log_probs_combined -= torch.log(x_cont)
+
         # Return batch over trials as required by SBI potentials.
-        return log_likelihood_trial_batch
+        return log_probs_combined
 
 
 class CategoricalNet(nn.Module):
@@ -267,6 +267,7 @@ class CategoricalNet(nn.Module):
         self.num_input = num_input
         self.activation = Sigmoid()
         self.softmax = Softmax(dim=1)
+        self.num_categories = num_categories
 
         # Maybe add z-score embedding for parameters.
         if embedding is not None:
