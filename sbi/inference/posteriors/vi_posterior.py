@@ -5,6 +5,7 @@ from copy import deepcopy
 from typing import Callable, Optional, Union, Iterable
 
 import torch
+import numpy as np
 from torch.distributions import Distribution
 
 from tqdm import tqdm
