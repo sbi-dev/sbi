@@ -267,6 +267,10 @@ class LikelihoodEstimator(NeuralInference, ABC):
         if show_train_summary:
             print(self._describe_round(self._round, self._summary))
 
+        # Avoid keeping the gradients in the resulting network, which can
+        # cause memory leakage when benchmarking.
+        self._neural_net.zero_grad()
+
         return deepcopy(self._neural_net)
 
     def build_posterior(
