@@ -351,7 +351,8 @@ class PosteriorEstimator(NeuralInference, ABC):
 
         # Avoid keeping the gradients in the resulting network, which can
         # cause memory leakage when benchmarking.
-        self._neural_net.zero_grad()
+        self._neural_net.zero_grad(set_to_none=True)
+
         return deepcopy(self._neural_net)
 
     def build_posterior(

@@ -412,3 +412,37 @@ def test_embedding_nets_integration_training_device(
         posterior = inference.build_posterior(density_estimator_train)
         proposal = posterior.set_default_x(x_o)
         theta = proposal.sample((samples_per_round,))
+
+
+@pytest.mark.parametrize("inference_method", [SNPE_A, SNPE_C, SNRE_A, SNRE_B, SNLE])
+def test_nograd_after_inference_train(inference_method: NeuralInference) -> None:
+
+    num_dim = 2
+    prior_ = BoxUniform(-torch.ones(num_dim), torch.ones(num_dim))
+    simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior_)
+
+    inference = inference_method(
+        prior,
+        **(
+            dict(classifier="resnet")
+            if inference_method in [SNRE_A, SNRE_B]
+            else dict(
+                density_estimator=(
+                    "mdn_snpe_a" if inference_method == SNPE_A else "maf"
+                )
+            )
+        ),
+        show_progress_bars=False
+    )
+
+    theta, x = simulate_for_sbi(simulator, prior, 32)
+    inference = inference.append_simulations(theta, x)
+
+    posterior_estimator = inference.train(max_num_epochs=2)
+
+    def check_no_grad(model):
+        for p in model.parameters():
+            assert p.grad is None
+
+    check_no_grad(posterior_estimator)
+    check_no_grad(inference._neural_net)
