@@ -199,7 +199,7 @@ def test_average_cond_coeff_matrix():
         limits=torch.tensor([[-60.0, 60.0], [-20, 20], [-7, 7]]),
         resolution=500,
     )
-    corr_dim12 = torch.sqrt(torch.tensor(30.0 ** 2 / 100.0 / 10.0))
+    corr_dim12 = torch.sqrt(torch.tensor(30.0**2 / 100.0 / 10.0))
     gt_matrix = torch.tensor(
         [[1.0, corr_dim12, 0.0], [corr_dim12, 1.0, 0.0], [0.0, 0.0, 1.0]]
     )
@@ -244,7 +244,7 @@ def test_gaussian_transforms(snpe_method: str, plot_results: bool = False):
     theta_range = torch.linspace(-bound, bound, 100)
     theta1_grid, theta2_grid = torch.meshgrid(theta_range, theta_range)
     theta_grid = torch.stack([theta1_grid, theta2_grid])
-    theta_grid_flat = torch.reshape(theta_grid, (2, 100 ** 2))
+    theta_grid_flat = torch.reshape(theta_grid, (2, 100**2))
 
     # Generate two MoGs.
     means1 = torch.tensor([[2.0, 2.0], [-2.0, -2.0]])

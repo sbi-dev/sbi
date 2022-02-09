@@ -7,10 +7,8 @@ import torch
 from pyknos.nflows.nn import nets
 from torch import Tensor, nn, relu
 
-from sbi.utils.sbiutils import standardizing_net, z_score_parser
-from sbi.utils.user_input_checks import check_embedding_net_device, check_data_device
-
-from sbi.utils.sbiutils import DefaultEmbeddingNet
+from sbi.utils.sbiutils import DefaultEmbeddingNet, standardizing_net, z_score_parser
+from sbi.utils.user_input_checks import check_data_device, check_embedding_net_device
 
 
 class StandardizeInputs(nn.Module):

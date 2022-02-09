@@ -2,34 +2,28 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 from copy import deepcopy
-from typing import Callable, Optional, Union, Iterable
+from typing import Callable, Iterable, Optional, Union
 
-import torch
 import numpy as np
+import torch
+from pyro.distributions import TransformedDistribution
 from torch.distributions import Distribution
-
 from tqdm import tqdm
 
-
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
-from sbi.utils import mcmc_transform
-from sbi.types import Shape, TorchTransform
-from sbi.utils.torchutils import (
-    atleast_2d_float32_tensor,
-    Tensor,
-    ensure_theta_batched,
-)
-
 from sbi.samplers.vi import (
     adapt_variational_distribution,
     check_variational_distribution,
+    get_flow_builder,
+    get_quality_metric,
+    get_sampling_method,
+    get_VI_method,
     make_object_deepcopy_compatible,
     move_all_tensor_to_device,
-    get_flow_builder,
-    get_VI_method,
-    get_sampling_method,
-    get_quality_metric,
 )
+from sbi.types import Shape, TorchTransform
+from sbi.utils import mcmc_transform
+from sbi.utils.torchutils import Tensor, atleast_2d_float32_tensor, ensure_theta_batched
 
 
 class VIPosterior(NeuralPosterior):
@@ -44,15 +38,15 @@ class VIPosterior(NeuralPosterior):
     References:
         [1] Variational methods for simulation-based inference, Manuel Glöckler, Michael
             Deistler, Jakob Macke, 2022, https://openreview.net/forum?id=kZ0UYdhqkNY
-        [2] Sequential Neural Posterior and Likelihood Approximation,  Samuel Wiqvist,
-        Jes Frellsen, Umberto Picchini, 2021, https://arxiv.org/abs/2102.06522
+        [2] Sequential Neural Posterior and Likelihood Approximation, Samuel Wiqvist,
+            Jes Frellsen, Umberto Picchini, 2021, https://arxiv.org/abs/2102.06522
     """
 
     def __init__(
         self,
         potential_fn: Callable,
         prior: Optional[Distribution] = None,
-        q: Union[str, Distribution, "VIPosterior", Callable] = "maf",
+        q: Union[str, TransformedDistribution, "VIPosterior", Callable] = "maf",
         theta_transform: Optional[TorchTransform] = None,
         vi_method: str = "rKL",
         device: str = "cpu",
@@ -68,14 +62,12 @@ class VIPosterior(NeuralPosterior):
                 quality metrics. Please make sure that this matches with the prior
                 within the potential_fn. If `None` is given, we will try to infer it
                 from potential_fn or q, if this fails we raise an Error.
-            q: Variational distribution, either string, distribution, or a VIPosterior
-                object. This specifies a parametric class of distribution over which
-                the best possible posterior approximation is searched. For string input,
-                we currently support [nsf, scf, maf, mcf, gaussian, gaussian_diag]. Of
-                course, you can also specify your own variational family by passing a
-                `parameterized` distribution object i.e. a torch.distributions
-                Distribution with methods `parameters` returning an iterable of all
-                parameters (you can pass them within the parameters/modules attribute).
+            q: Variational distribution, either string, `TransformedDistribution, or a
+                VIPosterior object. This specifies a parametric class of distribution
+                over which the best possible posterior approximation is searched. For
+                string input, we currently support [nsf, scf, maf, mcf, gaussian,
+                gaussian_diag]. You can also specify your own variational family by
+                passing a pyro `TransformedDistribution`.
                 Additionally, we allow a `Callable`, which allows you the pass a
                 `builder` function, which if called returns a distribution. This may be
                 useful for setting the hyperparameters e.g. `num_transfroms` within the
@@ -182,13 +174,13 @@ class VIPosterior(NeuralPosterior):
         parameters: Iterable = [],
         modules: Iterable = [],
     ) -> None:
-        """Defines the variational family. You can specify over which parameters/modules
-        we optimize. This is required for custom distributions which e.g. do not inherit
-        nn.Modules or has the function `parameters` or `modules` to give direct access
-        to trainable parameters. Further, you can pass a function, which constructs a
-        variational distribution if called.
+        """Defines the variational family.
 
-
+        You can specify over which parameters/modules we optimize. This is required for
+        custom distributions which e.g. do not inherit nn.Modules or has the function
+        `parameters` or `modules` to give direct access to trainable parameters.
+        Further, you can pass a function, which constructs a variational distribution
+        if called.
 
         Args:
             q: Variational distribution, either string, distribution, or a VIPosterior
@@ -246,6 +238,9 @@ class VIPosterior(NeuralPosterior):
             make_object_deepcopy_compatible(q.q)
             q = deepcopy(q.q)
         move_all_tensor_to_device(q, self._device)
+        assert isinstance(
+            q, Distribution
+        ), "Something went wrong when initializing the variational distribution. Please create an issue on github https://github.com/mackelab/sbi/issues"
         check_variational_distribution(q, self._prior)
         self._q = q
 
@@ -441,7 +436,9 @@ class VIPosterior(NeuralPosterior):
         # Warmup before training
         if reset_optimizer or (not optimizer.warm_up_was_done and not already_trained):
             if show_progress_bar:
-                iters.set_description("Warmup phase, this takes some seconds...")
+                iters.set_description(  # type: ignore
+                    "Warmup phase, this may take a few seconds..."
+                )
             optimizer.warm_up(warm_up_rounds)
 
         for i in iters:
@@ -449,7 +446,8 @@ class VIPosterior(NeuralPosterior):
             mean_loss, std_loss = optimizer.get_loss_stats()
             # Update progress bar
             if show_progress_bar:
-                iters.set_description(
+                assert isinstance(iters, tqdm)
+                iters.set_description(  # type: ignore
                     f"Loss: {np.round(float(mean_loss), 2)}"
                     f"Std: {np.round(float(std_loss), 2)}"
                 )

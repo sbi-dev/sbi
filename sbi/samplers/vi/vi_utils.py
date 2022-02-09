@@ -1,28 +1,26 @@
-import torch
-import numpy as np
-from torch.nn import Module
-from torch import Tensor
-from torch.distributions import TransformedDistribution, Distribution
-from torch.distributions.transforms import (
-    ComposeTransform,
-    IndependentTransform,
-)
-from sbi.types import TorchTransform
-from pyro.distributions.torch_transform import TransformModule
-
 from copy import deepcopy
-
 from typing import (
-    OrderedDict,
-    List,
-    Tuple,
-    Generator,
     Callable,
     Dict,
+    Generator,
     Iterable,
+    List,
     Optional,
+    OrderedDict,
+    Tuple,
     Union,
 )
+
+import numpy as np
+import torch
+from pyro.distributions import TransformedDistribution
+from pyro.distributions.torch_transform import TransformModule
+from torch import Tensor
+from torch.distributions import Distribution
+from torch.distributions.transforms import ComposeTransform, IndependentTransform
+from torch.nn import Module
+
+from sbi.types import TorchTransform
 
 
 def gpdfit(
@@ -57,11 +55,11 @@ def gpdfit(
 
     ks = -bs
     temp = ks[:, None] * x
-    ks = torch.log1p(temp).mean(axis=1)
+    ks = torch.log1p(temp).mean(dim=1)
     L = N * (torch.log(-bs / ks) - ks - 1)
 
     temp = torch.exp(L - L[:, None])
-    w = 1 / torch.sum(temp, axis=1)
+    w = 1 / torch.sum(temp, dim=1)
 
     dii = w >= 10 * eps
     if not torch.all(dii):
@@ -79,7 +77,7 @@ def gpdfit(
         temp = -x
         temp = bs[:, None] * temp
         temp = torch.log1p(temp)
-        ks = torch.mean(temp, axis=1)
+        ks = torch.mean(temp, dim=1)
 
     # estimate for sigma
     sigma = -k / b * N / (N - 0)
@@ -128,7 +126,7 @@ def get_parameters(t: Union[TorchTransform, TransformModule]) -> Iterable:
         Iterator[Iterable]: Generator of parameters.
     """
     if hasattr(t, "parameters"):
-        yield from t.parameters()
+        yield from t.parameters()  # type: ignore
     elif isinstance(t, ComposeTransform):
         for part in t.parts:
             yield from get_parameters(part)
@@ -161,7 +159,7 @@ def get_modules(t: Union[TorchTransform, TransformModule]) -> Iterable:
         pass
 
 
-def check_parameters_modules_attribute(q: Distribution) -> None:
+def check_parameters_modules_attribute(q: TransformedDistribution) -> None:
     """Checks a parameterized distribution object for valid `parameters` and `modules`.
 
     Args:
@@ -221,9 +219,14 @@ def check_sample_shape_and_support(q: Distribution, prior: Distribution) -> None
 
     samples = q.sample((1000,))
     samples_prior = prior.sample((1000,)).to(samples.device)
-    if hasattr(prior, "support"):
+    try:
+        _ = prior.support
+        has_support = True
+    except (NotImplementedError, AttributeError):
+        has_support = False
+    if has_support:
         assert all(
-            prior.support.check(samples)
+            prior.support.check(samples)  # type: ignore
         ), "The support of q must match that of the prior"
     assert (
         samples.shape == samples_prior.shape
@@ -294,7 +297,7 @@ def add_parameter_attributes_to_transformed_distribution(
 
 
 def adapt_variational_distribution(
-    q: Distribution,
+    q: TransformedDistribution,
     prior: Distribution,
     link_transform: Callable,
     parameters: Iterable = [],

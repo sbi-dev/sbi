@@ -220,7 +220,7 @@ def unbiased_mmd_squared(x, y):
     yy = f(y, y)
 
     scale = torch.median(torch.sqrt(torch.cat((xx, xy, yy))))
-    c = -0.5 / (scale ** 2)
+    c = -0.5 / (scale**2)
 
     k = lambda a: torch.sum(torch.exp(c * a))
 
@@ -246,15 +246,15 @@ def biased_mmd(x, y):
     yy = f(y, y)
 
     scale = torch.median(torch.sqrt(torch.cat((xx, xy, yy))))
-    c = -0.5 / (scale ** 2)
+    c = -0.5 / (scale**2)
 
     k = lambda a: torch.sum(torch.exp(c * a))
 
-    kxx = k(xx) / nx ** 2
+    kxx = k(xx) / nx**2
     del xx
     kxy = k(xy) / (nx * ny)
     del xy
-    kyy = k(yy) / ny ** 2
+    kyy = k(yy) / ny**2
     del yy
 
     mmd_square = kxx - 2 * kxy + kyy

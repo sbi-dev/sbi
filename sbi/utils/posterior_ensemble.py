@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
-from typing import Any, List, Optional, Union
+from typing import Any, List, Optional, Tuple, Union
 
 import torch
 from torch import Tensor
@@ -119,7 +119,7 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
         return self._weights
 
     @weights.setter
-    def weights(self, weights: Optional[Union[List[float], Tensor]]) -> Tensor:
+    def weights(self, weights: Optional[Union[List[float], Tensor]]) -> None:
         """Set relative weight for each posterior in the ensemble.
 
         Weights are normalised.
@@ -181,7 +181,7 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
         x: Optional[Tensor] = None,
         individually: bool = False,
         **kwargs,
-    ) -> Tensor:
+    ) -> Union[Tensor, Tuple[Tensor, Tensor]]:
         r"""Returns the average log-probability of the posterior ensemble
 
         $\sum_{i}^{N} w_{i} p_i(\theta|x)$.
@@ -278,7 +278,7 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
         save_best_every: int = 10,
         show_progress_bars: bool = False,
         individually: bool = False,
-    ) -> Tensor:
+    ) -> Union[Tensor, Tuple[Tensor, Tensor]]:
         r"""Returns the average maximum-a-posteriori estimate (MAP).
 
         Computes MAP estimate across the whole ensemble or for each component
@@ -344,8 +344,6 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
 
             if init_method == "posterior":
                 inits = self.sample((num_init_samples,), self._x_else_default_x(x))
-            elif init_method == "proposal":
-                inits = self.proposal.sample((num_init_samples,))
             elif isinstance(init_method, Tensor):
                 inits = init_method
             else:
