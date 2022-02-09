@@ -584,7 +584,7 @@ def mcmc_transform(
         try:
             _ = prior.support
             has_support = True
-        except NotImplementedError or AttributeError:
+        except (NotImplementedError, AttributeError):
             # NotImplementedError -> Distribution that inherits from torch dist but
             # does not implement support.
             # AttributeError -> Custom distribution that has no support attribute.
