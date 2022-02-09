@@ -42,7 +42,9 @@ def process_device(device: str) -> str:
             return device
 
 
-def check_if_prior_on_device(device: torch.device, prior: Optional[Any] = None) -> None:
+def check_if_prior_on_device(
+    device: Union[str, torch.device], prior: Optional[Any] = None
+) -> None:
     """Try to sample from the prior, and check that the returned data is on the correct
     trainin device. If the prior is `None`, simplys pass.
 
@@ -215,14 +217,16 @@ def get_temperature(max_value, bound=1 - 1e-3):
     """
     max_value = torch.Tensor([max_value])
     bound = torch.Tensor([bound])
-    temperature = min(-(1 / max_value) * (torch.log1p(-bound) - torch.log(bound)), 1)
+    temperature = torch.min(
+        -(1 / max_value) * (torch.log1p(-bound) - torch.log(bound)), 1
+    )
     return temperature
 
 
 def gaussian_kde_log_eval(samples, query):
     N, D = samples.shape[0], samples.shape[-1]
     std = N ** (-1 / (D + 4))
-    precision = (1 / (std ** 2)) * torch.eye(D)
+    precision = (1 / (std**2)) * torch.eye(D)
     a = query - samples
     b = a @ precision
     c = -0.5 * torch.sum(a * b, dim=-1)

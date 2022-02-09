@@ -2,22 +2,23 @@
 # THESTED HERE!!!!
 
 from __future__ import annotations
+
+from copy import deepcopy
 from pydoc import cli
 from tabnanny import check
 
 import numpy as np
-from pkg_resources import Distribution
 import pytest
 import torch
+import torch.distributions.transforms as torch_tf
+from pkg_resources import Distribution
 from torch import eye, ones, zeros
-from copy import deepcopy
+from torch.distributions import MultivariateNormal
 
 from sbi import utils
 from sbi.inference import SNLE, SNPE, SNRE, prepare_for_sbi, simulate_for_sbi
-from sbi.inference.potentials.base_potential import BasePotential
-import torch.distributions.transforms as torch_tf
-from torch.distributions import MultivariateNormal
 from sbi.inference.posteriors import VIPosterior
+from sbi.inference.potentials.base_potential import BasePotential
 from sbi.simulators.linear_gaussian import true_posterior_linear_gaussian_mvn_prior
 from tests.test_utils import check_c2st
 
@@ -118,7 +119,7 @@ def test_c2st_vi_flows_on_Gaussian(num_dim: int, q: str, set_seed):
     prior = MultivariateNormal(prior_mean, prior_cov)
     potential_fn = TractablePotential(prior=prior)
     theta_transform = torch_tf.identity_transform
-    
+
     posterior = VIPosterior(potential_fn, prior, theta_transform=theta_transform, q=q)
     posterior.set_default_x(torch.tensor(np.zeros((num_dim,)).astype(np.float32)))
     posterior.train(n_particles=1000, eps=1e-8)
@@ -126,6 +127,7 @@ def test_c2st_vi_flows_on_Gaussian(num_dim: int, q: str, set_seed):
     samples = torch.as_tensor(samples, dtype=torch.float32)
 
     check_c2st(samples, target_samples, alg="slice_np")
+
 
 @pytest.mark.slow
 @pytest.mark.parametrize("num_dim", (1, 2))
@@ -228,7 +230,7 @@ def test_vi_posterior_inferface():
 
     class FakePotential(BasePotential):
         def __call__(self, theta, **kwargs):
-            return torch.ones_like(torch.as_tensor(theta[:,0], dtype=torch.float32))
+            return torch.ones_like(torch.as_tensor(theta[:, 0], dtype=torch.float32))
 
         def allow_iid_x(self) -> bool:
             return True
@@ -241,13 +243,13 @@ def test_vi_posterior_inferface():
         potential_fn,
         theta_transform=theta_transform,
     )
-    posterior.set_default_x(torch.zeros((1,num_dim)))
+    posterior.set_default_x(torch.zeros((1, num_dim)))
 
     posterior2 = VIPosterior(potential_fn)
 
     # Raising errors if untrained
-    assert (
-        isinstance(posterior.q.support, type(posterior2.q.support))
+    assert isinstance(
+        posterior.q.support, type(posterior2.q.support)
     ), "The support indicated by 'theta_transform' is different than that of the 'prior'."
 
     with pytest.raises(Exception) as execinfo:
@@ -272,25 +274,31 @@ def test_vi_posterior_inferface():
         posterior._optimizer._optimizer, torch.optim.SGD
     ), "Assert chaning the optimizer base class did not work"
     posterior.train(max_num_iters=20, stick_the_landing=True)
-    
-    assert posterior._optimizer.stick_the_landing, "The sticking_the_landing argument is not correctly passed."
+
+    assert (
+        posterior._optimizer.stick_the_landing
+    ), "The sticking_the_landing argument is not correctly passed."
 
     posterior.vi_method = "alpha"
     posterior.train(max_num_iters=20)
     posterior.train(max_num_iters=20, alpha=0.9)
 
-    assert posterior._optimizer.alpha == 0.9, "The Hyperparameter alpha is not passed to the corresponding optmizer"
-    
+    assert (
+        posterior._optimizer.alpha == 0.9
+    ), "The Hyperparameter alpha is not passed to the corresponding optmizer"
+
     posterior.vi_method = "IW"
     posterior.train(max_num_iters=20)
     posterior.train(max_num_iters=20, K=32)
 
-    assert posterior._optimizer.K == 32, "The Hyperparameter K is not passed to the corresponding optmizer"
-    
+    assert (
+        posterior._optimizer.K == 32
+    ), "The Hyperparameter K is not passed to the corresponding optmizer"
+
     # Passing Hyperparameters in sample
     posterior.sample()
     posterior.sample(method="sir")
-    posterior.sample(method="sir", K = 128)
+    posterior.sample(method="sir", K=128)
 
     # Testing evaluate
     posterior.evaluate()
@@ -300,5 +308,3 @@ def test_vi_posterior_inferface():
     # Test log_prob and potential
     posterior.log_prob(posterior.sample())
     posterior.potential(posterior.sample())
-
-    

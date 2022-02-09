@@ -199,9 +199,9 @@ def test_restricted_prior_log_prob(prior, set_seed):
         y = torch.linspace(-range_, range_, resolution)
         X, Y = torch.meshgrid(x, y)
         xy = torch.stack([X, Y])
-        xy = torch.reshape(xy, (2, resolution ** 2)).T
+        xy = torch.reshape(xy, (2, resolution**2)).T
         dist_on_grid = torch.exp(distribution.log_prob(xy))
-        integral = torch.sum(dist_on_grid) / resolution ** 2 * (2 * range_) ** 2
+        integral = torch.sum(dist_on_grid) / resolution**2 * (2 * range_) ** 2
         return integral
 
     integal_restricted = integrate_grid(restricted_prior)

@@ -14,11 +14,6 @@ from torch import Tensor
 from torch import nn as nn
 from torch import ones, optim, zeros
 from torch.distributions import Distribution, Independent, biject_to, constraints
-<<<<<<< HEAD
-import torch.distributions.transforms as torch_tf
-=======
-from tqdm.auto import tqdm
->>>>>>> Fixups and feedback
 
 from sbi import utils as utils
 from sbi.types import TorchTransform

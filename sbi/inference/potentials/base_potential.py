@@ -21,6 +21,10 @@ class BasePotential(metaclass=ABCMeta):
         self.prior = prior
         self.set_x(x_o)
 
+    @abstractmethod
+    def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
+        raise NotImplementedError
+
     @property
     @abstractmethod
     def allow_iid_x(self) -> bool:

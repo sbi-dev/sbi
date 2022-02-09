@@ -231,7 +231,7 @@ class ActiveSubspace:
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
         stop_after_epochs: int = 20,
-        max_num_epochs: int = 2 ** 31 - 1,
+        max_num_epochs: int = 2**31 - 1,
         clip_max_norm: Optional[float] = 5.0,
     ) -> nn.Module:
         r"""Train a regression network to predict the specified property from $\theta$.
@@ -290,7 +290,7 @@ class ActiveSubspace:
             list(self._regression_net.parameters()),
             lr=learning_rate,
         )
-        max_num_epochs = 2 ** 31 - 1 if max_num_epochs is None else max_num_epochs
+        max_num_epochs = 2**31 - 1 if max_num_epochs is None else max_num_epochs
 
         # criterion / loss
         criterion = MSELoss()

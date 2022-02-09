@@ -1,36 +1,31 @@
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
+from copy import deepcopy
+from typing import Callable, Dict, List, Optional, Tuple, Type, Union
+
+import numpy as np
 import torch
+from pyro.distributions import TransformedDistribution
+from torch import Tensor, nn
 from torch.distributions import Distribution
-from torch import Tensor
-from torch import nn
-from torch.optim import SGD, Adam, Adadelta, RMSprop, Adagrad, Adamax, AdamW, ASGD
+from torch.optim import ASGD, SGD, Adadelta, Adagrad, Adam, Adamax, AdamW, RMSprop
 from torch.optim.lr_scheduler import (
     CosineAnnealingLR,
-    ExponentialLR,
     CosineAnnealingWarmRestarts,
     CyclicLR,
+    ExponentialLR,
     LambdaLR,
     StepLR,
 )
 
-from typing import Optional, List, Tuple, Callable, Dict, Union, Type
-from sbi.types import Array
-
-
-import numpy as np
-from abc import ABC, abstractmethod
-from copy import deepcopy
-
 from sbi.inference.potentials.base_potential import BasePotential
-
-
 from sbi.samplers.vi.vi_utils import (
     filter_kwrags_for_func,
     make_object_deepcopy_compatible,
     move_all_tensor_to_device,
 )
-
+from sbi.types import Array
 
 _VI_method = {}
 
@@ -46,7 +41,7 @@ class DivergenceOptimizer(ABC):
     def __init__(
         self,
         potential_fn: BasePotential,
-        q: Distribution,
+        q: TransformedDistribution,
         prior: Optional[Distribution] = None,
         n_particles: int = 256,
         clip_value: float = 5.0,
@@ -107,7 +102,7 @@ class DivergenceOptimizer(ABC):
         # This prevents error that would stop optimization.
         self.q.set_default_validate_args(False)
         if prior is not None:
-            self.prior.set_default_validate_args(False)
+            self.prior.set_default_validate_args(False)  # type: ignore
 
         # Manage modules if present.
         if hasattr(self.q, "modules"):
@@ -118,7 +113,9 @@ class DivergenceOptimizer(ABC):
 
         # Ensure that distribution has parameters and that these are on the right device
         if not hasattr(self.q, "parameters"):
-            raise ValueError("Your distribution has not parameters please add them.")
+            raise ValueError(
+                "The variational distribution has no parameters to optimize."
+            )
         self.to(self.device)
 
         # Keep a state to resolve invalid values
@@ -144,17 +141,10 @@ class DivergenceOptimizer(ABC):
         self.HYPER_PARAMETERS = ["n_particles", "clip_value", "eps"]
 
     @abstractmethod
-    def _generate_loss_function(self) -> None:
-        """This generates the loss function that will be used. Especially it must set
-        the `_loss` attribute to a Callable loss function."""
-        pass
-
     def _loss(self, *args, **kwargs) -> Tuple[Tensor, Tensor]:
         """This should be overwritten based on the `_generate_loss_function`. And is
         the function that is evaluate to compute the loss."""
-        raise NotImplementedError(
-            "I should have been overwritten by the `_generate_loss_function`."
-        )
+        raise NotImplementedError("Child classes implement the loss.")
 
     def to(self, device: str) -> None:
         """This will move all parameters to the correct device, both for likelihood and
@@ -176,23 +166,25 @@ class DivergenceOptimizer(ABC):
 
         """
         if method == "prior" and self.prior is not None:
-            p = self.prior
+            inital_target = self.prior
         elif method == "identity":
-            p = torch.distributions.TransformedDistribution(
+            inital_target = torch.distributions.TransformedDistribution(
                 self.q.base_dist, self.q.transforms[-1]
             )
         else:
-            NotImplementedError("We only implement methods `prior` or `identity`")
+            NotImplementedError(
+                "The only implemented methods are `prior` and `identity`."
+            )
 
         for _ in range(num_steps):
             self._optimizer.zero_grad()
             if self.q.has_rsample:
                 samples = self.q.rsample((32,))
                 logq = self.q.log_prob(samples)
-                logp = p.log_prob(samples)
+                logp = inital_target.log_prob(samples)  # type: ignore
                 loss = -torch.mean(logp - logq)
             else:
-                samples = p.sample((256,))
+                samples = inital_target.sample((256,))  # type: ignore
                 loss = -torch.mean(self.q.log_prob(samples))
             loss.backward(retain_graph=self.retain_graph)
             self._optimizer.step()
@@ -244,7 +236,7 @@ class DivergenceOptimizer(ABC):
         surrogate_loss.backward(retain_graph=self.retain_graph)
         if not torch.isfinite(surrogate_loss):
             self.resolve_state()
-        nn.utils.clip_grad_norm_(self.q.parameters(), self.clip_value)
+        nn.utils.clip_grad.clip_grad_norm_(self.q.parameters(), self.clip_value)
         self._optimizer.step()
         self._scheduler.step()
         self.update_loss_stats(loss.cpu())
@@ -363,22 +355,18 @@ class DivergenceOptimizer(ABC):
 
 
 def register_VI_method(
-    cls: Optional["DivergenceOptimizer"] = None,
     name: Optional[str] = None,
 ) -> Callable:
-    """Registers a new VI method, by adding a new Divergence Optimizer class
-
-
+    """Registers a new VI method, by adding a new Divergence Optimizer class.
 
     Args:
         cls: Class to add
         name: Associated name
-
     """
 
     def _register(cls: "DivergenceOptimizer") -> "DivergenceOptimizer":
         if name is None:
-            cls_name = cls.__name__
+            cls_name = cls.__class__.__name__
         else:
             cls_name = name
         if cls_name in _VI_method:
@@ -387,10 +375,7 @@ def register_VI_method(
             _VI_method[cls_name] = cls
         return cls
 
-    if cls is None:
-        return _register
-    else:
-        return _register(cls)
+    return _register
 
 
 def get_VI_method(name: str):
@@ -438,14 +423,12 @@ class ElboOptimizer(DivergenceOptimizer):
         make_object_deepcopy_compatible(self.q)
         self._surrogate_q = deepcopy(self.q)
 
-        self._generate_loss_function()
         self.eps = 1e-5
         self.HYPER_PARAMETERS += ["stick_the_landing"]
 
-    def _generate_loss_function(self) -> None:
-        """Generates the loss function depending on the input parameters."""
+    def _loss(self, xo: Tensor) -> Tuple[Tensor, Tensor]:
         if self.q.has_rsample:
-            self._loss = self.loss_rsample
+            return self.loss_rsample(xo)
         else:
             raise NotImplementedError(
                 "Currently only reparameterizable distributions are supported."
@@ -560,7 +543,7 @@ class IWElboOptimizer(ElboOptimizer):
             logweights - torch.logsumexp(logweights, -1).unsqueeze(-1)
         )
         if self.dreg:
-            normalized_weights = normalized_weights ** 2
+            normalized_weights = normalized_weights**2
         return normalized_weights
 
 
@@ -601,15 +584,13 @@ class ForwardKLOptimizer(DivergenceOptimizer):
 
         self.proposal = proposal
         self.weight_transform = weight_transform
-        self._generate_loss_function()
         self._loss_name = "forward_kl"
         self.HYPER_PARAMETERS += ["weight_transform", "proposal"]
         self.eps = 1e-5
 
-    def _generate_loss_function(self) -> None:
-        """This generates the loss function."""
-        if self.proposal == "q":
-            self._loss = self._loss_q_proposal
+    def _loss(self, xo: Tensor) -> Tuple[Tensor, Tensor]:
+        if self.q.has_rsample:
+            return self._loss_q_proposal(xo)
         else:
             raise NotImplementedError("Unknown loss.")
 
@@ -693,17 +674,17 @@ class RenyiDivergenceOptimizer(ElboOptimizer):
         if dreg:
             self.stick_the_landing = True
 
-    def _generate_loss_function(self) -> None:
-        if isinstance(self.alpha, float):
-            if self.q.has_rsample:
-                if not self.unbiased:
-                    self._loss = self.loss_alpha
-                else:
-                    self._loss = self.loss_alpha_unbiased
+    def _loss(self, xo: Tensor) -> Tuple[Tensor, Tensor]:
+        assert isinstance(self.alpha, float)
+        if self.q.has_rsample:
+            if not self.unbiased:
+                return self.loss_alpha(xo)
             else:
-                raise NotImplementedError(
-                    "Currently we only support reparameterizable distributions"
-                )
+                return self.loss_alpha_unbiased(xo)
+        else:
+            raise NotImplementedError(
+                "Currently we only support reparameterizable distributions"
+            )
 
     def loss_alpha_unbiased(self, x_o: Tensor) -> Tuple[Tensor, Tensor]:
         """Unbiased estimate of a surrogate RVB"""
@@ -730,5 +711,5 @@ class RenyiDivergenceOptimizer(ElboOptimizer):
         normed_logweights = logweights - mean_log_weights
         weights = normed_logweights.exp()
         if self.dreg:
-            weights = weights ** 2
+            weights = weights**2
         return weights, mean_log_weights

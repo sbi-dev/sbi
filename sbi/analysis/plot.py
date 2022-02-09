@@ -1131,6 +1131,7 @@ def _sbc_rank_plot(
                 num_rows = ax.shape[0]
             else:
                 num_rows = 1
+        assert ax is not None
 
         col_idx, row_idx = 0, 0
         for ii, ranki in enumerate(ranks_list):
@@ -1141,7 +1142,7 @@ def _sbc_rank_plot(
 
                 if plot_type == "cdf":
                     _plot_ranks_as_cdf(
-                        ranki[:, jj],
+                        ranki[:, jj],  # type: ignore
                         num_bins,
                         num_repeats,
                         ranks_label=ranks_labels[ii],
@@ -1158,7 +1159,7 @@ def _sbc_rank_plot(
                         )
                 elif plot_type == "hist":
                     _plot_ranks_as_hist(
-                        ranki[:, jj],
+                        ranki[:, jj],  # type: ignore
                         num_bins,
                         num_posterior_samples,
                         ranks_label=ranks_labels[ii],
@@ -1195,8 +1196,8 @@ def _sbc_rank_plot(
         plt.sca(ax)
         ranki = ranks_list[0]
         for jj in range(num_parameters):
-            plot_ranks_as_cdf(
-                ranki[:, jj],
+            _plot_ranks_as_cdf(
+                ranki[:, jj],  # type: ignore
                 num_bins,
                 num_repeats,
                 ranks_label=parameter_labels[jj],
@@ -1208,7 +1209,7 @@ def _sbc_rank_plot(
                 alpha=line_alpha,
             )
         if show_uniform_region:
-            plot_cdf_region_expected_under_uniformity(
+            _plot_cdf_region_expected_under_uniformity(
                 num_sbc_runs, num_bins, num_repeats, alpha=uniform_region_alpha
             )
 

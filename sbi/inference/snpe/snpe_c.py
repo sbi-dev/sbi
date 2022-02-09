@@ -94,7 +94,7 @@ class SNPE_C(PosteriorEstimator):
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
         stop_after_epochs: int = 20,
-        max_num_epochs: int = 2 ** 31 - 1,
+        max_num_epochs: int = 2**31 - 1,
         clip_max_norm: Optional[float] = 5.0,
         calibration_kernel: Optional[Callable] = None,
         exclude_invalid_x: bool = True,

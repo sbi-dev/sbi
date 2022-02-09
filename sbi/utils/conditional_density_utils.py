@@ -100,7 +100,7 @@ def eval_conditional_density(
 
         log_probs_on_grid = density.log_prob(repeated_condition)
     else:
-        repeated_condition = condition.repeat(resolution ** 2, 1)
+        repeated_condition = condition.repeat(resolution**2, 1)
         repeated_condition[:, dim1] = theta_grid_dim1.repeat(resolution)
         repeated_condition[:, dim2] = torch.repeat_interleave(
             theta_grid_dim2, resolution
@@ -225,8 +225,8 @@ def _compute_corrcoeff(probs: Tensor, limits: Tensor):
     covariance = _compute_covariance(normalized_probs, limits)
 
     marginal_x, marginal_y = _calc_marginals(normalized_probs, limits)
-    variance_x = _compute_covariance(marginal_x, limits[0], lambda x: x ** 2)
-    variance_y = _compute_covariance(marginal_y, limits[1], lambda x: x ** 2)
+    variance_x = _compute_covariance(marginal_x, limits[0], lambda x: x**2)
+    variance_y = _compute_covariance(marginal_y, limits[1], lambda x: x**2)
 
     return covariance / torch.sqrt(variance_x * variance_y)
 

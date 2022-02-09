@@ -8,10 +8,8 @@ from pyknos.nflows import flows, transforms
 from torch import Tensor, nn
 
 import sbi.utils as utils
-
-from sbi.utils.user_input_checks import check_embedding_net_device, check_data_device
-
 from sbi.utils.sbiutils import DefaultEmbeddingNet
+from sbi.utils.user_input_checks import check_data_device, check_embedding_net_device
 
 
 def build_mdn(

@@ -1,9 +1,8 @@
+from typing import Callable, List, Optional
+
 import torch
 from torch import Tensor
 from torch.distributions import Distribution
-
-from typing import Optional, List, Callable
-
 
 _SAMPLING_METHOD = {}
 

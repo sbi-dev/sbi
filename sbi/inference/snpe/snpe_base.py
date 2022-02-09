@@ -14,7 +14,12 @@ from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi import utils as utils
 from sbi.inference import NeuralInference, check_if_proposal_has_default_x
-from sbi.inference.posteriors import DirectPosterior, MCMCPosterior, RejectionPosterior
+from sbi.inference.posteriors import (
+    DirectPosterior,
+    MCMCPosterior,
+    RejectionPosterior,
+    VIPosterior,
+)
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials import posterior_estimator_based_potential
 from sbi.utils import (
@@ -157,7 +162,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
         stop_after_epochs: int = 20,
-        max_num_epochs: int = 2 ** 31 - 1,
+        max_num_epochs: int = 2**31 - 1,
         clip_max_norm: Optional[float] = 5.0,
         calibration_kernel: Optional[Callable] = None,
         exclude_invalid_x: bool = True,
@@ -358,9 +363,11 @@ class PosteriorEstimator(NeuralInference, ABC):
         prior: Optional[Any] = None,
         sample_with: str = "rejection",
         mcmc_method: str = "slice_np",
+        vi_method: str = "rKL",
         mcmc_parameters: Dict[str, Any] = {},
+        vi_parameters: Dict[str, Any] = {},
         rejection_sampling_parameters: Dict[str, Any] = {},
-    ) -> Union[MCMCPosterior, RejectionPosterior, DirectPosterior]:
+    ) -> Union[MCMCPosterior, RejectionPosterior, VIPosterior, DirectPosterior]:
         r"""Build posterior from the neural density estimator.
 
         For SNPE, the posterior distribution that is returned here implements the
@@ -376,12 +383,16 @@ class PosteriorEstimator(NeuralInference, ABC):
                 If `None`, use the latest neural density estimator that was trained.
             prior: Prior distribution.
             sample_with: Method to use for sampling from the posterior. Must be one of
-                [`mcmc` | `rejection`].
+                [`mcmc` | `rejection` | `vi`].
             mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`,
                 `hmc`, `nuts`. Currently defaults to `slice_np` for a custom numpy
                 implementation of slice sampling; select `hmc`, `nuts` or `slice` for
                 Pyro-based sampling.
+            vi_method: Method used for VI, one of [`rKL`, `fKL`, `IW`, `alpha`]. Note
+                some of the methods admit a `mode seeking` property (e.g. rKL) whereas
+                some admit a `mass covering` one (e.g fKL).
             mcmc_parameters: Additional kwargs passed to `MCMCPosterior`.
+            vi_parameters: Additional kwargs passed to `VIPosterior`.
             rejection_sampling_parameters: Additional kwargs passed to
                 `RejectionPosterior` or `DirectPosterior`. By default,
                 `DirectPosterior` is used. Only if `rejection_sampling_parameters`
@@ -438,7 +449,15 @@ class PosteriorEstimator(NeuralInference, ABC):
                 **mcmc_parameters,
             )
         elif sample_with == "vi":
-            raise NotImplementedError
+            self._posterior = VIPosterior(
+                potential_fn=potential_fn,
+                theta_transform=theta_transform,
+                prior=prior,
+                vi_method=vi_method,
+                device=device,
+                x_shape=self._x_shape,
+                **vi_parameters,
+            )
         else:
             raise NotImplementedError
 

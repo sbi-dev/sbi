@@ -4,22 +4,12 @@
 import numpy as np
 import pytest
 import torch
-
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.pyplot import subplots
 from torch.utils.tensorboard import SummaryWriter
 
 from sbi.analysis import plot_summary, sbc_rank_plot
-from sbi.inference import (
-    SNLE,
-    SNPE,
-    SNRE,
-    prepare_for_sbi,
-    simulate_for_sbi,
-)
-
-from sbi.analysis import plot_summary
 from sbi.inference import SNLE, SNPE, SNRE, prepare_for_sbi, simulate_for_sbi
 from sbi.utils import BoxUniform
 

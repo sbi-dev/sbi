@@ -2,47 +2,44 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 from __future__ import annotations
-from typing import Optional, Tuple
-from contextlib import nullcontext
 
+from contextlib import nullcontext
+from typing import Optional, Tuple
+
+import numpy as np
 import pytest
 import torch
-import numpy as np
-from torch import eye, ones, zeros
-import torch.nn as nn
-from torch.distributions import MultivariateNormal
-from torch.distributions import MultivariateNormal, Distribution
 import torch.distributions.transforms as torch_tf
+import torch.nn as nn
+from torch import eye, ones, zeros
+from torch.distributions import Distribution, MultivariateNormal
 
 from sbi import utils as utils
 from sbi.inference import (
-    NeuralInference,
     SNLE,
     SNPE_A,
     SNPE_C,
     SNRE_A,
     SNRE_B,
-    simulate_for_sbi,
     DirectPosterior,
     MCMCPosterior,
+    NeuralInference,
     RejectionPosterior,
-    DirectPosterior,
     VIPosterior,
-    ratio_estimator_based_potential,
     likelihood_estimator_based_potential,
     posterior_estimator_based_potential,
     ratio_estimator_based_potential,
     simulate_for_sbi,
 )
-from sbi.simulators import linear_gaussian, diagonal_linear_gaussian
+from sbi.inference.potentials.base_potential import BasePotential
+from sbi.simulators import diagonal_linear_gaussian, linear_gaussian
+from sbi.utils.get_nn_models import classifier_nn, likelihood_nn, posterior_nn
 from sbi.utils.torchutils import BoxUniform, process_device
 from sbi.utils.user_input_checks import (
-    validate_theta_and_x,
-    prepare_for_sbi,
     check_embedding_net_device,
+    prepare_for_sbi,
+    validate_theta_and_x,
 )
-from sbi.utils.get_nn_models import posterior_nn, likelihood_nn, classifier_nn
-from sbi.inference.potentials.base_potential import BasePotential
 
 
 @pytest.mark.slow

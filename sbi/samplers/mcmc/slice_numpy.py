@@ -68,7 +68,11 @@ class SliceSampler(MCMCSampler):
         self.width = None
 
     def gen(
-        self, n_samples: int, logger=sys.stdout, show_info: bool = False, rng=np.random
+        self,
+        n_samples: int,
+        logger=sys.stdout,
+        show_info: bool = False,
+        rng=np.random,  # type: ignore
     ):
         """
         Return samples using slice sampling.

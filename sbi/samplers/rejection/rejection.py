@@ -154,7 +154,7 @@ def rejection_sample(
             # of remaining samples is low.
             sampling_batch_size = min(
                 max_sampling_batch_size,
-                max(int(1.5 * num_remaining / acceptance_rate), 100)
+                max(int(1.5 * num_remaining / acceptance_rate), 100),
             )
             if (
                 num_sampled_total > 1000

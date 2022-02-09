@@ -121,7 +121,7 @@ class RatioEstimator(NeuralInference, ABC):
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
         stop_after_epochs: int = 20,
-        max_num_epochs: int = 2 ** 31 - 1,
+        max_num_epochs: int = 2**31 - 1,
         clip_max_norm: Optional[float] = 5.0,
         exclude_invalid_x: bool = True,
         resume_training: bool = False,
@@ -311,7 +311,7 @@ class RatioEstimator(NeuralInference, ABC):
         mcmc_parameters: Dict[str, Any] = {},
         vi_parameters: Dict[str, Any] = {},
         rejection_sampling_parameters: Dict[str, Any] = {},
-    ) -> Union[MCMCPosterior, RejectionPosterior]:
+    ) -> Union[MCMCPosterior, RejectionPosterior, VIPosterior]:
         r"""Build posterior from the neural density estimator.
 
         SNRE trains a neural network to approximate likelihood ratios. The

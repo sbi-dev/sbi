@@ -43,7 +43,7 @@ class SliceSamplerVectorized:
         self._reset()
 
     def _reset(self):
-        self.rng = np.random
+        self.rng = np.random  # type: ignore
         self.state = {}
         for c in range(self.num_chains):
             self.state[c] = {}

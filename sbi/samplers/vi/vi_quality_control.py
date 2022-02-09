@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-from pkg_resources import Distribution
-import torch
-import numpy as np
+from typing import Callable, Optional, Tuple
 
-from typing import Optional, Tuple, Callable
+import numpy as np
+import torch
+from torch.distributions import Distribution
 
 from sbi.samplers.vi.vi_utils import gpdfit
-from sbi.inference.posteriors.base_posterior import NeuralPosterior
-
 
 _QUALITY_METRIC = {}
 _METRIC_MESSAGE = {}
@@ -52,22 +50,27 @@ def get_quality_metric(name: str) -> Tuple[Callable, str]:
     return _QUALITY_METRIC[name], _METRIC_MESSAGE[name]
 
 
-def basic_checks(posterior: NeuralPosterior, N: int = int(5e4)):
+def basic_checks(posterior, N: int = int(5e4)):
     """Makes some basic checks to ensure the distribution is well defined.
 
     Args:
-        posterior: Variational posterior object to check.
+        posterior: Variational posterior object to check. Of type `VIPosterior`. No
+            typing due to circular imports.
         N: Number of samples that are checked.
-
-
     """
     prior = posterior._prior
+    assert prior is not None, "Posterior has no `._prior` attribute."
     prior_samples = prior.sample((N,))
     samples = posterior.sample((N,))
     assert (torch.isfinite(samples)).all(), "Some of the samples are not finite"
-    if hasattr(prior, "support"):
+    try:
+        _ = prior.support
+        has_support = True
+    except (NotImplementedError, AttributeError):
+        has_support = False
+    if has_support:
         assert (
-            prior.support.check(samples)
+            prior.support.check(samples)  # type: ignore
         ).all(), "Some of the samples are not within the prior support."
     assert (
         torch.isfinite(posterior.log_prob(samples))
@@ -83,7 +86,7 @@ def psis_diagnostics(
     proposal: Optional[Distribution] = None,
     N: int = int(5e4),
 ) -> float:
-    """This will evaluate the posteriors quality by investingating its importance
+    r"""This will evaluate the posteriors quality by investingating its importance
     weights. If q is a perfect posterior approximation then $q(\theta) \propto
     p(\theta, x_o)$ thus $\log w(\theta) = \log \frac{p(\theta, x_o)}{\log q(\theta)} =
     \log p(x_o)$ is constant. This function will fit a Generalized Paretto
@@ -132,7 +135,7 @@ def proportional_to_joint_diagnostics(
     proposal: Optional[Distribution] = None,
     N: int = int(5e4),
 ) -> float:
-    """This will evaluate the posteriors quality by investingating its importance
+    r"""This will evaluate the posteriors quality by investingating its importance
     weights. If q is a perfect posterior approximation then $q(\theta) \propto
     p(\theta, x_o)$. Thus we should be able to fit a line to $(q(\theta),
     p(\theta, x_o))$, whereas the slope will be proportional to the normalizing
@@ -166,7 +169,7 @@ def proportional_to_joint_diagnostics(
         w = torch.linalg.solve(X.T @ X, X.T @ Y)  # Linear regression
 
         residuals = Y - w * X
-        var_res = torch.sum(residuals ** 2)
+        var_res = torch.sum(residuals**2)
         var_tot = torch.sum((Y - Y.mean()) ** 2)
         r2 = 1 - var_res / var_tot  # R2 statistic to evaluate fit
     return r2
@@ -177,11 +180,16 @@ def proportional_to_joint_diagnostics(
     msg="\t Good: Smaller than 0.5  Bad: Larger than 1.0 \t\
          NOTE: Less sensitive to mode collapse.",
 )
-def psis_q(posterior: NeuralPosterior, N: int = int(5e4)):
+def psis_q(posterior, N: int = int(5e4)):
+    """
+    Args:
+        posterior: Of type `VIPosterior`. No typing due to circular imports.
+    """
     basic_checks(posterior)
     return psis_diagnostics(posterior.potential_fn, posterior.q, N=N)
 
 
+assert psis_diagnostics.__doc__ is not None
 psis_q.__doc__ = psis_diagnostics.__doc__.split("Args:")[0]
 
 
@@ -190,7 +198,11 @@ psis_q.__doc__ = psis_diagnostics.__doc__.split("Args:")[0]
     msg="\t Good: Larger than 0.5, best is 1.0  Bad: Smaller than 0.5 \t \
         NOTE: Less sensitive to mode collapse.",
 )
-def proportionality(posterior: NeuralPosterior, N: int = int(5e4)):
+def proportionality(posterior, N: int = int(5e4)):
+    """
+    Args:
+        posterior: Of type `VIPosterior`. No typing due to circular imports.
+    """
     basic_checks(posterior)
     return proportional_to_joint_diagnostics(posterior.potential_fn, posterior.q, N=N)
 
@@ -200,13 +212,18 @@ def proportionality(posterior: NeuralPosterior, N: int = int(5e4)):
     msg="\t Good: Larger than 0.5, best is 1.0  Bad: Smaller than 0.5 \t \
         NOTE: Less sensitive to mode collapse.",
 )
-def proportionality_prior(posterior: NeuralPosterior, N: int = int(5e4)):
+def proportionality_prior(posterior, N: int = int(5e4)):
+    """
+    Args:
+        posterior: Of type `VIPosterior`. No typing due to circular imports.
+    """
     basic_checks(posterior)
     return proportional_to_joint_diagnostics(
         posterior.potential_fn, posterior.q, proposal=posterior._prior, N=N
     )
 
 
+assert proportional_to_joint_diagnostics.__doc__ is not None
 proportionality.__doc__ = proportional_to_joint_diagnostics.__doc__.split("Args:")[0]
 proportionality_prior.__doc__ = proportional_to_joint_diagnostics.__doc__.split(
     "Args:"

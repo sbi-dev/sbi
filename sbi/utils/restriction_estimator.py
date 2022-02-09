@@ -265,7 +265,7 @@ class RestrictionEstimator:
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
         stop_after_epochs: int = 20,
-        max_num_epochs: int = 2 ** 31 - 1,
+        max_num_epochs: int = 2**31 - 1,
         clip_max_norm: Optional[float] = 5.0,
         loss_importance_weights: Union[bool, float] = False,
         subsample_invalid_sims: Union[float, str] = 1.0,
@@ -459,7 +459,7 @@ class RestrictionEstimator:
         else:
             classifier_ = classifier
 
-        classifier.zero_grad(set_to_none=True)
+        classifier_.zero_grad(set_to_none=True)
 
         return RestrictedPrior(
             self._prior,
