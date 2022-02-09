@@ -4,6 +4,7 @@
 import pytest
 import torch
 from torch import eye, ones, zeros
+from torch.distributions import MultivariateNormal
 
 from sbi import utils as utils
 from sbi.inference import (
@@ -167,3 +168,53 @@ def test_inference_with_restriction_estimator(set_seed):
 
     # Compute the c2st and assert it is near chance level of 0.5.
     check_c2st(samples, target_samples, alg=f"{SNPE_C}")
+
+
+@pytest.mark.parametrize("prior", ("uniform", "gaussian"))
+def test_restricted_prior_log_prob(prior, set_seed):
+    """Test whether the log-prob method of the restricted prior works appropriately."""
+
+    def simulator(theta):
+        perturbed_theta = theta + 0.5 * torch.randn(2)
+        perturbed_theta[theta[:, 0] < 0.8] = torch.as_tensor(
+            [float("nan"), float("nan")]
+        )
+        return perturbed_theta
+
+    if prior == "uniform":
+        prior = utils.BoxUniform(-2 * torch.ones(2), 2 * torch.ones(2))
+    else:
+        prior = MultivariateNormal(torch.zeros(2), torch.eye(2))
+    theta, x = simulate_for_sbi(simulator, prior, 1000)
+
+    restriction_estimator = RestrictionEstimator(prior=prior)
+    restriction_estimator.append_simulations(theta, x)
+    _ = restriction_estimator.train(max_num_epochs=40)
+    restricted_prior = restriction_estimator.restrict_prior()
+
+    def integrate_grid(distribution):
+        resolution = 500
+        range_ = 4
+        x = torch.linspace(-range_, range_, resolution)
+        y = torch.linspace(-range_, range_, resolution)
+        X, Y = torch.meshgrid(x, y)
+        xy = torch.stack([X, Y])
+        xy = torch.reshape(xy, (2, resolution ** 2)).T
+        dist_on_grid = torch.exp(distribution.log_prob(xy))
+        integral = torch.sum(dist_on_grid) / resolution ** 2 * (2 * range_) ** 2
+        return integral
+
+    integal_restricted = integrate_grid(restricted_prior)
+    error = torch.abs(integal_restricted - torch.as_tensor(1.0))
+    assert error < 0.01, "The restricted prior does not integrate to one."
+
+    theta = prior.sample((10_000,))
+    restricted_prior_probs = torch.exp(restricted_prior.log_prob(theta))
+
+    valid_thetas = restricted_prior.predict(theta).bool()
+    assert torch.all(
+        restricted_prior_probs[valid_thetas] > 0.0
+    ), "Accepted theta have zero probability."
+    assert torch.all(
+        restricted_prior_probs[torch.logical_not(valid_thetas)] == 0.0
+    ), "Rejected theta has non-zero probablity."
