@@ -263,7 +263,7 @@ def test_c2st_multi_round_snr_on_linearGaussian_vi(num_trials: int, set_seed):
     num_dim = 2
     x_o = zeros((num_trials, num_dim))
     num_samples = 500
-    num_simulations_per_round = 500 * num_trials
+    num_simulations_per_round = 1000 * num_trials
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(num_dim)
