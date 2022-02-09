@@ -151,10 +151,11 @@ def rejection_sample(
 
             # For remaining iterations (leakage or many samples) continue
             # sampling with fixed batch size, reduced in cased the number
-            # of remaining samples is low.
+            # of remaining samples is low. The `max(..., 1e-12)` is to avoid division
+            # by zero if acceptance rate is zero.
             sampling_batch_size = min(
                 max_sampling_batch_size,
-                max(int(1.5 * num_remaining / acceptance_rate), 100),
+                max(int(1.5 * num_remaining / max(acceptance_rate, 1e-12)), 100),
             )
             if (
                 num_sampled_total > 1000
@@ -270,9 +271,14 @@ def rejection_sample_posterior_within_prior(
         # acceptance rate is too low after the first 1_000 samples.
         acceptance_rate = (num_samples - num_remaining) / num_sampled_total
 
-        # For remaining iterations (leakage or many samples) continue sampling with
-        # fixed batch size.
-        sampling_batch_size = max_sampling_batch_size
+        # For remaining iterations (leakage or many samples) continue
+        # sampling with fixed batch size, reduced in cased the number
+        # of remaining samples is low. The `max(..., 1e-12)` is to avoid division
+        # by zero if acceptance rate is zero.
+        sampling_batch_size = min(
+            max_sampling_batch_size,
+            max(int(1.5 * num_remaining / max(acceptance_rate, 1e-12)), 100),
+        )
         if (
             num_sampled_total > 1000
             and acceptance_rate < warn_acceptance

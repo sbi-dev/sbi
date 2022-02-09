@@ -357,8 +357,6 @@ def test_api_snpe_c_posterior_correction(sample_with, mcmc_method, prior_str, se
     inference = SNPE_C(prior, show_progress_bars=False)
 
     theta, x = simulate_for_sbi(simulator, prior, 1000)
-    _ = inference.append_simulations(theta, x).train(max_num_epochs=5)
-
     posterior_estimator = inference.append_simulations(theta, x).train()
     potential_fn, theta_transform = posterior_estimator_based_potential(
         posterior_estimator, prior, x_o
