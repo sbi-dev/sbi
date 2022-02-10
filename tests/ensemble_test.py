@@ -4,11 +4,9 @@
 from __future__ import annotations
 
 import pytest
-from joblib import Parallel, delayed
 from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
-from sbi import inference
 from sbi.inference import infer, prepare_for_sbi
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
@@ -39,7 +37,7 @@ def test_c2st_posterior_ensemble_on_linearGaussian(inference_method, set_seed):
     num_dim = 2
     x_o = zeros(num_trials, num_dim)
     num_samples = 1000
-    num_simulations = 5000 if inference_method == "SNRE_A" else 2000
+    num_simulations = 4000 if inference_method == "SNRE_A" else 2000
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(num_dim)
@@ -59,10 +57,10 @@ def test_c2st_posterior_ensemble_on_linearGaussian(inference_method, set_seed):
 
     # train ensemble components
     ensemble_size = 2
-    posteriors = Parallel(n_jobs=ensemble_size)(
-        delayed(infer)(simulator, prior, inference_method, num_simulations)
+    posteriors = [
+        infer(simulator, prior, inference_method, num_simulations)
         for i in range(ensemble_size)
-    )
+    ]
 
     # create ensemble
     posterior = NeuralPosteriorEnsemble(posteriors)
@@ -90,7 +88,13 @@ def test_c2st_posterior_ensemble_on_linearGaussian(inference_method, set_seed):
     # This step is skipped for NLE since the probabilities are not normalised.
     if "snpe" in inference_method.lower() or "snre" in inference_method.lower():
         dkl = get_dkl_gaussian_prior(
-            posterior, x_o[0], likelihood_shift, likelihood_cov, prior_mean, prior_cov
+            posterior,
+            x_o[0],
+            likelihood_shift,
+            likelihood_cov,
+            prior_mean,
+            prior_cov,
+            num_samples=num_samples,
         )
         max_dkl = 0.15
         assert (
