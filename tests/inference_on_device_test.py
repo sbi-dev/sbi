@@ -458,16 +458,14 @@ def test_nograd_after_inference_train(inference_method) -> None:
 @pytest.mark.parametrize("q", ("maf", "nsf", "gaussian_diag", "gaussian", "mcf", "scf"))
 @pytest.mark.parametrize("vi_method", ("rKL", "fKL", "IW", "alpha"))
 @pytest.mark.parametrize("sampling_method", ("naive", "sir"))
-def test_vi_on_gpu(
-    num_dim: int, q: Distribution, vi_method: str, sampling_method: str, set_seed
-):
+def test_vi_on_gpu(num_dim: int, q: Distribution, vi_method: str, sampling_method: str):
     """Test VI on Gaussian, comparing to ground truth target via c2st.
 
     Args:
         num_dim: parameter dimension of the gaussian model
         vi_method: different vi methods
         sampling_method: Different sampling methods
-        set_seed: fixture for manual seeding
+
     """
 
     device = "cuda:0"

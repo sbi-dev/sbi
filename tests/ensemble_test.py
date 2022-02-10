@@ -25,12 +25,10 @@ from tests.test_utils import check_c2st, get_dkl_gaussian_prior
         "SNPE_C",
     ],
 )
-def test_c2st_posterior_ensemble_on_linearGaussian(inference_method, set_seed):
+def test_c2st_posterior_ensemble_on_linearGaussian(inference_method):
     """Test whether NeuralPosteriorEnsemble infers well a simple example with available
     ground truth.
 
-    Args:
-        set_seed: fixture for manual seeding
     """
 
     num_trials = 1

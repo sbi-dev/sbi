@@ -51,7 +51,7 @@ def test_running_sbc(method=SNPE_C, model="mdn"):
 
 
 @pytest.mark.slow
-def test_sbc_checks(set_seed):
+def test_sbc_checks():
     """Test the uniformity checks for SBC."""
 
     num_dim = 2

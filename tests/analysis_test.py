@@ -9,14 +9,13 @@ from sbi.utils import BoxUniform
 @pytest.mark.slow
 @pytest.mark.gpu
 @pytest.mark.parametrize("device", ["cpu", "cuda:0"])
-def test_analysis_modules(device: str, set_seed) -> None:
+def test_analysis_modules(device: str) -> None:
     """Tests sensitivity analysis and conditional posterior utils on GPU and CPU.
 
     This test performs only API tests. It does not test the accuracy of the modules.
 
     Args:
         device: Which device to run the inference on.
-        set_seed: Fixture for seeding.
     """
     num_dim = 3
     prior = BoxUniform(

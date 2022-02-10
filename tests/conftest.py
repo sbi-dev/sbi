@@ -6,7 +6,8 @@ import torch
 seed = 1
 
 
-@pytest.fixture(scope="function")
+# Use seed automatically for every test function.
+@pytest.fixture(autouse=True)
 def set_seed():
     torch.manual_seed(seed)
     numpy.random.seed(seed)

@@ -62,6 +62,7 @@ def get_dkl_gaussian_prior(
     likelihood_cov: Tensor,
     prior_mean: Tensor,
     prior_cov: Tensor,
+    num_samples: int = 200,
 ) -> Tensor:
     """
     Return the Kullback-Leibler divergence between estimated posterior (with Gaussian
@@ -74,13 +75,14 @@ def get_dkl_gaussian_prior(
         likelihood_cov: Covariance matrix of likelihood.
         prior_mean: Mean of prior.
         prior_cov: Covariance matrix of prior.
+        num_samples: number of samples that the Monte-Carlo estimate is based on
     """
 
     target_dist = true_posterior_linear_gaussian_mvn_prior(
         x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
     )
 
-    return kl_d_via_monte_carlo(target_dist, posterior, num_samples=200)
+    return kl_d_via_monte_carlo(target_dist, posterior, num_samples=num_samples)
 
 
 def get_prob_outside_uniform_prior(

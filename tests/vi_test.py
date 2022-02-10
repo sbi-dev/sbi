@@ -27,16 +27,14 @@ from tests.test_utils import check_c2st
 @pytest.mark.parametrize("num_dim", (1, 2))
 @pytest.mark.parametrize("vi_method", ("rKL", "fKL", "IW", "alpha"))
 @pytest.mark.parametrize("sampling_method", ("naive", "sir"))
-def test_c2st_vi_on_Gaussian(
-    num_dim: int, vi_method: str, sampling_method: str, set_seed
-):
+def test_c2st_vi_on_Gaussian(num_dim: int, vi_method: str, sampling_method: str):
     """Test VI on Gaussian, comparing to ground truth target via c2st.
 
     Args:
         num_dim: parameter dimension of the gaussian model
         vi_method: different vi methods
         sampling_method: Different sampling methods
-        set_seed: fixture for manual seeding
+
     """
 
     if sampling_method == "naive" and vi_method == "IW":
@@ -81,14 +79,14 @@ def test_c2st_vi_on_Gaussian(
 @pytest.mark.slow
 @pytest.mark.parametrize("num_dim", (1, 2))
 @pytest.mark.parametrize("q", ("maf", "nsf", "gaussian_diag", "gaussian", "mcf", "scf"))
-def test_c2st_vi_flows_on_Gaussian(num_dim: int, q: str, set_seed):
+def test_c2st_vi_flows_on_Gaussian(num_dim: int, q: str):
     """Test VI on Gaussian, comparing to ground truth target via c2st.
 
     Args:
         num_dim: parameter dimension of the gaussian model
         vi_method: different vi methods
         sampling_method: Different sampling methods
-        set_seed: fixture for manual seeding
+
     """
     # Coupling flows undefined at 1d
     if num_dim == 1 and q in ["mcf", "scf"]:
@@ -131,14 +129,14 @@ def test_c2st_vi_flows_on_Gaussian(num_dim: int, q: str, set_seed):
 
 @pytest.mark.slow
 @pytest.mark.parametrize("num_dim", (1, 2))
-def test_c2st_vi_external_distributions_on_Gaussian(num_dim: int, set_seed):
+def test_c2st_vi_external_distributions_on_Gaussian(num_dim: int):
     """Test VI on Gaussian, comparing to ground truth target via c2st.
 
     Args:
         num_dim: parameter dimension of the gaussian model
         vi_method: different vi methods
         sampling_method: Different sampling methods
-        set_seed: fixture for manual seeding
+
     """
     num_samples = 2000
 
@@ -186,7 +184,7 @@ def test_c2st_vi_external_distributions_on_Gaussian(num_dim: int, set_seed):
 
 
 @pytest.mark.parametrize("q", ("maf", "nsf", "gaussian_diag", "gaussian", "mcf", "scf"))
-def test_deepcopy_support(q: str, set_seed):
+def test_deepcopy_support(q: str):
     """Tests if the variational does support deepcopy.
 
     Args:

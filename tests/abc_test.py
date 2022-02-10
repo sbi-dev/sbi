@@ -64,7 +64,7 @@ def test_mcabc_inference_on_linear_gaussian(
 @pytest.mark.slow
 @pytest.mark.parametrize("lra", (True, False))
 @pytest.mark.parametrize("sass_expansion_degree", (1, 2))
-def test_mcabc_sass_lra(lra, sass_expansion_degree, set_seed):
+def test_mcabc_sass_lra(lra, sass_expansion_degree):
 
     test_mcabc_inference_on_linear_gaussian(
         num_dim=2, lra=lra, sass=True, sass_expansion_degree=sass_expansion_degree
@@ -143,7 +143,7 @@ def test_smcabc_inference_on_linear_gaussian(
 @pytest.mark.slow
 @pytest.mark.parametrize("lra", (True, False))
 @pytest.mark.parametrize("sass_expansion_degree", (1, 2))
-def test_smcabc_sass_lra(lra, sass_expansion_degree, set_seed):
+def test_smcabc_sass_lra(lra, sass_expansion_degree):
 
     test_smcabc_inference_on_linear_gaussian(
         num_dim=2,
@@ -156,7 +156,7 @@ def test_smcabc_sass_lra(lra, sass_expansion_degree, set_seed):
 
 
 @pytest.mark.parametrize("kde_bandwidth", ("cv", "silvermann", "scott", 0.1))
-def test_mcabc_kde(kde_bandwidth, set_seed):
+def test_mcabc_kde(kde_bandwidth):
     test_mcabc_inference_on_linear_gaussian(
         num_dim=2, kde=True, kde_bandwidth=kde_bandwidth
     )
@@ -164,7 +164,7 @@ def test_mcabc_kde(kde_bandwidth, set_seed):
 
 @pytest.mark.slow
 @pytest.mark.parametrize("kde_bandwidth", ("cv",))
-def test_smcabc_kde(kde_bandwidth, set_seed):
+def test_smcabc_kde(kde_bandwidth):
     test_smcabc_inference_on_linear_gaussian(
         num_dim=2,
         lra=False,

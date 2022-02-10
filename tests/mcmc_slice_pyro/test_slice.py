@@ -218,7 +218,7 @@ def test_beta_bernoulli():
         return p_latent
 
     true_probs = torch.tensor([0.9, 0.1])
-    data = dist.Bernoulli(true_probs).sample(sample_shape=(torch.Size((1000,))))
+    data = dist.Bernoulli(true_probs).sample(sample_shape=(torch.Size((1200,))))
     slice_kernel = Slice(model)
     mcmc = MCMC(slice_kernel, num_samples=400, warmup_steps=200)
     mcmc.run(data)

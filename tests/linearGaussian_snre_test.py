@@ -67,14 +67,12 @@ def test_api_sre_on_linearGaussian(num_dim: int):
         posterior.sample(sample_shape=(10,))
 
 
-def test_c2st_sre_on_linearGaussian(set_seed):
+def test_c2st_sre_on_linearGaussian():
     """Test whether SRE infers well a simple example with available ground truth.
 
     This example has different number of parameters theta than number of x. This test
     also acts as the only functional test for SRE not marked as slow.
 
-    Args:
-        set_seed: fixture for manual seeding
     """
 
     theta_dim = 3
@@ -150,14 +148,13 @@ def test_c2st_sre_variants_on_linearGaussian(
     num_trials: int,
     prior_str: str,
     method_str: str,
-    set_seed,
 ):
     """Test c2st accuracy of inference with SRE on linear Gaussian model.
 
     Args:
         num_dim: parameter dimension of the gaussian model
         prior_str: one of "gaussian" or "uniform"
-        set_seed: fixture for manual seeding
+
     """
 
     x_o = zeros(num_trials, num_dim)
@@ -253,12 +250,8 @@ def test_c2st_sre_variants_on_linearGaussian(
 
 @pytest.mark.slow
 @pytest.mark.parametrize("num_trials", (1, 3))
-def test_c2st_multi_round_snr_on_linearGaussian_vi(num_trials: int, set_seed):
-    """Test SNL on linear Gaussian, comparing to ground truth posterior via c2st.
-
-    Args:
-        set_seed: fixture for manual seeding
-    """
+def test_c2st_multi_round_snr_on_linearGaussian_vi(num_trials: int):
+    """Test SNL on linear Gaussian, comparing to ground truth posterior via c2st."""
 
     num_dim = 2
     x_o = zeros((num_trials, num_dim))
@@ -340,13 +333,13 @@ def test_c2st_multi_round_snr_on_linearGaussian_vi(num_trials: int, set_seed):
         ("alpha", "gaussian"),
     ),
 )
-def test_api_sre_sampling_methods(sampling_method: str, prior_str: str, set_seed):
+def test_api_sre_sampling_methods(sampling_method: str, prior_str: str):
     """Test leakage correction both for MCMC and rejection sampling.
 
     Args:
         mcmc_method: which mcmc method to use for sampling
         prior_str: one of "gaussian" or "uniform"
-        set_seed: fixture for manual seeding
+
     """
     num_dim = 2
     num_samples = 10

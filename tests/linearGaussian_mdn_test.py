@@ -24,16 +24,16 @@ from sbi.simulators.linear_gaussian import (
 from tests.test_utils import check_c2st
 
 
-def test_mdn_with_snpe(set_seed):
-    mdn_inference_with_different_methods(SNPE, set_seed)
+def test_mdn_with_snpe():
+    mdn_inference_with_different_methods(SNPE)
 
 
 @pytest.mark.slow
-def test_mdn_with_snle(set_seed):
-    mdn_inference_with_different_methods(SNLE, set_seed)
+def test_mdn_with_snle():
+    mdn_inference_with_different_methods(SNLE)
 
 
-def mdn_inference_with_different_methods(method, set_seed):
+def mdn_inference_with_different_methods(method):
 
     num_dim = 2
     x_o = torch.tensor([[1.0, 0.0]])

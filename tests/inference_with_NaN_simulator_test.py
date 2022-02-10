@@ -35,7 +35,7 @@ from tests.test_utils import check_c2st
         torch.Size((10, 10)),
     ),
 )
-def test_handle_invalid_x(x_shape, set_seed):
+def test_handle_invalid_x(x_shape):
 
     x = torch.rand(x_shape)
     x[x < 0.1] = float("nan")
@@ -69,7 +69,7 @@ def test_z_scoring_warning(snpe_method: type):
     ((SNPE_C, True, 0.05), (SNL, True, 0.05), (SRE, True, 0.05)),
 )
 def test_inference_with_nan_simulator(
-    method: type, exclude_invalid_x: bool, percent_nans: float, set_seed
+    method: type, exclude_invalid_x: bool, percent_nans: float
 ):
 
     # likelihood_mean will be likelihood_shift+theta
@@ -114,7 +114,7 @@ def test_inference_with_nan_simulator(
 
 
 @pytest.mark.slow
-def test_inference_with_restriction_estimator(set_seed):
+def test_inference_with_restriction_estimator():
 
     # likelihood_mean will be likelihood_shift+theta
     num_dim = 3
@@ -171,7 +171,7 @@ def test_inference_with_restriction_estimator(set_seed):
 
 
 @pytest.mark.parametrize("prior", ("uniform", "gaussian"))
-def test_restricted_prior_log_prob(prior, set_seed):
+def test_restricted_prior_log_prob(prior):
     """Test whether the log-prob method of the restricted prior works appropriately."""
 
     def simulator(theta):
