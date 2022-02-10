@@ -5,15 +5,13 @@
 from copy import deepcopy
 from typing import Any, Callable, Dict, Optional, Union
 
-from torch import Tensor
-
-from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior
+from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior, VIPosterior
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials import mixed_likelihood_estimator_based_potential
 from sbi.inference.snle.snle_base import LikelihoodEstimator
 from sbi.neural_nets.mnle import MixedDensityEstimator
 from sbi.types import TensorboardSummaryWriter, TorchModule
-from sbi.utils import del_entries, mask_sims_from_prior, validate_theta_and_x
+from sbi.utils import del_entries
 
 
 class MNLE(LikelihoodEstimator):
@@ -27,22 +25,28 @@ class MNLE(LikelihoodEstimator):
         show_progress_bars: bool = True,
         **unused_args,
     ):
-        r"""Mixed Neural Likelihood Estimation [1].
+        r"""Mixed Neural Likelihood Estimation (MNLE) [1].
 
-        [1]
+        Like SNLE, but not sequential and designed to be applied to data with mixed
+        types, e.g., continuous data and discrete data like they occur in
+        decision-making experiments (reation times and choices).
+
+        [1] Flexible and efficient simulation-based inference for models of
+        decision-making, Boelts et al. 2021,
+        https://www.biorxiv.org/content/10.1101/2021.12.22.473472v2
 
         Args:
             prior: A probability distribution that expresses prior knowledge about the
                 parameters, e.g. which ranges are meaningful for them. If `None`, the
                 prior must be passed to `.build_posterior()`.
-            density_estimator: If it is a string, use a pre-configured network of the
-                provided type. Alternatively, a function
+            density_estimator: If it is a string, it must be "mnle" to use the
+                preconfiugred neural nets for MNLE. Alternatively, a function
                 that builds a custom neural network can be provided. The function will
                 be called with the first batch of simulations (theta, x), which can
                 thus be used for shape inference and potentially for z-scoring. It
                 needs to return a PyTorch `nn.Module` implementing the density
                 estimator. The density estimator needs to provide the methods
-                `.log_prob` and `.sample()`.
+                `.log_prob`, `.log_prob_iid()` and `.sample()`.
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
@@ -55,48 +59,13 @@ class MNLE(LikelihoodEstimator):
                 0.14.0 is more mature, we will remove this argument.
         """
 
+        if isinstance(density_estimator, str):
+            assert (
+                density_estimator == "mnle"
+            ), f"""MNLE can be used with preconfigured 'mnle' density estimator only, 
+                not with {density_estimator}."""
         kwargs = del_entries(locals(), entries=("self", "__class__", "unused_args"))
         super().__init__(**kwargs, **unused_args)
-
-    def append_simulations(
-        self,
-        theta: Tensor,
-        x: Tensor,
-        from_round: int = 0,
-    ) -> "LikelihoodEstimator":
-        r"""Store parameters and simulation outputs to use them for later training.
-
-        Data are stored as entries in lists for each type of variable (parameter/data).
-
-        Stores $\theta$, $x$, prior_masks (indicating if simulations are coming from the
-        prior or not) and an index indicating which round the batch of simulations came
-        from.
-
-        Args:
-            theta: Parameter sets.
-            x: Simulation outputs.
-            from_round: Which round the data stemmed from. Round 0 means from the prior.
-                With default settings, this is not used at all for `SNLE`. Only when
-                the user later on requests `.train(discard_prior_samples=True)`, we
-                use these indices to find which training data stemmed from the prior.
-
-        Returns:
-            NeuralInference object (returned so that this function is chainable).
-        """
-
-        theta, x = validate_theta_and_x(theta, x, training_device=self._device)
-        # Test net here to avoid copying the train function from base.
-        assert isinstance(
-            self._build_neural_net(theta, x), MixedDensityEstimator
-        ), """Invalid density estimtor for MNLE, pass 'mnle' or pass a built function
-        similar to sbi.neural_nets.mnle.build_mnle"""
-
-        self._theta_roundwise.append(theta)
-        self._x_roundwise.append(x)
-        self._prior_masks.append(mask_sims_from_prior(int(from_round), theta.size(0)))
-        self._data_round_index.append(int(from_round))
-
-        return self
 
     def train(
         self,
@@ -154,9 +123,11 @@ class MNLE(LikelihoodEstimator):
         prior: Optional[Any] = None,
         sample_with: str = "mcmc",
         mcmc_method: str = "slice_np",
+        vi_method: str = "rKL",
         mcmc_parameters: Dict[str, Any] = {},
+        vi_parameters: Dict[str, Any] = {},
         rejection_sampling_parameters: Dict[str, Any] = {},
-    ) -> Union[MCMCPosterior, RejectionPosterior]:
+    ) -> Union[MCMCPosterior, RejectionPosterior, VIPosterior]:
         r"""Build posterior from the neural density estimator.
 
         SNLE trains a neural network to approximate the likelihood $p(x|\theta)$. The
@@ -169,14 +140,19 @@ class MNLE(LikelihoodEstimator):
                 If `None`, use the latest neural density estimator that was trained.
             prior: Prior distribution.
             sample_with: Method to use for sampling from the posterior. Must be one of
-                [`mcmc` | `rejection`].
+                [`mcmc` | `rejection` | `vi`].
             mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`,
                 `hmc`, `nuts`. Currently defaults to `slice_np` for a custom numpy
                 implementation of slice sampling; select `hmc`, `nuts` or `slice` for
                 Pyro-based sampling.
+            vi_method: Method used for VI, one of [`rKL`, `fKL`, `IW`, `alpha`]. Note
+                some of the methods admit a `mode seeking` property (e.g. rKL) whereas
+                some admit a `mass covering` one (e.g fKL).
             mcmc_parameters: Additional kwargs passed to `MCMCPosterior`.
+            vi_parameters: Additional kwargs passed to `VIPosterior`.
             rejection_sampling_parameters: Additional kwargs passed to
                 `RejectionPosterior`.
+
         Returns:
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods
             (the returned log-probability is unnormalized).
@@ -188,15 +164,21 @@ class MNLE(LikelihoodEstimator):
             prior = self._prior
 
         if density_estimator is None:
-            density_estimator = self._neural_net
+            likelihood_estimator = self._neural_net
             # If internal net is used device is defined.
             device = self._device
         else:
+            likelihood_estimator = density_estimator
             # Otherwise, infer it from the device of the net parameters.
             device = next(density_estimator.parameters()).device.type
 
+        assert isinstance(
+            likelihood_estimator, MixedDensityEstimator
+        ), f"""net must be of type MixedDensityEstimator but is {type
+            (likelihood_estimator)}."""
+
         potential_fn, theta_transform = mixed_likelihood_estimator_based_potential(
-            likelihood_estimator=self._neural_net, prior=prior, x_o=None
+            likelihood_estimator=likelihood_estimator, prior=prior, x_o=None
         )
 
         if sample_with == "mcmc":
@@ -218,7 +200,15 @@ class MNLE(LikelihoodEstimator):
                 **rejection_sampling_parameters,
             )
         elif sample_with == "vi":
-            raise NotImplementedError
+            self._posterior = VIPosterior(
+                potential_fn=potential_fn,
+                theta_transform=theta_transform,
+                prior=prior,
+                vi_method=vi_method,
+                device=device,
+                x_shape=self._x_shape,
+                **vi_parameters,
+            )
         else:
             raise NotImplementedError
 
