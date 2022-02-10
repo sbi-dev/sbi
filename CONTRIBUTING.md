@@ -12,7 +12,9 @@ head over to [issues on GitHub](https://github.com/mackelab/sbi/issues).
 
 ## Code contributions
 
-In general, we use pull requests to make changes to `sbi`.
+In general, we use pull requests to make changes to `sbi`. So, if you are planning to
+make a contribution, please fork, create a feature branch and then make a PR from
+your feature branch to the upstream `sbi` ([more details](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request-from-a-fork)).
 
 
 ### Development environment
@@ -51,6 +53,12 @@ repository, which will format all files.
 **[isort](https://github.com/timothycrosley/isort)**: Used to consistently order
 imports. You can run isort manually from the console using `isort` in the top
 directory.
+
+**[pyright](https://github.com/Microsoft/pyright)**: Used for static type checking. 
+
+`black` and `isort` and `pyright` are checked as part of our CI actions. If these
+checks fail please make sure you have installed the latest versions for each of them
+and run them locally.
 
 
 ## Online documentation

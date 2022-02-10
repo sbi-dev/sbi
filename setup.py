@@ -40,7 +40,7 @@ REQUIRED = [
 EXTRAS = {
     "dev": [
         "autoflake",
-        "black>=20.8bo",
+        "black",
         "deepdiff",
         "flake8",
         "isort",
