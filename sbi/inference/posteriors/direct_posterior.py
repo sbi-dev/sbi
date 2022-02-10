@@ -71,7 +71,7 @@ class DirectPosterior(NeuralPosterior):
         self.max_sampling_batch_size = max_sampling_batch_size
         self._leakage_density_correction_factor = None
 
-        self._purpose = "It samples the posterior network but rejects samples that lie outside of the prior bounds."
+        self._purpose = "It samples the posterior network and rejects samples that lie outside of the prior bounds."
 
     def sample(
         self,

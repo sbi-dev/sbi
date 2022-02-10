@@ -405,13 +405,17 @@ class NeuralInference(ABC):
             # end="\r" deletes the print statement when a new one appears.
             # https://stackoverflow.com/questions/3419984/. `\r` in the beginning due
             # to #330.
-            print("\r", "Training neural network. Epochs trained: ", epoch, end="")
+            print("\r", f"Training neural network. Epochs trained: {epoch}", end="")
 
     def _report_convergence_at_end(
         self, epoch: int, stop_after_epochs: int, max_num_epochs: int
     ) -> None:
         if self._converged(epoch, stop_after_epochs):
-            print(f"Neural network successfully converged after {epoch} epochs.")
+            print(
+                "\r",
+                f"Neural network successfully converged after {epoch} epochs.",
+                end="",
+            )
         elif max_num_epochs == epoch:
             warn(
                 "Maximum number of epochs `max_num_epochs={max_num_epochs}` reached,"
