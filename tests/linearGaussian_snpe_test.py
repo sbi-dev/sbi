@@ -52,13 +52,9 @@ from tests.test_utils import (
     ),
 )
 def test_c2st_snpe_on_linearGaussian(
-    snpe_method, num_dim: int, prior_str: str, num_trials: int, set_seed
+    snpe_method, num_dim: int, prior_str: str, num_trials: int
 ):
-    """Test whether SNPE infers well a simple example with available ground truth.
-
-    Args:
-        set_seed: fixture for manual seeding
-    """
+    """Test whether SNPE infers well a simple example with available ground truth."""
 
     x_o = zeros(num_trials, num_dim)
     num_samples = 1000
@@ -147,15 +143,13 @@ def test_c2st_snpe_on_linearGaussian(
         assert ((map_ - ones(num_dim)) ** 2).sum() < 0.5
 
 
-def test_c2st_snpe_on_linearGaussian_different_dims(set_seed):
+def test_c2st_snpe_on_linearGaussian_different_dims():
     """Test whether SNPE B/C infer well a simple example with available ground truth.
 
     This example has different number of parameters theta than number of x. Also
     this implicitly tests simulation_batch_size=1. It also impleictly tests whether the
     prior can be `None` and whether we can stop and resume training.
 
-    Args:
-        set_seed: fixture for manual seeding
     """
 
     theta_dim = 3
@@ -224,11 +218,9 @@ def test_c2st_snpe_on_linearGaussian_different_dims(set_seed):
         "snpe_c_non_atomic",
     ),
 )
-def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str, set_seed):
+def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
     """Test whether SNPE B/C infer well a simple example with available ground truth.
-
-    Args:
-        set_seed: fixture for manual seeding.
+    .
     """
 
     num_dim = 2
@@ -329,12 +321,10 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str, set_seed):
         ("rejection", "rejection", "uniform"),
     ),
 )
-def test_api_snpe_c_posterior_correction(sample_with, mcmc_method, prior_str, set_seed):
+def test_api_snpe_c_posterior_correction(sample_with, mcmc_method, prior_str):
     """Test that leakage correction applied to sampling works, with both MCMC and
     rejection.
 
-    Args:
-        set_seed: fixture for manual seeding
     """
 
     num_dim = 2
@@ -383,7 +373,7 @@ def test_api_snpe_c_posterior_correction(sample_with, mcmc_method, prior_str, se
 
 
 @pytest.mark.slow
-def test_sample_conditional(set_seed):
+def test_sample_conditional():
     """
     Test whether sampling from the conditional gives the same results as evaluating.
 
@@ -486,7 +476,6 @@ def test_sample_conditional(set_seed):
     assert max_err < 0.0027
 
 
-@pytest.mark.slow
 def test_mdn_conditional_density(num_dim: int = 3, cond_dim: int = 1):
     """Test whether the conditional density infered from MDN parameters of a
     `DirectPosterior` matches analytical results for MVN. This uses a n-D joint and
@@ -505,7 +494,7 @@ def test_mdn_conditional_density(num_dim: int = 3, cond_dim: int = 1):
 
     x_o = zeros(1, num_dim)
     num_samples = 1000
-    num_simulations = 2600
+    num_simulations = 2700
     condition = 0.1 * ones(1, num_dim)
 
     dims = list(range(num_dim))

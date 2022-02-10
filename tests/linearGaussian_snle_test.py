@@ -30,7 +30,7 @@ from tests.test_utils import check_c2st, get_prob_outside_uniform_prior
 
 
 @pytest.mark.parametrize("num_dim", (1, 3))
-def test_api_snl_on_linearGaussian(num_dim: int, set_seed):
+def test_api_snl_on_linearGaussian(num_dim: int):
     """Test API for inference on linear Gaussian model using SNL.
 
     Avoids expensive computations by training on few simulations and generating few
@@ -68,14 +68,12 @@ def test_api_snl_on_linearGaussian(num_dim: int, set_seed):
         posterior.sample(sample_shape=(num_samples,))
 
 
-def test_c2st_snl_on_linearGaussian(set_seed):
+def test_c2st_snl_on_linearGaussian():
     """Test whether SNL infers well a simple example with available ground truth.
 
     This example has different number of parameters theta than number of x. This test
     also acts as the only functional test for SNL not marked as slow.
 
-    Args:
-        set_seed: fixture for manual seeding
     """
 
     theta_dim = 3
@@ -135,15 +133,13 @@ def test_c2st_snl_on_linearGaussian(set_seed):
 @pytest.mark.slow
 @pytest.mark.parametrize("num_dim", (1, 2))
 @pytest.mark.parametrize("prior_str", ("uniform", "gaussian"))
-def test_c2st_and_map_snl_on_linearGaussian_different(
-    num_dim: int, prior_str: str, set_seed
-):
+def test_c2st_and_map_snl_on_linearGaussian_different(num_dim: int, prior_str: str):
     """Test SNL on linear Gaussian, comparing to ground truth posterior via c2st.
 
     Args:
         num_dim: parameter dimension of the gaussian model
         prior_str: one of "gaussian" or "uniform"
-        set_seed: fixture for manual seeding
+
     """
     num_samples = 500
     num_simulations = 3000
@@ -230,12 +226,8 @@ def test_c2st_and_map_snl_on_linearGaussian_different(
 
 @pytest.mark.slow
 @pytest.mark.parametrize("num_trials", (1, 3))
-def test_c2st_multi_round_snl_on_linearGaussian(num_trials: int, set_seed):
-    """Test SNL on linear Gaussian, comparing to ground truth posterior via c2st.
-
-    Args:
-        set_seed: fixture for manual seeding
-    """
+def test_c2st_multi_round_snl_on_linearGaussian(num_trials: int):
+    """Test SNL on linear Gaussian, comparing to ground truth posterior via c2st."""
 
     num_dim = 2
     x_o = zeros((num_trials, num_dim))
@@ -297,12 +289,8 @@ def test_c2st_multi_round_snl_on_linearGaussian(num_trials: int, set_seed):
 
 @pytest.mark.slow
 @pytest.mark.parametrize("num_trials", (1, 3))
-def test_c2st_multi_round_snl_on_linearGaussian_vi(num_trials: int, set_seed):
-    """Test SNL on linear Gaussian, comparing to ground truth posterior via c2st.
-
-    Args:
-        set_seed: fixture for manual seeding
-    """
+def test_c2st_multi_round_snl_on_linearGaussian_vi(num_trials: int):
+    """Test SNL on linear Gaussian, comparing to ground truth posterior via c2st."""
 
     num_dim = 2
     x_o = zeros((num_trials, num_dim))
@@ -384,14 +372,14 @@ def test_c2st_multi_round_snl_on_linearGaussian_vi(num_trials: int, set_seed):
 )
 @pytest.mark.parametrize("init_strategy", ("proposal", "sir"))
 def test_api_snl_sampling_methods(
-    sampling_method: str, prior_str: str, init_strategy: str, set_seed
+    sampling_method: str, prior_str: str, init_strategy: str
 ):
     """Runs SNL on linear Gaussian and tests sampling from posterior via mcmc.
 
     Args:
         mcmc_method: which mcmc method to use for sampling
         prior_str: use gaussian or uniform prior
-        set_seed: fixture for manual seeding
+
     """
 
     num_dim = 2
