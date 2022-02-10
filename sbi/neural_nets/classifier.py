@@ -7,7 +7,7 @@ import torch
 from pyknos.nflows.nn import nets
 from torch import Tensor, nn, relu
 
-from sbi.utils.sbiutils import DefaultEmbeddingNet, standardizing_net, z_score_parser
+from sbi.utils.sbiutils import standardizing_net, z_score_parser
 from sbi.utils.user_input_checks import check_data_device, check_embedding_net_device
 
 
@@ -114,12 +114,6 @@ def build_linear_classifier(
     Returns:
         Neural network.
     """
-    # Initialize default embedding net with linear layer
-    if isinstance(embedding_net_x, DefaultEmbeddingNet):
-        embedding_net_x.build_network(batch_x)
-    if isinstance(embedding_net_y, DefaultEmbeddingNet):
-        embedding_net_y.build_network(batch_y)
-
     check_data_device(batch_x, batch_y)
     check_embedding_net_device(embedding_net=embedding_net_x, datum=batch_y)
     check_embedding_net_device(embedding_net=embedding_net_y, datum=batch_y)
@@ -170,12 +164,6 @@ def build_mlp_classifier(
     Returns:
         Neural network.
     """
-    # Initialize default embedding net with linear layer
-    if isinstance(embedding_net_x, DefaultEmbeddingNet):
-        embedding_net_x.build_network(batch_x)
-    if isinstance(embedding_net_y, DefaultEmbeddingNet):
-        embedding_net_y.build_network(batch_y)
-
     check_data_device(batch_x, batch_y)
     check_embedding_net_device(embedding_net=embedding_net_x, datum=batch_y)
     check_embedding_net_device(embedding_net=embedding_net_y, datum=batch_y)
@@ -234,12 +222,6 @@ def build_resnet_classifier(
     Returns:
         Neural network.
     """
-    # Initialize default embedding net with linear layer
-    if isinstance(embedding_net_x, DefaultEmbeddingNet):
-        embedding_net_x.build_network(batch_x)
-    if isinstance(embedding_net_y, DefaultEmbeddingNet):
-        embedding_net_y.build_network(batch_y)
-
     check_data_device(batch_x, batch_y)
     check_embedding_net_device(embedding_net=embedding_net_x, datum=batch_y)
     check_embedding_net_device(embedding_net=embedding_net_y, datum=batch_y)

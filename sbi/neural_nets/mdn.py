@@ -8,7 +8,6 @@ from pyknos.nflows import flows, transforms
 from torch import Tensor, nn
 
 import sbi.utils as utils
-from sbi.utils.sbiutils import DefaultEmbeddingNet
 from sbi.utils.user_input_checks import check_data_device, check_embedding_net_device
 
 
@@ -44,10 +43,6 @@ def build_mdn(
     Returns:
         Neural network.
     """
-    # Initialize default embedding net with linear layer
-    if isinstance(embedding_net, DefaultEmbeddingNet):
-        embedding_net.build_network(batch_y)
-
     x_numel = batch_x[0].numel()
     # Infer the output dimensionality of the embedding_net by making a forward pass.
     check_data_device(batch_x, batch_y)
