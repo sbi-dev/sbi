@@ -830,31 +830,3 @@ def gradient_ascent(
         return argmax_, max_val
 
     return theta_transform.inv(best_theta_overall), max_val
-
-
-class DefaultEmbeddingNet(nn.Module):
-    def __init__(self):
-        """Class for Default Embedding Net that maps the context onto the flow."""
-        super().__init__()
-        self.net = nn.Identity()
-
-    def build_network(self, input: Tensor):
-        """Builds Small Network with Linear Layer of same input/output dimensions
-            and a non-linear activation function (relu).
-        Args:
-            input: Data batch used to infer dimensionality (number of features)
-        """
-        num_features = input.shape[-1]
-        self.net = nn.Sequential(nn.Linear(num_features, num_features), nn.ReLU())
-
-    def forward(self, x: Tensor) -> Tensor:
-        """Network forward pass.
-
-        Args:
-            x: Input tensor (batch_size, num_features)
-
-        Returns:
-            Network output (batch_size, num_features).
-        """
-        x = self.net(x)
-        return x
