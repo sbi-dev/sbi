@@ -229,11 +229,13 @@ def posterior_nn(
     )
 
     def build_fn_snpe_a(batch_theta, batch_x, num_components):
-        # Extract the number of components from the kwargs, such that
-        # they are exposed as a kwargs, offering the possibility to later
-        # override this kwarg with functools.partial. This is necessary
-        # in order to make sure that the MDN in SNPE-A only has one
-        # component when running the Algorithm 1 part.
+        """Build function for SNPE-A
+
+        Extract the number of components from the kwargs, such that they are exposed as
+        a kwargs, offering the possibility to later override this kwarg with
+        `functools.partial`. This is necessary in order to make sure that the MDN in
+        SNPE-A only has one component when running the Algorithm 1 part.
+        """
         return build_mdn(
             batch_x=batch_theta,
             batch_y=batch_x,
