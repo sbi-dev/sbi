@@ -21,10 +21,6 @@ from sbi.inference.base import (  # noqa: F401
 )
 from sbi.inference.snle.mnle import MNLE
 from sbi.inference.snle.snle_a import SNLE_A
-<<<<<<< HEAD
-=======
-# Unimplemented: don't export
->>>>>>> add mnle as snle child, add mixed potential, update tests.
 from sbi.inference.snpe.snpe_a import SNPE_A
 from sbi.inference.snpe.snpe_b import SNPE_B
 from sbi.inference.snpe.snpe_c import SNPE_C  # noqa: F401

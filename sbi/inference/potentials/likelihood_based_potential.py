@@ -1,10 +1,9 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Optional, Tuple
 
 import torch
-import torch.distributions.transforms as torch_tf
 from torch import Tensor, nn
 
 from sbi.inference.potentials.base_potential import BasePotential
@@ -141,11 +140,11 @@ def _log_likelihoods_over_trials(
 
 
 def mixed_likelihood_estimator_based_potential(
-    likelihood_estimator: nn.Module,
+    likelihood_estimator: MixedDensityEstimator,
     prior: Any,
     x_o: Optional[Tensor],
 ) -> Tuple[Callable, TorchTransform]:
-    r"""Returns potential $\log(p(x_o|\theta)p(\theta))$ for likelihood-based methods.
+    r"""Returns $\log(p(x_o|\theta)p(\theta))$ for mixed likelihood-based methods.
 
     It also returns a transformation that can be used to transform the potential into
     unconstrained space.
@@ -160,9 +159,6 @@ def mixed_likelihood_estimator_based_potential(
         to unconstrained space.
     """
 
-    assert isinstance(
-        likelihood_estimator, MixedDensityEstimator
-    ), f"net must be of type MixedDensityEstimator but is {type(likelihood_estimator)}."
     device = str(next(likelihood_estimator.discrete_net.parameters()).device)
 
     potential_fn = MixedLikelihoodBasedPotential(
@@ -176,7 +172,7 @@ def mixed_likelihood_estimator_based_potential(
 class MixedLikelihoodBasedPotential(LikelihoodBasedPotential):
     def __init__(
         self,
-        likelihood_estimator: nn.Module,
+        likelihood_estimator: MixedDensityEstimator,
         prior: Any,
         x_o: Optional[Tensor],
         device: str = "cpu",
@@ -187,9 +183,12 @@ class MixedLikelihoodBasedPotential(LikelihoodBasedPotential):
 
         # Calculate likelihood in one batch.
         with torch.set_grad_enabled(track_gradients):
+            # Call the specific log prob method of the mixed likelihood estimator as
+            # this optimizes the evaluation of the discrete data part.
+            # TODO: how to fix pyright issues?
             log_likelihood_trial_batch = self.likelihood_estimator.log_prob_iid(
                 self.x_o, theta
-            )
+            )  # type: ignore
             # Reshape to (x-trials x parameters), sum over trial-log likelihoods.
             log_likelihood_trial_sum = log_likelihood_trial_batch.reshape(
                 self.x_o.shape[0], -1
