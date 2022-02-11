@@ -6,7 +6,7 @@ from typing import Callable, Iterable, Optional, Union
 
 import numpy as np
 import torch
-from pyro.distributions import TransformedDistribution
+from torch import Tensor
 from torch.distributions import Distribution
 from tqdm import tqdm
 
@@ -21,32 +21,36 @@ from sbi.samplers.vi import (
     make_object_deepcopy_compatible,
     move_all_tensor_to_device,
 )
-from sbi.types import Shape, TorchTransform
+from sbi.types import (
+    Shape,
+    TorchTransform,
+    PyroTransformedDistribution,
+    TorchDistribution,
+    TorchTensor,
+)
 from sbi.utils import mcmc_transform
-from sbi.utils.torchutils import Tensor, atleast_2d_float32_tensor, ensure_theta_batched
+from sbi.utils.torchutils import atleast_2d_float32_tensor, ensure_theta_batched
 
 
 class VIPosterior(NeuralPosterior):
     r"""Provides VI (Variational Inference) to sample from the posterior.<br/><br/>
-
     SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
-    `VIPosterior` allows to learn a tractable variational posterior q(theta) which
+    `VIPosterior` allows to learn a tractable variational posterior $q(\theta)$ which
     approximates the true posterior $p(\theta|x_o)$. After this second training stage,
     we can produce approximate posterior samples, by just sampling from q with no
-    additional cost. For additional information see [1] and [2].
-
-    References:
-        [1] Variational methods for simulation-based inference, Manuel Glöckler, Michael
-            Deistler, Jakob Macke, 2022, https://openreview.net/forum?id=kZ0UYdhqkNY
-        [2] Sequential Neural Posterior and Likelihood Approximation, Samuel Wiqvist,
-            Jes Frellsen, Umberto Picchini, 2021, https://arxiv.org/abs/2102.06522
+    additional cost. For additional information see [1] and [2].<br/><br/>
+    References:<br/>
+    [1] Variational methods for simulation-based inference, Manuel Glöckler, Michael
+    Deistler, Jakob Macke, 2022, https://openreview.net/forum?id=kZ0UYdhqkNY<br/>
+    [2] Sequential Neural Posterior and Likelihood Approximation, Samuel Wiqvist, Jes
+    Frellsen, Umberto Picchini, 2021, https://arxiv.org/abs/2102.06522
     """
 
     def __init__(
         self,
         potential_fn: Callable,
-        prior: Optional[Distribution] = None,
-        q: Union[str, TransformedDistribution, "VIPosterior", Callable] = "maf",
+        prior: Optional[TorchDistribution] = None,
+        q: Union[str, PyroTransformedDistribution, "VIPosterior", Callable] = "maf",
         theta_transform: Optional[TorchTransform] = None,
         vi_method: str = "rKL",
         device: str = "cpu",
@@ -62,8 +66,8 @@ class VIPosterior(NeuralPosterior):
                 quality metrics. Please make sure that this matches with the prior
                 within the potential_fn. If `None` is given, we will try to infer it
                 from potential_fn or q, if this fails we raise an Error.
-            q: Variational distribution, either string, `TransformedDistribution, or a
-                VIPosterior object. This specifies a parametric class of distribution
+            q: Variational distribution, either string, `TransformedDistribution`, or a
+                `VIPosterior` object. This specifies a parametric class of distribution
                 over which the best possible posterior approximation is searched. For
                 string input, we currently support [nsf, scf, maf, mcf, gaussian,
                 gaussian_diag]. You can also specify your own variational family by
@@ -73,7 +77,7 @@ class VIPosterior(NeuralPosterior):
                 useful for setting the hyperparameters e.g. `num_transfroms` within the
                 `get_flow_builder` method specifying the number of transformations
                 within a normalizing flow. If q is already a `VIPosterior`, then the
-                arguments will be copied from it(relevant for multi-round training).
+                arguments will be copied from it (relevant for multi-round training).
             theta_transform: Maps form prior support to unconstrained space. The
                 inverse is used here to ensure that the posterior support is equal to
                 that of the prior.
@@ -170,7 +174,7 @@ class VIPosterior(NeuralPosterior):
 
     def set_q(
         self,
-        q: Union[str, Distribution, "VIPosterior", Callable],
+        q: Union[str, PyroTransformedDistribution, "VIPosterior", Callable],
         parameters: Iterable = [],
         modules: Iterable = [],
     ) -> None:
@@ -306,7 +310,10 @@ class VIPosterior(NeuralPosterior):
         return samples.reshape((*sample_shape, samples.shape[-1]))
 
     def log_prob(
-        self, theta: Tensor, x: Optional[Tensor] = None, track_gradients: bool = False
+        self,
+        theta: Tensor,
+        x: Optional[Tensor] = None,
+        track_gradients: bool = False,
     ) -> Tensor:
         r"""Returns the log-probability of theta under the variational posterior.
 
@@ -331,7 +338,7 @@ class VIPosterior(NeuralPosterior):
 
     def train(
         self,
-        x: Optional[Tensor] = None,
+        x: Optional[TorchTensor] = None,
         n_particles: int = 256,
         learning_rate: float = 1e-3,
         gamma: float = 0.999,
@@ -420,7 +427,10 @@ class VIPosterior(NeuralPosterior):
             )
 
         # Check context
-        x = atleast_2d_float32_tensor(self._x_else_default_x(x)).to(self._device)
+        x = atleast_2d_float32_tensor(self._x_else_default_x(x)).to(  # type: ignore
+            self._device
+        )
+
         already_trained = self._trained_on is not None and (x == self._trained_on).all()
 
         # Optimize
@@ -503,11 +513,11 @@ class VIPosterior(NeuralPosterior):
 
     def map(
         self,
-        x: Optional[Tensor] = None,
+        x: Optional[TorchTensor] = None,
         num_iter: int = 1_000,
         num_to_optimize: int = 100,
         learning_rate: float = 0.01,
-        init_method: Union[str, Tensor] = "proposal",
+        init_method: Union[str, TorchTensor] = "proposal",
         num_init_samples: int = 10_000,
         save_best_every: int = 10,
         show_progress_bars: bool = False,

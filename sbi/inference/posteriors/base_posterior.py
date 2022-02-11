@@ -103,10 +103,10 @@ class NeuralPosterior(ABC):
         self.set_default_x(x)
 
     def set_default_x(self, x: Tensor) -> "NeuralPosterior":
-        """Set new default x for `.sample(), .log_prob` to use as conditioning context.
+        r"""Set new default x for `.sample(), .log_prob` to use as conditioning context.
 
         This is a pure convenience to avoid having to repeatedly specify `x` in calls to
-        `.sample()` and `.log_prob()` - only θ needs to be passed.
+        `.sample()` and `.log_prob()` - only $\theta$ needs to be passed.
 
         This convenience is particularly useful when the posterior is focused, i.e.
         has been trained over multiple rounds to be accurate in the vicinity of a
@@ -117,7 +117,7 @@ class NeuralPosterior(ABC):
         that calls like `posterior.set_default_x(my_x).sample(mytheta)` are possible.
 
         Args:
-            x: The default observation to set for the posterior $p(theta|x)$.
+            x: The default observation to set for the posterior $p(\theta|x)$.
         Returns:
             `NeuralPosterior` that will use a default `x` when not explicitly passed.
         """
