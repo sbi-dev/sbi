@@ -139,6 +139,11 @@
     rendering:
       show_root_heading: true
       show_object_full_path: true
+
+::: sbi.analysis.plot.marginal_plot
+    rendering:
+      show_root_heading: true
+      show_object_full_path: true
       
 ::: sbi.analysis.plot.conditional_pairplot
     rendering:

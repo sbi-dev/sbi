@@ -2,6 +2,7 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 from typing import Any, Callable, List, Optional, Tuple, Union
+from warnings import warn
 
 import torch
 import torch.distributions.transforms as torch_tf
@@ -13,16 +14,11 @@ from sbi.utils.conditional_density_utils import (
     ConditionedPotential,
     RestrictedPriorForConditional,
     RestrictedTransformForConditional,
+    compute_corrcoeff,
     condition_mog,
+    extract_and_transform_mog,
 )
-from sbi.utils.conditional_density_utils import (
-    conditional_corrcoeff as utils_conditional_corrcoeff,
-)
-from sbi.utils.conditional_density_utils import (
-    eval_conditional_density as utils_eval_conditional_density,
-)
-from sbi.utils.conditional_density_utils import extract_and_transform_mog
-from sbi.utils.torchutils import atleast_2d_float32_tensor
+from sbi.utils.torchutils import atleast_2d_float32_tensor, ensure_theta_batched
 
 
 def eval_conditional_density(
@@ -68,18 +64,42 @@ def eval_conditional_density(
     Returns: Conditional probabilities. If `dim1 == dim2`, this will have shape
         (resolution). If `dim1 != dim2`, it will have shape (resolution, resolution).
     """
-    return utils_eval_conditional_density(
-        density=density,
-        condition=condition,
-        limits=limits,
-        dim1=dim1,
-        dim2=dim2,
-        resolution=resolution,
-        eps_margins1=eps_margins1,
-        eps_margins2=eps_margins2,
-        return_raw_log_prob=return_raw_log_prob,
-        warn_about_deprecation=False,
+
+    condition = ensure_theta_batched(condition)
+
+    theta_grid_dim1 = torch.linspace(
+        float(limits[dim1, 0] + eps_margins1),
+        float(limits[dim1, 1] - eps_margins1),
+        resolution,
+        device=condition.device,
     )
+    theta_grid_dim2 = torch.linspace(
+        float(limits[dim2, 0] + eps_margins2),
+        float(limits[dim2, 1] - eps_margins2),
+        resolution,
+        device=condition.device,
+    )
+
+    if dim1 == dim2:
+        repeated_condition = condition.repeat(resolution, 1)
+        repeated_condition[:, dim1] = theta_grid_dim1
+
+        log_probs_on_grid = density.log_prob(repeated_condition)
+    else:
+        repeated_condition = condition.repeat(resolution**2, 1)
+        repeated_condition[:, dim1] = theta_grid_dim1.repeat(resolution)
+        repeated_condition[:, dim2] = torch.repeat_interleave(
+            theta_grid_dim2, resolution
+        )
+
+        log_probs_on_grid = density.log_prob(repeated_condition)
+        log_probs_on_grid = torch.reshape(log_probs_on_grid, (resolution, resolution))
+
+    if return_raw_log_prob:
+        return log_probs_on_grid
+    else:
+        # Subtract maximum for numerical stability
+        return torch.exp(log_probs_on_grid - torch.max(log_probs_on_grid))
 
 
 def conditional_corrcoeff(
@@ -116,14 +136,51 @@ def conditional_corrcoeff(
     Returns: Average conditional correlation matrix of shape either `(num_dim, num_dim)`
     or `(len(subset), len(subset))` if `subset` was specified.
     """
-    return utils_conditional_corrcoeff(
-        density=density,
-        limits=limits,
-        condition=condition,
-        subset=subset,
-        resolution=resolution,
-        warn_about_deprecation=False,
+
+    device = density._device if hasattr(density, "_device") else "cpu"
+
+    subset_ = subset if subset is not None else range(condition.shape[1])
+
+    correlation_matrices = []
+    for cond in condition:
+        correlation_matrices.append(
+            torch.stack(
+                [
+                    compute_corrcoeff(
+                        eval_conditional_density(
+                            density,
+                            cond.to(device),
+                            limits.to(device),
+                            dim1=dim1,
+                            dim2=dim2,
+                            resolution=resolution,
+                        ),
+                        limits[[dim1, dim2]].to(device),
+                    )
+                    for dim1 in subset_
+                    for dim2 in subset_
+                    if dim1 < dim2
+                ]
+            )
+        )
+
+    average_correlations = torch.mean(torch.stack(correlation_matrices), dim=0)
+
+    # `average_correlations` is still a vector containing the upper triangular entries.
+    # Below, assemble them into a matrix:
+    av_correlation_matrix = torch.zeros((len(subset_), len(subset_)), device=device)
+    triu_indices = torch.triu_indices(
+        row=len(subset_), col=len(subset_), offset=1, device=device
     )
+    av_correlation_matrix[triu_indices[0], triu_indices[1]] = average_correlations
+
+    # Make the matrix symmetric by copying upper diagonal to lower diagonal.
+    av_correlation_matrix = torch.triu(av_correlation_matrix) + torch.tril(
+        av_correlation_matrix.T
+    )
+
+    av_correlation_matrix.fill_diagonal_(1.0)
+    return av_correlation_matrix
 
 
 class ConditionedMDN:

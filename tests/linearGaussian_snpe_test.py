@@ -567,12 +567,12 @@ def test_example_posterior(snpe_method: type):
     simulator, prior = prepare_for_sbi(
         lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov), prior
     )
-    inference = snpe_method(prior, show_progress_bars=False, **extra_kwargs)
+    inference = snpe_method(prior, show_progress_bars=False)
 
     theta, x = simulate_for_sbi(
         simulator, prior, 1000, simulation_batch_size=10, num_workers=6
     )
-    posterior_estimator = inference.append_simulations(theta, x).train()
+    posterior_estimator = inference.append_simulations(theta, x).train(**extra_kwargs)
     if snpe_method == SNPE_A:
         posterior_estimator = inference.correct_for_proposal()
     posterior = DirectPosterior(
