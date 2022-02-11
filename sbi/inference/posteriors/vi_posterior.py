@@ -22,11 +22,11 @@ from sbi.samplers.vi import (
     move_all_tensor_to_device,
 )
 from sbi.types import (
-    Shape,
-    TorchTransform,
     PyroTransformedDistribution,
+    Shape,
     TorchDistribution,
     TorchTensor,
+    TorchTransform,
 )
 from sbi.utils import mcmc_transform
 from sbi.utils.torchutils import atleast_2d_float32_tensor, ensure_theta_batched

@@ -15,7 +15,7 @@ from matplotlib.figure import Figure
 from scipy.stats import binom, gaussian_kde
 from torch import Tensor
 
-from sbi.utils import eval_conditional_density
+from sbi.analysis import eval_conditional_density
 
 try:
     collectionsAbc = collections.abc  # type: ignore
@@ -256,7 +256,6 @@ def get_conditional_diag_func(opts, limits, eps_margins, resolution):
                 resolution=resolution,
                 eps_margins1=eps_margins[row],
                 eps_margins2=eps_margins[row],
-                warn_about_deprecation=False,
             )
             .to("cpu")
             .numpy()
@@ -597,7 +596,6 @@ def conditional_pairplot(
     labels: Optional[List[str]] = None,
     ticks: Union[List, torch.Tensor] = [],
     points_colors: List[str] = plt.rcParams["axes.prop_cycle"].by_key()["color"],
-    warn_about_deprecation: bool = True,
     fig=None,
     axes=None,
     **kwargs,
@@ -632,9 +630,7 @@ def conditional_pairplot(
         labels: List of strings specifying the names of the parameters.
         ticks: Position of the ticks.
         points_colors: Colors of the `points`.
-        warn_about_deprecation: With sbi v0.15.0, we depracated the import of this
-            function from `sbi.utils`. Instead, it should be imported from
-            `sbi.analysis`.
+
         fig: matplotlib figure to plot on.
         axes: matplotlib axes corresponding to fig.
         **kwargs: Additional arguments to adjust the plot, see the source code in
@@ -670,7 +666,6 @@ def conditional_pairplot(
                 resolution=resolution,
                 eps_margins1=eps_margins[row],
                 eps_margins2=eps_margins[col],
-                warn_about_deprecation=False,
             )
             .to("cpu")
             .numpy()

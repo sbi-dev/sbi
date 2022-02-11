@@ -5,13 +5,13 @@
 from typing import NewType, Optional, Sequence, Tuple, TypeVar, Union
 
 import numpy as np
-from pyro.distributions import TransformedDistribution
 import torch
-from torch.distributions.transforms import Transform
+from pyro.distributions import TransformedDistribution
+from torch import Tensor
 from torch.distributions import Distribution
+from torch.distributions.transforms import Transform
 from torch.nn import Module
 from torch.utils.tensorboard.writer import SummaryWriter
-from torch import Tensor
 
 Array = Union[np.ndarray, torch.Tensor]
 Shape = Union[torch.Size, Tuple[int, ...]]
