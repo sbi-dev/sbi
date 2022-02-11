@@ -63,9 +63,8 @@ def sir(
         init_param_candidates = []
         for i in range(sir_num_batches):
             batch_draws = proposal.sample((sir_batch_size,)).detach()
-            transformed_batch_draws = transform(batch_draws)
-            init_param_candidates.append(transformed_batch_draws)
-            log_weights.append(potential_fn(transformed_batch_draws).detach())
+            init_param_candidates.append(batch_draws)
+            log_weights.append(potential_fn(batch_draws).detach())
         log_weights = torch.cat(log_weights)
         init_param_candidates = torch.cat(init_param_candidates)
 
@@ -77,4 +76,5 @@ def sir(
         probs /= probs.sum()
 
         idxs = torch.multinomial(probs, 1, replacement=False)
-        return init_param_candidates[idxs, :]
+        # Return transformed sample.
+        return transform(init_param_candidates[idxs, :])
