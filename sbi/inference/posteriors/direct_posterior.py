@@ -43,7 +43,6 @@ class DirectPosterior(NeuralPosterior):
         Args:
             prior: Prior distribution with `.log_prob()` and `.sample()`.
             posterior_estimator: The trained neural posterior.
-            x_o: Tensor at which to evaluate the `posterior_estimator`.
             max_sampling_batch_size: Batchsize of samples being drawn from
                 the proposal at every iteration.
             device: Training device, e.g., "cpu", "cuda" or "cuda:0". If None,

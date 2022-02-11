@@ -5,10 +5,13 @@
 from typing import NewType, Optional, Sequence, Tuple, TypeVar, Union
 
 import numpy as np
+from pyro.distributions import TransformedDistribution
 import torch
 from torch.distributions.transforms import Transform
+from torch.distributions import Distribution
 from torch.nn import Module
 from torch.utils.tensorboard.writer import SummaryWriter
+from torch import Tensor
 
 Array = Union[np.ndarray, torch.Tensor]
 Shape = Union[torch.Size, Tuple[int, ...]]
@@ -30,6 +33,11 @@ transform_types = Optional[
 TensorboardSummaryWriter = NewType("Writer", SummaryWriter)
 TorchTransform = NewType("torch Transform", Transform)
 TorchModule = NewType("Module", Module)
+TorchDistribution = NewType("torch Distribution", Distribution)
+PyroTransformedDistribution = NewType(
+    "pyro TransformedDistribution", TransformedDistribution
+)
+TorchTensor = NewType("Tensor", Tensor)
 
 __all__ = [
     "Array",
@@ -39,4 +47,7 @@ __all__ = [
     "TensorboardSummaryWriter",
     "TorchModule",
     "transform_types",
+    "TorchDistribution",
+    "PyroTransformedDistribution",
+    "TorchTensor",
 ]
