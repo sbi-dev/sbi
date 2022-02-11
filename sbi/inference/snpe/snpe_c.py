@@ -33,7 +33,6 @@ class SNPE_C(PosteriorEstimator):
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[TensorboardSummaryWriter] = None,
         show_progress_bars: bool = True,
-        **unused_args,
     ):
         r"""SNPE-C / APT [1].
 
@@ -79,13 +78,10 @@ class SNPE_C(PosteriorEstimator):
             summary_writer: A tensorboard `SummaryWriter` to control, among others, log
                 file location (default is `<current working directory>/logs`.)
             show_progress_bars: Whether to show a progressbar during training.
-            unused_args: Absorbs additional arguments. No entries will be used. If it
-                is not empty, we warn. In future versions, when the new interface of
-                0.14.0 is more mature, we will remove this argument.
         """
 
-        kwargs = del_entries(locals(), entries=("self", "__class__", "unused_args"))
-        super().__init__(**kwargs, **unused_args)
+        kwargs = del_entries(locals(), entries=("self", "__class__"))
+        super().__init__(**kwargs)
 
     def train(
         self,

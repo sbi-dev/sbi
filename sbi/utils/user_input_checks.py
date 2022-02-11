@@ -625,16 +625,6 @@ def check_sbi_inputs(simulator: Callable, prior: Distribution) -> None:
 
 def check_estimator_arg(estimator: Union[str, Callable]) -> None:
     """Check (density or ratio) estimator argument passed by the user."""
-    if isinstance(estimator, BoxUniform) or isinstance(estimator, Distribution):
-        raise ValueError(
-            "You passed a distribution as density_estimator. Probably, "
-            "your code is deprecated since sbi v0.14.0, which changed the "
-            "API. Please consult release notes to see how you can update your code: "
-            "https://github.com/mackelab/sbi/releases/tag/v0.14.0 "
-            "More information can be found under the corresponding pull request on "
-            "github: https://github.com/mackelab/sbi/pull/378 and tutorials: "
-            "https://www.mackelab.org/sbi/tutorial/02_flexible_interface/"
-        )
     assert isinstance(estimator, str) or (
         isinstance(estimator, Callable) and not isinstance(estimator, nn.Module)
     ), (

@@ -96,7 +96,6 @@ class NeuralInference(ABC):
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
         show_progress_bars: bool = True,
-        **unused_args,
     ):
         r"""Base class for inference methods.
 
@@ -113,26 +112,11 @@ class NeuralInference(ABC):
                 file location (default is `<current working directory>/logs`.)
             show_progress_bars: Whether to show a progressbar during simulation and
                 sampling.
-            unused_args: Absorbs additional arguments. No entries will be used. If it
-                is not empty, we warn. In future versions, when the new interface of
-                0.14.0 is more mature, we will remove this argument.
         """
 
         self._device = process_device(device)
         check_if_prior_on_device(self._device, prior)
         self._prior = prior
-
-        if unused_args:
-            warn(
-                f"You passed some keyword arguments that will not be used. "
-                f"Specifically, the unused arguments are: {list(unused_args.keys())}. "
-                f"These arguments might have been supported in sbi "
-                f"versions <0.14.0. Since 0.14.0, the API was changed. Please consult "
-                f"the corresponding pull request on github: "
-                f"https://github.com/mackelab/sbi/pull/378 and tutorials: "
-                f"https://www.mackelab.org/sbi/tutorial/02_flexible_interface/ for "
-                f"further information.",
-            )
 
         self._posterior = None
         self._neural_net = None
@@ -168,57 +152,6 @@ class NeuralInference(ABC):
             validation_log_probs=[],
             train_log_probs=[],
             epoch_durations_sec=[],
-        )
-
-    def __call__(self, unused_args):
-        """
-        f"Deprecated. The inference object is no longer callable as of `sbi` v0.14.0. "
-        f"Please consult our website for a tutorial on how to adapt your code: "
-        f"https://www.mackelab.org/sbi/tutorial/02_flexible_interface/ . For "
-        f"further information, see the corresponding pull request on github:
-        f"https://github.com/mackelab/sbi/pull/378.",
-        """
-        raise NameError(
-            "The inference object is no longer callable as of `sbi` v0.14.0. "
-            "Please consult the release notes for a tutorial on how to adapt your "
-            "code: https://github.com/mackelab/sbi/releases/tag/v0.14.0"
-            "For more information, visit our website: "
-            "https://www.mackelab.org/sbi/tutorial/02_flexible_interface/ or "
-            "see the corresponding pull request on github: "
-            "https://github.com/mackelab/sbi/pull/378.",
-        )
-
-    def provide_presimulated(
-        self, theta: Tensor, x: Tensor, from_round: int = 0
-    ) -> None:
-        r"""Deprecated since sbi 0.14.0.
-
-        Instead of using this, please use `.append_simulations()`. Please consult
-        release notes to see how you can update your code:
-        https://github.com/mackelab/sbi/releases/tag/v0.14.0
-        More information can be found under the corresponding pull request on github:
-        https://github.com/mackelab/sbi/pull/378
-        and tutorials:
-        https://www.mackelab.org/sbi/tutorial/02_flexible_interface/
-
-        Provide external $\theta$ and $x$ to be used for training later on.
-
-        Args:
-            theta: Parameter sets used to generate presimulated data.
-            x: Simulation outputs of presimulated data.
-            from_round: Which round the data was simulated from. `from_round=0` means
-                that the data came from the first round, i.e. the prior.
-        """
-        raise NameError(
-            "Deprecated since sbi 0.14.0. "
-            "Instead of using this, please use `.append_simulations()`. Please "
-            "consult release notes to see how you can update your code: "
-            "https://github.com/mackelab/sbi/releases/tag/v0.14.0"
-            "More information can be found under the corresponding pull request on "
-            "github: "
-            "https://github.com/mackelab/sbi/pull/378"
-            "and tutorials: "
-            "https://www.mackelab.org/sbi/tutorial/02_flexible_interface/",
         )
 
     def get_simulations(

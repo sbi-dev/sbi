@@ -35,8 +35,8 @@ class SNPE_B(PosteriorEstimator):
             "SNPE-B is not yet implemented in the sbi package, see issue #199."
         )
 
-        kwargs = del_entries(locals(), entries=("self", "__class__", "unused_args"))
-        super().__init__(**kwargs, **unused_args)
+        kwargs = del_entries(locals(), entries=("self", "__class__"))
+        super().__init__(**kwargs)
 
     def _log_prob_proposal_posterior(
         self, theta: Tensor, x: Tensor, masks: Tensor

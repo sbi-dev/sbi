@@ -30,7 +30,6 @@ class RatioEstimator(NeuralInference, ABC):
         logging_level: Union[int, str] = "warning",
         summary_writer: Optional[SummaryWriter] = None,
         show_progress_bars: bool = True,
-        **unused_args
     ):
         r"""Sequential Neural Ratio Estimation.
 
@@ -50,9 +49,6 @@ class RatioEstimator(NeuralInference, ABC):
                 first batch of simulations (theta, x), which can thus be used for shape
                 inference and potentially for z-scoring. It needs to return a PyTorch
                 `nn.Module` implementing the classifier.
-            unused_args: Absorbs additional arguments. No entries will be used. If it
-                is not empty, we warn. In future versions, when the new interface of
-                0.14.0 is more mature, we will remove this argument.
 
         See docstring of `NeuralInference` class for all other arguments.
         """
@@ -63,7 +59,6 @@ class RatioEstimator(NeuralInference, ABC):
             logging_level=logging_level,
             summary_writer=summary_writer,
             show_progress_bars=show_progress_bars,
-            **unused_args,
         )
 
         # As detailed in the docstring, `density_estimator` is either a string or
@@ -101,6 +96,7 @@ class RatioEstimator(NeuralInference, ABC):
                 With default settings, this is not used at all for `SNRE`. Only when
                 the user later on requests `.train(discard_prior_samples=True)`, we
                 use these indices to find which training data stemmed from the prior.
+
         Returns:
             NeuralInference object (returned so that this function is chainable).
         """
@@ -146,7 +142,7 @@ class RatioEstimator(NeuralInference, ABC):
             retrain_from_scratch: Whether to retrain the conditional density
                 estimator for the posterior from scratch each round.
             dataloader_kwargs: Additional or updated kwargs to be passed to the training
-                and validation dataloaders (like, e.g., a collate_fn)
+                and validation dataloaders (like, e.g., a collate_fn).
 
         Returns:
             Classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
@@ -339,6 +335,7 @@ class RatioEstimator(NeuralInference, ABC):
             vi_parameters: Additional kwargs passed to `VIPosterior`.
             rejection_sampling_parameters: Additional kwargs passed to
                 `RejectionPosterior`.
+
         Returns:
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods
             (the returned log-probability is unnormalized).

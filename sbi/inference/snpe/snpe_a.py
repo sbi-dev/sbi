@@ -31,7 +31,6 @@ class SNPE_A(PosteriorEstimator):
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[TensorboardSummaryWriter] = None,
         show_progress_bars: bool = True,
-        **unused_args,
     ):
         r"""SNPE-A [1].
 
@@ -73,9 +72,6 @@ class SNPE_A(PosteriorEstimator):
             summary_writer: A tensorboard `SummaryWriter` to control, among others, log
                 file location (default is `<current working directory>/logs`.)
             show_progress_bars: Whether to show a progressbar during training.
-            unused_args: Absorbs additional arguments. No entries will be used. If it
-                is not empty, we warn. In future versions, when the new interface of
-                0.14.0 is more mature, we will remove this argument.
         """
 
         # Catch invalid inputs.
@@ -95,7 +91,7 @@ class SNPE_A(PosteriorEstimator):
         # to pass arguments between functions, and that's implicit state management.
         kwargs = utils.del_entries(
             locals(),
-            entries=("self", "__class__", "unused_args", "num_components"),
+            entries=("self", "__class__", "num_components"),
         )
         super().__init__(**kwargs)
 
@@ -158,6 +154,7 @@ class SNPE_A(PosteriorEstimator):
                 biases when, in the last round, the Mixture of Gaussians is build from
                 a single Gaussian. This value can be problem-specific and also depends
                 on the number of mixture components.
+
         Returns:
             Density estimator that approximates the distribution $p(\theta|x)$.
         """

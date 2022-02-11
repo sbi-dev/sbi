@@ -31,7 +31,6 @@ class LikelihoodEstimator(NeuralInference, ABC):
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
         show_progress_bars: bool = True,
-        **unused_args
     ):
         r"""Base class for Sequential Neural Likelihood Estimation methods.
 
@@ -48,9 +47,6 @@ class LikelihoodEstimator(NeuralInference, ABC):
                 needs to return a PyTorch `nn.Module` implementing the density
                 estimator. The density estimator needs to provide the methods
                 `.log_prob` and `.sample()`.
-            unused_args: Absorbs additional arguments. No entries will be used. If it
-                is not empty, we warn. In future versions, when the new interface of
-                0.14.0 is more mature, we will remove this argument.
 
         See docstring of `NeuralInference` class for all other arguments.
         """
@@ -61,7 +57,6 @@ class LikelihoodEstimator(NeuralInference, ABC):
             logging_level=logging_level,
             summary_writer=summary_writer,
             show_progress_bars=show_progress_bars,
-            **unused_args,
         )
 
         # As detailed in the docstring, `density_estimator` is either a string or
