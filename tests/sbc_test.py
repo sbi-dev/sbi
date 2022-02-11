@@ -6,28 +6,33 @@ from __future__ import annotations
 import pytest
 import torch
 from torch import eye, ones, zeros
-from torch.distributions import MultivariateNormal
+from torch.distributions import MultivariateNormal, Uniform
 
 from sbi.analysis import check_sbc, get_nltp, run_sbc
-from sbi.inference import SNPE_C, simulate_for_sbi
+from sbi.inference import SNLE, SNPE, simulate_for_sbi
 from sbi.simulators import linear_gaussian
+from sbi.utils import BoxUniform, MultipleIndependent
 
 
-def test_running_sbc(method=SNPE_C, model="mdn"):
+@pytest.mark.parametrize("prior", ("boxuniform", "independent"))
+@pytest.mark.parametrize("method", (SNPE, SNLE))
+def test_running_sbc(method, prior, model="mdn"):
     """Tests running inference and then SBC and obtaining nltp."""
 
     num_dim = 2
+    if prior == "boxuniform":
+        prior = BoxUniform(-torch.ones(num_dim), torch.ones(num_dim))
+    else:
+        prior = MultipleIndependent(
+            [Uniform(-torch.ones(1), torch.ones(1)) for _ in range(num_dim)]
+        )
+
     num_simulations = 100
     max_num_epochs = 1
     num_sbc_runs = 2
 
-    x_o = zeros(1, num_dim)
     likelihood_shift = -1.0 * ones(num_dim)
     likelihood_cov = 0.3 * eye(num_dim)
-
-    prior_mean = zeros(num_dim)
-    prior_cov = eye(num_dim)
-    prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
 
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
@@ -39,12 +44,12 @@ def test_running_sbc(method=SNPE_C, model="mdn"):
     _ = inferer.append_simulations(theta, x).train(
         training_batch_size=100, max_num_epochs=max_num_epochs
     )
-    posterior = inferer.build_posterior().set_default_x(x_o)
+    posterior = inferer.build_posterior()
 
     thetas = prior.sample((num_sbc_runs,))
     xs = simulator(thetas)
 
-    run_sbc(thetas, xs, posterior, num_workers=5)
+    run_sbc(thetas, xs, posterior, num_workers=1, num_posterior_samples=10)
 
     # Check nltp
     get_nltp(thetas, xs, posterior)
