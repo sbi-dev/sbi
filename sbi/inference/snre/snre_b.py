@@ -17,7 +17,6 @@ class SNRE_B(RatioEstimator):
         logging_level: Union[int, str] = "warning",
         summary_writer: Optional[TensorboardSummaryWriter] = None,
         show_progress_bars: bool = True,
-        **unused_args
     ):
         r"""SRE[1], here known as SNRE_B.
 
@@ -42,13 +41,10 @@ class SNRE_B(RatioEstimator):
                 file location (default is `<current working directory>/logs`.)
             show_progress_bars: Whether to show a progressbar during simulation and
                 sampling.
-            unused_args: Absorbs additional arguments. No entries will be used. If it
-                is not empty, we warn. In future versions, when the new interface of
-                0.14.0 is more mature, we will remove this argument.
         """
 
-        kwargs = del_entries(locals(), entries=("self", "__class__", "unused_args"))
-        super().__init__(**kwargs, **unused_args)
+        kwargs = del_entries(locals(), entries=("self", "__class__"))
+        super().__init__(**kwargs)
 
     def train(
         self,
