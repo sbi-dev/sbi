@@ -187,11 +187,12 @@ class MixedLikelihoodBasedPotential(LikelihoodBasedPotential):
             # this optimizes the evaluation of the discrete data part.
             # TODO: how to fix pyright issues?
             log_likelihood_trial_batch = self.likelihood_estimator.log_prob_iid(
-                self.x_o, theta
+                x=self.x_o,
+                theta=theta.to(self.device),
             )  # type: ignore
             # Reshape to (x-trials x parameters), sum over trial-log likelihoods.
             log_likelihood_trial_sum = log_likelihood_trial_batch.reshape(
                 self.x_o.shape[0], -1
             ).sum(0)
 
-        return log_likelihood_trial_sum
+        return log_likelihood_trial_sum + self.prior.log_prob(theta)

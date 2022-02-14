@@ -23,7 +23,6 @@ class MNLE(LikelihoodEstimator):
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[TensorboardSummaryWriter] = None,
         show_progress_bars: bool = True,
-        **unused_args,
     ):
         r"""Mixed Neural Likelihood Estimation (MNLE) [1].
 
@@ -54,9 +53,6 @@ class MNLE(LikelihoodEstimator):
                 file location (default is `<current working directory>/logs`.)
             show_progress_bars: Whether to show a progressbar during simulation and
                 sampling.
-            unused_args: Absorbs additional arguments. No entries will be used. If it
-                is not empty, we warn. In future versions, when the new interface of
-                0.14.0 is more mature, we will remove this argument.
         """
 
         if isinstance(density_estimator, str):
@@ -64,8 +60,8 @@ class MNLE(LikelihoodEstimator):
                 density_estimator == "mnle"
             ), f"""MNLE can be used with preconfigured 'mnle' density estimator only, 
                 not with {density_estimator}."""
-        kwargs = del_entries(locals(), entries=("self", "__class__", "unused_args"))
-        super().__init__(**kwargs, **unused_args)
+        kwargs = del_entries(locals(), entries=("self", "__class__"))
+        super().__init__(**kwargs)
 
     def train(
         self,
@@ -73,7 +69,7 @@ class MNLE(LikelihoodEstimator):
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
         stop_after_epochs: int = 20,
-        max_num_epochs: Optional[int] = None,
+        max_num_epochs: int = 2**31 - 1,
         clip_max_norm: Optional[float] = 5.0,
         exclude_invalid_x: bool = True,
         resume_training: bool = False,
