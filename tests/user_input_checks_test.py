@@ -77,6 +77,10 @@ def matrix_simulator(theta):
     return theta.reshape(1, 2, 2)
 
 
+# Set default tensor locally to reach tensors in fixtures.
+torch.set_default_tensor_type(torch.FloatTensor)
+
+
 @pytest.mark.parametrize(
     "wrapper, prior, kwargs",
     (

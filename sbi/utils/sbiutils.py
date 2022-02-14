@@ -637,7 +637,25 @@ def mcmc_transform(
             transform, reinterpreted_batch_ndims=1
         )
 
+    check_transform(prior, transform)  # type: ignore
+
     return transform.inv  # type: ignore
+
+
+def check_transform(prior: Distribution, transform: TorchTransform) -> None:
+    """Check validity of transformed and re-transformed samples."""
+
+    theta = prior.sample((2,))
+
+    theta_unconstrained = transform.inv(theta)
+    assert (
+        theta_unconstrained.shape == theta.shape
+    ), """Mismatch between transformed and untransformed space. Note that you cannot 
+    use a transforms when using a MultipleIndependent prior with a Dirichlet prior."""
+
+    assert torch.allclose(
+        theta, transform(theta_unconstrained)
+    ), "Mismatch between true and re-transformed parameters."
 
 
 class ImproperEmpirical(Empirical):
