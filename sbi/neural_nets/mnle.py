@@ -23,7 +23,7 @@ def build_mnle(
     z_score_y: Optional[str] = "independent",
     num_transforms: int = 2,
     num_bins: int = 5,
-    hidden_features: int = 10,
+    hidden_features: int = 50,
     hidden_layers: int = 2,
     tail_bound: float = 10.0,
     log_transform_x: bool = True,
