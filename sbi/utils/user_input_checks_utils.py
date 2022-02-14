@@ -205,15 +205,17 @@ class MultipleIndependent(Distribution):
         arg_constraints: Dict[str, constraints.Constraint] = {},
     ):
         self._check_distributions(dists)
+        if validate_args is not None:
+            [d.set_default_validate_args(validate_args) for d in dists]
 
         self.dists = dists
         # numel() instead of event_shape because for all dists both is possible,
         # event_shape=[1] or batch_shape=[1]
-        self.dims_per_dist: Tensor = torch.as_tensor(
-            [d.sample().numel() for d in self.dists]
-        )
+        self.dims_per_dist = [d.sample().numel() for d in self.dists]
+
         self.ndims = int(torch.sum(torch.as_tensor(self.dims_per_dist)).item())
         self.custom_arg_constraints = arg_constraints
+        self.validate_args = validate_args
 
         super().__init__(
             batch_shape=torch.Size([]),  # batch size was ensured to be <= 1 above.
@@ -284,7 +286,7 @@ class MultipleIndependent(Distribution):
         log_probs = []
         dims_covered = 0
         for idx, d in enumerate(self.dists):
-            ndims = int(self.dims_per_dist[idx].item())
+            ndims = int(self.dims_per_dist[idx])
             v = value[:, dims_covered : dims_covered + ndims]
             # Reshape here to ensure all returned log_probs are 2D for concatenation.
             log_probs.append(d.log_prob(v).reshape(num_samples, 1))
@@ -338,7 +340,6 @@ class MultipleIndependent(Distribution):
                 supports.append(d.support.base_constraint)
             else:
                 supports.append(d.support)
-
         # Wrap as `independent` in order to have the correct shape of the
         # `log_abs_det`, i.e. summed over the parameter dimensions.
         return constraints.independent(
