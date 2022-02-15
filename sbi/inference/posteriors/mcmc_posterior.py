@@ -8,10 +8,12 @@ from warnings import warn
 import numpy as np
 import torch
 import torch.distributions.transforms as torch_tf
+from joblib import Parallel, delayed
 from pyro.infer.mcmc import HMC, NUTS
 from pyro.infer.mcmc.api import MCMC
 from torch import Tensor
 from torch import multiprocessing as mp
+from tqdm import tqdm
 
 from sbi import utils as utils
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
@@ -23,6 +25,7 @@ from sbi.samplers.mcmc import (
     proposal_init,
     sir,
 )
+from sbi.simulators.simutils import tqdm_joblib
 from sbi.types import Shape, TorchTransform
 from sbi.utils import pyro_potential_wrapper, transformed_potential
 from sbi.utils.torchutils import ensure_theta_batched
@@ -45,6 +48,7 @@ class MCMCPosterior(NeuralPosterior):
         num_chains: int = 1,
         init_strategy: str = "sir",
         init_strategy_num_candidates: int = 1_000,
+        num_workers: int = 1,
         device: Optional[str] = None,
         x_shape: Optional[torch.Size] = None,
     ):
@@ -71,6 +75,8 @@ class MCMCPosterior(NeuralPosterior):
                 with weights proportional to the `potential_fn`-value.
             init_strategy_num_candidates: Number of candidates to to find init
                 locations in `init_strategy=sir`.
+            num_workers: number of cpu core used to parallelize initialization of mcmc
+                parameters.
             device: Training device, e.g., "cpu", "cuda" or "cuda:0". If None,
                 `potential_fn.device` is used.
             x_shape: Shape of a single simulator output. If passed, it is used to check
@@ -91,6 +97,7 @@ class MCMCPosterior(NeuralPosterior):
         self.num_chains = num_chains
         self.init_strategy = init_strategy
         self.init_strategy_num_candidates = init_strategy_num_candidates
+        self.num_workers = num_workers
 
         self.potential_ = self._prepare_potential(method)
 
@@ -160,6 +167,7 @@ class MCMCPosterior(NeuralPosterior):
         mcmc_parameters: Dict = {},
         mcmc_method: Optional[str] = None,
         sample_with: Optional[str] = None,
+        num_workers: Optional[int] = None,
         show_progress_bars: bool = True,
     ) -> Tensor:
         r"""Return samples from posterior distribution $p(\theta|x)$ with MCMC.
@@ -190,6 +198,7 @@ class MCMCPosterior(NeuralPosterior):
         warmup_steps = self.warmup_steps if warmup_steps is None else warmup_steps
         num_chains = self.num_chains if num_chains is None else num_chains
         init_strategy = self.init_strategy if init_strategy is None else init_strategy
+        num_workers = self.num_workers if num_workers is None else num_workers
         init_strategy_num_candidates = (
             self.init_strategy_num_candidates
             if init_strategy_num_candidates is None
@@ -234,9 +243,21 @@ class MCMCPosterior(NeuralPosterior):
             transform=self.theta_transform,
             init_strategy=init_strategy,  # type: ignore
         )
-        initial_params = torch.cat(
-            [init_fn() for _ in range(num_chains)]  # type: ignore
-        )
+
+        # Generate initial params parallelized over num_workers.
+        with tqdm_joblib(
+            tqdm(
+                range(num_chains),  # type: ignore
+                disable=not show_progress_bars,
+                desc=f"Generating {num_chains} MCMC inits with {num_workers} workers.",
+                total=num_chains,
+            )
+        ) as _:
+            initial_params = torch.cat(
+                Parallel(n_jobs=num_workers)(
+                    delayed(init_fn)() for _ in range(num_chains)  # type: ignore
+                )
+            )
 
         num_samples = torch.Size(sample_shape).numel()
 
