@@ -1,28 +1,27 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 from functools import partial
-from math import ceil
 from typing import Any, Callable, Dict, Optional, Union
 from warnings import warn
 
-import numpy as np
 import torch
 import torch.distributions.transforms as torch_tf
+from joblib import Parallel, delayed
 from pyro.infer.mcmc import HMC, NUTS
 from pyro.infer.mcmc.api import MCMC
 from torch import Tensor
 from torch import multiprocessing as mp
+from tqdm import tqdm
 
-from sbi import utils as utils
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.samplers.mcmc import (
     IterateParameters,
     Slice,
-    SliceSampler,
-    SliceSamplerVectorized,
     proposal_init,
     sir,
+    slice_np_parallized,
 )
+from sbi.simulators.simutils import tqdm_joblib
 from sbi.types import Shape, TorchTransform
 from sbi.utils import pyro_potential_wrapper, transformed_potential
 from sbi.utils.torchutils import ensure_theta_batched
@@ -45,6 +44,7 @@ class MCMCPosterior(NeuralPosterior):
         num_chains: int = 1,
         init_strategy: str = "sir",
         init_strategy_num_candidates: int = 1_000,
+        num_workers: int = 1,
         device: Optional[str] = None,
         x_shape: Optional[torch.Size] = None,
     ):
@@ -71,6 +71,7 @@ class MCMCPosterior(NeuralPosterior):
                 with weights proportional to the `potential_fn`-value.
             init_strategy_num_candidates: Number of candidates to to find init
                 locations in `init_strategy=sir`.
+            num_workers: number of cpu cores used to parallelize mcmc
             device: Training device, e.g., "cpu", "cuda" or "cuda:0". If None,
                 `potential_fn.device` is used.
             x_shape: Shape of a single simulator output. If passed, it is used to check
@@ -91,6 +92,7 @@ class MCMCPosterior(NeuralPosterior):
         self.num_chains = num_chains
         self.init_strategy = init_strategy
         self.init_strategy_num_candidates = init_strategy_num_candidates
+        self.num_workers = num_workers
 
         self.potential_ = self._prepare_potential(method)
 
@@ -160,6 +162,7 @@ class MCMCPosterior(NeuralPosterior):
         mcmc_parameters: Dict = {},
         mcmc_method: Optional[str] = None,
         sample_with: Optional[str] = None,
+        num_workers: Optional[int] = None,
         show_progress_bars: bool = True,
     ) -> Tensor:
         r"""Return samples from posterior distribution $p(\theta|x)$ with MCMC.
@@ -190,6 +193,7 @@ class MCMCPosterior(NeuralPosterior):
         warmup_steps = self.warmup_steps if warmup_steps is None else warmup_steps
         num_chains = self.num_chains if num_chains is None else num_chains
         init_strategy = self.init_strategy if init_strategy is None else init_strategy
+        num_workers = self.num_workers if num_workers is None else num_workers
         init_strategy_num_candidates = (
             self.init_strategy_num_candidates
             if init_strategy_num_candidates is None
@@ -228,16 +232,9 @@ class MCMCPosterior(NeuralPosterior):
         )
         self.potential_ = self._prepare_potential(method)  # type: ignore
 
-        init_fn = self._build_mcmc_init_fn(
-            self.proposal,
-            self.potential_fn,
-            transform=self.theta_transform,
-            init_strategy=init_strategy,  # type: ignore
+        initial_params = self._get_initial_params(
+            init_strategy, num_chains, num_workers, show_progress_bars  # type: ignore
         )
-        initial_params = torch.cat(
-            [init_fn() for _ in range(num_chains)]  # type: ignore
-        )
-
         num_samples = torch.Size(sample_shape).numel()
 
         track_gradients = method in ("hmc", "nuts")
@@ -250,6 +247,7 @@ class MCMCPosterior(NeuralPosterior):
                     thin=thin,  # type: ignore
                     warmup_steps=warmup_steps,  # type: ignore
                     vectorized=(method == "slice_np_vectorized"),
+                    num_workers=num_workers,
                     show_progress_bars=show_progress_bars,
                 )
             elif method in ("hmc", "nuts", "slice"):
@@ -306,6 +304,66 @@ class MCMCPosterior(NeuralPosterior):
         else:
             raise NotImplementedError
 
+    def _get_initial_params(
+        self,
+        init_strategy: str,
+        num_chains: int,
+        num_workers: int,
+        show_progress_bars: bool,
+    ) -> Tensor:
+        """Return initial parameters for MCMC obtained with given init strategy.
+
+        Parallelizes across CPU cores only for SIR.
+
+        Args:
+            init_strategy: Specifies the initialization method. Either of
+                [`proposal`|`sir`|`latest_sample`].
+            num_chains: number of MCMC chains, generates initial params for each
+            num_workers: number of CPU cores for parallization
+            show_progress_bars: whether to show progress bars for SIR init
+
+        Returns:
+            Tensor: initial parameters, one for each chain
+        """
+        # Build init function
+        init_fn = self._build_mcmc_init_fn(
+            self.proposal,
+            self.potential_fn,
+            transform=self.theta_transform,
+            init_strategy=init_strategy,  # type: ignore
+        )
+
+        # Parallelize inits for SIR only.
+        if num_workers > 1 and init_strategy == "sir":
+
+            def seeded_init_fn(seed):
+                torch.manual_seed(seed)
+                return init_fn()
+
+            seeds = torch.randint(high=2**31, size=(num_workers,))
+
+            # Generate initial params parallelized over num_workers.
+            with tqdm_joblib(
+                tqdm(
+                    range(num_chains),  # type: ignore
+                    disable=not show_progress_bars,
+                    desc=f"""Generating {num_chains} MCMC inits with {num_workers} 
+                         workers.""",
+                    total=num_chains,
+                )
+            ):
+                initial_params = torch.cat(
+                    Parallel(n_jobs=num_workers)(
+                        delayed(seeded_init_fn)(seed) for seed in seeds
+                    )
+                )
+        else:
+            initial_params = torch.cat(
+                [init_fn() for _ in range(num_chains)]  # type: ignore
+            )
+
+        return initial_params
+
     def _slice_np_mcmc(
         self,
         num_samples: int,
@@ -314,6 +372,7 @@ class MCMCPosterior(NeuralPosterior):
         thin: int,
         warmup_steps: int,
         vectorized: bool = False,
+        num_workers: int = 1,
         show_progress_bars: bool = True,
     ) -> Tensor:
         """Custom implementation of slice sampling using Numpy.
@@ -326,43 +385,26 @@ class MCMCPosterior(NeuralPosterior):
             warmup_steps: Initial number of samples to discard.
             vectorized: Whether to use a vectorized implementation of
                 the Slice sampler (still experimental).
+            num_workers: number of CPU cores to use
+            seed: seed that will be used to generate sub-seeds for each worker
             show_progress_bars: Whether to show a progressbar during sampling;
                 can only be turned off for vectorized sampler.
 
         Returns: Tensor of shape (num_samples, shape_of_single_theta).
         """
-        num_chains = initial_params.shape[0]
-        dim_samples = initial_params.shape[1]
 
-        if not vectorized:  # Sample all chains sequentially
-            all_samples = []
-            for c in range(num_chains):
-                posterior_sampler = SliceSampler(
-                    utils.tensor2numpy(initial_params[c, :]).reshape(-1),
-                    lp_f=potential_function,
-                    thin=thin,
-                    verbose=show_progress_bars,
-                )
-                if warmup_steps > 0:
-                    posterior_sampler.gen(int(warmup_steps))
-                all_samples.append(
-                    posterior_sampler.gen(ceil(num_samples / num_chains))
-                )
-            all_samples = np.stack(all_samples).astype(np.float32)
-            samples = torch.from_numpy(all_samples)  # chains x samples x dim
-        else:  # Sample all chains at the same time
-            posterior_sampler = SliceSamplerVectorized(
-                init_params=utils.tensor2numpy(initial_params),
-                log_prob_fn=potential_function,
-                num_chains=num_chains,
-                verbose=show_progress_bars,
-            )
-            warmup_ = warmup_steps * thin
-            num_samples_ = ceil((num_samples * thin) / num_chains)
-            samples = posterior_sampler.run(warmup_ + num_samples_)
-            samples = samples[:, warmup_:, :]  # discard warmup steps
-            samples = samples[:, ::thin, :]  # thin chains
-            samples = torch.from_numpy(samples)  # chains x samples x dim
+        num_chains, dim_samples = initial_params.shape
+
+        samples = slice_np_parallized(
+            potential_function,
+            initial_params,
+            num_samples,
+            thin=thin,
+            warmup_steps=warmup_steps,
+            vectorized=vectorized,
+            num_workers=num_workers,
+            show_progress_bars=show_progress_bars,
+        )
 
         # Save sample as potential next init (if init_strategy == 'latest_sample').
         self._mcmc_init_params = samples[:, -1, :].reshape(num_chains, dim_samples)
