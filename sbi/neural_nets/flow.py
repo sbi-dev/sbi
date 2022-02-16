@@ -101,6 +101,9 @@ def build_maf(
     hidden_features: int = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
+    num_blocks: int = 2,
+    dropout_probability: float = 0.0,
+    use_batch_norm: bool = False,
     **kwargs,
 ) -> nn.Module:
     """Builds MAF p(x|y).
@@ -119,6 +122,9 @@ def build_maf(
         hidden_features: Number of hidden features.
         num_transforms: Number of transforms.
         embedding_net: Optional embedding network for y.
+        num_blocks: number of blocks used for residual net for context embedding.
+        dropout_probability: dropout probability for regularization in residual net.
+        use_batch_norm: whether to use batch norm in residual net.
         kwargs: Additional arguments that are passed by the build function but are not
             relevant for maf and are therefore ignored.
 
@@ -141,12 +147,12 @@ def build_maf(
                 features=x_numel,
                 hidden_features=hidden_features,
                 context_features=y_numel,
-                num_blocks=2,
+                num_blocks=num_blocks,
                 use_residual_blocks=False,
                 random_mask=False,
                 activation=tanh,
-                dropout_probability=0.0,
-                use_batch_norm=True,
+                dropout_probability=dropout_probability,
+                use_batch_norm=use_batch_norm,
             ),
             transforms.RandomPermutation(features=x_numel),
         ]
@@ -184,6 +190,9 @@ def build_nsf(
     embedding_net: nn.Module = nn.Identity(),
     tail_bound: float = 3.0,
     hidden_layers_spline_context: int = 1,
+    num_blocks: int = 2,
+    dropout_probability: float = 0.0,
+    use_batch_norm: bool = False,
     **kwargs,
 ) -> nn.Module:
     """Builds NSF p(x|y).
@@ -203,6 +212,12 @@ def build_nsf(
         num_transforms: Number of transforms.
         num_bins: Number of bins used for the splines.
         embedding_net: Optional embedding network for y.
+        tail_bound: tail bound for each spline.
+        hidden_layers_spline_context: number of hidden layers of the spline context net
+            for one-dimensional x.
+        num_blocks: number of blocks used for residual net for context embedding.
+        dropout_probability: dropout probability for regularization in residual net.
+        use_batch_norm: whether to use batch norm in residual net.
         kwargs: Additional arguments that are passed by the build function but are not
             relevant for maf and are therefore ignored.
 
@@ -236,10 +251,10 @@ def build_nsf(
             nets.ResidualNet,
             hidden_features=hidden_features,
             context_features=y_numel,
-            num_blocks=2,
+            num_blocks=num_blocks,
             activation=relu,
-            dropout_probability=0.0,
-            use_batch_norm=False,
+            dropout_probability=dropout_probability,
+            use_batch_norm=use_batch_norm,
         )
 
     # Stack spline transforms.

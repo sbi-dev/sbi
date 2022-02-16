@@ -23,6 +23,7 @@ def classifier_nn(
     hidden_features: int = 50,
     embedding_net_theta: nn.Module = nn.Identity(),
     embedding_net_x: nn.Module = nn.Identity(),
+    **kwargs,
 ) -> Callable:
     r"""
     Returns a function that builds a classifier for learning density ratios.
@@ -49,6 +50,7 @@ def classifier_nn(
         embedding_net_x:  Optional embedding network for simulation outputs $x$. This
             embedding net allows to learn features from potentially high-dimensional
             simulation outputs.
+        kwargs: additional custom arguments passed to downstream build functions.
     """
 
     kwargs = dict(
@@ -67,7 +69,8 @@ def classifier_nn(
                 embedding_net_theta,
                 embedding_net_x,
             ),
-        )
+        ),
+        **kwargs,
     )
 
     def build_fn(batch_theta, batch_x):
@@ -96,6 +99,7 @@ def likelihood_nn(
     num_bins: int = 10,
     embedding_net: nn.Module = nn.Identity(),
     num_components: int = 10,
+    **kwargs,
 ) -> Callable:
     r"""
     Returns a function that builds a density estimator for learning the likelihood.
@@ -124,6 +128,7 @@ def likelihood_nn(
         embedding_net: Optional embedding network for parameters $\theta$.
         num_components: Number of mixture components for a mixture of Gaussians.
             Ignored if density estimator is not an mdn.
+        kwargs: additional custom arguments passed to downstream build functions.
     """
 
     kwargs = dict(
@@ -146,7 +151,8 @@ def likelihood_nn(
                 embedding_net,
                 num_components,
             ),
-        )
+        ),
+        **kwargs,
     )
 
     def build_fn(batch_theta, batch_x):
@@ -175,6 +181,7 @@ def posterior_nn(
     num_bins: int = 10,
     embedding_net: nn.Module = nn.Identity(),
     num_components: int = 10,
+    **kwargs,
 ) -> Callable:
     r"""
     Returns a function that builds a density estimator for learning the posterior.
@@ -205,6 +212,7 @@ def posterior_nn(
             simulation outputs.
         num_components: Number of mixture components for a mixture of Gaussians.
             Ignored if density estimator is not an mdn.
+        kwargs: additional custom arguments passed to downstream build functions.
     """
 
     kwargs = dict(
@@ -227,7 +235,8 @@ def posterior_nn(
                 embedding_net,
                 num_components,
             ),
-        )
+        ),
+        **kwargs,
     )
 
     def build_fn_snpe_a(batch_theta, batch_x, num_components):
@@ -242,7 +251,7 @@ def posterior_nn(
             batch_x=batch_theta,
             batch_y=batch_x,
             num_components=num_components,
-            **kwargs
+            **kwargs,
         )
 
     def build_fn(batch_theta, batch_x):

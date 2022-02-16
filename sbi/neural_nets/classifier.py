@@ -199,6 +199,9 @@ def build_resnet_classifier(
     hidden_features: int = 50,
     embedding_net_x: nn.Module = nn.Identity(),
     embedding_net_y: nn.Module = nn.Identity(),
+    num_blocks: int = 2,
+    dropout_probability: float = 0.0,
+    use_batch_norm: bool = False,
 ) -> nn.Module:
     """Builds ResNet classifier.
 
@@ -235,10 +238,10 @@ def build_resnet_classifier(
         out_features=1,
         hidden_features=hidden_features,
         context_features=None,
-        num_blocks=2,
+        num_blocks=num_blocks,
         activation=relu,
-        dropout_probability=0.0,
-        use_batch_norm=False,
+        dropout_probability=dropout_probability,
+        use_batch_norm=use_batch_norm,
     )
 
     input_layer = build_input_layer(
