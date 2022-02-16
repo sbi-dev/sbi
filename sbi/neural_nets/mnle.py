@@ -21,12 +21,12 @@ def build_mnle(
     batch_y: Tensor,
     z_score_x: Optional[str] = "independent",
     z_score_y: Optional[str] = "independent",
-    log_transform_x: bool = True,
     num_transforms: int = 2,
     num_bins: int = 5,
-    tail_bound: float = 10.0,
     hidden_features: int = 10,
     hidden_layers: int = 2,
+    tail_bound: float = 10.0,
+    log_transform_x: bool = True,
     **kwargs,
 ):
     """Returns a density estimator for mixed data types.
@@ -39,13 +39,13 @@ def build_mnle(
         batch_y: batch of parameters
         z_score_x: whether to z-score x.
         z_score_y: whether to z-score y.
-        log_transform_x: whether to apply a log-transform to x to move it to unbounded
-            space, e.g., in case x consists of reaction time data (bounded by zero).
         num_transforms: number of transforms in the NSF
         num_bins: bins per spline for NSF.
-        tail_bound: spline tail bound for NSF.
         hidden_features: number of hidden features used in both nets.
         hidden_layers: number of hidden layers in the categorical net.
+        tail_bound: spline tail bound for NSF.
+        log_transform_x: whether to apply a log-transform to x to move it to unbounded
+            space, e.g., in case x consists of reaction time data (bounded by zero).
 
     Returns:
         MixedDensityEstimator: nn.Module for performing MNLE.
