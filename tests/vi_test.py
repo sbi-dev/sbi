@@ -4,22 +4,19 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from pydoc import cli
-from tabnanny import check
 
 import numpy as np
 import pytest
 import torch
 import torch.distributions.transforms as torch_tf
-from pkg_resources import Distribution
 from torch import eye, ones, zeros
-from torch.distributions import MultivariateNormal
+from torch.distributions import Beta, Binomial, Gamma, MultivariateNormal
 
-from sbi import utils
-from sbi.inference import SNLE, SNPE, SNRE, prepare_for_sbi, simulate_for_sbi
+from sbi.inference import SNLE, likelihood_estimator_based_potential
 from sbi.inference.posteriors import VIPosterior
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.simulators.linear_gaussian import true_posterior_linear_gaussian_mvn_prior
+from sbi.utils import MultipleIndependent
 from tests.test_utils import check_c2st
 
 
@@ -306,3 +303,36 @@ def test_vi_posterior_inferface():
     # Test log_prob and potential
     posterior.log_prob(posterior.sample())
     posterior.potential(posterior.sample())
+
+
+def test_vi_with_multiple_independent_prior():
+    prior = MultipleIndependent(
+        [
+            Gamma(torch.tensor([1.0]), torch.tensor([0.5])),
+            Beta(torch.tensor([2.0]), torch.tensor([2.0])),
+        ],
+        validate_args=False,
+    )
+
+    def simulator(theta):
+        return Binomial(probs=theta[:, 1]).sample().reshape(-1, 1)
+
+    num_simulations = 100
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
+
+    trainer = SNLE(prior)
+    nle = trainer.append_simulations(theta, x).train()
+    potential, transform = likelihood_estimator_based_potential(nle, prior, x[0])
+    posterior = VIPosterior(
+        potential,
+        prior=prior,  # type: ignore
+        theta_transform=transform,
+    )
+    posterior.set_default_x(x[0])
+    posterior.train()
+
+    posterior.sample(
+        sample_shape=(10,),
+        show_progress_bars=False,
+    )
