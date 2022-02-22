@@ -383,6 +383,10 @@ def local_coverage_test(
     uniform_predictions_per_dim:
         List of alpha predictions per dimension of theta, null_distr_samples value, xs_test point and alpha quantile. The predictions are based on uniform distribution samples.
     """
+    xs_test = atleast_2d_float32_tensor(xs_test)   
+    xs_train = atleast_2d_float32_tensor(xs_train)
+    xs_ranks = atleast_2d_float32_tensor(xs_ranks)
+    
     rank_predictions_per_dim = []
     uniform_predictions_per_dim = []
     local_pvalues_per_dim = []
@@ -390,15 +394,15 @@ def local_coverage_test(
 
     for dim in range(xs_ranks.shape[1]):
 
-        # Normalize ranks
-        xs_ranks = torch.ravel(xs_ranks[:, dim]) / num_posterior_samples
+        # Select dim, normalize ranks
+        ranks = torch.ravel(xs_ranks[:, dim]) / num_posterior_samples
 
         ### Calculate local test at points of interest xs_test
         rank_predictions = torch.zeros(size=(xs_test.shape[0], len(alphas)))
 
         for i, alpha in enumerate(alphas):
             # Fit training samples and PIT indicators/ranks
-            ind_train = [1 * (rank <= alpha) for rank in xs_ranks]
+            ind_train = [1 * (rank <= alpha) for rank in ranks]
             rhat_rank = copy.deepcopy(classifier)
             rhat_rank.fit(X=xs_train, y=ind_train)
 
