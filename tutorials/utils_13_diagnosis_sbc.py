@@ -1,26 +1,18 @@
+import math
 from typing import Callable, Optional
 
 import torch
-from torch import eye, ones
-from torch.distributions import MultivariateNormal
 
 from sbi.types import Shape
 
 
 # Mocking a neural posterior
 class BiasedPosterior:
-    def __init__(self, posterior: Callable, prior: Callable, shift: float = 5.0):
-        """give me a prior/posterior and I'll shift it, this class mimicks the case
-        if prior == posterior
-        """
+    def __init__(self, posterior: Callable, shift: float = 5.0):
+        """give me a prior/posterior and I'll shift it by a scalar `shift`. All calls to `sample` are wrapped."""
 
         self.shift = shift
-        self.prior = prior
         self.posterior = posterior
-
-    def map(self):
-
-        pass
 
     def set_default_x(self, x):
 
@@ -41,33 +33,19 @@ class BiasedPosterior:
 
 
 class DispersedPosterior:
-    def __init__(
-        self, posterior: Callable, prior: Callable, perc_dispersion: float = 0.05
-    ):
-        """give me a prior/posterior and I'll disperse it, this class mimicks the case
-        if prior == posterior
+    def __init__(self, posterior: Callable, dispersion: float = 1.05):
+        """give me a posterior and I'll disperse it. All calls to `sample` are wrapped.
+        This class exploits: Var(aX) = a**2 * Var(X) for any random variable X
+        while retaining the expectation value E[X] of all samples.
+
+        Parameters:
+            posterior: posterior distribution modelled like NeuralPosterior
+            dispersion: choose values <1. to make the variance smaller,
+                choose values >1. to make the variance larger (distribution more wide)
         """
 
-        self.dispersion = perc_dispersion
-        self.prior = prior
-        num_dim = self.prior.sample((1,)).shape[-1]
-        loc_ = ones(num_dim)
-        cov_ = eye(num_dim) * self.dispersion
-        if self.dispersion > 0.0:
-            self.dist = MultivariateNormal(
-                loc=loc_, covariance_matrix=cov_, validate_args=False
-            )
-        else:
-            self.dist = MultivariateNormal(
-                loc=loc_ + self.dispersion,
-                covariance_matrix=eye(num_dim) * self.dispersion * -1.0,
-                validate_args=False,
-            )
+        self.dispersion = math.sqrt(dispersion)
         self.posterior = posterior
-
-    def map(self):
-
-        pass
 
     def set_default_x(self, x):
 
@@ -83,5 +61,19 @@ class DispersedPosterior:
         value = self.posterior.sample(
             sample_shape, x, show_progress_bars=show_progress_bars
         )
-        dispersion = self.dist.sample(sample_shape)
-        return value * dispersion
+
+        # obtain the median of all samples before applying
+        # the dispersion to them (use median for more robust estimate)
+        median = torch.median(value, dim=0)  # dim 0 is the batch dimension
+
+        # disperse the samples
+        dispersed = value * self.dispersion
+
+        # obtain the new median after the dispersion
+        median_ = torch.median(dispersed, dim=0)
+
+        # shift to obtain the original expectation values
+        # (we only want to disperse the samples, not offset)
+        shift = median.values - median_.values
+
+        return dispersed + shift
