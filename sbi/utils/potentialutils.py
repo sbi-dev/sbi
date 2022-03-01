@@ -1,11 +1,11 @@
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Callable, Dict, Union
 
 import numpy as np
 import torch
 import torch.distributions.transforms as torch_tf
 from torch import Tensor
 
-from sbi.utils.torchutils import atleast_2d, ensure_theta_batched
+from sbi.utils.torchutils import ensure_theta_batched
 
 
 def transformed_potential(
@@ -35,7 +35,7 @@ def transformed_potential(
     ).to(device)
     # Transform `theta` from transformed (i.e. unconstrained) to untransformed
     # space.
-    theta = theta_transform.inv(transformed_theta)
+    theta = theta_transform.inv(transformed_theta)  # type: ignore
     log_abs_det = theta_transform.log_abs_det_jacobian(theta, transformed_theta)
 
     posterior_potential = potential_fn(theta, track_gradients=track_gradients)

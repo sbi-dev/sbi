@@ -138,7 +138,8 @@ class MCMCPosterior(NeuralPosterior):
             `len($\theta$)`-shaped log-probability.
         """
         warn(
-            "`.log_prob()` is deprecated for methods that can only evaluate the log-probability up to a normalizing constant. Use `.potential()` instead."
+            """`.log_prob()` is deprecated for methods that can only evaluate the
+            log-probability up to a normalizing constant. Use `.potential()` instead."""
         )
         warn("The log-probability is unnormalized!")
 
@@ -265,7 +266,7 @@ class MCMCPosterior(NeuralPosterior):
                 raise NameError
 
         samples = self.theta_transform.inv(transformed_samples)
-        return samples.reshape((*sample_shape, -1))
+        return samples.reshape((*sample_shape, -1))  # type: ignore
 
     def _build_mcmc_init_fn(
         self,
@@ -347,7 +348,7 @@ class MCMCPosterior(NeuralPosterior):
                 tqdm(
                     range(num_chains),  # type: ignore
                     disable=not show_progress_bars,
-                    desc=f"""Generating {num_chains} MCMC inits with {num_workers} 
+                    desc=f"""Generating {num_chains} MCMC inits with {num_workers}
                          workers.""",
                     total=num_chains,
                 )

@@ -4,7 +4,7 @@
 
 from abc import ABC
 from copy import deepcopy
-from typing import Any, Callable, Dict, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Optional, Union
 
 import torch
 from pyknos.nflows import flows
@@ -314,7 +314,9 @@ class LikelihoodEstimator(NeuralInference, ABC):
         if prior is None:
             assert (
                 self._prior is not None
-            ), "You did not pass a prior. You have to pass the prior either at initialization `inference = SNLE(prior)` or to `.build_posterior(prior=prior)`."
+            ), """You did not pass a prior. You have to pass the prior either at
+            initialization `inference = SNLE(prior)` or to `.build_posterior
+            (prior=prior)`."""
             prior = self._prior
         else:
             check_prior(prior)
@@ -354,7 +356,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
             self._posterior = VIPosterior(
                 potential_fn=potential_fn,
                 theta_transform=theta_transform,
-                prior=prior,
+                prior=prior,  # type: ignore
                 vi_method=vi_method,
                 device=device,
                 x_shape=self._x_shape,

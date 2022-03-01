@@ -1,5 +1,5 @@
 from abc import ABCMeta, abstractmethod
-from typing import Any, Optional
+from typing import Optional
 
 from torch import Tensor
 from torch.distributions import Distribution

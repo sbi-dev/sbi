@@ -600,7 +600,7 @@ def mcmc_transform(
         # by `biject_to()`, so we have to deal with this case separately.
         if has_support:
             if hasattr(prior.support, "base_constraint"):
-                constraint = prior.support.base_constraint
+                constraint = prior.support.base_constraint  # type: ignore
             else:
                 constraint = prior.support
             if isinstance(constraint, constraints._Real):
@@ -619,7 +619,7 @@ def mcmc_transform(
                 prior_mean = prior.mean.to(device)
                 prior_std = prior.stddev.to(device)
             else:
-                theta = prior.sample((num_prior_samples_for_zscoring,))
+                theta = prior.sample(torch.Size((num_prior_samples_for_zscoring,)))
                 prior_mean = theta.mean(dim=0).to(device)
                 prior_std = theta.std(dim=0).to(device)
 
@@ -645,16 +645,16 @@ def mcmc_transform(
 def check_transform(prior: Distribution, transform: TorchTransform) -> None:
     """Check validity of transformed and re-transformed samples."""
 
-    theta = prior.sample((2,))
+    theta = prior.sample(torch.Size((2,)))
 
     theta_unconstrained = transform.inv(theta)
     assert (
-        theta_unconstrained.shape == theta.shape
-    ), """Mismatch between transformed and untransformed space. Note that you cannot 
+        theta_unconstrained.shape == theta.shape  # type: ignore
+    ), """Mismatch between transformed and untransformed space. Note that you cannot
     use a transforms when using a MultipleIndependent prior with a Dirichlet prior."""
 
     assert torch.allclose(
-        theta, transform(theta_unconstrained)
+        theta, transform(theta_unconstrained)  # type: ignore
     ), "Mismatch between true and re-transformed parameters."
 
 
@@ -747,6 +747,8 @@ def gradient_ascent(
     Warning: The default values used by this function are not well-tested. They might
     require hand-tuning for the problem at hand.
 
+    TODO: find a way to tell pyright that transform(...) does not return None.
+
     Args:
         potential_fn: The function on which to optimize.
         inits: The initial parameters at which to start the gradient ascent steps.
@@ -795,8 +797,8 @@ def gradient_ascent(
     max_val = best_log_prob_overall
 
     optimize_inits = theta_transform(optimize_inits)
-    optimize_inits.requires_grad_(True)
-    optimizer = optim.Adam([optimize_inits], lr=learning_rate)
+    optimize_inits.requires_grad_(True)  # type: ignore
+    optimizer = optim.Adam([optimize_inits], lr=learning_rate)  # type: ignore
 
     iter_ = 0
 
@@ -818,7 +820,7 @@ def gradient_ascent(
                     log_probs_of_optimized = potential_fn(
                         theta_transform.inv(optimize_inits)
                     )
-                    best_theta_iter = optimize_inits[
+                    best_theta_iter = optimize_inits[  # type: ignore
                         torch.argmax(log_probs_of_optimized)
                     ]
                     best_log_prob_iter = potential_fn(
@@ -845,6 +847,6 @@ def gradient_ascent(
     except KeyboardInterrupt:
         interruption = f"Optimization was interrupted after {iter_} iterations. "
         print(interruption + interruption_note)
-        return argmax_, max_val
+        return argmax_, max_val  # type: ignore
 
-    return theta_transform.inv(best_theta_overall), max_val
+    return theta_transform.inv(best_theta_overall), max_val  # type: ignore

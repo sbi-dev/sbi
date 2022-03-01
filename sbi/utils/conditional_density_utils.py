@@ -2,11 +2,8 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 from copy import deepcopy
-from functools import partial
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
-from warnings import warn
+from typing import Callable, List, Optional, Tuple, Union
 
-import numpy as np
 import torch
 import torch.distributions.transforms as torch_tf
 from pyknos.mdn.mdn import MultivariateGaussianMDN as mdn
@@ -14,13 +11,7 @@ from pyknos.nflows.flows import Flow
 from torch import Tensor
 from torch.distributions import Distribution
 
-from sbi.types import TorchTransform
-from sbi.utils.torchutils import (
-    BoxUniform,
-    ScalarFloat,
-    atleast_2d_float32_tensor,
-    ensure_theta_batched,
-)
+from sbi.utils.torchutils import ensure_theta_batched
 from sbi.utils.user_input_checks import process_x
 
 
@@ -111,7 +102,7 @@ def _expected_value_f_of_x(
     limits = ensure_theta_batched(limits)
 
     x_values_over_which_we_integrate = [
-        torch.linspace(lim[0], lim[1], prob.shape[0], device=probs.device)
+        torch.linspace(lim[0].item(), lim[1].item(), prob.shape[0], device=probs.device)
         for lim, prob in zip(torch.flip(limits, [0]), probs)
     ]  # See #403 and #404 for flip().
     grids = list(torch.meshgrid(x_values_over_which_we_integrate))
@@ -163,7 +154,7 @@ def _normalize_probs(probs: Tensor, limits: Tensor) -> Tensor:
 
 
 def extract_and_transform_mog(
-    net: Flow, context: Tensor = None
+    net: Flow, context: Optional[Tensor] = None
 ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
     """Extracts the Mixture of Gaussians (MoG) parameters
     from an MDN based DirectPosterior at either the default x or input x.
@@ -420,7 +411,7 @@ class RestrictedTransformForConditional(torch_tf.Transform):
         full_theta = self.condition.repeat(theta.shape[0], 1)
         full_theta[:, self.dims_to_sample] = theta
         tf_full_theta = self.transform(full_theta)
-        return tf_full_theta[:, self.dims_to_sample]
+        return tf_full_theta[:, self.dims_to_sample]  # type: ignore
 
     def inv(self, theta: Tensor) -> Tensor:
         r"""
@@ -429,7 +420,7 @@ class RestrictedTransformForConditional(torch_tf.Transform):
         full_theta = self.condition.repeat(theta.shape[0], 1)
         full_theta[:, self.dims_to_sample] = theta
         tf_full_theta = self.transform.inv(full_theta)
-        return tf_full_theta[:, self.dims_to_sample]
+        return tf_full_theta[:, self.dims_to_sample]  # type: ignore
 
     def log_abs_det_jacobian(self, theta1: Tensor, theta2: Tensor) -> Tensor:
         """

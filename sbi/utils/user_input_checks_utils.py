@@ -3,13 +3,13 @@
 
 
 import warnings
-from typing import Dict, List, Optional, Sequence, Union
+from typing import Dict, Optional, Sequence, Union
 
 import torch
 from scipy.stats._distn_infrastructure import rv_frozen
 from scipy.stats._multivariate import multi_rv_frozen
 from torch import Tensor, float32
-from torch.distributions import Distribution, Independent, biject_to, constraints
+from torch.distributions import Distribution, constraints
 
 
 class CustomPriorWrapper(Distribution):
@@ -40,12 +40,13 @@ class CustomPriorWrapper(Distribution):
 
     def log_prob(self, value) -> Tensor:
         return torch.as_tensor(
-            self.custom_prior.log_prob(value), dtype=self.return_type
+            self.custom_prior.log_prob(value), dtype=self.return_type  # type: ignore
         )
 
     def sample(self, sample_shape=torch.Size()) -> Tensor:
         return torch.as_tensor(
-            self.custom_prior.sample(sample_shape), dtype=self.return_type
+            self.custom_prior.sample(sample_shape),
+            dtype=self.return_type,  # type: ignore
         )
 
     @property
@@ -84,11 +85,17 @@ class CustomPriorWrapper(Distribution):
 
     @property
     def mean(self):
-        return torch.as_tensor(self.custom_prior.mean, dtype=self.return_type)
+        return torch.as_tensor(
+            self.custom_prior.mean,
+            dtype=self.return_type,  # type: ignore
+        )
 
     @property
     def variance(self):
-        return torch.as_tensor(self.custom_prior.variance, dtype=self.return_type)
+        return torch.as_tensor(
+            self.custom_prior.variance,
+            dtype=self.return_type,  # type: ignore
+        )
 
 
 class ScipyPytorchWrapper(Distribution):
@@ -118,11 +125,15 @@ class ScipyPytorchWrapper(Distribution):
         )
 
     def log_prob(self, value) -> Tensor:
-        return torch.as_tensor(self.prior_scipy.logpdf(x=value), dtype=self.return_type)
+        return torch.as_tensor(
+            self.prior_scipy.logpdf(x=value),
+            dtype=self.return_type,  # type: ignore
+        )
 
     def sample(self, sample_shape=torch.Size()) -> Tensor:
         return torch.as_tensor(
-            self.prior_scipy.rvs(size=sample_shape), dtype=self.return_type
+            self.prior_scipy.rvs(size=sample_shape),
+            dtype=self.return_type,  # type: ignore
         )
 
     @property
@@ -165,18 +176,30 @@ class PytorchReturnTypeWrapper(Distribution):
         self.return_type = return_type
 
     def log_prob(self, value) -> Tensor:
-        return torch.as_tensor(self.prior.log_prob(value), dtype=self.return_type)
+        return torch.as_tensor(
+            self.prior.log_prob(value),
+            dtype=self.return_type,  # type: ignore
+        )
 
     def sample(self, sample_shape=torch.Size()) -> Tensor:
-        return torch.as_tensor(self.prior.sample(sample_shape), dtype=self.return_type)
+        return torch.as_tensor(
+            self.prior.sample(sample_shape),
+            dtype=self.return_type,  # type: ignore
+        )
 
     @property
     def mean(self):
-        return torch.as_tensor(self.prior.mean, dtype=self.return_type)
+        return torch.as_tensor(
+            self.prior.mean,
+            dtype=self.return_type,  # type: ignore
+        )
 
     @property
     def variance(self):
-        return torch.as_tensor(self.prior.variance, dtype=self.return_type)
+        return torch.as_tensor(
+            self.prior.variance,
+            dtype=self.return_type,  # type: ignore
+        )
 
     @property
     def support(self):
@@ -233,7 +256,7 @@ class MultipleIndependent(Distribution):
         """Check if dists is Sequence and longer 1 and check every member."""
         assert isinstance(
             dists, Sequence
-        ), f"""The combination of independent priors must be of type Sequence, is 
+        ), f"""The combination of independent priors must be of type Sequence, is
                {type(dists)}."""
         assert len(dists) > 1, "Provide at least 2 distributions to combine."
         # Check every element of the sequence.

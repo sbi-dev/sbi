@@ -132,15 +132,15 @@ class Slice(MCMCKernel):
         ), "Chain not initialized."
 
         for dim in torch.randperm(self._num_dimensions):
+            # cast for pyright.
+            idx = int(dim.item())
             (
-                params[self._site_name].view(-1)[dim.item()],
+                params[self._site_name].view(-1)[idx],
                 width_d,
-            ) = self._sample_from_conditional(params, dim.item())
+            ) = self._sample_from_conditional(params, idx)
             if self._t < self._warmup_steps:
                 # TODO: Other schemes for tuning bracket width?
-                self._width[dim.item()] += (
-                    width_d.item() - self._width[dim.item()]
-                ) / (self._t + 1)
+                self._width[idx] += (width_d.item() - self._width[idx]) / (self._t + 1)
 
         self._t += 1
 

@@ -8,7 +8,6 @@ import torch
 import torch.distributions.transforms as torch_tf
 from torch import Tensor
 
-from sbi import utils as utils
 from sbi.types import Array, Shape, TorchTransform
 from sbi.utils import gradient_ascent
 from sbi.utils.torchutils import ensure_theta_batched, process_device
@@ -176,7 +175,8 @@ class NeuralPosterior(ABC):
         return self.map_
 
     def __repr__(self):
-        desc = f"""{self.__class__.__name__} sampler for potential_fn=<{self.potential_fn.__class__.__name__}>"""
+        desc = f"""{self.__class__.__name__} sampler for potential_fn=<{self.
+                potential_fn.__class__.__name__}>"""
         return desc
 
     def __str__(self):

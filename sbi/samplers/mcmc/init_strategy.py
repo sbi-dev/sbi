@@ -29,7 +29,7 @@ def proposal_init(
     """Return a sample from the proposal."""
     prior_samples = proposal.sample((1,)).detach()
     transformed_prior_samples = transform(prior_samples)
-    return transformed_prior_samples
+    return transformed_prior_samples  # type: ignore
 
 
 def sir(
@@ -77,4 +77,4 @@ def sir(
 
         idxs = torch.multinomial(probs, 1, replacement=False)
         # Return transformed sample.
-        return transform(init_param_candidates[idxs, :])
+        return transform(init_param_candidates[idxs, :])  # type: ignore

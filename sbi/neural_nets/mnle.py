@@ -114,7 +114,7 @@ class CategoricalNet(nn.Module):
         num_categories: int = 2,
         num_hidden: int = 20,
         num_layers: int = 2,
-        embedding: nn.Module = None,
+        embedding: Optional[nn.Module] = None,
     ):
         """Initialize the neural net.
 
@@ -199,7 +199,11 @@ class CategoricalNet(nn.Module):
 
         # Predict Categorical ps and sample.
         ps = self.forward(theta)
-        return Categorical(probs=ps).sample((num_samples,)).reshape(num_samples, -1)
+        return (
+            Categorical(probs=ps)
+            .sample(torch.Size((num_samples,)))
+            .reshape(num_samples, -1)
+        )
 
 
 class MixedDensityEstimator(nn.Module):
@@ -232,7 +236,7 @@ class MixedDensityEstimator(nn.Module):
 
     def forward(self, x: Tensor):
         raise NotImplementedError(
-            """The forward method is not implemented for MNLE, use '.sample(...)' to 
+            """The forward method is not implemented for MNLE, use '.sample(...)' to
             generate samples though a forward pass."""
         )
 

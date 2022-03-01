@@ -75,7 +75,7 @@ def get_kde(
     if isinstance(bandwidth, str):
         assert bandwidth in ["cv", "scott", "silvermann"], "invalid kde bandwidth name."
 
-    transformed_samples = transform_(samples).numpy()
+    transformed_samples = transform_(samples).numpy()  # type: ignore
     num_samples, dim_samples = transformed_samples.shape
 
     algorithm = "auto"

@@ -262,7 +262,7 @@ class DivergenceOptimizer(ABC):
             m = self.moving_slope[
                 self.num_step - considered_values : self.num_step
             ].mean()
-            return abs(m) < self.eps
+            return abs(m).item() < self.eps
 
     def reset_loss_stats(self) -> None:
         """This will reset the loss statistics."""
@@ -442,7 +442,9 @@ class ElboOptimizer(DivergenceOptimizer):
         loss = -elbo_particles.mean()
         return loss, loss.clone().detach()
 
-    def generate_elbo_particles(self, x_o: Tensor, num_samples: int = None) -> Tensor:
+    def generate_elbo_particles(
+        self, x_o: Tensor, num_samples: Optional[int] = None
+    ) -> Tensor:
         """Generates individual ELBO particles i.e. logp(theta, x_o) - logq(theta)."""
         if num_samples is None:
             num_samples = self.n_particles
@@ -472,7 +474,8 @@ class IWElboOptimizer(ElboOptimizer):
     ELBO, which is an tighter bound to the evidence but also promotes a support covering
     behaviour.
 
-    NOTE: You may want to turn on `stick_the_landing` here as this loss leads to gradient
+    NOTE: You may want to turn on `stick_the_landing` here as this loss leads to
+    gradient
     estimates with vanishing signal to noise ratio. This is relevant for large K,
     especially K > n_particles.
 

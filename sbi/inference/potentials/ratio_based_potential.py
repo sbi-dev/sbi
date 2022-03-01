@@ -1,10 +1,9 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Callable, Optional, Tuple
 
 import torch
-import torch.distributions.transforms as torch_tf
 from torch import Tensor, nn
 from torch.distributions import Distribution
 
@@ -119,7 +118,8 @@ def _log_ratios_over_trials(
     ), "x and theta must match in batch shape."
     assert (
         next(net.parameters()).device == x.device and x.device == theta.device
-    ), f"device mismatch: net, x, theta: {next(net.parameters()).device}, {x.device}, {theta.device}."
+    ), f"""device mismatch: net, x, theta: {next(net.parameters()).device}, {x.device},
+        {theta.device}."""
 
     # Calculate ratios in one batch.
     with torch.set_grad_enabled(track_gradients):

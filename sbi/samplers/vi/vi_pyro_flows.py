@@ -341,13 +341,13 @@ class TransformedDistribution(torch.distributions.TransformedDistribution):
 
     def parameters(self):
         if hasattr(self.base_dist, "parameters"):
-            yield from self.base_dist.parameters()
+            yield from self.base_dist.parameters()  # type: ignore
         for t in self.transforms:
             yield from get_parameters(t)
 
     def modules(self):
         if hasattr(self.base_dist, "modules"):
-            yield from self.base_dist.modules()
+            yield from self.base_dist.modules()  # type: ignore
         for t in self.transforms:
             yield from get_modules(t)
 
@@ -359,7 +359,7 @@ def build_flow(
     transform: str = "affine_autoregressive",
     permute: bool = True,
     batch_norm: bool = False,
-    base_dist: Distribution = None,
+    base_dist: Optional[Distribution] = None,
     device: str = "cpu",
     **kwargs,
 ) -> TransformedDistribution:
@@ -385,10 +385,13 @@ def build_flow(
     """
     # Some transforms increase dimension by decreasing the degrees of freedom e.g.
     # SoftMax.
-    additional_dim = len(
-        link_flow(torch.zeros(event_shape, device=device))
-    ) - torch.tensor(event_shape, device=device)
-    event_shape = torch.Size(torch.tensor(event_shape, device=device) - additional_dim)
+    additional_dim = (
+        len(link_flow(torch.zeros(event_shape, device=device)))
+        - torch.tensor(event_shape, device=device).item()
+    )
+    event_shape = torch.Size(
+        (torch.tensor(event_shape, device=device) - additional_dim).tolist()
+    )
     # Base distribution is standard normal if not specified
     if base_dist is None:
         base_dist = Independent(

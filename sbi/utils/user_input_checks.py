@@ -2,7 +2,6 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 
-import logging
 import warnings
 from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union, cast
 
@@ -47,7 +46,8 @@ def process_prior(
         prior: Prior object with `.sample()` and `.log_prob()` as provided by the user.
         custom_prior_wrapper_kwargs: kwargs to be passed to the class that wraps a
             custom prior into a pytorch Distribution, e.g., for passing bounds for a
-            prior with bounded support (lower_bound, upper_bound), or argument constraints
+            prior with bounded support (lower_bound, upper_bound), or argument
+            constraints.
             (arg_constraints), see pytorch.distributions.Distribution for more info.
 
     Raises:
@@ -94,7 +94,8 @@ def process_custom_prior(
         prior: Prior object with `.sample()` and `.log_prob()` as provided by the user.
         custom_prior_wrapper_kwargs: kwargs to be passed to the class that wraps a
             custom prior into a pytorch Distribution, e.g., for passing bounds for a
-            prior with bounded support (lower_bound, upper_bound), or argument constraints
+            prior with bounded support (lower_bound, upper_bound), or argument
+            constraints.
             (arg_constraints), see pytorch.distributions.Distribution for more info.
 
     Returns:
@@ -123,7 +124,8 @@ def maybe_wrap_prior_as_pytorch(
         prior: Prior object with `.sample()` and `.log_prob()` as provided by the user.
         custom_prior_wrapper_kwargs: kwargs to be passed to the class that wraps a
             custom prior into a pytorch Distribution, e.g., for passing bounds for a
-            prior with bounded support (lower_bound, upper_bound), or argument constraints
+            prior with bounded support (lower_bound, upper_bound), or argument
+            constraints.
             (arg_constraints), see pytorch.distributions.Distribution for more info.
 
     Raises:
@@ -257,8 +259,6 @@ def check_for_possibly_batched_x_shape(x_shape):
 
     x_ndim = len(x_shape)
     inferred_batch_shape, *inferred_data_shape = x_shape
-    # Interpret first dimension as batch dimension.
-    inferred_data_ndim = len(inferred_data_shape)
 
     # Reject multidimensional data with batch_shape > 1.
     if x_ndim > 1 and inferred_batch_shape > 1:
@@ -618,7 +618,7 @@ def check_sbi_inputs(simulator: Callable, prior: Distribution) -> None:
     """
     check_prior_support(prior)
     num_prior_samples = 1
-    theta = prior.sample((num_prior_samples,))
+    theta = prior.sample(torch.Size((num_prior_samples,)))
     theta_batch_shape, *_ = theta.shape
     simulation = simulator(theta)
     sim_batch_shape, *sim_event_shape = simulation.shape
