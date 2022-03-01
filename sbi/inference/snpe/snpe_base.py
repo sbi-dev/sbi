@@ -162,6 +162,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         calibration_kernel: Optional[Callable] = None,
         exclude_invalid_x: bool = True,
         resume_training: bool = False,
+        start_ind_of_data: int = 0,
         discard_prior_samples: bool = False,
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
@@ -219,6 +220,11 @@ class PosteriorEstimator(NeuralInference, ABC):
         theta, x, prior_masks = self.get_simulations(
             start_idx, exclude_invalid_x, warn_on_invalid=True
         )
+        print("theta before", theta.shape)
+        theta = theta[start_ind_of_data:]
+        x = x[start_ind_of_data:]
+        prior_masks = prior_masks[start_ind_of_data:]
+        print("theta after", theta.shape)
 
         # Dataset is shared for training and validation loaders.
         dataset = data.TensorDataset(theta, x, prior_masks)

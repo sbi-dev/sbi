@@ -124,9 +124,9 @@ def _log_likelihoods_over_trials(
     assert (
         x_repeated.shape[0] == theta_repeated.shape[0]
     ), "x and theta must match in batch shape."
-    assert (
-        next(net.parameters()).device == x.device and x.device == theta.device
-    ), f"device mismatch: net, x, theta: {next(net.parameters()).device}, {x.device}, {theta.device}."
+    # assert (
+    #     next(net.parameters()).device == x.device and x.device == theta.device
+    # ), f"device mismatch: net, x, theta: {next(net.parameters()).device}, {x.device}, {theta.device}."
 
     # Calculate likelihood in one batch.
     with torch.set_grad_enabled(track_gradients):

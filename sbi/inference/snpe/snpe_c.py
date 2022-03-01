@@ -96,6 +96,7 @@ class SNPE_C(PosteriorEstimator):
         exclude_invalid_x: bool = True,
         resume_training: bool = False,
         discard_prior_samples: bool = False,
+        start_ind_of_data: int = 0,
         use_combined_loss: bool = False,
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
