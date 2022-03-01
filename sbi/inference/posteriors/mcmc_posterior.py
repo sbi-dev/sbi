@@ -510,16 +510,15 @@ class MCMCPosterior(NeuralPosterior):
         save_best_every: int = 10,
         show_progress_bars: bool = False,
         force_update: bool = False,
-        warn_about_cached: bool = True,
     ) -> Tensor:
         r"""Returns the maximum-a-posteriori estimate (MAP).
 
         The method can be interrupted (Ctrl-C) when the user sees that the
-        log-probability converges. The best estimate will be saved in `self.map_`.
-        The MAP is obtained by running gradient ascent from a given number of starting
-        positions (samples from the posterior with the highest log-probability). After
-        the optimization is done, we select the parameter set that has the highest
-        log-probability after the optimization.
+        log-probability converges. The best estimate will be saved in `self._map` and
+        can be accessed with `self.map()`. The MAP is obtained by running gradient
+        ascent from a given number of starting positions (samples from the posterior
+        with the highest log-probability). After the optimization is done, we select the
+        parameter set that has the highest log-probability after the optimization.
 
         Warning: The default values used by this function are not well-tested. They
         might require hand-tuning for the problem at hand.
@@ -528,14 +527,14 @@ class MCMCPosterior(NeuralPosterior):
         in unbounded space and transform the result back into bounded space.
 
         Args:
-            x: Observed data at which to evaluate the MAP.
+            x: Deprecated - use `.set_default_x()` prior to `.map()`.
             num_iter: Number of optimization steps that the algorithm takes
                 to find the MAP.
             learning_rate: Learning rate of the optimizer.
             init_method: How to select the starting parameters for the optimization. If
-                it is a string, it can be either [`posterior`, `proposal`], which
-                samples the respective distribution `num_init_samples` times. If it is
-                a tensor, the tensor will be used as init locations.
+                it is a string, it can be either [`posterior`, `prior`], which samples
+                the respective distribution `num_init_samples` times. If it is a
+                tensor, the tensor will be used as init locations.
             num_init_samples: Draw this number of samples from the posterior and
                 evaluate the log-probability of all of them.
             num_to_optimize: From the drawn `num_init_samples`, use the
@@ -547,10 +546,8 @@ class MCMCPosterior(NeuralPosterior):
                 (thus, the default is `10`.)
             show_progress_bars: Whether or not to show a progressbar for sampling from
                 the posterior.
-            force_update: Whether or not to re-calculate the MAP when x is unchanged and
+            force_update: Whether to re-calculate the MAP when x is unchanged and
                 have a cached value.
-            warn_about_cached: Whether or not to show warning that we are using the
-                stored value for the MAP.
             log_prob_kwargs: Will be empty for SNLE and SNRE. Will contain
                 {'norm_posterior': True} for SNPE.
 
@@ -567,7 +564,6 @@ class MCMCPosterior(NeuralPosterior):
             save_best_every=save_best_every,
             show_progress_bars=show_progress_bars,
             force_update=force_update,
-            warn_about_cached=warn_about_cached,
         )
 
 

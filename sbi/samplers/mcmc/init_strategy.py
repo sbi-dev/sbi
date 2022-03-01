@@ -4,7 +4,7 @@
 from typing import Any, Callable
 
 import torch
-from pyknos import nflows
+import torch.distributions.transforms as torch_tf
 from torch import Tensor
 
 
