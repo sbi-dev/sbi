@@ -521,15 +521,16 @@ class VIPosterior(NeuralPosterior):
         num_init_samples: int = 10_000,
         save_best_every: int = 10,
         show_progress_bars: bool = False,
+        force_update: bool = False,
     ) -> Tensor:
         r"""Returns the maximum-a-posteriori estimate (MAP).
 
         The method can be interrupted (Ctrl-C) when the user sees that the
-        log-probability converges. The best estimate will be saved in `self.map_`.
-        The MAP is obtained by running gradient ascent from a given number of starting
-        positions (samples from the posterior with the highest log-probability). After
-        the optimization is done, we select the parameter set that has the highest
-        log-probability after the optimization.
+        log-probability converges. The best estimate will be saved in `self._map` and
+        can be accessed with `self.map()`. The MAP is obtained by running gradient
+        ascent from a given number of starting positions (samples from the posterior
+        with the highest log-probability). After the optimization is done, we select the
+        parameter set that has the highest log-probability after the optimization.
 
         Warning: The default values used by this function are not well-tested. They
         might require hand-tuning for the problem at hand.
@@ -538,7 +539,7 @@ class VIPosterior(NeuralPosterior):
         in unbounded space and transform the result back into bounded space.
 
         Args:
-            x: Observed data at which to evaluate the MAP.
+            x: Deprecated - use `.set_default_x()` prior to `.map()`.
             num_iter: Number of optimization steps that the algorithm takes
                 to find the MAP.
             learning_rate: Learning rate of the optimizer.
@@ -557,8 +558,10 @@ class VIPosterior(NeuralPosterior):
                 (thus, the default is `10`.)
             show_progress_bars: Whether or not to show a progressbar for sampling from
                 the posterior.
+            force_update: Whether to re-calculate the MAP when x is unchanged and
+                have a cached value.
             log_prob_kwargs: Will be empty for SNLE and SNRE. Will contain
-                {`norm_posterior`: True} for SNPE.
+                {'norm_posterior': True} for SNPE.
 
         Returns:
             The MAP estimate.
@@ -573,4 +576,5 @@ class VIPosterior(NeuralPosterior):
             num_init_samples=num_init_samples,
             save_best_every=save_best_every,
             show_progress_bars=show_progress_bars,
+            force_update=force_update,
         )

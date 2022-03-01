@@ -106,6 +106,7 @@ class NeuralPosterior(ABC):
 
     def set_default_x(self, x: Tensor) -> "NeuralPosterior":
         """Set new default x for `.sample(), .log_prob` to use as conditioning context.
+
         Reset the MAP stored for the old default x if applicable.
 
         This is a pure convenience to avoid having to repeatedly specify `x` in calls to
@@ -143,6 +144,41 @@ class NeuralPosterior(ABC):
         else:
             return self.default_x
 
+    def _calculate_map(
+        self,
+        num_iter: int = 1_000,
+        num_to_optimize: int = 100,
+        learning_rate: float = 0.01,
+        init_method: Union[str, Tensor] = "posterior",
+        num_init_samples: int = 1_000,
+        save_best_every: int = 10,
+        show_progress_bars: bool = False,
+    ) -> Tensor:
+        """Calculates the maximum-a-posteriori estimate (MAP).
+
+        See `map()` method of child classes for docstring.
+        """
+
+        if init_method == "posterior":
+            inits = self.sample((num_init_samples,))
+        elif init_method == "proposal":
+            inits = self.proposal.sample((num_init_samples,))  # type: ignore
+        elif isinstance(init_method, Tensor):
+            inits = init_method
+        else:
+            raise ValueError
+
+        return gradient_ascent(
+            potential_fn=self.potential_fn,
+            inits=inits,
+            theta_transform=self.theta_transform,
+            num_iter=num_iter,
+            num_to_optimize=num_to_optimize,
+            learning_rate=learning_rate,
+            save_best_every=save_best_every,
+            show_progress_bars=show_progress_bars,
+        )[0]
+
     @abstractmethod
     def map(
         self,
@@ -155,48 +191,34 @@ class NeuralPosterior(ABC):
         save_best_every: int = 10,
         show_progress_bars: bool = False,
         force_update: bool = False,
-        warn_about_cached: bool = True,
     ) -> Tensor:
-        """See child classes for docstring."""
+        """Returns stored maximum-a-posterior estimate (MAP), otherwise calculates it.
 
-        def calculate_map(x):
-            self.potential_fn.set_x(self._x_else_default_x(x))
-            if init_method == "posterior":
-                inits = self.sample((num_init_samples,))
-            elif init_method == "proposal":
-                inits = self.proposal.sample((num_init_samples,))  # type: ignore
-            elif isinstance(init_method, Tensor):
-                inits = init_method
-            else:
-                raise ValueError
-            return gradient_ascent(
-                potential_fn=self.potential_fn,
-                inits=inits,
-                theta_transform=self.theta_transform,
+        See child classes for docstring.
+        """
+
+        if x is not None:
+            raise ValueError(
+                "Passing `x` directly to `.map()` has been deprecated."
+                "Use `.self_default_x()` to set `x`, and then run `.map()` "
+            )
+
+        if self.default_x is None:
+            raise ValueError(
+                "Default `x` has not been set."
+                "To set the default, use the `.set_default_x()` method."
+            )
+
+        if self._map is None or force_update:
+            self.potential_fn.set_x(self.default_x)
+            self._map = self._calculate_map(
                 num_iter=num_iter,
                 num_to_optimize=num_to_optimize,
                 learning_rate=learning_rate,
+                init_method=init_method,
+                num_init_samples=num_init_samples,
                 save_best_every=save_best_every,
                 show_progress_bars=show_progress_bars,
-            )[0]
-
-        # Check if the provided x matches the default x (short-circuit on identity).
-        if x is None:
-            is_new_x = self.default_x is None
-        else:
-            is_new_x = self.default_x is None or (
-                x is not self.default_x and (x != self.default_x).any()
-            )
-        not_saved_at_default_x = self._map is None
-
-        if is_new_x:  # Calculate at x; don't save.
-            return calculate_map(x)
-        elif not_saved_at_default_x or force_update:  # Calculate at default_x; save.
-            self._map = calculate_map(self.default_x)
-            return self._map
-        if warn_about_cached:
-            warn(
-                "Using saved value of map from previous calculation. To calculate MAP with new arguments, use 'force_update = True'."
             )
         return self._map
 
