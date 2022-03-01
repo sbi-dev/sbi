@@ -5,19 +5,21 @@
 from copy import deepcopy
 from typing import Any, Callable, Dict, Optional, Union
 
+from torch.distributions import Distribution
+
 from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior, VIPosterior
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials import mixed_likelihood_estimator_based_potential
 from sbi.inference.snle.snle_base import LikelihoodEstimator
 from sbi.neural_nets.mnle import MixedDensityEstimator
 from sbi.types import TensorboardSummaryWriter, TorchModule
-from sbi.utils import del_entries
+from sbi.utils import check_prior, del_entries
 
 
 class MNLE(LikelihoodEstimator):
     def __init__(
         self,
-        prior: Optional[Any] = None,
+        prior: Optional[Distribution] = None,
         density_estimator: Union[str, Callable] = "mnle",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
@@ -66,7 +68,7 @@ class MNLE(LikelihoodEstimator):
     def build_posterior(
         self,
         density_estimator: Optional[TorchModule] = None,
-        prior: Optional[Any] = None,
+        prior: Optional[Distribution] = None,
         sample_with: str = "mcmc",
         mcmc_method: str = "slice_np",
         vi_method: str = "rKL",
@@ -108,6 +110,8 @@ class MNLE(LikelihoodEstimator):
                 self._prior is not None
             ), "You did not pass a prior. You have to pass the prior either at initialization `inference = SNLE(prior)` or to `.build_posterior(prior=prior)`."
             prior = self._prior
+        else:
+            check_prior(prior)
 
         if density_estimator is None:
             likelihood_estimator = self._neural_net

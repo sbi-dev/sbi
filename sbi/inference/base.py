@@ -5,11 +5,12 @@ from abc import ABC, abstractmethod
 from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union, cast
+from typing import Any, Callable, Dict, Optional, Tuple, Union
 from warnings import warn
 
 import torch
 from torch import Tensor
+from torch.distributions import Distribution
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.tensorboard.writer import SummaryWriter
@@ -18,6 +19,7 @@ import sbi.inference
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.simulators.simutils import simulate_in_batches
 from sbi.utils import (
+    check_prior,
     get_log_root,
     handle_invalid_x,
     warn_if_zscoring_changes_data,
@@ -31,7 +33,7 @@ from sbi.utils.user_input_checks import prepare_for_sbi
 
 def infer(
     simulator: Callable,
-    prior: Any,
+    prior: Distribution,
     method: str,
     num_simulations: int,
     num_workers: int = 1,
@@ -91,7 +93,7 @@ class NeuralInference(ABC):
 
     def __init__(
         self,
-        prior: Optional[Any] = None,
+        prior: Optional[Distribution] = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
@@ -101,9 +103,8 @@ class NeuralInference(ABC):
 
         Args:
             prior: A probability distribution that expresses prior knowledge about the
-                parameters, e.g. which ranges are meaningful for them. Any
-                object with `.log_prob()`and `.sample()` (for example, a PyTorch
-                distribution) can be used.
+                parameters, e.g. which ranges are meaningful for them. Must be a PyTorch
+                distribution, see FAQ for details on how to use custom distributions.
             device: torch device on which to train the neural net and on which to
                 perform all posterior operations, e.g. gpu or cpu.
             logging_level: Minimum severity of messages to log. One of the strings
@@ -115,6 +116,7 @@ class NeuralInference(ABC):
         """
 
         self._device = process_device(device)
+        check_prior(prior)
         check_if_prior_on_device(self._device, prior)
         self._prior = prior
 

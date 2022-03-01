@@ -5,6 +5,7 @@ from typing import Any, Callable, Optional, Tuple
 
 import torch
 from torch import Tensor, nn
+from torch.distributions import Distribution
 
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.neural_nets.mnle import MixedDensityEstimator
@@ -16,7 +17,7 @@ from sbi.utils.torchutils import atleast_2d
 
 def likelihood_estimator_based_potential(
     likelihood_estimator: nn.Module,
-    prior: Any,
+    prior: Distribution,
     x_o: Optional[Tensor],
 ) -> Tuple[Callable, TorchTransform]:
     r"""Returns potential $\log(p(x_o|\theta)p(\theta))$ for likelihood-based methods.
@@ -50,7 +51,7 @@ class LikelihoodBasedPotential(BasePotential):
     def __init__(
         self,
         likelihood_estimator: nn.Module,
-        prior: Any,
+        prior: Distribution,
         x_o: Optional[Tensor],
         device: str = "cpu",
     ):
@@ -141,7 +142,7 @@ def _log_likelihoods_over_trials(
 
 def mixed_likelihood_estimator_based_potential(
     likelihood_estimator: MixedDensityEstimator,
-    prior: Any,
+    prior: Distribution,
     x_o: Optional[Tensor],
 ) -> Tuple[Callable, TorchTransform]:
     r"""Returns $\log(p(x_o|\theta)p(\theta))$ for mixed likelihood-based methods.
@@ -173,7 +174,7 @@ class MixedLikelihoodBasedPotential(LikelihoodBasedPotential):
     def __init__(
         self,
         likelihood_estimator: MixedDensityEstimator,
-        prior: Any,
+        prior: Distribution,
         x_o: Optional[Tensor],
         device: str = "cpu",
     ):

@@ -6,6 +6,7 @@ import torch
 import torch.nn.functional as F
 from pyknos.nflows.nn import nets
 from torch import Tensor, nn, optim, relu
+from torch.distributions import Distribution
 from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler, WeightedRandomSampler
@@ -142,7 +143,7 @@ def build_classifier(
 class RestrictionEstimator:
     def __init__(
         self,
-        prior: Any,
+        prior: Distribution,
         model: Union[str, Callable] = "resnet",
         decision_criterion: Union[str, Callable] = "nan",
         hidden_features: int = 100,
@@ -506,7 +507,7 @@ class RestrictionEstimator:
 class RestrictedPrior:
     def __init__(
         self,
-        prior: Any,
+        prior: Distribution,
         classifier: nn.Module,
         validation_theta: Tensor,
         validation_label: Tensor,

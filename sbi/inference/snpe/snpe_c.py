@@ -8,7 +8,7 @@ import torch
 from pyknos.mdn.mdn import MultivariateGaussianMDN as mdn
 from pyknos.nflows.transforms import CompositeTransform
 from torch import Tensor, eye, nn, ones
-from torch.distributions import MultivariateNormal, Uniform
+from torch.distributions import Distribution, MultivariateNormal, Uniform
 
 from sbi import utils as utils
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
@@ -27,7 +27,7 @@ from sbi.utils import (
 class SNPE_C(PosteriorEstimator):
     def __init__(
         self,
-        prior: Optional[Any] = None,
+        prior: Optional[Distribution] = None,
         density_estimator: Union[str, Callable] = "maf",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",

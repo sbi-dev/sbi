@@ -2,12 +2,15 @@ from abc import ABCMeta, abstractmethod
 from typing import Any, Optional
 
 from torch import Tensor
+from torch.distributions import Distribution
 
 from sbi.utils.user_input_checks import process_x
 
 
 class BasePotential(metaclass=ABCMeta):
-    def __init__(self, prior: Any, x_o: Optional[Tensor] = None, device: str = "cpu"):
+    def __init__(
+        self, prior: Distribution, x_o: Optional[Tensor] = None, device: str = "cpu"
+    ):
         """Initialize potential function.
 
         This parent class takes care of setting `x_o`.

@@ -8,6 +8,7 @@ from warnings import warn
 
 import torch
 from torch import Tensor, nn, ones, optim
+from torch.distributions import Distribution
 from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.utils import data
 from torch.utils.tensorboard.writer import SummaryWriter
@@ -35,7 +36,7 @@ from sbi.utils.sbiutils import ImproperEmpirical, mask_sims_from_prior
 class PosteriorEstimator(NeuralInference, ABC):
     def __init__(
         self,
-        prior: Optional[Any] = None,
+        prior: Optional[Distribution] = None,
         density_estimator: Union[str, Callable] = "maf",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
@@ -355,7 +356,7 @@ class PosteriorEstimator(NeuralInference, ABC):
     def build_posterior(
         self,
         density_estimator: Optional[nn.Module] = None,
-        prior: Optional[Any] = None,
+        prior: Optional[Distribution] = None,
         sample_with: str = "rejection",
         mcmc_method: str = "slice_np",
         vi_method: str = "rKL",
@@ -404,6 +405,8 @@ class PosteriorEstimator(NeuralInference, ABC):
                 "`.build_posterior(prior=prior)`."
             )
             prior = self._prior
+        else:
+            utils.check_prior(prior)
 
         if density_estimator is None:
             posterior_estimator = self._neural_net

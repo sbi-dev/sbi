@@ -12,7 +12,7 @@ from pyknos.mdn.mdn import MultivariateGaussianMDN
 from pyknos.nflows import flows
 from pyknos.nflows.transforms import CompositeTransform
 from torch import Tensor
-from torch.distributions import MultivariateNormal
+from torch.distributions import Distribution, MultivariateNormal
 
 import sbi.utils as utils
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
@@ -24,7 +24,7 @@ from sbi.utils import torchutils
 class SNPE_A(PosteriorEstimator):
     def __init__(
         self,
-        prior: Optional[Any] = None,
+        prior: Optional[Distribution] = None,
         density_estimator: Union[str, Callable] = "mdn_snpe_a",
         num_components: int = 10,
         device: str = "cpu",
@@ -262,7 +262,7 @@ class SNPE_A(PosteriorEstimator):
     def build_posterior(
         self,
         density_estimator: Optional[TorchModule] = None,
-        prior: Optional[Any] = None,
+        prior: Optional[Distribution] = None,
     ) -> "DirectPosterior":
         r"""Build posterior from the neural density estimator.
 
@@ -367,7 +367,7 @@ class SNPE_A_MDN(nn.Module):
         self,
         flow: flows.Flow,
         proposal: Union["utils.BoxUniform", "MultivariateNormal", "DirectPosterior"],
-        prior: Any,
+        prior: Distribution,
         device: str,
     ):
         """Constructor.

@@ -2,6 +2,7 @@ from typing import Any, Callable, Dict, Optional, Union
 
 import torch
 from torch import Tensor, nn, ones
+from torch.distributions import Distribution
 
 from sbi.inference.snre.snre_base import RatioEstimator
 from sbi.types import TensorboardSummaryWriter
@@ -11,7 +12,7 @@ from sbi.utils import del_entries
 class SNRE_A(RatioEstimator):
     def __init__(
         self,
-        prior: Optional[Any] = None,
+        prior: Optional[Distribution] = None,
         classifier: Union[str, Callable] = "resnet",
         device: str = "cpu",
         logging_level: Union[int, str] = "warning",

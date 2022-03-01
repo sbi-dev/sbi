@@ -26,6 +26,7 @@ from sbi.samplers.vi.vi_utils import (
     move_all_tensor_to_device,
 )
 from sbi.types import Array
+from sbi.utils import check_prior
 
 _VI_method = {}
 
@@ -89,6 +90,7 @@ class DivergenceOptimizer(ABC):
 
         self.potential_fn = potential_fn
         self.q = q
+        check_prior(prior)
         self.prior = prior
         self.device = potential_fn.device
         self.to(self.device)
