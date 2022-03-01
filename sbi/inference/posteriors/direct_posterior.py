@@ -1,6 +1,6 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Optional, Union, Dict
 
 import torch
 from pyknos.nflows import flows
@@ -15,6 +15,33 @@ from sbi.samplers.rejection.rejection import rejection_sample_posterior_within_p
 from sbi.types import Shape
 from sbi.utils.sbiutils import match_theta_and_x_batch_shapes, within_support
 from sbi.utils.torchutils import ensure_theta_batched
+
+
+class DirectEnsemblePosterior:
+    def __init__(self, neural_nets, trained_rounds, **kwargs):
+        pass
+
+    def sample(
+        self,
+        sample_shape: Shape = torch.Size(),
+        x: Optional[Tensor] = None,
+        show_progress_bars: bool = False,
+        rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
+    ) -> Tensor:
+        pass
+
+    def log_prob(
+        self,
+        theta: Tensor,
+        x: Optional[Tensor] = None,
+        norm_posterior: bool = True,
+        track_gradients: bool = False,
+        leakage_correction_params: Optional[dict] = None,
+    ) -> Tensor:
+        pass
+
+    def set_default_x(self, x: Tensor) -> None:
+        pass
 
 
 class DirectPosterior(NeuralPosterior):
