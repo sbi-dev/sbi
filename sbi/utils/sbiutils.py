@@ -549,7 +549,7 @@ def match_theta_and_x_batch_shapes(theta: Tensor, x: Tensor) -> Tuple[Tensor, Te
 
 
 def mcmc_transform(
-    prior: Any,
+    prior: Distribution,
     num_prior_samples_for_zscoring: int = 1000,
     enable_transform: bool = True,
     device: str = "cpu",

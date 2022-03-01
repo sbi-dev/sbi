@@ -8,6 +8,7 @@ import torch
 import torch.distributions.transforms as torch_tf
 from pyknos.mdn.mdn import MultivariateGaussianMDN as mdn
 from torch import Tensor, nn
+from torch.distributions import Distribution
 
 from sbi.types import Shape, TorchTransform
 from sbi.utils.conditional_density_utils import (
@@ -233,7 +234,7 @@ class ConditionedMDN:
 def conditonal_potential(
     potential_fn: Callable,
     theta_transform: TorchTransform,
-    prior: Any,
+    prior: Distribution,
     condition: Tensor,
     dims_to_sample: List[int],
 ) -> Tuple[Callable, torch_tf.Transform, Any]:

@@ -12,6 +12,7 @@ import torch.distributions.transforms as torch_tf
 from pyknos.mdn.mdn import MultivariateGaussianMDN as mdn
 from pyknos.nflows.flows import Flow
 from torch import Tensor
+from torch.distributions import Distribution
 
 from sbi.types import TorchTransform
 from sbi.utils.torchutils import (
@@ -363,7 +364,7 @@ class RestrictedPriorForConditional:
     this class.
     """
 
-    def __init__(self, full_prior: Any, dims_to_sample: List[int]):
+    def __init__(self, full_prior: Distribution, dims_to_sample: List[int]):
         self.full_prior = full_prior
         self.dims_to_sample = dims_to_sample
 

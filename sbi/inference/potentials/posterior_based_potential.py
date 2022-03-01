@@ -7,6 +7,7 @@ import torch
 import torch.distributions.transforms as torch_tf
 from pyknos.nflows import flows
 from torch import Tensor, nn
+from torch.distributions import Distribution
 
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.types import TorchTransform
@@ -17,7 +18,7 @@ from sbi.utils.torchutils import ensure_theta_batched
 
 def posterior_estimator_based_potential(
     posterior_estimator: nn.Module,
-    prior: Any,
+    prior: Distribution,
     x_o: Optional[Tensor],
 ) -> Tuple[Callable, TorchTransform]:
     r"""Returns the potential for posterior-based methods.
@@ -54,7 +55,7 @@ class PosteriorBasedPotential(BasePotential):
     def __init__(
         self,
         posterior_estimator: flows.Flow,
-        prior: Any,
+        prior: Distribution,
         x_o: Optional[Tensor],
         device: str = "cpu",
     ):

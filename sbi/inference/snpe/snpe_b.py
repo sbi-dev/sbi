@@ -6,6 +6,7 @@ from typing import Any, Callable, Optional, Union
 
 import torch
 from torch import Tensor
+from torch.distributions import Distribution
 
 import sbi.utils as utils
 from sbi.inference.snpe.snpe_base import PosteriorEstimator
@@ -16,7 +17,7 @@ from sbi.utils import del_entries
 class SNPE_B(PosteriorEstimator):
     def __init__(
         self,
-        prior: Optional[Any] = None,
+        prior: Optional[Distribution] = None,
         density_estimator: Union[str, Callable] = "maf",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",

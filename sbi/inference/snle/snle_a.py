@@ -5,6 +5,7 @@
 from typing import Any, Callable, Dict, Optional, Union
 
 from pyknos.nflows import flows
+from torch.distributions import Distribution
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.snle.snle_base import LikelihoodEstimator
@@ -15,7 +16,7 @@ from sbi.utils import del_entries
 class SNLE_A(LikelihoodEstimator):
     def __init__(
         self,
-        prior: Optional[Any] = None,
+        prior: Optional[Distribution] = None,
         density_estimator: Union[str, Callable] = "maf",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",

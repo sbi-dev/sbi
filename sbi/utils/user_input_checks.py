@@ -25,6 +25,19 @@ from sbi.utils.user_input_checks_utils import (
 )
 
 
+def check_prior(prior: Any) -> None:
+    """Assert that prior is a PyTorch distribution (or pass if None)."""
+
+    if prior is None:
+        pass
+    else:
+        assert isinstance(
+            prior, Distribution
+        ), """Prior must be a PyTorch Distribution. See FAQ 7 for more details or use
+        `sbi.utils.user_input_checks.process_prior` for wrapping scipy and lists of
+        independent priors."""
+
+
 def process_prior(
     prior, custom_prior_wrapper_kwargs: Dict = {}
 ) -> Tuple[Distribution, int, bool]:

@@ -4,6 +4,7 @@ from typing import Any, Callable, Dict, Optional, Union
 
 import torch
 from torch import Tensor, eye, nn, ones, optim
+from torch.distributions import Distribution
 from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.utils import data
 from torch.utils.tensorboard.writer import SummaryWriter
@@ -14,6 +15,7 @@ from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior, VIPoster
 from sbi.inference.potentials import ratio_estimator_based_potential
 from sbi.utils import (
     check_estimator_arg,
+    check_prior,
     clamp_and_warn,
     validate_theta_and_x,
     x_shape_from_simulation,
@@ -24,7 +26,7 @@ from sbi.utils.sbiutils import mask_sims_from_prior
 class RatioEstimator(NeuralInference, ABC):
     def __init__(
         self,
-        prior: Optional[Any] = None,
+        prior: Optional[Distribution] = None,
         classifier: Union[str, Callable] = "resnet",
         device: str = "cpu",
         logging_level: Union[int, str] = "warning",
@@ -300,7 +302,7 @@ class RatioEstimator(NeuralInference, ABC):
     def build_posterior(
         self,
         density_estimator: Optional[nn.Module] = None,
-        prior: Optional[Any] = None,
+        prior: Optional[Distribution] = None,
         sample_with: str = "mcmc",
         mcmc_method: str = "slice_np",
         vi_method: str = "rKL",
@@ -345,6 +347,8 @@ class RatioEstimator(NeuralInference, ABC):
                 self._prior is not None
             ), "You did not pass a prior. You have to pass the prior either at initialization `inference = SNRE(prior)` or to `.build_posterior(prior=prior)`."
             prior = self._prior
+        else:
+            check_prior(prior)
 
         if density_estimator is None:
             ratio_estimator = self._neural_net

@@ -6,6 +6,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import torch
 import torch.distributions.transforms as torch_tf
 from torch import Tensor, nn
+from torch.distributions import Distribution
 
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.types import TorchTransform
@@ -16,7 +17,7 @@ from sbi.utils.torchutils import atleast_2d
 
 def ratio_estimator_based_potential(
     ratio_estimator: nn.Module,
-    prior: Any,
+    prior: Distribution,
     x_o: Optional[Tensor],
 ) -> Tuple[Callable, TorchTransform]:
     r"""Returns the potential for ratio-based methods.
@@ -48,7 +49,7 @@ class RatioBasedPotential(BasePotential):
     def __init__(
         self,
         ratio_estimator: nn.Module,
-        prior: Any,
+        prior: Distribution,
         x_o: Optional[Tensor],
         device: str = "cpu",
     ):

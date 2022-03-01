@@ -9,6 +9,7 @@ from typing import Any, Callable, Dict, Optional, Tuple, Union
 import torch
 from pyknos.nflows import flows
 from torch import Tensor, nn, optim
+from torch.distributions import Distribution
 from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.utils import data
 from torch.utils.tensorboard.writer import SummaryWriter
@@ -19,6 +20,7 @@ from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior, VIPoster
 from sbi.inference.potentials import likelihood_estimator_based_potential
 from sbi.utils import (
     check_estimator_arg,
+    check_prior,
     mask_sims_from_prior,
     validate_theta_and_x,
     x_shape_from_simulation,
@@ -28,7 +30,7 @@ from sbi.utils import (
 class LikelihoodEstimator(NeuralInference, ABC):
     def __init__(
         self,
-        prior: Optional[Any] = None,
+        prior: Optional[Distribution] = None,
         density_estimator: Union[str, Callable] = "maf",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
@@ -272,7 +274,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
     def build_posterior(
         self,
         density_estimator: Optional[nn.Module] = None,
-        prior: Optional[Any] = None,
+        prior: Optional[Distribution] = None,
         sample_with: str = "mcmc",
         mcmc_method: str = "slice_np",
         vi_method: str = "rKL",
@@ -314,6 +316,8 @@ class LikelihoodEstimator(NeuralInference, ABC):
                 self._prior is not None
             ), "You did not pass a prior. You have to pass the prior either at initialization `inference = SNLE(prior)` or to `.build_posterior(prior=prior)`."
             prior = self._prior
+        else:
+            check_prior(prior)
 
         if density_estimator is None:
             likelihood_estimator = self._neural_net

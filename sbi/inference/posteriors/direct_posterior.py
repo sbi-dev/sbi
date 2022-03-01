@@ -5,6 +5,7 @@ from typing import Any, Callable, Optional, Union
 import torch
 from pyknos.nflows import flows
 from torch import Tensor, log, nn
+from torch.distributions import Distribution
 
 from sbi import utils as utils
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
@@ -13,7 +14,7 @@ from sbi.inference.potentials.posterior_based_potential import (
 )
 from sbi.samplers.rejection.rejection import rejection_sample_posterior_within_prior
 from sbi.types import Shape
-from sbi.utils.sbiutils import match_theta_and_x_batch_shapes, within_support
+from sbi.utils import check_prior, match_theta_and_x_batch_shapes, within_support
 from sbi.utils.torchutils import ensure_theta_batched
 
 
@@ -34,7 +35,7 @@ class DirectPosterior(NeuralPosterior):
     def __init__(
         self,
         posterior_estimator: flows.Flow,
-        prior: Any,
+        prior: Distribution,
         max_sampling_batch_size: int = 10_000,
         device: Optional[str] = None,
         x_shape: Optional[torch.Size] = None,
@@ -53,6 +54,7 @@ class DirectPosterior(NeuralPosterior):
         # Because `DirectPosterior` does not take the `potential_fn` as input, it
         # builds it itself. The `potential_fn` and `theta_transform` are used only for
         # obtaining the MAP.
+        check_prior(prior)
         potential_fn, theta_transform = posterior_estimator_based_potential(
             posterior_estimator, prior, None
         )
