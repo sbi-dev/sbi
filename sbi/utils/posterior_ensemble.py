@@ -5,6 +5,7 @@ from typing import List, Optional, Tuple, Union
 
 import torch
 from torch import Tensor
+from torch.distributions import Distribution
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.base_potential import BasePotential
@@ -74,7 +75,8 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
         self.num_components = len(posteriors)
         self.weights = weights
         self.theta_transform = theta_transform
-        self.priors = []
+        # Take first prior as reference
+        self.prior = posteriors[0].potential_fn.prior
 
         device = self.ensure_same_device(posteriors)
 
@@ -82,11 +84,13 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
         for posterior in posteriors:
             potential = posterior.potential_fn
             potential_fns.append(potential)
-            self.priors.append(potential.prior)
+            # make sure all prior are the same
+            assert isinstance(potential.prior, type(self.prior)), (
+                "All posteriors in ensemble must have the same prior: "
+                f"{potential.prior} {self.prior}"
+            )
 
-        potential_fn = EnsemblePotential(
-            potential_fns, self._weights, self.priors, None
-        )
+        potential_fn = EnsemblePotential(potential_fns, self._weights, self.prior, None)
 
         super().__init__(
             potential_fn=potential_fn,
@@ -379,7 +383,7 @@ class EnsemblePotential(BasePotential):
         self,
         potential_fns: List,
         weights: Tensor,
-        priors: List[Any],
+        prior: Distribution,
         x_o: Optional[Tensor],
         device: str = "cpu",
     ):
@@ -394,8 +398,7 @@ class EnsemblePotential(BasePotential):
         self._weights = weights
         self.potential_fns = potential_fns
 
-        # list of priors potential_fn.prior
-        super().__init__(priors, x_o, device)
+        super().__init__(prior, x_o, device)
 
     def allow_iid_x(self) -> bool:
         if any(
