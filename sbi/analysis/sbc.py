@@ -36,7 +36,8 @@ def run_sbc(
         xs: observed data for sbc, simulated from thetas.
         posterior: a posterior obtained from sbi.
         num_posterior_samples: number of approximate posterior samples used for ranking.
-        num_workers: number of CPU cores to use in parallel for running num_sbc_samples inferences.
+        num_workers: number of CPU cores to use in parallel for running num_sbc_samples
+            inferences.
         sbc_batch_size: batch size for workers.
         show_progress_bar: whether to display a progress over sbc runs.
 
@@ -76,7 +77,7 @@ def run_sbc(
                     batches.""",
                 total=len(thetas_batches),
             )
-        ) as progress_bar:
+        ) as _:
             sbc_outputs = Parallel(n_jobs=num_workers)(
                 delayed(sbc_on_batch)(
                     thetas_batch, xs_batch, posterior, num_posterior_samples
@@ -125,7 +126,8 @@ def sbc_on_batch(
         thetas: ground truth parameters.
         xs: corresponding observations.
         posterior: sbi posterior.
-        num_posterior_samples: number of samples to draw from the posterior in each sbc run.
+        num_posterior_samples: number of samples to draw from the posterior in each sbc
+            run.
 
     Returns
         ranks: ranks of true parameters vs. posterior samples under the specified RV,
@@ -310,7 +312,7 @@ def check_uniformity_c2st(
                 c2st(
                     rks.unsqueeze(1),
                     Uniform(zeros(1), num_posterior_samples * ones(1)).sample(
-                        (ranks.shape[0],)
+                        torch.Size((ranks.shape[0],))
                     ),
                 )
                 for rks in ranks.T

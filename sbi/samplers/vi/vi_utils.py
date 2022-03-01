@@ -168,7 +168,8 @@ def check_parameters_modules_attribute(q: TransformedDistribution) -> None:
 
     if not hasattr(q, "parameters"):
         raise ValueError(
-            "The variational distribution requires an `parameters` attribute, which returns an iterable of parameters"
+            """The variational distribution requires an `parameters` attribute, which
+            returns an iterable of parameters"""
         )
     else:
         assert isinstance(q.parameters, Callable), "The parameters must be callable"
@@ -183,10 +184,12 @@ def check_parameters_modules_attribute(q: TransformedDistribution) -> None:
                 trainable += 1
         assert (
             trainable > 0
-        ), "Nothing to train, atleast one of the parameters must have an enabled gradient."
+        ), """Nothing to train, atleast one of the parameters must have an enabled
+            gradient."""
     if not hasattr(q, "modules"):
         raise ValueError(
-            "The variational distribution requires an modules attribute, which returns an iterable of parameters."
+            """The variational distribution requires an modules attribute, which returns
+            an iterable of parameters."""
         )
     else:
         assert isinstance(q.modules, Callable), "The parameters must be callable"
@@ -217,8 +220,9 @@ def check_sample_shape_and_support(q: Distribution, prior: Distribution) -> None
         q.batch_shape == prior.batch_shape
     ), "The batch sahpe of q must match that of the prior"
 
-    samples = q.sample((1000,))
-    samples_prior = prior.sample((1000,)).to(samples.device)
+    sample_shape = torch.Size((1000,))
+    samples = q.sample(sample_shape)
+    samples_prior = prior.sample(sample_shape).to(samples.device)
     try:
         _ = prior.support
         has_support = True
@@ -355,8 +359,6 @@ def _base_recursor(
     True, then an action is applied as specified in `action`. We use it e.g. to
     move tensors to a given device.
 
-
-
     Args:
         obj: An object which serves as root of the traversal.
         parent: The previously traversed object.
@@ -389,7 +391,7 @@ def _base_recursor(
                 _base_recursor(o, check=check, action=action)
                 new_obj.append(o)
         if parent is not None and key is not None:
-            setattr(parent, key, type(obj)(new_obj))
+            setattr(parent, key, type(obj)(new_obj))  # type: ignore
     else:
         return
 

@@ -1,10 +1,9 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Callable, Optional, Tuple
 
 import torch
-import torch.distributions.transforms as torch_tf
 from pyknos.nflows import flows
 from torch import Tensor, nn
 from torch.distributions import Distribution

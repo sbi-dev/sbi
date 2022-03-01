@@ -8,7 +8,6 @@ from typing import Any, Callable, Dict, Optional, Union
 from torch.distributions import Distribution
 
 from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior, VIPosterior
-from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials import mixed_likelihood_estimator_based_potential
 from sbi.inference.snle.snle_base import LikelihoodEstimator
 from sbi.neural_nets.mnle import MixedDensityEstimator
@@ -60,7 +59,7 @@ class MNLE(LikelihoodEstimator):
         if isinstance(density_estimator, str):
             assert (
                 density_estimator == "mnle"
-            ), f"""MNLE can be used with preconfigured 'mnle' density estimator only, 
+            ), f"""MNLE can be used with preconfigured 'mnle' density estimator only,
                 not with {density_estimator}."""
         kwargs = del_entries(locals(), entries=("self", "__class__"))
         super().__init__(**kwargs)
@@ -108,7 +107,9 @@ class MNLE(LikelihoodEstimator):
         if prior is None:
             assert (
                 self._prior is not None
-            ), "You did not pass a prior. You have to pass the prior either at initialization `inference = SNLE(prior)` or to `.build_posterior(prior=prior)`."
+            ), """You did not pass a prior. You have to pass the prior either at
+            initialization `inference = SNLE(prior)` or to `.build_posterior
+            (prior=prior)`."""
             prior = self._prior
         else:
             check_prior(prior)
@@ -153,7 +154,7 @@ class MNLE(LikelihoodEstimator):
             self._posterior = VIPosterior(
                 potential_fn=potential_fn,
                 theta_transform=theta_transform,
-                prior=prior,
+                prior=prior,  # type: ignore
                 vi_method=vi_method,
                 device=device,
                 x_shape=self._x_shape,

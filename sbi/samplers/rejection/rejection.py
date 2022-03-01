@@ -5,6 +5,7 @@ from typing import Any, Callable, Optional, Tuple
 import torch
 import torch.distributions.transforms as torch_tf
 from torch import Tensor, as_tensor
+from torch.distributions import Distribution
 from tqdm.auto import tqdm
 
 from sbi.utils import gradient_ascent, within_support
@@ -184,7 +185,7 @@ def rejection_sample(
 @torch.no_grad()
 def rejection_sample_posterior_within_prior(
     posterior_nn: Any,
-    prior: Callable,
+    prior: Distribution,
     x: Tensor,
     num_samples: int,
     show_progress_bars: bool = False,

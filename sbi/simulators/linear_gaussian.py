@@ -140,12 +140,12 @@ def samples_true_posterior_linear_gaussian_mvn_prior_different_dims(
         prior_mean[:-num_discarded_dims],
         prior_cov[:-num_discarded_dims, :-num_discarded_dims],
     )
-    posterior_samples = posterior_dist.sample((num_samples,))
+    posterior_samples = posterior_dist.sample(torch.Size((num_samples,)))
 
     # Because some dimensions were discarded, these ground truth parameters have to
     # be sampled from the prior and then concatenated to the samples obtained above.
     prior_dist = MultivariateNormal(prior_mean, prior_cov)
-    prior_samples = prior_dist.sample((num_samples,))
+    prior_samples = prior_dist.sample(torch.Size((num_samples,)))
     relevant_prior_samples = prior_samples[:, -num_discarded_dims:]
     posterior_samples = torch.cat((posterior_samples, relevant_prior_samples), dim=1)
 
@@ -194,12 +194,12 @@ def samples_true_posterior_linear_gaussian_uniform_prior(
     samples = []
 
     while num_remaining > 0:
-        candidate_samples = posterior.sample(sample_shape=(num_remaining,))
+        candidate_samples = posterior.sample(sample_shape=torch.Size((num_remaining,)))
         is_in_prior = within_support(prior, candidate_samples)
         # accept if in prior
         if is_in_prior.sum():
             samples.append(candidate_samples[is_in_prior, :])
-            num_remaining -= is_in_prior.sum().item()
+            num_remaining -= int(is_in_prior.sum().item())
 
     return torch.cat(samples)
 

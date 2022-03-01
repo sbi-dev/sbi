@@ -2,12 +2,10 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Callable, Optional, Union
 
-from pyknos.nflows import flows
 from torch.distributions import Distribution
 
-from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.snle.snle_base import LikelihoodEstimator
 from sbi.types import TensorboardSummaryWriter
 from sbi.utils import del_entries

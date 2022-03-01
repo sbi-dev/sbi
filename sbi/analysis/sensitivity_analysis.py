@@ -52,9 +52,9 @@ def destandardizing_net(batch_t: Tensor, min_std: float = 1e-7) -> nn.Module:
     else:
         t_std = 1
         logging.warning(
-            f"""Using a one-dimensional batch will instantiate a Standardize transform 
-            with (mean, std) parameters which are not representative of the data. We 
-            allow this behavior because you might be loading a pre-trained. If this is 
+            """Using a one-dimensional batch will instantiate a Standardize transform
+            with (mean, std) parameters which are not representative of the data. We
+            allow this behavior because you might be loading a pre-trained. If this is
             not the case, please be sure to use a larger batch."""
         )
 
@@ -371,7 +371,8 @@ class ActiveSubspace:
         property changes in the fastest way. They will have the largest eigenvalues.
 
         This computes the matrix:
-        $\mathbf{M} = \mathbb{E}_{p(\theta|x_o)}[\nabla_{\theta} f(\theta)^T \nabla_{\theta}
+        $\mathbf{M} = \mathbb{E}_{p(\theta|x_o)}[\nabla_{\theta} f(\theta)^T
+        \nabla_{\theta}
         f(\theta)]$
         where $f(\cdot)$ is the trained regression network. The expected value is
         approximated with a Monte-Carlo mean. Next, do an eigenvalue

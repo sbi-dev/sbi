@@ -345,7 +345,9 @@ class RatioEstimator(NeuralInference, ABC):
         if prior is None:
             assert (
                 self._prior is not None
-            ), "You did not pass a prior. You have to pass the prior either at initialization `inference = SNRE(prior)` or to `.build_posterior(prior=prior)`."
+            ), """You did not pass a prior. You have to pass the prior either at
+                initialization `inference = SNRE(prior)` or to `.build_posterior
+                (prior=prior)`."""
             prior = self._prior
         else:
             check_prior(prior)
@@ -385,7 +387,7 @@ class RatioEstimator(NeuralInference, ABC):
             self._posterior = VIPosterior(
                 potential_fn=potential_fn,
                 theta_transform=theta_transform,
-                prior=prior,
+                prior=prior,  # type: ignore
                 vi_method=vi_method,
                 device=device,
                 x_shape=self._x_shape,

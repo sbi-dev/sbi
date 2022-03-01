@@ -2,7 +2,7 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 
-from typing import Any, Callable, Optional, Union
+from typing import Callable, Optional, Union
 
 import torch
 from torch import Tensor

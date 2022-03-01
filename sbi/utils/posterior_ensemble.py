@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
-from typing import Any, List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
 import torch
 from torch import Tensor
@@ -169,7 +169,7 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
         for posterior_index, sample_size in torch.vstack(
             posterior_indizes.unique(return_counts=True)
         ).T:
-            sample_shape_c = torch.Size((sample_size,))
+            sample_shape_c = torch.Size((int(sample_size),))
             samples.append(
                 self.posteriors[posterior_index].sample(sample_shape_c, x=x, **kwargs)
             )

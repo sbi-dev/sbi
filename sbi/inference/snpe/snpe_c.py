@@ -2,7 +2,7 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Callable, Dict, Optional, Union
 
 import torch
 from pyknos.mdn.mdn import MultivariateGaussianMDN as mdn
@@ -194,8 +194,8 @@ class SNPE_C(PosteriorEstimator):
 
         if isinstance(self._maybe_z_scored_prior, MultivariateNormal):
             self.prec_m_prod_prior = torch.mv(
-                self._maybe_z_scored_prior.precision_matrix,
-                self._maybe_z_scored_prior.loc,
+                self._maybe_z_scored_prior.precision_matrix,  # type: ignore
+                self._maybe_z_scored_prior.loc,  # type: ignore
             )
 
     def _set_maybe_z_scored_prior(self) -> None:

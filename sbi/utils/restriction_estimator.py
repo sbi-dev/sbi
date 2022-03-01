@@ -1,6 +1,6 @@
 from copy import deepcopy
 from math import floor
-from typing import Any, Callable, Optional, Tuple, Union
+from typing import Callable, Optional, Tuple, Union
 
 import torch
 import torch.nn.functional as F
@@ -593,7 +593,7 @@ class RestrictedPrior:
         sampling_batch_size = min(num_samples, max_sampling_batch_size)
         while num_remaining > 0:
             # Sample and reject.
-            candidates = self._prior.sample((sampling_batch_size,)).reshape(
+            candidates = self._prior.sample(torch.Size((sampling_batch_size,))).reshape(
                 sampling_batch_size, -1
             )
             are_accepted_by_classifier = self.predict(candidates)
@@ -740,7 +740,7 @@ class RestrictedPrior:
     def tune_rejection_threshold(
         self,
         allowed_false_negatives: Optional[float] = None,
-        reweigh_factor: float = None,
+        reweigh_factor: Optional[float] = None,
         print_fp_rate=False,
         safety_margin: Optional[Union[str, float]] = "frequentist",
     ) -> None:
@@ -770,10 +770,10 @@ class RestrictedPrior:
                 distribution of classifier predictions.
         """
 
-        assert allowed_false_negatives is None or reweigh_factor is None, (
-            "Both the `allowed_false_negatives` and the `reweigh_factor` are set. You "
-            "can only set one of them."
-        )
+        assert (
+            allowed_false_negatives is None or reweigh_factor is None
+        ), """Both the `allowed_false_negatives` and the `reweigh_factor` are set. You
+            can only set one of them."""
         self._reweigh_factor = reweigh_factor
 
         valid_val_theta = self._validation_theta[self._validation_label.bool()]

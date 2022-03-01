@@ -76,7 +76,7 @@ def naive_sampling(
         Tensor: Samples of shape (num_samples, event_shape)
 
     """
-    return proposal.sample((num_samples,))
+    return proposal.sample(torch.Size((num_samples,)))
 
 
 @register_sampling_method(
@@ -111,7 +111,7 @@ def importance_resampling(
     for _ in range(iters):
         batch_size = min(num_samples_batch, num_samples - len(final_samples))
         with torch.no_grad():
-            thetas = proposal.sample((batch_size * K,))
+            thetas = proposal.sample(torch.Size((batch_size * K,)))
             logp = potential_fn(thetas)
             logq = proposal.log_prob(thetas)
             weights = (logp - logq).reshape(batch_size, K).softmax(-1).cumsum(-1)

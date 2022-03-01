@@ -335,7 +335,7 @@ class NeuralInference(ABC):
         return description
 
     @staticmethod
-    def _maybe_show_progress(show=bool, epoch=int) -> None:
+    def _maybe_show_progress(show: bool, epoch: int) -> None:
         if show:
             # end="\r" deletes the print statement when a new one appears.
             # https://stackoverflow.com/questions/3419984/. `\r` in the beginning due

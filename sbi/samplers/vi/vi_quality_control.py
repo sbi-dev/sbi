@@ -4,6 +4,7 @@ from typing import Callable, Optional, Tuple
 
 import numpy as np
 import torch
+from torch import Size
 from torch.distributions import Distribution
 
 from sbi.samplers.vi.vi_utils import gpdfit
@@ -60,8 +61,8 @@ def basic_checks(posterior, N: int = int(5e4)):
     """
     prior = posterior._prior
     assert prior is not None, "Posterior has no `._prior` attribute."
-    prior_samples = prior.sample((N,))
-    samples = posterior.sample((N,))
+    prior_samples = prior.sample(Size((N,)))
+    samples = posterior.sample(Size((N,)))
     assert (torch.isfinite(samples)).all(), "Some of the samples are not finite"
     try:
         _ = prior.support
@@ -114,9 +115,9 @@ def psis_diagnostics(
     M = int(min(N / 5, 3 * np.sqrt(N)))
     with torch.no_grad():
         if proposal is None:
-            samples = q.sample((N,))
+            samples = q.sample(Size((N,)))
         else:
-            samples = proposal.sample((N,))
+            samples = proposal.sample(Size((N,)))
         log_q = q.log_prob(samples)
         log_potential = potential_function(samples)
         logweights = log_potential - log_q
@@ -158,9 +159,9 @@ def proportional_to_joint_diagnostics(
 
     with torch.no_grad():
         if proposal is None:
-            samples = q.sample((N,))
+            samples = q.sample(Size((N,)))
         else:
-            samples = proposal.sample((N,))
+            samples = proposal.sample(Size((N,)))
         log_q = q.log_prob(samples)
         log_potential = potential_function(samples)
 
@@ -172,7 +173,7 @@ def proportional_to_joint_diagnostics(
         var_res = torch.sum(residuals**2)
         var_tot = torch.sum((Y - Y.mean()) ** 2)
         r2 = 1 - var_res / var_tot  # R2 statistic to evaluate fit
-    return r2
+    return r2.item()
 
 
 @register_quality_metric(

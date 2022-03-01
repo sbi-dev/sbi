@@ -2,7 +2,6 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 from typing import Any, Callable, List, Optional, Tuple, Union
-from warnings import warn
 
 import torch
 import torch.distributions.transforms as torch_tf
@@ -275,7 +274,7 @@ def conditonal_potential(
     transformed_condition = theta_transform(condition)
 
     conditioned_potential_fn = ConditionedPotential(
-        potential_fn, transformed_condition, dims_to_sample
+        potential_fn, transformed_condition, dims_to_sample  # type: ignore
     )
 
     restricted_prior = RestrictedPriorForConditional(prior, dims_to_sample)

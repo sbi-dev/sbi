@@ -1,13 +1,12 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
-from typing import Any, Callable, Optional, Union
+from typing import Optional, Union
 
 import torch
 from pyknos.nflows import flows
-from torch import Tensor, log, nn
+from torch import Tensor, log
 from torch.distributions import Distribution
 
-from sbi import utils as utils
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.posterior_based_potential import (
     posterior_estimator_based_potential,
@@ -72,7 +71,8 @@ class DirectPosterior(NeuralPosterior):
         self.max_sampling_batch_size = max_sampling_batch_size
         self._leakage_density_correction_factor = None
 
-        self._purpose = "It samples the posterior network and rejects samples that lie outside of the prior bounds."
+        self._purpose = """It samples the posterior network and rejects samples that
+            lie outside of the prior bounds."""
 
     def sample(
         self,

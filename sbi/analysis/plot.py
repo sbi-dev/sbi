@@ -3,7 +3,6 @@
 
 import collections
 from typing import Any, Dict, List, Optional, Tuple, Union
-from warnings import warn
 
 import matplotlib as mpl
 import numpy as np
@@ -83,7 +82,8 @@ def probs2contours(probs, levels):
     Parameters
     ----------
     probs : array
-        Probability array. doesn't have to sum to 1, but it is assumed it contains all the mass
+        Probability array. doesn't have to sum to 1, but it is assumed it contains all
+        the mass
     levels : list
         Percentile levels, have to be in [0.0, 1.0]. Specifies contour levels that
         include a given proportion of samples, i.e., 0.1 specifies where the top 10% of
@@ -210,7 +210,7 @@ def get_diag_func(samples, limits, opts, **kwargs):
         if len(samples) > 0:
             for n, v in enumerate(samples):
                 if opts["diag"][n] == "hist":
-                    h = plt.hist(
+                    plt.hist(
                         v[:, row], color=opts["samples_colors"][n], **opts["hist_diag"]
                     )
                 elif opts["diag"][n] == "kde":
@@ -221,7 +221,7 @@ def get_diag_func(samples, limits, opts, **kwargs):
                         limits[row, 0], limits[row, 1], opts["kde_diag"]["bins"]
                     )
                     ys = density(xs)
-                    h = plt.plot(
+                    plt.plot(
                         xs,
                         ys,
                         color=opts["samples_colors"][n],
@@ -260,7 +260,7 @@ def get_conditional_diag_func(opts, limits, eps_margins, resolution):
             .to("cpu")
             .numpy()
         )
-        h = plt.plot(
+        plt.plot(
             np.linspace(
                 limits[row, 0],
                 limits[row, 1],
@@ -279,7 +279,7 @@ def pairplot(
         Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor]
     ] = None,
     limits: Optional[Union[List, torch.Tensor]] = None,
-    subset: List[int] = None,
+    subset: Optional[List[int]] = None,
     upper: Optional[str] = "hist",
     diag: Optional[str] = "hist",
     figsize: Tuple = (10, 10),
@@ -356,15 +356,15 @@ def pairplot(
                         ],
                         **opts["hist_offdiag"],
                     )
-                    h = plt.imshow(
+                    plt.imshow(
                         hist.T,
                         origin="lower",
-                        extent=[
+                        extent=(
                             xedges[0],
                             xedges[-1],
                             yedges[0],
                             yedges[-1],
-                        ],
+                        ),
                         aspect="auto",
                     )
 
@@ -394,14 +394,14 @@ def pairplot(
                     Z = np.reshape(density(positions).T, X.shape)
 
                     if opts["upper"][n] == "kde" or opts["upper"][n] == "kde2d":
-                        h = plt.imshow(
+                        plt.imshow(
                             Z,
-                            extent=[
+                            extent=(
                                 limits[col][0],
                                 limits[col][1],
                                 limits[row][0],
                                 limits[row][1],
-                            ],
+                            ),
                             origin="lower",
                             aspect="auto",
                         )
@@ -410,7 +410,7 @@ def pairplot(
                             Z = probs2contours(Z, opts["contour_offdiag"]["levels"])
                         else:
                             Z = (Z - Z.min()) / (Z.max() - Z.min())
-                        h = plt.contour(
+                        plt.contour(
                             X,
                             Y,
                             Z,
@@ -427,14 +427,14 @@ def pairplot(
                     else:
                         pass
                 elif opts["upper"][n] == "scatter":
-                    h = plt.scatter(
+                    plt.scatter(
                         v[:, col],
                         v[:, row],
                         color=opts["samples_colors"][n],
                         **opts["scatter_offdiag"],
                     )
                 elif opts["upper"][n] == "plot":
-                    h = plt.plot(
+                    plt.plot(
                         v[:, col],
                         v[:, row],
                         color=opts["samples_colors"][n],
@@ -454,7 +454,7 @@ def marginal_plot(
         Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor]
     ] = None,
     limits: Optional[Union[List, torch.Tensor]] = None,
-    subset: List[int] = None,
+    subset: Optional[List[int]] = None,
     diag: Optional[str] = "hist",
     figsize: Tuple = (10, 10),
     labels: Optional[List[str]] = None,
@@ -518,7 +518,7 @@ def conditional_marginal_plot(
     points: Optional[
         Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor]
     ] = None,
-    subset: List[int] = None,
+    subset: Optional[List[int]] = None,
     resolution: int = 50,
     figsize: Tuple = (10, 10),
     labels: Optional[List[str]] = None,
@@ -538,7 +538,8 @@ def conditional_marginal_plot(
     Say we have a 3D density with parameters $\theta_0$, $\theta_1$, $\theta_2$ and
     a condition $c$ passed by the user in the `condition` argument.
     For the plot of $\theta_0$ on the diagonal, this will plot the conditional
-    $p(\theta_0 | \theta_1=c[1], \theta_2=c[2])$. All other diagonals and are built in the corresponding way.
+    $p(\theta_0 | \theta_1=c[1], \theta_2=c[2])$. All other diagonals and are built in
+    the corresponding way.
 
     Args:
         density: Probability density with a `log_prob()` method.
@@ -590,7 +591,7 @@ def conditional_pairplot(
     points: Optional[
         Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor]
     ] = None,
-    subset: List[int] = None,
+    subset: Optional[List[int]] = None,
     resolution: int = 50,
     figsize: Tuple = (10, 10),
     labels: Optional[List[str]] = None,
@@ -670,15 +671,15 @@ def conditional_pairplot(
             .to("cpu")
             .numpy()
         )
-        h = plt.imshow(
+        plt.imshow(
             p_image.T,
             origin="lower",
-            extent=[
+            extent=(
                 limits[col, 0],
                 limits[col, 1],
                 limits[row, 0],
                 limits[row, 1],
-            ],
+            ),
             aspect="auto",
         )
 
@@ -869,7 +870,7 @@ def _arrange_plots(
                 if len(points) > 0:
                     extent = ax.get_ylim()
                     for n, v in enumerate(points):
-                        h = plt.plot(
+                        plt.plot(
                             [v[:, col], v[:, col]],
                             extent,
                             color=opts["points_colors"][n],
@@ -887,7 +888,7 @@ def _arrange_plots(
                 if len(points) > 0:
 
                     for n, v in enumerate(points):
-                        h = plt.plot(
+                        plt.plot(
                             v[:, col],
                             v[:, row],
                             color=opts["points_colors"][n],
@@ -979,11 +980,11 @@ def _get_default_opts():
 def sbc_rank_plot(
     ranks: Union[Tensor, np.ndarray, List[Tensor], List[np.ndarray]],
     num_posterior_samples: int,
-    num_bins: int = None,
+    num_bins: Optional[int] = None,
     plot_type: str = "cdf",
-    parameter_labels: List[str] = None,
-    ranks_labels: List[str] = None,
-    colors: List[str] = None,
+    parameter_labels: Optional[List[str]] = None,
+    ranks_labels: Optional[List[str]] = None,
+    colors: Optional[List[str]] = None,
     kwargs: Dict = {},
 ) -> Tuple[Figure, Axes]:
     """Plot simulation-based calibration ranks as empirical CDFs or histograms.
@@ -1021,11 +1022,11 @@ def sbc_rank_plot(
 def _sbc_rank_plot(
     ranks: Union[Tensor, np.ndarray, List[Tensor], List[np.ndarray]],
     num_posterior_samples: int,
-    num_bins: int = None,
+    num_bins: Optional[int] = None,
     plot_type: str = "cdf",
-    parameter_labels: List[str] = None,
-    ranks_labels: List[str] = None,
-    colors: List[str] = None,
+    parameter_labels: Optional[List[str]] = None,
+    ranks_labels: Optional[List[str]] = None,
+    colors: Optional[List[str]] = None,
     num_repeats: int = 50,
     line_alpha: float = 0.8,
     show_uniform_region: bool = True,
@@ -1035,9 +1036,9 @@ def _sbc_rank_plot(
     params_in_subplots: bool = False,
     show_ylabel: bool = False,
     sharey: bool = False,
-    fig: Figure = None,
-    ax: Axes = None,
-    figsize: tuple = None,
+    fig: Optional[Figure] = None,
+    ax: Optional[Axes] = None,
+    figsize: Optional[tuple] = None,
 ) -> Tuple[Figure, Axes]:
     """Plot simulation-based calibration ranks as empirical CDFs or histograms.
 
@@ -1197,7 +1198,7 @@ def _sbc_rank_plot(
                 num_repeats,
                 ranks_label=parameter_labels[jj],
                 color=f"C{jj}" if colors is None else colors[jj],
-                xlabel=f"posterior rank",
+                xlabel="posterior rank",
                 # Plot ylabel and legend at last.
                 show_ylabel=jj == (num_parameters - 1),
                 show_legend=jj == (num_parameters - 1),
@@ -1215,8 +1216,8 @@ def _plot_ranks_as_hist(
     ranks: np.ndarray,
     num_bins: int,
     num_posterior_samples: int,
-    ranks_label: str = None,
-    xlabel: str = None,
+    ranks_label: Optional[str] = None,
+    xlabel: Optional[str] = None,
     color: str = "firebrick",
     alpha: float = 0.8,
     show_ylabel: bool = False,
@@ -1231,7 +1232,8 @@ def _plot_ranks_as_hist(
         ranks: SBC ranks in shape (num_sbc_runs, )
         num_bins: number of bins for the histogram, recommendation is num_sbc_runs / 20.
         num_posteriors_samples: number of posterior samples used for ranking.
-        ranks_label: label for the ranks, e.g., when comparing ranks of different methods.
+        ranks_label: label for the ranks, e.g., when comparing ranks of different
+            methods.
         xlabel: label for the current parameter.
         color: histogram color, default from Talts et al.
         alpha: histogram transparency.
@@ -1266,9 +1268,9 @@ def _plot_ranks_as_cdf(
     ranks: np.ndarray,
     num_bins: int,
     num_repeats: int,
-    ranks_label: str = None,
-    xlabel: str = None,
-    color: str = None,
+    ranks_label: Optional[str] = None,
+    xlabel: Optional[str] = None,
+    color: Optional[str] = None,
     alpha: float = 0.8,
     show_ylabel: bool = True,
     show_legend: bool = False,
@@ -1281,7 +1283,8 @@ def _plot_ranks_as_cdf(
         ranks: SBC ranks in shape (num_sbc_runs, )
         num_bins: number of bins for the histogram, recommendation is num_sbc_runs / 20.
         num_repeats: number of repeats of each CDF step, i.e., resolution of the eCDF.
-        ranks_label: label for the ranks, e.g., when comparing ranks of different methods.
+        ranks_label: label for the ranks, e.g., when comparing ranks of different
+            methods.
         xlabel: label for the current parameter
         color: line color for the cdf.
         alpha: line transparency.

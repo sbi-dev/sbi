@@ -194,10 +194,10 @@ class SNPE_A(PosteriorEstimator):
                 self._expand_mog(eps=component_perturbation)
             else:
                 warnings.warn(
-                    f"You have already run SNPE-A with `final_round=True`. Running it"
-                    f"again with this setting will not allow computing the posthoc"
-                    f"correction applied in SNPE-A. Thus, you will get an error when "
-                    f"calling `.build_posterior()` after training.",
+                    "You have already run SNPE-A with `final_round=True`. Running it"
+                    "again with this setting will not allow computing the posthoc"
+                    "correction applied in SNPE-A. Thus, you will get an error when "
+                    "calling `.build_posterior()` after training.",
                     UserWarning,
                 )
         else:
@@ -246,11 +246,14 @@ class SNPE_A(PosteriorEstimator):
             proposal = self._prior
             assert isinstance(
                 proposal, (MultivariateNormal, utils.BoxUniform)
-            ), "Prior must be `torch.distributions.MultivariateNormal` or `sbi.utils.BoxUniform`"
+            ), """Prior must be `torch.distributions.MultivariateNormal` or `sbi.utils.
+                BoxUniform`"""
         else:
             assert isinstance(
                 self._proposal_roundwise[-1], DirectPosterior
-            ), "The proposal you passed to `append_simulations` is neither the prior nor a `DirectPosterior`. SNPE-A currently only supports these scenarios."
+            ), """The proposal you passed to `append_simulations` is neither the prior
+                nor a `DirectPosterior`. SNPE-A currently only supports these scenarios.
+                """
             proposal = self._proposal_roundwise[-1]
 
         # Create the SNPE_A_MDN
@@ -280,7 +283,9 @@ class SNPE_A(PosteriorEstimator):
         if prior is None:
             assert (
                 self._prior is not None
-            ), "You did not pass a prior. You have to pass the prior either at initialization `inference = SNPE_A(prior)` or to `.build_posterior(prior=prior)`."
+            ), """You did not pass a prior. You have to pass the prior either at
+                initialization `inference = SNPE_A(prior)` or to `.build_posterior
+                (prior=prior)`."""
             prior = self._prior
 
         wrapped_density_estimator = self.correct_for_proposal(
@@ -401,7 +406,7 @@ class SNPE_A_MDN(nn.Module):
         # Take care of z-scoring, pre-compute and store prior terms.
         self._set_state_for_mog_proposal()
 
-    def log_prob(self, inputs, context=None):
+    def log_prob(self, inputs: Tensor, context: Tensor) -> Tensor:
         inputs, context = inputs.to(self._device), context.to(self._device)
 
         if not self._apply_correction:
@@ -426,7 +431,7 @@ class SNPE_A_MDN(nn.Module):
             )
             return log_prob_proposal_posterior  # \hat{p} from eq (3) in [1]
 
-    def sample(self, num_samples, context=None, batch_size=None) -> Tensor:
+    def sample(self, num_samples: int, context: Tensor, batch_size: int) -> Tensor:
         context = context.to(self._device)
 
         if not self._apply_correction:
@@ -601,8 +606,8 @@ class SNPE_A_MDN(nn.Module):
 
         if isinstance(self._maybe_z_scored_prior, MultivariateNormal):
             self.prec_m_prod_prior = torch.mv(
-                self._maybe_z_scored_prior.precision_matrix,
-                self._maybe_z_scored_prior.loc,
+                self._maybe_z_scored_prior.precision_matrix,  # type: ignore
+                self._maybe_z_scored_prior.loc,  # type: ignore
             )
 
     def _set_maybe_z_scored_prior(self) -> None:

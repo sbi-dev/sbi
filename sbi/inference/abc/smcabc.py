@@ -515,7 +515,7 @@ class SMCABC(ABCBASE):
         # define multinomial with weights as probs
         multi = Multinomial(probs=weights)
         # sample num samples, with replacement
-        samples = multi.sample(sample_shape=(num_samples,))
+        samples = multi.sample(sample_shape=torch.Size((num_samples,)))
         # get indices of success trials
         indices = torch.where(samples)[1]
         # return those indices from trace
@@ -706,6 +706,6 @@ class SMCABC(ABCBASE):
         )
 
         # Variance spans the range of particles for every dimension.
-        particle_ranges = tensor([max(column) - min(column) for column in samples.T])
+        particle_ranges = samples.max(0).values - samples.min(0).values
         assert particle_ranges.ndim < 2
         return particle_ranges
