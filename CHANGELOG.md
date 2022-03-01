@@ -11,6 +11,7 @@
 - `retrain_from_scratch_each_round` is now called `retrain_from_scratch` (#598, thanks to @jnsbck)
 - API changes that had been introduced in `sbi v0.14.0` and `v0.15.0` are not enforced. Using the interface prior to
   those changes leads to an error (#645)
+- prior passed to SNPE / SNLE / SNRE must be a PyTorch distribution (#655), see FAQ-7 for how to pass use custom prior.
 
 ## Major changes and bug fixes
 - new `sampler interface` (#573)
@@ -18,6 +19,9 @@
 - added `Sequential Neural Variational Inference (SNVI)` (Glöckler et al. 2022) (#609, thanks to @manuelgloeckler)
 - bugfix for SNPE-C with mixture density networks (#573)
 - bugfix for sampling-importance resampling (SIR) as `init_strategy` for MCMC (#646)
+- new density estimator for neural likelihood estimation with mixed data types (MNLE, #638)
+- MCMC can now be parallelized across CPUs (#648)
+- improved device check to remove several GPU issues (#610, thanks to @LouisRouillard)
 
 ## Enhancements
 - pairplot takes `ax` and `fig` (#557)
@@ -40,7 +44,10 @@
 - posterior ensembles (#612, thanks to @jnsbck)
 - remove gradients before returning the `posterior` (#631, thanks to @tomMoral)
 - reduce batchsize of rejection sampling if few samples are left (#631, thanks to @tomMoral)
-
+- tutorial for how to use SBC (#629, thanks to @psteinb)
+- tutorial for how to use SBI with trial-based data and mixed data types (#638)
+- allow to use a `RestrictedPrior` as prior for `SNPE` (#642)
+- optional pre-configured embedding nets (#568, #644, thanks to @JuliaLinhart)
 
 # v0.17.2
 
