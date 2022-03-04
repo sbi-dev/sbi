@@ -1,4 +1,4 @@
-# v0.18.0 (next release)
+# v0.18.0
 
 ## Breaking changes
 - Posteriors saved under `sbi` `v0.17.2` or older can not be loaded under `sbi` 
