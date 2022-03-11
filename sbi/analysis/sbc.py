@@ -201,7 +201,7 @@ def check_sbc(
     ranks: Tensor,
     prior_samples: Tensor,
     dap_samples: Tensor,
-    num_posterior_samples: int,
+    num_posterior_samples: int = 1000,
     num_c2st_repetitions: int = 1,
 ) -> Dict[str, Tensor]:
     """Return uniformity checks and data averaged posterior checks for SBC.
