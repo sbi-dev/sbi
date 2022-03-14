@@ -606,9 +606,7 @@
 <h2 id="12-simulator">1.2 Simulator<a class="headerlink" href="#12-simulator" title="Permanent link">&para;</a></h2>
 <p>Defining some helper functions first:</p>
 <div class="highlight"><pre><span></span><code><span class="k">def</span> <span class="nf">create_t_x</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-    <span class="sd">&#39;&#39;&#39;</span>
-<span class="sd">    Return an t, x array for plotting based on params</span>
-<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="sd">&quot;&quot;&quot;Return an t, x array for plotting based on params&quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">theta</span><span class="o">.</span><span class="n">ndim</span><span class="o">==</span><span class="mi">1</span><span class="p">:</span>
         <span class="n">theta</span><span class="o">=</span><span class="n">theta</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">newaxis</span><span class="p">,:]</span>
 
@@ -623,9 +621,7 @@
     <span class="k">return</span> <span class="n">t</span><span class="p">,</span> <span class="n">x</span>
 
 <span class="k">def</span> <span class="nf">eval</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-    <span class="sd">&#39;&#39;&#39;</span>
-<span class="sd">    Evaluate the quadratic function at &#39;t&#39;</span>
-<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="sd">&quot;&quot;&quot;Evaluate the quadratic function at `t`&quot;&quot;&quot;</span>
 
     <span class="k">if</span> <span class="n">theta</span><span class="o">.</span><span class="n">ndim</span><span class="o">==</span><span class="mi">1</span><span class="p">:</span>
         <span class="n">theta</span><span class="o">=</span><span class="n">theta</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">newaxis</span><span class="p">,:]</span>
@@ -642,7 +638,7 @@
 <span class="n">t</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="n">create_t_x</span><span class="p">(</span><span class="n">theta_o</span><span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="s1">&#39;k&#39;</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>[&lt;matplotlib.lines.Line2D at 0x7fbfda9d6e50&gt;]
+<div class="codehilite"><pre><span></span><code>[&lt;matplotlib.lines.Line2D at 0x7f828b191d60&gt;]
 </code></pre></div>
 
 <p><img alt="png" src="../10_crafting_summary_statistics_files/10_crafting_summary_statistics_14_1.png" /></p>
@@ -653,15 +649,15 @@
 <br>
 <span class="arithmatex">\(\textbf{get_MSE()}\)</span> returns the mean squared error between true and a quadratic function corresponding to a prior distributions sample.</p>
 <div class="highlight"><pre><span></span><code><span class="k">def</span> <span class="nf">get_3_values</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-    <span class="sd">&#39;&#39;&#39;</span>
+    <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Return 3 &#39;y&#39; values corresponding to x=-0.5,0,0.75 as summary statistic vector</span>
-<span class="sd">    &#39;&#39;&#39;</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="nb">eval</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span><span class="o">-</span><span class="mf">0.5</span><span class="p">,</span><span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">),</span> <span class="nb">eval</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">),</span> <span class="nb">eval</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span><span class="mf">0.75</span><span class="p">,</span><span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">)])</span><span class="o">.</span><span class="n">T</span>
 </code></pre></div>
 <div class="highlight"><pre><span></span><code><span class="k">def</span> <span class="nf">get_MSE</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">theta_o</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-    <span class="sd">&#39;&#39;&#39;</span>
+    <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Return the mean-squared error (MSE) i.e. Euclidean distance from the observation function</span>
-<span class="sd">    &#39;&#39;&#39;</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">_</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">create_t_x</span><span class="p">(</span><span class="n">theta_o</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">)</span> <span class="c1"># truth</span>
     <span class="n">_</span><span class="p">,</span> <span class="n">y_</span><span class="o">=</span> <span class="n">create_t_x</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">)</span> <span class="c1"># simulations</span>
     <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">square</span><span class="p">(</span><span class="n">y_</span><span class="o">-</span><span class="n">y</span><span class="p">),</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">keepdims</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">T</span> <span class="c1"># MSE</span>
@@ -677,7 +673,7 @@
 <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span><span class="s1">&#39;grey&#39;</span><span class="p">,</span> <span class="n">zorder</span><span class="o">=</span><span class="mi">0</span><span class="p">);</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>&lt;matplotlib.legend.Legend at 0x7fbfd88724c0&gt;
+<div class="codehilite"><pre><span></span><code>&lt;matplotlib.legend.Legend at 0x7f8289154eb0&gt;
 </code></pre></div>
 
 <p><img alt="png" src="../10_crafting_summary_statistics_files/10_crafting_summary_statistics_22_1.png" /></p>
@@ -695,7 +691,7 @@
 <span class="n">_</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>Neural network successfully converged after 124 epochs.
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 181 epochs.
 </code></pre></div>
 
 <p>Now that we&rsquo;ve build the posterior as such, we can see how likely it finds certain parameters given that we tell it that we&rsquo;ve observed a certain summary statistic (in this case the MSE). We can then sample from it.</p>
@@ -732,7 +728,7 @@
 
 
 
-&lt;matplotlib.legend.Legend at 0x7fbfd4241640&gt;
+&lt;matplotlib.legend.Legend at 0x7f82882cd670&gt;
 </code></pre></div>
 
 <p><img alt="png" src="../10_crafting_summary_statistics_files/10_crafting_summary_statistics_33_2.png" /></p>
@@ -746,7 +742,7 @@
 <span class="n">_</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>Neural network successfully converged after 107 epochs.
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 127 epochs.
 </code></pre></div>
 
 <p>The observation is now given by the values of the observed trace at three different coordinates:</p>
@@ -769,28 +765,25 @@
 </code></pre></div>
 
 <p><img alt="png" src="../10_crafting_summary_statistics_files/10_crafting_summary_statistics_40_1.png" /></p>
-<div class="highlight"><pre><span></span><code><span class="n">x_o_x</span><span class="p">,</span> <span class="n">x_o_y</span> <span class="o">=</span> <span class="n">create_x_y</span><span class="p">(</span><span class="n">theta_o</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><span class="n">x_o_x</span><span class="p">,</span> <span class="n">x_o_y</span> <span class="o">=</span> <span class="n">create_t_x</span><span class="p">(</span><span class="n">theta_o</span><span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">x_o_x</span><span class="p">,</span><span class="n">x_o_y</span><span class="p">,</span> <span class="s1">&#39;k&#39;</span><span class="p">,</span> <span class="n">zorder</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;truth&#39;</span><span class="p">)</span>
 <span class="n">theta_p</span><span class="o">=</span><span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">100</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_o</span><span class="p">)</span>
 <span class="n">ind_10_highest</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">argsort</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">posterior</span><span class="o">.</span><span class="n">log_prob</span><span class="p">(</span><span class="n">theta</span><span class="o">=</span><span class="n">theta_p</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="n">x_o</span><span class="p">)))[</span><span class="o">-</span><span class="mi">10</span><span class="p">:]</span>
 <span class="n">theta_p_considered</span><span class="o">=</span><span class="n">theta_p</span><span class="p">[</span><span class="n">ind_10_highest</span><span class="p">,:]</span>
-<span class="n">x_x</span><span class="p">,</span><span class="n">x_y</span><span class="o">=</span><span class="n">create_x_y</span><span class="p">(</span><span class="n">theta_p_considered</span><span class="o">.</span><span class="n">numpy</span><span class="p">())</span>
+<span class="n">x_x</span><span class="p">,</span><span class="n">x_y</span><span class="o">=</span><span class="n">create_t_x</span><span class="p">(</span><span class="n">theta_p_considered</span><span class="o">.</span><span class="n">numpy</span><span class="p">())</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">x_x</span><span class="p">,</span><span class="n">x_y</span><span class="p">,</span><span class="s1">&#39;grey&#39;</span><span class="p">,</span> <span class="n">zorder</span><span class="o">=</span><span class="mi">0</span><span class="p">);</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>HBox(children=(FloatProgress(value=0.0, description=&#39;Drawing 100 posterior samples&#39;, style=ProgressStyle(descr…
+<div class="codehilite"><pre><span></span><code>Drawing 100 posterior samples:   0%|          | 0/100 [00:00&lt;?, ?it/s]
 
 
 
 
 
-
-
-
-&lt;matplotlib.legend.Legend at 0x7f6d038db290&gt;
+&lt;matplotlib.legend.Legend at 0x7f82885b4af0&gt;
 </code></pre></div>
 
-<p><img alt="png" src="../10_crafting_summary_statistics_files/10_crafting_summary_statistics_41_3.png" /></p>
+<p><img alt="png" src="../10_crafting_summary_statistics_files/10_crafting_summary_statistics_41_2.png" /></p>
 <p>Ok this definitely seems to work! The posterior correctly focuses on the true parameters with greater confidence. You can experiment yourself how this improves further with more training samples or you could try to see how many you&rsquo;d exactly need to keep having a satisfyingly looking posterior and high posterior sample simulations.</p>
 <p>So, what&rsquo;s up with the MSE? Why does it not seem so informative to constrain the posterior? In 1.6, we&rsquo;ll see both the power and pitfalls of summary statistics.</p>
 <h2 id="16-prior-simulations-summary-statistics-vs-observed-summary-statistics">1.6 Prior simulations&rsquo; summary statistics vs observed summary statistics<a class="headerlink" href="#16-prior-simulations-summary-statistics-vs-observed-summary-statistics" title="Permanent link">&para;</a></h2>

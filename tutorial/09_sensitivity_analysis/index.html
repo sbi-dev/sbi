@@ -634,16 +634,15 @@
 
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">infer</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">num_simulations</span><span class="o">=</span><span class="mi">2000</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">&#39;SNPE&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">2</span><span class="p">))</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>HBox(children=(FloatProgress(value=0.0, description=&#39;Running 2000 simulations.&#39;, max=2000.0, style=ProgressSty…
+<div class="codehilite"><pre><span></span><code>Running 2000 simulations.:   0%|          | 0/2000 [00:00&lt;?, ?it/s]
 
 
-
-Neural network successfully converged after 96 epochs.
+ Neural network successfully converged after 117 epochs.
 </code></pre></div>
 
 <div class="highlight"><pre><span></span><code><span class="n">posterior_samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">2000</span><span class="p">,))</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>HBox(children=(FloatProgress(value=0.0, description=&#39;Drawing 2000 posterior samples&#39;, max=2000.0, style=Progre…
+<div class="codehilite"><pre><span></span><code>Drawing 2000 posterior samples:   0%|          | 0/2000 [00:00&lt;?, ?it/s]
 </code></pre></div>
 
 <div class="highlight"><pre><span></span><code><span class="n">_</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span><span class="n">posterior_samples</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">]],</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
@@ -653,7 +652,7 @@ Neural network successfully converged after 96 epochs.
 <div class="highlight"><pre><span></span><code><span class="n">sensitivity</span> <span class="o">=</span> <span class="n">ActiveSubspace</span><span class="p">(</span><span class="n">posterior</span><span class="p">)</span>
 <span class="n">e_vals</span><span class="p">,</span> <span class="n">e_vecs</span> <span class="o">=</span> <span class="n">sensitivity</span><span class="o">.</span><span class="n">find_directions</span><span class="p">(</span><span class="n">posterior_log_prob_as_property</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>HBox(children=(FloatProgress(value=0.0, description=&#39;Drawing 1000 posterior samples&#39;, max=1000.0, style=Progre…
+<div class="codehilite"><pre><span></span><code>Drawing 1000 posterior samples:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
 </code></pre></div>
 
 <p>The method <code>.find_active()</code> returns eigenvalues and the corresponding eigenvectors. It does so by computing the matrix:</p>
@@ -665,11 +664,11 @@ Neural network successfully converged after 96 epochs.
 <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Eigenvectors: </span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e_vecs</span><span class="p">)</span>
 </code></pre></div>
 <div class="codehilite"><pre><span></span><code>Eigenvalues: 
- tensor([2.9249e-06, 8.7961e-05])
+ tensor([2.3552e-06, 7.0754e-05])
 
 Eigenvectors: 
- tensor([[ 0.7343,  0.6789],
-        [ 0.6789, -0.7343]])
+ tensor([[-0.7066, -0.7076],
+        [-0.7076,  0.7066]])
 </code></pre></div>
 
 <p>Lastly, we can project the data into the active dimensions. In this case, we will just use one active dimension:</p>
@@ -691,33 +690,29 @@ Eigenvectors:
 
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">infer</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">num_simulations</span><span class="o">=</span><span class="mi">2000</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">&#39;SNPE&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">2</span><span class="p">))</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>HBox(children=(FloatProgress(value=0.0, description=&#39;Running 2000 simulations.&#39;, max=2000.0, style=ProgressSty…
+<div class="codehilite"><pre><span></span><code>Running 2000 simulations.:   0%|          | 0/2000 [00:00&lt;?, ?it/s]
 
 
-
-Neural network successfully converged after 33 epochs.
+ Neural network successfully converged after 139 epochs.
 </code></pre></div>
 
 <div class="highlight"><pre><span></span><code><span class="n">_</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span><span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10_000</span><span class="p">,)),</span> <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">]],</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>HBox(children=(FloatProgress(value=0.0, description=&#39;Drawing 10000 posterior samples&#39;, max=10000.0, style=Prog…
+<div class="codehilite"><pre><span></span><code>Drawing 10000 posterior samples:   0%|          | 0/10000 [00:00&lt;?, ?it/s]
 </code></pre></div>
 
-<p><img alt="png" src="../09_sensitivity_analysis_files/09_sensitivity_analysis_18_2.png" /></p>
+<p><img alt="png" src="../09_sensitivity_analysis_files/09_sensitivity_analysis_18_1.png" /></p>
 <div class="highlight"><pre><span></span><code><span class="n">sensitivity</span> <span class="o">=</span> <span class="n">ActiveSubspace</span><span class="p">(</span><span class="n">posterior</span><span class="p">)</span>
 </code></pre></div>
 <p>This time, we begin by drawing samples from the posterior and then computing the desired property for each of the samples (i.e. you will probably have to run simulations for each theta and extract the property from the simulation output). As an example, we assume that the property is just the cube of the first dimension of the simulation output:</p>
 <div class="highlight"><pre><span></span><code><span class="n">theta</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="n">simulate_for_sbi</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">posterior</span><span class="p">,</span> <span class="mi">5000</span><span class="p">)</span>
 <span class="n">property_</span> <span class="o">=</span> <span class="n">x</span><span class="p">[:,</span> <span class="p">:</span><span class="mi">1</span><span class="p">]</span><span class="o">**</span><span class="mi">3</span>  <span class="c1"># E.g. metabolic cost.</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>HBox(children=(FloatProgress(value=0.0, description=&#39;Drawing 5000 posterior samples&#39;, max=5000.0, style=Progre…
+<div class="codehilite"><pre><span></span><code>Drawing 5000 posterior samples:   0%|          | 0/5000 [00:00&lt;?, ?it/s]
 
 
 
-
-
-
-HBox(children=(FloatProgress(value=0.0, description=&#39;Running 5000 simulations.&#39;, max=5000.0, style=ProgressSty…
+Running 5000 simulations.:   0%|          | 0/5000 [00:00&lt;?, ?it/s]
 </code></pre></div>
 
 <p>To investigate the sensitivity of a given parameter, we train a neural network to predict the <code>property_</code> from the parameters and then analyse the neural network as above:</p>
@@ -726,21 +721,21 @@ HBox(children=(FloatProgress(value=0.0, description=&#39;Running 5000 simulation
 <div class="highlight"><pre><span></span><code><span class="n">_</span> <span class="o">=</span> <span class="n">sensitivity</span><span class="o">.</span><span class="n">add_property</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">property_</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
 <span class="n">e_vals</span><span class="p">,</span> <span class="n">e_vecs</span> <span class="o">=</span> <span class="n">sensitivity</span><span class="o">.</span><span class="n">find_directions</span><span class="p">()</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>Training neural network. Epochs trained:  73
+<div class="codehilite"><pre><span></span><code> Training neural network. Epochs trained:  24
 
 
-HBox(children=(FloatProgress(value=0.0, description=&#39;Drawing 1000 posterior samples&#39;, max=1000.0, style=Progre…
+Drawing 1000 posterior samples:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
 </code></pre></div>
 
 <div class="highlight"><pre><span></span><code><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Eigenvalues: </span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e_vals</span><span class="p">,</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Eigenvectors: </span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e_vecs</span><span class="p">)</span>
 </code></pre></div>
 <div class="codehilite"><pre><span></span><code>Eigenvalues: 
- tensor([2.3021e-06, 6.5982e-05])
+ tensor([2.8801e-06, 6.1131e-05])
 
 Eigenvectors: 
- tensor([[-0.0191,  0.9998],
-        [ 0.9998,  0.0191]])
+ tensor([[ 0.0362,  0.9993],
+        [ 0.9993, -0.0362]])
 </code></pre></div>
 
 <p>As we can see, one of the eigenvalues is much smaller than the other one. The larger eigenvalue represents (approximately) the vector <code>[1.0, 0.0]</code>. This makes sense, because only the <code>property_</code> is influenced only by the first output which, in turn, is influenced only by the first parameter.</p>

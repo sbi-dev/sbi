@@ -602,7 +602,7 @@
 
 <h1 id="efficient-handling-of-invalid-simulation-outputs">Efficient handling of invalid simulation outputs<a class="headerlink" href="#efficient-handling-of-invalid-simulation-outputs" title="Permanent link">&para;</a></h1>
 <p>For many simulators, the output of the simulator can be ill-defined or it can have non-sensical values. For example, in neuroscience models, if a specific parameter set does not produce a spike, features such as the spike shape can not be computed. When using <code>sbi</code>, such simulations that have <code>NaN</code> or <code>inf</code> in their output are discarded during neural network training. This can lead to inefficetive use of simulation budget: we carry out many simulations, but a potentially large fraction of them is discarded. </p>
-<p>In this tutorial, we show how we can use <code>sbi</code> to learn regions in parameter space that produce <code>valid</code> simulation outputs, and thereby improve the sampling efficiency. The key idea of the method is to use a classifier to distinguish parameters that lead to <code>valid</code> simulations from regions that lead to <code>invalid</code> simulations. After we have obtained the region in parameter space that produes <code>valid</code> simulation outputs, we train the deep neural density estimator used in <code>SNPE</code>. The method was originally proposed in Lueckmann, Goncalves et al. 2017 and later used in Deistler et al. 2021 (in preparation).</p>
+<p>In this tutorial, we show how we can use <code>sbi</code> to learn regions in parameter space that produce <code>valid</code> simulation outputs, and thereby improve the sampling efficiency. The key idea of the method is to use a classifier to distinguish parameters that lead to <code>valid</code> simulations from regions that lead to <code>invalid</code> simulations. After we have obtained the region in parameter space that produes <code>valid</code> simulation outputs, we train the deep neural density estimator used in <code>SNPE</code>. The method was originally proposed in <a href="https://arxiv.org/abs/1711.01861">Lueckmann, Goncalves et al. 2017</a> and later used in <a href="https://www.biorxiv.org/content/10.1101/2021.07.30.454484v3.abstract">Deistler et al. 2021</a>.</p>
 <h2 id="main-syntax">Main syntax<a class="headerlink" href="#main-syntax" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">SNPE</span>
 <span class="kn">from</span> <span class="nn">sbi.utils</span> <span class="kn">import</span> <span class="n">RestrictionEstimator</span>
@@ -644,8 +644,7 @@
 <div class="highlight"><pre><span></span><code><span class="n">theta</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="n">simulate_for_sbi</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="mi">1000</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Simulation outputs: &quot;</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>HBox(children=(FloatProgress(value=0.0, description=&#39;Running 1000 simulations.&#39;, max=1000.0, style=ProgressSty…
-
+<div class="codehilite"><pre><span></span><code>Running 1000 simulations.:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
 
 
 Simulation outputs:  tensor([[ 0.0411, -0.5656],
@@ -664,7 +663,7 @@ Simulation outputs:  tensor([[ 0.0411, -0.5656],
 <div class="highlight"><pre><span></span><code><span class="n">restriction_estimator</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
 <span class="n">classifier</span> <span class="o">=</span> <span class="n">restriction_estimator</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>Training neural network. Epochs trained:  31
+<div class="codehilite"><pre><span></span><code>Training neural network. Epochs trained:  35
 </code></pre></div>
 
 <p>We can inspect the <code>restricted_prior</code>, i.e. the parameters that the classifier believes will lead to <code>valid</code> simulation outputs, with:</p>
@@ -672,33 +671,28 @@ Simulation outputs:  tensor([[ 0.0411, -0.5656],
 <span class="n">samples</span> <span class="o">=</span> <span class="n">restricted_prior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10_000</span><span class="p">,))</span>
 <span class="n">_</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span><span class="n">samples</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">]],</span> <span class="n">fig_size</span><span class="o">=</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>The classifier rejected 51.1% of all samples. You will get a speed-up of 104.6%.
-
-
-/home/michael/Documents/sbi/sbi/utils/plot.py:197: UserWarning: You passed an argument `fig_size`. Since sbi v0.15.0, the argument should be called `figsize`. In future versions, `fig_size` will no longer be supported.
-  warn(
+<div class="codehilite"><pre><span></span><code>The classifier rejected 51.6% of all samples. You will get a speed-up of 106.5%.
 </code></pre></div>
 
-<p><img alt="png" src="../08_restriction_estimator_files/08_restriction_estimator_16_2.png" /></p>
+<p><img alt="png" src="../08_restriction_estimator_files/08_restriction_estimator_16_1.png" /></p>
 <p>Indeed, parameter sets sampled from the <code>restricted_prior</code> always have a first parameter larger than <code>0.0</code>. These are the ones that produce <code>valid</code> simulation outputs (see our definition of the simulator above). We can then use the <code>restricted_prior</code> to generate more simulations. Almost all of them will have <code>valid</code> simulation outputs:</p>
 <div class="highlight"><pre><span></span><code><span class="n">new_theta</span><span class="p">,</span> <span class="n">new_x</span> <span class="o">=</span> <span class="n">simulate_for_sbi</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">restricted_prior</span><span class="p">,</span> <span class="mi">1000</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Simulation outputs: &quot;</span><span class="p">,</span> <span class="n">new_x</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>The classifier rejected 51.0% of all samples. You will get a speed-up of 104.2%.
+<div class="codehilite"><pre><span></span><code>The classifier rejected 50.9% of all samples. You will get a speed-up of 103.6%.
 
 
 
-HBox(children=(FloatProgress(value=0.0, description=&#39;Running 1000 simulations.&#39;, max=1000.0, style=ProgressSty…
+Running 1000 simulations.:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
 
 
-
-Simulation outputs:  tensor([[0.8354, 1.2736],
-        [0.7019, 0.8654],
-        [3.1989, 0.4628],
+Simulation outputs:  tensor([[ 0.6834, -0.2415],
+        [ 1.3459,  1.5373],
+        [ 2.1092,  1.9180],
         ...,
-        [2.8816, 2.2535],
-        [0.8272, 1.9156],
-        [0.5428, 0.8408]])
+        [ 0.8845,  0.4036],
+        [ 1.9111,  1.2526],
+        [ 0.8320,  2.3755]])
 </code></pre></div>
 
 <p>We can now use <strong>all</strong> simulations and run <code>SNPE</code> as always:</p>
@@ -715,27 +709,18 @@ Simulation outputs:  tensor([[0.8354, 1.2736],
 <div class="codehilite"><pre><span></span><code>WARNING:root:Found 523 NaN simulations and 0 Inf simulations. They will be excluded from training.
 
 
-Neural network successfully converged after 41 epochs.
+ Neural network successfully converged after 118 epochs.
 
 
-
-HBox(children=(FloatProgress(value=0.0, description=&#39;Drawing 10000 posterior samples&#39;, max=10000.0, style=Prog…
-
-
-
-
-
-/home/michael/Documents/sbi/sbi/utils/plot.py:197: UserWarning: You passed an argument `fig_size`. Since sbi v0.15.0, the argument should be called `figsize`. In future versions, `fig_size` will no longer be supported.
-  warn(
+Drawing 10000 posterior samples:   0%|          | 0/10000 [00:00&lt;?, ?it/s]
 </code></pre></div>
 
-<p><img alt="png" src="../08_restriction_estimator_files/08_restriction_estimator_20_5.png" /></p>
+<p><img alt="png" src="../08_restriction_estimator_files/08_restriction_estimator_20_3.png" /></p>
 <h2 id="further-options-for-tuning-the-algorithm">Further options for tuning the algorithm<a class="headerlink" href="#further-options-for-tuning-the-algorithm" title="Permanent link">&para;</a></h2>
 <ul>
 <li>the whole procedure can be repeated many times (see the loop shown in &ldquo;Main syntax&rdquo; in this tutorial)  </li>
 <li>the classifier is trained to be relatively conservative, i.e. it will try to be very sure that a specific parameter set can indeed not produce <code>valid</code> simulation outputs. If you are ok with the restricted prior potentially ignoring a small fraction of parameter sets that might have produced <code>valid</code> data, you can use <code>restriction_estimator.restrict_prior(allowed_false_negatives=...)</code>. The argument <code>allowed_false_negatives</code> sets the fraction of potentially ignored parameter sets. A higher value will lead to more <code>valid</code> simulations.  </li>
 <li>By default, the algorithm considers simulations that have at least one <code>NaN</code> of <code>inf</code> as <code>invalid</code>. You can specify custom criterions with <code>RestrictionEstimator(decision_criterion=...)</code></li>
-<li>For differencese between the <code>RestrictionEstimator</code> and <a href="https://www.mackelab.org/sbi/tutorial/03_multiround_inference/">multi-round inference</a>, please see Deistler et al. 2021 (in preparation).</li>
 </ul>
 
               

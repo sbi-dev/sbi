@@ -8,14 +8,14 @@
       
       
       
-        <link rel="canonical" href="https://mackelab.org/sbi/tutorial/03_multiround_inference/">
+        <link rel="canonical" href="https://mackelab.org/sbi/tutorial/12_diagnosis_posterior_predictive_check/">
       
       <link rel="icon" href="../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.2.3, mkdocs-material-8.1.7">
     
     
       
-        <title>Multi-round inference - sbi</title>
+        <title>Posterior Predictive Checks (PPC) in SBI - sbi</title>
       
     
     
@@ -68,7 +68,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#multi-round-inference" class="md-skip">
+        <a href="#posterior-predictive-checks-ppc-in-sbi" class="md-skip">
           Skip to content
         </a>
       
@@ -100,7 +100,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Multi-round inference
+              Posterior Predictive Checks (PPC) in SBI
             
           </span>
         </div>
@@ -237,14 +237,12 @@
 
   
   
-    
-  
   
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
       
-        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3" type="checkbox" id="__nav_3" checked>
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3" type="checkbox" id="__nav_3" >
       
       
       
@@ -326,14 +324,12 @@
               
   
   
-    
-  
   
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
       
-        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3_2" type="checkbox" id="__nav_3_2" checked>
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3_2" type="checkbox" id="__nav_3_2" >
       
       
       
@@ -368,59 +364,11 @@
               
   
   
-    
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" data-md-toggle="toc" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          Multi-round inference
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../03_multiround_inference/" class="md-nav__link">
         Multi-round inference
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#main-syntax" class="md-nav__link">
-    Main syntax
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#linear-gaussian-example" class="md-nav__link">
-    Linear Gaussian example
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -622,8 +570,8 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#linear-gaussian-example" class="md-nav__link">
-    Linear Gaussian example
+  <a href="#performing-a-ppc-over-a-toy-example" class="md-nav__link">
+    Performing a PPC over a toy example
   </a>
   
 </li>
@@ -640,101 +588,124 @@
             <article class="md-content__inner md-typeset">
               
                 
-<a href="http://github.com/mackelab/sbi/edit/master/docs/tutorial/03_multiround_inference.md" title="Edit this page" class="md-content__button md-icon">
+<a href="http://github.com/mackelab/sbi/edit/master/docs/tutorial/12_diagnosis_posterior_predictive_check.md" title="Edit this page" class="md-content__button md-icon">
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75L3 17.25z"/></svg>
 </a>
 
 
-<h1 id="multi-round-inference">Multi-round inference<a class="headerlink" href="#multi-round-inference" title="Permanent link">&para;</a></h1>
-<p>In the previous tutorials, we have inferred the posterior using <strong>single-round inference</strong>. In <strong>single-round inference</strong>, we draw parameters from the prior, simulate the corresponding data, and then train a neural network to obtain the posterior. However,  if one is interested in only one particular observation <code>x_o</code> sampling from the prior can be inefficient in the number of simulations because one is effectively learning a posterior estimate for all observations in the prior space. In this tutorial, we show how one can alleviate this issue by performing <strong>multi-round inference</strong> with <code>sbi</code>.  </p>
-<p><strong>Multi-round inference</strong> also starts by drawing parameters from the prior, simulating them, and training a neural network to estimate the posterior distribution. Afterwards, however, it continues inference in multiple rounds, focusing on a particular observation <code>x_o</code>. In each new round of inference, it draws samples from the obtained posterior distribution conditioned at <code>x_o</code> (instead of from the prior), simulates these, and trains the network again. This process can be repeated arbitrarily often to get increasingly good approximations to the true posterior distribution at <code>x_o</code>.</p>
-<p>Running multi-round inference can be more efficient in the number of simulations, but it will lead to the posterior no longer being amortized (i.e. it will be accurate only for a specific observation <code>x_o</code>, not for any <code>x</code>).</p>
-<p>Note, you can find the original version of this notebook at <a href="https://github.com/mackelab/sbi/blob/main/tutorials/03_multiround_inference.ipynb">https://github.com/mackelab/sbi/blob/main/tutorials/03_multiround_inference.ipynb</a> in the <code>sbi</code> repository.</p>
+<h1 id="posterior-predictive-checks-ppc-in-sbi">Posterior Predictive Checks (PPC) in SBI<a class="headerlink" href="#posterior-predictive-checks-ppc-in-sbi" title="Permanent link">&para;</a></h1>
+<p>A common <strong>safety check</strong> performed as part of inference are <a href="https://rss.onlinelibrary.wiley.com/doi/full/10.1111/rssa.12378">Posterior Predictive Checks (PPC)</a>. A PPC compares data <span class="arithmatex">\(x_{\text{pp}}\)</span> generated using the parameters <span class="arithmatex">\(\theta_{\text{posterior}}\)</span> sampled from the posterior with the observed data <span class="arithmatex">\(x_o\)</span>. The general concept is that -if the inference is correct- <strong>the generated data <span class="arithmatex">\(x_{\text{pp}}\)</span> should &ldquo;look similar&rdquo; the oberved data <span class="arithmatex">\(x_0\)</span></strong>. Said differently, <span class="arithmatex">\(x_o\)</span> should be within the support of <span class="arithmatex">\(x_{\text{pp}}\)</span>.</p>
+<p>A PPC usually shouldn&rsquo;t be used as a <a href="http://proceedings.mlr.press/v130/lueckmann21a.html">validation metric</a>. Nonetheless a PPC is a good start for an inference diagnosis and can provide with an intuition about any bias introduced in inference: does <span class="arithmatex">\(x_{\text{pp}}\)</span> systematically differ from <span class="arithmatex">\(x_o\)</span>?</p>
 <h2 id="main-syntax">Main syntax<a class="headerlink" href="#main-syntax" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><span class="c1"># 2 rounds: first round simulates from the prior, second round simulates parameter set </span>
-<span class="c1"># that were sampled from the obtained posterior.</span>
-<span class="n">num_rounds</span> <span class="o">=</span> <span class="mi">2</span>
-<span class="c1"># The specific observation we want to focus the inference on.</span>
-<span class="n">x_o</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="p">,)</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.analysis</span> <span class="kn">import</span> <span class="n">pairplot</span>
 
-<span class="n">posteriors</span> <span class="o">=</span> <span class="p">[]</span>
-<span class="n">proposal</span> <span class="o">=</span> <span class="n">prior</span>
+<span class="c1"># A PPC is performed after we trained or neural posterior</span>
+<span class="n">posterior</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">x_o</span><span class="p">)</span>
 
-<span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_rounds</span><span class="p">):</span>
-    <span class="n">theta</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="n">simulate_for_sbi</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">proposal</span><span class="p">,</span> <span class="n">num_simulations</span><span class="o">=</span><span class="mi">500</span><span class="p">)</span>
+<span class="c1"># We draw theta samples from the posterior. This part is not in the scope of SBI</span>
+<span class="n">posterior_samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">5_000</span><span class="p">,))</span>
 
-     <span class="c1"># In `SNLE` and `SNRE`, you should not pass the `proposal` to `.append_simulations()`</span>
-    <span class="n">density_estimator</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">proposal</span><span class="o">=</span><span class="n">proposal</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
-    <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span><span class="n">density_estimator</span><span class="p">)</span>
-    <span class="n">posteriors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">posterior</span><span class="p">)</span>
-    <span class="n">proposal</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">x_o</span><span class="p">)</span>
+<span class="c1"># We use posterior theta samples to generate x data</span>
+<span class="n">x_pp</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">posterior_samples</span><span class="p">)</span>
+
+<span class="c1"># We verify if the observed data falls within the support of the generated data</span>
+<span class="n">_</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span>
+    <span class="n">samples</span><span class="o">=</span><span class="n">x_pp</span><span class="p">,</span>
+    <span class="n">points</span><span class="o">=</span><span class="n">x_o</span>
+<span class="p">)</span>
 </code></pre></div>
-<h2 id="linear-gaussian-example">Linear Gaussian example<a class="headerlink" href="#linear-gaussian-example" title="Permanent link">&para;</a></h2>
-<p>Below, we give a full example of inferring the posterior distribution over multiple rounds.</p>
-<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">torch</span>
+<h2 id="performing-a-ppc-over-a-toy-example">Performing a PPC over a toy example<a class="headerlink" href="#performing-a-ppc-over-a-toy-example" title="Permanent link">&para;</a></h2>
+<p>Below we provide an example Posterior Predictive Check (PPC) over some toy example:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.analysis</span> <span class="kn">import</span> <span class="n">pairplot</span>
+<span class="kn">import</span> <span class="nn">torch</span>
 
-<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">SNPE</span><span class="p">,</span> <span class="n">prepare_for_sbi</span><span class="p">,</span> <span class="n">simulate_for_sbi</span>
-<span class="kn">from</span> <span class="nn">sbi.utils.get_nn_models</span> <span class="kn">import</span> <span class="n">posterior_nn</span>
-<span class="kn">from</span> <span class="nn">sbi</span> <span class="kn">import</span> <span class="n">utils</span> <span class="k">as</span> <span class="n">utils</span>
-<span class="kn">from</span> <span class="nn">sbi</span> <span class="kn">import</span> <span class="n">analysis</span> <span class="k">as</span> <span class="n">analysis</span>
 <span class="n">_</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
 </code></pre></div>
-<p>First, we define a simple prior and simulator and ensure that they comply with <code>sbi</code> by using <code>prepare_for_sbi</code>:</p>
-<div class="highlight"><pre><span></span><code><span class="n">num_dim</span> <span class="o">=</span> <span class="mi">3</span>
-<span class="n">prior</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">BoxUniform</span><span class="p">(</span><span class="n">low</span><span class="o">=-</span><span class="mi">2</span><span class="o">*</span><span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">num_dim</span><span class="p">),</span> 
-                         <span class="n">high</span><span class="o">=</span><span class="mi">2</span><span class="o">*</span><span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">num_dim</span><span class="p">))</span>
+<p>We work on an inference problem over three parameters using any of the techniques implemented in <code>sbi</code>. In this tutorial, we load the dummy posterior:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">toy_posterior_for_07_cc</span> <span class="kn">import</span> <span class="n">ExamplePosterior</span>
+<span class="n">posterior</span> <span class="o">=</span> <span class="n">ExamplePosterior</span><span class="p">()</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code><span class="k">def</span> <span class="nf">linear_gaussian</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
-    <span class="k">return</span> <span class="n">theta</span> <span class="o">+</span> <span class="mf">1.0</span> <span class="o">+</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn_like</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.1</span>
+<p>Let us say that we are observing the data point <span class="arithmatex">\(x_o\)</span>:</p>
+<div class="highlight"><pre><span></span><code><span class="n">D</span> <span class="o">=</span> <span class="mi">5</span>  <span class="c1"># simulator output was 5-dimensional</span>
+<span class="n">x_o</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">D</span><span class="p">)</span>
+<span class="n">posterior</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">x_o</span><span class="p">)</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span> <span class="o">=</span> <span class="n">prepare_for_sbi</span><span class="p">(</span><span class="n">linear_gaussian</span><span class="p">,</span> <span class="n">prior</span><span class="p">)</span>
+<p>The posterior can be used to draw <span class="arithmatex">\(\theta_{\text{posterior}}\)</span> samples:</p>
+<div class="highlight"><pre><span></span><code><span class="n">posterior_samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">5_000</span><span class="p">,))</span>
+
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span>
+    <span class="n">samples</span><span class="o">=</span><span class="n">posterior_samples</span><span class="p">,</span>
+    <span class="n">limits</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([[</span><span class="o">-</span><span class="mf">2.5</span><span class="p">,</span> <span class="mf">2.5</span><span class="p">]]</span><span class="o">*</span><span class="mi">3</span><span class="p">),</span>
+    <span class="n">upper</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;kde&#39;</span><span class="p">],</span>
+    <span class="n">diag</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;kde&#39;</span><span class="p">],</span>
+    <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span><span class="mi">5</span><span class="p">),</span>
+    <span class="n">labels</span><span class="o">=</span><span class="p">[</span><span class="sa">rf</span><span class="s2">&quot;$\theta_</span><span class="si">{</span><span class="n">d</span><span class="si">}</span><span class="s2">$&quot;</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">)]</span>
+<span class="p">)</span>
 </code></pre></div>
-<p>Then, we instantiate the inference object:</p>
-<div class="highlight"><pre><span></span><code><span class="n">inference</span> <span class="o">=</span> <span class="n">SNPE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">)</span>
+<p><img alt="png" src="../12_diagnosis_posterior_predictive_check_files/12_diagnosis_posterior_predictive_check_11_0.png" /></p>
+<p>Now we can use our simulator to generate some data <span class="arithmatex">\(x_{\text{PP}}\)</span>, using as input parameters the poterior samples <span class="arithmatex">\(\theta_{\text{posterior}}\)</span>. Note that the simulation part is not in the <code>sbi</code> scope, so any simulator -including a non-Python one- can be used at this stage. In our case we&rsquo;ll use a dummy simulator:</p>
+<div class="highlight"><pre><span></span><code><span class="k">def</span> <span class="nf">dummy_simulator</span><span class="p">(</span>
+    <span class="n">posterior_samples</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+    <span class="o">*</span><span class="n">args</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">kwargs</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+    <span class="n">sample_size</span> <span class="o">=</span> <span class="n">posterior_samples</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">scale</span> <span class="o">=</span> <span class="mf">1.0</span>
+
+    <span class="n">shift</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">distributions</span><span class="o">.</span><span class="n">Gumbel</span><span class="p">(</span>
+        <span class="n">loc</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">D</span><span class="p">),</span>
+        <span class="n">scale</span><span class="o">=</span><span class="n">scale</span> <span class="o">/</span> <span class="mi">2</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">sample</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">distributions</span><span class="o">.</span><span class="n">Gumbel</span><span class="p">(</span>
+        <span class="n">loc</span><span class="o">=</span><span class="n">x_o</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">shift</span><span class="p">,</span>
+        <span class="n">scale</span><span class="o">=</span><span class="n">scale</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">sample_size</span><span class="p">,))</span>
+
+<span class="n">x_pp</span> <span class="o">=</span> <span class="n">dummy_simulator</span><span class="p">(</span><span class="n">posterior_samples</span><span class="p">)</span>
 </code></pre></div>
-<p>And we can run inference. In this example, we will run inference over <code>2</code> rounds, potentially leading to a more focused posterior around the observation <code>x_o</code>.</p>
-<div class="highlight"><pre><span></span><code><span class="n">num_rounds</span> <span class="o">=</span> <span class="mi">2</span>
-<span class="n">x_o</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="p">,)</span>
-
-<span class="n">posteriors</span> <span class="o">=</span> <span class="p">[]</span>
-<span class="n">proposal</span> <span class="o">=</span> <span class="n">prior</span>
-
-<span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_rounds</span><span class="p">):</span>
-    <span class="n">theta</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="n">simulate_for_sbi</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">proposal</span><span class="p">,</span> <span class="n">num_simulations</span><span class="o">=</span><span class="mi">500</span><span class="p">)</span>
-    <span class="n">density_estimator</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">proposal</span><span class="o">=</span><span class="n">proposal</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
-    <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span><span class="n">density_estimator</span><span class="p">)</span>
-    <span class="n">posteriors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">posterior</span><span class="p">)</span>
-    <span class="n">proposal</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">x_o</span><span class="p">)</span>
+<p>Plotting <span class="arithmatex">\(x_o\)</span> against the <span class="arithmatex">\(x_{\text{pp}}\)</span>, we perform a PPC that plays the role of a sanity check. In this case, the check indicates that <span class="arithmatex">\(x_o\)</span> falls right within the support of <span class="arithmatex">\(x_{\text{pp}}\)</span>, which should make the experimenter rather confident about the estimated <code>posterior</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="n">_</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span>
+    <span class="n">samples</span><span class="o">=</span><span class="n">x_pp</span><span class="p">,</span>
+    <span class="n">points</span><span class="o">=</span><span class="n">x_o</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+    <span class="n">limits</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([[</span><span class="o">-</span><span class="mf">2.</span><span class="p">,</span> <span class="mf">5.</span><span class="p">]]</span><span class="o">*</span><span class="mi">5</span><span class="p">),</span>
+    <span class="n">points_colors</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">,</span>
+    <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span><span class="mi">8</span><span class="p">),</span>
+    <span class="n">upper</span><span class="o">=</span><span class="s2">&quot;scatter&quot;</span><span class="p">,</span>
+    <span class="n">scatter_offdiag</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span>
+        <span class="n">marker</span><span class="o">=</span><span class="s1">&#39;.&#39;</span><span class="p">,</span>
+        <span class="n">s</span><span class="o">=</span><span class="mi">5</span>
+    <span class="p">),</span>
+    <span class="n">points_offdiag</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span>
+        <span class="n">marker</span><span class="o">=</span><span class="s1">&#39;+&#39;</span><span class="p">,</span>
+        <span class="n">markersize</span><span class="o">=</span><span class="mi">20</span>
+    <span class="p">),</span>
+    <span class="n">labels</span><span class="o">=</span><span class="p">[</span><span class="sa">rf</span><span class="s2">&quot;$x_</span><span class="si">{</span><span class="n">d</span><span class="si">}</span><span class="s2">$&quot;</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">D</span><span class="p">)]</span>
+<span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>Running 500 simulations.:   0%|          | 0/500 [00:00&lt;?, ?it/s]
+<p><img alt="png" src="../12_diagnosis_posterior_predictive_check_files/12_diagnosis_posterior_predictive_check_15_0.png" /></p>
+<p>In contrast, <span class="arithmatex">\(x_o\)</span> falling well outside the support of <span class="arithmatex">\(x_{\text{pp}}\)</span> is indicative of a failure to estimate the correct posterior. Here we simulate such a failure mode:</p>
+<div class="highlight"><pre><span></span><code><span class="n">error_shift</span> <span class="o">=</span> <span class="o">-</span><span class="mf">2.0</span><span class="o">*</span><span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>
 
-
- Neural network successfully converged after 157 epochs.
-
-
-Drawing 500 posterior samples:   0%|          | 0/500 [00:00&lt;?, ?it/s]
-
-
-
-Running 500 simulations.:   0%|          | 0/500 [00:00&lt;?, ?it/s]
-
-
-Using SNPE-C with atomic loss
- Neural network successfully converged after 58 epochs.
+<span class="n">_</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span>
+    <span class="n">samples</span><span class="o">=</span><span class="n">x_pp</span><span class="p">,</span>
+    <span class="n">points</span><span class="o">=</span><span class="n">x_o</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">error_shift</span><span class="p">,</span>
+    <span class="n">limits</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([[</span><span class="o">-</span><span class="mf">2.</span><span class="p">,</span> <span class="mf">5.</span><span class="p">]]</span><span class="o">*</span><span class="mi">5</span><span class="p">),</span>
+    <span class="n">points_colors</span><span class="o">=</span><span class="s2">&quot;red&quot;</span><span class="p">,</span>
+    <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span><span class="mi">8</span><span class="p">),</span>
+    <span class="n">upper</span><span class="o">=</span><span class="s2">&quot;scatter&quot;</span><span class="p">,</span>
+    <span class="n">scatter_offdiag</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span>
+        <span class="n">marker</span><span class="o">=</span><span class="s1">&#39;.&#39;</span><span class="p">,</span>
+        <span class="n">s</span><span class="o">=</span><span class="mi">5</span>
+    <span class="p">),</span>
+    <span class="n">points_offdiag</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span>
+        <span class="n">marker</span><span class="o">=</span><span class="s1">&#39;+&#39;</span><span class="p">,</span>
+        <span class="n">markersize</span><span class="o">=</span><span class="mi">20</span>
+    <span class="p">),</span>
+    <span class="n">labels</span><span class="o">=</span><span class="p">[</span><span class="sa">rf</span><span class="s2">&quot;$x_</span><span class="si">{</span><span class="n">d</span><span class="si">}</span><span class="s2">$&quot;</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">D</span><span class="p">)]</span>
+<span class="p">)</span>
 </code></pre></div>
-
-<p>Note that, for <code>num_rounds&gt;1</code>, the posterior is no longer amortized: it will give good results when sampled around <code>x=observation</code>, but possibly bad results for other <code>x</code>.</p>
-<p>Once we have obtained the posterior, we can <code>.sample()</code>, <code>.log_prob()</code>, or <code>.pairplot()</code> in the same way as for the simple interface.</p>
-<div class="highlight"><pre><span></span><code><span class="n">posterior_samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_o</span><span class="p">)</span>
-
-<span class="c1"># plot posterior samples</span>
-<span class="n">_</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">pairplot</span><span class="p">(</span><span class="n">posterior_samples</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">],[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">],[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">]],</span> 
-                   <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span><span class="mi">5</span><span class="p">))</span>
-</code></pre></div>
-<div class="codehilite"><pre><span></span><code>Drawing 10000 posterior samples:   0%|          | 0/10000 [00:00&lt;?, ?it/s]
-</code></pre></div>
-
-<p><img alt="png" src="../03_multiround_inference_files/03_multiround_inference_16_1.png" /></p>
+<p><img alt="png" src="../12_diagnosis_posterior_predictive_check_files/12_diagnosis_posterior_predictive_check_17_0.png" /></p>
+<p>A typical way to investigate this issue would be to run a <em><strong>prior* predictive check</strong>, applying the same plotting strategy, but drawing <span class="arithmatex">\(\theta\)</span> from the prior instead of the posterior. **The support for <span class="arithmatex">\(x_{\text{pp}}\)</span> should be larger and should contain <span class="arithmatex">\(x_o\)</span>*</em>. If this check is successful, the &ldquo;blame&rdquo; can then be shifted to the inference (method used, convergence of density estimators, number of sequential rounds, etc&hellip;).</p>
 
               
             </article>
@@ -744,41 +715,6 @@ Using SNPE-C with atomic loss
       </main>
       
         <footer class="md-footer">
-  
-    <nav class="md-footer__inner md-grid" aria-label="Footer">
-      
-        
-        <a href="../02_flexible_interface/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Flexible interface" rel="prev">
-          <div class="md-footer__button md-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12z"/></svg>
-          </div>
-          <div class="md-footer__title">
-            <div class="md-ellipsis">
-              <span class="md-footer__direction">
-                Previous
-              </span>
-              Flexible interface
-            </div>
-          </div>
-        </a>
-      
-      
-        
-        <a href="../04_density_estimators/" class="md-footer__link md-footer__link--next" aria-label="Next: Custom density estimators" rel="next">
-          <div class="md-footer__title">
-            <div class="md-ellipsis">
-              <span class="md-footer__direction">
-                Next
-              </span>
-              Custom density estimators
-            </div>
-          </div>
-          <div class="md-footer__button md-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11H4z"/></svg>
-          </div>
-        </a>
-      
-    </nav>
   
   <div class="md-footer-meta md-typeset">
     <div class="md-footer-meta__inner md-grid">

@@ -637,7 +637,7 @@
 <span class="n">plt</span><span class="o">.</span><span class="n">sca</span><span class="p">(</span><span class="n">ax</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">([</span><span class="s2">&quot;GT&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="p">[</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">nt</span><span class="si">}</span><span class="s2"> trials&quot;</span> <span class="k">for</span> <span class="n">nt</span> <span class="ow">in</span> <span class="n">num_trials</span><span class="p">]);</span>
 </code></pre></div>
-<p><img alt="png" src="../10_Inference_given_IID_observations_files/10_Inference_given_IID_observations_4_0.png" /></p>
+<p><img alt="png" src="10_Inference_given_IID_observations_files/10_Inference_given_IID_observations_4_0.png" /></p>
 <h2 id="iid-x-inference-with-nle">IID x inference with NLE<a class="headerlink" href="#iid-x-inference-with-nle" title="Permanent link">&para;</a></h2>
 <p>(S)NLE can easily perform inference given multiple IID x because it based on learning the likelihood. Once the likelihood is learned, i.e., a neural network that given a single observation and a parameter predicts the likelihood of that observation given the parameter, one can perform MCMC to obtain posterior samples. </p>
 <p>MCMC relies on evaluating ratios of likelihoods of candidate parameters to either accept or reject them to be posterior samples. When inferring the posterior given multiple IID observation, these likelihoods are just the joint likelihoods of each IID observation given the current parameter candidate. Thus, given a neural likelihood from SNLE, we can calculate these joint likelihoods and perform MCMC given IID data:</p>
@@ -1353,7 +1353,7 @@ Generating MCMC samples
 <div class="codehilite"><pre><span></span><code>100%|██████████| 70000/70000 [02:01&lt;00:00, 574.98it/s]
 </code></pre></div>
 
-<p><img alt="png" src="../10_Inference_given_IID_observations_files/10_Inference_given_IID_observations_8_1.png" /></p>
+<p><img alt="png" src="10_Inference_given_IID_observations_files/10_Inference_given_IID_observations_8_1.png" /></p>
 <div class="highlight"><pre><span></span><code><span class="n">cs</span> <span class="o">=</span> <span class="p">[</span><span class="n">c2st</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">s1</span><span class="p">),</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">s2</span><span class="p">))</span> <span class="k">for</span> <span class="n">s1</span><span class="p">,</span> <span class="n">s2</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">ss</span><span class="p">,</span> <span class="n">samples</span><span class="p">)]</span>
 </code></pre></div>
 <div class="highlight"><pre><span></span><code><span class="n">cs</span>

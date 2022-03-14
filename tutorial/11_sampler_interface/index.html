@@ -8,14 +8,14 @@
       
       
       
-        <link rel="canonical" href="https://mackelab.org/sbi/tutorial/01_gaussian_amortized/">
+        <link rel="canonical" href="https://mackelab.org/sbi/tutorial/11_sampler_interface/">
       
       <link rel="icon" href="../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.2.3, mkdocs-material-8.1.7">
     
     
       
-        <title>Amortized inference - sbi</title>
+        <title>The sampler interface - sbi</title>
       
     
     
@@ -68,7 +68,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#amortized-posterior-inference-on-gaussian-example" class="md-skip">
+        <a href="#the-sampler-interface" class="md-skip">
           Skip to content
         </a>
       
@@ -100,7 +100,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Amortized inference
+              The sampler interface
             
           </span>
         </div>
@@ -237,14 +237,12 @@
 
   
   
-    
-  
   
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
       
-        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3" type="checkbox" id="__nav_3" checked>
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3" type="checkbox" id="__nav_3" >
       
       
       
@@ -265,14 +263,12 @@
               
   
   
-    
-  
   
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
       
-        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3_1" type="checkbox" id="__nav_3_1" checked>
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3_1" type="checkbox" id="__nav_3_1" >
       
       
       
@@ -307,59 +303,11 @@
               
   
   
-    
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" data-md-toggle="toc" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          Amortized inference
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../01_gaussian_amortized/" class="md-nav__link">
         Amortized inference
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#defining-prior-simulator-and-running-inference" class="md-nav__link">
-    Defining prior, simulator, and running inference
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#amortized-inference" class="md-nav__link">
-    Amortized inference
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -615,15 +563,22 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#defining-prior-simulator-and-running-inference" class="md-nav__link">
-    Defining prior, simulator, and running inference
+  <a href="#main-syntax-for-snle" class="md-nav__link">
+    Main syntax for SNLE
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#amortized-inference" class="md-nav__link">
-    Amortized inference
+  <a href="#further-explanation" class="md-nav__link">
+    Further explanation
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#main-syntax-for-snpe" class="md-nav__link">
+    Main syntax for SNPE
   </a>
   
 </li>
@@ -640,68 +595,61 @@
             <article class="md-content__inner md-typeset">
               
                 
-<a href="http://github.com/mackelab/sbi/edit/master/docs/tutorial/01_gaussian_amortized.md" title="Edit this page" class="md-content__button md-icon">
+<a href="http://github.com/mackelab/sbi/edit/master/docs/tutorial/11_sampler_interface.md" title="Edit this page" class="md-content__button md-icon">
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75L3 17.25z"/></svg>
 </a>
 
 
-<h1 id="amortized-posterior-inference-on-gaussian-example">Amortized posterior inference on Gaussian example<a class="headerlink" href="#amortized-posterior-inference-on-gaussian-example" title="Permanent link">&para;</a></h1>
-<p>Note, you can find the original version of this notebook at <a href="https://github.com/mackelab/sbi/blob/main/tutorials/01_gaussian_amortized.ipynb">https://github.com/mackelab/sbi/blob/main/tutorials/01_gaussian_amortized.ipynb</a> in the <code>sbi</code> repository.</p>
-<p>In this tutorial, we will demonstrate how <code>sbi</code> can infer an amortized posterior for a simple toy model with a uniform prior and Gaussian likelihood.</p>
-<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<h1 id="the-sampler-interface">The sampler interface<a class="headerlink" href="#the-sampler-interface" title="Permanent link">&para;</a></h1>
+<p>Note: this tutorial requires that the user is already familiar with the <a href="https://www.mackelab.org/sbi/tutorial/02_flexible_interface/">flexible interface</a>.</p>
+<p><code>sbi</code> implements three methods: SNPE, SNLE, and SNRE. When using SNPE, the trained neural network directly approximates the posterior. Thus, sampling from the posterior can be done by sampling from the trained neural network. The neural networks trained in SNLE and SNRE approximate the likelihood(-ratio). Thus, in order to draw samples from the posterior, one has to perform additional sampling steps, e.g. Markov-chain Monte-Carlo (MCMC). In <code>sbi</code>, the implemented samplers are:
+- Markov-chain Monte-Carlo (MCMC)
+- Rejection sampling<br />
+- Variational inference (VI)</p>
+<p>When using the flexible interface, the sampler as well as its attributes can be set with <code>sample_with="mcmc"</code>, <code>mcmc_method="slice_np"</code>, and <code>mcmc_parameters={}</code>. However, for full flexibility in customizing the sampler, we recommend using the <strong>sampler interface</strong>. This interface is described here. Further details can be found <a href="https://github.com/mackelab/sbi/pull/573">here</a>.</p>
+<h2 id="main-syntax-for-snle">Main syntax for SNLE<a class="headerlink" href="#main-syntax-for-snle" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">SNLE</span>
+<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">likelihood_estimator_based_potential</span><span class="p">,</span> <span class="n">MCMCPosterior</span>
 
-<span class="kn">from</span> <span class="nn">sbi</span> <span class="kn">import</span> <span class="n">utils</span> <span class="k">as</span> <span class="n">utils</span>
-<span class="kn">from</span> <span class="nn">sbi</span> <span class="kn">import</span> <span class="n">analysis</span> <span class="k">as</span> <span class="n">analysis</span>
-<span class="kn">from</span> <span class="nn">sbi.inference.base</span> <span class="kn">import</span> <span class="n">infer</span>
-</code></pre></div>
-<h2 id="defining-prior-simulator-and-running-inference">Defining prior, simulator, and running inference<a class="headerlink" href="#defining-prior-simulator-and-running-inference" title="Permanent link">&para;</a></h2>
-<p>Say we have a 3-dimensional parameter space, and the prior is uniformly distributed between <code>-2</code> and <code>2</code> in each dimension, i.e. <span class="arithmatex">\(\theta \in [-2,2], y\in [-2,2], z \in [-2,2]\)</span>.</p>
-<div class="highlight"><pre><span></span><code><span class="n">num_dim</span> <span class="o">=</span> <span class="mi">3</span>
-<span class="n">prior</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">BoxUniform</span><span class="p">(</span><span class="n">low</span><span class="o">=-</span><span class="mi">2</span><span class="o">*</span><span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">num_dim</span><span class="p">),</span> <span class="n">high</span><span class="o">=</span><span class="mi">2</span><span class="o">*</span><span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">num_dim</span><span class="p">))</span>
-</code></pre></div>
-<p>Our simulator takes the input parameters, adds <code>1.0</code> in each dimension, and then adds some Gaussian noise:</p>
-<div class="highlight"><pre><span></span><code><span class="k">def</span> <span class="nf">linear_gaussian</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
-    <span class="k">return</span> <span class="n">theta</span> <span class="o">+</span> <span class="mf">1.0</span> <span class="o">+</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn_like</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.1</span>
-</code></pre></div>
-<p>We can then run inference:</p>
-<div class="highlight"><pre><span></span><code><span class="n">posterior</span> <span class="o">=</span> <span class="n">infer</span><span class="p">(</span><span class="n">linear_gaussian</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="s1">&#39;SNPE&#39;</span><span class="p">,</span> <span class="n">num_simulations</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
-</code></pre></div>
-<div class="codehilite"><pre><span></span><code>Running 1000 simulations.:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
+<span class="n">inference</span> <span class="o">=</span> <span class="n">SNLE</span><span class="p">()</span>
+<span class="n">likelihood_estimator</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
 
-
- Neural network successfully converged after 97 epochs.
+<span class="n">potential_fn</span><span class="p">,</span> <span class="n">parameter_transform</span> <span class="o">=</span> <span class="n">likelihood_estimator_based_potential</span><span class="p">(</span><span class="n">likelihood_estimator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">x_o</span><span class="p">)</span>
+<span class="n">posterior</span> <span class="o">=</span> <span class="n">MCMCPosterior</span><span class="p">(</span><span class="n">potential_fn</span><span class="p">,</span> <span class="n">proposal</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">parameter_transform</span><span class="o">=</span><span class="n">parameter_transform</span><span class="p">)</span>
 </code></pre></div>
-
-<h2 id="amortized-inference">Amortized inference<a class="headerlink" href="#amortized-inference" title="Permanent link">&para;</a></h2>
-<p>Note that we have not yet provided an observation to the inference procedure. In fact, we can evaluate the posterior for different observations without having to re-run inference. This is called amortization. An amortized posterior is one that is not focused on any particular observation. Naturally, if the diversity of observations is large, any of the inference methods will need to run a sufficient number of simulations for the resulting posterior to perform well across these diverse observations.</p>
-<p>Let&rsquo;s say we have two observations <code>x_o_1 = [0,0,0]</code> and <code>x_o_2 = [2,2,2]</code>:</p>
-<div class="highlight"><pre><span></span><code><span class="n">x_o_1</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="p">,)</span>
-<span class="n">x_o_2</span> <span class="o">=</span> <span class="mf">2.0</span><span class="o">*</span><span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">3</span><span class="p">,)</span>
+<h2 id="further-explanation">Further explanation<a class="headerlink" href="#further-explanation" title="Permanent link">&para;</a></h2>
+<p>The first lines are the same as for the flexible interface:</p>
+<div class="highlight"><pre><span></span><code><span class="n">inference</span> <span class="o">=</span> <span class="n">SNLE</span><span class="p">()</span>
+<span class="n">likelihood_estimator</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
 </code></pre></div>
-<p>We can draw samples from the posterior given <code>x_o_1</code> and then plot them:</p>
-<div class="highlight"><pre><span></span><code><span class="n">posterior_samples_1</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_o_1</span><span class="p">)</span>
-
-<span class="c1"># plot posterior samples</span>
-<span class="n">_</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">pairplot</span><span class="p">(</span><span class="n">posterior_samples_1</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">],[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">],[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">]],</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span><span class="mi">5</span><span class="p">))</span>
+<p>Next, we obtain the potential function. A potential function is a function of the parameter <span class="arithmatex">\(f(\theta)\)</span>. The posterior is proportional to the product of likelihood and prior: <span class="arithmatex">\(p(\theta | x_o) \propto p(x_o | \theta)p(\theta)\)</span>. The potential function is the logarithm of the right-hand side of this equation: <span class="arithmatex">\(f(\theta) = \log(p(x_o | \theta)p(\theta))\)</span></p>
+<div class="highlight"><pre><span></span><code><span class="n">potential_fn</span><span class="p">,</span> <span class="n">parameter_transform</span> <span class="o">=</span> <span class="n">likelihood_estimator_based_potential</span><span class="p">(</span><span class="n">likelihood_estimator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">x_o</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>Drawing 10000 posterior samples:   0%|          | 0/10000 [00:00&lt;?, ?it/s]
+<p>By calling the <code>potential_fn</code>, you can evaluate the potential:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Assuming that your parameters are 1D.</span>
+<span class="n">potential</span> <span class="o">=</span> <span class="n">potential_fn</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>  <span class="c1"># -&gt; returns f(0) = log( p(x_o|0) p(0) )</span>
 </code></pre></div>
-
-<p><img alt="png" src="../01_gaussian_amortized_files/01_gaussian_amortized_14_1.png" /></p>
-<p>As it can be seen, the posterior samples are centered around <code>[-1,-1,-1]</code> in each dimension. 
-This makes sense because the simulator always adds <code>1.0</code> in each dimension and we have observed <code>x_o_1 = [0,0,0]</code>.</p>
-<p>Since the learned posterior is amortized, we can also draw samples from the posterior given the second observation without having to re-run inference:</p>
-<div class="highlight"><pre><span></span><code><span class="n">posterior_samples_2</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_o_2</span><span class="p">)</span>
-
-<span class="c1"># plot posterior samples</span>
-<span class="n">_</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">pairplot</span><span class="p">(</span><span class="n">posterior_samples_2</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">],[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">],[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">]],</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span><span class="mi">5</span><span class="p">))</span>
+<p>The other object that is returned by <code>likelihood_estimator_based_potential</code> is a <code>parameter_transform</code>. The <code>parameter_transform</code> is a <a href="https://github.com/pytorch/pytorch/blob/master/torch/distributions/transforms.py">pytorch transform</a>. The <code>parameter_transform</code> is a fixed transform that is can be applied to parameter <code>theta</code>. It transforms the parameters into unconstrained space (if the prior is bounded, e.g. <code>BoxUniform</code>), and standardizes the parameters (i.e. zero mean, one std). Using <code>parameter_transform</code> during sampling is optional, but it usually improves the performance of MCMC.</p>
+<div class="highlight"><pre><span></span><code><span class="n">theta_tf</span> <span class="o">=</span> <span class="n">parameter_transform</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+<span class="n">theta_original</span> <span class="o">=</span> <span class="n">parameter_transform</span><span class="o">.</span><span class="n">inv</span><span class="p">(</span><span class="n">theta_tf</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">theta_original</span><span class="p">)</span>  <span class="c1"># -&gt; tensor([[0.0]])</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>Drawing 10000 posterior samples:   0%|          | 0/10000 [00:00&lt;?, ?it/s]
-</code></pre></div>
+<p>After having obtained the <code>potential_fn</code>, we can sample from the posterior with MCMC or rejection sampling:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">MCMCPosterior</span><span class="p">,</span> <span class="n">RejectionPosterior</span>
 
-<p><img alt="png" src="../01_gaussian_amortized_files/01_gaussian_amortized_17_1.png" /></p>
-<p>So, if we observed <code>x_o_2 = [2,2,2]</code>, the posterior is centered around <code>[1,1,1]</code> &ndash; again, this makes sense because the simulator adds <code>1.0</code> in each dimension.</p>
+<span class="n">posterior</span> <span class="o">=</span> <span class="n">MCMCPosterior</span><span class="p">(</span><span class="n">potential_fn</span><span class="p">,</span> <span class="n">proposal</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">theta_transform</span><span class="o">=</span><span class="n">parameter_transform</span><span class="p">)</span>
+<span class="n">posterior</span> <span class="o">=</span> <span class="n">RejectionPosterior</span><span class="p">(</span><span class="n">potential_fn</span><span class="p">,</span> <span class="n">proposal</span><span class="o">=</span><span class="n">prior</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="main-syntax-for-snpe">Main syntax for SNPE<a class="headerlink" href="#main-syntax-for-snpe" title="Permanent link">&para;</a></h2>
+<p>SNPE usually does not require MCMC or rejection sampling (if you still need it, you can use the same syntax as above with the <code>posterior_estimator_based_potential</code> function). Instead, SNPE samples from the neural network. If the support of the prior is bounded, some samples can lie outside of the support of the prior. The <code>DirectPosterior</code> class automatically rejects these samples:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">SNPE</span>
+<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">DirectPosterior</span>
+
+<span class="n">inference</span> <span class="o">=</span> <span class="n">SNPE</span><span class="p">()</span>
+<span class="n">posterior_estimator</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+
+<span class="n">posterior</span> <span class="o">=</span> <span class="n">DirectPosterior</span><span class="p">(</span><span class="n">posterior_estimator</span><span class="p">,</span> <span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">)</span>
+</code></pre></div>
 
               
             </article>
@@ -711,41 +659,6 @@ This makes sense because the simulator always adds <code>1.0</code> in each dime
       </main>
       
         <footer class="md-footer">
-  
-    <nav class="md-footer__inner md-grid" aria-label="Footer">
-      
-        
-        <a href="../00_getting_started/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Getting started" rel="prev">
-          <div class="md-footer__button md-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12z"/></svg>
-          </div>
-          <div class="md-footer__title">
-            <div class="md-ellipsis">
-              <span class="md-footer__direction">
-                Previous
-              </span>
-              Getting started
-            </div>
-          </div>
-        </a>
-      
-      
-        
-        <a href="../02_flexible_interface/" class="md-footer__link md-footer__link--next" aria-label="Next: Flexible interface" rel="next">
-          <div class="md-footer__title">
-            <div class="md-ellipsis">
-              <span class="md-footer__direction">
-                Next
-              </span>
-              Flexible interface
-            </div>
-          </div>
-          <div class="md-footer__button md-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11H4z"/></svg>
-          </div>
-        </a>
-      
-    </nav>
   
   <div class="md-footer-meta md-typeset">
     <div class="md-footer-meta__inner md-grid">
