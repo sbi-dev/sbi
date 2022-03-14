@@ -8,7 +8,7 @@ import numpy as np
 import torch
 from torch import Tensor
 from torch.distributions import Distribution
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.samplers.vi import (
