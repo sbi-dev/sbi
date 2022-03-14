@@ -1,0 +1,1418 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://mackelab.org/sbi/tutorial/10_Inference_given_IID_observations/">
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.2.3, mkdocs-material-8.1.7">
+    
+    
+      
+        <title>10 Inference given IID observations - sbi</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.cd566b2a.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.e6a45f82.min.css">
+        
+          
+          
+          <meta name="theme-color" content="#4051b5">
+        
+      
+    
+    
+    
+      
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,400i,700%7CRoboto+Mono&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../static/global.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#the-analytical-posterior-concentrates-around-true-parameters-with-increasing-number-of-iid-trials" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="sbi" class="md-header__button md-logo" aria-label="sbi" data-md-component="logo">
+      
+  <img src="../../static/logo.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            sbi
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              10 Inference given IID observations
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5z"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" aria-label="Clear" tabindex="-1">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="http://github.com/mackelab/sbi/" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    mackelab/sbi
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="sbi" class="md-nav__button md-logo" aria-label="sbi" data-md-component="logo">
+      
+  <img src="../../static/logo.svg" alt="logo">
+
+    </a>
+    sbi
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="http://github.com/mackelab/sbi/" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    mackelab/sbi
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        Home
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../install/" class="md-nav__link">
+        Installation
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+      
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3" type="checkbox" id="__nav_3" >
+      
+      
+      
+      
+        <label class="md-nav__link" for="__nav_3">
+          Tutorials and Examples
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <nav class="md-nav" aria-label="Tutorials and Examples" data-md-level="1">
+        <label class="md-nav__title" for="__nav_3">
+          <span class="md-nav__icon md-icon"></span>
+          Tutorials and Examples
+        </label>
+        <ul class="md-nav__list" data-md-scrollfix>
+          
+            
+              
+  
+  
+  
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+      
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3_1" type="checkbox" id="__nav_3_1" >
+      
+      
+      
+      
+        <label class="md-nav__link" for="__nav_3_1">
+          Introduction
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <nav class="md-nav" aria-label="Introduction" data-md-level="2">
+        <label class="md-nav__title" for="__nav_3_1">
+          <span class="md-nav__icon md-icon"></span>
+          Introduction
+        </label>
+        <ul class="md-nav__list" data-md-scrollfix>
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../00_getting_started/" class="md-nav__link">
+        Getting started
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../01_gaussian_amortized/" class="md-nav__link">
+        Amortized inference
+      </a>
+    </li>
+  
+
+            
+          
+        </ul>
+      </nav>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+      
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3_2" type="checkbox" id="__nav_3_2" >
+      
+      
+      
+      
+        <label class="md-nav__link" for="__nav_3_2">
+          Advanced
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <nav class="md-nav" aria-label="Advanced" data-md-level="2">
+        <label class="md-nav__title" for="__nav_3_2">
+          <span class="md-nav__icon md-icon"></span>
+          Advanced
+        </label>
+        <ul class="md-nav__list" data-md-scrollfix>
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../02_flexible_interface/" class="md-nav__link">
+        Flexible interface
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../03_multiround_inference/" class="md-nav__link">
+        Multi-round inference
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../04_density_estimators/" class="md-nav__link">
+        Custom density estimators
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../05_embedding_net/" class="md-nav__link">
+        Learning summary statistics
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../07_conditional_distributions/" class="md-nav__link">
+        Conditional distributions
+      </a>
+    </li>
+  
+
+            
+          
+        </ul>
+      </nav>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+      
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3_3" type="checkbox" id="__nav_3_3" >
+      
+      
+      
+      
+        <label class="md-nav__link" for="__nav_3_3">
+          Examples
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <nav class="md-nav" aria-label="Examples" data-md-level="2">
+        <label class="md-nav__title" for="__nav_3_3">
+          <span class="md-nav__icon md-icon"></span>
+          Examples
+        </label>
+        <ul class="md-nav__list" data-md-scrollfix>
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/00_HH_simulator/" class="md-nav__link">
+        Hodgkin-Huxley example
+      </a>
+    </li>
+  
+
+            
+          
+        </ul>
+      </nav>
+    </li>
+  
+
+            
+          
+        </ul>
+      </nav>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contribute/" class="md-nav__link">
+        Contribute
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/" class="md-nav__link">
+        API Reference
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        FAQ
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../credits/" class="md-nav__link">
+        Credits
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-analytical-posterior-concentrates-around-true-parameters-with-increasing-number-of-iid-trials" class="md-nav__link">
+    The analytical posterior concentrates around true parameters with increasing number of IID trials
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#iid-x-inference-with-nle" class="md-nav__link">
+    IID x inference with NLE
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          <div class="md-content" data-md-component="content">
+            <article class="md-content__inner md-typeset">
+              
+                
+<a href="http://github.com/mackelab/sbi/edit/master/docs/tutorial/10_Inference_given_IID_observations.md" title="Edit this page" class="md-content__button md-icon">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75L3 17.25z"/></svg>
+</a>
+
+
+  <h1>10 Inference given IID observations</h1>
+
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+
+<span class="kn">from</span> <span class="nn">torch</span> <span class="kn">import</span> <span class="n">zeros</span><span class="p">,</span> <span class="n">ones</span><span class="p">,</span> <span class="n">eye</span>
+<span class="kn">from</span> <span class="nn">torch.distributions</span> <span class="kn">import</span> <span class="n">MultivariateNormal</span>
+<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">SNLE</span><span class="p">,</span> <span class="n">prepare_for_sbi</span><span class="p">,</span> <span class="n">simulate_for_sbi</span>
+<span class="kn">from</span> <span class="nn">sbi.analysis</span> <span class="kn">import</span> <span class="n">pairplot</span>
+<span class="kn">from</span> <span class="nn">sbi.utils.metrics</span> <span class="kn">import</span> <span class="n">c2st</span>
+
+<span class="kn">from</span> <span class="nn">sbi.simulators.linear_gaussian</span> <span class="kn">import</span> <span class="n">linear_gaussian</span><span class="p">,</span> <span class="n">true_posterior_linear_gaussian_mvn_prior</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="c1"># Gaussian simulator</span>
+<span class="n">theta_dim</span> <span class="o">=</span> <span class="mi">2</span>
+<span class="n">x_dim</span> <span class="o">=</span> <span class="n">theta_dim</span>
+<span class="c1"># likelihood_mean will be likelihood_shift+theta</span>
+<span class="n">likelihood_shift</span> <span class="o">=</span> <span class="o">-</span><span class="mf">1.0</span> <span class="o">*</span> <span class="n">zeros</span><span class="p">(</span><span class="n">x_dim</span><span class="p">)</span>
+<span class="n">likelihood_cov</span> <span class="o">=</span> <span class="mf">0.3</span> <span class="o">*</span> <span class="n">eye</span><span class="p">(</span><span class="n">x_dim</span><span class="p">)</span>
+
+<span class="n">prior_mean</span> <span class="o">=</span> <span class="n">zeros</span><span class="p">(</span><span class="n">theta_dim</span><span class="p">)</span>
+<span class="n">prior_cov</span> <span class="o">=</span> <span class="n">eye</span><span class="p">(</span><span class="n">theta_dim</span><span class="p">)</span>
+<span class="n">prior</span> <span class="o">=</span> <span class="n">MultivariateNormal</span><span class="p">(</span><span class="n">loc</span><span class="o">=</span><span class="n">prior_mean</span><span class="p">,</span> <span class="n">covariance_matrix</span><span class="o">=</span><span class="n">prior_cov</span><span class="p">)</span>
+
+<span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span> <span class="o">=</span> <span class="n">prepare_for_sbi</span><span class="p">(</span><span class="k">lambda</span> <span class="n">theta</span><span class="p">:</span> <span class="n">linear_gaussian</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">likelihood_shift</span><span class="p">,</span> <span class="n">likelihood_cov</span><span class="p">),</span> <span class="n">prior</span><span class="p">)</span>
+
+<span class="k">def</span> <span class="nf">get_true_posterior_samples</span><span class="p">(</span><span class="n">x_o</span><span class="p">,</span> <span class="n">num_samples</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">true_posterior_linear_gaussian_mvn_prior</span><span class="p">(</span><span class="n">x_o</span><span class="p">,</span> 
+                                                    <span class="n">likelihood_shift</span><span class="p">,</span> 
+                                                    <span class="n">likelihood_cov</span><span class="p">,</span> 
+                                                    <span class="n">prior_mean</span><span class="p">,</span> 
+                                                    <span class="n">prior_cov</span><span class="p">)</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_samples</span><span class="p">,))</span>
+</code></pre></div>
+<h2 id="the-analytical-posterior-concentrates-around-true-parameters-with-increasing-number-of-iid-trials">The analytical posterior concentrates around true parameters with increasing number of IID trials<a class="headerlink" href="#the-analytical-posterior-concentrates-around-true-parameters-with-increasing-number-of-iid-trials" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><span class="n">num_trials</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">15</span><span class="p">,</span> <span class="mi">20</span><span class="p">]</span>
+<span class="n">tho</span> <span class="o">=</span> <span class="n">zeros</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">theta_dim</span><span class="p">)</span>
+
+<span class="n">xos</span> <span class="o">=</span> <span class="p">[</span><span class="n">tho</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="n">nt</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">nt</span> <span class="ow">in</span> <span class="n">num_trials</span><span class="p">]</span>
+<span class="n">ss</span> <span class="o">=</span> <span class="p">[</span><span class="n">get_true_posterior_samples</span><span class="p">(</span><span class="n">xo</span><span class="p">,</span> <span class="mi">5000</span><span class="p">)</span> <span class="k">for</span> <span class="n">xo</span> <span class="ow">in</span> <span class="n">xos</span><span class="p">]</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span><span class="n">ss</span><span class="p">,</span> <span class="n">points</span><span class="o">=</span><span class="n">tho</span><span class="p">,</span> <span class="n">upper</span><span class="o">=</span><span class="s2">&quot;scatter&quot;</span><span class="p">,</span> <span class="n">points_colors</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;k&quot;</span><span class="p">],</span> 
+         <span class="n">points_offdiag</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">marker</span><span class="o">=</span><span class="s2">&quot;+&quot;</span><span class="p">))</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">sca</span><span class="p">(</span><span class="n">ax</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">([</span><span class="s2">&quot;GT&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="p">[</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">nt</span><span class="si">}</span><span class="s2"> trials&quot;</span> <span class="k">for</span> <span class="n">nt</span> <span class="ow">in</span> <span class="n">num_trials</span><span class="p">]);</span>
+</code></pre></div>
+<p><img alt="png" src="../10_Inference_given_IID_observations_files/10_Inference_given_IID_observations_4_0.png" /></p>
+<h2 id="iid-x-inference-with-nle">IID x inference with NLE<a class="headerlink" href="#iid-x-inference-with-nle" title="Permanent link">&para;</a></h2>
+<p>(S)NLE can easily perform inference given multiple IID x because it based on learning the likelihood. Once the likelihood is learned, i.e., a neural network that given a single observation and a parameter predicts the likelihood of that observation given the parameter, one can perform MCMC to obtain posterior samples. </p>
+<p>MCMC relies on evaluating ratios of likelihoods of candidate parameters to either accept or reject them to be posterior samples. When inferring the posterior given multiple IID observation, these likelihoods are just the joint likelihoods of each IID observation given the current parameter candidate. Thus, given a neural likelihood from SNLE, we can calculate these joint likelihoods and perform MCMC given IID data:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Train SNLE.</span>
+<span class="n">inferer</span> <span class="o">=</span> <span class="n">SNLE</span><span class="p">(</span><span class="n">prior</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="s2">&quot;mdn&quot;</span><span class="p">)</span>
+<span class="n">theta</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="n">simulate_for_sbi</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="mi">100000</span><span class="p">,</span> <span class="n">simulation_batch_size</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
+<span class="n">inferer</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="n">training_batch_size</span><span class="o">=</span><span class="mi">100</span><span class="p">);</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>Running 100000 simulations.:   0%|          | 0/100000 [00:00&lt;?, ?it/s]
+
+
+Neural network successfully converged after 34 epochs.
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code><span class="c1"># Obtain posterior samples for different number of iid xos. </span>
+<span class="n">samples</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="n">num_samples</span> <span class="o">=</span> <span class="mi">5000</span>
+
+<span class="n">mcmc_parameters</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+    <span class="n">num_chains</span> <span class="o">=</span> <span class="mi">20</span><span class="p">,</span>
+    <span class="n">thin</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
+    <span class="n">warmup_steps</span><span class="o">=</span> <span class="mi">100</span><span class="p">,</span>
+    <span class="n">init_strategy</span><span class="o">=</span> <span class="s2">&quot;sir&quot;</span><span class="p">,</span>
+    <span class="n">sir_batch_size</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span>
+    <span class="n">sir_num_batches</span> <span class="o">=</span> <span class="mi">100</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">mcmc_method</span> <span class="o">=</span> <span class="s2">&quot;slice_np_vectorized&quot;</span>
+
+<span class="k">for</span> <span class="n">xo</span> <span class="ow">in</span> <span class="n">xos</span><span class="p">:</span>
+    <span class="n">posterior</span> <span class="o">=</span> <span class="n">inferer</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span>
+        <span class="n">mcmc_method</span><span class="o">=</span><span class="n">mcmc_method</span><span class="p">,</span> 
+        <span class="n">mcmc_parameters</span><span class="o">=</span><span class="n">mcmc_parameters</span><span class="p">,</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">set_default_x</span><span class="p">(</span><span class="n">xo</span><span class="p">)</span>
+    <span class="n">samples</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">sample_shape</span><span class="o">=</span><span class="p">(</span><span class="n">num_samples</span><span class="p">,)))</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>  0%|          | 0/70000 [00:00&lt;?, ?it/s]
+
+Generating MCMC samples
+
+
+100%|██████████| 70000/70000 [01:13&lt;00:00, 498.93it/s] 
+  0%|          | 0/70000 [00:00&lt;?, ?it/s][A
+
+Generating MCMC samples
+
+
+
+  0%|          | 10/70000 [00:00&lt;42:44, 27.30it/s][A
+  0%|          | 30/70000 [00:00&lt;16:46, 69.50it/s][A
+  0%|          | 100/70000 [00:00&lt;04:59, 233.23it/s][A
+  0%|          | 220/70000 [00:00&lt;02:24, 481.99it/s][A
+  0%|          | 300/70000 [00:00&lt;02:06, 553.02it/s][A
+  1%|          | 420/70000 [00:00&lt;01:40, 692.19it/s][A
+  1%|          | 510/70000 [00:01&lt;01:37, 710.70it/s][A
+  1%|          | 620/70000 [00:01&lt;01:25, 812.07it/s][A
+  1%|          | 710/70000 [00:01&lt;01:26, 800.57it/s][A
+  1%|          | 810/70000 [00:01&lt;01:21, 851.34it/s][A
+  1%|▏         | 900/70000 [00:01&lt;01:23, 822.78it/s][A
+  1%|▏         | 990/70000 [00:01&lt;01:22, 831.97it/s][A
+  2%|▏         | 1090/70000 [00:01&lt;01:22, 835.50it/s][A
+  2%|▏         | 1200/70000 [00:01&lt;01:15, 906.98it/s][A
+  2%|▏         | 1300/70000 [00:01&lt;01:17, 885.90it/s][A
+  2%|▏         | 1390/70000 [00:02&lt;01:23, 821.81it/s][A
+  2%|▏         | 1480/70000 [00:02&lt;01:25, 800.51it/s][A
+  2%|▏         | 1590/70000 [00:02&lt;01:18, 870.59it/s][A
+  2%|▏         | 1680/70000 [00:02&lt;01:32, 736.71it/s][A
+  3%|▎         | 1780/70000 [00:02&lt;01:25, 799.46it/s][A
+  3%|▎         | 1870/70000 [00:02&lt;01:24, 809.79it/s][A
+  3%|▎         | 1960/70000 [00:02&lt;01:36, 702.64it/s][A
+  3%|▎         | 2040/70000 [00:03&lt;01:47, 633.17it/s][A
+  3%|▎         | 2120/70000 [00:03&lt;01:43, 658.26it/s][A
+  3%|▎         | 2230/70000 [00:03&lt;01:35, 712.36it/s][A
+  3%|▎         | 2310/70000 [00:03&lt;01:36, 703.99it/s][A
+  3%|▎         | 2390/70000 [00:03&lt;01:32, 727.98it/s][A
+  4%|▎         | 2470/70000 [00:03&lt;01:34, 713.03it/s][A
+  4%|▎         | 2550/70000 [00:03&lt;02:02, 551.11it/s][A
+  4%|▎         | 2620/70000 [00:03&lt;01:55, 583.98it/s][A
+  4%|▍         | 2690/70000 [00:04&lt;02:02, 549.57it/s][A
+  4%|▍         | 2750/70000 [00:04&lt;02:02, 549.53it/s][A
+  4%|▍         | 2850/70000 [00:04&lt;01:43, 647.65it/s][A
+  4%|▍         | 2920/70000 [00:04&lt;01:48, 618.13it/s][A
+  4%|▍         | 2990/70000 [00:04&lt;01:47, 622.05it/s][A
+  4%|▍         | 3060/70000 [00:04&lt;02:01, 548.70it/s][A
+  4%|▍         | 3120/70000 [00:04&lt;02:01, 549.98it/s][A
+  5%|▍         | 3230/70000 [00:04&lt;01:45, 635.83it/s][A
+  5%|▍         | 3320/70000 [00:05&lt;01:35, 699.94it/s][A
+  5%|▍         | 3420/70000 [00:05&lt;01:25, 776.82it/s][A
+  5%|▌         | 3510/70000 [00:05&lt;01:24, 790.18it/s][A
+  5%|▌         | 3600/70000 [00:05&lt;01:23, 799.99it/s][A
+  5%|▌         | 3710/70000 [00:05&lt;01:15, 876.26it/s][A
+  5%|▌         | 3800/70000 [00:05&lt;01:18, 847.77it/s][A
+  6%|▌         | 3900/70000 [00:05&lt;01:16, 865.24it/s][A
+  6%|▌         | 3990/70000 [00:05&lt;01:20, 815.05it/s][A
+  6%|▌         | 4100/70000 [00:05&lt;01:14, 886.03it/s][A
+  6%|▌         | 4190/70000 [00:06&lt;01:24, 775.30it/s][A
+  6%|▌         | 4280/70000 [00:06&lt;01:28, 742.93it/s][A
+  6%|▌         | 4360/70000 [00:06&lt;01:29, 733.04it/s][A
+  6%|▋         | 4470/70000 [00:06&lt;01:19, 825.68it/s][A
+  7%|▋         | 4560/70000 [00:06&lt;01:28, 741.00it/s][A
+  7%|▋         | 4680/70000 [00:06&lt;01:18, 835.27it/s][A
+  7%|▋         | 4770/70000 [00:06&lt;01:25, 767.34it/s][A
+  7%|▋         | 4880/70000 [00:06&lt;01:20, 806.91it/s][A
+  7%|▋         | 4990/70000 [00:07&lt;01:13, 881.05it/s][A
+  7%|▋         | 5090/70000 [00:07&lt;01:11, 906.99it/s][A
+  7%|▋         | 5190/70000 [00:07&lt;01:14, 875.37it/s][A
+  8%|▊         | 5300/70000 [00:07&lt;01:09, 934.87it/s][A
+  8%|▊         | 5400/70000 [00:07&lt;01:10, 915.23it/s][A
+  8%|▊         | 5510/70000 [00:07&lt;01:10, 910.53it/s][A
+  8%|▊         | 5630/70000 [00:07&lt;01:05, 976.95it/s][A
+  8%|▊         | 5730/70000 [00:07&lt;01:08, 943.41it/s][A
+  8%|▊         | 5840/70000 [00:07&lt;01:06, 964.59it/s][A
+  8%|▊         | 5940/70000 [00:08&lt;01:07, 952.08it/s][A
+  9%|▊         | 6040/70000 [00:08&lt;01:06, 964.11it/s][A
+  9%|▉         | 6140/70000 [00:08&lt;01:11, 896.45it/s][A
+  9%|▉         | 6240/70000 [00:08&lt;01:10, 899.75it/s][A
+  9%|▉         | 6340/70000 [00:08&lt;01:16, 833.07it/s][A
+  9%|▉         | 6430/70000 [00:08&lt;01:15, 836.81it/s][A
+  9%|▉         | 6520/70000 [00:08&lt;01:16, 834.64it/s][A
+ 10%|▉         | 6650/70000 [00:08&lt;01:07, 934.98it/s][A
+ 10%|▉         | 6750/70000 [00:08&lt;01:10, 901.22it/s][A
+ 10%|▉         | 6880/70000 [00:09&lt;01:05, 968.85it/s][A
+ 10%|▉         | 6980/70000 [00:09&lt;01:10, 893.13it/s][A
+ 10%|█         | 7100/70000 [00:09&lt;01:05, 964.34it/s][A
+ 10%|█         | 7200/70000 [00:09&lt;01:05, 951.87it/s][A
+ 10%|█         | 7300/70000 [00:09&lt;01:07, 926.11it/s][A
+ 11%|█         | 7400/70000 [00:09&lt;01:07, 929.33it/s][A
+ 11%|█         | 7500/70000 [00:09&lt;01:06, 936.29it/s][A
+ 11%|█         | 7610/70000 [00:09&lt;01:04, 971.24it/s][A
+ 11%|█         | 7710/70000 [00:09&lt;01:08, 905.52it/s][A
+ 11%|█         | 7860/70000 [00:10&lt;00:58, 1062.05it/s][A
+ 11%|█▏        | 7970/70000 [00:10&lt;01:04, 961.36it/s] [A
+ 12%|█▏        | 8080/70000 [00:10&lt;01:03, 974.98it/s][A
+ 12%|█▏        | 8180/70000 [00:10&lt;01:04, 959.18it/s][A
+ 12%|█▏        | 8300/70000 [00:10&lt;01:03, 965.47it/s][A
+ 12%|█▏        | 8400/70000 [00:10&lt;01:04, 958.19it/s][A
+ 12%|█▏        | 8500/70000 [00:10&lt;01:03, 963.14it/s][A
+ 12%|█▏        | 8600/70000 [00:10&lt;01:03, 963.04it/s][A
+ 12%|█▏        | 8700/70000 [00:11&lt;01:08, 891.67it/s][A
+ 13%|█▎        | 8810/70000 [00:11&lt;01:07, 911.94it/s][A
+ 13%|█▎        | 8910/70000 [00:11&lt;01:06, 921.38it/s][A
+ 13%|█▎        | 9010/70000 [00:11&lt;01:05, 925.01it/s][A
+ 13%|█▎        | 9110/70000 [00:11&lt;01:06, 917.66it/s][A
+ 13%|█▎        | 9220/70000 [00:11&lt;01:02, 966.55it/s][A
+ 13%|█▎        | 9320/70000 [00:11&lt;01:06, 914.52it/s][A
+ 13%|█▎        | 9440/70000 [00:11&lt;01:01, 982.42it/s][A
+ 14%|█▎        | 9540/70000 [00:11&lt;01:03, 953.14it/s][A
+ 14%|█▍        | 9640/70000 [00:12&lt;01:04, 937.70it/s][A
+ 14%|█▍        | 9740/70000 [00:12&lt;01:03, 942.72it/s][A
+ 14%|█▍        | 9840/70000 [00:12&lt;01:03, 940.17it/s][A
+ 14%|█▍        | 9940/70000 [00:12&lt;01:04, 937.67it/s][A
+ 14%|█▍        | 10050/70000 [00:12&lt;01:03, 940.89it/s][A
+ 15%|█▍        | 10170/70000 [00:12&lt;01:01, 980.23it/s][A
+ 15%|█▍        | 10270/70000 [00:12&lt;01:02, 962.03it/s][A
+ 15%|█▍        | 10370/70000 [00:12&lt;01:02, 960.83it/s][A
+ 15%|█▍        | 10470/70000 [00:12&lt;01:05, 913.31it/s][A
+ 15%|█▌        | 10590/70000 [00:12&lt;01:00, 983.87it/s][A
+ 15%|█▌        | 10690/70000 [00:13&lt;01:00, 979.43it/s][A
+ 15%|█▌        | 10790/70000 [00:13&lt;01:01, 960.83it/s][A
+ 16%|█▌        | 10900/70000 [00:13&lt;00:59, 990.56it/s][A
+ 16%|█▌        | 11000/70000 [00:13&lt;01:01, 956.66it/s][A
+ 16%|█▌        | 11110/70000 [00:13&lt;00:59, 986.15it/s][A
+ 16%|█▌        | 11210/70000 [00:13&lt;01:00, 974.39it/s][A
+ 16%|█▌        | 11310/70000 [00:13&lt;01:01, 958.19it/s][A
+ 16%|█▋        | 11420/70000 [00:13&lt;01:00, 974.06it/s][A
+ 16%|█▋        | 11520/70000 [00:13&lt;00:59, 979.44it/s][A
+ 17%|█▋        | 11620/70000 [00:14&lt;00:59, 976.26it/s][A
+ 17%|█▋        | 11720/70000 [00:14&lt;01:01, 949.51it/s][A
+ 17%|█▋        | 11840/70000 [00:14&lt;01:00, 968.42it/s][A
+ 17%|█▋        | 11940/70000 [00:14&lt;00:59, 972.13it/s][A
+ 17%|█▋        | 12050/70000 [00:14&lt;00:57, 1006.74it/s][A
+ 17%|█▋        | 12160/70000 [00:14&lt;01:01, 946.58it/s] [A
+ 18%|█▊        | 12270/70000 [00:14&lt;01:03, 905.85it/s][A
+ 18%|█▊        | 12390/70000 [00:14&lt;00:59, 974.87it/s][A
+ 18%|█▊        | 12490/70000 [00:14&lt;01:01, 933.06it/s][A
+ 18%|█▊        | 12600/70000 [00:15&lt;00:58, 975.53it/s][A
+ 18%|█▊        | 12700/70000 [00:15&lt;00:58, 972.79it/s][A
+ 18%|█▊        | 12810/70000 [00:15&lt;00:58, 970.23it/s][A
+ 18%|█▊        | 12910/70000 [00:15&lt;00:58, 977.53it/s][A
+ 19%|█▊        | 13010/70000 [00:15&lt;01:07, 850.43it/s][A
+ 19%|█▊        | 13100/70000 [00:15&lt;01:07, 838.77it/s][A
+ 19%|█▉        | 13210/70000 [00:15&lt;01:05, 873.45it/s][A
+ 19%|█▉        | 13300/70000 [00:15&lt;01:04, 877.00it/s][A
+ 19%|█▉        | 13410/70000 [00:15&lt;01:03, 887.92it/s][A
+ 19%|█▉        | 13500/70000 [00:16&lt;01:16, 737.26it/s][A
+ 19%|█▉        | 13580/70000 [00:16&lt;01:18, 722.05it/s][A
+ 20%|█▉        | 13660/70000 [00:16&lt;01:19, 707.41it/s][A
+ 20%|█▉        | 13740/70000 [00:16&lt;01:21, 692.67it/s][A
+ 20%|█▉        | 13830/70000 [00:16&lt;01:16, 738.22it/s][A
+ 20%|█▉        | 13910/70000 [00:16&lt;01:14, 754.00it/s][A
+ 20%|█▉        | 13990/70000 [00:16&lt;01:16, 727.65it/s][A
+ 20%|██        | 14090/70000 [00:16&lt;01:10, 787.81it/s][A
+ 20%|██        | 14170/70000 [00:17&lt;01:10, 786.98it/s][A
+ 20%|██        | 14250/70000 [00:17&lt;01:16, 726.02it/s][A
+ 20%|██        | 14330/70000 [00:17&lt;01:14, 743.85it/s][A
+ 21%|██        | 14410/70000 [00:17&lt;01:20, 694.29it/s][A
+ 21%|██        | 14490/70000 [00:17&lt;01:18, 711.16it/s][A
+ 21%|██        | 14570/70000 [00:17&lt;01:29, 618.30it/s][A
+ 21%|██        | 14690/70000 [00:17&lt;01:13, 756.72it/s][A
+ 21%|██        | 14780/70000 [00:17&lt;01:16, 724.03it/s][A
+ 21%|██▏       | 14910/70000 [00:18&lt;01:04, 857.63it/s][A
+ 21%|██▏       | 15010/70000 [00:18&lt;01:06, 823.16it/s][A
+ 22%|██▏       | 15110/70000 [00:18&lt;01:03, 861.71it/s][A
+ 22%|██▏       | 15210/70000 [00:18&lt;01:04, 847.40it/s][A
+ 22%|██▏       | 15310/70000 [00:18&lt;01:04, 848.81it/s][A
+ 22%|██▏       | 15410/70000 [00:18&lt;01:02, 866.62it/s][A
+ 22%|██▏       | 15510/70000 [00:18&lt;01:00, 900.51it/s][A
+ 22%|██▏       | 15620/70000 [00:18&lt;00:58, 933.32it/s][A
+ 22%|██▏       | 15720/70000 [00:18&lt;00:57, 945.03it/s][A
+ 23%|██▎       | 15820/70000 [00:19&lt;01:04, 841.10it/s][A
+ 23%|██▎       | 15910/70000 [00:19&lt;01:09, 773.14it/s][A
+ 23%|██▎       | 16010/70000 [00:19&lt;01:07, 797.57it/s][A
+ 23%|██▎       | 16100/70000 [00:19&lt;01:08, 784.02it/s][A
+ 23%|██▎       | 16180/70000 [00:19&lt;01:11, 750.06it/s][A
+ 23%|██▎       | 16270/70000 [00:19&lt;01:08, 785.20it/s][A
+ 23%|██▎       | 16390/70000 [00:19&lt;01:01, 872.44it/s][A
+ 24%|██▎       | 16480/70000 [00:19&lt;01:01, 876.34it/s][A
+ 24%|██▎       | 16570/70000 [00:20&lt;01:08, 778.23it/s][A
+ 24%|██▍       | 16660/70000 [00:20&lt;01:06, 801.68it/s][A
+ 24%|██▍       | 16760/70000 [00:20&lt;01:02, 847.10it/s][A
+ 24%|██▍       | 16850/70000 [00:20&lt;01:02, 856.39it/s][A
+ 24%|██▍       | 16950/70000 [00:20&lt;01:01, 868.71it/s][A
+ 24%|██▍       | 17040/70000 [00:20&lt;01:03, 834.30it/s][A
+ 24%|██▍       | 17140/70000 [00:20&lt;01:01, 858.91it/s][A
+ 25%|██▍       | 17230/70000 [00:20&lt;01:01, 859.07it/s][A
+ 25%|██▍       | 17350/70000 [00:20&lt;00:55, 953.37it/s][A
+ 25%|██▍       | 17450/70000 [00:21&lt;00:57, 916.89it/s][A
+ 25%|██▌       | 17550/70000 [00:21&lt;00:56, 933.53it/s][A
+ 25%|██▌       | 17690/70000 [00:21&lt;00:50, 1028.18it/s][A
+ 25%|██▌       | 17800/70000 [00:21&lt;00:53, 977.10it/s] [A
+ 26%|██▌       | 17910/70000 [00:21&lt;00:57, 902.83it/s][A
+ 26%|██▌       | 18010/70000 [00:21&lt;00:56, 923.23it/s][A
+ 26%|██▌       | 18110/70000 [00:21&lt;01:05, 790.39it/s][A
+ 26%|██▌       | 18210/70000 [00:21&lt;01:02, 832.03it/s][A
+ 26%|██▌       | 18310/70000 [00:22&lt;01:03, 819.12it/s][A
+ 26%|██▋       | 18430/70000 [00:22&lt;00:58, 882.14it/s][A
+ 26%|██▋       | 18530/70000 [00:22&lt;00:56, 907.70it/s][A
+ 27%|██▋       | 18630/70000 [00:22&lt;00:56, 907.97it/s][A
+ 27%|██▋       | 18730/70000 [00:22&lt;00:55, 920.21it/s][A
+ 27%|██▋       | 18830/70000 [00:22&lt;00:56, 911.47it/s][A
+ 27%|██▋       | 18930/70000 [00:22&lt;00:58, 878.73it/s][A
+ 27%|██▋       | 19030/70000 [00:22&lt;00:56, 899.19it/s][A
+ 27%|██▋       | 19130/70000 [00:22&lt;00:55, 908.71it/s][A
+ 27%|██▋       | 19240/70000 [00:22&lt;00:52, 962.06it/s][A
+ 28%|██▊       | 19340/70000 [00:23&lt;00:55, 916.15it/s][A
+ 28%|██▊       | 19490/70000 [00:23&lt;00:47, 1067.22it/s][A
+ 28%|██▊       | 19600/70000 [00:23&lt;00:50, 999.03it/s] [A
+ 28%|██▊       | 19710/70000 [00:23&lt;00:52, 964.49it/s][A
+ 28%|██▊       | 19810/70000 [00:23&lt;00:55, 905.18it/s][A
+ 28%|██▊       | 19920/70000 [00:23&lt;00:52, 947.60it/s][A
+ 29%|██▊       | 20020/70000 [00:23&lt;00:53, 931.73it/s][A
+ 29%|██▉       | 20130/70000 [00:23&lt;00:51, 959.95it/s][A
+ 29%|██▉       | 20230/70000 [00:24&lt;00:56, 880.08it/s][A
+ 29%|██▉       | 20390/70000 [00:24&lt;00:46, 1064.64it/s][A
+ 29%|██▉       | 20500/70000 [00:24&lt;00:53, 932.11it/s] [A
+ 29%|██▉       | 20620/70000 [00:24&lt;00:54, 903.99it/s][A
+ 30%|██▉       | 20760/70000 [00:24&lt;00:48, 1008.67it/s][A
+ 30%|██▉       | 20870/70000 [00:24&lt;00:52, 939.85it/s] [A
+ 30%|███       | 21010/70000 [00:24&lt;00:47, 1024.85it/s][A
+ 30%|███       | 21120/70000 [00:24&lt;00:49, 987.30it/s] [A
+ 30%|███       | 21230/70000 [00:25&lt;00:53, 910.31it/s][A
+ 31%|███       | 21380/70000 [00:25&lt;00:46, 1056.27it/s][A
+ 31%|███       | 21500/70000 [00:25&lt;00:50, 952.71it/s] [A
+ 31%|███       | 21610/70000 [00:25&lt;00:52, 926.93it/s][A
+ 31%|███       | 21730/70000 [00:25&lt;00:48, 989.08it/s][A
+ 31%|███       | 21840/70000 [00:25&lt;00:51, 943.20it/s][A
+ 31%|███▏      | 21980/70000 [00:25&lt;00:47, 1004.50it/s][A
+ 32%|███▏      | 22090/70000 [00:25&lt;00:51, 932.89it/s] [A
+ 32%|███▏      | 22200/70000 [00:26&lt;00:49, 962.38it/s][A
+ 32%|███▏      | 22300/70000 [00:26&lt;00:50, 943.16it/s][A
+ 32%|███▏      | 22410/70000 [00:26&lt;00:54, 877.08it/s][A
+ 32%|███▏      | 22540/70000 [00:26&lt;00:48, 981.81it/s][A
+ 32%|███▏      | 22650/70000 [00:26&lt;00:51, 913.49it/s][A
+ 33%|███▎      | 22770/70000 [00:26&lt;00:48, 977.81it/s][A
+ 33%|███▎      | 22880/70000 [00:26&lt;00:49, 949.87it/s][A
+ 33%|███▎      | 22990/70000 [00:26&lt;00:48, 974.84it/s][A
+ 33%|███▎      | 23090/70000 [00:27&lt;00:49, 945.33it/s][A
+ 33%|███▎      | 23210/70000 [00:27&lt;00:50, 932.96it/s][A
+ 33%|███▎      | 23320/70000 [00:27&lt;00:48, 958.32it/s][A
+ 33%|███▎      | 23420/70000 [00:27&lt;00:51, 911.40it/s][A
+ 34%|███▎      | 23560/70000 [00:27&lt;00:44, 1039.39it/s][A
+ 34%|███▍      | 23670/70000 [00:27&lt;00:50, 920.46it/s] [A
+ 34%|███▍      | 23800/70000 [00:27&lt;00:47, 979.07it/s][A
+ 34%|███▍      | 23910/70000 [00:27&lt;00:50, 919.65it/s][A
+ 34%|███▍      | 24020/70000 [00:28&lt;00:49, 932.40it/s][A
+ 34%|███▍      | 24120/70000 [00:28&lt;00:48, 945.22it/s][A
+ 35%|███▍      | 24230/70000 [00:28&lt;00:46, 980.78it/s][A
+ 35%|███▍      | 24330/70000 [00:28&lt;00:46, 972.68it/s][A
+ 35%|███▍      | 24430/70000 [00:28&lt;00:46, 972.03it/s][A
+ 35%|███▌      | 24530/70000 [00:28&lt;00:47, 965.84it/s][A
+ 35%|███▌      | 24640/70000 [00:28&lt;00:47, 961.68it/s][A
+ 35%|███▌      | 24740/70000 [00:28&lt;00:46, 970.99it/s][A
+ 36%|███▌      | 24850/70000 [00:28&lt;00:45, 989.24it/s][A
+ 36%|███▌      | 24950/70000 [00:28&lt;00:45, 991.84it/s][A
+ 36%|███▌      | 25050/70000 [00:29&lt;00:46, 972.80it/s][A
+ 36%|███▌      | 25150/70000 [00:29&lt;00:47, 947.80it/s][A
+ 36%|███▌      | 25260/70000 [00:29&lt;00:45, 979.87it/s][A
+ 36%|███▌      | 25360/70000 [00:29&lt;00:48, 919.21it/s][A
+ 36%|███▋      | 25470/70000 [00:29&lt;00:48, 920.59it/s][A
+ 37%|███▋      | 25600/70000 [00:29&lt;00:44, 991.26it/s][A
+ 37%|███▋      | 25700/70000 [00:29&lt;00:47, 930.14it/s][A
+ 37%|███▋      | 25800/70000 [00:29&lt;00:59, 743.89it/s][A
+ 37%|███▋      | 25890/70000 [00:30&lt;00:57, 768.18it/s][A
+ 37%|███▋      | 26000/70000 [00:30&lt;00:52, 846.08it/s][A
+ 37%|███▋      | 26090/70000 [00:30&lt;00:58, 752.08it/s][A
+ 37%|███▋      | 26220/70000 [00:30&lt;00:51, 848.05it/s][A
+ 38%|███▊      | 26310/70000 [00:30&lt;00:53, 820.55it/s][A
+ 38%|███▊      | 26430/70000 [00:30&lt;00:47, 914.97it/s][A
+ 38%|███▊      | 26530/70000 [00:30&lt;00:50, 867.80it/s][A
+ 38%|███▊      | 26630/70000 [00:30&lt;00:49, 871.53it/s][A
+ 38%|███▊      | 26720/70000 [00:31&lt;00:55, 780.33it/s][A
+ 38%|███▊      | 26850/70000 [00:31&lt;00:49, 866.74it/s][A
+ 38%|███▊      | 26940/70000 [00:31&lt;00:50, 847.23it/s][A
+ 39%|███▊      | 27050/70000 [00:31&lt;00:47, 902.69it/s][A
+ 39%|███▉      | 27150/70000 [00:31&lt;00:50, 847.67it/s][A
+ 39%|███▉      | 27260/70000 [00:31&lt;00:49, 870.67it/s][A
+ 39%|███▉      | 27360/70000 [00:31&lt;00:47, 903.18it/s][A
+ 39%|███▉      | 27460/70000 [00:31&lt;00:47, 894.97it/s][A
+ 39%|███▉      | 27560/70000 [00:31&lt;00:47, 887.29it/s][A
+ 40%|███▉      | 27660/70000 [00:32&lt;00:49, 863.23it/s][A
+ 40%|███▉      | 27790/70000 [00:32&lt;00:43, 979.03it/s][A
+ 40%|███▉      | 27890/70000 [00:32&lt;00:49, 856.20it/s][A
+ 40%|████      | 28050/70000 [00:32&lt;00:40, 1024.35it/s][A
+ 40%|████      | 28160/70000 [00:32&lt;00:47, 873.06it/s] [A
+ 40%|████      | 28260/70000 [00:32&lt;00:48, 864.18it/s][A
+ 41%|████      | 28360/70000 [00:32&lt;00:47, 868.73it/s][A
+ 41%|████      | 28460/70000 [00:32&lt;00:46, 889.88it/s][A
+ 41%|████      | 28560/70000 [00:33&lt;00:48, 863.01it/s][A
+ 41%|████      | 28680/70000 [00:33&lt;00:44, 936.94it/s][A
+ 41%|████      | 28780/70000 [00:33&lt;00:44, 921.06it/s][A
+ 41%|████▏     | 28880/70000 [00:33&lt;00:45, 913.54it/s][A
+ 41%|████▏     | 29000/70000 [00:33&lt;00:42, 969.39it/s][A
+ 42%|████▏     | 29100/70000 [00:33&lt;00:43, 937.51it/s][A
+ 42%|████▏     | 29230/70000 [00:33&lt;00:39, 1031.39it/s][A
+ 42%|████▏     | 29340/70000 [00:33&lt;00:45, 891.33it/s] [A
+ 42%|████▏     | 29450/70000 [00:34&lt;00:43, 932.90it/s][A
+ 42%|████▏     | 29550/70000 [00:34&lt;00:46, 860.87it/s][A
+ 42%|████▏     | 29650/70000 [00:34&lt;00:46, 871.62it/s][A
+ 42%|████▏     | 29740/70000 [00:34&lt;00:48, 832.85it/s][A
+ 43%|████▎     | 29850/70000 [00:34&lt;00:46, 872.24it/s][A
+ 43%|████▎     | 29940/70000 [00:34&lt;00:48, 822.06it/s][A
+ 43%|████▎     | 30050/70000 [00:34&lt;00:45, 885.65it/s][A
+ 43%|████▎     | 30150/70000 [00:34&lt;00:46, 864.43it/s][A
+ 43%|████▎     | 30260/70000 [00:34&lt;00:44, 901.80it/s][A
+ 43%|████▎     | 30360/70000 [00:35&lt;00:44, 899.98it/s][A
+ 44%|████▎     | 30460/70000 [00:35&lt;00:44, 880.00it/s][A
+ 44%|████▎     | 30550/70000 [00:35&lt;00:48, 806.30it/s][A
+ 44%|████▍     | 30640/70000 [00:35&lt;00:52, 743.70it/s][A
+ 44%|████▍     | 30740/70000 [00:35&lt;00:49, 785.71it/s][A
+ 44%|████▍     | 30830/70000 [00:35&lt;00:48, 811.22it/s][A
+ 44%|████▍     | 30930/70000 [00:35&lt;00:46, 846.51it/s][A
+ 44%|████▍     | 31020/70000 [00:35&lt;00:47, 818.23it/s][A
+ 44%|████▍     | 31140/70000 [00:36&lt;00:44, 879.05it/s][A
+ 45%|████▍     | 31230/70000 [00:36&lt;00:44, 872.04it/s][A
+ 45%|████▍     | 31340/70000 [00:36&lt;00:42, 907.77it/s][A
+ 45%|████▍     | 31440/70000 [00:36&lt;00:45, 841.02it/s][A
+ 45%|████▌     | 31540/70000 [00:36&lt;00:44, 862.67it/s][A
+ 45%|████▌     | 31630/70000 [00:36&lt;00:45, 842.59it/s][A
+ 45%|████▌     | 31730/70000 [00:36&lt;00:44, 865.41it/s][A
+ 45%|████▌     | 31820/70000 [00:36&lt;00:48, 791.07it/s][A
+ 46%|████▌     | 31930/70000 [00:36&lt;00:45, 841.42it/s][A
+ 46%|████▌     | 32020/70000 [00:37&lt;00:47, 796.37it/s][A
+ 46%|████▌     | 32120/70000 [00:37&lt;00:45, 826.93it/s][A
+ 46%|████▌     | 32210/70000 [00:37&lt;00:51, 736.13it/s][A
+ 46%|████▌     | 32340/70000 [00:37&lt;00:46, 807.55it/s][A
+ 46%|████▋     | 32430/70000 [00:37&lt;00:47, 785.16it/s][A
+ 46%|████▋     | 32540/70000 [00:37&lt;00:44, 833.32it/s][A
+ 47%|████▋     | 32630/70000 [00:37&lt;00:54, 691.44it/s][A
+ 47%|████▋     | 32750/70000 [00:38&lt;00:48, 769.08it/s][A
+ 47%|████▋     | 32840/70000 [00:38&lt;00:52, 710.26it/s][A
+ 47%|████▋     | 32960/70000 [00:38&lt;00:46, 803.06it/s][A
+ 47%|████▋     | 33060/70000 [00:38&lt;00:45, 806.44it/s][A
+ 47%|████▋     | 33150/70000 [00:38&lt;00:44, 824.61it/s][A
+ 47%|████▋     | 33240/70000 [00:38&lt;00:46, 784.76it/s][A
+ 48%|████▊     | 33350/70000 [00:38&lt;00:42, 857.11it/s][A
+ 48%|████▊     | 33440/70000 [00:38&lt;00:42, 859.31it/s][A
+ 48%|████▊     | 33530/70000 [00:38&lt;00:42, 856.35it/s][A
+ 48%|████▊     | 33620/70000 [00:39&lt;00:42, 848.51it/s][A
+ 48%|████▊     | 33730/70000 [00:39&lt;00:41, 881.43it/s][A
+ 48%|████▊     | 33820/70000 [00:39&lt;00:44, 813.04it/s][A
+ 48%|████▊     | 33940/70000 [00:39&lt;00:39, 913.86it/s][A
+ 49%|████▊     | 34040/70000 [00:39&lt;00:42, 842.02it/s][A
+ 49%|████▉     | 34130/70000 [00:39&lt;00:42, 847.58it/s][A
+ 49%|████▉     | 34220/70000 [00:39&lt;00:44, 809.83it/s][A
+ 49%|████▉     | 34320/70000 [00:39&lt;00:42, 845.51it/s][A
+ 49%|████▉     | 34410/70000 [00:40&lt;00:52, 679.72it/s][A
+ 49%|████▉     | 34510/70000 [00:40&lt;00:47, 754.56it/s][A
+ 49%|████▉     | 34600/70000 [00:40&lt;00:47, 744.07it/s][A
+ 50%|████▉     | 34680/70000 [00:40&lt;00:47, 749.45it/s][A
+ 50%|████▉     | 34790/70000 [00:40&lt;00:44, 799.78it/s][A
+ 50%|████▉     | 34890/70000 [00:40&lt;00:42, 819.31it/s][A
+ 50%|████▉     | 34990/70000 [00:40&lt;00:40, 861.55it/s][A
+ 50%|█████     | 35080/70000 [00:40&lt;00:41, 848.77it/s][A
+ 50%|█████     | 35170/70000 [00:40&lt;00:40, 857.64it/s][A
+ 50%|█████     | 35260/70000 [00:41&lt;00:40, 849.16it/s][A
+ 50%|█████     | 35350/70000 [00:41&lt;00:41, 839.75it/s][A
+ 51%|█████     | 35450/70000 [00:41&lt;00:41, 829.51it/s][A
+ 51%|█████     | 35540/70000 [00:41&lt;00:44, 775.33it/s][A
+ 51%|█████     | 35650/70000 [00:41&lt;00:40, 855.57it/s][A
+ 51%|█████     | 35760/70000 [00:41&lt;00:39, 856.30it/s][A
+ 51%|█████     | 35870/70000 [00:41&lt;00:38, 895.79it/s][A
+ 51%|█████▏    | 35980/70000 [00:41&lt;00:36, 921.17it/s][A
+ 52%|█████▏    | 36080/70000 [00:42&lt;00:36, 929.39it/s][A
+ 52%|█████▏    | 36190/70000 [00:42&lt;00:35, 957.00it/s][A
+ 52%|█████▏    | 36290/70000 [00:42&lt;00:36, 933.15it/s][A
+ 52%|█████▏    | 36400/70000 [00:42&lt;00:34, 962.18it/s][A
+ 52%|█████▏    | 36500/70000 [00:42&lt;00:35, 932.07it/s][A
+ 52%|█████▏    | 36610/70000 [00:42&lt;00:34, 973.83it/s][A
+ 52%|█████▏    | 36710/70000 [00:42&lt;00:34, 955.87it/s][A
+ 53%|█████▎    | 36810/70000 [00:42&lt;00:35, 924.64it/s][A
+ 53%|█████▎    | 36930/70000 [00:42&lt;00:34, 966.75it/s][A
+ 53%|█████▎    | 37030/70000 [00:43&lt;00:36, 891.61it/s][A
+ 53%|█████▎    | 37130/70000 [00:43&lt;00:41, 792.31it/s][A
+ 53%|█████▎    | 37220/70000 [00:43&lt;00:42, 764.42it/s][A
+ 53%|█████▎    | 37350/70000 [00:43&lt;00:37, 876.76it/s][A
+ 54%|█████▎    | 37450/70000 [00:43&lt;00:36, 888.79it/s][A
+ 54%|█████▎    | 37570/70000 [00:43&lt;00:33, 962.87it/s][A
+ 54%|█████▍    | 37670/70000 [00:43&lt;00:36, 888.90it/s][A
+ 54%|█████▍    | 37780/70000 [00:43&lt;00:34, 934.17it/s][A
+ 54%|█████▍    | 37880/70000 [00:44&lt;00:34, 934.45it/s][A
+ 54%|█████▍    | 37990/70000 [00:44&lt;00:33, 944.95it/s][A
+ 54%|█████▍    | 38100/70000 [00:44&lt;00:32, 977.16it/s][A
+ 55%|█████▍    | 38200/70000 [00:44&lt;00:33, 951.33it/s][A
+ 55%|█████▍    | 38310/70000 [00:44&lt;00:32, 977.93it/s][A
+ 55%|█████▍    | 38410/70000 [00:44&lt;00:34, 917.77it/s][A
+ 55%|█████▌    | 38530/70000 [00:44&lt;00:33, 947.48it/s][A
+ 55%|█████▌    | 38630/70000 [00:44&lt;00:33, 945.18it/s][A
+ 55%|█████▌    | 38750/70000 [00:44&lt;00:31, 995.83it/s][A
+ 56%|█████▌    | 38860/70000 [00:45&lt;00:33, 934.91it/s][A
+ 56%|█████▌    | 38990/70000 [00:45&lt;00:31, 998.34it/s][A
+ 56%|█████▌    | 39100/70000 [00:45&lt;00:31, 988.97it/s][A
+ 56%|█████▌    | 39200/70000 [00:45&lt;00:32, 945.79it/s][A
+ 56%|█████▌    | 39330/70000 [00:45&lt;00:29, 1034.81it/s][A
+ 56%|█████▋    | 39440/70000 [00:45&lt;00:32, 951.85it/s] [A
+ 57%|█████▋    | 39580/70000 [00:45&lt;00:30, 1001.96it/s][A
+ 57%|█████▋    | 39690/70000 [00:45&lt;00:31, 955.88it/s] [A
+ 57%|█████▋    | 39800/70000 [00:45&lt;00:30, 986.83it/s][A
+ 57%|█████▋    | 39930/70000 [00:46&lt;00:28, 1054.10it/s][A
+ 57%|█████▋    | 40040/70000 [00:46&lt;00:30, 969.22it/s] [A
+ 57%|█████▋    | 40160/70000 [00:46&lt;00:29, 1010.27it/s][A
+ 58%|█████▊    | 40270/70000 [00:46&lt;00:30, 986.04it/s] [A
+ 58%|█████▊    | 40380/70000 [00:46&lt;00:29, 1007.07it/s][A
+ 58%|█████▊    | 40490/70000 [00:46&lt;00:30, 970.67it/s] [A
+ 58%|█████▊    | 40590/70000 [00:46&lt;00:32, 916.36it/s][A
+ 58%|█████▊    | 40690/70000 [00:46&lt;00:32, 890.26it/s][A
+ 58%|█████▊    | 40810/70000 [00:47&lt;00:30, 945.69it/s][A
+ 58%|█████▊    | 40910/70000 [00:47&lt;00:30, 956.29it/s][A
+ 59%|█████▊    | 41010/70000 [00:47&lt;00:31, 930.39it/s][A
+ 59%|█████▉    | 41130/70000 [00:47&lt;00:28, 996.72it/s][A
+ 59%|█████▉    | 41240/70000 [00:47&lt;00:29, 978.47it/s][A
+ 59%|█████▉    | 41340/70000 [00:47&lt;00:30, 952.13it/s][A
+ 59%|█████▉    | 41440/70000 [00:47&lt;00:33, 861.99it/s][A
+ 59%|█████▉    | 41540/70000 [00:47&lt;00:32, 878.81it/s][A
+ 60%|█████▉    | 41660/70000 [00:47&lt;00:29, 957.49it/s][A
+ 60%|█████▉    | 41760/70000 [00:48&lt;00:29, 964.56it/s][A
+ 60%|█████▉    | 41860/70000 [00:48&lt;00:30, 925.71it/s][A
+ 60%|█████▉    | 41980/70000 [00:48&lt;00:28, 998.28it/s][A
+ 60%|██████    | 42090/70000 [00:48&lt;00:28, 985.10it/s][A
+ 60%|██████    | 42200/70000 [00:48&lt;00:28, 989.43it/s][A
+ 60%|██████    | 42300/70000 [00:48&lt;00:28, 972.39it/s][A
+ 61%|██████    | 42420/70000 [00:48&lt;00:27, 994.20it/s][A
+ 61%|██████    | 42520/70000 [00:48&lt;00:28, 958.92it/s][A
+ 61%|██████    | 42620/70000 [00:48&lt;00:30, 903.65it/s][A
+ 61%|██████    | 42750/70000 [00:49&lt;00:27, 981.63it/s][A
+ 61%|██████    | 42850/70000 [00:49&lt;00:28, 950.58it/s][A
+ 61%|██████▏   | 42970/70000 [00:49&lt;00:26, 1012.61it/s][A
+ 62%|██████▏   | 43080/70000 [00:49&lt;00:27, 964.80it/s] [A
+ 62%|██████▏   | 43190/70000 [00:49&lt;00:27, 978.55it/s][A
+ 62%|██████▏   | 43290/70000 [00:49&lt;00:50, 532.10it/s][A
+ 62%|██████▏   | 43380/70000 [00:50&lt;00:54, 489.43it/s][A
+ 62%|██████▏   | 43470/70000 [00:50&lt;00:47, 557.49it/s][A
+ 62%|██████▏   | 43580/70000 [00:50&lt;00:40, 651.16it/s][A
+ 62%|██████▏   | 43670/70000 [00:50&lt;00:37, 700.70it/s][A
+ 63%|██████▎   | 43780/70000 [00:50&lt;00:33, 783.47it/s][A
+ 63%|██████▎   | 43870/70000 [00:50&lt;00:33, 770.00it/s][A
+ 63%|██████▎   | 43980/70000 [00:50&lt;00:30, 840.71it/s][A
+ 63%|██████▎   | 44090/70000 [00:50&lt;00:29, 868.38it/s][A
+ 63%|██████▎   | 44190/70000 [00:51&lt;00:29, 873.21it/s][A
+ 63%|██████▎   | 44290/70000 [00:51&lt;00:28, 905.34it/s][A
+ 63%|██████▎   | 44390/70000 [00:51&lt;00:29, 855.32it/s][A
+ 64%|██████▎   | 44520/70000 [00:51&lt;00:27, 914.24it/s][A
+ 64%|██████▎   | 44620/70000 [00:51&lt;00:31, 810.44it/s][A
+ 64%|██████▍   | 44730/70000 [00:51&lt;00:28, 879.68it/s][A
+ 64%|██████▍   | 44830/70000 [00:51&lt;00:30, 816.13it/s][A
+ 64%|██████▍   | 44950/70000 [00:51&lt;00:27, 906.82it/s][A
+ 64%|██████▍   | 45050/70000 [00:51&lt;00:27, 893.59it/s][A
+ 65%|██████▍   | 45160/70000 [00:52&lt;00:26, 942.93it/s][A
+ 65%|██████▍   | 45260/70000 [00:52&lt;00:27, 903.13it/s][A
+ 65%|██████▍   | 45370/70000 [00:52&lt;00:28, 867.78it/s][A
+ 65%|██████▍   | 45460/70000 [00:52&lt;00:59, 413.06it/s][A
+ 65%|██████▌   | 45530/70000 [00:53&lt;01:47, 228.43it/s][A
+ 65%|██████▌   | 45580/70000 [00:54&lt;02:37, 154.94it/s][A
+ 65%|██████▌   | 45620/70000 [00:54&lt;02:55, 138.57it/s][A
+ 65%|██████▌   | 45650/70000 [00:55&lt;02:49, 143.98it/s][A
+ 65%|██████▌   | 45680/70000 [00:55&lt;02:35, 156.12it/s][A
+ 65%|██████▌   | 45710/70000 [00:55&lt;03:14, 125.06it/s][A
+ 65%|██████▌   | 45730/70000 [00:55&lt;03:51, 104.72it/s][A
+ 65%|██████▌   | 45750/70000 [00:56&lt;03:35, 112.53it/s][A
+ 65%|██████▌   | 45830/70000 [00:56&lt;01:58, 204.13it/s][A
+ 66%|██████▌   | 45940/70000 [00:56&lt;01:09, 346.09it/s][A
+ 66%|██████▌   | 46020/70000 [00:56&lt;00:56, 426.63it/s][A
+ 66%|██████▌   | 46100/70000 [00:56&lt;01:07, 353.87it/s][A
+ 66%|██████▌   | 46190/70000 [00:56&lt;00:56, 422.47it/s][A
+ 66%|██████▌   | 46340/70000 [00:56&lt;00:41, 576.12it/s][A
+ 66%|██████▋   | 46420/70000 [00:57&lt;00:40, 587.21it/s][A
+ 66%|██████▋   | 46490/70000 [00:57&lt;00:38, 602.89it/s][A
+ 67%|██████▋   | 46570/70000 [00:57&lt;00:38, 603.65it/s][A
+ 67%|██████▋   | 46720/70000 [00:57&lt;00:29, 802.33it/s][A
+ 67%|██████▋   | 46810/70000 [00:57&lt;00:30, 749.04it/s][A
+ 67%|██████▋   | 46940/70000 [00:57&lt;00:27, 834.62it/s][A
+ 67%|██████▋   | 47030/70000 [00:57&lt;00:30, 746.89it/s][A
+ 67%|██████▋   | 47140/70000 [00:57&lt;00:29, 777.59it/s][A
+ 67%|██████▋   | 47240/70000 [00:58&lt;00:27, 822.00it/s][A
+ 68%|██████▊   | 47340/70000 [00:58&lt;00:27, 823.78it/s][A
+ 68%|██████▊   | 47450/70000 [00:58&lt;00:25, 887.00it/s][A
+ 68%|██████▊   | 47550/70000 [00:58&lt;00:26, 842.40it/s][A
+ 68%|██████▊   | 47670/70000 [00:58&lt;00:25, 888.03it/s][A
+ 68%|██████▊   | 47770/70000 [00:58&lt;00:26, 844.61it/s][A
+ 68%|██████▊   | 47890/70000 [00:58&lt;00:24, 890.37it/s][A
+ 69%|██████▊   | 47990/70000 [00:58&lt;00:26, 831.40it/s][A
+ 69%|██████▉   | 48130/70000 [00:59&lt;00:22, 963.30it/s][A
+ 69%|██████▉   | 48230/70000 [00:59&lt;00:24, 892.65it/s][A
+ 69%|██████▉   | 48340/70000 [00:59&lt;00:23, 931.50it/s][A
+ 69%|██████▉   | 48440/70000 [00:59&lt;00:24, 876.16it/s][A
+ 69%|██████▉   | 48550/70000 [00:59&lt;00:23, 911.90it/s][A
+ 70%|██████▉   | 48650/70000 [00:59&lt;00:23, 905.09it/s][A
+ 70%|██████▉   | 48750/70000 [00:59&lt;00:23, 897.06it/s][A
+ 70%|██████▉   | 48880/70000 [00:59&lt;00:21, 991.45it/s][A
+ 70%|██████▉   | 48990/70000 [00:59&lt;00:22, 935.65it/s][A
+ 70%|███████   | 49140/70000 [01:00&lt;00:20, 1039.77it/s][A
+ 70%|███████   | 49260/70000 [01:00&lt;00:19, 1082.39it/s][A
+ 71%|███████   | 49370/70000 [01:00&lt;00:20, 1021.69it/s][A
+ 71%|███████   | 49490/70000 [01:00&lt;00:19, 1052.40it/s][A
+ 71%|███████   | 49600/70000 [01:00&lt;00:20, 1018.58it/s][A
+ 71%|███████   | 49720/70000 [01:00&lt;00:19, 1056.64it/s][A
+ 71%|███████   | 49830/70000 [01:00&lt;00:19, 1050.56it/s][A
+ 71%|███████▏  | 49940/70000 [01:00&lt;00:19, 1053.69it/s][A
+ 72%|███████▏  | 50080/70000 [01:00&lt;00:17, 1121.83it/s][A
+ 72%|███████▏  | 50200/70000 [01:01&lt;00:18, 1080.82it/s][A
+ 72%|███████▏  | 50320/70000 [01:01&lt;00:17, 1097.55it/s][A
+ 72%|███████▏  | 50440/70000 [01:01&lt;00:18, 1058.82it/s][A
+ 72%|███████▏  | 50570/70000 [01:01&lt;00:17, 1099.85it/s][A
+ 72%|███████▏  | 50710/70000 [01:01&lt;00:17, 1133.70it/s][A
+ 73%|███████▎  | 50830/70000 [01:01&lt;00:17, 1102.35it/s][A
+ 73%|███████▎  | 50950/70000 [01:01&lt;00:17, 1099.93it/s][A
+ 73%|███████▎  | 51100/70000 [01:01&lt;00:16, 1170.45it/s][A
+ 73%|███████▎  | 51220/70000 [01:01&lt;00:16, 1165.67it/s][A
+ 73%|███████▎  | 51340/70000 [01:02&lt;00:16, 1115.87it/s][A
+ 74%|███████▎  | 51470/70000 [01:02&lt;00:16, 1137.03it/s][A
+ 74%|███████▎  | 51590/70000 [01:02&lt;00:16, 1127.99it/s][A
+ 74%|███████▍  | 51720/70000 [01:02&lt;00:15, 1155.33it/s][A
+ 74%|███████▍  | 51860/70000 [01:02&lt;00:14, 1220.21it/s][A
+ 74%|███████▍  | 51990/70000 [01:02&lt;00:16, 1106.97it/s][A
+ 74%|███████▍  | 52130/70000 [01:02&lt;00:16, 1074.21it/s][A
+ 75%|███████▍  | 52270/70000 [01:02&lt;00:15, 1119.61it/s][A
+ 75%|███████▍  | 52400/70000 [01:03&lt;00:15, 1162.87it/s][A
+ 75%|███████▌  | 52520/70000 [01:03&lt;00:14, 1170.20it/s][A
+ 75%|███████▌  | 52660/70000 [01:03&lt;00:14, 1232.02it/s][A
+ 75%|███████▌  | 52790/70000 [01:03&lt;00:15, 1131.33it/s][A
+ 76%|███████▌  | 52910/70000 [01:03&lt;00:15, 1090.98it/s][A
+ 76%|███████▌  | 53050/70000 [01:03&lt;00:14, 1170.55it/s][A
+ 76%|███████▌  | 53170/70000 [01:03&lt;00:15, 1100.27it/s][A
+ 76%|███████▌  | 53290/70000 [01:03&lt;00:15, 1094.16it/s][A
+ 76%|███████▋  | 53440/70000 [01:03&lt;00:13, 1187.75it/s][A
+ 77%|███████▋  | 53570/70000 [01:04&lt;00:15, 1077.00it/s][A
+ 77%|███████▋  | 53720/70000 [01:04&lt;00:14, 1133.92it/s][A
+ 77%|███████▋  | 53870/70000 [01:04&lt;00:14, 1136.64it/s][A
+ 77%|███████▋  | 53990/70000 [01:04&lt;00:14, 1129.44it/s][A
+ 77%|███████▋  | 54120/70000 [01:04&lt;00:14, 1076.26it/s][A
+ 78%|███████▊  | 54280/70000 [01:04&lt;00:13, 1137.28it/s][A
+ 78%|███████▊  | 54430/70000 [01:04&lt;00:13, 1182.49it/s][A
+ 78%|███████▊  | 54550/70000 [01:04&lt;00:14, 1092.86it/s][A
+ 78%|███████▊  | 54680/70000 [01:05&lt;00:13, 1139.36it/s][A
+ 78%|███████▊  | 54800/70000 [01:05&lt;00:13, 1126.32it/s][A
+ 78%|███████▊  | 54920/70000 [01:05&lt;00:13, 1124.32it/s][A
+ 79%|███████▊  | 55060/70000 [01:05&lt;00:12, 1178.68it/s][A
+ 79%|███████▉  | 55180/70000 [01:05&lt;00:13, 1118.21it/s][A
+ 79%|███████▉  | 55300/70000 [01:05&lt;00:13, 1086.08it/s][A
+ 79%|███████▉  | 55430/70000 [01:05&lt;00:13, 1114.22it/s][A
+ 79%|███████▉  | 55550/70000 [01:05&lt;00:13, 1099.68it/s][A
+ 80%|███████▉  | 55690/70000 [01:05&lt;00:12, 1174.51it/s][A
+ 80%|███████▉  | 55810/70000 [01:06&lt;00:12, 1118.32it/s][A
+ 80%|███████▉  | 55930/70000 [01:06&lt;00:12, 1126.20it/s][A
+ 80%|████████  | 56060/70000 [01:06&lt;00:11, 1172.29it/s][A
+ 80%|████████  | 56180/70000 [01:06&lt;00:12, 1104.97it/s][A
+ 80%|████████  | 56310/70000 [01:06&lt;00:11, 1141.32it/s][A
+ 81%|████████  | 56430/70000 [01:06&lt;00:11, 1154.42it/s][A
+ 81%|████████  | 56550/70000 [01:06&lt;00:11, 1142.04it/s][A
+ 81%|████████  | 56670/70000 [01:06&lt;00:11, 1118.44it/s][A
+ 81%|████████  | 56790/70000 [01:06&lt;00:12, 1073.19it/s][A
+ 81%|████████▏ | 56930/70000 [01:07&lt;00:11, 1159.11it/s][A
+ 82%|████████▏ | 57050/70000 [01:07&lt;00:11, 1117.23it/s][A
+ 82%|████████▏ | 57180/70000 [01:07&lt;00:11, 1128.31it/s][A
+ 82%|████████▏ | 57310/70000 [01:07&lt;00:11, 1135.01it/s][A
+ 82%|████████▏ | 57430/70000 [01:07&lt;00:11, 1075.73it/s][A
+ 82%|████████▏ | 57580/70000 [01:07&lt;00:10, 1189.27it/s][A
+ 82%|████████▏ | 57710/70000 [01:07&lt;00:10, 1197.46it/s][A
+ 83%|████████▎ | 57840/70000 [01:07&lt;00:11, 1096.17it/s][A
+ 83%|████████▎ | 57980/70000 [01:07&lt;00:10, 1167.60it/s][A
+ 83%|████████▎ | 58100/70000 [01:08&lt;00:10, 1094.97it/s][A
+ 83%|████████▎ | 58220/70000 [01:08&lt;00:10, 1091.31it/s][A
+ 83%|████████▎ | 58360/70000 [01:08&lt;00:10, 1134.62it/s][A
+ 84%|████████▎ | 58480/70000 [01:08&lt;00:10, 1116.13it/s][A
+ 84%|████████▎ | 58600/70000 [01:08&lt;00:10, 1135.65it/s][A
+ 84%|████████▍ | 58720/70000 [01:08&lt;00:10, 1114.87it/s][A
+ 84%|████████▍ | 58850/70000 [01:08&lt;00:09, 1144.53it/s][A
+ 84%|████████▍ | 58980/70000 [01:08&lt;00:09, 1176.14it/s][A
+ 84%|████████▍ | 59100/70000 [01:08&lt;00:09, 1129.18it/s][A
+ 85%|████████▍ | 59240/70000 [01:09&lt;00:09, 1096.39it/s][A
+ 85%|████████▍ | 59380/70000 [01:09&lt;00:09, 1168.88it/s][A
+ 85%|████████▌ | 59500/70000 [01:09&lt;00:09, 1113.19it/s][A
+ 85%|████████▌ | 59630/70000 [01:09&lt;00:09, 1117.15it/s][A
+ 85%|████████▌ | 59780/70000 [01:09&lt;00:08, 1188.39it/s][A
+ 86%|████████▌ | 59900/70000 [01:09&lt;00:09, 1093.41it/s][A
+ 86%|████████▌ | 60030/70000 [01:09&lt;00:08, 1147.75it/s][A
+ 86%|████████▌ | 60150/70000 [01:09&lt;00:08, 1114.65it/s][A
+ 86%|████████▌ | 60270/70000 [01:09&lt;00:08, 1135.49it/s][A
+ 86%|████████▋ | 60410/70000 [01:10&lt;00:08, 1168.48it/s][A
+ 86%|████████▋ | 60530/70000 [01:10&lt;00:08, 1112.21it/s][A
+ 87%|████████▋ | 60650/70000 [01:10&lt;00:08, 1091.38it/s][A
+ 87%|████████▋ | 60800/70000 [01:10&lt;00:07, 1186.36it/s][A
+ 87%|████████▋ | 60920/70000 [01:10&lt;00:08, 1115.23it/s][A
+ 87%|████████▋ | 61040/70000 [01:10&lt;00:08, 1073.31it/s][A
+ 87%|████████▋ | 61210/70000 [01:10&lt;00:07, 1179.31it/s][A
+ 88%|████████▊ | 61330/70000 [01:10&lt;00:07, 1130.03it/s][A
+ 88%|████████▊ | 61450/70000 [01:11&lt;00:07, 1133.88it/s][A
+ 88%|████████▊ | 61600/70000 [01:11&lt;00:06, 1221.56it/s][A
+ 88%|████████▊ | 61730/70000 [01:11&lt;00:07, 1127.33it/s][A
+ 88%|████████▊ | 61850/70000 [01:11&lt;00:07, 1049.91it/s][A
+ 89%|████████▊ | 62000/70000 [01:11&lt;00:06, 1164.15it/s][A
+ 89%|████████▊ | 62120/70000 [01:11&lt;00:06, 1144.33it/s][A
+ 89%|████████▉ | 62240/70000 [01:11&lt;00:07, 1031.83it/s][A
+ 89%|████████▉ | 62430/70000 [01:11&lt;00:07, 1061.82it/s][A
+ 89%|████████▉ | 62620/70000 [01:12&lt;00:06, 1209.47it/s][A
+ 90%|████████▉ | 62750/70000 [01:12&lt;00:06, 1118.55it/s][A
+ 90%|████████▉ | 62870/70000 [01:12&lt;00:06, 1071.16it/s][A
+ 90%|█████████ | 63020/70000 [01:12&lt;00:06, 1084.11it/s][A
+ 90%|█████████ | 63150/70000 [01:12&lt;00:06, 1114.14it/s][A
+ 90%|█████████ | 63270/70000 [01:12&lt;00:06, 1085.61it/s][A
+ 91%|█████████ | 63420/70000 [01:12&lt;00:05, 1122.03it/s][A
+ 91%|█████████ | 63570/70000 [01:12&lt;00:05, 1167.72it/s][A
+ 91%|█████████ | 63690/70000 [01:13&lt;00:05, 1113.72it/s][A
+ 91%|█████████ | 63820/70000 [01:13&lt;00:05, 1153.61it/s][A
+ 91%|█████████▏| 63940/70000 [01:13&lt;00:05, 1159.07it/s][A
+ 92%|█████████▏| 64060/70000 [01:13&lt;00:05, 1115.50it/s][A
+ 92%|█████████▏| 64210/70000 [01:13&lt;00:05, 1127.70it/s][A
+ 92%|█████████▏| 64330/70000 [01:13&lt;00:04, 1134.98it/s][A
+ 92%|█████████▏| 64450/70000 [01:13&lt;00:05, 1104.29it/s][A
+ 92%|█████████▏| 64590/70000 [01:13&lt;00:04, 1180.51it/s][A
+ 92%|█████████▏| 64710/70000 [01:13&lt;00:04, 1073.46it/s][A
+ 93%|█████████▎| 64840/70000 [01:14&lt;00:04, 1124.77it/s][A
+ 93%|█████████▎| 64970/70000 [01:14&lt;00:04, 1165.46it/s][A
+ 93%|█████████▎| 65090/70000 [01:14&lt;00:04, 1087.62it/s][A
+ 93%|█████████▎| 65230/70000 [01:14&lt;00:04, 1143.62it/s][A
+ 93%|█████████▎| 65350/70000 [01:14&lt;00:04, 1091.09it/s][A
+ 94%|█████████▎| 65480/70000 [01:14&lt;00:04, 1121.93it/s][A
+ 94%|█████████▎| 65620/70000 [01:14&lt;00:03, 1193.83it/s][A
+ 94%|█████████▍| 65750/70000 [01:14&lt;00:03, 1120.24it/s][A
+ 94%|█████████▍| 65870/70000 [01:14&lt;00:03, 1072.29it/s][A
+ 94%|█████████▍| 66030/70000 [01:15&lt;00:03, 1207.83it/s][A
+ 95%|█████████▍| 66160/70000 [01:15&lt;00:03, 1126.45it/s][A
+ 95%|█████████▍| 66280/70000 [01:15&lt;00:03, 1105.28it/s][A
+ 95%|█████████▍| 66420/70000 [01:15&lt;00:03, 1174.88it/s][A
+ 95%|█████████▌| 66540/70000 [01:15&lt;00:03, 1116.27it/s][A
+ 95%|█████████▌| 66660/70000 [01:15&lt;00:03, 1093.35it/s][A
+ 95%|█████████▌| 66780/70000 [01:15&lt;00:02, 1104.91it/s][A
+ 96%|█████████▌| 66900/70000 [01:15&lt;00:02, 1100.67it/s][A
+ 96%|█████████▌| 67040/70000 [01:16&lt;00:02, 1158.83it/s][A
+ 96%|█████████▌| 67160/70000 [01:16&lt;00:02, 1091.37it/s][A
+ 96%|█████████▌| 67290/70000 [01:16&lt;00:02, 1104.16it/s][A
+ 96%|█████████▋| 67430/70000 [01:16&lt;00:02, 1154.11it/s][A
+ 96%|█████████▋| 67550/70000 [01:16&lt;00:02, 1089.26it/s][A
+ 97%|█████████▋| 67690/70000 [01:16&lt;00:02, 1092.73it/s][A
+ 97%|█████████▋| 67830/70000 [01:16&lt;00:01, 1157.53it/s][A
+ 97%|█████████▋| 67950/70000 [01:16&lt;00:01, 1128.51it/s][A
+ 97%|█████████▋| 68070/70000 [01:16&lt;00:01, 1118.18it/s][A
+ 97%|█████████▋| 68190/70000 [01:17&lt;00:01, 1110.39it/s][A
+ 98%|█████████▊| 68310/70000 [01:17&lt;00:01, 1120.61it/s][A
+ 98%|█████████▊| 68450/70000 [01:17&lt;00:01, 1194.23it/s][A
+ 98%|█████████▊| 68580/70000 [01:17&lt;00:01, 1104.74it/s][A
+ 98%|█████████▊| 68700/70000 [01:17&lt;00:01, 1097.29it/s][A
+ 98%|█████████▊| 68850/70000 [01:17&lt;00:00, 1194.08it/s][A
+ 99%|█████████▊| 68980/70000 [01:17&lt;00:00, 1093.88it/s][A
+ 99%|█████████▊| 69100/70000 [01:17&lt;00:00, 1071.29it/s][A
+ 99%|█████████▉| 69210/70000 [01:17&lt;00:00, 1076.15it/s][A
+ 99%|█████████▉| 69320/70000 [01:18&lt;00:00, 1044.71it/s][A
+ 99%|█████████▉| 69430/70000 [01:18&lt;00:00, 1056.03it/s][A
+ 99%|█████████▉| 69540/70000 [01:18&lt;00:00, 905.47it/s] [A
+ 99%|█████████▉| 69640/70000 [01:18&lt;00:00, 811.24it/s][A
+100%|█████████▉| 69730/70000 [01:18&lt;00:00, 729.05it/s][A
+100%|█████████▉| 69810/70000 [01:18&lt;00:00, 623.68it/s][A
+100%|█████████▉| 69880/70000 [01:18&lt;00:00, 584.07it/s][A
+100%|██████████| 70000/70000 [02:54&lt;00:00, 402.09it/s][A
+100%|██████████| 70000/70000 [01:19&lt;00:00, 880.52it/s]
+  0%|          | 0/70000 [00:00&lt;?, ?it/s]
+
+Generating MCMC samples
+
+
+100%|██████████| 70000/70000 [01:53&lt;00:00, 614.57it/s]
+  0%|          | 0/70000 [00:00&lt;?, ?it/s]
+
+Generating MCMC samples
+
+
+100%|██████████| 70000/70000 [02:01&lt;00:00, 148.53it/s]
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code><span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span><span class="n">samples</span><span class="p">,</span> <span class="n">points</span><span class="o">=</span><span class="n">tho</span><span class="p">,</span> <span class="n">upper</span><span class="o">=</span><span class="s2">&quot;scatter&quot;</span><span class="p">,</span> <span class="n">points_colors</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;k&quot;</span><span class="p">],</span> 
+         <span class="n">points_offdiag</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">marker</span><span class="o">=</span><span class="s2">&quot;+&quot;</span><span class="p">))</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">sca</span><span class="p">(</span><span class="n">ax</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">([</span><span class="s2">&quot;GT&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="p">[</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">nt</span><span class="si">}</span><span class="s2"> trials&quot;</span> <span class="k">for</span> <span class="n">nt</span> <span class="ow">in</span> <span class="n">num_trials</span><span class="p">]);</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>100%|██████████| 70000/70000 [02:01&lt;00:00, 574.98it/s]
+</code></pre></div>
+
+<p><img alt="png" src="../10_Inference_given_IID_observations_files/10_Inference_given_IID_observations_8_1.png" /></p>
+<div class="highlight"><pre><span></span><code><span class="n">cs</span> <span class="o">=</span> <span class="p">[</span><span class="n">c2st</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">s1</span><span class="p">),</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">s2</span><span class="p">))</span> <span class="k">for</span> <span class="n">s1</span><span class="p">,</span> <span class="n">s2</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">ss</span><span class="p">,</span> <span class="n">samples</span><span class="p">)]</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="n">cs</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>[tensor([0.4997]), tensor([0.5170]), tensor([0.5140]), tensor([0.5204])]
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code>
+</code></pre></div>
+
+              
+            </article>
+          </div>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        <div class="md-social">
+  
+    
+    
+      
+      
+    
+    <a href="https://github.com/mackelab/sbi" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 512"><path d="M186.1 328.7c0 20.9-10.9 55.1-36.7 55.1s-36.7-34.2-36.7-55.1 10.9-55.1 36.7-55.1 36.7 34.2 36.7 55.1zM480 278.2c0 31.9-3.2 65.7-17.5 95-37.9 76.6-142.1 74.8-216.7 74.8-75.8 0-186.2 2.7-225.6-74.8-14.6-29-20.2-63.1-20.2-95 0-41.9 13.9-81.5 41.5-113.6-5.2-15.8-7.7-32.4-7.7-48.8 0-21.5 4.9-32.3 14.6-51.8 45.3 0 74.3 9 108.8 36 29-6.9 58.8-10 88.7-10 27 0 54.2 2.9 80.4 9.2 34-26.7 63-35.2 107.8-35.2 9.8 19.5 14.6 30.3 14.6 51.8 0 16.4-2.6 32.7-7.7 48.2 27.5 32.4 39 72.3 39 114.2zm-64.3 50.5c0-43.9-26.7-82.6-73.5-82.6-18.9 0-37 3.4-56 6-14.9 2.3-29.8 3.2-45.1 3.2-15.2 0-30.1-.9-45.1-3.2-18.7-2.6-37-6-56-6-46.8 0-73.5 38.7-73.5 82.6 0 87.8 80.4 101.3 150.4 101.3h48.2c70.3 0 150.6-13.4 150.6-101.3zm-82.6-55.1c-25.8 0-36.7 34.2-36.7 55.1s10.9 55.1 36.7 55.1 36.7-34.2 36.7-55.1-10.9-55.1-36.7-55.1z"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    <script id="__config" type="application/json">{"base": "../..", "features": [], "translations": {"clipboard.copy": "Copy to clipboard", "clipboard.copied": "Copied to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.placeholder": "Type to start searching", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.term.missing": "Missing", "select.version.title": "Select version"}, "search": "../../assets/javascripts/workers/search.22074ed6.min.js"}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.01de222e.min.js"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+      
+    
+  </body>
+</html>
