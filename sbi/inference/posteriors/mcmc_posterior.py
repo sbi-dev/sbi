@@ -341,7 +341,7 @@ class MCMCPosterior(NeuralPosterior):
                 torch.manual_seed(seed)
                 return init_fn()
 
-            seeds = torch.randint(high=2**31, size=(num_workers,))
+            seeds = torch.randint(high=2**31, size=(num_chains,))
 
             # Generate initial params parallelized over num_workers.
             with tqdm_joblib(
