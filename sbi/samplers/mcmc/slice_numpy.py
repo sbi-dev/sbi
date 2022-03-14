@@ -275,7 +275,10 @@ class SliceSamplerVectorized:
             self.state[c]["width"] = np.full(self.n_dims, self.init_width)
 
         if self.verbose:
-            pbar = tqdm(range(self.num_chains * num_samples))
+            pbar = tqdm(
+                range(self.num_chains * num_samples),
+                desc=f"Running vectorized MCMC with {self.num_chains} chains",
+            )
 
         num_chains_finished = 0
         while num_chains_finished != self.num_chains:
@@ -514,8 +517,9 @@ def slice_np_parallized(
     with tqdm_joblib(
         tqdm(
             range(num_batches),  # type: ignore
-            disable=not show_progress_bars,
-            desc=f"Running {num_chains} MCMC chains in {num_batches} batches.",
+            disable=not show_progress_bars or num_workers == 1,
+            desc=f"""Running {num_chains} MCMC chains with {num_workers} worker{"s" if
+                  num_workers>1 else ""} (batch_size={batch_size}).""",
             total=num_chains,
         )
     ):
