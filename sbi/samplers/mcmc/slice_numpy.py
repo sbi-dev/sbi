@@ -10,7 +10,7 @@ import numpy as np
 import torch
 from joblib import Parallel, delayed
 from matplotlib import pyplot as plt
-from tqdm import tqdm, trange
+from tqdm.auto import tqdm, trange
 
 from sbi.simulators.simutils import tqdm_joblib
 from sbi.utils import tensor2numpy
