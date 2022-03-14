@@ -15,7 +15,7 @@
     
     
       
-        <title>SBI with trial-based data and models mixed data types - sbi</title>
+        <title>SBI with trial-based (mixed) data - sbi</title>
       
     
     
@@ -100,7 +100,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              SBI with trial-based data and models mixed data types
+              SBI with trial-based (mixed) data
             
           </span>
         </div>
@@ -237,12 +237,14 @@
 
   
   
+    
+  
   
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
       
-        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3" type="checkbox" id="__nav_3" >
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3" type="checkbox" id="__nav_3" checked>
       
       
       
@@ -324,12 +326,14 @@
               
   
   
+    
+  
   
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
       
-        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3_2" type="checkbox" id="__nav_3_2" >
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3_2" type="checkbox" id="__nav_3_2" checked>
       
       
       
@@ -416,6 +420,192 @@
 
             
           
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../08_restriction_estimator/" class="md-nav__link">
+        Handling invalid simulations
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../09_sensitivity_analysis/" class="md-nav__link">
+        Posterior sensitivity analysis
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../10_crafting_summary_statistics/" class="md-nav__link">
+        Crafting summary statistics
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../11_sampler_interface/" class="md-nav__link">
+        Sampler interface
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+    
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" data-md-toggle="toc" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          SBI with trial-based (mixed) data
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        SBI with trial-based (mixed) data
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#amortization-of-neural-network-training-with-likelihood-based-sbi" class="md-nav__link">
+    Amortization of neural network training with likelihood-based SBI
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi-with-trial-based-data" class="md-nav__link">
+    SBI with trial-based data
+  </a>
+  
+    <nav class="md-nav" aria-label="SBI with trial-based data">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-analytical-posterior-concentrates-around-true-parameters-with-increasing-number-of-iid-trials" class="md-nav__link">
+    The analytical posterior concentrates around true parameters with increasing number of IID trials
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trial-based-inference-with-nle" class="md-nav__link">
+    Trial-based inference with NLE
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trial-based-sbi-with-mixed-data-types" class="md-nav__link">
+    Trial-based SBI with mixed data types
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#toy-problem-for-mnle" class="md-nav__link">
+    Toy problem for MNLE
+  </a>
+  
+    <nav class="md-nav" aria-label="Toy problem for MNLE">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#obtain-reference-posterior-samples-via-analytical-likelihood-and-mcmc" class="md-nav__link">
+    Obtain reference-posterior samples via analytical likelihood and MCMC
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#train-mnle-and-generate-samples-via-mcmc" class="md-nav__link">
+    Train MNLE and generate samples via MCMC
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#compare-mnle-and-reference-posterior" class="md-nav__link">
+    Compare MNLE and reference posterior
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#repeat-inference-with-different-x_o-that-has-more-trials" class="md-nav__link">
+    Repeat inference with different x_o that has more trials
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+            
+          
         </ul>
       </nav>
     </li>
@@ -438,12 +628,73 @@
       
       
         <label class="md-nav__link" for="__nav_3_3">
+          Diagnostics
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <nav class="md-nav" aria-label="Diagnostics" data-md-level="2">
+        <label class="md-nav__title" for="__nav_3_3">
+          <span class="md-nav__icon md-icon"></span>
+          Diagnostics
+        </label>
+        <ul class="md-nav__list" data-md-scrollfix>
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../13_diagnosis_posterior_predictive_check.md" class="md-nav__link">
+        Posterior predictive checks
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../14_diagnosis_sbc.md" class="md-nav__link">
+        Simulation-based calibration
+      </a>
+    </li>
+  
+
+            
+          
+        </ul>
+      </nav>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+      
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3_4" type="checkbox" id="__nav_3_4" >
+      
+      
+      
+      
+        <label class="md-nav__link" for="__nav_3_4">
           Examples
           <span class="md-nav__icon md-icon"></span>
         </label>
       
       <nav class="md-nav" aria-label="Examples" data-md-level="2">
-        <label class="md-nav__title" for="__nav_3_3">
+        <label class="md-nav__title" for="__nav_3_4">
           <span class="md-nav__icon md-icon"></span>
           Examples
         </label>
@@ -1068,6 +1319,41 @@ MCMC init with proposal: 100%|████████████████�
       </main>
       
         <footer class="md-footer">
+  
+    <nav class="md-footer__inner md-grid" aria-label="Footer">
+      
+        
+        <a href="../11_sampler_interface/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Sampler interface" rel="prev">
+          <div class="md-footer__button md-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12z"/></svg>
+          </div>
+          <div class="md-footer__title">
+            <div class="md-ellipsis">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              Sampler interface
+            </div>
+          </div>
+        </a>
+      
+      
+        
+        <a href="../../examples/00_HH_simulator/" class="md-footer__link md-footer__link--next" aria-label="Next: Hodgkin-Huxley example" rel="next">
+          <div class="md-footer__title">
+            <div class="md-ellipsis">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              Hodgkin-Huxley example
+            </div>
+          </div>
+          <div class="md-footer__button md-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11H4z"/></svg>
+          </div>
+        </a>
+      
+    </nav>
   
   <div class="md-footer-meta md-typeset">
     <div class="md-footer-meta__inner md-grid">
