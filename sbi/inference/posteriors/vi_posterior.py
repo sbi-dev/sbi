@@ -234,7 +234,7 @@ class VIPosterior(NeuralPosterior):
         elif isinstance(q, VIPosterior):
             self._q_build_fn = q._q_build_fn
             self._trained_on = q._trained_on
-            self.vi_method = q.vi_method
+            self.vi_method = q.vi_method  # type: ignore
             self._device = q._device
             self._prior = q._prior
             self._x = q._x
@@ -398,7 +398,7 @@ class VIPosterior(NeuralPosterior):
 
         # Init q and the optimizer if necessary
         if retrain_from_scratch:
-            self.q = self._q_build_fn()
+            self.q = self._q_build_fn()  # type: ignore
             self._optimizer = self._optimizer_builder(
                 self.potential_fn,
                 self.q,
