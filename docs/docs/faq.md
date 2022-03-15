@@ -11,3 +11,5 @@
 [How should I save and load objects in `sbi`?](faq/question_05.md)
 
 [Can I stop neural network training and resume it later?](faq/question_06.md)
+
+[How can I use a prior that is not defined in PyTorch?](faq/question_07.md)

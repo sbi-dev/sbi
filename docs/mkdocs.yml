@@ -14,6 +14,14 @@ nav:
         - Custom density estimators: tutorial/04_density_estimators.md
         - Learning summary statistics: tutorial/05_embedding_net.md
         - Conditional distributions: tutorial/07_conditional_distributions.md
+        - Handling invalid simulations: tutorial/08_restriction_estimator.md
+        - Posterior sensitivity analysis: tutorial/09_sensitivity_analysis.md
+        - Crafting summary statistics: tutorial/10_crafting_summary_statistics.md
+        - Sampler interface: tutorial/11_sampler_interface.md
+        - SBI with trial-based (mixed) data: tutorial/14_SBI_with_trial-based_mixed_data.md
+      - Diagnostics:
+        - Posterior predictive checks: tutorial/12_diagnosis_posterior_predictive_check.md
+        - Simulation-based calibration: tutorial/13_diagnosis_sbc.md
       - Examples:
         - Hodgkin-Huxley example: examples/00_HH_simulator.md
   - Contribute: contribute.md
