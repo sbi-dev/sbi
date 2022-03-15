@@ -91,11 +91,6 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
-         <loc>https://mackelab.org/sbi/tutorial/03_flexible_interface/</loc>
-         <lastmod>2022-03-15</lastmod>
-         <changefreq>daily</changefreq>
-    </url>
-    <url>
          <loc>https://mackelab.org/sbi/tutorial/03_multiround_inference/</loc>
          <lastmod>2022-03-15</lastmod>
          <changefreq>daily</changefreq>
@@ -122,11 +117,6 @@
     </url>
     <url>
          <loc>https://mackelab.org/sbi/tutorial/09_sensitivity_analysis/</loc>
-         <lastmod>2022-03-15</lastmod>
-         <changefreq>daily</changefreq>
-    </url>
-    <url>
-         <loc>https://mackelab.org/sbi/tutorial/10_Inference_given_IID_observations/</loc>
          <lastmod>2022-03-15</lastmod>
          <changefreq>daily</changefreq>
     </url>
