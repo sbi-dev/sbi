@@ -899,7 +899,7 @@
 
 
 <h1 id="simulation-based-calibration-in-sbi">Simulation-based Calibration in SBI<a class="headerlink" href="#simulation-based-calibration-in-sbi" title="Permanent link">&para;</a></h1>
-<p>After a density estimator has been trained with simulated data to obtain a posterior, the estimator should be made subject to several diagnostic tests, before being used for inference given the actual observed data. <a href="12_diagnostics_posterior_predictive_check.ipynb">Posterior Predictive Checks</a> provide one way to &ldquo;critique&rdquo; a trained estimator via its predictive performance. Another important approach to such diagnostics is simulation-based calibration as reported by <a href="https://arxiv.org/abs/1804.06788">Talts et al, 2018</a>.</p>
+<p>After a density estimator has been trained with simulated data to obtain a posterior, the estimator should be made subject to several diagnostic tests, before being used for inference given the actual observed data. <em>Posterior Predictive Checks</em> (see tutorial 12) provide one way to &ldquo;critique&rdquo; a trained estimator via its predictive performance. Another important approach to such diagnostics is simulation-based calibration as reported by <a href="https://arxiv.org/abs/1804.06788">Talts et al, 2018</a>.</p>
 <p><strong>Simulation-based calibration</strong> (SBC) provides a (qualitative) view and a quantitive measure to check, whether the uncertainties of the posterior are balanced, i.e., neither over-confident nor under-confident. As such, SBC can be viewed as a necessary condition (but not sufficient) for a valid inference algorithm: If SBC checks fail, this tells you that your inference is invalid. If SBC checks pass, this is no guarantee that the posterior estimation is working.</p>
 <h2 id="in-a-nutshell">In a nutshell<a class="headerlink" href="#in-a-nutshell" title="Permanent link">&para;</a></h2>
 <p>To run SBC,  </p>
@@ -922,7 +922,7 @@
 </ul>
 <h3 id="what-can-sbc-diagnose">What can SBC diagnose?<a class="headerlink" href="#what-can-sbc-diagnose" title="Permanent link">&para;</a></h3>
 <p><strong>SBC can inform us whether we are not wrong.</strong> However, it cannot tell us whether we are right, i.e., SBC checks a necessary condition. For example, imagine you run SBC using the prior as a posterior. The ranks would be perfectly uniform. But the inference would be wrong.</p>
-<p><strong>The <a href="12_diagnostics_posterior_predictive_check.ipynb">Posterior Predictive Checks</a> can be seen as the complementary sufficient check</strong> for the posterior (only as a methaphor, no theoretical guarantees here). Using the prior as a posterior and then doing predictive checks would clearly show that inference failed. </p>
+<p><strong>The Posterior Predictive Checks (see tutorial 12) can be seen as the complementary sufficient check</strong> for the posterior (only as a methaphor, no theoretical guarantees here). Using the prior as a posterior and then doing predictive checks would clearly show that inference failed. </p>
 <p>To summarize SBC can:</p>
 <ul>
 <li>tell us whether the SBI method applied to the problem at hand produces posteriors that have well-calibrated uncertainties,</li>
