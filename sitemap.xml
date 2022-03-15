@@ -141,17 +141,17 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
-         <loc>https://mackelab.org/sbi/tutorial/12_diagnosis_posterior_predictive_check/</loc>
+         <loc>https://mackelab.org/sbi/tutorial/12_diagnostics_posterior_predictive_check/</loc>
          <lastmod>2022-03-15</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
-         <loc>https://mackelab.org/sbi/tutorial/13_diagnosis_sbc/</loc>
+         <loc>https://mackelab.org/sbi/tutorial/13_diagnostics_simulation_based_calibration/</loc>
          <lastmod>2022-03-15</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
-         <loc>https://mackelab.org/sbi/tutorial/14_SBI_with_trial-based_mixed_data/</loc>
+         <loc>https://mackelab.org/sbi/tutorial/14_multi-trial-data-and-mixed-data-types/</loc>
          <lastmod>2022-03-15</lastmod>
          <changefreq>daily</changefreq>
     </url>

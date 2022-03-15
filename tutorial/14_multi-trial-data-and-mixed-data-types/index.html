@@ -8,7 +8,7 @@
       
       
       
-        <link rel="canonical" href="https://mackelab.org/sbi/tutorial/14_SBI_with_trial-based_mixed_data/">
+        <link rel="canonical" href="https://mackelab.org/sbi/tutorial/14_multi-trial-data-and-mixed-data-types/">
       
       <link rel="icon" href="../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.2.3, mkdocs-material-8.1.7">
@@ -68,7 +68,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#sbi-with-trial-based-data-and-models-mixed-data-types" class="md-skip">
+        <a href="#sbi-with-trial-based-data-and-models-of-mixed-data-types" class="md-skip">
           Skip to content
         </a>
       
@@ -645,7 +645,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../12_diagnosis_posterior_predictive_check/" class="md-nav__link">
+      <a href="../12_diagnostics_posterior_predictive_check/" class="md-nav__link">
         Posterior predictive checks
       </a>
     </li>
@@ -659,7 +659,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../13_diagnosis_sbc/" class="md-nav__link">
+      <a href="../13_diagnostics_simulation_based_calibration/" class="md-nav__link">
         Simulation-based calibration
       </a>
     </li>
@@ -907,15 +907,15 @@
             <article class="md-content__inner md-typeset">
               
                 
-<a href="http://github.com/mackelab/sbi/edit/master/docs/tutorial/14_SBI_with_trial-based_mixed_data.md" title="Edit this page" class="md-content__button md-icon">
+<a href="http://github.com/mackelab/sbi/edit/master/docs/tutorial/14_multi-trial-data-and-mixed-data-types.md" title="Edit this page" class="md-content__button md-icon">
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75L3 17.25z"/></svg>
 </a>
 
 
-<h1 id="sbi-with-trial-based-data-and-models-mixed-data-types">SBI with trial-based data and models mixed data types<a class="headerlink" href="#sbi-with-trial-based-data-and-models-mixed-data-types" title="Permanent link">&para;</a></h1>
+<h1 id="sbi-with-trial-based-data-and-models-of-mixed-data-types">SBI with trial-based data and models of mixed data types<a class="headerlink" href="#sbi-with-trial-based-data-and-models-of-mixed-data-types" title="Permanent link">&para;</a></h1>
 <p>Trial-based data often has the property that the individual trials can be assumed to be independent and identically distributed (iid), i.e., they are assumed to have the same underlying model parameters. For example, in a decision-making experiments, the experiment is often repeated in trials with the same experimental settings and conditions. The corresponding set of trials is then assumed to be &ldquo;iid&rdquo;. </p>
 <h3 id="amortization-of-neural-network-training-with-likelihood-based-sbi">Amortization of neural network training with likelihood-based SBI<a class="headerlink" href="#amortization-of-neural-network-training-with-likelihood-based-sbi" title="Permanent link">&para;</a></h3>
-<p>For some SBI variants the iid assumption can be exploited, e.g., when using a likelihood-based SBI method (<code>SNLE</code>, <code>SNRE</code>) one can train the density or ratio estimator on single-trial data, and then perform inference with <code>MCMC</code>. Crucially, because the data is iid, one can repeat the inference with a different <code>x_o</code>, i.e., a different set of trials, or number of trials, without having to retrain the density. One can interpet this as amortization of the SBI training: we can obtain a neural likelihood, or likelihood-ratio estimate for new <code>x_o</code>s without retraining, but we still have to run <code>MCMC</code> or <code>VI</code> to do inference. </p>
+<p>For some SBI variants the iid assumption can be exploited: when using a likelihood-based SBI method (<code>SNLE</code>, <code>SNRE</code>) one can train the density or ratio estimator on single-trial data, and then perform inference with <code>MCMC</code>. Crucially, because the data is iid and the estimator is trained on single-trial data, one can repeat the inference with a different <code>x_o</code> (a different set of trials, or different number of trials) without having to retrain the density estimator. One can interpet this as amortization of the SBI training: we can obtain a neural likelihood, or likelihood-ratio estimate for new <code>x_o</code>s without retraining, but we still have to run <code>MCMC</code> or <code>VI</code> to do inference. </p>
 <p>In addition, one can not only change the number of trials of a new <code>x_o</code>, but also the entire inference setting. For example, one can apply hierarchical inference scenarios with changing hierarchical denpendencies between the model parameters&ndash;all without having to retrain the density estimator because that is based on estimating single-trail likelihoods.</p>
 <p>Let us first have a look how trial-based inference works in <code>SBI</code> before we discuss models with &ldquo;mixed data types&rdquo;.</p>
 <h2 id="sbi-with-trial-based-data">SBI with trial-based data<a class="headerlink" href="#sbi-with-trial-based-data" title="Permanent link">&para;</a></h2>
@@ -996,7 +996,7 @@ x | \theta \sim \mathcal{N}(\theta,\; \Sigma=I) \\
   levels=opts[&quot;contour_offdiag&quot;][&quot;levels&quot;],
 </code></pre></div>
 
-<p><img alt="png" src="../14_SBI_with_trial-based_mixed_data_files/14_SBI_with_trial-based_mixed_data_6_1.png" /></p>
+<p><img alt="png" src="../14_multi-trial-data-and-mixed-data-types_files/14_multi-trial-data-and-mixed-data-types_6_1.png" /></p>
 <p>Indeed, with increasing number of trials the posterior density concentrates around the true underlying parameter.</p>
 <h2 id="trial-based-inference-with-nle">Trial-based inference with NLE<a class="headerlink" href="#trial-based-inference-with-nle" title="Permanent link">&para;</a></h2>
 <p>(S)NLE can easily perform inference given multiple IID x because it is based on learning the likelihood. Once the likelihood is learned on single trials, i.e., a neural network that given a single observation and a parameter predicts the likelihood of that observation given the parameter, one can perform MCMC to obtain posterior samples. </p>
@@ -1080,7 +1080,7 @@ MCMC init with proposal: 100%|████████████████�
   levels=opts[&quot;contour_offdiag&quot;][&quot;levels&quot;],
 </code></pre></div>
 
-<p><img alt="png" src="../14_SBI_with_trial-based_mixed_data_files/14_SBI_with_trial-based_mixed_data_12_1.png" /></p>
+<p><img alt="png" src="../14_multi-trial-data-and-mixed-data-types_files/14_multi-trial-data-and-mixed-data-types_12_1.png" /></p>
 <p>The pairplot above already indicates that (S)NLE is well able to obtain accurate posterior samples also for increasing number of trials (note that we trained the single-round version of SNLE so that we did not have to re-train it for new <span class="arithmatex">\(x_o\)</span>). </p>
 <p>Quantitatively we can measure the accuracy of SNLE by calculating the <code>c2st</code> score between SNLE and the true posterior samples, where the best accuracy is perfect for <code>0.5</code>:</p>
 <div class="highlight"><pre><span></span><code><span class="n">cs</span> <span class="o">=</span> <span class="p">[</span><span class="n">c2st</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">s1</span><span class="p">),</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">s2</span><span class="p">))</span> <span class="k">for</span> <span class="n">s1</span><span class="p">,</span> <span class="n">s2</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">ss</span><span class="p">,</span> <span class="n">samples</span><span class="p">)]</span>
@@ -1097,7 +1097,7 @@ c2st score for num_trials=20: 0.55
 <p>This inference procedure would work similarly when using <code>SNRE</code>. However, note that it does not work for <code>SNPE</code> because in <code>SNPE</code> we are learning the posterior directly so that whenever <code>x_o</code> changes (in terms of the number of trials or the parameter dependencies) the posterior changes and <code>SNPE</code> needs to be trained again. </p>
 <h2 id="trial-based-sbi-with-mixed-data-types">Trial-based SBI with mixed data types<a class="headerlink" href="#trial-based-sbi-with-mixed-data-types" title="Permanent link">&para;</a></h2>
 <p>In some cases, models with trial-based data additionally return data with mixed data types, e.g., continous and discrete data. For example, most computational models of decision-making have continuous reaction times and discrete choices as output. </p>
-<p>This can induce a problem when performing trial-based SBI that relies on learning a neural likelihood. The problem is that it is challenging for most density estimator to handle both, continous and discrete data at the same time. There has been developed a method for solving this problem, it&rsquo;s called <strong>Mixed Neural Likelihood Estimation</strong> (MNLE). It works just like NLE, but with mixed data types. The trick is that it learns two separate density estimators, one for the discrete part of the data, and one for the continuous part, and combines the two to obtain the final neural likelihood. Crucially, the continuous density estimator is trained conditioned on the output of the discrete one, such that statistical dependencies between the discrete and continous data (e.g., between choices and reaction times) are modeled as well. The interested reader is referred to the original paper available <a href="https://www.biorxiv.org/content/10.1101/2021.12.22.473472v2">here</a>.</p>
+<p>This can induce a problem when performing trial-based SBI that relies on learning a neural likelihood. The problem is that it is challenging for most density estimators to handle both, continous and discrete data at the same time. There has been developed a method for solving this problem, it&rsquo;s called <strong>Mixed Neural Likelihood Estimation</strong> (MNLE). It works just like NLE, but with mixed data types. The trick is that it learns two separate density estimators, one for the discrete part of the data, and one for the continuous part, and combines the two to obtain the final neural likelihood. Crucially, the continuous density estimator is trained conditioned on the output of the discrete one, such that statistical dependencies between the discrete and continous data (e.g., between choices and reaction times) are modeled as well. The interested reader is referred to the original paper available <a href="https://www.biorxiv.org/content/10.1101/2021.12.22.473472v2">here</a>.</p>
 <p>MNLE was recently added to <code>sbi</code> (see <a href="https://github.com/mackelab/sbi/pull/638">PR</a>) and follow the same API as <code>SNLE</code>.</p>
 <h2 id="toy-problem-for-mnle">Toy problem for <code>MNLE</code><a class="headerlink" href="#toy-problem-for-mnle" title="Permanent link">&para;</a></h2>
 <p>To illustrate <code>MNLE</code> we set up a toy simulator that outputs mixed data and for which we know the likelihood such we can obtain reference posterior samples via MCMC.</p>
@@ -1211,6 +1211,20 @@ MCMC init with proposal: 100%|████████████████�
 <span class="n">x</span> <span class="o">=</span> <span class="n">mixed_simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
 
 <span class="c1"># Train MNLE and obtain MCMC-based posterior.</span>
+<span class="n">trainer</span> <span class="o">=</span> <span class="n">MNLE</span><span class="p">()</span>
+<span class="n">estimator</span> <span class="o">=</span> <span class="n">trainer</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 84 epochs.
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code><span class="n">posterior</span> <span class="o">=</span> <span class="n">trainer</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span><span class="n">estimator</span><span class="p">,</span> <span class="n">prior</span><span class="p">)</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="c1"># Training data</span>
+<span class="n">num_simulations</span> <span class="o">=</span> <span class="mi">5000</span>
+<span class="n">theta</span> <span class="o">=</span> <span class="n">prior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_simulations</span><span class="p">,))</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">mixed_simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
+
+<span class="c1"># Train MNLE and obtain MCMC-based posterior.</span>
 <span class="n">trainer</span> <span class="o">=</span> <span class="n">MNLE</span><span class="p">(</span><span class="n">prior</span><span class="p">)</span>
 <span class="n">estimator</span> <span class="o">=</span> <span class="n">trainer</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
 <span class="n">mnle_posterior</span> <span class="o">=</span> <span class="n">trainer</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span><span class="n">mcmc_method</span><span class="o">=</span><span class="s2">&quot;slice_np_vectorized&quot;</span><span class="p">,</span>
@@ -1258,7 +1272,7 @@ MCMC init with proposal: 100%|████████████████�
   levels=opts[&quot;contour_offdiag&quot;][&quot;levels&quot;],
 </code></pre></div>
 
-<p><img alt="png" src="../14_SBI_with_trial-based_mixed_data_files/14_SBI_with_trial-based_mixed_data_27_1.png" /></p>
+<p><img alt="png" src="../14_multi-trial-data-and-mixed-data-types_files/14_multi-trial-data-and-mixed-data-types_29_1.png" /></p>
 <p>We see that the inferred <code>MNLE</code> posterior nicely matches the reference posterior, and how both inferred a posterior that is quite different from the prior.</p>
 <p>Because MNLE training is amortized we can obtain another posterior given a different observation with potentially a different number of trials, just by running MCMC again (without re-training <code>MNLE</code>):</p>
 <h3 id="repeat-inference-with-different-x_o-that-has-more-trials">Repeat inference with different <code>x_o</code> that has more trials<a class="headerlink" href="#repeat-inference-with-different-x_o-that-has-more-trials" title="Permanent link">&para;</a></h3>
@@ -1305,7 +1319,7 @@ MCMC init with proposal: 100%|████████████████�
   levels=opts[&quot;contour_offdiag&quot;][&quot;levels&quot;],
 </code></pre></div>
 
-<p><img alt="png" src="../14_SBI_with_trial-based_mixed_data_files/14_SBI_with_trial-based_mixed_data_31_1.png" /></p>
+<p><img alt="png" src="../14_multi-trial-data-and-mixed-data-types_files/14_multi-trial-data-and-mixed-data-types_33_1.png" /></p>
 <p>Again we can see that the posteriors match nicely. In addition, we observe that the posterior variance reduces as we increase the number of trials, similar to the illustration with the Gaussian example at the beginning of the tutorial. </p>
 <p>A final note: <code>MNLE</code> is trained on single-trial data. Theoretically, density estimation is perfectly accurate only in the limit of infinite training data. Thus, training with a finite amount of training data naturally induces a small bias in the density estimator. As we observed above, this bias is so small that we don&rsquo;t really notice it, e.g., the <code>c2st</code> scores were close to 0.5. However, when we increase the number of trials in <code>x_o</code> dramatically (on the order of 1000s) the small bias can accumulate over the trials and inference with <code>MNLE</code> can become less accurate.</p>
 <div class="highlight"><pre><span></span><code>
@@ -1339,7 +1353,7 @@ MCMC init with proposal: 100%|████████████████�
       
       
         
-        <a href="../12_diagnosis_posterior_predictive_check/" class="md-footer__link md-footer__link--next" aria-label="Next: Posterior predictive checks" rel="next">
+        <a href="../12_diagnostics_posterior_predictive_check/" class="md-footer__link md-footer__link--next" aria-label="Next: Posterior predictive checks" rel="next">
           <div class="md-footer__title">
             <div class="md-ellipsis">
               <span class="md-footer__direction">
