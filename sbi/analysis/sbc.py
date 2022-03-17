@@ -339,19 +339,16 @@ def local_coverage_test(
     xs_test: Tensor,
     xs_train: Tensor,
     xs_ranks: Tensor,
-    num_posterior_samples: int = 1000,
+    num_posterior_samples: int = 300,
     alphas: Tensor = torch.linspace(0.05, 0.95, 21),
     classifier: Callable = LogisticRegression(
         penalty="none", solver="saga", max_iter=10000
     ),
-    null_distr_samples: int = 300,
+    null_distr_samples: int = 500,
 ) -> Tuple[List[Tensor], List[Tensor], List[Tensor], List[Tensor]]:
     """Compute local coverage tests using the ranks computed by sbc.
-
     Returns for each dimension of theta the global and local p-values as well as quantile predictions based on sbc ranks at test points xs_test and quantile predictions based on uniform samples at test points xs_test.
-
     The local coverage test is implemented as proposed in Zhao et al., "Validating Conditional Density Models and Bayesian Inference Algorithms", https://proceedings.mlr.press/v161/zhao21b/zhao21b.pdf.
-
     Parameters
     ----------
     xs_test:
@@ -371,7 +368,6 @@ def local_coverage_test(
     null_distr_samples:
         Determines how many uniform test statistics will be used for computing the p-values.
         Reasonable values for null_distr_samples might lie in (200, 1000).
-
     Returns
     -------
     global_pvalues_per_dim:
@@ -383,10 +379,10 @@ def local_coverage_test(
     uniform_predictions_per_dim:
         List of alpha predictions per dimension of theta, null_distr_samples value, xs_test point and alpha quantile. The predictions are based on uniform distribution samples.
     """
-    xs_test = atleast_2d_float32_tensor(xs_test)   
+    xs_test = atleast_2d_float32_tensor(xs_test)    # TODO: .to(device)
     xs_train = atleast_2d_float32_tensor(xs_train)
     xs_ranks = atleast_2d_float32_tensor(xs_ranks)
-    
+
     rank_predictions_per_dim = []
     uniform_predictions_per_dim = []
     local_pvalues_per_dim = []
@@ -403,12 +399,21 @@ def local_coverage_test(
         for i, alpha in enumerate(alphas):
             # Fit training samples and PIT indicators/ranks
             ind_train = [1 * (rank <= alpha) for rank in ranks]
-            rhat_rank = copy.deepcopy(classifier)
-            rhat_rank.fit(X=xs_train, y=ind_train)
+            
+            # If all ind_train are 0 or 1, no classifier needs to be trained
+            if np.sum(ind_train) == len(ind_train):
+                print(f'all ranks are smaller than {alpha}')
+                rank_predictions[:, i] = 1
+            elif np.sum(ind_train) == 0:
+                print(f'all ranks are larger than {alpha}')
+                rank_predictions[:, i] = 0
+            else:
+                rhat_rank = copy.deepcopy(classifier)
+                rhat_rank.fit(X=xs_train, y=ind_train)
 
-            # Predict on test samples
-            pred = rhat_rank.predict_proba(xs_test)[:, 1]
-            rank_predictions[:, i] = torch.FloatTensor(pred)
+                # Predict on test samples
+                pred = rhat_rank.predict_proba(xs_test)[:, 1]
+                rank_predictions[:, i] = torch.FloatTensor(pred)
 
         # Compute test statistic T for the rank predictions
         T_rank = torch.mean((rank_predictions - alphas) ** 2, dim=1)
@@ -433,12 +438,21 @@ def local_coverage_test(
             for i, alpha in enumerate(alphas):
                 # Fit training samples and uniform indicators
                 ind_train = [1 * (sample <= alpha) for sample in uni_sample]
-                rhat_uni = copy.deepcopy(classifier)
-                rhat_uni.fit(X=xs_train, y=ind_train)
 
-                # Predict on test samples
-                preds = rhat_uni.predict_proba(xs_test)[:, 1]
-                uniform_predictions_b[:, i] = torch.FloatTensor(preds)
+                # If all ind_train are 0 or 1, no classifier needs to be trained
+                if np.sum(ind_train) == len(ind_train):
+                    print(f'all ranks are smaller than {alpha}')
+                    uniform_predictions_b[:, i] = 1
+                elif np.sum(ind_train) == 0:
+                    print(f'all ranks are larger than {alpha}')
+                    uniform_predictions_b[:, i] = 0
+                else:
+                    rhat_uni = copy.deepcopy(classifier)
+                    rhat_uni.fit(X=xs_train, y=ind_train)
+
+                    # Predict on test samples
+                    preds = rhat_uni.predict_proba(xs_test)[:, 1]
+                    uniform_predictions_b[:, i] = torch.FloatTensor(preds)
 
             # Compute test statistic T for uniform samples
             T_uni[b] = torch.mean((uniform_predictions_b - alphas) ** 2, dim=1)

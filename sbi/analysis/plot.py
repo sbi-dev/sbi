@@ -1412,15 +1412,13 @@ def pp_plots_local_coverage(
     uniform_predictions: Tensor,
     local_pvalues: Tensor,
     theta_dim=0,
+    theta='',
     alphas: Tensor = torch.linspace(0.05, 0.95, 21),
     conf_alpha: float = 0.05,
     plot_significant_obs: bool = False,
-    title: str = '',
-    fig = None,
-    grid = None
+    fig = None
 ) -> None:
     """PP-plots for alpha and xs_test rank predictions.
-
     Parameters
     ----------
     n_plots:
@@ -1439,23 +1437,24 @@ def pp_plots_local_coverage(
         local_pvalues should be equivalent to local_pvalues returned by local_coverage_test().
     theta_dim:
         Choose dimension of theta if theta is multidimensional.
+    theta:
+        Name of parameter corresponding to theta_dim.
     alphas:
         Posterior quantiles used for running local_coverage_test().
     conf_alpha:
         Confidence value used for creating confidence bounds.
     plot_significant_obs:
         Plot only observations that have a significant p-value, i.e. outside the confidence bounds.
-    title:
-        Title of plot
+        A minimum of n_plots and the number of significant plots is plotted.
     fig: 
         Matplotlib figure to plot on.
     """
 
     if plot_significant_obs:
         xs_idx = torch.where(local_pvalues[theta_dim] < conf_alpha)[0]
-        n_plots = len(xs_idx)
+        n_plots = min(len(xs_idx), n_plots)
         if n_plots == 0:
-            print("no significant p-values for this theta dimension found")
+            print(f"no significant p-values for theta {theta} found")
             return
     else:
         xs_idx = np.random.randint(0, n_plots, size=(n_plots,))
@@ -1470,12 +1469,14 @@ def pp_plots_local_coverage(
 
     n_yplots = 5
     n_xplots = int(np.ceil(n_plots / n_yplots))
+
     if fig is None:
         fig, axs = plt.subplots(n_xplots, n_yplots, figsize=(20, n_xplots * 4))
-        plt.suptitle(title)
+        plt.suptitle('local p-values ' + str(theta), fontsize=16)
         plt.tight_layout()
+        plt.rc('font', size=13)
     else:
-        fig.suptitle(title, fontsize=18)
+        fig.suptitle('local p-values ' + str(theta), fontsize=16)
         axs = fig.subplots(n_xplots, n_yplots)
 
     for idx, ax in zip(xs_idx, axs.ravel()[:n_plots]):
@@ -1489,4 +1490,7 @@ def pp_plots_local_coverage(
             + ", p-value:"
             + str(np.round(local_pvalues[theta_dim][idx].item(), 4))
         )
-        
+        ax.spines['right'].set_visible(False)
+        ax.spines['top'].set_visible(False)
+    
+    return
