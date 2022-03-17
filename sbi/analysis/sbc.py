@@ -2,6 +2,7 @@ import copy
 import warnings
 from typing import Callable, Dict, List, Tuple
 
+import numpy as np
 import torch
 from joblib import Parallel, delayed
 from scipy.stats import kstest, uniform
@@ -14,6 +15,7 @@ from sbi.inference import DirectPosterior
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.simulators.simutils import tqdm_joblib
 from sbi.utils.metrics import c2st
+from sbi.utils.torchutils import atleast_2d_float32_tensor
 
 
 def run_sbc(
