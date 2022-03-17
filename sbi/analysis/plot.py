@@ -1412,11 +1412,11 @@ def pp_plots_local_coverage(
     uniform_predictions: Tensor,
     local_pvalues: Tensor,
     theta_dim=0,
-    theta='',
+    theta="",
     alphas: Tensor = torch.linspace(0.05, 0.95, 21),
     conf_alpha: float = 0.05,
     plot_significant_obs: bool = False,
-    fig = None
+    fig=None,
 ) -> None:
     """PP-plots for alpha and xs_test rank predictions.
     Parameters
@@ -1446,7 +1446,7 @@ def pp_plots_local_coverage(
     plot_significant_obs:
         Plot only observations that have a significant p-value, i.e. outside the confidence bounds.
         A minimum of n_plots and the number of significant plots is plotted.
-    fig: 
+    fig:
         Matplotlib figure to plot on.
     """
 
@@ -1472,11 +1472,11 @@ def pp_plots_local_coverage(
 
     if fig is None:
         fig, axs = plt.subplots(n_xplots, n_yplots, figsize=(20, n_xplots * 4))
-        plt.suptitle('local p-values ' + str(theta), fontsize=16)
+        plt.suptitle("local p-values " + str(theta), fontsize=16)
         plt.tight_layout()
-        plt.rc('font', size=13)
+        plt.rc("font", size=13)
     else:
-        fig.suptitle('local p-values ' + str(theta), fontsize=16)
+        fig.suptitle("local p-values " + str(theta), fontsize=16)
         axs = fig.subplots(n_xplots, n_yplots)
 
     for idx, ax in zip(xs_idx, axs.ravel()[:n_plots]):
@@ -1490,7 +1490,7 @@ def pp_plots_local_coverage(
             + ", p-value:"
             + str(np.round(local_pvalues[theta_dim][idx].item(), 4))
         )
-        ax.spines['right'].set_visible(False)
-        ax.spines['top'].set_visible(False)
-    
+        ax.spines["right"].set_visible(False)
+        ax.spines["top"].set_visible(False)
+
     return

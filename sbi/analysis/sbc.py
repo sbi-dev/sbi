@@ -361,7 +361,7 @@ def local_coverage_test(
     uniform_predictions_per_dim:
         List of alpha predictions per dimension of theta, null_distr_samples value, xs_test point and alpha quantile. The predictions are based on uniform distribution samples.
     """
-    xs_test = atleast_2d_float32_tensor(xs_test)    # TODO: .to(device)
+    xs_test = atleast_2d_float32_tensor(xs_test)  # TODO: .to(device)
     xs_train = atleast_2d_float32_tensor(xs_train)
     xs_ranks = atleast_2d_float32_tensor(xs_ranks)
 
@@ -381,13 +381,13 @@ def local_coverage_test(
         for i, alpha in enumerate(alphas):
             # Fit training samples and PIT indicators/ranks
             ind_train = [1 * (rank <= alpha) for rank in ranks]
-            
+
             # If all ind_train are 0 or 1, no classifier needs to be trained
             if np.sum(ind_train) == len(ind_train):
-                print(f'all ranks are smaller than {alpha}')
+                print(f"all ranks are smaller than {alpha}")
                 rank_predictions[:, i] = 1
             elif np.sum(ind_train) == 0:
-                print(f'all ranks are larger than {alpha}')
+                print(f"all ranks are larger than {alpha}")
                 rank_predictions[:, i] = 0
             else:
                 rhat_rank = copy.deepcopy(classifier)
@@ -423,10 +423,10 @@ def local_coverage_test(
 
                 # If all ind_train are 0 or 1, no classifier needs to be trained
                 if np.sum(ind_train) == len(ind_train):
-                    print(f'all ranks are smaller than {alpha}')
+                    print(f"all ranks are smaller than {alpha}")
                     uniform_predictions_b[:, i] = 1
                 elif np.sum(ind_train) == 0:
-                    print(f'all ranks are larger than {alpha}')
+                    print(f"all ranks are larger than {alpha}")
                     uniform_predictions_b[:, i] = 0
                 else:
                     rhat_uni = copy.deepcopy(classifier)
