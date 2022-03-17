@@ -28,13 +28,10 @@ def run_sbc(
     show_progress_bar: bool = True,
 ) -> Tuple[Tensor, Tensor]:
     """Run simulation-based calibration (SBC) (parallelized across sbc runs).
-
     Returns sbc ranks, log probs of the true parameters under the posterior and samples
     from the data averaged posterior, one for each sbc run, respectively.
-
     SBC is implemented as proposed in Talts et al., "Validating Bayesian Inference
     Algorithms with Simulation-Based Calibration", https://arxiv.org/abs/1804.06788.
-
     Args:
         thetas: ground-truth parameters for sbc, simulated from the prior.
         xs: observed data for sbc, simulated from thetas.
@@ -44,7 +41,6 @@ def run_sbc(
             inferences.
         sbc_batch_size: batch size for workers.
         show_progress_bar: whether to display a progress over sbc runs.
-
     Returns:
         ranks: ranks of the ground truth parameters under the inferred posterior.
         dap_samples: samples from the data averaged posterior.
@@ -125,14 +121,12 @@ def sbc_on_batch(
     thetas: Tensor, xs: Tensor, posterior: NeuralPosterior, num_posterior_samples: int
 ) -> Tuple[Tensor, Tensor]:
     """Return SBC results for a batch of SBC parameters and data from prior.
-
     Args:
         thetas: ground truth parameters.
         xs: corresponding observations.
         posterior: sbi posterior.
         num_posterior_samples: number of samples to draw from the posterior in each sbc
             run.
-
     Returns
         ranks: ranks of true parameters vs. posterior samples under the specified RV,
             for each posterior dimension.
@@ -162,7 +156,6 @@ def sbc_on_batch(
 
 def get_nltp(thetas: Tensor, xs: Tensor, posterior: NeuralPosterior) -> Tensor:
     """Return negative log prob of true parameters under the posterior.
-
     NLTP: negative log probs of true parameters under the approximate posterior.
     The expectation of NLTP over samples from the prior and the simulator defines
     an upper bound for accuracy of the ground-truth posterior (without having
@@ -170,15 +163,12 @@ def get_nltp(thetas: Tensor, xs: Tensor, posterior: NeuralPosterior) -> Tensor:
     Thus, if the one calculates NLTP for many thetas (say >100), one can use it as a
     comparable measure of posterior accuracy when comparing inference methods, or
     settings (even without access to the ground-truth posterior)
-
     Note that this is interpretable only for normalized log probs, i.e., when
     using (S)NPE.
-
     Args:
         thetas: parameters (sampled from the prior) for which to calculate NLTP values.
         xs: simulated data corresponding to thetas.
         posterior: inferred posterior for which to calculate NLTP.
-
     Returns:
         nltp: negative log probs of true parameters under approximate posteriors.
     """
@@ -205,11 +195,10 @@ def check_sbc(
     ranks: Tensor,
     prior_samples: Tensor,
     dap_samples: Tensor,
-    num_posterior_samples: int,
+    num_posterior_samples: int = 1000,
     num_c2st_repetitions: int = 1,
 ) -> Dict[str, Tensor]:
     """Return uniformity checks and data averaged posterior checks for SBC.
-
     Args:
         ranks: ranks for each sbc run and for each model parameter, i.e.,
             shape (N, dim_parameters)
@@ -217,7 +206,6 @@ def check_sbc(
         dap_samples: N samples from the data averaged posterior
         num_posterior_samples: number of posterior samples used for sbc ranking.
         num_c2st_repetitions: number of times c2st is repeated to estimate robustness.
-
     Returns (all in a dictionary):
         ks_pvals: p-values of the Kolmogorov-Smirnov test of uniformity,
             one for each dim_parameters.
@@ -247,9 +235,7 @@ def check_sbc(
 
 def check_prior_vs_dap(prior_samples: Tensor, dap_samples: Tensor) -> Tensor:
     """Returns the c2st accuracy between prior and data avaraged posterior samples.
-
     c2st is calculated for each dimension separately.
-
     According to simulation-based calibration, the inference methods is well-calibrated
     if the data averaged posterior samples follow the same distribution as the prior,
     i.e., if the c2st score is close to 0.5. If it is not, then this suggests that the
@@ -269,14 +255,11 @@ def check_prior_vs_dap(prior_samples: Tensor, dap_samples: Tensor) -> Tensor:
 
 def check_uniformity_frequentist(ranks, num_posterior_samples) -> Tensor:
     """Return p-values for uniformity of the ranks.
-
     Calculates Kolomogorov-Smirnov test using scipy.
-
     Args:
         ranks: ranks for each sbc run and for each model parameter, i.e.,
             shape (N, dim_parameters)
         num_posterior_samples: number of posterior samples used for sbc ranking.
-
     Returns:
         ks_pvals: p-values of the Kolmogorov-Smirnov test of uniformity,
             one for each dim_parameters.
@@ -296,15 +279,12 @@ def check_uniformity_c2st(
     ranks, num_posterior_samples, num_repetitions: int = 1
 ) -> Tensor:
     """Return c2st scores for uniformity of the ranks.
-
     Run a c2st between ranks and uniform samples.
-
     Args:
         ranks: ranks for each sbc run and for each model parameter, i.e.,
             shape (N, dim_parameters)
         num_posterior_samples: number of posterior samples used for sbc ranking.
         num_repetitions: repetitions of C2ST tests estimate classifier variance.
-
     Returns:
         c2st_ranks: C2ST accuracy of between ranks and uniform baseline,
             one for each dim_parameters.
