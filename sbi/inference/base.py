@@ -244,7 +244,7 @@ class NeuralInference(ABC):
 
         """
 
-        datset = data.TensorDataset(
+        dataset = data.TensorDataset(
             *self.get_simulations(
             starting_round,exclude_invalid_x, warn_on_invalid = warn_on_invalid,
             warn_if_zscoring = warn_if_zscoring
