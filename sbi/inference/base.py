@@ -161,6 +161,7 @@ class NeuralInference(ABC):
         starting_round: int = 0,
         exclude_invalid_x: bool = True,
         warn_on_invalid: bool = True,
+        warn_if_zscoring: Optional[bool] = True,
     ) -> Tuple[Tensor, Tensor, Tensor]:
         r"""Returns all $\theta$, $x$, and prior_masks from rounds >= `starting_round`.
 
@@ -190,7 +191,8 @@ class NeuralInference(ABC):
         # Check for NaNs in simulations.
         is_valid_x, num_nans, num_infs = handle_invalid_x(x, exclude_invalid_x)
         # Check for problematic z-scoring
-        warn_if_zscoring_changes_data(x[is_valid_x])
+        if warn_if_zscoring:
+            warn_if_zscoring_changes_data(x[is_valid_x])
         if warn_on_invalid:
             warn_on_invalid_x(num_nans, num_infs, exclude_invalid_x)
             warn_on_invalid_x_for_snpec_leakage(
@@ -215,6 +217,74 @@ class NeuralInference(ABC):
         show_train_summary: bool = False,
     ) -> NeuralPosterior:
         raise NotImplementedError
+
+    def get_dataloaders_all(
+        self,
+        starting_round: int = 0,
+        exclude_invalid_x: bool = True,
+        warn_on_invalid: bool = True,
+        training_batch_size: int = 50,
+        validation_fraction: float = 0.1,
+        resume_training: bool = False,
+        dataloader_kwargs: Optional[dict] = None,
+        warn_if_zscoring: Optional[bool] = True,
+        ) -> Tuple[data.DataLoader, data.DataLoader]:
+        """Return dataloaders for training and validation.
+
+        Args:
+            dataset: holding all theta and x, optionally masks.
+            training_batch_size: training arg of inference methods.
+            resume_training: Whether the current call is resuming training so that no
+                new training and validation indices into the dataset have to be created.
+            dataloader_kwargs: Additional or updated kwargs to be passed to the training
+                and validation dataloaders (like, e.g., a collate_fn).
+
+        Returns:
+            Tuple of dataloaders for training and validation.
+
+        """
+
+        datset = data.TensorDataset(
+            *self.get_simulations(
+            starting_round,exclude_invalid_x, warn_on_invalid = warn_on_invalid,
+            warn_if_zscoring = warn_if_zscoring
+            )
+
+            )
+        # Get total number of training examples.
+        num_examples = len(dataset)
+
+        # Select random train and validation splits from (theta, x) pairs.
+        num_training_examples = int((1 - validation_fraction) * num_examples)
+        num_validation_examples = num_examples - num_training_examples
+
+        if not resume_training:
+            permuted_indices = torch.randperm(num_examples)
+            self.train_indices, self.val_indices = (
+                permuted_indices[:num_training_examples],
+                permuted_indices[num_training_examples:],
+            )
+
+        # Create training and validation loaders using a subset sampler.
+        # Intentionally use dicts to define the default dataloader args
+        # Then, use dataloader_kwargs to override (or add to) any of these defaults
+        # https://stackoverflow.com/questions/44784577/in-method-call-args-how-to-override-keyword-argument-of-unpacked-dict
+        train_loader_kwargs = {
+            "batch_size": min(training_batch_size, num_training_examples),
+            "drop_last": True,
+            "sampler": SubsetRandomSampler(torch.arange(len(self.train_indices).tolist()) ),
+        }
+        val_loader_kwargs = {
+            "batch_size": min(training_batch_size, num_validation_examples),
+            "shuffle": False,
+            "drop_last": True,
+            "sampler": SubsetRandomSampler(torch.arange(len(self.val_indices).tolist()) ),
+        }
+        if dataloader_kwargs is not None:
+            train_loader_kwargs = dict(train_loader_kwargs, **dataloader_kwargs)
+            val_loader_kwargs = dict(val_loader_kwargs, **dataloader_kwargs)
+
+        return data.DataLoader(dataset[train_indices], **train_loader_kwargs), data.DataLoader(dataset[val_indices], **val_loader_kwargs)
 
     def get_dataloaders(
         self,
@@ -358,7 +428,8 @@ class NeuralInference(ABC):
             )
 
     def _summarize(
-        self, round_: int, x_o: Union[Tensor, None], theta_bank: Tensor, x_bank: Tensor
+        self, round_: int, x_o: Union[Tensor, None], theta_bank: Union[Tensor,None]
+        , x_bank: Union[Tensor,None]
     ) -> None:
         """Update the summary_writer with statistics for a given round.
 

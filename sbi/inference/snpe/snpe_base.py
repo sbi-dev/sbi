@@ -166,6 +166,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         discard_prior_samples: bool = False,
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
+        warn_if_zscoring: Optional[bool] = True,
         dataloader_kwargs: Optional[dict] = None,
     ) -> nn.Module:
         r"""Return density estimator that approximates the distribution $p(\theta|x)$.
@@ -217,25 +218,20 @@ class PosteriorEstimator(NeuralInference, ABC):
         if self.use_non_atomic_loss or hasattr(self, "_ran_final_round"):
             start_idx = self._round
 
-        theta, x, prior_masks = self.get_simulations(
-            start_idx, exclude_invalid_x, warn_on_invalid=True
-        )
-
-        # Dataset is shared for training and validation loaders.
-        dataset = data.TensorDataset(theta, x, prior_masks)
-
         # Set the proposal to the last proposal that was passed by the user. For
         # atomic SNPE, it does not matter what the proposal is. For non-atomic
         # SNPE, we only use the latest data that was passed, i.e. the one from the
         # last proposal.
         proposal = self._proposal_roundwise[-1]
 
-        train_loader, val_loader = self.get_dataloaders(
-            dataset,
+        train_loader, val_loader = self.get_dataloaders_all(
+            start_idx,
+            exclude_invalid_x,
             training_batch_size,
             validation_fraction,
             resume_training,
             dataloader_kwargs=dataloader_kwargs,
+            warn_if_zscoring=warn_if_zscoring,
         )
 
         # First round or if retraining from scratch:
@@ -341,7 +337,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         self._summary["best_validation_log_probs"].append(self._best_val_log_prob)
 
         # Update tensorboard and summary dict.
-        self._summarize(round_=self._round, x_o=None, theta_bank=theta, x_bank=x)
+        self._summarize(round_=self._round, x_o=None, theta_bank=None, x_bank=None)
 
         # Update description for progress bar.
         if show_train_summary:
