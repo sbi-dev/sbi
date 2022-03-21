@@ -95,6 +95,7 @@ class SNPE_C(PosteriorEstimator):
         calibration_kernel: Optional[Callable] = None,
         exclude_invalid_x: bool = True,
         resume_training: bool = False,
+        force_first_round_loss: bool = False,
         discard_prior_samples: bool = False,
         use_combined_loss: bool = False,
         retrain_from_scratch: bool = False,
@@ -123,6 +124,9 @@ class SNPE_C(PosteriorEstimator):
                 cluster. If `True`, the split between train and validation set, the
                 optimizer, the number of epochs, and the best validation log-prob will
                 be restored from the last time `.train()` was called.
+            force_first_round_loss: If `True`, train with maximum likelihood,
+                i.e., potentially ignoring the correction for using a proposal
+                distribution different from the prior.
             discard_prior_samples: Whether to discard samples simulated in round 1, i.e.
                 from the prior. Training may be sped up by ignoring such less targeted
                 samples.
