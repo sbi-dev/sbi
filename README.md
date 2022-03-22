@@ -54,6 +54,8 @@ The following algorithms are currently available:
 
 #### Sequential Neural Posterior Estimation (SNPE)
 
+* [`SNPE_A`](https://www.mackelab.org/sbi/reference/#sbi.inference.snpe.snpe_a.SNPE_A) from Papamakarios G and Murray I [_Fast ε-free Inference of Simulation Models with Bayesian Conditional Density Estimation_](https://proceedings.neurips.cc/paper/2016/hash/6aca97005c68f1206823815f66102863-Abstract.html) (NeurIPS 2016).
+  
 * [`SNPE_C`](https://www.mackelab.org/sbi/reference/#sbi.inference.snpe.snpe_c.SNPE_C) or `APT` from Greenberg D, Nonnenmacher M, and Macke J [_Automatic
   Posterior Transformation for likelihood-free
   inference_](https://arxiv.org/abs/1905.07488) (ICML 2019).
