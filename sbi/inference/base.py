@@ -129,10 +129,13 @@ class NeuralInference(ABC):
         # Initialize roundwise (theta, x, prior_masks) for storage of parameters,
         # simulations and masks indicating if simulations came from prior.
         self._theta_roundwise, self._x_roundwise, self._prior_masks = [], [], []
+        self._dataset = None
+        self._num_sims_per_round = []
         self._model_bank = []
 
         # Initialize list that indicates the round from which simulations were drawn.
         self._data_round_index = []
+
 
         self._round = 0
         self._val_log_prob = float("-Inf")
@@ -221,13 +224,10 @@ class NeuralInference(ABC):
     def get_dataloaders_all(
         self,
         starting_round: int = 0,
-        exclude_invalid_x: bool = True,
-        warn_on_invalid: bool = True,
         training_batch_size: int = 50,
         validation_fraction: float = 0.1,
         resume_training: bool = False,
         dataloader_kwargs: Optional[dict] = None,
-        warn_if_zscoring: Optional[bool] = True,
         ) -> Tuple[data.DataLoader, data.DataLoader]:
         """Return dataloaders for training and validation.
 
@@ -244,22 +244,19 @@ class NeuralInference(ABC):
 
         """
 
-        dataset = data.TensorDataset(
-            *self.get_simulations(
-            starting_round,exclude_invalid_x, warn_on_invalid = warn_on_invalid,
-            warn_if_zscoring = warn_if_zscoring
-            )
+        if starting_round == 0:
+            indices = torch.arange(sum(self._num_sims_per_round))
+        else:
+            indices = torch.arange(sum(self._num_sims_per_round[:starting_round]), sum(self._num_sims_per_round))
 
-            )
         # Get total number of training examples.
-        num_examples = len(dataset)
-
+        num_examples = len(indices)
         # Select random train and validation splits from (theta, x) pairs.
         num_training_examples = int((1 - validation_fraction) * num_examples)
         num_validation_examples = num_examples - num_training_examples
 
         if not resume_training:
-            permuted_indices = torch.randperm(num_examples)
+            permuted_indices = indices[torch.randperm(num_examples)]
             self.train_indices, self.val_indices = (
                 permuted_indices[:num_training_examples],
                 permuted_indices[num_training_examples:],
@@ -272,19 +269,19 @@ class NeuralInference(ABC):
         train_loader_kwargs = {
             "batch_size": min(training_batch_size, num_training_examples),
             "drop_last": True,
-            "sampler": SubsetRandomSampler(torch.arange(len(self.train_indices).tolist()) ),
+            "sampler": SubsetRandomSampler(torch.arange(len(self.train_indices)).tolist() ),
         }
         val_loader_kwargs = {
             "batch_size": min(training_batch_size, num_validation_examples),
             "shuffle": False,
             "drop_last": True,
-            "sampler": SubsetRandomSampler(torch.arange(len(self.val_indices).tolist()) ),
+            "sampler": SubsetRandomSampler(torch.arange(len(self.val_indices)).tolist() ),
         }
         if dataloader_kwargs is not None:
             train_loader_kwargs = dict(train_loader_kwargs, **dataloader_kwargs)
             val_loader_kwargs = dict(val_loader_kwargs, **dataloader_kwargs)
 
-        return data.DataLoader(dataset[train_indices], **train_loader_kwargs), data.DataLoader(dataset[val_indices], **val_loader_kwargs)
+        return data.DataLoader(self._dataset, **train_loader_kwargs), data.DataLoader(self._dataset, **val_loader_kwargs)
 
     def get_dataloaders(
         self,

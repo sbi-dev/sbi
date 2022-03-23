@@ -100,6 +100,7 @@ class SNPE_C(PosteriorEstimator):
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
+        warn_if_zscoring: Optional[bool] = True
     ) -> nn.Module:
         r"""Return density estimator that approximates the distribution $p(\theta|x)$.
 

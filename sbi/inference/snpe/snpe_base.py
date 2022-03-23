@@ -29,6 +29,10 @@ from sbi.utils import (
     test_posterior_net_for_multi_d_x,
     validate_theta_and_x,
     x_shape_from_simulation,
+    handle_invalid_x,
+    warn_if_zscoring_changes_data,
+    warn_on_invalid_x,
+    warn_on_invalid_x_for_snpec_leakage,
 )
 from sbi.utils.sbiutils import ImproperEmpirical, mask_sims_from_prior
 
@@ -88,6 +92,11 @@ class PosteriorEstimator(NeuralInference, ABC):
         theta: Tensor,
         x: Tensor,
         proposal: Optional[DirectPosterior] = None,
+        exclude_invalid_x: bool = True,
+        warn_on_invalid: bool = True,
+        warn_if_zscoring: bool = True,
+        return_self: bool = True,
+        data_device: str = None
     ) -> "PosteriorEstimator":
         r"""Store parameters and simulation outputs to use them for later training.
 
@@ -108,7 +117,26 @@ class PosteriorEstimator(NeuralInference, ABC):
             NeuralInference object (returned so that this function is chainable).
         """
 
-        theta, x = validate_theta_and_x(theta, x, training_device=self._device)
+        # Add ability to specify device data is saved on
+        if data_device is None: data_device = self._device
+        theta, x = validate_theta_and_x(theta, x, training_device=data_device)
+
+
+        is_valid_x, num_nans, num_infs = handle_invalid_x(x, exclude_invalid_x)
+
+        # Check for problematic z-scoring
+        if warn_if_zscoring:
+            warn_if_zscoring_changes_data(x[is_valid_x])
+        if warn_on_invalid:
+            warn_on_invalid_x(num_nans, num_infs, exclude_invalid_x)
+            warn_on_invalid_x_for_snpec_leakage(
+                num_nans, num_infs, exclude_invalid_x, type(self).__name__, self._round
+            )
+
+        x = x[is_valid_x]
+        theta = theta[is_valid_x]
+
+
         self._check_proposal(proposal)
 
         if (
@@ -122,7 +150,7 @@ class PosteriorEstimator(NeuralInference, ABC):
             # with MLE loss or with atomic loss (see, in `train()`:
             # self._round = max(self._data_round_index))
             self._data_round_index.append(0)
-            self._prior_masks.append(mask_sims_from_prior(0, theta.size(0)))
+            prior_masks = mask_sims_from_prior(0, theta.size(0))
         else:
             if not self._data_round_index:
                 # This catches a pretty specific case: if, in the first round, one
@@ -130,10 +158,16 @@ class PosteriorEstimator(NeuralInference, ABC):
                 self._data_round_index.append(1)
             else:
                 self._data_round_index.append(max(self._data_round_index) + 1)
-            self._prior_masks.append(mask_sims_from_prior(1, theta.size(0)))
+            prior_masks = mask_sims_from_prior(1, theta.size(0))
 
-        self._theta_roundwise.append(theta)
-        self._x_roundwise.append(x)
+
+        if self._dataset is None:
+            #If first round, set up ConcatDataset
+            self._dataset = data.ConcatDataset( [data.TensorDataset(theta,x,prior_masks),] )
+        else:
+            self._dataset.datasets.append( data.TensorDataset(theta,x,prior_masks) )
+
+        self._num_sims_per_round.append(theta.size(0))
         self._proposal_roundwise.append(proposal)
 
         if self._prior is None or isinstance(self._prior, ImproperEmpirical):
@@ -150,7 +184,11 @@ class PosteriorEstimator(NeuralInference, ABC):
             theta_prior = self.get_simulations()[0]
             self._prior = ImproperEmpirical(theta_prior, ones(theta_prior.shape[0]))
 
-        return self
+        #Add ability to not return self
+        if return_self:
+            return self
+        else:
+            return 1
 
     def train(
         self,
@@ -226,22 +264,24 @@ class PosteriorEstimator(NeuralInference, ABC):
 
         train_loader, val_loader = self.get_dataloaders_all(
             start_idx,
-            exclude_invalid_x,
             training_batch_size,
             validation_fraction,
             resume_training,
             dataloader_kwargs=dataloader_kwargs,
-            warn_if_zscoring=warn_if_zscoring,
         )
-
         # First round or if retraining from scratch:
         # Call the `self._build_neural_net` with the rounds' thetas and xs as
         # arguments, which will build the neural network.
         # This is passed into NeuralPosterior, to create a neural posterior which
         # can `sample()` and `log_prob()`. The network is accessible via `.net`.
         if self._neural_net is None or retrain_from_scratch:
+
+            #Get test theta,x
+            test_theta = self._dataset.datasets[0].tensors[0][:100]
+            test_x = self._dataset.datasets[0].tensors[1][:100]
+
             self._neural_net = self._build_neural_net(
-                theta[self.train_indices], x[self.train_indices]
+                test_theta, test_x
             )
             # If data on training device already move net as well.
             if (
@@ -250,8 +290,8 @@ class PosteriorEstimator(NeuralInference, ABC):
             ):
                 self._neural_net.to(self._device)
 
-            test_posterior_net_for_multi_d_x(self._neural_net, theta, x)
-            self._x_shape = x_shape_from_simulation(x)
+            test_posterior_net_for_multi_d_x(self._neural_net, test_theta, test_x)
+            self._x_shape = x_shape_from_simulation(test_x)
 
         # Move entire net to device for training.
         self._neural_net.to(self._device)
