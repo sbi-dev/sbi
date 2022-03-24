@@ -165,7 +165,8 @@ class PosteriorEstimator(NeuralInference, ABC):
             #If first round, set up ConcatDataset
             self._dataset = data.ConcatDataset( [data.TensorDataset(theta,x,prior_masks),] )
         else:
-            self._dataset.datasets.append( data.TensorDataset(theta,x,prior_masks) )
+            #Otherwise append to Dataset
+            self._dataset = data.ConcatDataset( self._dataset.datasets + [data.TensorDataset(theta,x,prior_masks),] )
 
         self._num_sims_per_round.append(theta.size(0))
         self._proposal_roundwise.append(proposal)
