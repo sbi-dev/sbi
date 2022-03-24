@@ -276,7 +276,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         # can `sample()` and `log_prob()`. The network is accessible via `.net`.
         if self._neural_net is None or retrain_from_scratch:
 
-            #Get test theta,x
+            #Get theta,x from dataset to initialize NN
             test_theta = self._dataset.datasets[0].tensors[0][:100]
             test_x = self._dataset.datasets[0].tensors[1][:100]
 
@@ -286,7 +286,7 @@ class PosteriorEstimator(NeuralInference, ABC):
             # If data on training device already move net as well.
             if (
                 not self._device == "cpu"
-                and f"{x.device.type}:{x.device.index}" == self._device
+                and f"{test_x.device.type}:{test_x.device.index}" == self._device
             ):
                 self._neural_net.to(self._device)
 
