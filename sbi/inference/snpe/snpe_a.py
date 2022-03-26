@@ -107,6 +107,7 @@ class SNPE_A(PosteriorEstimator):
         calibration_kernel: Optional[Callable] = None,
         exclude_invalid_x: bool = True,
         resume_training: bool = False,
+        force_first_round_loss: bool = False,
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
@@ -143,6 +144,11 @@ class SNPE_A(PosteriorEstimator):
                 cluster. If `True`, the split between train and validation set, the
                 optimizer, the number of epochs, and the best validation log-prob will
                 be restored from the last time `.train()` was called.
+            force_first_round_loss: If `True`, train with maximum likelihood,
+                i.e., potentially ignoring the correction for using a proposal
+                distribution different from the prior.
+            force_first_round_loss: If `True`, train with maximum likelihood,
+                regardless of the proposal distribution.
             retrain_from_scratch: Whether to retrain the conditional density
                 estimator for the posterior from scratch each round. Not supported for
                 SNPE-A.
@@ -431,7 +437,7 @@ class SNPE_A_MDN(nn.Module):
             )
             return log_prob_proposal_posterior  # \hat{p} from eq (3) in [1]
 
-    def sample(self, num_samples: int, context: Tensor, batch_size: int) -> Tensor:
+    def sample(self, num_samples: int, context: Tensor, batch_size: int = 1) -> Tensor:
         context = context.to(self._device)
 
         if not self._apply_correction:
@@ -461,7 +467,7 @@ class SNPE_A_MDN(nn.Module):
 
         # Compute the precision factors which represent the upper triangular matrix
         # of the cholesky decomposition of the prec_p.
-        prec_factors_p = torch.cholesky(prec_p, upper=True)
+        prec_factors_p = torch.linalg.cholesky(prec_p, upper=True)
 
         assert logits_p.ndim == 2
         assert m_p.ndim == 3
@@ -693,14 +699,14 @@ class SNPE_A_MDN(nn.Module):
         # Check if precision matrices are positive definite.
         for batches in precisions_pp:
             for pprior in batches:
-                eig_pprior = torch.symeig(pprior, eigenvectors=False).eigenvalues
+                eig_pprior = torch.linalg.eigvalsh(pprior, UPLO="U")
                 if not (eig_pprior > 0).all():
                     raise AssertionError(
                         "The precision matrix of the proposal is not positive definite!"
                     )
         for batches in precisions_d:
             for d in batches:
-                eig_d = torch.symeig(d, eigenvectors=False).eigenvalues
+                eig_d = torch.linalg.eigvalsh(d, UPLO="U")
                 if not (eig_d > 0).all():
                     raise AssertionError(
                         "The precision matrix of the density estimator is not "

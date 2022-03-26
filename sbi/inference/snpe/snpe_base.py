@@ -202,6 +202,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         calibration_kernel: Optional[Callable] = None,
         exclude_invalid_x: bool = True,
         resume_training: bool = False,
+        force_first_round_loss: bool = False,
         discard_prior_samples: bool = False,
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
@@ -229,6 +230,9 @@ class PosteriorEstimator(NeuralInference, ABC):
                 cluster. If `True`, the split between train and validation set, the
                 optimizer, the number of epochs, and the best validation log-prob will
                 be restored from the last time `.train()` was called.
+            force_first_round_loss: If `True`, train with maximum likelihood,
+                i.e., potentially ignoring the correction for using a proposal
+                distribution different from the prior.
             discard_prior_samples: Whether to discard samples simulated in round 1, i.e.
                 from the prior. Training may be sped up by ignoring such less targeted
                 samples.
@@ -242,6 +246,20 @@ class PosteriorEstimator(NeuralInference, ABC):
         Returns:
             Density estimator that approximates the distribution $p(\theta|x)$.
         """
+        if self._round == 0 and self._neural_net is not None:
+            assert force_first_round_loss, (
+                "You have already trained this neural network. After you had trained "
+                "the network, you again appended simulations with `append_simulations"
+                "(theta, x)`, but you did not provide a proposal. If the new "
+                "simulations are sampled from the prior, you can set "
+                "`.train(..., force_first_round_loss=True`). However, if the new "
+                "simulations were not sampled from the prior, you should pass the "
+                "proposal, i.e. `append_simulations(theta, x, proposal)`. If "
+                "your samples are not sampled from the prior and you do not pass a "
+                "proposal and you set `force_first_round_loss=True`, the result of "
+                "SNPE will not be the true posterior. Instead, it will be the proposal "
+                "posterior, which (usually) is more narrow than the true posterior."
+            )
 
         # Calibration kernels proposed in Lueckmann, Gonçalves et al., 2017.
         if calibration_kernel is None:
@@ -527,7 +545,6 @@ class PosteriorEstimator(NeuralInference, ABC):
         Returns:
             Calibration kernel-weighted negative log prob.
         """
-
         if self._round == 0:
             # Use posterior log prob (without proposal correction) for first round.
             log_prob = self._neural_net.log_prob(theta, x)
@@ -539,6 +556,7 @@ class PosteriorEstimator(NeuralInference, ABC):
     def _check_proposal(self, proposal):
         """
         Check for validity of the provided proposal distribution.
+
         If the proposal is a `NeuralPosterior`, we check if the default_x is set.
         If the proposal is **not** a `NeuralPosterior`, we warn since it is likely that
         the user simply passed the prior, but this would still trigger atomic loss.
