@@ -642,7 +642,9 @@ def mcmc_transform(
     return transform.inv  # type: ignore
 
 
-def check_transform(prior: Distribution, transform: TorchTransform) -> None:
+def check_transform(
+    prior: Distribution, transform: TorchTransform, atol: float = 1e-3
+) -> None:
     """Check validity of transformed and re-transformed samples."""
 
     theta = prior.sample(torch.Size((2,)))
@@ -654,8 +656,8 @@ def check_transform(prior: Distribution, transform: TorchTransform) -> None:
     use a transforms when using a MultipleIndependent prior with a Dirichlet prior."""
 
     assert torch.allclose(
-        theta, transform(theta_unconstrained)  # type: ignore
-    ), "Mismatch between true and re-transformed parameters."
+        theta, transform(theta_unconstrained), atol=atol  # type: ignore
+    ), "Original and re-transformed parameters must be close to each other."
 
 
 class ImproperEmpirical(Empirical):
