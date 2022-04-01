@@ -169,7 +169,7 @@ class RatioEstimator(NeuralInference, ABC):
             dataloader_kwargs=dataloader_kwargs,
         )
 
-        clipped_batch_size = min(training_batch_size, int(val_loader.batch_size))
+        clipped_batch_size = min(training_batch_size, val_loader.batch_size)  # type: ignore
 
         num_atoms = int(
             clamp_and_warn(
