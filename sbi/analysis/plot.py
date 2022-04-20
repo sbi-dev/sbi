@@ -314,7 +314,7 @@ def pairplot(
         fig: matplotlib figure to plot on.
         axes: matplotlib axes corresponding to fig.
         **kwargs: Additional arguments to adjust the plot, see the source code in
-            `_get_default_opts()` in `sbi.utils.plot` for more details.
+            `_get_default_opts()` in `sbi.analysis.plot` for more details.
 
     Returns: figure and axis of posterior distribution plot
     """
@@ -486,7 +486,7 @@ def marginal_plot(
         fig: matplotlib figure to plot on.
         axes: matplotlib axes corresponding to fig.
         **kwargs: Additional arguments to adjust the plot, see the source code in
-            `_get_default_opts()` in `sbi.utils.plot` for more details.
+            `_get_default_opts()` in `sbi.analysis.plot` for more details.
 
     Returns: figure and axis of posterior distribution plot
     """
@@ -560,7 +560,7 @@ def conditional_marginal_plot(
         fig: matplotlib figure to plot on.
         axes: matplotlib axes corresponding to fig.
         **kwargs: Additional arguments to adjust the plot, see the source code in
-            `_get_default_opts()` in `sbi.utils.plot` for more details.
+            `_get_default_opts()` in `sbi.analysis.plot` for more details.
 
     Returns: figure and axis of posterior distribution plot
     """
@@ -635,7 +635,7 @@ def conditional_pairplot(
         fig: matplotlib figure to plot on.
         axes: matplotlib axes corresponding to fig.
         **kwargs: Additional arguments to adjust the plot, see the source code in
-            `_get_default_opts()` in `sbi.utils.plot` for more details.
+            `_get_default_opts()` in `sbi.analysis.plot` for more details.
 
     Returns: figure and axis of posterior distribution plot
     """
