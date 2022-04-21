@@ -96,7 +96,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         warn_on_invalid: bool = True,
         warn_if_zscoring: bool = True,
         return_self: bool = True,
-        data_device: str = None
+        data_device: str = None,
     ) -> "PosteriorEstimator":
         r"""Store parameters and simulation outputs to use them for later training.
 
@@ -112,6 +112,15 @@ class PosteriorEstimator(NeuralInference, ABC):
             proposal: The distribution that the parameters $\theta$ were sampled from.
                 Pass `None` if the parameters were sampled from the prior. If not
                 `None`, it will trigger a different loss-function.
+            exclude_invalid_x: Whether to exclude simulation outputs `x=NaN` or `x=±∞`
+                during training. Expect errors, silent or explicit, when `False`.
+            warn_on_invalid: Whether to warn if data is invalid
+            warn_if_zscoring: Whether to test if z-scoring causes duplicates
+            return_self: Whether to return a instance of the class, allows chaining
+                with `.train()`. Setting `False` decreases memory overhead.
+            data_device: Where to store the data, default is on the same device where
+                the training is happening. If training a large dataset on a GPU with not
+                much VRAM can set to 'cpu' to store data on system memory instead.
 
         Returns:
             NeuralInference object (returned so that this function is chainable).
@@ -188,8 +197,6 @@ class PosteriorEstimator(NeuralInference, ABC):
         #Add ability to not return self
         if return_self:
             return self
-        else:
-            return 1
 
     def train(
         self,
@@ -200,13 +207,11 @@ class PosteriorEstimator(NeuralInference, ABC):
         max_num_epochs: int = 2**31 - 1,
         clip_max_norm: Optional[float] = 5.0,
         calibration_kernel: Optional[Callable] = None,
-        exclude_invalid_x: bool = True,
         resume_training: bool = False,
         force_first_round_loss: bool = False,
         discard_prior_samples: bool = False,
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
-        warn_if_zscoring: Optional[bool] = True,
         dataloader_kwargs: Optional[dict] = None,
     ) -> nn.Module:
         r"""Return density estimator that approximates the distribution $p(\theta|x)$.
@@ -224,8 +229,6 @@ class PosteriorEstimator(NeuralInference, ABC):
                 prevent exploding gradients. Use None for no clipping.
             calibration_kernel: A function to calibrate the loss with respect to the
                 simulations `x`. See Lueckmann, Gonçalves et al., NeurIPS 2017.
-            exclude_invalid_x: Whether to exclude simulation outputs `x=NaN` or `x=±∞`
-                during training. Expect errors, silent or explicit, when `False`.
             resume_training: Can be used in case training time is limited, e.g. on a
                 cluster. If `True`, the split between train and validation set, the
                 optimizer, the number of epochs, and the best validation log-prob will
@@ -281,7 +284,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         # last proposal.
         proposal = self._proposal_roundwise[-1]
 
-        train_loader, val_loader = self.get_dataloaders_all(
+        train_loader, val_loader = self.get_dataloaders(
             start_idx,
             training_batch_size,
             validation_fraction,

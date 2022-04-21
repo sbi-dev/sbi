@@ -17,8 +17,11 @@ from sbi.utils import (
     check_estimator_arg,
     check_prior,
     clamp_and_warn,
+    handle_invalid_x,
     validate_theta_and_x,
     x_shape_from_simulation,
+    warn_if_zscoring_changes_data,
+    warn_on_invalid_x,
 )
 from sbi.utils.sbiutils import mask_sims_from_prior
 
@@ -82,6 +85,11 @@ class RatioEstimator(NeuralInference, ABC):
         theta: Tensor,
         x: Tensor,
         from_round: int = 0,
+        exclude_invalid_x: bool = True,
+        warn_on_invalid: bool = True,
+        warn_if_zscoring: bool = True,
+        return_self: bool = True,
+        data_device: str = None,
     ) -> "RatioEstimator":
         r"""Store parameters and simulation outputs to use them for later training.
 
@@ -98,19 +106,48 @@ class RatioEstimator(NeuralInference, ABC):
                 With default settings, this is not used at all for `SNRE`. Only when
                 the user later on requests `.train(discard_prior_samples=True)`, we
                 use these indices to find which training data stemmed from the prior.
-
+            exclude_invalid_x: Whether to exclude simulation outputs `x=NaN` or `x=±∞`
+                during training. Expect errors, silent or explicit, when `False`.
+            warn_on_invalid: Whether to warn if data is invalid
+            warn_if_zscoring: Whether to test if z-scoring causes duplicates
+            return_self: Whether to return a instance of the class, allows chaining
+                with `.train()`. Setting `False` decreases memory overhead.
+            data_device: Where to store the data, default is on the same device where
+                the training is happening. If training a large dataset on a GPU with not
+                much VRAM can set to 'cpu' to store data on system memory instead.
         Returns:
             NeuralInference object (returned so that this function is chainable).
         """
 
         theta, x = validate_theta_and_x(theta, x, training_device=self._device)
 
-        self._theta_roundwise.append(theta)
-        self._x_roundwise.append(x)
-        self._prior_masks.append(mask_sims_from_prior(int(from_round), theta.size(0)))
-        self._data_round_index.append(int(from_round))
+        is_valid_x, num_nans, num_infs = handle_invalid_x(x, exclude_invalid_x)
 
-        return self
+        # Check for problematic z-scoring
+        if warn_if_zscoring:
+            warn_if_zscoring_changes_data(x[is_valid_x])
+        if warn_on_invalid:
+            warn_on_invalid_x(num_nans, num_infs, exclude_invalid_x)
+
+        x = x[is_valid_x]
+        theta = theta[is_valid_x]
+
+        if data_device is None: data_device = self._device
+        theta, x = validate_theta_and_x(theta, x, training_device=data_device)
+        prior_masks = mask_sims_from_prior(int(from_round), theta.size(0))
+
+        if self._dataset is None:
+            #If first round, set up ConcatDataset
+            self._dataset = data.ConcatDataset( [data.TensorDataset(theta,x,prior_masks),] )
+        else:
+            #Otherwise append to Dataset
+            self._dataset = data.ConcatDataset( self._dataset.datasets + [data.TensorDataset(theta,x,prior_masks),] )
+        
+        self._num_sims_per_round.append(theta.size(0))
+        self._data_round_index.append(int(from_round) )
+
+        if return_self:
+            return self
 
     def train(
         self,
@@ -154,15 +191,9 @@ class RatioEstimator(NeuralInference, ABC):
         start_idx = int(discard_prior_samples and self._round > 0)
         # Load data from most recent round.
         self._round = max(self._data_round_index)
-        theta, x, _ = self.get_simulations(
-            start_idx, exclude_invalid_x, warn_on_invalid=True
-        )
-
-        # Dataset is shared for training and validation loaders.
-        dataset = data.TensorDataset(theta, x)
 
         train_loader, val_loader = self.get_dataloaders(
-            dataset,
+            start_idx,
             training_batch_size,
             validation_fraction,
             resume_training,
@@ -183,11 +214,15 @@ class RatioEstimator(NeuralInference, ABC):
         # This is passed into NeuralPosterior, to create a neural posterior which
         # can `sample()` and `log_prob()`. The network is accessible via `.net`.
         if self._neural_net is None or retrain_from_scratch:
-            self._neural_net = self._build_neural_net(
-                theta[self.train_indices], x[self.train_indices]
-            )
-            self._x_shape = x_shape_from_simulation(x)
 
+            #Get theta,x from dataset to initialize NN
+            test_theta = self._dataset.datasets[0].tensors[0][:100]
+            test_x = self._dataset.datasets[0].tensors[1][:100]
+
+            self._neural_net = self._build_neural_net(
+                test_theta, test_x
+            )
+            self._x_shape = x_shape_from_simulation(test_x)
         self._neural_net.to(self._device)
 
         if not resume_training:
@@ -260,8 +295,8 @@ class RatioEstimator(NeuralInference, ABC):
         self._summarize(
             round_=self._round,
             x_o=None,
-            theta_bank=theta,
-            x_bank=x,
+            theta_bank=None,
+            x_bank=None,
         )
 
         # Update description for progress bar.

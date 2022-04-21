@@ -26,7 +26,7 @@ from sbi.utils import (
     warn_on_invalid_x,
     warn_on_invalid_x_for_snpec_leakage,
 )
-from sbi.utils.sbiutils import get_simulations_since_round
+from sbi.utils.sbiutils import get_simulations_indcies
 from sbi.utils.torchutils import check_if_prior_on_device, process_device
 from sbi.utils.user_input_checks import prepare_for_sbi
 
@@ -128,7 +128,6 @@ class NeuralInference(ABC):
 
         # Initialize roundwise (theta, x, prior_masks) for storage of parameters,
         # simulations and masks indicating if simulations came from prior.
-        self._theta_roundwise, self._x_roundwise, self._prior_masks = [], [], []
         self._dataset = None
         self._num_sims_per_round = []
         self._model_bank = []
@@ -162,9 +161,6 @@ class NeuralInference(ABC):
     def get_simulations(
         self,
         starting_round: int = 0,
-        exclude_invalid_x: bool = True,
-        warn_on_invalid: bool = True,
-        warn_if_zscoring: Optional[bool] = True,
     ) -> Tuple[Tensor, Tensor, Tensor]:
         r"""Returns all $\theta$, $x$, and prior_masks from rounds >= `starting_round`.
 
@@ -181,28 +177,22 @@ class NeuralInference(ABC):
         Returns: Parameters, simulation outputs, prior masks.
         """
 
-        theta = get_simulations_since_round(
-            self._theta_roundwise, self._data_round_index, starting_round
-        )
-        x = get_simulations_since_round(
-            self._x_roundwise, self._data_round_index, starting_round
-        )
-        prior_masks = get_simulations_since_round(
-            self._prior_masks, self._data_round_index, starting_round
-        )
+        #This is a pretty clunky implementation but not sure this will be used much with
+        #new implementation of `get_dataloaders`
+        indicies = get_simulations_indcies(self._num_sims_per_round, self._data_round_index, starting_round)
+        theta,x,prior_masks = [],[],[]
 
-        # Check for NaNs in simulations.
-        is_valid_x, num_nans, num_infs = handle_invalid_x(x, exclude_invalid_x)
-        # Check for problematic z-scoring
-        if warn_if_zscoring:
-            warn_if_zscoring_changes_data(x[is_valid_x])
-        if warn_on_invalid:
-            warn_on_invalid_x(num_nans, num_infs, exclude_invalid_x)
-            warn_on_invalid_x_for_snpec_leakage(
-                num_nans, num_infs, exclude_invalid_x, type(self).__name__, self._round
-            )
+        for ind in indicies:
+            theta_cur,x_cur,prior_mask_cur = self._dataset[ind]
+            theta.append(theta_cur)
+            x.append(x_cur)
+            prior_masks.append(prior_mask_cur)
+        
+        theta = torch.stack(theta).squeeze()
+        x = torch.stack(x).squeeze()
+        prior_masks = torch.stack(prior_masks).squeeze()
 
-        return theta[is_valid_x], x[is_valid_x], prior_masks[is_valid_x]
+        return theta, x, prior_masks
 
     @abstractmethod
     def train(
@@ -221,7 +211,7 @@ class NeuralInference(ABC):
     ) -> NeuralPosterior:
         raise NotImplementedError
 
-    def get_dataloaders_all(
+    def get_dataloaders(
         self,
         starting_round: int = 0,
         training_batch_size: int = 50,
@@ -243,11 +233,9 @@ class NeuralInference(ABC):
             Tuple of dataloaders for training and validation.
 
         """
-
-        if starting_round == 0:
-            indices = torch.arange(sum(self._num_sims_per_round))
-        else:
-            indices = torch.arange(sum(self._num_sims_per_round[:starting_round]), sum(self._num_sims_per_round))
+        
+        #Generate indicies to use based on starting_round
+        indices = get_simulations_indcies(self._num_sims_per_round, self._data_round_index, starting_round)
 
         # Get total number of training examples.
         num_examples = len(indices)
@@ -256,6 +244,7 @@ class NeuralInference(ABC):
         num_validation_examples = num_examples - num_training_examples
 
         if not resume_training:
+            # Seperate indicies for training and validation
             permuted_indices = indices[torch.randperm(num_examples)]
             self.train_indices, self.val_indices = (
                 permuted_indices[:num_training_examples],
@@ -281,68 +270,10 @@ class NeuralInference(ABC):
             train_loader_kwargs = dict(train_loader_kwargs, **dataloader_kwargs)
             val_loader_kwargs = dict(val_loader_kwargs, **dataloader_kwargs)
 
-        return data.DataLoader(self._dataset, **train_loader_kwargs), data.DataLoader(self._dataset, **val_loader_kwargs)
+        train_loader = data.DataLoader(self._dataset, **train_loader_kwargs)
+        val_loader =  data.DataLoader(self._dataset, **val_loader_kwargs)
 
-    def get_dataloaders(
-        self,
-        dataset: data.TensorDataset,
-        training_batch_size: int = 50,
-        validation_fraction: float = 0.1,
-        resume_training: bool = False,
-        dataloader_kwargs: Optional[dict] = None,
-    ) -> Tuple[data.DataLoader, data.DataLoader]:
-        """Return dataloaders for training and validation.
-
-        Args:
-            dataset: holding all theta and x, optionally masks.
-            training_batch_size: training arg of inference methods.
-            resume_training: Whether the current call is resuming training so that no
-                new training and validation indices into the dataset have to be created.
-            dataloader_kwargs: Additional or updated kwargs to be passed to the training
-                and validation dataloaders (like, e.g., a collate_fn).
-
-        Returns:
-            Tuple of dataloaders for training and validation.
-
-        """
-
-        # Get total number of training examples.
-        num_examples = len(dataset)
-
-        # Select random train and validation splits from (theta, x) pairs.
-        num_training_examples = int((1 - validation_fraction) * num_examples)
-        num_validation_examples = num_examples - num_training_examples
-
-        if not resume_training:
-            permuted_indices = torch.randperm(num_examples)
-            self.train_indices, self.val_indices = (
-                permuted_indices[:num_training_examples],
-                permuted_indices[num_training_examples:],
-            )
-
-        # Create training and validation loaders using a subset sampler.
-        # Intentionally use dicts to define the default dataloader args
-        # Then, use dataloader_kwargs to override (or add to) any of these defaults
-        # https://stackoverflow.com/questions/44784577/in-method-call-args-how-to-override-keyword-argument-of-unpacked-dict
-        train_loader_kwargs = {
-            "batch_size": min(training_batch_size, num_training_examples),
-            "drop_last": True,
-            "sampler": SubsetRandomSampler(self.train_indices.tolist()),
-        }
-        val_loader_kwargs = {
-            "batch_size": min(training_batch_size, num_validation_examples),
-            "shuffle": False,
-            "drop_last": True,
-            "sampler": SubsetRandomSampler(self.val_indices.tolist()),
-        }
-        if dataloader_kwargs is not None:
-            train_loader_kwargs = dict(train_loader_kwargs, **dataloader_kwargs)
-            val_loader_kwargs = dict(val_loader_kwargs, **dataloader_kwargs)
-
-        train_loader = data.DataLoader(dataset, **train_loader_kwargs)
-        val_loader = data.DataLoader(dataset, **val_loader_kwargs)
-
-        return train_loader, val_loader
+        return train_loader,val_loader
 
     def _converged(self, epoch: int, stop_after_epochs: int) -> bool:
         """Return whether the training converged yet and save best model state so far.
