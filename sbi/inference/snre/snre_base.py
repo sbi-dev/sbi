@@ -19,9 +19,9 @@ from sbi.utils import (
     clamp_and_warn,
     handle_invalid_x,
     validate_theta_and_x,
-    x_shape_from_simulation,
     warn_if_zscoring_changes_data,
     warn_on_invalid_x,
+    x_shape_from_simulation,
 )
 from sbi.utils.sbiutils import mask_sims_from_prior
 
@@ -186,11 +186,11 @@ class RatioEstimator(NeuralInference, ABC):
         Returns:
             Classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
         """
-
+        # Load data from most recent round.
+        self._round = max(self._data_round_index)       
         # Starting index for the training set (1 = discard round-0 samples).
         start_idx = int(discard_prior_samples and self._round > 0)
-        # Load data from most recent round.
-        self._round = max(self._data_round_index)
+        
 
         train_loader, val_loader = self.get_dataloaders(
             start_idx,

@@ -21,8 +21,8 @@ from sbi.inference.potentials import likelihood_estimator_based_potential
 from sbi.utils import (
     check_estimator_arg,
     check_prior,
-    mask_sims_from_prior,
     handle_invalid_x,
+    mask_sims_from_prior,
     validate_theta_and_x,
     warn_if_zscoring_changes_data,
     warn_on_invalid_x,
@@ -182,11 +182,11 @@ class LikelihoodEstimator(NeuralInference, ABC):
         Returns:
             Density estimator that has learned the distribution $p(x|\theta)$.
         """
-
-        # Starting index for the training set (1 = discard round-0 samples).
-        start_idx = int(discard_prior_samples and self._round > 0)
         # Load data from most recent round.
         self._round = max(self._data_round_index)
+        # Starting index for the training set (1 = discard round-0 samples).
+        start_idx = int(discard_prior_samples and self._round > 0)
+        
 
         train_loader, val_loader = self.get_dataloaders(
             start_idx,

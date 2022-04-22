@@ -26,13 +26,13 @@ from sbi.inference.potentials import posterior_estimator_based_potential
 from sbi.utils import (
     RestrictedPrior,
     check_estimator_arg,
+    handle_invalid_x,
     test_posterior_net_for_multi_d_x,
     validate_theta_and_x,
-    x_shape_from_simulation,
-    handle_invalid_x,
     warn_if_zscoring_changes_data,
     warn_on_invalid_x,
     warn_on_invalid_x_for_snpec_leakage,
+    x_shape_from_simulation,
 )
 from sbi.utils.sbiutils import ImproperEmpirical, mask_sims_from_prior
 
@@ -249,6 +249,9 @@ class PosteriorEstimator(NeuralInference, ABC):
         Returns:
             Density estimator that approximates the distribution $p(\theta|x)$.
         """
+        # Load data from most recent round.
+        self._round = max(self._data_round_index)
+
         if self._round == 0 and self._neural_net is not None:
             assert force_first_round_loss, (
                 "You have already trained this neural network. After you had trained "
