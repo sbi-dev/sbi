@@ -258,13 +258,13 @@ class NeuralInference(ABC):
         train_loader_kwargs = {
             "batch_size": min(training_batch_size, num_training_examples),
             "drop_last": True,
-            "sampler": SubsetRandomSampler(torch.arange(len(self.train_indices)).tolist() ),
+            "sampler": SubsetRandomSampler(self.train_indices.tolist() ),
         }
         val_loader_kwargs = {
             "batch_size": min(training_batch_size, num_validation_examples),
             "shuffle": False,
             "drop_last": True,
-            "sampler": SubsetRandomSampler(torch.arange(len(self.val_indices)).tolist() ),
+            "sampler": SubsetRandomSampler(self.val_indices.tolist() ),
         }
         if dataloader_kwargs is not None:
             train_loader_kwargs = dict(train_loader_kwargs, **dataloader_kwargs)
