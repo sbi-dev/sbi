@@ -11,6 +11,7 @@ from torch.distributions import MultivariateNormal
 from sbi import utils as utils
 from sbi.inference import (
     SNLE,
+    ImportanceSamplingPosterior,
     MCMCPosterior,
     RejectionPosterior,
     VIPosterior,
@@ -368,6 +369,8 @@ def test_c2st_multi_round_snl_on_linearGaussian_vi(num_trials: int):
         ("fKL", "gaussian"),
         ("IW", "gaussian"),
         ("alpha", "gaussian"),
+        ("importance", "uniform"),
+        ("importance", "gaussian"),
     ),
 )
 @pytest.mark.parametrize("init_strategy", ("proposal", "sir"))
@@ -397,6 +400,8 @@ def test_api_snl_sampling_methods(
         or "hmc" in sampling_method
     ):
         sample_with = "mcmc"
+    elif sampling_method == "importance":
+        sample_with = "importance"
     else:
         sample_with = "vi"
 
@@ -432,6 +437,12 @@ def test_api_snl_sampling_methods(
             thin=3,
             num_chains=num_chains,
             init_strategy=init_strategy,
+        )
+    elif sample_with == "importance":
+        posterior = ImportanceSamplingPosterior(
+            potential_fn,
+            proposal=prior,
+            theta_transform=theta_transform,
         )
     else:
         posterior = VIPosterior(

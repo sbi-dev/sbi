@@ -16,7 +16,6 @@ from sbi.samplers.vi import (
     check_variational_distribution,
     get_flow_builder,
     get_quality_metric,
-    get_sampling_method,
     get_VI_method,
     make_object_deepcopy_compatible,
     move_all_tensor_to_device,
@@ -275,7 +274,6 @@ class VIPosterior(NeuralPosterior):
         self,
         sample_shape: Shape = torch.Size(),
         x: Optional[Tensor] = None,
-        method: str = "naive",
         **kwargs,
     ) -> Tensor:
         """Samples from the variational posterior distribution.
@@ -302,11 +300,7 @@ class VIPosterior(NeuralPosterior):
                 f"The variational posterior was not fit on the specified `default_x` "
                 f"{x}. Please train using `posterior.train()`."
             )
-
-        self.potential_fn.set_x(x)
-        sampling_function = get_sampling_method(method)
-        num_samples = torch.Size(sample_shape).numel()
-        samples = sampling_function(num_samples, self.potential_fn, self.q, **kwargs)
+        samples = self.q.sample(sample_shape)
         return samples.reshape((*sample_shape, samples.shape[-1]))
 
     def log_prob(
@@ -502,8 +496,6 @@ class VIPosterior(NeuralPosterior):
             quality_control_metric: The metric of choice, we currently support [psis,
                 prop, prop_prior].
             N: Number of samples which is used to evaluate the metric.
-
-
         """
         quality_control_fn, quality_control_msg = get_quality_metric(
             quality_control_metric

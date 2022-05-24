@@ -7,7 +7,12 @@ import torch
 from torch import Size
 from torch.distributions import Distribution
 
-from sbi.samplers.vi.vi_utils import gpdfit
+from sbi.samplers.importance.importance_sampling import (
+    exponentiate_weights,
+    gpdfit,
+    importance_sample,
+    largest_weight_indices,
+)
 
 _QUALITY_METRIC = {}
 _METRIC_MESSAGE = {}
@@ -82,9 +87,8 @@ def basic_checks(posterior, N: int = int(5e4)):
 
 
 def psis_diagnostics(
-    potential_function: Callable,
+    potential_fn: Callable,
     q: Distribution,
-    proposal: Optional[Distribution] = None,
     N: int = int(5e4),
 ) -> float:
     r"""This will evaluate the posteriors quality by investingating its importance
@@ -97,36 +101,24 @@ def psis_diagnostics(
 
     NOTE: In our experience this metric does distinguish "very bad" from "ok", but
     becomes less sensitive to distinguish "ok" from "good".
-
     Args:
         potential_function: Potential function of target.
         q: Variational distribution, should be proportional to the potential_function
         proposal: Proposal for samples. Typically this is q.
         N: Number of samples involved in the test.
-
     Returns:
         float: Quality metric
-
     Reference:
         [1] _Yes, but Did It Work?: Evaluating Variational Inference_, Yuling Yao, Aki
         Vehtari, Daniel Simpson, Andrew Gelman, 2018, https://arxiv.org/abs/1802.02538
-
     """
-    M = int(min(N / 5, 3 * np.sqrt(N)))
-    with torch.no_grad():
-        if proposal is None:
-            samples = q.sample(Size((N,)))
-        else:
-            samples = proposal.sample(Size((N,)))
-        log_q = q.log_prob(samples)
-        log_potential = potential_function(samples)
-        logweights = log_potential - log_q
-        logweights = logweights[torch.isfinite(logweights)]
-        logweights_max = logweights.max()
-        weights = torch.exp(logweights - logweights_max)  # Thus will only affect scale
-        vals, _ = weights.sort()
-        largest_weigths = vals[-M:]
-        k, _ = gpdfit(largest_weigths)
+    _, log_importance_weights = importance_sample(
+        potential_fn=potential_fn, proposal=q, num_samples=N
+    )
+    importance_weights = exponentiate_weights(log_importance_weights)
+    largest_weight_inds = largest_weight_indices(importance_weights)
+    largest_weights = importance_weights[largest_weight_inds]
+    k, _ = gpdfit(largest_weights)
     return k
 
 
@@ -196,8 +188,7 @@ psis_q.__doc__ = psis_diagnostics.__doc__.split("Args:")[0]
 
 @register_quality_metric(
     name="prop",
-    msg="\t Good: Larger than 0.5, best is 1.0  Bad: Smaller than 0.5 \t \
-        NOTE: Less sensitive to mode collapse.",
+    msg="\t Good: Larger than 0.5, best is 1.0  Bad: Smaller than 0.5",
 )
 def proportionality(posterior, N: int = int(5e4)):
     """
@@ -210,8 +201,7 @@ def proportionality(posterior, N: int = int(5e4)):
 
 @register_quality_metric(
     name="prop_prior",
-    msg="\t Good: Larger than 0.5, best is 1.0  Bad: Smaller than 0.5 \t \
-        NOTE: Less sensitive to mode collapse.",
+    msg="\t Good: Larger than 0.5, best is 1.0  Bad: Smaller than 0.5",
 )
 def proportionality_prior(posterior, N: int = int(5e4)):
     """

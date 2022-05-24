@@ -11,6 +11,7 @@ from sbi import utils as utils
 from sbi.inference import (
     AALR,
     SNRE_B,
+    ImportanceSamplingPosterior,
     MCMCPosterior,
     RejectionPosterior,
     VIPosterior,
@@ -331,6 +332,8 @@ def test_c2st_multi_round_snr_on_linearGaussian_vi(num_trials: int):
         ("fKL", "gaussian"),
         ("IW", "gaussian"),
         ("alpha", "gaussian"),
+        ("importance", "uniform"),
+        ("importance", "gaussian"),
     ),
 )
 def test_api_sre_sampling_methods(sampling_method: str, prior_str: str):
@@ -356,6 +359,8 @@ def test_api_sre_sampling_methods(sampling_method: str, prior_str: str):
         or "hmc" in sampling_method
     ):
         sample_with = "mcmc"
+    elif sampling_method == "importance":
+        sample_with = "importance"
     else:
         sample_with = "vi"
 
@@ -388,6 +393,12 @@ def test_api_sre_sampling_methods(sampling_method: str, prior_str: str):
             method=sampling_method,
             thin=3,
             num_chains=num_chains,
+        )
+    elif sample_with == "importance":
+        posterior = ImportanceSamplingPosterior(
+            potential_fn,
+            proposal=prior,
+            theta_transform=theta_transform,
         )
     else:
         posterior = VIPosterior(

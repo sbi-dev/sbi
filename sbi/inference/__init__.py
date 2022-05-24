@@ -47,6 +47,7 @@ _abc_family = ["ABC", "MCABC", "SMC", "SMCABC"]
 __all__ = _snpe_family + _snre_family + _snle_family + _abc_family
 
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
+from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
 from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
 from sbi.inference.posteriors.rejection_posterior import RejectionPosterior
 from sbi.inference.posteriors.vi_posterior import VIPosterior
