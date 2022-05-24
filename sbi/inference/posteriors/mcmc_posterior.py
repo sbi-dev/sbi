@@ -285,7 +285,8 @@ class MCMCPosterior(NeuralPosterior):
             init_strategy: Specifies the initialization method. Either of
                 [`proposal`|`sir`|`latest_sample`].
             kwargs: Passed on to init function. This way, init specific keywords can
-                be set through `mcmc_parameters`. Unused arguments should be absorbed.
+                be set through `mcmc_parameters`. Unused arguments will be absorbed by
+                the intitialization method.
 
         Returns: Initialization function.
         """
@@ -311,6 +312,7 @@ class MCMCPosterior(NeuralPosterior):
         num_chains: int,
         num_workers: int,
         show_progress_bars: bool,
+        **kwargs,
     ) -> Tensor:
         """Return initial parameters for MCMC obtained with given init strategy.
 
@@ -322,6 +324,7 @@ class MCMCPosterior(NeuralPosterior):
             num_chains: number of MCMC chains, generates initial params for each
             num_workers: number of CPU cores for parallization
             show_progress_bars: whether to show progress bars for SIR init
+            kwargs: Passed on to `_build_mcmc_init_fn`.
 
         Returns:
             Tensor: initial parameters, one for each chain
@@ -332,6 +335,7 @@ class MCMCPosterior(NeuralPosterior):
             self.potential_fn,
             transform=self.theta_transform,
             init_strategy=init_strategy,  # type: ignore
+            **kwargs,
         )
 
         # Parallelize inits for SIR only.
