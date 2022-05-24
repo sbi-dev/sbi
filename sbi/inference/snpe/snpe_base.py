@@ -302,7 +302,12 @@ class PosteriorEstimator(NeuralInference, ABC):
                 )
 
                 train_losses = self._loss(
-                    theta_batch, x_batch, masks_batch, proposal, calibration_kernel
+                    theta_batch,
+                    x_batch,
+                    masks_batch,
+                    proposal,
+                    calibration_kernel,
+                    force_first_round_loss=force_first_round_loss,
                 )
                 train_loss = torch.mean(train_losses)
                 train_log_probs_sum -= train_losses.sum().item()
@@ -339,6 +344,7 @@ class PosteriorEstimator(NeuralInference, ABC):
                         masks_batch,
                         proposal,
                         calibration_kernel,
+                        force_first_round_loss=force_first_round_loss,
                     )
                     val_log_prob_sum -= val_losses.sum().item()
 
@@ -499,6 +505,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         masks: Tensor,
         proposal: Optional[Any],
         calibration_kernel: Callable,
+        force_first_round_loss: bool = False,
     ) -> Tensor:
         """Return loss with proposal correction (`round_>0`) or without it (`round_=0`).
 
@@ -507,8 +514,11 @@ class PosteriorEstimator(NeuralInference, ABC):
 
         Returns:
             Calibration kernel-weighted negative log prob.
+            force_first_round_loss: If `True`, train with maximum likelihood,
+                i.e., potentially ignoring the correction for using a proposal
+                distribution different from the prior.
         """
-        if self._round == 0:
+        if self._round == 0 or force_first_round_loss:
             # Use posterior log prob (without proposal correction) for first round.
             log_prob = self._neural_net.log_prob(theta, x)
         else:
