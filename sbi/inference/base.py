@@ -128,13 +128,12 @@ class NeuralInference(ABC):
 
         # Initialize roundwise (theta, x, prior_masks) for storage of parameters,
         # simulations and masks indicating if simulations came from prior.
-        self._dataset = None
+        self._dataset = data.Dataset()
         self._num_sims_per_round = []
         self._model_bank = []
 
         # Initialize list that indicates the round from which simulations were drawn.
         self._data_round_index = []
-
 
         self._round = 0
         self._val_log_prob = float("-Inf")
@@ -177,19 +176,21 @@ class NeuralInference(ABC):
         Returns: Parameters, simulation outputs, prior masks.
         """
 
-        #This is a pretty clunky implementation but not sure this will be used much with
-        #new implementation of `get_dataloaders`
-        indicies = get_simulations_indcies(self._num_sims_per_round, self._data_round_index, starting_round)
-        theta,x,prior_masks = [],[],[]
+        # This is a pretty clunky implementation but not sure this will be used much with
+        # new implementation of `get_dataloaders`
+        indicies = get_simulations_indcies(
+            self._num_sims_per_round, self._data_round_index, starting_round
+        )
+        theta, x, prior_masks = [], [], []
 
         for ind in indicies:
-            theta_cur,x_cur,prior_mask_cur = self._dataset[ind]
+            theta_cur, x_cur, prior_mask_cur = self._dataset[ind]
             theta.append(theta_cur)
             x.append(x_cur)
             prior_masks.append(prior_mask_cur)
-        
-        theta = torch.stack(theta).squeeze()
-        x = torch.stack(x).squeeze()
+
+        theta = torch.stack(theta)
+        x = torch.stack(x)
         prior_masks = torch.stack(prior_masks).squeeze()
 
         return theta, x, prior_masks
@@ -218,7 +219,7 @@ class NeuralInference(ABC):
         validation_fraction: float = 0.1,
         resume_training: bool = False,
         dataloader_kwargs: Optional[dict] = None,
-        ) -> Tuple[data.DataLoader, data.DataLoader]:
+    ) -> Tuple[data.DataLoader, data.DataLoader]:
         """Return dataloaders for training and validation.
 
         Args:
@@ -233,9 +234,11 @@ class NeuralInference(ABC):
             Tuple of dataloaders for training and validation.
 
         """
-        
-        #Generate indicies to use based on starting_round
-        indices = get_simulations_indcies(self._num_sims_per_round, self._data_round_index, starting_round)
+
+        # Generate indicies to use based on starting_round
+        indices = get_simulations_indcies(
+            self._num_sims_per_round, self._data_round_index, starting_round
+        )
 
         # Get total number of training examples.
         num_examples = len(indices)
@@ -258,22 +261,22 @@ class NeuralInference(ABC):
         train_loader_kwargs = {
             "batch_size": min(training_batch_size, num_training_examples),
             "drop_last": True,
-            "sampler": SubsetRandomSampler(self.train_indices.tolist() ),
+            "sampler": SubsetRandomSampler(self.train_indices.tolist()),
         }
         val_loader_kwargs = {
             "batch_size": min(training_batch_size, num_validation_examples),
             "shuffle": False,
             "drop_last": True,
-            "sampler": SubsetRandomSampler(self.val_indices.tolist() ),
+            "sampler": SubsetRandomSampler(self.val_indices.tolist()),
         }
         if dataloader_kwargs is not None:
             train_loader_kwargs = dict(train_loader_kwargs, **dataloader_kwargs)
             val_loader_kwargs = dict(val_loader_kwargs, **dataloader_kwargs)
 
         train_loader = data.DataLoader(self._dataset, **train_loader_kwargs)
-        val_loader =  data.DataLoader(self._dataset, **val_loader_kwargs)
+        val_loader = data.DataLoader(self._dataset, **val_loader_kwargs)
 
-        return train_loader,val_loader
+        return train_loader, val_loader
 
     def _converged(self, epoch: int, stop_after_epochs: int) -> bool:
         """Return whether the training converged yet and save best model state so far.
@@ -356,8 +359,11 @@ class NeuralInference(ABC):
             )
 
     def _summarize(
-        self, round_: int, x_o: Union[Tensor, None], theta_bank: Union[Tensor,None]
-        , x_bank: Union[Tensor,None]
+        self,
+        round_: int,
+        x_o: Union[Tensor, None],
+        theta_bank: Union[Tensor, None],
+        x_bank: Union[Tensor, None],
     ) -> None:
         """Update the summary_writer with statistics for a given round.
 

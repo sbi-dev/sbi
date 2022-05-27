@@ -96,8 +96,8 @@ class PosteriorEstimator(NeuralInference, ABC):
         warn_on_invalid: bool = True,
         warn_if_zscoring: bool = True,
         return_self: bool = True,
-        data_device: str = None,
-    ) -> "PosteriorEstimator":
+        data_device: Optional[str] = None,
+    ) -> Union["PosteriorEstimator", None]:
         r"""Store parameters and simulation outputs to use them for later training.
 
         Data are stored as entries in lists for each type of variable (parameter/data).
@@ -127,9 +127,6 @@ class PosteriorEstimator(NeuralInference, ABC):
         """
 
         # Add ability to specify device data is saved on
-        if data_device is None: data_device = self._device
-        theta, x = validate_theta_and_x(theta, x, training_device=data_device)
-
 
         is_valid_x, num_nans, num_infs = handle_invalid_x(x, exclude_invalid_x)
 
@@ -145,6 +142,9 @@ class PosteriorEstimator(NeuralInference, ABC):
         x = x[is_valid_x]
         theta = theta[is_valid_x]
 
+        if data_device is None:
+            data_device = self._device
+        theta, x = validate_theta_and_x(theta, x, training_device=data_device)
 
         self._check_proposal(proposal)
 
@@ -169,13 +169,21 @@ class PosteriorEstimator(NeuralInference, ABC):
                 self._data_round_index.append(max(self._data_round_index) + 1)
             prior_masks = mask_sims_from_prior(1, theta.size(0))
 
-
-        if self._dataset is None:
-            #If first round, set up ConcatDataset
-            self._dataset = data.ConcatDataset( [data.TensorDataset(theta,x,prior_masks),] )
+        if len(self._num_sims_per_round) == 0:
+            # If first round, set up ConcatDataset
+            self._dataset = data.ConcatDataset(
+                [
+                    data.TensorDataset(theta, x, prior_masks),
+                ]
+            )
         else:
-            #Otherwise append to Dataset
-            self._dataset = data.ConcatDataset( self._dataset.datasets + [data.TensorDataset(theta,x,prior_masks),] )
+            # Otherwise append to Dataset
+            self._dataset = data.ConcatDataset(
+                self._dataset.datasets
+                + [
+                    data.TensorDataset(theta, x, prior_masks),
+                ]
+            )
 
         self._num_sims_per_round.append(theta.size(0))
         self._proposal_roundwise.append(proposal)
@@ -194,7 +202,7 @@ class PosteriorEstimator(NeuralInference, ABC):
             theta_prior = self.get_simulations()[0]
             self._prior = ImproperEmpirical(theta_prior, ones(theta_prior.shape[0]))
 
-        #Add ability to not return self
+        # Add ability to not return self
         if return_self:
             return self
 
@@ -301,22 +309,20 @@ class PosteriorEstimator(NeuralInference, ABC):
         # can `sample()` and `log_prob()`. The network is accessible via `.net`.
         if self._neural_net is None or retrain_from_scratch:
 
-            #Get theta,x from dataset to initialize NN
-            test_theta = self._dataset.datasets[0].tensors[0][:100]
-            test_x = self._dataset.datasets[0].tensors[1][:100]
-
+            # Get theta,x from dataset to initialize NN
+            theta, x, _ = self.get_simulations()
             self._neural_net = self._build_neural_net(
-                test_theta, test_x
+                theta[:training_batch_size].to("cpu"), x[:training_batch_size].to("cpu")
             )
-            # If data on training device already move net as well.
-            if (
-                not self._device == "cpu"
-                and f"{test_x.device.type}:{test_x.device.index}" == self._device
-            ):
-                self._neural_net.to(self._device)
+            self._x_shape = x_shape_from_simulation(x[:training_batch_size].to("cpu"))
 
-            test_posterior_net_for_multi_d_x(self._neural_net, test_theta, test_x)
-            self._x_shape = x_shape_from_simulation(test_x)
+            test_posterior_net_for_multi_d_x(
+                self._neural_net,
+                theta[:training_batch_size].to("cpu"),
+                x[:training_batch_size].to("cpu"),
+            )
+
+            del theta, x
 
         # Move entire net to device for training.
         self._neural_net.to(self._device)

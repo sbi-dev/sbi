@@ -90,8 +90,8 @@ class LikelihoodEstimator(NeuralInference, ABC):
         warn_on_invalid: bool = True,
         warn_if_zscoring: bool = True,
         return_self: bool = True,
-        data_device: str = None,
-    ) -> "LikelihoodEstimator":
+        data_device: Optional[str] = None,
+    ) -> Union["LikelihoodEstimator", None]:
         r"""Store parameters and simulation outputs to use them for later training.
 
         Data are stored as entries in lists for each type of variable (parameter/data).
@@ -131,20 +131,30 @@ class LikelihoodEstimator(NeuralInference, ABC):
         x = x[is_valid_x]
         theta = theta[is_valid_x]
 
-        if data_device is None: data_device = self._device
+        if data_device is None:
+            data_device = self._device
         theta, x = validate_theta_and_x(theta, x, training_device=data_device)
         prior_masks = mask_sims_from_prior(int(from_round), theta.size(0))
 
-        if self._dataset is None:
-            #If first round, set up ConcatDataset
-            self._dataset = data.ConcatDataset( [data.TensorDataset(theta,x,prior_masks),] )
+        if len(self._num_sims_per_round) == 0:
+            # If first round, set up ConcatDataset
+            self._dataset = data.ConcatDataset(
+                [
+                    data.TensorDataset(theta, x, prior_masks),
+                ]
+            )
         else:
-            #Otherwise append to Dataset
-            self._dataset = data.ConcatDataset( self._dataset.datasets + [data.TensorDataset(theta,x,prior_masks),] )
+            # Otherwise append to Dataset
+            self._dataset = data.ConcatDataset(
+                self._dataset.datasets
+                + [
+                    data.TensorDataset(theta, x, prior_masks),
+                ]
+            )
 
         self._num_sims_per_round.append(theta.size(0))
-        self._data_round_index.append(int(from_round) )
-        
+        self._data_round_index.append(int(from_round))
+
         if return_self:
             return self
 
@@ -186,7 +196,6 @@ class LikelihoodEstimator(NeuralInference, ABC):
         self._round = max(self._data_round_index)
         # Starting index for the training set (1 = discard round-0 samples).
         start_idx = int(discard_prior_samples and self._round > 0)
-        
 
         train_loader, val_loader = self.get_dataloaders(
             start_idx,
@@ -202,15 +211,14 @@ class LikelihoodEstimator(NeuralInference, ABC):
         # This is passed into NeuralPosterior, to create a neural posterior which
         # can `sample()` and `log_prob()`. The network is accessible via `.net`.
         if self._neural_net is None or retrain_from_scratch:
-            
-            #Get theta,x from dataset to initialize NN
-            test_theta = self._dataset.datasets[0].tensors[0][:100]
-            test_x = self._dataset.datasets[0].tensors[1][:100]
 
+            # Get theta,x from dataset to initialize NN
+            theta, x, _ = self.get_simulations()
             self._neural_net = self._build_neural_net(
-                test_theta, test_x
+                theta[:training_batch_size].to("cpu"), x[:training_batch_size].to("cpu")
             )
-            self._x_shape = x_shape_from_simulation(test_x)
+            self._x_shape = x_shape_from_simulation(x[:training_batch_size].to("cpu"))
+            del theta, x
             assert (
                 len(self._x_shape) < 3
             ), "SNLE cannot handle multi-dimensional simulator output."

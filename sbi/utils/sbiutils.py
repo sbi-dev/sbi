@@ -348,6 +348,7 @@ def get_simulations_since_round(
         [t for t, r in zip(data, data_round_indices) if r >= starting_round_index]
     )
 
+
 def get_simulations_indcies(
     num_sims_per_round: List, data_round_indices: List, starting_round_index: int
 ) -> Tensor:
@@ -363,14 +364,15 @@ def get_simulations_indcies(
             counting from 0.
     """
     inds = []
-    for j, (n,r) in enumerate(zip(num_sims_per_round,data_round_indices)):
-        
-        #Where to start counting
+    for j, (n, r) in enumerate(zip(num_sims_per_round, data_round_indices)):
+
+        # Where to start counting
         s_ind = sum(num_sims_per_round[:j])
-    
+
         if r >= starting_round_index:
-            inds.append(torch.arange(s_ind,s_ind + n) )
+            inds.append(torch.arange(s_ind, s_ind + n))
     return torch.cat(inds)
+
 
 def mask_sims_from_prior(round_: int, num_simulations: int) -> Tensor:
     """Returns Tensor True where simulated from prior parameters.
