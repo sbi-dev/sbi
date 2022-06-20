@@ -779,10 +779,11 @@ def _arrange_plots(
 
     # Style axes
     row_idx = -1
-    for row in range(rows):
-        if row not in subset and not flat:
+    for row in range(dim):
+        if row not in subset:
             continue
-        else:
+
+        if not flat:
             row_idx += 1
 
         col_idx = -1
