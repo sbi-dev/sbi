@@ -113,12 +113,15 @@ def test_training_and_mcmc_on_device(
         kwargs = dict(
             density_estimator=utils.posterior_nn(model=model, num_transforms=2)
         )
+        train_kwargs = dict(force_first_round_loss=True)
     elif method == SNLE:
         kwargs = dict(
             density_estimator=utils.likelihood_nn(model=model, num_transforms=2)
         )
+        train_kwargs = dict()
     elif method in (SNRE_A, SNRE_B):
         kwargs = dict(classifier=utils.classifier_nn(model=model))
+        train_kwargs = dict()
     else:
         raise ValueError()
 
@@ -132,7 +135,7 @@ def test_training_and_mcmc_on_device(
         theta, x = theta.to(data_device), x.to(data_device)
 
         estimator = inferer.append_simulations(theta, x).train(
-            training_batch_size=100, max_num_epochs=max_num_epochs
+            training_batch_size=100, max_num_epochs=max_num_epochs, **train_kwargs
         )
         if method == SNLE:
             potential_fn, theta_transform = likelihood_estimator_based_potential(
@@ -362,6 +365,7 @@ def test_embedding_nets_integration_training_device(
                 hidden_features=4,
             )
         )
+        train_kwargs = dict(force_first_round_loss=True)
     elif inference_method == SNLE:
         embedding_net = nn.Linear(in_features=D_theta, out_features=2).to(
             embedding_net_device
@@ -374,6 +378,7 @@ def test_embedding_nets_integration_training_device(
                 num_transforms=2,
             )
         )
+        train_kwargs = dict()
     else:
         embedding_net = nn.Linear(in_features=D_x, out_features=2).to(
             embedding_net_device
@@ -386,6 +391,7 @@ def test_embedding_nets_integration_training_device(
                 num_transforms=2,
             )
         )
+        train_kwargs = dict()
 
     with pytest.raises(Exception) if prior_device != training_device else nullcontext():
         inference = inference_method(prior=prior, **nn_kwargs, device=training_device)
@@ -411,7 +417,9 @@ def test_embedding_nets_integration_training_device(
         with pytest.warns(UserWarning) if (round_idx == 0) and (
             embedding_net_device != training_device
         ) else nullcontext():
-            density_estimator_train = density_estimator_append.train(max_num_epochs=2)
+            density_estimator_train = density_estimator_append.train(
+                max_num_epochs=2, **train_kwargs
+            )
 
         posterior = inference.build_posterior(density_estimator_train)
         proposal = posterior.set_default_x(x_o)
@@ -465,7 +473,6 @@ def test_vi_on_gpu(num_dim: int, q: Distribution, vi_method: str, sampling_metho
         num_dim: parameter dimension of the gaussian model
         vi_method: different vi methods
         sampling_method: Different sampling methods
-
     """
 
     device = "cuda:0"
