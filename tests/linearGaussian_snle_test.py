@@ -373,7 +373,7 @@ def test_c2st_multi_round_snl_on_linearGaussian_vi(num_trials: int):
         ("importance", "gaussian"),
     ),
 )
-@pytest.mark.parametrize("init_strategy", ("proposal", "sir"))
+@pytest.mark.parametrize("init_strategy", ("proposal", "resample"))
 def test_api_snl_sampling_methods(
     sampling_method: str, prior_str: str, init_strategy: str
 ):
