@@ -27,7 +27,6 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         potential_fn: Callable,
         proposal: Any,
         theta_transform: Optional[TorchTransform] = None,
-        max_sampling_batch_size: int = 10_000,
         device: Optional[str] = None,
         x_shape: Optional[torch.Size] = None,
     ):
@@ -37,11 +36,8 @@ class ImportanceSamplingPosterior(NeuralPosterior):
             proposal: The proposal distribution.
             theta_transform: Transformation that is applied to parameters. Is not used
                 during but only when calling `.map()`.
-            max_sampling_batch_size: The batchsize of samples being drawn from
-                the proposal at every iteration.
-            num_importance_samples: Number of importance samples.
-            device: Training device, e.g., "cpu", "cuda" or "cuda:0". If None,
-                `potential_fn.device` is used.
+            device: Device on which to sample, e.g., "cpu", "cuda" or "cuda:0". If
+                None, `potential_fn.device` is used.
             x_shape: Shape of a single simulator output. If passed, it is used to check
                 the shape of the observed data and give a descriptive error.
         """
@@ -53,7 +49,6 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         )
 
         self.proposal = proposal
-        self.max_sampling_batch_size = max_sampling_batch_size
         self._normalization_constant = None
 
         self._purpose = (
@@ -106,7 +101,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
     def estimate_normalization_constant(
         self, x: Tensor, num_samples: int = 10_000, force_update: bool = False
     ) -> Tensor:
-        """Estimates the normalization constant with importance sampling.
+        """Returns the normalization constant with importance sampling.
 
         Args:
             num_samples: Number of importance samples used for the estimate.
@@ -146,8 +141,6 @@ class ImportanceSamplingPosterior(NeuralPosterior):
 
         Args:
             sample_shape: Desired shape of samples that are drawn from posterior.
-            max_sampling_batch_size: Batchsize of samples being drawn from
-                the proposal at every iteration.
             sample_with: This argument only exists to keep backward-compatibility with
                 `sbi` v0.17.2 or older. If it is set, we instantly raise an error.
 
@@ -176,7 +169,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         sample_shape: Shape = torch.Size(),
         x: Optional[Tensor] = None,
         oversampling_factor: int = 32,
-        max_sampling_batch_size: Optional[int] = None,
+        max_sampling_batch_size: int = 10_000,
         show_progress_bars: bool = True,
     ):
         r"""Returns approximate samples from posterior $p(\theta|x)$ via SIR.
@@ -190,6 +183,8 @@ class ImportanceSamplingPosterior(NeuralPosterior):
                 `sbi` v0.17.2 or older. If it is set, we instantly raise an error.
             oversampling_factor: Number of proposed samples form which only one is
                 selected based on its importance weight.
+            max_sampling_batch_size: The batchsize of samples being drawn from
+                the proposal at every iteration. Used only in `sir_sample()`.
             show_progress_bars: Whether to show sampling progress monitor.
 
         Returns:
@@ -197,13 +192,6 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         """
         num_samples = torch.Size(sample_shape).numel()
         self.potential_fn.set_x(self._x_else_default_x(x))
-
-        # Replace arguments that were not passed with their default.
-        max_sampling_batch_size = (
-            self.max_sampling_batch_size
-            if max_sampling_batch_size is None
-            else max_sampling_batch_size
-        )
 
         samples = sampling_importance_resampling(
             self.potential_fn,
