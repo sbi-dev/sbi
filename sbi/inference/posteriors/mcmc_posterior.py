@@ -18,7 +18,8 @@ from sbi.samplers.mcmc import (
     IterateParameters,
     Slice,
     proposal_init,
-    sir,
+    sir_init,
+    resample_given_potential_fn,
     slice_np_parallized,
 )
 from sbi.simulators.simutils import tqdm_joblib
@@ -42,7 +43,7 @@ class MCMCPosterior(NeuralPosterior):
         thin: int = 10,
         warmup_steps: int = 10,
         num_chains: int = 1,
-        init_strategy: str = "sir",
+        init_strategy: str = "resample",
         init_strategy_num_candidates: int = 1_000,
         num_workers: int = 1,
         device: Optional[str] = None,
@@ -67,8 +68,10 @@ class MCMCPosterior(NeuralPosterior):
                 init locations from `proposal`, whereas `sir` will use Sequential-
                 Importance-Resampling (SIR). SIR initially samples
                 `init_strategy_num_candidates` from the `proposal`, evaluates all of
-                them under the `potential_fn`, and then resamples the initial locations
-                with weights proportional to the `potential_fn`-value.
+                them under the `potential_fn` and `proposal`, and then resamples the
+                initial locations with weights proportional to `exp(potential_fn -
+                proposal.log_prob`. `resample` is the same as `sir` but
+                uses `exp(potential_fn)` as weights.
             init_strategy_num_candidates: Number of candidates to to find init
                 locations in `init_strategy=sir`.
             num_workers: number of cpu cores used to parallelize mcmc
@@ -283,7 +286,7 @@ class MCMCPosterior(NeuralPosterior):
             potential_fn: Potential function that the candidate samples are weighted
                 with.
             init_strategy: Specifies the initialization method. Either of
-                [`proposal`|`sir`|`latest_sample`].
+                [`proposal`|`sir`|`resample`|`latest_sample`].
             kwargs: Passed on to init function. This way, init specific keywords can
                 be set through `mcmc_parameters`. Unused arguments will be absorbed by
                 the intitialization method.
@@ -299,7 +302,18 @@ class MCMCPosterior(NeuralPosterior):
                 )
             return lambda: proposal_init(proposal, transform=transform, **kwargs)
         elif init_strategy == "sir":
-            return lambda: sir(proposal, potential_fn, transform=transform, **kwargs)
+            warn(
+                "As of sbi v0.19.0, the behavior of the SIR initialization for MCMC "
+                "has changed. If you wish to restore the behavior of sbi v0.18.0, set "
+                "`init_strategy='resample'.`"
+            )
+            return lambda: sir_init(
+                proposal, potential_fn, transform=transform, **kwargs
+            )
+        elif init_strategy == "resample":
+            return lambda: resample_given_potential_fn(
+                proposal, potential_fn, transform=transform, **kwargs
+            )
         elif init_strategy == "latest_sample":
             latest_sample = IterateParameters(self._mcmc_init_params, **kwargs)
             return latest_sample
@@ -320,7 +334,7 @@ class MCMCPosterior(NeuralPosterior):
 
         Args:
             init_strategy: Specifies the initialization method. Either of
-                [`proposal`|`sir`|`latest_sample`].
+                [`proposal`|`sir`|`resample`|`latest_sample`].
             num_chains: number of MCMC chains, generates initial params for each
             num_workers: number of CPU cores for parallization
             show_progress_bars: whether to show progress bars for SIR init
@@ -338,8 +352,8 @@ class MCMCPosterior(NeuralPosterior):
             **kwargs,
         )
 
-        # Parallelize inits for SIR only.
-        if num_workers > 1 and init_strategy == "sir":
+        # Parallelize inits for resampling only.
+        if num_workers > 1 and init_strategy == "resample":
 
             def seeded_init_fn(seed):
                 torch.manual_seed(seed)

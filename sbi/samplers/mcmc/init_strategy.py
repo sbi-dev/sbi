@@ -6,6 +6,7 @@ from typing import Any, Callable
 import torch
 import torch.distributions.transforms as torch_tf
 from torch import Tensor
+from sbi.samplers.importance.sir import sampling_importance_resampling
 
 
 class IterateParameters:
@@ -32,7 +33,7 @@ def proposal_init(
     return transformed_prior_samples  # type: ignore
 
 
-def sir(
+def sir_init(
     proposal: Any,
     potential_fn: Callable,
     transform: torch_tf.Transform,
@@ -44,8 +45,41 @@ def sir(
 
     See Rubin 1988, "Using the sir algorithm to simulate posterior distributions."
 
-    This function can also do `SIR` on the conditional posterior
-    $p(\theta_i|\theta_j, x)$ when a `condition` and `dims_to_sample` are passed.
+    Args:
+        proposal: Proposal distribution, candidate samples are drawn from it.
+        potential_fn: Potential function that the candidate samples are weighted with.
+            Note that the function needs to return log probabilities.
+        sir_num_batches: Number of candidate batches drawn.
+        sir_batch_size: Batch size used for evaluating candidates.
+
+    Returns:
+        A single sample.
+    """
+    sample = sampling_importance_resampling(
+        potential_fn=potential_fn,
+        proposal=proposal,
+        num_samples=1,
+        oversampling_factor=sir_num_batches * sir_batch_size,
+        max_sampling_batch_size=sir_batch_size,
+    )
+    return transform(sample)
+
+
+def resample_given_potential_fn(
+    proposal: Any,
+    potential_fn: Callable,
+    transform: torch_tf.Transform,
+    sir_num_batches: int = 10,
+    sir_batch_size: int = 1000,
+    **kwargs: Any,
+) -> Tensor:
+    r"""Return a sample via resampling proposal samples with `potential_fn` weights.
+
+    The difference to actually performing SIR is that the weights are given only
+    by the `potential_fn`, whereas SIR corrects for the `proposal.log_prob()`.
+
+    Up to `sbi` v0.18.0, this method was the default. As of `sbi` v0.19.0, the default
+    is SIR (i.e., with correction).
 
     Args:
         proposal: Proposal distribution, candidate samples are drawn from it.
