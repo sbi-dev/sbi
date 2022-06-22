@@ -31,6 +31,7 @@ from sbi.inference import (
     ratio_estimator_based_potential,
     simulate_for_sbi,
 )
+from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.simulators import diagonal_linear_gaussian, linear_gaussian
 from sbi.utils.get_nn_models import classifier_nn, likelihood_nn, posterior_nn
@@ -53,9 +54,11 @@ from sbi.utils.user_input_checks import (
         (SNLE, "maf", "slice"),
         (SNLE, "nsf", "slice_np"),
         (SNLE, "nsf", "rejection"),
+        (SNLE, "maf", "importance"),
         (SNRE_A, "mlp", "slice_np_vectorized"),
         (SNRE_B, "resnet", "nuts"),
         (SNRE_B, "resnet", "rejection"),
+        (SNRE_B, "resnet", "importance"),
     ],
 )
 @pytest.mark.parametrize("data_device", ("cpu", "cuda:0"))
@@ -162,6 +165,10 @@ def test_training_and_mcmc_on_device(
             posterior = DirectPosterior(
                 posterior_estimator=estimator, prior=prior
             ).set_default_x(x_o)
+        elif mcmc_method == "importance":
+            posterior = ImportanceSamplingPosterior(
+                potential_fn=potential_fn, proposal=prior
+            )
         else:
             posterior = MCMCPosterior(
                 potential_fn=potential_fn,
@@ -365,7 +372,7 @@ def test_embedding_nets_integration_training_device(
                 hidden_features=4,
             )
         )
-        train_kwargs = dict(force_first_round_loss=True)
+        train_kwargs = dict()
     elif inference_method == SNLE:
         embedding_net = nn.Linear(in_features=D_theta, out_features=2).to(
             embedding_net_device
@@ -391,7 +398,7 @@ def test_embedding_nets_integration_training_device(
                 num_transforms=2,
             )
         )
-        train_kwargs = dict()
+        train_kwargs = dict(force_first_round_loss=True)
 
     with pytest.raises(Exception) if prior_device != training_device else nullcontext():
         inference = inference_method(prior=prior, **nn_kwargs, device=training_device)

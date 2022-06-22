@@ -14,6 +14,7 @@ def sampling_importance_resampling(
     oversampling_factor: int = 32,
     max_sampling_batch_size: int = 10_000,
     show_progress_bars: bool = False,
+    device: str = "cpu",
     **kwargs,
 ) -> Tensor:
     """Return samples obtained with sampling importance resampling (SIR).
@@ -27,6 +28,7 @@ def sampling_importance_resampling(
         max_sampling_batch_size: The batchsize of samples being drawn from the
             proposal at every iteration.
         show_progress_bars: Whether or not to show a progress bar.
+        device: Device on which to sample.
 
     Returns:
         Tensor: Samples of shape (num_samples, event_shape).
@@ -53,7 +55,7 @@ def sampling_importance_resampling(
             )
             log_weights = log_weights.reshape(batch_size, oversampling_factor)
             weights = log_weights.softmax(-1).cumsum(-1)
-            uniform_decision = torch.rand(batch_size, 1, device=thetas.device)
+            uniform_decision = torch.rand(batch_size, 1, device=device)
             mask = torch.cumsum(weights >= uniform_decision, -1) == 1
             samples = thetas.reshape(batch_size, oversampling_factor, -1)[mask]
             selected_samples.append(samples)

@@ -60,7 +60,6 @@ class RejectionPosterior(NeuralPosterior):
         self.proposal = proposal
         self.max_sampling_batch_size = max_sampling_batch_size
         self.num_samples_to_find_max = num_samples_to_find_max
-        self.num_samples_to_find_max = num_samples_to_find_max
         self.num_iter_to_find_max = num_iter_to_find_max
         self.m = m
 

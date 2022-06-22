@@ -27,6 +27,9 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         potential_fn: Callable,
         proposal: Any,
         theta_transform: Optional[TorchTransform] = None,
+        method: str = "sir",
+        oversampling_factor: int = 32,
+        max_sampling_batch_size: int = 10_000,
         device: Optional[str] = None,
         x_shape: Optional[torch.Size] = None,
     ):
@@ -36,6 +39,15 @@ class ImportanceSamplingPosterior(NeuralPosterior):
             proposal: The proposal distribution.
             theta_transform: Transformation that is applied to parameters. Is not used
                 during but only when calling `.map()`.
+            method: Either of [`sir`|`importance`]. This sets the behavior of the
+                `.sample()` method. With `sir`, approximate posterior samples are
+                generated with sampling importance resampling (SIR). With
+                `importance`, the `.sample()` method returns a tuple of samples and
+                corresponding importance weights.
+            oversampling_factor: Number of proposed samples form which only one is
+                selected based on its importance weight.
+            max_sampling_batch_size: The batchsize of samples being drawn from the
+                proposal at every iteration.
             device: Device on which to sample, e.g., "cpu", "cuda" or "cuda:0". If
                 None, `potential_fn.device` is used.
             x_shape: Shape of a single simulator output. If passed, it is used to check
@@ -50,6 +62,10 @@ class ImportanceSamplingPosterior(NeuralPosterior):
 
         self.proposal = proposal
         self._normalization_constant = None
+        self.method = method
+
+        self.oversampling_factor = oversampling_factor
+        self.max_sampling_batch_size = max_sampling_batch_size
 
         self._purpose = (
             "It provides sampling-importance resampling (SIR) to .sample() from the "
@@ -95,7 +111,9 @@ class ImportanceSamplingPosterior(NeuralPosterior):
                 x, **normalization_constant_params
             )
 
-            return potential_values - torch.log(normalization_constant)
+            return (potential_values - torch.log(normalization_constant)).to(
+                self._device
+            )
 
     @torch.no_grad()
     def estimate_normalization_constant(
@@ -129,13 +147,45 @@ class ImportanceSamplingPosterior(NeuralPosterior):
             )
             self._normalization_constant = torch.mean(torch.exp(log_importance_weights))
 
-        return self._normalization_constant  # type: ignore
+        return self._normalization_constant.to(self._device)  # type: ignore
 
     def sample(
         self,
         sample_shape: Shape = torch.Size(),
         x: Optional[Tensor] = None,
+        oversampling_factor: int = 32,
+        max_sampling_batch_size: int = 10_000,
         sample_with: Optional[str] = None,
+    ) -> Union[Tensor, Tuple[Tensor, Tensor]]:
+        """Return samples from the approximate posterior distribution.
+
+        Args:
+            sample_shape: _description_
+            x: _description_
+        """
+        if sample_with is not None:
+            raise ValueError(
+                f"You set `sample_with={sample_with}`. As of sbi v0.18.0, setting "
+                f"`sample_with` is no longer supported. You have to rerun "
+                f"`.build_posterior(sample_with={sample_with}).`"
+            )
+
+        self.potential_fn.set_x(self._x_else_default_x(x))
+
+        if self.method == "sir":
+            return self._sir_sample(
+                sample_shape,
+                oversampling_factor=oversampling_factor,
+                max_sampling_batch_size=max_sampling_batch_size,
+            )
+        elif self.method == "importance":
+            return self._importance_sample(sample_shape)
+        else:
+            raise NameError
+
+    def _importance_sample(
+        self,
+        sample_shape: Shape = torch.Size(),
     ) -> Tuple[Tensor, Tensor]:
         """Returns samples from the proposal and log of their importance weights.
 
@@ -148,26 +198,18 @@ class ImportanceSamplingPosterior(NeuralPosterior):
             Samples and logarithm of corresponding importance weights.
         """
         num_samples = torch.Size(sample_shape).numel()
-        self.potential_fn.set_x(self._x_else_default_x(x))
-
-        if sample_with is not None:
-            raise ValueError(
-                f"You set `sample_with={sample_with}`. As of sbi v0.18.0, setting "
-                f"`sample_with` is no longer supported. You have to rerun "
-                f"`.build_posterior(sample_with={sample_with}).`"
-            )
         samples, log_importance_weights = importance_sample(
             self.potential_fn,
             proposal=self.proposal,
             num_samples=num_samples,
         )
 
-        return (samples.reshape((*sample_shape, -1)), log_importance_weights)
+        samples = samples.reshape((*sample_shape, -1)).to(self._device)
+        return samples, log_importance_weights.to(self._device)
 
-    def sir_sample(
+    def _sir_sample(
         self,
         sample_shape: Shape = torch.Size(),
-        x: Optional[Tensor] = None,
         oversampling_factor: int = 32,
         max_sampling_batch_size: int = 10_000,
         show_progress_bars: bool = True,
@@ -190,9 +232,19 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         Returns:
             Samples from posterior.
         """
-        num_samples = torch.Size(sample_shape).numel()
-        self.potential_fn.set_x(self._x_else_default_x(x))
+        # Replace arguments that were not passed with their default.
+        oversampling_factor = (
+            self.oversampling_factor
+            if oversampling_factor is None
+            else oversampling_factor
+        )
+        max_sampling_batch_size = (
+            self.max_sampling_batch_size
+            if max_sampling_batch_size is None
+            else max_sampling_batch_size
+        )
 
+        num_samples = torch.Size(sample_shape).numel()
         samples = sampling_importance_resampling(
             self.potential_fn,
             proposal=self.proposal,
@@ -203,7 +255,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
             device=self._device,
         )
 
-        return samples.reshape((*sample_shape, -1))
+        return samples.reshape((*sample_shape, -1)).to(self._device)
 
     def map(
         self,
