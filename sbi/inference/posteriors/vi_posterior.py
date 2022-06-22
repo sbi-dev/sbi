@@ -280,16 +280,6 @@ class VIPosterior(NeuralPosterior):
 
         Args:
             sample_shape: Shape of samples
-            method: Sampling method, alternatively we can debias the approximation by
-                using simple and efficient sampling schemes. We support one of [naive,
-                sir].
-            kwargs: Hyperparameters for the sampling methods.
-                naive: Just samples from q, no parameters.
-                sir: Performs sampling importance resampling.
-                    `K`: Number of importance samples
-                    `num_samples_batch`: How many samples are drawn in parallel (For
-                        large K you may have to decrease this due to memory limitation).
-
 
         Returns:
             Samples from posterior.
@@ -300,7 +290,7 @@ class VIPosterior(NeuralPosterior):
                 f"The variational posterior was not fit on the specified `default_x` "
                 f"{x}. Please train using `posterior.train()`."
             )
-        samples = self.q.sample(sample_shape)
+        samples = self.q.sample(torch.Size(sample_shape))
         return samples.reshape((*sample_shape, samples.shape[-1]))
 
     def log_prob(

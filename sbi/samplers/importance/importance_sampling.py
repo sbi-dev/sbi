@@ -8,7 +8,7 @@ from torch import Tensor
 def importance_sample(
     potential_fn, proposal, num_samples: int = 1
 ) -> Tuple[Tensor, Tensor]:
-    """Returns samples from proposal, log(importance weights), and log(Z).
+    """Returns samples from proposal and log(importance weights).
 
     Args:
         potential_fn: Unnormalized potential function.

@@ -16,16 +16,17 @@ def sampling_importance_resampling(
     show_progress_bars: bool = False,
     **kwargs,
 ) -> Tensor:
-    """Perform sampling importance resampling (SIR).
+    """Return samples obtained with sampling importance resampling (SIR).
 
     Args:
+        potential_fn: Potential function $log(p(\theta))$ from which to draw samples.
+        proposal: Proposal distribution for SIR.
         num_samples: Number of samples to draw.
-        potential_fn: Potential function, this may be used to debias the proposal.
-        proposal: Proposal distribution to propose samples.
         oversampling_factor: Number of proposed samples form which only one is
             selected based on its importance weight.
-        num_samples_batch: Number of samples processed in parallel. For large K you may
-            want to reduce this, depending on your memory capabilities.
+        max_sampling_batch_size: The batchsize of samples being drawn from the
+            proposal at every iteration.
+        show_progress_bars: Whether or not to show a progress bar.
 
     Returns:
         Tensor: Samples of shape (num_samples, event_shape).

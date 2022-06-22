@@ -6,6 +6,7 @@ from typing import Any, Callable
 import torch
 import torch.distributions.transforms as torch_tf
 from torch import Tensor
+
 from sbi.samplers.importance.sir import sampling_importance_resampling
 
 
@@ -62,7 +63,7 @@ def sir_init(
         oversampling_factor=sir_num_batches * sir_batch_size,
         max_sampling_batch_size=sir_batch_size,
     )
-    return transform(sample)
+    return transform(sample)  # type: ignore
 
 
 def resample_given_potential_fn(

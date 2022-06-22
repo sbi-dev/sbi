@@ -18,8 +18,8 @@ from sbi.samplers.mcmc import (
     IterateParameters,
     Slice,
     proposal_init,
-    sir_init,
     resample_given_potential_fn,
+    sir_init,
     slice_np_parallized,
 )
 from sbi.simulators.simutils import tqdm_joblib

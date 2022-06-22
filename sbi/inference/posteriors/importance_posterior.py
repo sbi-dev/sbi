@@ -1,8 +1,6 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
-from functools import partial
-from typing import Any, Callable, Optional, Union
-from warnings import warn
+from typing import Any, Callable, Optional, Tuple, Union
 
 import torch
 from torch import Tensor
@@ -18,9 +16,9 @@ from sbi.utils.torchutils import ensure_theta_batched
 class ImportanceSamplingPosterior(NeuralPosterior):
     r"""Provides importance sampling to sample from the posterior.<br/><br/>
     SNLE or SNRE train neural networks to approximate the likelihood(-ratios).
-    `SIRPosterior` allows to estimate the posterior log-probability by estimating
-    the normlalization constant with importance sampling. It also allows to perform
-    importance sampling (with `.sample()`) and to draw approximate samples with
+    `ImportanceSamplingPosterior` allows to estimate the posterior log-probability by
+    estimating the normlalization constant with importance sampling. It also allows to
+    perform importance sampling (with `.sample()`) and to draw approximate samples with
     sampling-importance-resampling (SIR) (with `.sir_sample()`)
     """
 
@@ -80,6 +78,8 @@ class ImportanceSamplingPosterior(NeuralPosterior):
             track_gradients: Whether the returned tensor supports tracking gradients.
                 This can be helpful for e.g. sensitivity analysis, but increases memory
                 consumption.
+            normalization_constant_params: Parameters passed on to
+                `estimate_normalization_constant()`.
 
         Returns:
             `len($\theta$)`-shaped log-probability.
@@ -88,19 +88,22 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         self.potential_fn.set_x(x)
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
-        potential_values = self.potential_fn(
-            theta.to(self._device), track_gradients=track_gradients
-        )
 
-        if normalization_constant_params is None:
-            normalization_constant_params = dict()  # use defaults
-        normalization_constant = self._estimate_normalization_constant(
-            x, **normalization_constant_params
-        )
+        with torch.set_grad_enabled(track_gradients):
+            potential_values = self.potential_fn(
+                theta.to(self._device), track_gradients=track_gradients
+            )
 
-        return potential_values - torch.log(normalization_constant)
+            if normalization_constant_params is None:
+                normalization_constant_params = dict()  # use defaults
+            normalization_constant = self.estimate_normalization_constant(
+                x, **normalization_constant_params
+            )
 
-    def _estimate_normalization_constant(
+            return potential_values - torch.log(normalization_constant)
+
+    @torch.no_grad()
+    def estimate_normalization_constant(
         self, x: Tensor, num_samples: int = 10_000, force_update: bool = False
     ) -> Tensor:
         """Estimates the normalization constant with importance sampling.
@@ -137,10 +140,9 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         self,
         sample_shape: Shape = torch.Size(),
         x: Optional[Tensor] = None,
-        max_sampling_batch_size: Optional[int] = None,
         sample_with: Optional[str] = None,
-    ):
-        """Returns samples from the proposal and their log(importance weights).
+    ) -> Tuple[Tensor, Tensor]:
+        """Returns samples from the proposal and log of their importance weights.
 
         Args:
             sample_shape: Desired shape of samples that are drawn from posterior.
@@ -150,17 +152,10 @@ class ImportanceSamplingPosterior(NeuralPosterior):
                 `sbi` v0.17.2 or older. If it is set, we instantly raise an error.
 
         Returns:
-            _type_: _description_
+            Samples and logarithm of corresponding importance weights.
         """
         num_samples = torch.Size(sample_shape).numel()
         self.potential_fn.set_x(self._x_else_default_x(x))
-
-        # Replace arguments that were not passed with their default.
-        max_sampling_batch_size = (
-            self.max_sampling_batch_size
-            if max_sampling_batch_size is None
-            else max_sampling_batch_size
-        )
 
         if sample_with is not None:
             raise ValueError(
@@ -184,14 +179,17 @@ class ImportanceSamplingPosterior(NeuralPosterior):
         max_sampling_batch_size: Optional[int] = None,
         show_progress_bars: bool = True,
     ):
-        r"""Return samples from posterior $p(\theta|x)$ via SIR.
+        r"""Returns approximate samples from posterior $p(\theta|x)$ via SIR.
 
         Args:
             sample_shape: Desired shape of samples that are drawn from posterior. If
                 sample_shape is multidimensional we simply draw `sample_shape.numel()`
                 samples and then reshape into the desired shape.
+            x: Observed data.
             sample_with: This argument only exists to keep backward-compatibility with
                 `sbi` v0.17.2 or older. If it is set, we instantly raise an error.
+            oversampling_factor: Number of proposed samples form which only one is
+                selected based on its importance weight.
             show_progress_bars: Whether to show sampling progress monitor.
 
         Returns:
