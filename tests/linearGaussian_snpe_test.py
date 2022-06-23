@@ -374,6 +374,48 @@ def test_api_snpe_c_posterior_correction(sample_with, mcmc_method, prior_str):
     _ = posterior.log_prob(samples)
 
 
+# Testing rejection and mcmc sampling methods.
+@pytest.mark.parametrize(
+    "force_first_round_loss, pass_proposal_to_append",
+    (
+        (True, True),
+        (True, False),
+        (False, True),
+        pytest.param(False, False, marks=pytest.mark.xfail),
+    ),
+)
+def test_api_force_first_round_loss(
+    force_first_round_loss: bool, pass_proposal_to_append: bool
+):
+    """Test that leakage correction applied to sampling works, with both MCMC and
+    rejection.
+
+    """
+
+    num_dim = 2
+    x_o = zeros(1, num_dim)
+
+    # likelihood_mean will be likelihood_shift+theta
+    likelihood_shift = -1.0 * ones(num_dim)
+    likelihood_cov = 0.3 * eye(num_dim)
+    prior = utils.BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
+
+    simulator, prior = prepare_for_sbi(
+        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov), prior
+    )
+    inference = SNPE_C(prior, show_progress_bars=False)
+
+    proposal = prior
+    for _ in range(2):
+        train_proposal = proposal if pass_proposal_to_append else None
+        theta, x = simulate_for_sbi(simulator, proposal, 1000)
+        _ = inference.append_simulations(theta, x, proposal=train_proposal).train(
+            force_first_round_loss=force_first_round_loss, max_num_epochs=2
+        )
+        posterior = inference.build_posterior().set_default_x(x_o)
+        proposal = posterior
+
+
 @pytest.mark.slow
 def test_sample_conditional():
     """

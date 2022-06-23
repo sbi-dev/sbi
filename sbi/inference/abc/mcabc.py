@@ -177,8 +177,9 @@ class MCABC(ABCBASE):
             kde_dist = get_kde(final_theta, **kde_kwargs)
 
             if return_summary:
-                return kde_dist, dict(
-                    theta=final_theta, distances=distances_accepted, x=x_accepted
+                return (
+                    kde_dist,
+                    dict(theta=final_theta, distances=distances_accepted, x=x_accepted),
                 )
             else:
                 return kde_dist
