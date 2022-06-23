@@ -18,15 +18,8 @@ from torch.utils.tensorboard.writer import SummaryWriter
 import sbi.inference
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.simulators.simutils import simulate_in_batches
-from sbi.utils import (
-    check_prior,
-    get_log_root,
-    handle_invalid_x,
-    warn_if_zscoring_changes_data,
-    warn_on_invalid_x,
-    warn_on_invalid_x_for_snpec_leakage,
-)
-from sbi.utils.sbiutils import get_simulations_indcies
+from sbi.utils import check_prior, get_log_root
+from sbi.utils.sbiutils import get_simulations_since_round
 from sbi.utils.torchutils import check_if_prior_on_device, process_device
 from sbi.utils.user_input_checks import prepare_for_sbi
 
@@ -128,8 +121,9 @@ class NeuralInference(ABC):
 
         # Initialize roundwise (theta, x, prior_masks) for storage of parameters,
         # simulations and masks indicating if simulations came from prior.
-        self._dataset = data.Dataset()
-        self._num_sims_per_round = []
+        self._theta_roundwise = []
+        self._x_roundwise = []
+        self._prior_masks = []
         self._model_bank = []
 
         # Initialize list that indicates the round from which simulations were drawn.
@@ -176,22 +170,15 @@ class NeuralInference(ABC):
         Returns: Parameters, simulation outputs, prior masks.
         """
 
-        # This is a pretty clunky implementation but not sure this will be used much with
-        # new implementation of `get_dataloaders`
-        indicies = get_simulations_indcies(
-            self._num_sims_per_round, self._data_round_index, starting_round
+        theta = get_simulations_since_round(
+            self._theta_roundwise, self._data_round_index, starting_round
         )
-        theta, x, prior_masks = [], [], []
-
-        for ind in indicies:
-            theta_cur, x_cur, prior_mask_cur = self._dataset[ind]
-            theta.append(theta_cur)
-            x.append(x_cur)
-            prior_masks.append(prior_mask_cur)
-
-        theta = torch.stack(theta)
-        x = torch.stack(x)
-        prior_masks = torch.stack(prior_masks).squeeze()
+        x = get_simulations_since_round(
+            self._x_roundwise, self._data_round_index, starting_round
+        )
+        prior_masks = get_simulations_since_round(
+            self._prior_masks, self._data_round_index, starting_round
+        )
 
         return theta, x, prior_masks
 
@@ -235,20 +222,20 @@ class NeuralInference(ABC):
 
         """
 
-        # Generate indicies to use based on starting_round
-        indices = get_simulations_indcies(
-            self._num_sims_per_round, self._data_round_index, starting_round
-        )
+        #
+        theta, x, prior_masks = self.get_simulations(starting_round)
+
+        dataset = data.TensorDataset(theta, x, prior_masks)
 
         # Get total number of training examples.
-        num_examples = len(indices)
+        num_examples = theta.size(0)
         # Select random train and validation splits from (theta, x) pairs.
         num_training_examples = int((1 - validation_fraction) * num_examples)
         num_validation_examples = num_examples - num_training_examples
 
         if not resume_training:
             # Seperate indicies for training and validation
-            permuted_indices = indices[torch.randperm(num_examples)]
+            permuted_indices = torch.randperm(num_examples)
             self.train_indices, self.val_indices = (
                 permuted_indices[:num_training_examples],
                 permuted_indices[num_training_examples:],
@@ -273,8 +260,8 @@ class NeuralInference(ABC):
             train_loader_kwargs = dict(train_loader_kwargs, **dataloader_kwargs)
             val_loader_kwargs = dict(val_loader_kwargs, **dataloader_kwargs)
 
-        train_loader = data.DataLoader(self._dataset, **train_loader_kwargs)
-        val_loader = data.DataLoader(self._dataset, **val_loader_kwargs)
+        train_loader = data.DataLoader(dataset, **train_loader_kwargs)
+        val_loader = data.DataLoader(dataset, **val_loader_kwargs)
 
         return train_loader, val_loader
 

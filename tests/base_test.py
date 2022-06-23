@@ -11,7 +11,7 @@ def test_get_dataloaders(training_batch_size):
     validation_fraction = 0.1
 
     inferer = SNPE()
-    inferer.append_simulations(torch.ones(N), torch.zeros(N), warn_if_zscoring=False)
+    inferer.append_simulations(torch.ones(N), torch.zeros(N))
     _, val_loader = inferer.get_dataloaders(
         0,
         training_batch_size=training_batch_size,

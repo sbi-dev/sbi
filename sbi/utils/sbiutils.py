@@ -349,31 +349,6 @@ def get_simulations_since_round(
     )
 
 
-def get_simulations_indcies(
-    num_sims_per_round: List, data_round_indices: List, starting_round_index: int
-) -> Tensor:
-    """
-    Returns indicies for for all simulations round >= `starting_round`. Used in
-    `get_dataloaders` and `get_simulations`
-
-    Args:
-        num_sims_per_round: Number of simulations per round
-        data_round_indices: List with same length as data, each entry is an integer that
-            indicates which round the data is from.
-        starting_round_index: From which round onwards to return the data. We start
-            counting from 0.
-    """
-    inds = []
-    for j, (n, r) in enumerate(zip(num_sims_per_round, data_round_indices)):
-
-        # Where to start counting
-        s_ind = sum(num_sims_per_round[:j])
-
-        if r >= starting_round_index:
-            inds.append(torch.arange(s_ind, s_ind + n))
-    return torch.cat(inds)
-
-
 def mask_sims_from_prior(round_: int, num_simulations: int) -> Tensor:
     """Returns Tensor True where simulated from prior parameters.
 

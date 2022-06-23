@@ -92,12 +92,8 @@ class PosteriorEstimator(NeuralInference, ABC):
         theta: Tensor,
         x: Tensor,
         proposal: Optional[DirectPosterior] = None,
-        exclude_invalid_x: bool = True,
-        warn_on_invalid: bool = True,
-        warn_if_zscoring: bool = True,
-        return_self: bool = True,
         data_device: Optional[str] = None,
-    ) -> Union["PosteriorEstimator", None]:
+    ) -> "PosteriorEstimator":
         r"""Store parameters and simulation outputs to use them for later training.
 
         Data are stored as entries in lists for each type of variable (parameter/data).
@@ -112,12 +108,6 @@ class PosteriorEstimator(NeuralInference, ABC):
             proposal: The distribution that the parameters $\theta$ were sampled from.
                 Pass `None` if the parameters were sampled from the prior. If not
                 `None`, it will trigger a different loss-function.
-            exclude_invalid_x: Whether to exclude simulation outputs `x=NaN` or `x=±∞`
-                during training. Expect errors, silent or explicit, when `False`.
-            warn_on_invalid: Whether to warn if data is invalid
-            warn_if_zscoring: Whether to test if z-scoring causes duplicates
-            return_self: Whether to return a instance of the class, allows chaining
-                with `.train()`. Setting `False` decreases memory overhead.
             data_device: Where to store the data, default is on the same device where
                 the training is happening. If training a large dataset on a GPU with not
                 much VRAM can set to 'cpu' to store data on system memory instead.
@@ -126,26 +116,24 @@ class PosteriorEstimator(NeuralInference, ABC):
             NeuralInference object (returned so that this function is chainable).
         """
 
-        # Add ability to specify device data is saved on
-
-        is_valid_x, num_nans, num_infs = handle_invalid_x(x, exclude_invalid_x)
-
-        # Check for problematic z-scoring
-        if warn_if_zscoring:
-            warn_if_zscoring_changes_data(x[is_valid_x])
-        if warn_on_invalid:
-            warn_on_invalid_x(num_nans, num_infs, exclude_invalid_x)
-            warn_on_invalid_x_for_snpec_leakage(
-                num_nans, num_infs, exclude_invalid_x, type(self).__name__, self._round
-            )
+        is_valid_x, num_nans, num_infs = handle_invalid_x(x, True)  # Hardcode to True
 
         x = x[is_valid_x]
         theta = theta[is_valid_x]
 
+        # Check for problematic z-scoring
+        warn_if_zscoring_changes_data(x)
+        warn_on_invalid_x(num_nans, num_infs, True)
+        warn_on_invalid_x_for_snpec_leakage(
+            num_nans, num_infs, True, type(self).__name__, self._round
+        )
+
         if data_device is None:
             data_device = self._device
-        theta, x = validate_theta_and_x(theta, x, training_device=data_device)
 
+        theta, x = validate_theta_and_x(
+            theta, x, data_device=data_device, training_device=self._device
+        )
         self._check_proposal(proposal)
 
         if (
@@ -169,23 +157,10 @@ class PosteriorEstimator(NeuralInference, ABC):
                 self._data_round_index.append(max(self._data_round_index) + 1)
             prior_masks = mask_sims_from_prior(1, theta.size(0))
 
-        if len(self._num_sims_per_round) == 0:
-            # If first round, set up ConcatDataset
-            self._dataset = data.ConcatDataset(
-                [
-                    data.TensorDataset(theta, x, prior_masks),
-                ]
-            )
-        else:
-            # Otherwise append to Dataset
-            self._dataset = data.ConcatDataset(
-                self._dataset.datasets
-                + [
-                    data.TensorDataset(theta, x, prior_masks),
-                ]
-            )
+        self._theta_roundwise.append(theta)
+        self._x_roundwise.append(x)
+        self._prior_masks.append(prior_masks)
 
-        self._num_sims_per_round.append(theta.size(0))
         self._proposal_roundwise.append(proposal)
 
         if self._prior is None or isinstance(self._prior, ImproperEmpirical):
@@ -202,9 +177,7 @@ class PosteriorEstimator(NeuralInference, ABC):
             theta_prior = self.get_simulations()[0]
             self._prior = ImproperEmpirical(theta_prior, ones(theta_prior.shape[0]))
 
-        # Add ability to not return self
-        if return_self:
-            return self
+        return self
 
     def train(
         self,
@@ -310,16 +283,15 @@ class PosteriorEstimator(NeuralInference, ABC):
         if self._neural_net is None or retrain_from_scratch:
 
             # Get theta,x from dataset to initialize NN
-            theta, x, _ = self.get_simulations()
-            self._neural_net = self._build_neural_net(
-                theta[:training_batch_size].to("cpu"), x[:training_batch_size].to("cpu")
-            )
-            self._x_shape = x_shape_from_simulation(x[:training_batch_size].to("cpu"))
+            x = self._x_roundwise[0][:training_batch_size]
+            theta = self._theta_roundwise[0][:training_batch_size]
+            self._neural_net = self._build_neural_net(theta.to("cpu"), x.to("cpu"))
+            self._x_shape = x_shape_from_simulation(x.to("cpu"))
 
             test_posterior_net_for_multi_d_x(
                 self._neural_net,
-                theta[:training_batch_size].to("cpu"),
-                x[:training_batch_size].to("cpu"),
+                theta.to("cpu"),
+                x.to("cpu"),
             )
 
             del theta, x

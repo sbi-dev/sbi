@@ -37,8 +37,7 @@ def flexible():
     inference = SNPE(prior)
 
     theta, x = simulate_for_sbi(simulator, proposal=prior, num_simulations=500)
-    inference.append_simulations(theta, x)
-    density_estimator = inference.train()
+    density_estimator = inference.append_simulations(theta, x).train()
     posterior = inference.build_posterior(density_estimator)
     posterior.sample((100,), x=x_o)
 
