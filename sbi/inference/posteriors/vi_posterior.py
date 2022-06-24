@@ -299,8 +299,8 @@ class VIPosterior(NeuralPosterior):
         x = self._x_else_default_x(x)
         if self._trained_on is None or (x != self._trained_on).all():
             raise AttributeError(
-                f"The variational posterior was not fit using observation {x}."
-                "Please train."
+                f"The variational posterior was not fit on the specified `default_x` "
+                f"{x}. Please train using `posterior.train()`."
             )
 
         self.potential_fn.set_x(x)
