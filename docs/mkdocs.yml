@@ -8,20 +8,21 @@ nav:
       - Introduction:
         - Getting started: tutorial/00_getting_started.md
         - Amortized inference: tutorial/01_gaussian_amortized.md
-      - Advanced:
         - Flexible interface: tutorial/02_flexible_interface.md
+        - Sampler interface: tutorial/11_sampler_interface.md
+      - Advanced:
         - Multi-round inference: tutorial/03_multiround_inference.md
         - Custom density estimators: tutorial/04_density_estimators.md
         - Learning summary statistics: tutorial/05_embedding_net.md
-        - Conditional distributions: tutorial/07_conditional_distributions.md
         - Handling invalid simulations: tutorial/08_restriction_estimator.md
-        - Posterior sensitivity analysis: tutorial/09_sensitivity_analysis.md
         - Crafting summary statistics: tutorial/10_crafting_summary_statistics.md
-        - Sampler interface: tutorial/11_sampler_interface.md
         - SBI with trial-based (mixed) data: tutorial/14_multi-trial-data-and-mixed-data-types.md
       - Diagnostics:
         - Posterior predictive checks: tutorial/12_diagnostics_posterior_predictive_check.md
         - Simulation-based calibration: tutorial/13_diagnostics_simulation_based_calibration.md
+      - Analysis:
+        - Conditional distributions: tutorial/07_conditional_distributions.md
+        - Posterior sensitivity analysis: tutorial/09_sensitivity_analysis.md
       - Examples:
         - Hodgkin-Huxley example: examples/00_HH_simulator.md
   - Contribute: contribute.md
