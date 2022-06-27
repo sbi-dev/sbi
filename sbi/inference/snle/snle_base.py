@@ -189,12 +189,10 @@ class LikelihoodEstimator(NeuralInference, ABC):
         # can `sample()` and `log_prob()`. The network is accessible via `.net`.
         if self._neural_net is None or retrain_from_scratch:
 
-            # Get theta,x from dataset to initialize NN
-            theta, x, _ = self.get_simulations()
-            self._neural_net = self._build_neural_net(
-                theta[:training_batch_size].to("cpu"), x[:training_batch_size].to("cpu")
-            )
-            self._x_shape = x_shape_from_simulation(x[:training_batch_size].to("cpu"))
+            # Get theta,x to initialize NN
+            theta, x, _ = self.get_simulations(starting_round=start_idx)
+            self._neural_net = self._build_neural_net(theta.to("cpu"), x.to("cpu"))
+            self._x_shape = x_shape_from_simulation(x.to("cpu"))
             del theta, x
             assert (
                 len(self._x_shape) < 3

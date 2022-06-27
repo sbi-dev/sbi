@@ -657,6 +657,10 @@ def validate_theta_and_x(
     2) If they have the same batchsize.
     3) If they are of `dtype=float32`.
 
+    Additionally, We move the data to the specified `data_device`. This is where the
+    data is stored and can be separate from `training_device`, where the
+    computations for training are performed.
+
     Raises:
         AssertionError: If theta or x are not torch.Tensor-like,
         do not yield the same batchsize and do not have dtype==float32.
@@ -664,6 +668,7 @@ def validate_theta_and_x(
     Args:
         theta: Parameters.
         x: Simulation outputs.
+        data_device: Device where data is stored.
         training_device: Training device for net.
     """
     assert isinstance(theta, Tensor), "Parameters theta must be a `torch.Tensor`."
