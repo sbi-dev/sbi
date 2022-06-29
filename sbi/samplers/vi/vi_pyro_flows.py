@@ -385,8 +385,10 @@ def build_flow(
     """
     # Some transforms increase dimension by decreasing the degrees of freedom e.g.
     # SoftMax.
+    # `unsqueeze(0)` because the `link_flow` requires a batch dimension if the prior is
+    # a `MultipleIndependent`.
     additional_dim = (
-        len(link_flow(torch.zeros(event_shape, device=device)))
+        len(link_flow(torch.zeros(event_shape, device=device).unsqueeze(0))[0])
         - torch.tensor(event_shape, device=device).item()
     )
     event_shape = torch.Size(
