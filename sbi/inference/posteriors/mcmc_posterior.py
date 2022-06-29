@@ -353,7 +353,7 @@ class MCMCPosterior(NeuralPosterior):
         )
 
         # Parallelize inits for resampling only.
-        if num_workers > 1 and init_strategy == "resample":
+        if num_workers > 1 and (init_strategy == "resample" or init_strategy == "sir"):
 
             def seeded_init_fn(seed):
                 torch.manual_seed(seed)
