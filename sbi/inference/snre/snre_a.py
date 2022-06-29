@@ -55,7 +55,6 @@ class SNRE_A(RatioEstimator):
         stop_after_epochs: int = 20,
         max_num_epochs: int = 2**31 - 1,
         clip_max_norm: Optional[float] = 5.0,
-        exclude_invalid_x: bool = True,
         resume_training: bool = False,
         discard_prior_samples: bool = False,
         retrain_from_scratch: bool = False,
@@ -75,8 +74,6 @@ class SNRE_A(RatioEstimator):
                 we train until validation loss increases (see also `stop_after_epochs`).
             clip_max_norm: Value at which to clip the total gradient norm in order to
                 prevent exploding gradients. Use None for no clipping.
-            exclude_invalid_x: Whether to exclude simulation outputs `x=NaN` or `x=±∞`
-                during training. Expect errors, silent or explicit, when `False`.
             resume_training: Can be used in case training time is limited, e.g. on a
                 cluster. If `True`, the split between train and validation set, the
                 optimizer, the number of epochs, and the best validation log-prob will

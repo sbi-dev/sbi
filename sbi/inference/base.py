@@ -18,14 +18,7 @@ from torch.utils.tensorboard.writer import SummaryWriter
 import sbi.inference
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.simulators.simutils import simulate_in_batches
-from sbi.utils import (
-    check_prior,
-    get_log_root,
-    handle_invalid_x,
-    warn_if_zscoring_changes_data,
-    warn_on_invalid_x,
-    warn_on_invalid_x_for_snpec_leakage,
-)
+from sbi.utils import check_prior, get_log_root
 from sbi.utils.sbiutils import get_simulations_since_round
 from sbi.utils.torchutils import check_if_prior_on_device, process_device
 from sbi.utils.user_input_checks import prepare_for_sbi
@@ -128,7 +121,9 @@ class NeuralInference(ABC):
 
         # Initialize roundwise (theta, x, prior_masks) for storage of parameters,
         # simulations and masks indicating if simulations came from prior.
-        self._theta_roundwise, self._x_roundwise, self._prior_masks = [], [], []
+        self._theta_roundwise = []
+        self._x_roundwise = []
+        self._prior_masks = []
         self._model_bank = []
 
         # Initialize list that indicates the round from which simulations were drawn.
@@ -159,8 +154,6 @@ class NeuralInference(ABC):
     def get_simulations(
         self,
         starting_round: int = 0,
-        exclude_invalid_x: bool = True,
-        warn_on_invalid: bool = True,
     ) -> Tuple[Tensor, Tensor, Tensor]:
         r"""Returns all $\theta$, $x$, and prior_masks from rounds >= `starting_round`.
 
@@ -187,17 +180,7 @@ class NeuralInference(ABC):
             self._prior_masks, self._data_round_index, starting_round
         )
 
-        # Check for NaNs in simulations.
-        is_valid_x, num_nans, num_infs = handle_invalid_x(x, exclude_invalid_x)
-        # Check for problematic z-scoring
-        warn_if_zscoring_changes_data(x[is_valid_x])
-        if warn_on_invalid:
-            warn_on_invalid_x(num_nans, num_infs, exclude_invalid_x)
-            warn_on_invalid_x_for_snpec_leakage(
-                num_nans, num_infs, exclude_invalid_x, type(self).__name__, self._round
-            )
-
-        return theta[is_valid_x], x[is_valid_x], prior_masks[is_valid_x]
+        return theta, x, prior_masks
 
     @abstractmethod
     def train(
@@ -218,7 +201,7 @@ class NeuralInference(ABC):
 
     def get_dataloaders(
         self,
-        dataset: data.TensorDataset,
+        starting_round: int = 0,
         training_batch_size: int = 50,
         validation_fraction: float = 0.1,
         resume_training: bool = False,
@@ -239,14 +222,19 @@ class NeuralInference(ABC):
 
         """
 
-        # Get total number of training examples.
-        num_examples = len(dataset)
+        #
+        theta, x, prior_masks = self.get_simulations(starting_round)
 
+        dataset = data.TensorDataset(theta, x, prior_masks)
+
+        # Get total number of training examples.
+        num_examples = theta.size(0)
         # Select random train and validation splits from (theta, x) pairs.
         num_training_examples = int((1 - validation_fraction) * num_examples)
         num_validation_examples = num_examples - num_training_examples
 
         if not resume_training:
+            # Seperate indicies for training and validation
             permuted_indices = torch.randperm(num_examples)
             self.train_indices, self.val_indices = (
                 permuted_indices[:num_training_examples],
@@ -358,7 +346,11 @@ class NeuralInference(ABC):
             )
 
     def _summarize(
-        self, round_: int, x_o: Union[Tensor, None], theta_bank: Tensor, x_bank: Tensor
+        self,
+        round_: int,
+        x_o: Union[Tensor, None],
+        theta_bank: Union[Tensor, None],
+        x_bank: Union[Tensor, None],
     ) -> None:
         """Update the summary_writer with statistics for a given round.
 

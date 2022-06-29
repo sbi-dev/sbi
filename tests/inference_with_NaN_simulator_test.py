@@ -102,9 +102,9 @@ def test_inference_with_nan_simulator(
     inference = method(prior=prior)
 
     theta, x = simulate_for_sbi(simulator, prior, num_simulations)
-    _ = inference.append_simulations(theta, x).train(
-        exclude_invalid_x=exclude_invalid_x
-    )
+    _ = inference.append_simulations(
+        theta, x, exclude_invalid_x=exclude_invalid_x
+    ).train()
     posterior = inference.build_posterior()
 
     samples = posterior.sample((num_samples,), x=x_o)

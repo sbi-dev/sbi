@@ -145,7 +145,7 @@ def HHsimulator(V0, params, dt, t, I, seed=None):
             + g_leak * E_leak
             + gbar_M * p[i - 1] * E_K
             + I[i - 1]
-            + nois_fact * rng.randn() / (tstep ** 0.5)
+            + nois_fact * rng.randn() / (tstep**0.5)
         ) / (tau_V_inv * C)
         V[i] = V_inf + (V[i - 1] - V_inf) * np.exp(-tstep * tau_V_inv)
         n[i] = n_inf(V[i]) + (n[i - 1] - n_inf(V[i])) * np.exp(-tstep / tau_n(V[i]))

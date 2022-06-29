@@ -647,7 +647,7 @@ def check_estimator_arg(estimator: Union[str, Callable]) -> None:
 
 
 def validate_theta_and_x(
-    theta: Any, x: Any, training_device: str = "cpu"
+    theta: Any, x: Any, data_device: str = "cpu", training_device: str = "cpu"
 ) -> Tuple[Tensor, Tensor]:
     r"""
     Checks if the passed $(\theta, x)$ are valid.
@@ -657,6 +657,10 @@ def validate_theta_and_x(
     2) If they have the same batchsize.
     3) If they are of `dtype=float32`.
 
+    Additionally, We move the data to the specified `data_device`. This is where the
+    data is stored and can be separate from `training_device`, where the
+    computations for training are performed.
+
     Raises:
         AssertionError: If theta or x are not torch.Tensor-like,
         do not yield the same batchsize and do not have dtype==float32.
@@ -664,6 +668,7 @@ def validate_theta_and_x(
     Args:
         theta: Parameters.
         x: Simulation outputs.
+        data_device: Device where data is stored.
         training_device: Training device for net.
     """
     assert isinstance(theta, Tensor), "Parameters theta must be a `torch.Tensor`."
@@ -679,21 +684,21 @@ def validate_theta_and_x(
     assert theta.dtype == float32, "Type of parameters must be float32."
     assert x.dtype == float32, "Type of simulator outputs must be float32."
 
-    if str(x.device) != training_device:
+    if str(x.device) != data_device:
         warnings.warn(
-            f"Data x has device '{x.device}' "
-            f"different from the training_device '{training_device}', "
-            f"moving x to the training_device '{training_device}'."
+            f"Data x has device '{x.device}'."
+            f"Moving x to the data_device '{data_device}'."
+            f"Training will proceed on device '{training_device}'."
         )
-        x = x.to(training_device)
+        x = x.to(data_device)
 
-    if str(theta.device) != training_device:
+    if str(theta.device) != data_device:
         warnings.warn(
-            f"Parameters theta has device '{theta.device}' "
-            f"different from the training_device '{training_device}', "
-            f"moving theta to the training_device '{training_device}'."
+            f"Parameters theta has device '{x.device}'. "
+            f"Moving theta to the data_device '{data_device}'."
+            f"Training will proceed on device '{training_device}'."
         )
-        theta = theta.to(training_device)
+        theta = theta.to(data_device)
 
     return theta, x
 

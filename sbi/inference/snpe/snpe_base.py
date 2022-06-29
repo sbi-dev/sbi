@@ -26,8 +26,12 @@ from sbi.inference.potentials import posterior_estimator_based_potential
 from sbi.utils import (
     RestrictedPrior,
     check_estimator_arg,
+    handle_invalid_x,
     test_posterior_net_for_multi_d_x,
     validate_theta_and_x,
+    warn_if_zscoring_changes_data,
+    warn_on_invalid_x,
+    warn_on_invalid_x_for_snpec_leakage,
     x_shape_from_simulation,
 )
 from sbi.utils.sbiutils import ImproperEmpirical, mask_sims_from_prior
@@ -88,6 +92,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         theta: Tensor,
         x: Tensor,
         proposal: Optional[DirectPosterior] = None,
+        data_device: Optional[str] = None,
     ) -> "PosteriorEstimator":
         r"""Store parameters and simulation outputs to use them for later training.
 
@@ -103,12 +108,32 @@ class PosteriorEstimator(NeuralInference, ABC):
             proposal: The distribution that the parameters $\theta$ were sampled from.
                 Pass `None` if the parameters were sampled from the prior. If not
                 `None`, it will trigger a different loss-function.
+            data_device: Where to store the data, default is on the same device where
+                the training is happening. If training a large dataset on a GPU with not
+                much VRAM can set to 'cpu' to store data on system memory instead.
 
         Returns:
             NeuralInference object (returned so that this function is chainable).
         """
 
-        theta, x = validate_theta_and_x(theta, x, training_device=self._device)
+        is_valid_x, num_nans, num_infs = handle_invalid_x(x, True)  # Hardcode to True
+
+        x = x[is_valid_x]
+        theta = theta[is_valid_x]
+
+        # Check for problematic z-scoring
+        warn_if_zscoring_changes_data(x)
+        warn_on_invalid_x(num_nans, num_infs, True)
+        warn_on_invalid_x_for_snpec_leakage(
+            num_nans, num_infs, True, type(self).__name__, self._round
+        )
+
+        if data_device is None:
+            data_device = self._device
+
+        theta, x = validate_theta_and_x(
+            theta, x, data_device=data_device, training_device=self._device
+        )
         self._check_proposal(proposal)
 
         if (
@@ -122,7 +147,7 @@ class PosteriorEstimator(NeuralInference, ABC):
             # with MLE loss or with atomic loss (see, in `train()`:
             # self._round = max(self._data_round_index))
             self._data_round_index.append(0)
-            self._prior_masks.append(mask_sims_from_prior(0, theta.size(0)))
+            prior_masks = mask_sims_from_prior(0, theta.size(0))
         else:
             if not self._data_round_index:
                 # This catches a pretty specific case: if, in the first round, one
@@ -130,10 +155,12 @@ class PosteriorEstimator(NeuralInference, ABC):
                 self._data_round_index.append(1)
             else:
                 self._data_round_index.append(max(self._data_round_index) + 1)
-            self._prior_masks.append(mask_sims_from_prior(1, theta.size(0)))
+            prior_masks = mask_sims_from_prior(1, theta.size(0))
 
         self._theta_roundwise.append(theta)
         self._x_roundwise.append(x)
+        self._prior_masks.append(prior_masks)
+
         self._proposal_roundwise.append(proposal)
 
         if self._prior is None or isinstance(self._prior, ImproperEmpirical):
@@ -161,7 +188,6 @@ class PosteriorEstimator(NeuralInference, ABC):
         max_num_epochs: int = 2**31 - 1,
         clip_max_norm: Optional[float] = 5.0,
         calibration_kernel: Optional[Callable] = None,
-        exclude_invalid_x: bool = True,
         resume_training: bool = False,
         force_first_round_loss: bool = False,
         discard_prior_samples: bool = False,
@@ -184,8 +210,6 @@ class PosteriorEstimator(NeuralInference, ABC):
                 prevent exploding gradients. Use None for no clipping.
             calibration_kernel: A function to calibrate the loss with respect to the
                 simulations `x`. See Lueckmann, Gonçalves et al., NeurIPS 2017.
-            exclude_invalid_x: Whether to exclude simulation outputs `x=NaN` or `x=±∞`
-                during training. Expect errors, silent or explicit, when `False`.
             resume_training: Can be used in case training time is limited, e.g. on a
                 cluster. If `True`, the split between train and validation set, the
                 optimizer, the number of epochs, and the best validation log-prob will
@@ -206,6 +230,9 @@ class PosteriorEstimator(NeuralInference, ABC):
         Returns:
             Density estimator that approximates the distribution $p(\theta|x)$.
         """
+        # Load data from most recent round.
+        self._round = max(self._data_round_index)
+
         if self._round == 0 and self._neural_net is not None:
             assert force_first_round_loss, (
                 "You have already trained this neural network. After you had trained "
@@ -235,13 +262,6 @@ class PosteriorEstimator(NeuralInference, ABC):
         if self.use_non_atomic_loss or hasattr(self, "_ran_final_round"):
             start_idx = self._round
 
-        theta, x, prior_masks = self.get_simulations(
-            start_idx, exclude_invalid_x, warn_on_invalid=True
-        )
-
-        # Dataset is shared for training and validation loaders.
-        dataset = data.TensorDataset(theta, x, prior_masks)
-
         # Set the proposal to the last proposal that was passed by the user. For
         # atomic SNPE, it does not matter what the proposal is. For non-atomic
         # SNPE, we only use the latest data that was passed, i.e. the one from the
@@ -249,31 +269,31 @@ class PosteriorEstimator(NeuralInference, ABC):
         proposal = self._proposal_roundwise[-1]
 
         train_loader, val_loader = self.get_dataloaders(
-            dataset,
+            start_idx,
             training_batch_size,
             validation_fraction,
             resume_training,
             dataloader_kwargs=dataloader_kwargs,
         )
-
         # First round or if retraining from scratch:
         # Call the `self._build_neural_net` with the rounds' thetas and xs as
         # arguments, which will build the neural network.
         # This is passed into NeuralPosterior, to create a neural posterior which
         # can `sample()` and `log_prob()`. The network is accessible via `.net`.
         if self._neural_net is None or retrain_from_scratch:
-            self._neural_net = self._build_neural_net(
-                theta[self.train_indices], x[self.train_indices]
-            )
-            # If data on training device already move net as well.
-            if (
-                not self._device == "cpu"
-                and f"{x.device.type}:{x.device.index}" == self._device
-            ):
-                self._neural_net.to(self._device)
 
-            test_posterior_net_for_multi_d_x(self._neural_net, theta, x)
-            self._x_shape = x_shape_from_simulation(x)
+            # Get theta,x to initialize NN
+            theta, x, _ = self.get_simulations(starting_round=start_idx)
+            self._neural_net = self._build_neural_net(theta.to("cpu"), x.to("cpu"))
+            self._x_shape = x_shape_from_simulation(x.to("cpu"))
+
+            test_posterior_net_for_multi_d_x(
+                self._neural_net,
+                theta.to("cpu"),
+                x.to("cpu"),
+            )
+
+            del theta, x
 
         # Move entire net to device for training.
         self._neural_net.to(self._device)
@@ -365,7 +385,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         self._summary["best_validation_log_probs"].append(self._best_val_log_prob)
 
         # Update tensorboard and summary dict.
-        self._summarize(round_=self._round, x_o=None, theta_bank=theta, x_bank=x)
+        self._summarize(round_=self._round, x_o=None, theta_bank=None, x_bank=None)
 
         # Update description for progress bar.
         if show_train_summary:
