@@ -32,6 +32,9 @@ def importance_sample(
 def exponentiate_weights(log_weights: Tensor) -> Tensor:
     """Subtracts the maximum of the `log_weights` and then exponentiates them.
 
+    It also filters out infinite `log_weights`, thus the input and output shape can
+    differ.
+
     Args:
         log_weights: Logarithm of the importance weights.
 
@@ -48,11 +51,15 @@ def largest_weight_indices(weights: Tensor) -> Tensor:
     """Returns the indizes of the largest weights.
 
     Args:
-        weights: Importance weights.
+        weights: Weights of which to return the largest indices. Usually importance
+            weights.
 
     Returns:
         Tensor: The indices of the largest importance weights.
     """
+    # Compute number of weights that are used for estimating the Pareto distribution.
+    # Vehtari, Gelman, Gabry, 2017.
+    # Yao, Vehtari, Simpson, Gelman, 2018
     number_of_weights = int(min(len(weights) / 5, 3 * sqrt(len(weights))))
     _, inds = weights.sort()
     return inds[-number_of_weights:]
@@ -61,7 +68,7 @@ def largest_weight_indices(weights: Tensor) -> Tensor:
 def gpdfit(
     x: Tensor, sorted: bool = True, eps: float = 1e-8, return_quadrature: bool = False
 ) -> Tuple:
-    """Maximum aposteriori estimate of a Generalized Paretto distribution.
+    """Maximum a posteriori estimate of a Generalized Paretto distribution.
 
     Pytorch version of gpdfit according to
     https://github.com/avehtari/PSIS/blob/master/py/psis.py. This function will compute

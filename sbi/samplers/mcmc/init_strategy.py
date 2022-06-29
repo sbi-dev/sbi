@@ -63,6 +63,7 @@ def sir_init(
         oversampling_factor=sir_num_batches * sir_batch_size,
         max_sampling_batch_size=sir_batch_size,
     )
+    print(sample.shape)
     return transform(sample)  # type: ignore
 
 

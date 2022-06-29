@@ -44,9 +44,9 @@ class ImportanceSamplingPosterior(NeuralPosterior):
                 generated with sampling importance resampling (SIR). With
                 `importance`, the `.sample()` method returns a tuple of samples and
                 corresponding importance weights.
-            oversampling_factor: Number of proposed samples form which only one is
+            oversampling_factor: Number of proposed samples from which only one is
                 selected based on its importance weight.
-            max_sampling_batch_size: The batchsize of samples being drawn from the
+            max_sampling_batch_size: The batch size of samples being drawn from the
                 proposal at every iteration.
             device: Device on which to sample, e.g., "cpu", "cuda" or "cuda:0". If
                 None, `potential_fn.device` is used.
@@ -119,10 +119,12 @@ class ImportanceSamplingPosterior(NeuralPosterior):
     def estimate_normalization_constant(
         self, x: Tensor, num_samples: int = 10_000, force_update: bool = False
     ) -> Tensor:
-        """Returns the normalization constant with importance sampling.
+        """Returns the normalization constant via importance sampling.
 
         Args:
             num_samples: Number of importance samples used for the estimate.
+            force_update: Whether to re-calculate the normlization constant when x is
+                unchanged and have a cached value.
         """
         # Check if the provided x matches the default x (short-circuit on identity).
         is_new_x = self.default_x is None or (

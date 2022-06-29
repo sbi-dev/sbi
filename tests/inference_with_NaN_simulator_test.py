@@ -65,12 +65,10 @@ def test_z_scoring_warning(snpe_method: type):
 
 @pytest.mark.slow
 @pytest.mark.parametrize(
-    ("method", "exclude_invalid_x", "percent_nans"),
-    ((SNPE_C, True, 0.05), (SNL, True, 0.05), (SRE, True, 0.05)),
+    ("method", "percent_nans"),
+    ((SNPE_C, 0.05), (SNL, 0.05), (SRE, 0.05)),
 )
-def test_inference_with_nan_simulator(
-    method: type, exclude_invalid_x: bool, percent_nans: float
-):
+def test_inference_with_nan_simulator(method: type, percent_nans: float):
 
     # likelihood_mean will be likelihood_shift+theta
     num_dim = 3
@@ -102,9 +100,7 @@ def test_inference_with_nan_simulator(
     inference = method(prior=prior)
 
     theta, x = simulate_for_sbi(simulator, prior, num_simulations)
-    _ = inference.append_simulations(
-        theta, x, exclude_invalid_x=exclude_invalid_x
-    ).train()
+    _ = inference.append_simulations(theta, x).train()
     posterior = inference.build_posterior()
 
     samples = posterior.sample((num_samples,), x=x_o)

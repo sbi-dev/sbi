@@ -35,7 +35,8 @@ def sampling_importance_resampling(
     """
 
     selected_samples = []
-    max_sampling_batch_size = int(max_sampling_batch_size / oversampling_factor)
+
+    max_sampling_batch_size = max(1, int(max_sampling_batch_size / oversampling_factor))
     sampling_batch_size = min(num_samples, max_sampling_batch_size)
 
     num_remaining = num_samples
