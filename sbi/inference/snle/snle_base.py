@@ -191,7 +191,11 @@ class LikelihoodEstimator(NeuralInference, ABC):
 
             # Get theta,x to initialize NN
             theta, x, _ = self.get_simulations(starting_round=start_idx)
-            self._neural_net = self._build_neural_net(theta.to("cpu"), x.to("cpu"))
+            # Use only training data for building the neural net (z-scoring transforms)
+            self._neural_net = self._build_neural_net(
+                theta[self.train_indices].to("cpu"),
+                x[self.train_indices].to("cpu"),
+            )
             self._x_shape = x_shape_from_simulation(x.to("cpu"))
             del theta, x
             assert (
