@@ -2,167 +2,142 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://mackelab.org/sbi/</loc>
-         <lastmod>2022-03-15</lastmod>
+         <lastmod>2022-06-30</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/contribute/</loc>
-         <lastmod>2022-03-15</lastmod>
+         <lastmod>2022-06-30</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/credits/</loc>
-         <lastmod>2022-03-15</lastmod>
+         <lastmod>2022-06-30</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/faq/</loc>
-         <lastmod>2022-03-15</lastmod>
+         <lastmod>2022-06-30</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/install/</loc>
-         <lastmod>2022-03-15</lastmod>
+         <lastmod>2022-06-30</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/reference/</loc>
-         <lastmod>2022-03-15</lastmod>
+         <lastmod>2022-06-30</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/examples/00_HH_simulator/</loc>
-         <lastmod>2022-03-15</lastmod>
+         <lastmod>2022-06-30</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/faq/question_01/</loc>
-         <lastmod>2022-03-15</lastmod>
+         <lastmod>2022-06-30</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/faq/question_02/</loc>
-         <lastmod>2022-03-15</lastmod>
+         <lastmod>2022-06-30</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/faq/question_03/</loc>
-         <lastmod>2022-03-15</lastmod>
+         <lastmod>2022-06-30</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/faq/question_04/</loc>
-         <lastmod>2022-03-15</lastmod>
+         <lastmod>2022-06-30</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/faq/question_05/</loc>
-         <lastmod>2022-03-15</lastmod>
+         <lastmod>2022-06-30</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/faq/question_06/</loc>
-         <lastmod>2022-03-15</lastmod>
+         <lastmod>2022-06-30</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/faq/question_07/</loc>
-         <lastmod>2022-03-15</lastmod>
+         <lastmod>2022-06-30</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/tutorial/00_getting_started/</loc>
-         <lastmod>2022-03-15</lastmod>
+         <lastmod>2022-06-30</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/tutorial/01_gaussian_amortized/</loc>
-         <lastmod>2022-03-15</lastmod>
-         <changefreq>daily</changefreq>
-    </url>
-    <url>
-         <loc>https://mackelab.org/sbi/tutorial/02_HH_simulator/</loc>
-         <lastmod>2022-03-15</lastmod>
+         <lastmod>2022-06-30</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/tutorial/02_flexible_interface/</loc>
-         <lastmod>2022-03-15</lastmod>
+         <lastmod>2022-06-30</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/tutorial/03_multiround_inference/</loc>
-         <lastmod>2022-03-15</lastmod>
+         <lastmod>2022-06-30</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/tutorial/04_density_estimators/</loc>
-         <lastmod>2022-03-15</lastmod>
+         <lastmod>2022-06-30</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/tutorial/05_embedding_net/</loc>
-         <lastmod>2022-03-15</lastmod>
+         <lastmod>2022-06-30</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/tutorial/07_conditional_distributions/</loc>
-         <lastmod>2022-03-15</lastmod>
+         <lastmod>2022-06-30</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/tutorial/08_restriction_estimator/</loc>
-         <lastmod>2022-03-15</lastmod>
+         <lastmod>2022-06-30</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/tutorial/09_sensitivity_analysis/</loc>
-         <lastmod>2022-03-15</lastmod>
+         <lastmod>2022-06-30</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/tutorial/10_crafting_summary_statistics/</loc>
-         <lastmod>2022-03-15</lastmod>
+         <lastmod>2022-06-30</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/tutorial/11_sampler_interface/</loc>
-         <lastmod>2022-03-15</lastmod>
+         <lastmod>2022-06-30</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/tutorial/12_diagnostics_posterior_predictive_check/</loc>
-         <lastmod>2022-03-15</lastmod>
+         <lastmod>2022-06-30</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/tutorial/13_diagnostics_simulation_based_calibration/</loc>
-         <lastmod>2022-03-15</lastmod>
+         <lastmod>2022-06-30</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/tutorial/14_multi-trial-data-and-mixed-data-types/</loc>
-         <lastmod>2022-03-15</lastmod>
-         <changefreq>daily</changefreq>
-    </url>
-    <url>
-         <loc>https://mackelab.org/sbi/tutorial/Model%20Misspecification/</loc>
-         <lastmod>2022-03-15</lastmod>
-         <changefreq>daily</changefreq>
-    </url>
-    <url>
-         <loc>https://mackelab.org/sbi/tutorial/SAAS/</loc>
-         <lastmod>2022-03-15</lastmod>
-         <changefreq>daily</changefreq>
-    </url>
-    <url>
-         <loc>https://mackelab.org/sbi/tutorial/SBC/</loc>
-         <lastmod>2022-03-15</lastmod>
-         <changefreq>daily</changefreq>
-    </url>
-    <url>
-         <loc>https://mackelab.org/sbi/tutorial/SBI%20and%20Model%20Misspecification/</loc>
-         <lastmod>2022-03-15</lastmod>
+         <lastmod>2022-06-30</lastmod>
          <changefreq>daily</changefreq>
     </url>
 </urlset>
