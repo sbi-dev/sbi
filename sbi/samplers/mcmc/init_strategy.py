@@ -38,7 +38,7 @@ def sir_init(
     proposal: Any,
     potential_fn: Callable,
     transform: torch_tf.Transform,
-    num_candidate_samples: int = 1000,
+    num_candidate_samples: int = 10_000,
     **kwargs: Any,
 ) -> Tensor:
     r"""Return a sample obtained by sequential importance reweighting.
@@ -68,7 +68,7 @@ def resample_given_potential_fn(
     proposal: Any,
     potential_fn: Callable,
     transform: torch_tf.Transform,
-    num_candidate_samples: int = 1000,
+    num_candidate_samples: int = 10_000,
     num_batches: int = 1,
     **kwargs: Any,
 ) -> Tensor:
