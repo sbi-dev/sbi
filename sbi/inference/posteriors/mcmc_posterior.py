@@ -237,7 +237,11 @@ class MCMCPosterior(NeuralPosterior):
         self.potential_ = self._prepare_potential(method)  # type: ignore
 
         initial_params = self._get_initial_params(
-            init_strategy, num_chains, num_workers, show_progress_bars  # type: ignore
+            init_strategy,
+            num_chains,
+            num_workers,
+            show_progress_bars,  # type: ignore
+            **dict(num_candidate_samples=init_strategy_num_candidates),
         )
         num_samples = torch.Size(sample_shape).numel()
 
