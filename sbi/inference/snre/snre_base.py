@@ -77,9 +77,6 @@ class RatioEstimator(NeuralInference, ABC):
         else:
             self._build_neural_net = classifier
 
-        # Ratio-based-specific summary_writer fields.
-        self._summary.update({"mcmc_times": []})  # type: ignore
-
     def append_simulations(
         self,
         theta: Tensor,

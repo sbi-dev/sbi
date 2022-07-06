@@ -84,9 +84,6 @@ class PosteriorEstimator(NeuralInference, ABC):
         self._proposal_roundwise = []
         self.use_non_atomic_loss = False
 
-        # Extra SNPE-specific fields summary_writer.
-        self._summary.update({"rejection_sampling_acceptance_rates": []})  # type:ignore
-
     def append_simulations(
         self,
         theta: Tensor,
