@@ -348,7 +348,7 @@ class PosteriorEstimator(NeuralInference, ABC):
             train_log_prob_average = train_log_probs_sum / (
                 len(train_loader) * train_loader.batch_size  # type: ignore
             )
-            self._summary["train_log_probs"].append(train_log_prob_average)
+            self._summary["training_log_probs"].append(train_log_prob_average)
 
             # Calculate validation performance.
             self._neural_net.eval()
@@ -385,11 +385,11 @@ class PosteriorEstimator(NeuralInference, ABC):
         self._report_convergence_at_end(self.epoch, stop_after_epochs, max_num_epochs)
 
         # Update summary.
-        self._summary["epochs"].append(self.epoch)
-        self._summary["best_validation_log_probs"].append(self._best_val_log_prob)
+        self._summary["epochs_trained"].append(self.epoch)
+        self._summary["best_validation_log_prob"].append(self._best_val_log_prob)
 
         # Update tensorboard and summary dict.
-        self._summarize(round_=self._round, x_o=None, theta_bank=None, x_bank=None)
+        self._summarize(round_=self._round)
 
         # Update description for progress bar.
         if show_train_summary:

@@ -27,14 +27,14 @@ _NeuralInference = Any
 
 def plot_summary(
     inference: Union[_NeuralInference, Path],
-    tags: List[str] = ["validation_log_probs_across_rounds"],
+    tags: List[str] = ["validation_log_probs"],
     disable_tensorboard_prompt: bool = False,
     tensorboard_scalar_limit: int = 10_000,
     figsize: List[int] = [20, 6],
     fontsize: float = 12,
     fig: Optional[Figure] = None,
     axes: Optional[Axes] = None,
-    xlabel: str = "epochs",
+    xlabel: str = "epochs_trained",
     ylabel: List[str] = [],
     plot_kwargs: Dict[str, Any] = {},
 ) -> Tuple[Figure, Axes]:

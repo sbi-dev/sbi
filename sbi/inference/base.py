@@ -143,11 +143,10 @@ class NeuralInference(ABC):
 
         # Logging during training (by SummaryWriter).
         self._summary = dict(
-            median_observation_distances=[],
-            epochs=[],
-            best_validation_log_probs=[],
+            epochs_trained=[],
+            best_validation_log_prob=[],
             validation_log_probs=[],
-            train_log_probs=[],
+            training_log_probs=[],
             epoch_durations_sec=[],
         )
 
@@ -308,15 +307,15 @@ class NeuralInference(ABC):
 
     @staticmethod
     def _describe_round(round_: int, summary: Dict[str, list]) -> str:
-        epochs = summary["epochs"][-1]
-        best_validation_log_probs = summary["best_validation_log_probs"][-1]
+        epochs = summary["epochs_trained"][-1]
+        best_validation_log_prob = summary["best_validation_log_prob"][-1]
 
         description = f"""
         -------------------------
         ||||| ROUND {round_ + 1} STATS |||||:
         -------------------------
         Epochs trained: {epochs}
-        Best validation performance: {best_validation_log_probs:.4f}
+        Best validation performance: {best_validation_log_prob:.4f}
         -------------------------
         """
 
@@ -348,78 +347,67 @@ class NeuralInference(ABC):
     def _summarize(
         self,
         round_: int,
-        x_o: Union[Tensor, None],
-        theta_bank: Union[Tensor, None],
-        x_bank: Union[Tensor, None],
     ) -> None:
         """Update the summary_writer with statistics for a given round.
 
-        Statistics are extracted from the arguments and from entries in self._summary
-        created during training.
+        During training several performance statistics are added to the summary, e.g.,
+        using `self._summary['key'].append(value)`. This function writes these values
+        into summary writer object.
+
+        Args:
+            round: index of round
 
         Scalar tags:
-            - median_observation_distances
-            - epochs_trained
-            - best_validation_log_prob
-            - validation_log_probs_across_rounds
-            - train_log_probs_across_rounds
-            - epoch_durations_sec_across_rounds
+            - epochs_trained:
+                number of epochs trained
+            - best_validation_log_prob:
+                best validation log prob (for each round).
+            - validation_log_probs:
+                validation log probs for every epoch (for each round).
+            - training_log_probs
+                training log probs for every epoch (for each round).
+            - epoch_durations_sec
+                epoch duration for every epoch (for each round)
+
         """
-
-        # NB. This is a subset of the logging as done in `GH:conormdurkan/lfi`. A big
-        # part of the logging was removed because of API changes, e.g., logging
-        # comparisons to ground-truth parameters and samples.
-
-        # Median |x - x0| for most recent round.
-        if x_o is not None:
-            median_observation_distance = torch.median(
-                torch.sqrt(torch.sum((x_bank - x_o.reshape(1, -1)) ** 2, dim=-1))
-            )
-            self._summary["median_observation_distances"].append(
-                median_observation_distance.item()
-            )
-
-            self._summary_writer.add_scalar(
-                tag="median_observation_distance",
-                scalar_value=self._summary["median_observation_distances"][-1],
-                global_step=round_ + 1,
-            )
 
         # Add most recent training stats to summary writer.
         self._summary_writer.add_scalar(
             tag="epochs_trained",
-            scalar_value=self._summary["epochs"][-1],
+            scalar_value=self._summary["epochs_trained"][-1],
             global_step=round_ + 1,
         )
 
         self._summary_writer.add_scalar(
             tag="best_validation_log_prob",
-            scalar_value=self._summary["best_validation_log_probs"][-1],
+            scalar_value=self._summary["best_validation_log_prob"][-1],
             global_step=round_ + 1,
         )
 
         # Add validation log prob for every epoch.
         # Offset with all previous epochs.
         offset = (
-            torch.tensor(self._summary["epochs"][:-1], dtype=torch.int).sum().item()
+            torch.tensor(self._summary["epochs_trained"][:-1], dtype=torch.int)
+            .sum()
+            .item()
         )
         for i, vlp in enumerate(self._summary["validation_log_probs"][offset:]):
             self._summary_writer.add_scalar(
-                tag="validation_log_probs_across_rounds",
+                tag="validation_log_probs",
                 scalar_value=vlp,
                 global_step=offset + i,
             )
 
-        for i, tlp in enumerate(self._summary["train_log_probs"][offset:]):
+        for i, tlp in enumerate(self._summary["training_log_probs"][offset:]):
             self._summary_writer.add_scalar(
-                tag="train_log_probs_across_rounds",
+                tag="training_log_probs",
                 scalar_value=tlp,
                 global_step=offset + i,
             )
 
         for i, eds in enumerate(self._summary["epoch_durations_sec"][offset:]):
             self._summary_writer.add_scalar(
-                tag="epoch_durations_sec_across_rounds",
+                tag="epoch_durations_sec",
                 scalar_value=eds,
                 global_step=offset + i,
             )
