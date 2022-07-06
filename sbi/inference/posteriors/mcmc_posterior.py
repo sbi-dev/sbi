@@ -44,7 +44,8 @@ class MCMCPosterior(NeuralPosterior):
         warmup_steps: int = 10,
         num_chains: int = 1,
         init_strategy: str = "resample",
-        init_strategy_num_candidates: int = 1_000,
+        init_strategy_parameters: Dict[str, Any] = {},
+        init_strategy_num_candidates: Optional[int] = None,
         num_workers: int = 1,
         device: Optional[str] = None,
         x_shape: Optional[torch.Size] = None,
@@ -72,8 +73,13 @@ class MCMCPosterior(NeuralPosterior):
                 initial locations with weights proportional to `exp(potential_fn -
                 proposal.log_prob`. `resample` is the same as `sir` but
                 uses `exp(potential_fn)` as weights.
+            init_strategy_parameters: Dictionary of keyword arguments passed to the
+                init strategy, e.g., for `init_strategy=sir` this could be
+                `num_candidate_samples`, i.e., the number of candidates to to find init
+                locations (internal default is `1000`), or `device`.
             init_strategy_num_candidates: Number of candidates to to find init
-                locations in `init_strategy=sir`.
+                 locations in `init_strategy=sir` (deprecated, use
+                 init_strategy_parameters instead).
             num_workers: number of cpu cores used to parallelize mcmc
             device: Training device, e.g., "cpu", "cuda" or "cuda:0". If None,
                 `potential_fn.device` is used.
@@ -94,8 +100,18 @@ class MCMCPosterior(NeuralPosterior):
         self.warmup_steps = warmup_steps
         self.num_chains = num_chains
         self.init_strategy = init_strategy
-        self.init_strategy_num_candidates = init_strategy_num_candidates
+        self.init_strategy_parameters = init_strategy_parameters
         self.num_workers = num_workers
+
+        if init_strategy_num_candidates is not None:
+            warn(
+                """Passing `init_strategy_num_candidates` is deprecated as of sbi
+                v0.19.0. Instead, use e.g.,
+                `init_strategy_parameters={"num_candidate_samples": 1000}`"""
+            )
+            self.init_strategy_parameters[
+                "num_candidate_samples"
+            ] = init_strategy_num_candidates
 
         self.potential_ = self._prepare_potential(method)
 
@@ -162,6 +178,7 @@ class MCMCPosterior(NeuralPosterior):
         warmup_steps: Optional[int] = None,
         num_chains: Optional[int] = None,
         init_strategy: Optional[str] = None,
+        init_strategy_parameters: Optional[Dict[str, Any]] = None,
         init_strategy_num_candidates: Optional[int] = None,
         mcmc_parameters: Dict = {},
         mcmc_method: Optional[str] = None,
@@ -198,11 +215,20 @@ class MCMCPosterior(NeuralPosterior):
         num_chains = self.num_chains if num_chains is None else num_chains
         init_strategy = self.init_strategy if init_strategy is None else init_strategy
         num_workers = self.num_workers if num_workers is None else num_workers
-        init_strategy_num_candidates = (
-            self.init_strategy_num_candidates
-            if init_strategy_num_candidates is None
-            else init_strategy_num_candidates
+        init_strategy_parameters = (
+            self.init_strategy_parameters
+            if init_strategy_parameters is None
+            else init_strategy_parameters
         )
+        if init_strategy_num_candidates is not None:
+            warn(
+                """Passing `init_strategy_num_candidates` is deprecated as of sbi
+                v0.19.0. Instead, use e.g.,
+                `init_strategy_parameters={"num_candidate_samples": 1000}`"""
+            )
+            self.init_strategy_parameters[
+                "num_candidate_samples"
+            ] = init_strategy_num_candidates
         if sample_with is not None:
             raise ValueError(
                 f"You set `sample_with={sample_with}`. As of sbi v0.18.0, setting "
@@ -231,17 +257,14 @@ class MCMCPosterior(NeuralPosterior):
         warmup_steps = _maybe_use_dict_entry(warmup_steps, "warmup_steps", m_p)
         num_chains = _maybe_use_dict_entry(num_chains, "num_chains", m_p)
         init_strategy = _maybe_use_dict_entry(init_strategy, "init_strategy", m_p)
-        init_strategy_num_candidates = _maybe_use_dict_entry(
-            init_strategy_num_candidates, "init_strategy_num_candidates", m_p
-        )
         self.potential_ = self._prepare_potential(method)  # type: ignore
 
         initial_params = self._get_initial_params(
-            init_strategy,
-            num_chains,
+            init_strategy,  # type: ignore
+            num_chains,  # type: ignore
             num_workers,
-            show_progress_bars,  # type: ignore
-            **dict(num_candidate_samples=init_strategy_num_candidates),
+            show_progress_bars,
+            **init_strategy_parameters,
         )
         num_samples = torch.Size(sample_shape).numel()
 
