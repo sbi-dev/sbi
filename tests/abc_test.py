@@ -12,6 +12,7 @@ from sbi.utils import BoxUniform
 from tests.test_utils import check_c2st
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("num_dim", (1, 2))
 def test_mcabc_inference_on_linear_gaussian(
     num_dim,
@@ -71,6 +72,7 @@ def test_mcabc_sass_lra(lra, sass_expansion_degree):
     )
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("num_dim", (1, 2))
 @pytest.mark.parametrize("prior_type", ("uniform", "gaussian"))
 def test_smcabc_inference_on_linear_gaussian(
@@ -155,6 +157,7 @@ def test_smcabc_sass_lra(lra, sass_expansion_degree):
     )
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("kde_bandwidth", ("cv", "silvermann", "scott", 0.1))
 def test_mcabc_kde(kde_bandwidth):
     test_mcabc_inference_on_linear_gaussian(
