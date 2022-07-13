@@ -293,11 +293,8 @@ def conditional_potential(
 
     condition = atleast_2d_float32_tensor(condition)
 
-    # Transform the `condition` to unconstrained space.
-    transformed_condition = theta_transform(condition)
-
     conditioned_potential_fn = ConditionedPotential(
-        potential_fn, transformed_condition, dims_to_sample  # type: ignore
+        potential_fn, condition, dims_to_sample  # type: ignore
     )
 
     restricted_prior = RestrictedPriorForConditional(prior, dims_to_sample)
