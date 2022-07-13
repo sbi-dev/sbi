@@ -2,6 +2,7 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 from typing import Any, Callable, List, Optional, Tuple, Union
+from warnings import warn
 
 import torch
 import torch.distributions.transforms as torch_tf
@@ -231,6 +232,28 @@ class ConditionedMDN:
 
 
 def conditonal_potential(
+    potential_fn: Callable,
+    theta_transform: TorchTransform,
+    prior: Distribution,
+    condition: Tensor,
+    dims_to_sample: List[int],
+) -> Tuple[Callable, torch_tf.Transform, Any]:
+    """
+    Only for backwards compatibility.
+
+    The name of this function was renamed until v0.19.0. (notice the missing `i` in
+    the name).
+    """
+    warn(
+        "The misspelled function `conditonal_potential` will be removed in a future "
+        "release of sbi. Please use `conditional_potential` (spelled correctly)."
+    )
+    return conditional_potential(
+        potential_fn, theta_transform, prior, condition, dims_to_sample
+    )
+
+
+def conditional_potential(
     potential_fn: Callable,
     theta_transform: TorchTransform,
     prior: Distribution,
