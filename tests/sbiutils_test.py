@@ -3,7 +3,7 @@ from typing import Tuple
 import matplotlib.pyplot as plt
 import pytest
 import torch
-from torch import Tensor, eye, ones, zeros
+from torch import Tensor, ones, zeros
 from torch.distributions import MultivariateNormal
 from torch.distributions.transforms import IndependentTransform, identity_transform
 
@@ -15,15 +15,7 @@ from sbi.analysis import (
 )
 from sbi.inference import SNPE, SNPE_A
 from sbi.inference.snpe.snpe_a import SNPE_A_MDN
-from sbi.utils import (
-    BoxUniform,
-    classifier_nn,
-    get_kde,
-    likelihood_nn,
-    mcmc_transform,
-    posterior_nn,
-)
-from sbi.utils.user_input_checks import process_prior
+from sbi.utils import BoxUniform, classifier_nn, get_kde, likelihood_nn, posterior_nn
 
 
 def test_conditional_density_1d():

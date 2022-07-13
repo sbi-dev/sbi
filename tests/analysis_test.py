@@ -3,7 +3,7 @@ import torch
 
 from sbi.analysis import ActiveSubspace, conditional_corrcoeff, conditional_pairplot
 from sbi.inference import SNPE
-from sbi.utils import BoxUniform
+from sbi.utils import BoxUniform, get_1d_marginal_peaks_from_kde
 
 
 @pytest.mark.slow
@@ -57,3 +57,14 @@ def test_analysis_modules(device: str) -> None:
     _ = conditional_pairplot(
         posterior, condition=posterior.sample((1,)), limits=[[-2, 2], [-2, 2], [-2, 2]]
     )
+
+
+@pytest.mark.parametrize("num_candidates", (1_000,))
+def test_1d_marginals_peaks_from_kde(num_candidates):
+
+    num_samples = 10_000
+    num_dim = 4
+    samples = torch.ones(num_samples, num_dim) + 1.0 * torch.randn(num_samples, num_dim)
+
+    peaks = get_1d_marginal_peaks_from_kde(samples, num_candidates=num_candidates)
+    assert torch.allclose(peaks, torch.ones(num_dim), atol=1e-1)
