@@ -12,7 +12,7 @@ from torch.distributions import MultivariateNormal
 
 from sbi import analysis as analysis
 from sbi import utils as utils
-from sbi.analysis import ConditionedMDN, conditonal_potential
+from sbi.analysis import ConditionedMDN, conditional_potential
 from sbi.inference import (
     SNPE_A,
     SNPE_B,
@@ -468,7 +468,11 @@ def test_sample_conditional():
     potential_fn, theta_transform = posterior_estimator_based_potential(
         posterior_estimator, prior=prior, x_o=x_o
     )
-    (conditioned_potential_fn, restricted_tf, restricted_prior,) = conditonal_potential(
+    (
+        conditioned_potential_fn,
+        restricted_tf,
+        restricted_prior,
+    ) = conditional_potential(
         potential_fn=potential_fn,
         theta_transform=theta_transform,
         prior=prior,
