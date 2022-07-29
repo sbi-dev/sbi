@@ -1,5 +1,6 @@
 from sbi.inference.snre.snre_a import SNRE_A
 from sbi.inference.snre.snre_b import SNRE_B
+from sbi.inference.snre.snre_c import SNRE_C
 
 # Aliases
 AALR = SNRE_A
