@@ -2,8 +2,10 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 from __future__ import annotations
+from itertools import product
 
 import pytest
+from sbi.inference.snre.snre_base import RatioEstimator
 from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
@@ -11,6 +13,7 @@ from sbi import utils as utils
 from sbi.inference import (
     AALR,
     SNRE_B,
+    SNRE_C,
     ImportanceSamplingPosterior,
     MCMCPosterior,
     RejectionPosterior,
@@ -33,8 +36,8 @@ from tests.test_utils import (
 )
 
 
-@pytest.mark.parametrize("num_dim", (1, 3))
-def test_api_sre_on_linearGaussian(num_dim: int):
+@pytest.mark.parametrize("num_dim, SNRE", product((1, 3), (SNRE_B, SNRE_C)))
+def test_api_sre_on_linearGaussian(num_dim: int, SNRE: RatioEstimator):
     """Test inference API of SRE with linear Gaussian model.
 
     Avoids intense computation for fast testing of API etc.
@@ -46,7 +49,7 @@ def test_api_sre_on_linearGaussian(num_dim: int):
     prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
 
     simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior)
-    inference = SNRE_B(
+    inference = SNRE(
         classifier="resnet",
         show_progress_bars=False,
     )
@@ -68,7 +71,8 @@ def test_api_sre_on_linearGaussian(num_dim: int):
         posterior.sample(sample_shape=(10,))
 
 
-def test_c2st_sre_on_linearGaussian():
+@pytest.mark.parametrize("SNRE", (SNRE_B, SNRE_C))
+def test_c2st_sre_on_linearGaussian(SNRE: RatioEstimator):
     """Test whether SRE infers well a simple example with available ground truth.
 
     This example has different number of parameters theta than number of x. This test
@@ -97,7 +101,7 @@ def test_c2st_sre_on_linearGaussian():
         ),
         prior,
     )
-    inference = SNRE_B(
+    inference = SNRE(
         classifier="resnet",
         show_progress_bars=False,
     )
@@ -182,7 +186,7 @@ def test_c2st_sre_variants_on_linearGaussian(
         show_progress_bars=False,
     )
 
-    inference = SNRE_B(**kwargs) if method_str == "sre" else AALR(**kwargs)
+    inference = SNRE_B(**kwargs) if method_str == "sre" else AALR(**kwargs)  # TODO SNRE_C add support for 
 
     # Should use default `num_atoms=10` for SRE; `num_atoms=2` for AALR
     theta, x = simulate_for_sbi(
@@ -250,8 +254,8 @@ def test_c2st_sre_variants_on_linearGaussian(
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("num_trials", (1, 3))
-def test_c2st_multi_round_snr_on_linearGaussian_vi(num_trials: int):
+@pytest.mark.parametrize("num_dim, SNRE", product((1, 3), (SNRE_B, SNRE_C)))
+def test_c2st_multi_round_snr_on_linearGaussian_vi(num_trials: int, SNRE: RatioEstimator):
     """Test SNL on linear Gaussian, comparing to ground truth posterior via c2st."""
 
     num_dim = 2
@@ -274,7 +278,7 @@ def test_c2st_multi_round_snr_on_linearGaussian_vi(num_trials: int):
     simulator, prior = prepare_for_sbi(
         lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov), prior
     )
-    inference = SNRE_B(show_progress_bars=False)
+    inference = SNRE(show_progress_bars=False)
 
     theta, x = simulate_for_sbi(
         simulator, prior, num_simulations_per_round, simulation_batch_size=50
