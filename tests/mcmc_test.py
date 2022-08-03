@@ -5,18 +5,30 @@ from __future__ import annotations
 
 from math import ceil
 
+import arviz as az
 import numpy as np
 import pytest
 import torch
 from torch import eye, ones, zeros
+from torch.distributions import Uniform
 
+from sbi.inference import (
+    SNLE,
+    MCMCPosterior,
+    likelihood_estimator_based_potential,
+    prepare_for_sbi,
+    simulate_for_sbi,
+)
 from sbi.samplers.mcmc.slice_numpy import (
     SliceSampler,
     SliceSamplerSerial,
     SliceSamplerVectorized,
 )
-from sbi.simulators.linear_gaussian import true_posterior_linear_gaussian_mvn_prior
-from sbi.utils import tensor2numpy
+from sbi.simulators.linear_gaussian import (
+    diagonal_linear_gaussian,
+    true_posterior_linear_gaussian_mvn_prior,
+)
+from sbi.utils import likelihood_nn, tensor2numpy
 from tests.test_utils import check_c2st
 
 
@@ -170,3 +182,57 @@ def test_c2st_slice_np_parallelized(vectorized: bool, num_workers: int):
     check_c2st(
         samples, target_samples, alg=f"slice_np {'vectorized' if vectorized else ''}"
     )
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize(
+    "method",
+    (
+        "nuts",
+        "hmc",
+        "slice",
+        "slice_np",
+        "slice_np_vectorized",
+    ),
+)
+def test_getting_inference_diagnostics_sample(method):
+
+    num_samples = 100
+    num_dim = 2
+    num_chains = 2
+
+    # Use composed prior to test MultipleIndependent case.
+    prior = [
+        Uniform(low=-ones(1), high=ones(1)),
+        Uniform(low=-ones(1), high=ones(1)),
+    ]
+
+    simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior)
+    density_estimator = likelihood_nn("maf", num_transforms=3)
+    inference = SNLE(density_estimator=density_estimator, show_progress_bars=False)
+
+    theta, x = simulate_for_sbi(simulator, prior, 1000, simulation_batch_size=50)
+    likelihood_estimator = inference.append_simulations(theta, x).train(
+        training_batch_size=100
+    )
+
+    x_o = zeros((1, num_dim))
+    potential_fn, theta_transform = likelihood_estimator_based_potential(
+        prior=prior, likelihood_estimator=likelihood_estimator, x_o=x_o
+    )
+    posterior = MCMCPosterior(
+        proposal=prior,
+        potential_fn=potential_fn,
+        theta_transform=theta_transform,
+        thin=3,
+        num_chains=num_chains,
+    )
+    _ = posterior.sample(sample_shape=(num_samples,), method=method)
+
+    _, idata = posterior.sample(
+        sample_shape=(num_samples,),
+        method=method,
+        return_arviz=True,
+    )
+
+    az.plot_trace(idata)
