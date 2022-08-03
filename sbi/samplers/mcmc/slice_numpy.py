@@ -255,6 +255,7 @@ class SliceSamplerSerial:
 
         self.n_dims = self.x.size
         self.num_workers = num_workers
+        self._samples = None
 
     def run(self, num_samples: int) -> np.ndarray:
         """Runs MCMC and returns thinned samples.
@@ -293,6 +294,9 @@ class SliceSamplerSerial:
         samples = samples.reshape(num_chains, -1, dim_samples)  # chains, samples, dim
         samples = samples[:, :: self.thin, :]  # thin chains
 
+        # save samples
+        self._samples = samples
+
         return samples
 
     def run_fun(self, num_samples, inits, seed) -> np.ndarray:
@@ -309,6 +313,39 @@ class SliceSamplerSerial:
             verbose=self.num_workers == 1 and self.verbose,
         )
         return posterior_sampler.gen(num_samples)
+
+    def get_samples(
+        self, num_samples: Optional[int] = None, group_by_chain: bool = True
+    ) -> Union[None, np.ndarray]:
+        """Returns samples from last call to self.run.
+
+        Returns None if no samples have been generated yet.
+
+        Args:
+            num_samples: Number of samples to return (for each chain if grouped by
+                chain), if too large, all samples are returned (no error).
+            group_by_chain: Whether to return samples grouped by chain (chain x samples
+                x dim_params) or flattened (all_samples, dim_params).
+
+        Returns:
+            samples (or None if no samples have been generated yet)
+        """
+        if self._samples is None:
+            return None
+        # if not grouped by chain, flatten samples into (all_samples, dim_params)
+        if not group_by_chain:
+            samples = self._samples.reshape(-1, self._samples.shape[2])
+        else:
+            samples = self._samples
+
+        # if not specified return all samples
+        if num_samples is None:
+            return samples
+        # otherwise return last num_samples (for each chain when grouped).
+        elif group_by_chain:
+            return samples[:, -num_samples:, :]
+        else:
+            return samples[-num_samples:, :]
 
 
 class SliceSamplerVectorized:
@@ -349,6 +386,8 @@ class SliceSamplerVectorized:
         self.max_width = max_width
 
         self.n_dims = self.x.size
+
+        self._samples = None
 
         # TODO: implement parallelization across batches of chains.
         if num_workers > 1:
@@ -547,7 +586,42 @@ class SliceSamplerVectorized:
 
         samples = samples[:, :: self.thin, :]  # thin chains
 
+        self._samples = samples
+
         return samples
+
+    def get_samples(
+        self, num_samples: Optional[int] = None, group_by_chain: bool = True
+    ) -> Union[None, np.ndarray]:
+        """Returns samples from last call to self.run.
+
+        Returns None if no samples have been generated yet.
+
+        Args:
+            num_samples: Number of samples to return (for each chain if grouped by
+                chain), if too large, all samples are returned (no error).
+            group_by_chain: Whether to return samples grouped by chain (chain x samples
+                x dim_params) or flattened (all_samples, dim_params).
+
+        Returns:
+            samples (or None if no samples have been generated yet)
+        """
+        if self._samples is None:
+            return None
+        # if not grouped by chain, flatten samples into (all_samples, dim_params)
+        if not group_by_chain:
+            samples = self._samples.reshape(-1, self._samples.shape[2])
+        else:
+            samples = self._samples
+
+        # if not specified return all samples
+        if num_samples is None:
+            return samples
+        # otherwise return last num_samples (for each chain when grouped).
+        elif group_by_chain:
+            return samples[:, -num_samples:, :]
+        else:
+            return samples[-num_samples:, :]
 
 
 def run_slice_np_vectorized_parallelized(

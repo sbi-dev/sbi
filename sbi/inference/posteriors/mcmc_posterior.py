@@ -2,11 +2,12 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 from functools import partial
 from math import ceil
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Callable, Dict, Optional, Tuple, Union
 from warnings import warn
 
 import torch
 import torch.distributions.transforms as torch_tf
+from arviz.data import InferenceData
 from joblib import Parallel, delayed
 from numpy import ndarray
 from pyro.infer.mcmc import HMC, NUTS
@@ -15,7 +16,6 @@ from torch import Tensor
 from torch import multiprocessing as mp
 from tqdm.auto import tqdm
 
-# TODO: fix imports.
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.samplers.mcmc import (
     IterateParameters,
@@ -28,7 +28,12 @@ from sbi.samplers.mcmc import (
 )
 from sbi.simulators.simutils import tqdm_joblib
 from sbi.types import Shape, TorchTransform
-from sbi.utils import pyro_potential_wrapper, tensor2numpy, transformed_potential
+from sbi.utils import (
+    get_arviz_diagnostics,
+    pyro_potential_wrapper,
+    tensor2numpy,
+    transformed_potential,
+)
 from sbi.utils.torchutils import ensure_theta_batched
 
 
@@ -199,8 +204,9 @@ class MCMCPosterior(NeuralPosterior):
         mcmc_method: Optional[str] = None,
         sample_with: Optional[str] = None,
         num_workers: Optional[int] = None,
+        return_arviz: bool = False,
         show_progress_bars: bool = True,
-    ) -> Tensor:
+    ) -> Union[Tensor, Tuple[Tensor, InferenceData]]:
         r"""Return samples from posterior distribution $p(\theta|x)$ with MCMC.
 
         Check the `__init__()` method for a description of all arguments as well as
@@ -306,12 +312,24 @@ class MCMCPosterior(NeuralPosterior):
                     warmup_steps=warmup_steps,  # type: ignore
                     num_chains=num_chains,
                     show_progress_bars=show_progress_bars,
-                ).detach()
+                )
             else:
                 raise NameError
 
         samples = self.theta_transform.inv(transformed_samples)
-        return samples.reshape((*sample_shape, -1))  # type: ignore
+
+        # Maybe return Arviz inference data object.
+        if return_arviz:
+            return (
+                samples.reshape((*sample_shape, -1)),  # type: ignore
+                get_arviz_diagnostics(
+                    self._posterior_sampler,
+                    param_name=self.param_name,
+                    theta_transform=self.theta_transform,  # type: ignore
+                ),
+            )
+        else:
+            return samples.reshape((*sample_shape, -1))  # type: ignore
 
     def _build_mcmc_init_fn(
         self,
@@ -452,7 +470,9 @@ class MCMCPosterior(NeuralPosterior):
             show_progress_bars: Whether to show a progressbar during sampling;
                 can only be turned off for vectorized sampler.
 
-        Returns: Tensor of shape (num_samples, shape_of_single_theta).
+        Returns:
+            Tensor of shape (num_samples, shape_of_single_theta).
+            Arviz InferenceData object.
         """
 
         num_chains, dim_samples = initial_params.shape
@@ -500,7 +520,7 @@ class MCMCPosterior(NeuralPosterior):
         warmup_steps: int = 200,
         num_chains: Optional[int] = 1,
         show_progress_bars: bool = True,
-    ):
+    ) -> Tensor:
         r"""Return samples obtained using Pyro HMC, NUTS for slice kernels.
 
         Args:
@@ -514,7 +534,9 @@ class MCMCPosterior(NeuralPosterior):
             num_chains: Whether to sample in parallel. If None, use all but one CPU.
             show_progress_bars: Whether to show a progressbar during sampling.
 
-        Returns: Tensor of shape (num_samples, shape_of_single_theta).
+        Returns:
+            Tensor of shape (num_samples, shape_of_single_theta).
+            Arviz InferenceData object.
         """
         num_chains = mp.cpu_count() - 1 if num_chains is None else num_chains
 
@@ -541,7 +563,7 @@ class MCMCPosterior(NeuralPosterior):
         samples = samples[::thin][:num_samples]
         assert samples.shape[0] == num_samples
 
-        return samples
+        return samples.detach()
 
     def _prepare_potential(self, method: str) -> Callable:
         """Combines potential and transform and takes care of gradients and pyro.
