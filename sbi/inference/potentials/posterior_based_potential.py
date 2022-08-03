@@ -4,6 +4,7 @@
 from typing import Callable, Optional, Tuple
 
 import torch
+import torch.distributions.transforms as torch_tf
 from pyknos.nflows import flows
 from torch import Tensor, nn
 from torch.distributions import Distribution
@@ -19,6 +20,7 @@ def posterior_estimator_based_potential(
     posterior_estimator: nn.Module,
     prior: Distribution,
     x_o: Optional[Tensor],
+    theta_transform: Optional[TorchTransform] = None,
 ) -> Tuple[Callable, TorchTransform]:
     r"""Returns the potential for posterior-based methods.
 
@@ -32,6 +34,11 @@ def posterior_estimator_based_potential(
         posterior_estimator: The neural network modelling the posterior.
         prior: The prior distribution.
         x_o: The observed data at which to evaluate the posterior.
+        theta_transform: Transform to map the parameters to an
+            unconstrained space. If None (default), a suitable transform is
+            built from the prior support. In order to not use a transform at all,
+            pass an identity transform, e.g., `theta_transform=torch.distrbutions.
+            transforms`.
 
     Returns:
         The potential function and a transformation that maps
@@ -43,7 +50,9 @@ def posterior_estimator_based_potential(
     potential_fn = PosteriorBasedPotential(
         posterior_estimator, prior, x_o, device=device
     )
-    theta_transform = mcmc_transform(prior, device=device)
+
+    if theta_transform is None:
+        theta_transform = mcmc_transform(prior, device=device)
 
     return potential_fn, theta_transform
 
