@@ -411,7 +411,11 @@ class SNPE_C(PosteriorEstimator):
         log_prob_proposal_posterior = utils.mog_log_prob(
             theta, logits_pp, m_pp, prec_pp
         )
-        utils.assert_all_finite(log_prob_proposal_posterior, "proposal posterior eval")
+        utils.assert_all_finite(
+            log_prob_proposal_posterior,
+            """the evaluation of the MoG proposal posterior. This is likely due to too
+            little training data---consider increasing your simulation budget.""",
+        )
 
         return log_prob_proposal_posterior
 
