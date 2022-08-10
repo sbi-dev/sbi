@@ -9,5 +9,4 @@ from sbi.samplers.mcmc.slice_numpy import (
     SliceSampler,
     SliceSamplerSerial,
     SliceSamplerVectorized,
-    run_slice_np_vectorized_parallelized,
 )

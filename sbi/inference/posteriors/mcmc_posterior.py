@@ -5,6 +5,7 @@ from math import ceil
 from typing import Any, Callable, Dict, Optional, Tuple, Union
 from warnings import warn
 
+import arviz as az
 import torch
 import torch.distributions.transforms as torch_tf
 from arviz.data import InferenceData
@@ -28,12 +29,7 @@ from sbi.samplers.mcmc import (
 )
 from sbi.simulators.simutils import tqdm_joblib
 from sbi.types import Shape, TorchTransform
-from sbi.utils import (
-    get_arviz_diagnostics,
-    pyro_potential_wrapper,
-    tensor2numpy,
-    transformed_potential,
-)
+from sbi.utils import pyro_potential_wrapper, tensor2numpy, transformed_potential
 from sbi.utils.torchutils import ensure_theta_batched
 
 
@@ -56,7 +52,6 @@ class MCMCPosterior(NeuralPosterior):
         init_strategy_parameters: Dict[str, Any] = {},
         init_strategy_num_candidates: Optional[int] = None,
         num_workers: int = 1,
-        param_name: str = "theta",
         device: Optional[str] = None,
         x_shape: Optional[torch.Size] = None,
     ):
@@ -91,9 +86,6 @@ class MCMCPosterior(NeuralPosterior):
                  locations in `init_strategy=sir` (deprecated, use
                  init_strategy_parameters instead).
             num_workers: number of cpu cores used to parallelize mcmc
-            param_name: Name of the sampled parameters used internally. When sampling
-                with `mcmc_method` of `slice`, `hmc`, or `nuts`, this name is used in
-                the sampler returned by `self.posterior_sampler` after sampling.
             device: Training device, e.g., "cpu", "cuda" or "cuda:0". If None,
                 `potential_fn.device` is used.
             x_shape: Shape of a single simulator output. If passed, it is used to check
@@ -115,8 +107,9 @@ class MCMCPosterior(NeuralPosterior):
         self.init_strategy = init_strategy
         self.init_strategy_parameters = init_strategy_parameters
         self.num_workers = num_workers
-        self.param_name = param_name
         self._posterior_sampler = None
+        # Hardcode parameter name to reduce clutter kwargs.
+        self.param_name = "theta"
 
         if init_strategy_num_candidates is not None:
             warn(
@@ -204,7 +197,6 @@ class MCMCPosterior(NeuralPosterior):
         mcmc_method: Optional[str] = None,
         sample_with: Optional[str] = None,
         num_workers: Optional[int] = None,
-        return_arviz: bool = False,
         show_progress_bars: bool = True,
     ) -> Union[Tensor, Tuple[Tensor, InferenceData]]:
         r"""Return samples from posterior distribution $p(\theta|x)$ with MCMC.
@@ -318,18 +310,7 @@ class MCMCPosterior(NeuralPosterior):
 
         samples = self.theta_transform.inv(transformed_samples)
 
-        # Maybe return Arviz inference data object.
-        if return_arviz:
-            return (
-                samples.reshape((*sample_shape, -1)),  # type: ignore
-                get_arviz_diagnostics(
-                    self._posterior_sampler,
-                    param_name=self.param_name,
-                    theta_transform=self.theta_transform,  # type: ignore
-                ),
-            )
-        else:
-            return samples.reshape((*sample_shape, -1))  # type: ignore
+        return samples.reshape((*sample_shape, -1))  # type: ignore
 
     def _build_mcmc_init_fn(
         self,
@@ -463,10 +444,9 @@ class MCMCPosterior(NeuralPosterior):
             initial_params: Initial parameters for MCMC chain.
             thin: Thinning (subsampling) factor.
             warmup_steps: Initial number of samples to discard.
-            vectorized: Whether to use a vectorized implementation of
-                the Slice sampler (still experimental).
-            num_workers: number of CPU cores to use
-            seed: seed that will be used to generate sub-seeds for each worker
+            vectorized: Whether to use a vectorized implementation of the Slice sampler.
+            num_workers: Number of CPU cores to use.
+            init_width: Inital width of brackets.
             show_progress_bars: Whether to show a progressbar during sampling;
                 can only be turned off for vectorized sampler.
 
@@ -666,6 +646,60 @@ class MCMCPosterior(NeuralPosterior):
             show_progress_bars=show_progress_bars,
             force_update=force_update,
         )
+
+    def get_arviz_inference_data(self) -> InferenceData:
+        """Returns arviz InferenceData object constructed most recent samples.
+
+        Note: the InferenceData is constructed using the posterior samples generated in
+        most recent call to `.sample(...)`.
+
+        For Pyro HMC and NUTS kernels InferenceData will contain diagnostics, for Pyro
+        Slice or sbi slice sampling samples, only the samples are added.
+
+        Returns:
+            inference_data: Arviz InferenceData object.
+        """
+        assert (
+            self._posterior_sampler is not None
+        ), """No samples have been generated, call .sample() first."""
+
+        sampler: Union[
+            MCMC, SliceSamplerSerial, SliceSamplerVectorized
+        ] = self._posterior_sampler
+
+        # If Pyro sampler and samples not transformed, use arviz' from_pyro.
+        # Exclude 'slice' kernel as it lacks the 'divergence' diagnostics key.
+        if isinstance(self._posterior_sampler, (HMC, NUTS)) and isinstance(
+            self.theta_transform, torch_tf.IndependentTransform
+        ):
+            inference_data = az.from_pyro(sampler)
+
+        # otherwise get samples from sampler and transform to original space.
+        else:
+            transformed_samples = sampler.get_samples(group_by_chain=True)
+            # Pyro samplers returns dicts, get values.
+            if isinstance(transformed_samples, Dict):
+                # popitem gets last items, [1] get the values as tensor.
+                transformed_samples = transformed_samples.popitem()[1]
+            # Our slice samplers return numpy arrays.
+            elif isinstance(transformed_samples, ndarray):
+                transformed_samples = torch.from_numpy(transformed_samples).type(
+                    torch.float32
+                )
+            # For MultipleIndependent priors transforms first dim must be batch dim.
+            # thus, reshape back and forth to have batch dim in front.
+            num_chains, samples_per_chain, dim_params = transformed_samples.shape
+            samples = self.theta_transform.inv(  # type: ignore
+                transformed_samples.reshape(-1, dim_params)
+            ).reshape(  # type: ignore
+                num_chains, samples_per_chain, dim_params
+            )
+
+            inference_data = az.convert_to_inference_data(
+                {f"{self.param_name}": samples}
+            )
+
+        return inference_data
 
 
 def _maybe_use_dict_entry(default: Any, key: str, dict_to_check: Dict) -> Any:

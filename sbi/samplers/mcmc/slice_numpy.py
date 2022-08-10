@@ -316,10 +316,10 @@ class SliceSamplerSerial:
 
     def get_samples(
         self, num_samples: Optional[int] = None, group_by_chain: bool = True
-    ) -> Union[None, np.ndarray]:
+    ) -> np.ndarray:
         """Returns samples from last call to self.run.
 
-        Returns None if no samples have been generated yet.
+        Raises ValueError if no samples have been generated yet.
 
         Args:
             num_samples: Number of samples to return (for each chain if grouped by
@@ -328,10 +328,10 @@ class SliceSamplerSerial:
                 x dim_params) or flattened (all_samples, dim_params).
 
         Returns:
-            samples (or None if no samples have been generated yet)
+            samples
         """
         if self._samples is None:
-            return None
+            raise ValueError("No samples found from MCMC run.")
         # if not grouped by chain, flatten samples into (all_samples, dim_params)
         if not group_by_chain:
             samples = self._samples.reshape(-1, self._samples.shape[2])
@@ -592,10 +592,10 @@ class SliceSamplerVectorized:
 
     def get_samples(
         self, num_samples: Optional[int] = None, group_by_chain: bool = True
-    ) -> Union[None, np.ndarray]:
+    ) -> np.ndarray:
         """Returns samples from last call to self.run.
 
-        Returns None if no samples have been generated yet.
+        Raises ValueError if no samples have been generated yet.
 
         Args:
             num_samples: Number of samples to return (for each chain if grouped by
@@ -604,10 +604,10 @@ class SliceSamplerVectorized:
                 x dim_params) or flattened (all_samples, dim_params).
 
         Returns:
-            samples (or None if no samples have been generated yet)
+            samples
         """
         if self._samples is None:
-            return None
+            raise ValueError("No samples found from MCMC run.")
         # if not grouped by chain, flatten samples into (all_samples, dim_params)
         if not group_by_chain:
             samples = self._samples.reshape(-1, self._samples.shape[2])
@@ -622,87 +622,3 @@ class SliceSamplerVectorized:
             return samples[:, -num_samples:, :]
         else:
             return samples[-num_samples:, :]
-
-
-def run_slice_np_vectorized_parallelized(
-    potential_function: Callable,
-    initial_params: torch.Tensor,
-    num_samples: int,
-    thin: int,
-    warmup_steps: int,
-    vectorized: bool,
-    num_workers: int = 1,
-    show_progress_bars: bool = False,
-):
-    """Run slice np (vectorized) parallized over CPU cores.
-
-    In case of the vectorized version of slice np parallization happens over batches of
-    chains to still exploit vectorization.
-
-    MCMC progress bars are omitted if num_workers > 1 to reduce clutter. Instead the
-    progress over chains is shown.
-
-    Args:
-        potential_function: potential function
-        initial_params: initital parameters, one for each chain
-        num_samples: number of MCMC samples to produce
-        thin: thinning factor
-        warmup_steps: number of warmup / burnin steps
-        vectorized: whether to use the vectorized version
-        num_workers: number of CPU cores to use
-        show_progress_bars: whether to show progress bars
-
-    Returns:
-        Tensor: final MCMC samples of each chain (num_chains, num_samples, dim_samples)
-    """
-    num_chains, dim_samples = initial_params.shape
-
-    # Generate seeds for workers from current random state.
-    seeds = torch.randint(high=2**31, size=(num_chains,))
-
-    # Define local function to run a batch of chains vectorized.
-    def run_slice_np_vectorized(inits, seed):
-        # Seed current job.
-        np.random.seed(seed)
-        posterior_sampler = SliceSamplerVectorized(
-            init_params=tensor2numpy(inits),
-            log_prob_fn=potential_function,
-            num_chains=inits.shape[0],
-            # Show pbars of workers only for single worker
-            verbose=show_progress_bars and num_workers == 1,
-        )
-        # TODO: move warmup and thinning into SliceSamplerVectorized?
-        warmup_ = warmup_steps * thin
-        num_samples_ = ceil((num_samples * thin) / num_chains)
-        samples = posterior_sampler.run(warmup_ + num_samples_)
-        samples = samples[:, warmup_:, :]  # discard warmup steps
-        samples = samples[:, ::thin, :]  # thin chains
-        samples = torch.from_numpy(samples)  # chains x samples x dim
-        return samples
-
-    # For vectorized case a batch contains multiple chains to exploit vectorization.
-    batch_size = ceil(num_chains / num_workers)
-    run_fun = run_slice_np_vectorized
-
-    # Parallize over batch of chains.
-    initial_params_in_batches = torch.split(initial_params, batch_size, dim=0)
-    num_batches = len(initial_params_in_batches)
-
-    # Show progress bars over batches.
-    with tqdm_joblib(
-        tqdm(
-            range(num_batches),  # type: ignore
-            disable=not show_progress_bars or num_workers == 1,
-            desc=f"""Running {num_chains} MCMC chains with {num_workers} worker{"s" if
-                  num_workers>1 else ""} (batch_size={batch_size}).""",
-            total=num_chains,
-        )
-    ):
-        all_samples = Parallel(n_jobs=num_workers)(
-            delayed(run_fun)(initial_params_batch, seed)
-            for initial_params_batch, seed in zip(initial_params_in_batches, seeds)
-        )
-        all_samples = np.stack(all_samples).astype(np.float32)
-        samples = torch.from_numpy(all_samples)
-
-    return samples.reshape(num_chains, -1, dim_samples)  # chains x samples x dim

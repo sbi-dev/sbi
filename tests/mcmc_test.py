@@ -184,7 +184,6 @@ def test_c2st_slice_np_parallelized(vectorized: bool, num_workers: int):
     )
 
 
-@pytest.mark.slow
 @pytest.mark.parametrize(
     "method",
     (
@@ -195,7 +194,7 @@ def test_c2st_slice_np_parallelized(vectorized: bool, num_workers: int):
         "slice_np_vectorized",
     ),
 )
-def test_getting_inference_diagnostics_sample(method):
+def test_getting_inference_diagnostics(method):
 
     num_samples = 100
     num_dim = 2
@@ -227,12 +226,7 @@ def test_getting_inference_diagnostics_sample(method):
         thin=3,
         num_chains=num_chains,
     )
-    _ = posterior.sample(sample_shape=(num_samples,), method=method)
-
-    _, idata = posterior.sample(
-        sample_shape=(num_samples,),
-        method=method,
-        return_arviz=True,
-    )
+    posterior.sample(sample_shape=(num_samples,), method=method)
+    idata = posterior.get_arviz_inference_data()
 
     az.plot_trace(idata)
