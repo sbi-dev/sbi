@@ -132,6 +132,8 @@ class NeuralPosterior(ABC):
 
     def _x_else_default_x(self, x: Optional[Array]) -> Tensor:
         if x is not None:
+            # New x, reset posterior sampler.
+            self._posterior_sampler = None
             return process_x(
                 x, x_shape=self._x_shape, allow_iid_x=self.potential_fn.allow_iid_x
             )
@@ -140,7 +142,6 @@ class NeuralPosterior(ABC):
                 "Context `x` needed when a default has not been set."
                 "If you'd like to have a default, use the `.set_default_x()` method."
             )
-            self._posterior_sampler = None
         else:
             return self.default_x
 

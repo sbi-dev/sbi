@@ -14,7 +14,6 @@ from sbi.utils.sbiutils import (
     clamp_and_warn,
     del_entries,
     expit,
-    get_arviz_diagnostics,
     get_simulations_since_round,
     gradient_ascent,
     handle_invalid_x,
