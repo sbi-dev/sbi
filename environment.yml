@@ -18,6 +18,7 @@ channels:
   - pytorch
 
 dependencies:
+  - arviz
   - cudatoolkit
   - jupyter
   - jupyterlab
