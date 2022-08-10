@@ -20,6 +20,7 @@ nav:
       - Diagnostics:
         - Posterior predictive checks: tutorial/12_diagnostics_posterior_predictive_check.md
         - Simulation-based calibration: tutorial/13_diagnostics_simulation_based_calibration.md
+        - Density plots and MCMC diagnostics with ArviZ: tutorial/15_mcmc_diagnostics_with_arviz.md 
       - Analysis:
         - Conditional distributions: tutorial/07_conditional_distributions.md
         - Posterior sensitivity analysis: tutorial/09_sensitivity_analysis.md

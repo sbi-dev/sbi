@@ -6,6 +6,7 @@
 [![DOI](https://joss.theoj.org/papers/10.21105/joss.02505/status.svg)](https://doi.org/10.21105/joss.02505)
 
 ## sbi: simulation-based inference
+
 [Getting Started](https://www.mackelab.org/sbi/tutorial/00_getting_started/) | [Documentation](https://www.mackelab.org/sbi/)
 
 `sbi` is a PyTorch package for simulation-based inference. Simulation-based inference is  
@@ -23,25 +24,28 @@ from sbi.inference import infer
 # import your simulator, define your prior over the parameters
 parameter_posterior = infer(simulator, prior, method='SNPE', num_simulations=100)
 ```
-See below for the available methods of inference, `SNPE`, `SNRE` and `SNLE`.
 
+See below for the available methods of inference, `SNPE`, `SNRE` and `SNLE`.
 
 ## Installation
 
 `sbi` requires Python 3.6 or higher. We recommend to use a [`conda`](https://docs.conda.io/en/latest/miniconda.html) virtual
 environment ([Miniconda installation instructions](https://docs.conda.io/en/latest/miniconda.html])). If `conda` is installed on the system, an environment for
 installing `sbi` can be created as follows:
+
 ```commandline
 # Create an environment for sbi (indicate Python 3.6 or higher); activate it
 $ conda create -n sbi_env python=3.7 && conda activate sbi_env
 ```
 
 Independent of whether you are using `conda` or not, `sbi` can be installed using `pip`:
+
 ```commandline
-$ pip install sbi
+pip install sbi
 ```
 
 To test the installation, drop into a python prompt and run
+
 ```python
 from sbi.examples.minimal import simple
 posterior = simple()
@@ -60,11 +64,10 @@ The following algorithms are currently available:
   Posterior Transformation for likelihood-free
   inference_](https://arxiv.org/abs/1905.07488) (ICML 2019).
 
-
 #### Sequential Neural Likelihood Estimation (SNLE)
+
 * [`SNLE_A`](https://www.mackelab.org/sbi/reference/#sbi.inference.snle.snle_a.SNLE_A) or just `SNL` from Papamakarios G, Sterrat DC and Murray I [_Sequential
   Neural Likelihood_](https://arxiv.org/abs/1805.07226) (AISTATS 2019).
-
 
 #### Sequential Neural Ratio Estimation (SNRE)
 
@@ -74,13 +77,16 @@ The following algorithms are currently available:
 
 #### Sequential Neural Variational Inference (SNVI)
 
-* [`SNVI`](https://www.mackelab.org/sbi/reference/#sbi.inference.posteriors.vi_posterior) from Glöckler M, Deistler M, Macke J, [_Variational methods for simulation-based inference_](https://openreview.net/forum?id=kZ0UYdhqkNY) (ICLR 2022). 
+* [`SNVI`](https://www.mackelab.org/sbi/reference/#sbi.inference.posteriors.vi_posterior) from Glöckler M, Deistler M, Macke J, [_Variational methods for simulation-based inference_](https://openreview.net/forum?id=kZ0UYdhqkNY) (ICLR 2022).
+
+#### Mixed Neural Likelihood Estimation (MNLE)
+
+* [`MNLE`](https://www.mackelab.org/sbi/reference/#sbi.inference.snle.mnle.MNLE) from Boelts J, Lueckmann JM, Gao R, Macke J, [_Flexible and efficient simulation-based inference for models of decision-making](https://elifesciences.org/articles/77220) (eLife 2022).
 
 ## Feedback and Contributions
 
 We would like to hear how `sbi` is working for your inference problems as well as receive bug reports, pull requests and other feedback (see
 [contribute](http://www.mackelab.org/sbi/contribute/)).
-
 
 ## Acknowledgements
 
@@ -89,19 +95,17 @@ We would like to hear how `sbi` is working for your inference problems as well a
 M. Durkan's `lfi`. `sbi` runs as a community project; development is coordinated at the
 [mackelab](https://uni-tuebingen.de/en/research/core-research/cluster-of-excellence-machine-learning/research/research/cluster-research-groups/professorships/machine-learning-in-science/). See also [credits](https://github.com/mackelab/sbi/blob/master/docs/docs/credits.md).
 
-
 ## Support
 
 `sbi` has been supported by the German Federal Ministry of Education and Research (BMBF) through the project ADIMEM, FKZ 01IS18052 A-D). [ADIMEM](https://fit.uni-tuebingen.de/Project/Details?id=9199) is a collaborative project between the groups of Jakob Macke (Uni Tübingen), Philipp Berens (Uni Tübingen), Philipp Hennig (Uni Tübingen) and Marcel Oberlaender (caesar Bonn) which aims to develop inference methods for mechanistic models.
-
 
 ## License
 
 [Affero General Public License v3 (AGPLv3)](https://www.gnu.org/licenses/)
 
-
 ## Citation
-If you use `sbi` consider citing the [sbi software paper](https://doi.org/10.21105/joss.02505), in addition to the original research articles describing the specifc sbi-algorithm(s) you are using: 
+
+If you use `sbi` consider citing the [sbi software paper](https://doi.org/10.21105/joss.02505), in addition to the original research articles describing the specifc sbi-algorithm(s) you are using:
 
 ```
 @article{tejero-cantero2020sbi,
