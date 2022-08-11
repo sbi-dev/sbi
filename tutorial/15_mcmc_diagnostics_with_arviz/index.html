@@ -1,0 +1,1828 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://mackelab.org/sbi/tutorial/15_mcmc_diagnostics_with_arviz/">
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.3.0, mkdocs-material-8.2.8">
+    
+    
+      
+        <title>Density plots and MCMC diagnostics with ArviZ - sbi</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.644de097.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.e6a45f82.min.css">
+        
+          
+          
+          <meta name="theme-color" content="#4051b5">
+        
+      
+    
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../static/global.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#mcmc-diagnostics-with-arviz" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="sbi" class="md-header__button md-logo" aria-label="sbi" data-md-component="logo">
+      
+  <img src="../../static/logo.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            sbi
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Density plots and MCMC diagnostics with ArviZ
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5z"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" aria-label="Clear" tabindex="-1">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="http://github.com/mackelab/sbi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.1.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    mackelab/sbi
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="sbi" class="md-nav__button md-logo" aria-label="sbi" data-md-component="logo">
+      
+  <img src="../../static/logo.svg" alt="logo">
+
+    </a>
+    sbi
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="http://github.com/mackelab/sbi" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.1.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    mackelab/sbi
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        Home
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../install/" class="md-nav__link">
+        Installation
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+    
+  
+  
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+      
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3" type="checkbox" id="__nav_3" checked>
+      
+      
+      
+      
+        <label class="md-nav__link" for="__nav_3">
+          Tutorials and Examples
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <nav class="md-nav" aria-label="Tutorials and Examples" data-md-level="1">
+        <label class="md-nav__title" for="__nav_3">
+          <span class="md-nav__icon md-icon"></span>
+          Tutorials and Examples
+        </label>
+        <ul class="md-nav__list" data-md-scrollfix>
+          
+            
+              
+  
+  
+  
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+      
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3_1" type="checkbox" id="__nav_3_1" >
+      
+      
+      
+      
+        <label class="md-nav__link" for="__nav_3_1">
+          Introduction
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <nav class="md-nav" aria-label="Introduction" data-md-level="2">
+        <label class="md-nav__title" for="__nav_3_1">
+          <span class="md-nav__icon md-icon"></span>
+          Introduction
+        </label>
+        <ul class="md-nav__list" data-md-scrollfix>
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../00_getting_started/" class="md-nav__link">
+        Getting started
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../01_gaussian_amortized/" class="md-nav__link">
+        Amortized inference
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../02_flexible_interface/" class="md-nav__link">
+        Flexible interface
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../11_sampler_interface/" class="md-nav__link">
+        Sampler interface
+      </a>
+    </li>
+  
+
+            
+          
+        </ul>
+      </nav>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+      
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3_2" type="checkbox" id="__nav_3_2" >
+      
+      
+      
+      
+        <label class="md-nav__link" for="__nav_3_2">
+          Advanced
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <nav class="md-nav" aria-label="Advanced" data-md-level="2">
+        <label class="md-nav__title" for="__nav_3_2">
+          <span class="md-nav__icon md-icon"></span>
+          Advanced
+        </label>
+        <ul class="md-nav__list" data-md-scrollfix>
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../03_multiround_inference/" class="md-nav__link">
+        Multi-round inference
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../04_density_estimators/" class="md-nav__link">
+        Custom density estimators
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../05_embedding_net/" class="md-nav__link">
+        Learning summary statistics
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../08_restriction_estimator/" class="md-nav__link">
+        Handling invalid simulations
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../10_crafting_summary_statistics/" class="md-nav__link">
+        Crafting summary statistics
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../14_multi-trial-data-and-mixed-data-types/" class="md-nav__link">
+        SBI with trial-based (mixed) data
+      </a>
+    </li>
+  
+
+            
+          
+        </ul>
+      </nav>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+    
+  
+  
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+      
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3_3" type="checkbox" id="__nav_3_3" checked>
+      
+      
+      
+      
+        <label class="md-nav__link" for="__nav_3_3">
+          Diagnostics
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <nav class="md-nav" aria-label="Diagnostics" data-md-level="2">
+        <label class="md-nav__title" for="__nav_3_3">
+          <span class="md-nav__icon md-icon"></span>
+          Diagnostics
+        </label>
+        <ul class="md-nav__list" data-md-scrollfix>
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../12_diagnostics_posterior_predictive_check/" class="md-nav__link">
+        Posterior predictive checks
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../13_diagnostics_simulation_based_calibration/" class="md-nav__link">
+        Simulation-based calibration
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+    
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" data-md-toggle="toc" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          Density plots and MCMC diagnostics with ArviZ
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        Density plots and MCMC diagnostics with ArviZ
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#train-mnle-to-approximate-the-likelihood" class="md-nav__link">
+    Train MNLE to approximate the likelihood
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#run-pyro-nuts-mcmc-and-obtain-arviz-inferencedata-object" class="md-nav__link">
+    Run Pyro NUTS MCMC and obtain arviz InferenceData object
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#generate-arviz-plots" class="md-nav__link">
+    Generate arviz plots
+  </a>
+  
+    <nav class="md-nav" aria-label="Generate arviz plots">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#diagnostic-plots" class="md-nav__link">
+    Diagnostic plots
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#posterior-density-plots" class="md-nav__link">
+    Posterior density  plots
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+            
+          
+        </ul>
+      </nav>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+      
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3_4" type="checkbox" id="__nav_3_4" >
+      
+      
+      
+      
+        <label class="md-nav__link" for="__nav_3_4">
+          Analysis
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <nav class="md-nav" aria-label="Analysis" data-md-level="2">
+        <label class="md-nav__title" for="__nav_3_4">
+          <span class="md-nav__icon md-icon"></span>
+          Analysis
+        </label>
+        <ul class="md-nav__list" data-md-scrollfix>
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../07_conditional_distributions/" class="md-nav__link">
+        Conditional distributions
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../09_sensitivity_analysis/" class="md-nav__link">
+        Posterior sensitivity analysis
+      </a>
+    </li>
+  
+
+            
+          
+        </ul>
+      </nav>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+      
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3_5" type="checkbox" id="__nav_3_5" >
+      
+      
+      
+      
+        <label class="md-nav__link" for="__nav_3_5">
+          Examples
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <nav class="md-nav" aria-label="Examples" data-md-level="2">
+        <label class="md-nav__title" for="__nav_3_5">
+          <span class="md-nav__icon md-icon"></span>
+          Examples
+        </label>
+        <ul class="md-nav__list" data-md-scrollfix>
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/00_HH_simulator/" class="md-nav__link">
+        Hodgkin-Huxley example
+      </a>
+    </li>
+  
+
+            
+          
+        </ul>
+      </nav>
+    </li>
+  
+
+            
+          
+        </ul>
+      </nav>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contribute/" class="md-nav__link">
+        Contribute
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/" class="md-nav__link">
+        API Reference
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        FAQ
+      </a>
+    </li>
+  
+
+    
+      
+      
+      
+
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../credits/" class="md-nav__link">
+        Credits
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#train-mnle-to-approximate-the-likelihood" class="md-nav__link">
+    Train MNLE to approximate the likelihood
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#run-pyro-nuts-mcmc-and-obtain-arviz-inferencedata-object" class="md-nav__link">
+    Run Pyro NUTS MCMC and obtain arviz InferenceData object
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#generate-arviz-plots" class="md-nav__link">
+    Generate arviz plots
+  </a>
+  
+    <nav class="md-nav" aria-label="Generate arviz plots">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#diagnostic-plots" class="md-nav__link">
+    Diagnostic plots
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#posterior-density-plots" class="md-nav__link">
+    Posterior density  plots
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          <div class="md-content" data-md-component="content">
+            <article class="md-content__inner md-typeset">
+              
+                
+<a href="http://github.com/mackelab/sbi/edit/master/docs/tutorial/15_mcmc_diagnostics_with_arviz.md" title="Edit this page" class="md-content__button md-icon">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75L3 17.25z"/></svg>
+</a>
+
+
+
+<h1 id="mcmc-diagnostics-with-arviz">MCMC diagnostics with <a href="https://python.arviz.org/">Arviz</a><a class="headerlink" href="#mcmc-diagnostics-with-arviz" title="Permanent link">&para;</a></h1>
+<p>This tutorial shows how to evaluate the quality of MCMC samples generated via <code>sbi</code> using the <code>arviz</code> package. </p>
+<p>We demonstrate this case using the trial-based simulator presented in Tutorial 14: A toy simulator mimicking the drift-diffusion model of decision-making. </p>
+<p>Outline:</p>
+<p>1) Train MNLE to approximate the likelihood underlying the simulator
+2) Run MCMC using <code>pyro</code> MCMC samplers via <code>sbi</code> interface
+3) Use <code>arviz</code> to visualize the posterior, predictive distributions and MCMC diagnostics. </p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">arviz</span> <span class="k">as</span> <span class="nn">az</span>
+<span class="kn">import</span> <span class="nn">torch</span>
+
+<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">MNLE</span><span class="p">,</span> <span class="n">likelihood_estimator_based_potential</span>
+<span class="kn">from</span> <span class="nn">pyro.distributions</span> <span class="kn">import</span> <span class="n">InverseGamma</span>
+<span class="kn">from</span> <span class="nn">torch.distributions</span> <span class="kn">import</span> <span class="n">Beta</span><span class="p">,</span> <span class="n">Binomial</span><span class="p">,</span> <span class="n">Gamma</span>
+<span class="kn">from</span> <span class="nn">sbi.utils</span> <span class="kn">import</span> <span class="n">MultipleIndependent</span>
+
+<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">MCMCPosterior</span>
+
+<span class="c1"># Seeding</span>
+<span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="c1"># Toy simulator for mixed data</span>
+<span class="k">def</span> <span class="nf">mixed_simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
+    <span class="n">beta</span><span class="p">,</span> <span class="n">ps</span> <span class="o">=</span> <span class="n">theta</span><span class="p">[:,</span> <span class="p">:</span><span class="mi">1</span><span class="p">],</span> <span class="n">theta</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">:]</span>
+
+    <span class="n">choices</span> <span class="o">=</span> <span class="n">Binomial</span><span class="p">(</span><span class="n">probs</span><span class="o">=</span><span class="n">ps</span><span class="p">)</span><span class="o">.</span><span class="n">sample</span><span class="p">()</span>
+    <span class="n">rts</span> <span class="o">=</span> <span class="n">InverseGamma</span><span class="p">(</span><span class="n">concentration</span><span class="o">=</span><span class="mi">2</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">beta</span><span class="p">),</span> <span class="n">rate</span><span class="o">=</span><span class="n">beta</span><span class="p">)</span><span class="o">.</span><span class="n">sample</span><span class="p">()</span>
+
+    <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">((</span><span class="n">rts</span><span class="p">,</span> <span class="n">choices</span><span class="p">),</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+
+<span class="c1"># Define independent priors for each dimension.</span>
+<span class="n">prior</span> <span class="o">=</span> <span class="n">MultipleIndependent</span><span class="p">(</span>
+    <span class="p">[</span>
+        <span class="n">Gamma</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mf">1.0</span><span class="p">]),</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mf">0.5</span><span class="p">])),</span>
+        <span class="n">Beta</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mf">2.0</span><span class="p">]),</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mf">2.0</span><span class="p">])),</span>
+    <span class="p">],</span>
+    <span class="n">validate_args</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span>
+</code></pre></div>
+<h2 id="train-mnle-to-approximate-the-likelihood">Train MNLE to approximate the likelihood<a class="headerlink" href="#train-mnle-to-approximate-the-likelihood" title="Permanent link">&para;</a></h2>
+<p>For details see <a href="https://www.mackelab.org/sbi/tutorial/14_multi-trial-data-and-mixed-data-types/">tutorial 14</a>. </p>
+<p>Here, we pass <code>mcmc_method="nuts"</code> in order to use the underlying <a href="https://docs.pyro.ai/en/1.8.1/mcmc.html#nuts"><code>pyro</code> No-U-turn sampler</a>, but it would work as well with other samplers (e.g. &ldquo;slice_np_vectorized&rdquo;, &ldquo;hmc&rdquo;). </p>
+<p>Additionally, when calling <code>posterior.sample(...)</code> we pass <code>return_arviz=True</code> so that the <a href="https://arviz-devs.github.io/arviz/api/generated/arviz.InferenceData.html#arviz.InferenceData"><code>Arviz InferenceData</code></a> object is returned. This object gives us access to the wealth of MCMC diagnostics tool provided by <code>arviz</code>.</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Generate training data and train MNLE.</span>
+<span class="n">num_simulations</span> <span class="o">=</span> <span class="mi">10000</span>
+<span class="n">theta</span> <span class="o">=</span> <span class="n">prior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="n">num_simulations</span><span class="p">,))</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">mixed_simulator</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
+
+<span class="n">trainer</span> <span class="o">=</span> <span class="n">MNLE</span><span class="p">(</span><span class="n">prior</span><span class="p">)</span>
+<span class="n">likelihood_estimator</span> <span class="o">=</span> <span class="n">trainer</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>/Users/janbolts/qode/sbi/sbi/neural_nets/mnle.py:60: UserWarning: The mixed neural likelihood estimator assumes that x contains
+        continuous data in the first n-1 columns (e.g., reaction times) and
+        categorical data in the last column (e.g., corresponding choices). If
+        this is not the case for the passed `x` do not use this function.
+  warnings.warn(
+
+
+ Neural network successfully converged after 65 epochs.
+</code></pre></div>
+
+<h2 id="run-pyro-nuts-mcmc-and-obtain-arviz-inferencedata-object">Run Pyro NUTS MCMC and obtain <code>arviz InferenceData</code> object<a class="headerlink" href="#run-pyro-nuts-mcmc-and-obtain-arviz-inferencedata-object" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><span class="c1"># Simulate &quot;observed&quot; data x_o</span>
+<span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">42</span><span class="p">)</span>
+<span class="n">num_trials</span> <span class="o">=</span> <span class="mi">100</span>
+<span class="n">theta_o</span> <span class="o">=</span> <span class="n">prior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">1</span><span class="p">,))</span>
+<span class="n">x_o</span> <span class="o">=</span> <span class="n">mixed_simulator</span><span class="p">(</span><span class="n">theta_o</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="n">num_trials</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+
+<span class="c1"># Set MCMC parameters and run Pyro NUTS.</span>
+<span class="n">mcmc_parameters</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+    <span class="n">num_chains</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+    <span class="n">thin</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
+    <span class="n">warmup_steps</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
+    <span class="n">init_strategy</span><span class="o">=</span><span class="s2">&quot;proposal&quot;</span><span class="p">,</span>
+    <span class="n">method</span><span class="o">=</span><span class="s2">&quot;nuts&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">num_samples</span> <span class="o">=</span> <span class="mi">1000</span>
+
+<span class="c1"># get the potential function and parameter transform for constructing the posterior</span>
+<span class="n">potential_fn</span><span class="p">,</span> <span class="n">parameter_transform</span> <span class="o">=</span> <span class="n">likelihood_estimator_based_potential</span><span class="p">(</span>
+    <span class="n">likelihood_estimator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">x_o</span>
+<span class="p">)</span>
+<span class="n">mnle_posterior</span> <span class="o">=</span> <span class="n">MCMCPosterior</span><span class="p">(</span>
+    <span class="n">potential_fn</span><span class="p">,</span> <span class="n">proposal</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">theta_transform</span><span class="o">=</span><span class="n">parameter_transform</span><span class="p">,</span> <span class="o">**</span><span class="n">mcmc_parameters</span>
+<span class="p">)</span>
+
+<span class="n">mnle_samples</span> <span class="o">=</span> <span class="n">mnle_posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span>
+    <span class="p">(</span><span class="n">num_samples</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_o</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">False</span>
+<span class="p">)</span>
+<span class="c1"># get arviz InferenceData object from posterior</span>
+<span class="n">inference_data</span> <span class="o">=</span> <span class="n">mnle_posterior</span><span class="o">.</span><span class="n">get_arviz_inference_data</span><span class="p">()</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>/Users/janbolts/qode/sbi/sbi/utils/sbiutils.py:280: UserWarning: An x with a batch size of 100 was passed. It will be interpreted as a batch of independent and identically
+            distributed data X={x_1, ..., x_n}, i.e., data generated based on the
+            same underlying (unknown) parameter. The resulting posterior will be with
+            respect to entire batch, i.e,. p(theta | X).
+  warnings.warn(
+</code></pre></div>
+
+<h2 id="generate-arviz-plots">Generate <code>arviz</code> plots<a class="headerlink" href="#generate-arviz-plots" title="Permanent link">&para;</a></h2>
+<p>The resulting <code>InferenceData</code> object can be passed to most <code>arviz</code> plotting functions, and there are plenty see <a href="https://arviz-devs.github.io/arviz/examples/index.html#">here</a> for an overview.</p>
+<p>To get a better understanding of the <code>InferenceData</code> object see <a href="https://arviz-devs.github.io/arviz/schema/schema.html">here</a>. </p>
+<p>Below and overview of common MCMC diagnostics plot, see the corresponding <code>arviz</code> documentation for interpretation of the plots. </p>
+<p>We will a full use-case using the SBI-MCMC-arviz workflow soon.</p>
+<div class="highlight"><pre><span></span><code><span class="n">inference_data</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>        &lt;div&gt;
+          &lt;div class=&#39;xr-header&#39;&gt;
+            &lt;div class=&quot;xr-obj-type&quot;&gt;arviz.InferenceData&lt;/div&gt;
+          &lt;/div&gt;
+          &lt;ul class=&quot;xr-sections group-sections&quot;&gt;
+
+        &lt;li class = &quot;xr-section-item&quot;&gt;
+              &lt;input id=&quot;idata_posterior9e5ab3b8-1ffc-45d5-81ed-6432bb4f407c&quot; class=&quot;xr-section-summary-in&quot; type=&quot;checkbox&quot;&gt;
+              &lt;label for=&quot;idata_posterior9e5ab3b8-1ffc-45d5-81ed-6432bb4f407c&quot; class = &quot;xr-section-summary&quot;&gt;posterior&lt;/label&gt;
+              &lt;div class=&quot;xr-section-inline-details&quot;&gt;&lt;/div&gt;
+              &lt;div class=&quot;xr-section-details&quot;&gt;
+                  &lt;ul id=&quot;xr-dataset-coord-list&quot; class=&quot;xr-var-list&quot;&gt;
+                      &lt;div style=&quot;padding-left:2rem;&quot;&gt;&lt;div&gt;&lt;svg style=&quot;position: absolute; width: 0; height: 0; overflow: hidden&quot;&gt;
+</code></pre></div>
+
+<p><defs>
+<symbol id="icon-database" viewBox="0 0 32 32">
+<path d="M16 0c-8.837 0-16 2.239-16 5v4c0 2.761 7.163 5 16 5s16-2.239 16-5v-4c0-2.761-7.163-5-16-5z"></path>
+<path d="M16 17c-8.837 0-16-2.239-16-5v6c0 2.761 7.163 5 16 5s16-2.239 16-5v-6c0 2.761-7.163 5-16 5z"></path>
+<path d="M16 26c-8.837 0-16-2.239-16-5v6c0 2.761 7.163 5 16 5s16-2.239 16-5v-6c0 2.761-7.163 5-16 5z"></path>
+</symbol>
+<symbol id="icon-file-text2" viewBox="0 0 32 32">
+<path d="M28.681 7.159c-0.694-0.947-1.662-2.053-2.724-3.116s-2.169-2.030-3.116-2.724c-1.612-1.182-2.393-1.319-2.841-1.319h-15.5c-1.378 0-2.5 1.121-2.5 2.5v27c0 1.378 1.122 2.5 2.5 2.5h23c1.378 0 2.5-1.122 2.5-2.5v-19.5c0-0.448-0.137-1.23-1.319-2.841zM24.543 5.457c0.959 0.959 1.712 1.825 2.268 2.543h-4.811v-4.811c0.718 0.556 1.584 1.309 2.543 2.268zM28 29.5c0 0.271-0.229 0.5-0.5 0.5h-23c-0.271 0-0.5-0.229-0.5-0.5v-27c0-0.271 0.229-0.5 0.5-0.5 0 0 15.499-0 15.5 0v7c0 0.552 0.448 1 1 1h7v19.5z"></path>
+<path d="M23 26h-14c-0.552 0-1-0.448-1-1s0.448-1 1-1h14c0.552 0 1 0.448 1 1s-0.448 1-1 1z"></path>
+<path d="M23 22h-14c-0.552 0-1-0.448-1-1s0.448-1 1-1h14c0.552 0 1 0.448 1 1s-0.448 1-1 1z"></path>
+<path d="M23 18h-14c-0.552 0-1-0.448-1-1s0.448-1 1-1h14c0.552 0 1 0.448 1 1s-0.448 1-1 1z"></path>
+</symbol>
+</defs>
+</svg></p>
+<style>/* CSS stylesheet for displaying xarray objects in jupyterlab.
+ *
+ */
+
+:root {
+  --xr-font-color0: var(--jp-content-font-color0, rgba(0, 0, 0, 1));
+  --xr-font-color2: var(--jp-content-font-color2, rgba(0, 0, 0, 0.54));
+  --xr-font-color3: var(--jp-content-font-color3, rgba(0, 0, 0, 0.38));
+  --xr-border-color: var(--jp-border-color2, #e0e0e0);
+  --xr-disabled-color: var(--jp-layout-color3, #bdbdbd);
+  --xr-background-color: var(--jp-layout-color0, white);
+  --xr-background-color-row-even: var(--jp-layout-color1, white);
+  --xr-background-color-row-odd: var(--jp-layout-color2, #eeeeee);
+}
+
+html[theme=dark],
+body.vscode-dark {
+  --xr-font-color0: rgba(255, 255, 255, 1);
+  --xr-font-color2: rgba(255, 255, 255, 0.54);
+  --xr-font-color3: rgba(255, 255, 255, 0.38);
+  --xr-border-color: #1F1F1F;
+  --xr-disabled-color: #515151;
+  --xr-background-color: #111111;
+  --xr-background-color-row-even: #111111;
+  --xr-background-color-row-odd: #313131;
+}
+
+.xr-wrap {
+  display: block;
+  min-width: 300px;
+  max-width: 700px;
+}
+
+.xr-text-repr-fallback {
+  /* fallback to plain text repr when CSS is not injected (untrusted notebook) */
+  display: none;
+}
+
+.xr-header {
+  padding-top: 6px;
+  padding-bottom: 6px;
+  margin-bottom: 4px;
+  border-bottom: solid 1px var(--xr-border-color);
+}
+
+.xr-header > div,
+.xr-header > ul {
+  display: inline;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.xr-obj-type,
+.xr-array-name {
+  margin-left: 2px;
+  margin-right: 10px;
+}
+
+.xr-obj-type {
+  color: var(--xr-font-color2);
+}
+
+.xr-sections {
+  padding-left: 0 !important;
+  display: grid;
+  grid-template-columns: 150px auto auto 1fr 20px 20px;
+}
+
+.xr-section-item {
+  display: contents;
+}
+
+.xr-section-item input {
+  display: none;
+}
+
+.xr-section-item input + label {
+  color: var(--xr-disabled-color);
+}
+
+.xr-section-item input:enabled + label {
+  cursor: pointer;
+  color: var(--xr-font-color2);
+}
+
+.xr-section-item input:enabled + label:hover {
+  color: var(--xr-font-color0);
+}
+
+.xr-section-summary {
+  grid-column: 1;
+  color: var(--xr-font-color2);
+  font-weight: 500;
+}
+
+.xr-section-summary > span {
+  display: inline-block;
+  padding-left: 0.5em;
+}
+
+.xr-section-summary-in:disabled + label {
+  color: var(--xr-font-color2);
+}
+
+.xr-section-summary-in + label:before {
+  display: inline-block;
+  content: '►';
+  font-size: 11px;
+  width: 15px;
+  text-align: center;
+}
+
+.xr-section-summary-in:disabled + label:before {
+  color: var(--xr-disabled-color);
+}
+
+.xr-section-summary-in:checked + label:before {
+  content: '▼';
+}
+
+.xr-section-summary-in:checked + label > span {
+  display: none;
+}
+
+.xr-section-summary,
+.xr-section-inline-details {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+.xr-section-inline-details {
+  grid-column: 2 / -1;
+}
+
+.xr-section-details {
+  display: none;
+  grid-column: 1 / -1;
+  margin-bottom: 5px;
+}
+
+.xr-section-summary-in:checked ~ .xr-section-details {
+  display: contents;
+}
+
+.xr-array-wrap {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 20px auto;
+}
+
+.xr-array-wrap > label {
+  grid-column: 1;
+  vertical-align: top;
+}
+
+.xr-preview {
+  color: var(--xr-font-color3);
+}
+
+.xr-array-preview,
+.xr-array-data {
+  padding: 0 5px !important;
+  grid-column: 2;
+}
+
+.xr-array-data,
+.xr-array-in:checked ~ .xr-array-preview {
+  display: none;
+}
+
+.xr-array-in:checked ~ .xr-array-data,
+.xr-array-preview {
+  display: inline-block;
+}
+
+.xr-dim-list {
+  display: inline-block !important;
+  list-style: none;
+  padding: 0 !important;
+  margin: 0;
+}
+
+.xr-dim-list li {
+  display: inline-block;
+  padding: 0;
+  margin: 0;
+}
+
+.xr-dim-list:before {
+  content: '(';
+}
+
+.xr-dim-list:after {
+  content: ')';
+}
+
+.xr-dim-list li:not(:last-child):after {
+  content: ',';
+  padding-right: 5px;
+}
+
+.xr-has-index {
+  font-weight: bold;
+}
+
+.xr-var-list,
+.xr-var-item {
+  display: contents;
+}
+
+.xr-var-item > div,
+.xr-var-item label,
+.xr-var-item > .xr-var-name span {
+  background-color: var(--xr-background-color-row-even);
+  margin-bottom: 0;
+}
+
+.xr-var-item > .xr-var-name:hover span {
+  padding-right: 5px;
+}
+
+.xr-var-list > li:nth-child(odd) > div,
+.xr-var-list > li:nth-child(odd) > label,
+.xr-var-list > li:nth-child(odd) > .xr-var-name span {
+  background-color: var(--xr-background-color-row-odd);
+}
+
+.xr-var-name {
+  grid-column: 1;
+}
+
+.xr-var-dims {
+  grid-column: 2;
+}
+
+.xr-var-dtype {
+  grid-column: 3;
+  text-align: right;
+  color: var(--xr-font-color2);
+}
+
+.xr-var-preview {
+  grid-column: 4;
+}
+
+.xr-var-name,
+.xr-var-dims,
+.xr-var-dtype,
+.xr-preview,
+.xr-attrs dt {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-right: 10px;
+}
+
+.xr-var-name:hover,
+.xr-var-dims:hover,
+.xr-var-dtype:hover,
+.xr-attrs dt:hover {
+  overflow: visible;
+  width: auto;
+  z-index: 1;
+}
+
+.xr-var-attrs,
+.xr-var-data {
+  display: none;
+  background-color: var(--xr-background-color) !important;
+  padding-bottom: 5px !important;
+}
+
+.xr-var-attrs-in:checked ~ .xr-var-attrs,
+.xr-var-data-in:checked ~ .xr-var-data {
+  display: block;
+}
+
+.xr-var-data > table {
+  float: right;
+}
+
+.xr-var-name span,
+.xr-var-data,
+.xr-attrs {
+  padding-left: 25px !important;
+}
+
+.xr-attrs,
+.xr-var-attrs,
+.xr-var-data {
+  grid-column: 1 / -1;
+}
+
+dl.xr-attrs {
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: 125px auto;
+}
+
+.xr-attrs dt,
+.xr-attrs dd {
+  padding: 0;
+  margin: 0;
+  float: left;
+  padding-right: 10px;
+  width: auto;
+}
+
+.xr-attrs dt {
+  font-weight: normal;
+  grid-column: 1;
+}
+
+.xr-attrs dt:hover span {
+  display: inline-block;
+  background: var(--xr-background-color);
+  padding-right: 10px;
+}
+
+.xr-attrs dd {
+  grid-column: 2;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.xr-icon-database,
+.xr-icon-file-text2 {
+  display: inline-block;
+  vertical-align: middle;
+  width: 1em;
+  height: 1.5em !important;
+  stroke-width: 0;
+  stroke: currentColor;
+  fill: currentColor;
+}
+</style>
+<pre class='xr-text-repr-fallback'>&lt;xarray.Dataset&gt;
+Dimensions:      (chain: 4, draw: 1254, theta_dim_0: 2)
+Coordinates:
+  * chain        (chain) int64 0 1 2 3
+  * draw         (draw) int64 0 1 2 3 4 5 6 ... 1248 1249 1250 1251 1252 1253
+  * theta_dim_0  (theta_dim_0) int64 0 1
+Data variables:
+    theta        (chain, draw, theta_dim_0) float32 2.125 0.8092 ... 0.8088
+Attributes:
+    created_at:     2022-08-10T14:02:41.300799
+    arviz_version:  0.11.2</pre>
+<div class='xr-wrap' hidden><div class='xr-header'><div class='xr-obj-type'>xarray.Dataset</div></div><ul class='xr-sections'><li class='xr-section-item'><input id='section-23143ae5-2e8c-4c65-88ec-face6329f6e0' class='xr-section-summary-in' type='checkbox' disabled ><label for='section-23143ae5-2e8c-4c65-88ec-face6329f6e0' class='xr-section-summary'  title='Expand/collapse section'>Dimensions:</label><div class='xr-section-inline-details'><ul class='xr-dim-list'><li><span class='xr-has-index'>chain</span>: 4</li><li><span class='xr-has-index'>draw</span>: 1254</li><li><span class='xr-has-index'>theta_dim_0</span>: 2</li></ul></div><div class='xr-section-details'></div></li><li class='xr-section-item'><input id='section-cf29286c-76da-4701-9d4e-b01913629d74' class='xr-section-summary-in' type='checkbox'  checked><label for='section-cf29286c-76da-4701-9d4e-b01913629d74' class='xr-section-summary' >Coordinates: <span>(3)</span></label><div class='xr-section-inline-details'></div><div class='xr-section-details'><ul class='xr-var-list'><li class='xr-var-item'><div class='xr-var-name'><span class='xr-has-index'>chain</span></div><div class='xr-var-dims'>(chain)</div><div class='xr-var-dtype'>int64</div><div class='xr-var-preview xr-preview'>0 1 2 3</div><input id='attrs-76d92135-0da0-4ea9-bb1c-b3d857e2e00a' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-76d92135-0da0-4ea9-bb1c-b3d857e2e00a' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-0fef25c5-ad91-4294-865c-c5d3ba5cbb4a' class='xr-var-data-in' type='checkbox'><label for='data-0fef25c5-ad91-4294-865c-c5d3ba5cbb4a' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([0, 1, 2, 3])</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span class='xr-has-index'>draw</span></div><div class='xr-var-dims'>(draw)</div><div class='xr-var-dtype'>int64</div><div class='xr-var-preview xr-preview'>0 1 2 3 4 ... 1250 1251 1252 1253</div><input id='attrs-ae6b279c-476a-4964-a476-1ed3b3843451' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-ae6b279c-476a-4964-a476-1ed3b3843451' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-77c8a3c7-0338-4b8c-971f-a072df98680b' class='xr-var-data-in' type='checkbox'><label for='data-77c8a3c7-0338-4b8c-971f-a072df98680b' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([   0,    1,    2, ..., 1251, 1252, 1253])</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span class='xr-has-index'>theta_dim_0</span></div><div class='xr-var-dims'>(theta_dim_0)</div><div class='xr-var-dtype'>int64</div><div class='xr-var-preview xr-preview'>0 1</div><input id='attrs-afe92219-5fd9-40e8-916e-9d0c27f0c355' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-afe92219-5fd9-40e8-916e-9d0c27f0c355' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-e7abfd8a-0d51-42b7-8440-08274d6531df' class='xr-var-data-in' type='checkbox'><label for='data-e7abfd8a-0d51-42b7-8440-08274d6531df' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([0, 1])</pre></div></li></ul></div></li><li class='xr-section-item'><input id='section-f3d26677-7253-423b-a7e5-9054fb527e93' class='xr-section-summary-in' type='checkbox'  checked><label for='section-f3d26677-7253-423b-a7e5-9054fb527e93' class='xr-section-summary' >Data variables: <span>(1)</span></label><div class='xr-section-inline-details'></div><div class='xr-section-details'><ul class='xr-var-list'><li class='xr-var-item'><div class='xr-var-name'><span>theta</span></div><div class='xr-var-dims'>(chain, draw, theta_dim_0)</div><div class='xr-var-dtype'>float32</div><div class='xr-var-preview xr-preview'>2.125 0.8092 2.267 ... 1.848 0.8088</div><input id='attrs-7b70cb1f-2a1c-4100-9631-392f6a35c1b2' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-7b70cb1f-2a1c-4100-9631-392f6a35c1b2' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-8ac681e0-4634-4519-a1c1-f9c9b3ea9ac4' class='xr-var-data-in' type='checkbox'><label for='data-8ac681e0-4634-4519-a1c1-f9c9b3ea9ac4' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([[[2.1245914 , 0.8092162 ],
+        [2.266512  , 0.8164251 ],
+        [2.036817  , 0.79519475],
+        ...,
+        [1.8315581 , 0.7797423 ],
+        [2.050106  , 0.7541253 ],
+        [1.9130744 , 0.7940467 ]],
+
+       [[1.8672262 , 0.79227704],
+        [1.9084876 , 0.87156725],
+        [1.9282253 , 0.89998335],
+        ...,
+        [1.966494  , 0.7684441 ],
+        [1.9171734 , 0.76520354],
+        [1.9165115 , 0.8100004 ]],
+
+       [[2.1789386 , 0.92230934],
+        [2.2388353 , 0.8388026 ],
+        [2.2388353 , 0.8388026 ],
+        ...,
+        [2.2749808 , 0.8510151 ],
+        [2.207828  , 0.843363  ],
+        [1.9331468 , 0.7714892 ]],
+
+       [[2.0355892 , 0.902892  ],
+        [2.1481078 , 0.76634836],
+        [2.0999866 , 0.8813891 ],
+        ...,
+        [1.8813787 , 0.85843307],
+        [1.9198259 , 0.727575  ],
+        [1.8484387 , 0.80877745]]], dtype=float32)</pre></div></li></ul></div></li><li class='xr-section-item'><input id='section-c8521897-e1f5-4738-973f-06c38e153522' class='xr-section-summary-in' type='checkbox'  checked><label for='section-c8521897-e1f5-4738-973f-06c38e153522' class='xr-section-summary' >Attributes: <span>(2)</span></label><div class='xr-section-inline-details'></div><div class='xr-section-details'><dl class='xr-attrs'><dt><span>created_at :</span></dt><dd>2022-08-10T14:02:41.300799</dd><dt><span>arviz_version :</span></dt><dd>0.11.2</dd></dl></div></li></ul></div>
+<p></div><br></div>
+                      </ul>
+                  </div>
+            </li></p>
+<div class="codehilite"><pre><span></span><code>          &lt;/ul&gt;
+        &lt;/div&gt;
+        &lt;style&gt; /* CSS stylesheet for displaying InferenceData objects in jupyterlab.
+</code></pre></div>
+
+<p>*
+ */</p>
+<p>:root {
+  &ndash;xr-font-color0: var(&ndash;jp-content-font-color0, rgba(0, 0, 0, 1));
+  &ndash;xr-font-color2: var(&ndash;jp-content-font-color2, rgba(0, 0, 0, 0.54));
+  &ndash;xr-font-color3: var(&ndash;jp-content-font-color3, rgba(0, 0, 0, 0.38));
+  &ndash;xr-border-color: var(&ndash;jp-border-color2, #e0e0e0);
+  &ndash;xr-disabled-color: var(&ndash;jp-layout-color3, #bdbdbd);
+  &ndash;xr-background-color: var(&ndash;jp-layout-color0, white);
+  &ndash;xr-background-color-row-even: var(&ndash;jp-layout-color1, white);
+  &ndash;xr-background-color-row-odd: var(&ndash;jp-layout-color2, #eeeeee);
+}</p>
+<p>html[theme=dark],
+body.vscode-dark {
+  &ndash;xr-font-color0: rgba(255, 255, 255, 1);
+  &ndash;xr-font-color2: rgba(255, 255, 255, 0.54);
+  &ndash;xr-font-color3: rgba(255, 255, 255, 0.38);
+  &ndash;xr-border-color: #1F1F1F;
+  &ndash;xr-disabled-color: #515151;
+  &ndash;xr-background-color: #111111;
+  &ndash;xr-background-color-row-even: #111111;
+  &ndash;xr-background-color-row-odd: #313131;
+}</p>
+<p>.xr-wrap {
+  display: block;
+  min-width: 300px;
+  max-width: 700px;
+}</p>
+<p>.xr-text-repr-fallback {
+  /* fallback to plain text repr when CSS is not injected (untrusted notebook) */
+  display: none;
+}</p>
+<p>.xr-header {
+  padding-top: 6px;
+  padding-bottom: 6px;
+  margin-bottom: 4px;
+  border-bottom: solid 1px var(&ndash;xr-border-color);
+}</p>
+<p>.xr-header &gt; div,
+.xr-header &gt; ul {
+  display: inline;
+  margin-top: 0;
+  margin-bottom: 0;
+}</p>
+<p>.xr-obj-type,
+.xr-array-name {
+  margin-left: 2px;
+  margin-right: 10px;
+}</p>
+<p>.xr-obj-type {
+  color: var(&ndash;xr-font-color2);
+}</p>
+<p>.xr-sections {
+  padding-left: 0 !important;
+  display: grid;
+  grid-template-columns: 150px auto auto 1fr 20px 20px;
+}</p>
+<p>.xr-sections.group-sections {
+  grid-template-columns: auto;
+}</p>
+<p>.xr-section-item {
+  display: contents;
+}</p>
+<p>.xr-section-item input {
+  display: none;
+}</p>
+<p>.xr-section-item input + label {
+  color: var(&ndash;xr-disabled-color);
+}</p>
+<p>.xr-section-item input:enabled + label {
+  cursor: pointer;
+  color: var(&ndash;xr-font-color2);
+}</p>
+<p>.xr-section-item input:enabled + label:hover {
+  color: var(&ndash;xr-font-color0);
+}</p>
+<p>.xr-section-summary {
+  grid-column: 1;
+  color: var(&ndash;xr-font-color2);
+  font-weight: 500;
+}</p>
+<p>.xr-section-summary &gt; span {
+  display: inline-block;
+  padding-left: 0.5em;
+}</p>
+<p>.xr-section-summary-in:disabled + label {
+  color: var(&ndash;xr-font-color2);
+}</p>
+<p>.xr-section-summary-in + label:before {
+  display: inline-block;
+  content: &lsquo;►&rsquo;;
+  font-size: 11px;
+  width: 15px;
+  text-align: center;
+}</p>
+<p>.xr-section-summary-in:disabled + label:before {
+  color: var(&ndash;xr-disabled-color);
+}</p>
+<p>.xr-section-summary-in:checked + label:before {
+  content: &lsquo;▼&rsquo;;
+}</p>
+<p>.xr-section-summary-in:checked + label &gt; span {
+  display: none;
+}</p>
+<p>.xr-section-summary,
+.xr-section-inline-details {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}</p>
+<p>.xr-section-inline-details {
+  grid-column: 2 / -1;
+}</p>
+<p>.xr-section-details {
+  display: none;
+  grid-column: 1 / -1;
+  margin-bottom: 5px;
+}</p>
+<p>.xr-section-summary-in:checked ~ .xr-section-details {
+  display: contents;
+}</p>
+<p>.xr-array-wrap {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 20px auto;
+}</p>
+<p>.xr-array-wrap &gt; label {
+  grid-column: 1;
+  vertical-align: top;
+}</p>
+<p>.xr-preview {
+  color: var(&ndash;xr-font-color3);
+}</p>
+<p>.xr-array-preview,
+.xr-array-data {
+  padding: 0 5px !important;
+  grid-column: 2;
+}</p>
+<p>.xr-array-data,
+.xr-array-in:checked ~ .xr-array-preview {
+  display: none;
+}</p>
+<p>.xr-array-in:checked ~ .xr-array-data,
+.xr-array-preview {
+  display: inline-block;
+}</p>
+<p>.xr-dim-list {
+  display: inline-block !important;
+  list-style: none;
+  padding: 0 !important;
+  margin: 0;
+}</p>
+<p>.xr-dim-list li {
+  display: inline-block;
+  padding: 0;
+  margin: 0;
+}</p>
+<p>.xr-dim-list:before {
+  content: &lsquo;(&lsquo;;
+}</p>
+<p>.xr-dim-list:after {
+  content: &lsquo;)&rsquo;;
+}</p>
+<p>.xr-dim-list li:not(:last-child):after {
+  content: &lsquo;,&rsquo;;
+  padding-right: 5px;
+}</p>
+<p>.xr-has-index {
+  font-weight: bold;
+}</p>
+<p>.xr-var-list,
+.xr-var-item {
+  display: contents;
+}</p>
+<p>.xr-var-item &gt; div,
+.xr-var-item label,
+.xr-var-item &gt; .xr-var-name span {
+  background-color: var(&ndash;xr-background-color-row-even);
+  margin-bottom: 0;
+}</p>
+<p>.xr-var-item &gt; .xr-var-name:hover span {
+  padding-right: 5px;
+}</p>
+<p>.xr-var-list &gt; li:nth-child(odd) &gt; div,
+.xr-var-list &gt; li:nth-child(odd) &gt; label,
+.xr-var-list &gt; li:nth-child(odd) &gt; .xr-var-name span {
+  background-color: var(&ndash;xr-background-color-row-odd);
+}</p>
+<p>.xr-var-name {
+  grid-column: 1;
+}</p>
+<p>.xr-var-dims {
+  grid-column: 2;
+}</p>
+<p>.xr-var-dtype {
+  grid-column: 3;
+  text-align: right;
+  color: var(&ndash;xr-font-color2);
+}</p>
+<p>.xr-var-preview {
+  grid-column: 4;
+}</p>
+<p>.xr-var-name,
+.xr-var-dims,
+.xr-var-dtype,
+.xr-preview,
+.xr-attrs dt {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-right: 10px;
+}</p>
+<p>.xr-var-name:hover,
+.xr-var-dims:hover,
+.xr-var-dtype:hover,
+.xr-attrs dt:hover {
+  overflow: visible;
+  width: auto;
+  z-index: 1;
+}</p>
+<p>.xr-var-attrs,
+.xr-var-data {
+  display: none;
+  background-color: var(&ndash;xr-background-color) !important;
+  padding-bottom: 5px !important;
+}</p>
+<p>.xr-var-attrs-in:checked ~ .xr-var-attrs,
+.xr-var-data-in:checked ~ .xr-var-data {
+  display: block;
+}</p>
+<p>.xr-var-data &gt; table {
+  float: right;
+}</p>
+<p>.xr-var-name span,
+.xr-var-data,
+.xr-attrs {
+  padding-left: 25px !important;
+}</p>
+<p>.xr-attrs,
+.xr-var-attrs,
+.xr-var-data {
+  grid-column: 1 / -1;
+}</p>
+<p>dl.xr-attrs {
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: 125px auto;
+}</p>
+<p>.xr-attrs dt, dd {
+  padding: 0;
+  margin: 0;
+  float: left;
+  padding-right: 10px;
+  width: auto;
+}</p>
+<p>.xr-attrs dt {
+  font-weight: normal;
+  grid-column: 1;
+}</p>
+<p>.xr-attrs dt:hover span {
+  display: inline-block;
+  background: var(&ndash;xr-background-color);
+  padding-right: 10px;
+}</p>
+<p>.xr-attrs dd {
+  grid-column: 2;
+  white-space: pre-wrap;
+  word-break: break-all;
+}</p>
+<p>.xr-icon-database,
+.xr-icon-file-text2 {
+  display: inline-block;
+  vertical-align: middle;
+  width: 1em;
+  height: 1.5em !important;
+  stroke-width: 0;
+  stroke: currentColor;
+  fill: currentColor;
+}
+.xr-wrap{width:700px!important;} </style></p>
+<h3 id="diagnostic-plots">Diagnostic plots<a class="headerlink" href="#diagnostic-plots" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="n">az</span><span class="o">.</span><span class="n">style</span><span class="o">.</span><span class="n">use</span><span class="p">(</span><span class="s2">&quot;arviz-darkgrid&quot;</span><span class="p">)</span>
+<span class="n">az</span><span class="o">.</span><span class="n">plot_rank</span><span class="p">(</span><span class="n">inference_data</span><span class="p">)</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>array([&lt;AxesSubplot:title={&#39;center&#39;:&#39;theta\n0&#39;}, xlabel=&#39;Rank (all chains)&#39;, ylabel=&#39;Chain&#39;&gt;,
+       &lt;AxesSubplot:title={&#39;center&#39;:&#39;theta\n1&#39;}, xlabel=&#39;Rank (all chains)&#39;, ylabel=&#39;Chain&#39;&gt;],
+      dtype=object)
+</code></pre></div>
+
+<p><img alt="png" src="../15_mcmc_diagnostics_with_arviz_files/15_mcmc_diagnostics_with_arviz_10_1.png" /></p>
+<div class="highlight"><pre><span></span><code><span class="n">az</span><span class="o">.</span><span class="n">plot_autocorr</span><span class="p">(</span><span class="n">inference_data</span><span class="p">);</span>
+</code></pre></div>
+<p><img alt="png" src="../15_mcmc_diagnostics_with_arviz_files/15_mcmc_diagnostics_with_arviz_11_0.png" /></p>
+<div class="highlight"><pre><span></span><code><span class="n">az</span><span class="o">.</span><span class="n">plot_trace</span><span class="p">(</span><span class="n">inference_data</span><span class="p">,</span> <span class="n">compact</span><span class="o">=</span><span class="kc">False</span><span class="p">);</span>
+</code></pre></div>
+<p><img alt="png" src="../15_mcmc_diagnostics_with_arviz_files/15_mcmc_diagnostics_with_arviz_12_0.png" /></p>
+<div class="highlight"><pre><span></span><code><span class="n">az</span><span class="o">.</span><span class="n">plot_ess</span><span class="p">(</span><span class="n">inference_data</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="s2">&quot;evolution&quot;</span><span class="p">);</span>
+</code></pre></div>
+<p><img alt="png" src="../15_mcmc_diagnostics_with_arviz_files/15_mcmc_diagnostics_with_arviz_13_0.png" /></p>
+<h3 id="posterior-density-plots">Posterior density  plots<a class="headerlink" href="#posterior-density-plots" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="n">az</span><span class="o">.</span><span class="n">plot_posterior</span><span class="p">(</span><span class="n">inference_data</span><span class="p">)</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>array([&lt;AxesSubplot:title={&#39;center&#39;:&#39;theta\n0&#39;}&gt;,
+       &lt;AxesSubplot:title={&#39;center&#39;:&#39;theta\n1&#39;}&gt;], dtype=object)
+</code></pre></div>
+
+<p><img alt="png" src="../15_mcmc_diagnostics_with_arviz_files/15_mcmc_diagnostics_with_arviz_15_1.png" /></p>
+<div class="highlight"><pre><span></span><code><span class="nb">print</span><span class="p">(</span>
+    <span class="sa">f</span><span class="s2">&quot;Given the </span><span class="si">{</span><span class="n">num_trials</span><span class="si">}</span><span class="s2"> we observed, the posterior is centered around true underlying parameters theta_o: </span><span class="si">{</span><span class="n">theta_o</span><span class="si">}</span><span class="s2">&quot;</span>
+<span class="p">)</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>Given the 100 we observed, the posterior is centered around true underlying parameters theta_o: tensor([[1.9622, 0.7550]])
+</code></pre></div>
+
+<div class="highlight"><pre><span></span><code><span class="n">az</span><span class="o">.</span><span class="n">plot_pair</span><span class="p">(</span><span class="n">inference_data</span><span class="p">)</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>&lt;AxesSubplot:xlabel=&#39;theta\n0&#39;, ylabel=&#39;theta\n1&#39;&gt;
+</code></pre></div>
+
+<p><img alt="png" src="../15_mcmc_diagnostics_with_arviz_files/15_mcmc_diagnostics_with_arviz_17_1.png" /></p>
+<div class="highlight"><pre><span></span><code><span class="n">az</span><span class="o">.</span><span class="n">plot_pair</span><span class="p">(</span>
+    <span class="n">inference_data</span><span class="p">,</span>
+    <span class="n">var_names</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;theta&quot;</span><span class="p">],</span>
+    <span class="n">kind</span><span class="o">=</span><span class="s2">&quot;hexbin&quot;</span><span class="p">,</span>
+    <span class="n">marginals</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">10</span><span class="p">),</span>
+<span class="p">)</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>array([[&lt;AxesSubplot:&gt;, None],
+       [&lt;AxesSubplot:xlabel=&#39;theta\n0&#39;, ylabel=&#39;theta\n1&#39;&gt;,
+        &lt;AxesSubplot:&gt;]], dtype=object)
+</code></pre></div>
+
+<p><img alt="png" src="../15_mcmc_diagnostics_with_arviz_files/15_mcmc_diagnostics_with_arviz_18_1.png" /></p>
+<div class="highlight"><pre><span></span><code>
+</code></pre></div>
+
+              
+            </article>
+          </div>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    <nav class="md-footer__inner md-grid" aria-label="Footer">
+      
+        
+        <a href="../13_diagnostics_simulation_based_calibration/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Simulation-based calibration" rel="prev">
+          <div class="md-footer__button md-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12z"/></svg>
+          </div>
+          <div class="md-footer__title">
+            <div class="md-ellipsis">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              Simulation-based calibration
+            </div>
+          </div>
+        </a>
+      
+      
+        
+        <a href="../07_conditional_distributions/" class="md-footer__link md-footer__link--next" aria-label="Next: Conditional distributions" rel="next">
+          <div class="md-footer__title">
+            <div class="md-ellipsis">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              Conditional distributions
+            </div>
+          </div>
+          <div class="md-footer__button md-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11H4z"/></svg>
+          </div>
+        </a>
+      
+    </nav>
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        <div class="md-social">
+  
+    
+    
+      
+      
+    
+    <a href="https://github.com/mackelab/sbi" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 512"><!--! Font Awesome Free 6.1.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc.--><path d="M186.1 328.7c0 20.9-10.9 55.1-36.7 55.1s-36.7-34.2-36.7-55.1 10.9-55.1 36.7-55.1 36.7 34.2 36.7 55.1zM480 278.2c0 31.9-3.2 65.7-17.5 95-37.9 76.6-142.1 74.8-216.7 74.8-75.8 0-186.2 2.7-225.6-74.8-14.6-29-20.2-63.1-20.2-95 0-41.9 13.9-81.5 41.5-113.6-5.2-15.8-7.7-32.4-7.7-48.8 0-21.5 4.9-32.3 14.6-51.8 45.3 0 74.3 9 108.8 36 29-6.9 58.8-10 88.7-10 27 0 54.2 2.9 80.4 9.2 34-26.7 63-35.2 107.8-35.2 9.8 19.5 14.6 30.3 14.6 51.8 0 16.4-2.6 32.7-7.7 48.2 27.5 32.4 39 72.3 39 114.2zm-64.3 50.5c0-43.9-26.7-82.6-73.5-82.6-18.9 0-37 3.4-56 6-14.9 2.3-29.8 3.2-45.1 3.2-15.2 0-30.1-.9-45.1-3.2-18.7-2.6-37-6-56-6-46.8 0-73.5 38.7-73.5 82.6 0 87.8 80.4 101.3 150.4 101.3h48.2c70.3 0 150.6-13.4 150.6-101.3zm-82.6-55.1c-25.8 0-36.7 34.2-36.7 55.1s10.9 55.1 36.7 55.1 36.7-34.2 36.7-55.1-10.9-55.1-36.7-55.1z"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    <script id="__config" type="application/json">{"base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.5e67fbfe.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version.title": "Select version"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.c44cc438.min.js"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+      
+    
+  </body>
+</html>

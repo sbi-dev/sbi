@@ -8,11 +8,10 @@
       
       
       
-      
         <link rel="canonical" href="https://mackelab.org/sbi/tutorial/07_conditional_distributions/">
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.3.0, mkdocs-material-7.1.5">
+      <meta name="generator" content="mkdocs-1.3.0, mkdocs-material-8.2.8">
     
     
       
@@ -20,10 +19,10 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.bde7dde4.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.644de097.min.css">
       
         
-        <link rel="stylesheet" href="../../assets/stylesheets/palette.ef6f36e2.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.e6a45f82.min.css">
         
           
           
@@ -35,19 +34,21 @@
     
       
         
+        
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,400i,700%7CRoboto+Mono&display=fallback">
-        <style>:root{--md-text-font-family:"Roboto";--md-code-font-family:"Roboto Mono"}</style>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
       
-    
     
     
       <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
     
       <link rel="stylesheet" href="../../static/global.css">
     
+    <script>__md_scope=new URL("../..",location),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
+
     
     
   </head>
@@ -61,7 +62,6 @@
     <body dir="ltr" data-md-color-scheme="" data-md-color-primary="indigo" data-md-color-accent="indigo">
   
     
-    <script>function __prefix(e){return new URL("../..",location).pathname+"."+e}function __get(e,t=localStorage){return JSON.parse(t.getItem(__prefix(e)))}</script>
     
     <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
     <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
@@ -78,7 +78,10 @@
       
     </div>
     
-      <header class="md-header" data-md-component="header">
+    
+      
+
+<header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="../.." title="sbi" class="md-header__button md-logo" aria-label="sbi" data-md-component="logo">
       
@@ -110,19 +113,22 @@
       <label class="md-header__button md-icon" for="__search">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5z"/></svg>
       </label>
-      
-<div class="md-search" data-md-component="search" role="dialog">
+      <div class="md-search" data-md-component="search" role="dialog">
   <label class="md-search__overlay" for="__search"></label>
   <div class="md-search__inner" role="search">
     <form class="md-search__form" name="search">
-      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" data-md-state="active" required>
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
       <label class="md-search__icon md-icon" for="__search">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5z"/></svg>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12z"/></svg>
       </label>
-      <button type="reset" class="md-search__icon md-icon" aria-label="Clear" tabindex="-1">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>
-      </button>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" aria-label="Clear" tabindex="-1">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>
+        </button>
+      </nav>
+      
     </form>
     <div class="md-search__output">
       <div class="md-search__scrollwrap" data-md-scrollfix>
@@ -139,11 +145,10 @@
     
     
       <div class="md-header__source">
-        
-<a href="http://github.com/mackelab/sbi" title="Go to repository" class="md-source" data-md-component="source">
+        <a href="http://github.com/mackelab/sbi" title="Go to repository" class="md-source" data-md-component="source">
   <div class="md-source__icon md-icon">
     
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.1.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
   </div>
   <div class="md-source__repository">
     mackelab/sbi
@@ -152,11 +157,14 @@
       </div>
     
   </nav>
+  
 </header>
     
     <div class="md-container" data-md-component="container">
       
       
+        
+          
         
       
       <main class="md-main" data-md-component="main">
@@ -181,11 +189,10 @@
   </label>
   
     <div class="md-nav__source">
-      
-<a href="http://github.com/mackelab/sbi" title="Go to repository" class="md-source" data-md-component="source">
+      <a href="http://github.com/mackelab/sbi" title="Go to repository" class="md-source" data-md-component="source">
   <div class="md-source__icon md-icon">
     
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.1.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
   </div>
   <div class="md-source__repository">
     mackelab/sbi
@@ -240,10 +247,14 @@
       
         <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3" type="checkbox" id="__nav_3" checked>
       
-      <label class="md-nav__link" for="__nav_3">
-        Tutorials and Examples
-        <span class="md-nav__icon md-icon"></span>
-      </label>
+      
+      
+      
+        <label class="md-nav__link" for="__nav_3">
+          Tutorials and Examples
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <nav class="md-nav" aria-label="Tutorials and Examples" data-md-level="1">
         <label class="md-nav__title" for="__nav_3">
           <span class="md-nav__icon md-icon"></span>
@@ -252,6 +263,7 @@
         <ul class="md-nav__list" data-md-scrollfix>
           
             
+              
   
   
   
@@ -261,10 +273,14 @@
       
         <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3_1" type="checkbox" id="__nav_3_1" >
       
-      <label class="md-nav__link" for="__nav_3_1">
-        Introduction
-        <span class="md-nav__icon md-icon"></span>
-      </label>
+      
+      
+      
+        <label class="md-nav__link" for="__nav_3_1">
+          Introduction
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <nav class="md-nav" aria-label="Introduction" data-md-level="2">
         <label class="md-nav__title" for="__nav_3_1">
           <span class="md-nav__icon md-icon"></span>
@@ -273,6 +289,7 @@
         <ul class="md-nav__list" data-md-scrollfix>
           
             
+              
   
   
   
@@ -283,8 +300,10 @@
     </li>
   
 
+            
           
             
+              
   
   
   
@@ -295,8 +314,10 @@
     </li>
   
 
+            
           
             
+              
   
   
   
@@ -307,8 +328,10 @@
     </li>
   
 
+            
           
             
+              
   
   
   
@@ -319,14 +342,17 @@
     </li>
   
 
+            
           
         </ul>
       </nav>
     </li>
   
 
+            
           
             
+              
   
   
   
@@ -336,10 +362,14 @@
       
         <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3_2" type="checkbox" id="__nav_3_2" >
       
-      <label class="md-nav__link" for="__nav_3_2">
-        Advanced
-        <span class="md-nav__icon md-icon"></span>
-      </label>
+      
+      
+      
+        <label class="md-nav__link" for="__nav_3_2">
+          Advanced
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <nav class="md-nav" aria-label="Advanced" data-md-level="2">
         <label class="md-nav__title" for="__nav_3_2">
           <span class="md-nav__icon md-icon"></span>
@@ -348,6 +378,7 @@
         <ul class="md-nav__list" data-md-scrollfix>
           
             
+              
   
   
   
@@ -358,8 +389,10 @@
     </li>
   
 
+            
           
             
+              
   
   
   
@@ -370,8 +403,10 @@
     </li>
   
 
+            
           
             
+              
   
   
   
@@ -382,8 +417,10 @@
     </li>
   
 
+            
           
             
+              
   
   
   
@@ -394,8 +431,10 @@
     </li>
   
 
+            
           
             
+              
   
   
   
@@ -406,8 +445,10 @@
     </li>
   
 
+            
           
             
+              
   
   
   
@@ -418,14 +459,17 @@
     </li>
   
 
+            
           
         </ul>
       </nav>
     </li>
   
 
+            
           
             
+              
   
   
   
@@ -435,10 +479,14 @@
       
         <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3_3" type="checkbox" id="__nav_3_3" >
       
-      <label class="md-nav__link" for="__nav_3_3">
-        Diagnostics
-        <span class="md-nav__icon md-icon"></span>
-      </label>
+      
+      
+      
+        <label class="md-nav__link" for="__nav_3_3">
+          Diagnostics
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <nav class="md-nav" aria-label="Diagnostics" data-md-level="2">
         <label class="md-nav__title" for="__nav_3_3">
           <span class="md-nav__icon md-icon"></span>
@@ -447,6 +495,7 @@
         <ul class="md-nav__list" data-md-scrollfix>
           
             
+              
   
   
   
@@ -457,8 +506,10 @@
     </li>
   
 
+            
           
             
+              
   
   
   
@@ -469,14 +520,31 @@
     </li>
   
 
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../15_mcmc_diagnostics_with_arviz/" class="md-nav__link">
+        Density plots and MCMC diagnostics with ArviZ
+      </a>
+    </li>
+  
+
+            
           
         </ul>
       </nav>
     </li>
   
 
+            
           
             
+              
   
   
     
@@ -488,10 +556,14 @@
       
         <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3_4" type="checkbox" id="__nav_3_4" checked>
       
-      <label class="md-nav__link" for="__nav_3_4">
-        Analysis
-        <span class="md-nav__icon md-icon"></span>
-      </label>
+      
+      
+      
+        <label class="md-nav__link" for="__nav_3_4">
+          Analysis
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <nav class="md-nav" aria-label="Analysis" data-md-level="2">
         <label class="md-nav__title" for="__nav_3_4">
           <span class="md-nav__icon md-icon"></span>
@@ -500,6 +572,7 @@
         <ul class="md-nav__list" data-md-scrollfix>
           
             
+              
   
   
     
@@ -523,6 +596,7 @@
       </a>
       
         
+
 <nav class="md-nav md-nav--secondary" aria-label="Table of contents">
   
   
@@ -564,8 +638,10 @@
     </li>
   
 
+            
           
             
+              
   
   
   
@@ -576,14 +652,17 @@
     </li>
   
 
+            
           
         </ul>
       </nav>
     </li>
   
 
+            
           
             
+              
   
   
   
@@ -593,10 +672,14 @@
       
         <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3_5" type="checkbox" id="__nav_3_5" >
       
-      <label class="md-nav__link" for="__nav_3_5">
-        Examples
-        <span class="md-nav__icon md-icon"></span>
-      </label>
+      
+      
+      
+        <label class="md-nav__link" for="__nav_3_5">
+          Examples
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <nav class="md-nav" aria-label="Examples" data-md-level="2">
         <label class="md-nav__title" for="__nav_3_5">
           <span class="md-nav__icon md-icon"></span>
@@ -605,6 +688,7 @@
         <ul class="md-nav__list" data-md-scrollfix>
           
             
+              
   
   
   
@@ -615,12 +699,14 @@
     </li>
   
 
+            
           
         </ul>
       </nav>
     </li>
   
 
+            
           
         </ul>
       </nav>
@@ -700,6 +786,7 @@
                 <div class="md-sidebar__scrollwrap">
                   <div class="md-sidebar__inner">
                     
+
 <nav class="md-nav md-nav--secondary" aria-label="Table of contents">
   
   
@@ -746,12 +833,13 @@
             <article class="md-content__inner md-typeset">
               
                 
-                  <a href="http://github.com/mackelab/sbi/edit/master/docs/tutorial/07_conditional_distributions.md" title="Edit this page" class="md-content__button md-icon">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75L3 17.25z"/></svg>
-                  </a>
-                
-                
-                <h1 id="analysing-variability-and-compensation-mechansims-with-conditional-distributions">Analysing variability and compensation mechansims with conditional distributions<a class="headerlink" href="#analysing-variability-and-compensation-mechansims-with-conditional-distributions" title="Permanent link">&para;</a></h1>
+<a href="http://github.com/mackelab/sbi/edit/master/docs/tutorial/07_conditional_distributions.md" title="Edit this page" class="md-content__button md-icon">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75L3 17.25z"/></svg>
+</a>
+
+
+
+<h1 id="analysing-variability-and-compensation-mechansims-with-conditional-distributions">Analysing variability and compensation mechansims with conditional distributions<a class="headerlink" href="#analysing-variability-and-compensation-mechansims-with-conditional-distributions" title="Permanent link">&para;</a></h1>
 <p>A central advantage of <code>sbi</code> over parameter search methods such as genetic algorithms is that the posterior captures <strong>all</strong> models that can reproduce experimental data. This allows us to analyse whether parameters can be variable or have to be narrowly tuned, and to analyse compensation mechanisms between different parameters. See also <a href="https://www.nature.com/articles/nn.2735?page=2">Marder and Taylor, 2011</a> for further motivation to identify all models that capture experimental data.  </p>
 <p>In this tutorial, we will show how one can use the posterior distribution to identify whether parameters can be variable or have to be finely tuned, and how we can use the posterior to find potential compensation mechanisms between model parameters. To investigate this, we will extract <strong>conditional distributions</strong> from the posterior inferred with <code>sbi</code>.</p>
 <p>Note, you can find the original version of this notebook at <a href="https://github.com/mackelab/sbi/blob/main/tutorials/07_conditional_distributions.ipynb">https://github.com/mackelab/sbi/blob/main/tutorials/07_conditional_distributions.ipynb</a> in the <code>sbi</code> repository.</p>
@@ -762,14 +850,14 @@
 <span class="n">_</span> <span class="o">=</span> <span class="n">conditional_pairplot</span><span class="p">(</span>
     <span class="n">density</span><span class="o">=</span><span class="n">posterior</span><span class="p">,</span>
     <span class="n">condition</span><span class="o">=</span><span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">1</span><span class="p">,)),</span>
-    <span class="n">limits</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([[</span><span class="o">-</span><span class="mf">2.</span><span class="p">,</span> <span class="mf">2.</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mf">2.</span><span class="p">,</span> <span class="mf">2.</span><span class="p">]]),</span>
+    <span class="n">limits</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([[</span><span class="o">-</span><span class="mf">2.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mf">2.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">]]),</span>
 <span class="p">)</span>
 
 <span class="c1"># Compute the matrix of correlation coefficients of the slices.</span>
 <span class="n">cond_coeff_mat</span> <span class="o">=</span> <span class="n">conditional_corrcoeff</span><span class="p">(</span>
     <span class="n">density</span><span class="o">=</span><span class="n">posterior</span><span class="p">,</span>
     <span class="n">condition</span><span class="o">=</span><span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">1</span><span class="p">,)),</span>
-    <span class="n">limits</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([[</span><span class="o">-</span><span class="mf">2.</span><span class="p">,</span> <span class="mf">2.</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mf">2.</span><span class="p">,</span> <span class="mf">2.</span><span class="p">]]),</span>
+    <span class="n">limits</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([[</span><span class="o">-</span><span class="mf">2.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mf">2.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">]]),</span>
 <span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">cond_coeff_mat</span><span class="p">,</span> <span class="n">clim</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
 </code></pre></div>
@@ -789,6 +877,7 @@
 </code></pre></div>
 <p>Let&rsquo;s say we have used SNPE to obtain a posterior distribution over three parameters. In this tutorial, we just load the posterior from a file:</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">toy_posterior_for_07_cc</span> <span class="kn">import</span> <span class="n">ExamplePosterior</span>
+
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">ExamplePosterior</span><span class="p">()</span>
 </code></pre></div>
 <p>First, we specify the experimental observation <span class="arithmatex">\(x_o\)</span> at which we want to evaluate and sample the posterior <span class="arithmatex">\(p(\theta|x_o)\)</span>:</p>
@@ -800,44 +889,56 @@
 
 <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span>
     <span class="n">samples</span><span class="o">=</span><span class="n">posterior_samples</span><span class="p">,</span>
-    <span class="n">limits</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([[</span><span class="o">-</span><span class="mf">2.</span><span class="p">,</span> <span class="mf">2.</span><span class="p">]]</span><span class="o">*</span><span class="mi">3</span><span class="p">),</span>
-    <span class="n">upper</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;kde&#39;</span><span class="p">],</span>
-    <span class="n">diag</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;kde&#39;</span><span class="p">],</span>
-    <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span><span class="mi">5</span><span class="p">)</span>
+    <span class="n">limits</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([[</span><span class="o">-</span><span class="mf">2.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">]]</span> <span class="o">*</span> <span class="mi">3</span><span class="p">),</span>
+    <span class="n">upper</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;kde&quot;</span><span class="p">],</span>
+    <span class="n">diag</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;kde&quot;</span><span class="p">],</span>
+    <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span>
 <span class="p">)</span>
 </code></pre></div>
 <p><img alt="png" src="../07_conditional_distributions_files/07_conditional_distributions_11_0.png" /></p>
 <p>The 1D and 2D marginals of the posterior fill almost the entire parameter space! Also, the Pearson correlation coefficient matrix of the marginal shows rather weak interactions (low correlations):</p>
 <div class="highlight"><pre><span></span><code><span class="n">corr_matrix_marginal</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">corrcoef</span><span class="p">(</span><span class="n">posterior_samples</span><span class="o">.</span><span class="n">T</span><span class="p">)</span>
-<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
-<span class="n">im</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">corr_matrix_marginal</span><span class="p">,</span> <span class="n">clim</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">&#39;PiYG&#39;</span><span class="p">)</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
+<span class="n">im</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">corr_matrix_marginal</span><span class="p">,</span> <span class="n">clim</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;PiYG&quot;</span><span class="p">)</span>
 <span class="n">_</span> <span class="o">=</span> <span class="n">fig</span><span class="o">.</span><span class="n">colorbar</span><span class="p">(</span><span class="n">im</span><span class="p">)</span>
 </code></pre></div>
 <p><img alt="png" src="../07_conditional_distributions_files/07_conditional_distributions_13_0.png" /></p>
 <p>It might be tempting to conclude that the experimental data barely constrains our parameters and that almost all parameter combinations can reproduce the experimental data. As we will show below, this is not the case.</p>
 <p>Because our toy posterior has only three parameters, we can plot posterior samples in a 3D plot:</p>
-<div class="highlight"><pre><span></span><code><span class="n">rc</span><span class="p">(</span><span class="s1">&#39;animation&#39;</span><span class="p">,</span> <span class="n">html</span><span class="o">=</span><span class="s1">&#39;html5&#39;</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><span class="n">rc</span><span class="p">(</span><span class="s2">&quot;animation&quot;</span><span class="p">,</span> <span class="n">html</span><span class="o">=</span><span class="s2">&quot;html5&quot;</span><span class="p">)</span>
 
 <span class="c1"># First set up the figure, the axis, and the plot element we want to animate</span>
-<span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span><span class="mi">6</span><span class="p">))</span>
-<span class="n">ax</span> <span class="o">=</span> <span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">111</span><span class="p">,</span> <span class="n">projection</span><span class="o">=</span><span class="s1">&#39;3d&#39;</span><span class="p">)</span>
+<span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="mi">6</span><span class="p">))</span>
+<span class="n">ax</span> <span class="o">=</span> <span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">111</span><span class="p">,</span> <span class="n">projection</span><span class="o">=</span><span class="s2">&quot;3d&quot;</span><span class="p">)</span>
 
 <span class="n">ax</span><span class="o">.</span><span class="n">set_xlim</span><span class="p">((</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
 <span class="n">ax</span><span class="o">.</span><span class="n">set_ylim</span><span class="p">((</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
 
+
 <span class="k">def</span> <span class="nf">init</span><span class="p">():</span>
-    <span class="n">line</span><span class="p">,</span> <span class="o">=</span> <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">([],</span> <span class="p">[],</span> <span class="n">lw</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+    <span class="p">(</span><span class="n">line</span><span class="p">,)</span> <span class="o">=</span> <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">([],</span> <span class="p">[],</span> <span class="n">lw</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
     <span class="n">line</span><span class="o">.</span><span class="n">set_data</span><span class="p">([],</span> <span class="p">[])</span>
     <span class="k">return</span> <span class="p">(</span><span class="n">line</span><span class="p">,)</span>
 
+
 <span class="k">def</span> <span class="nf">animate</span><span class="p">(</span><span class="n">angle</span><span class="p">):</span>
     <span class="n">num_samples_vis</span> <span class="o">=</span> <span class="mi">1000</span>
-    <span class="n">line</span> <span class="o">=</span> <span class="n">ax</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">posterior_samples</span><span class="p">[:</span><span class="n">num_samples_vis</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">posterior_samples</span><span class="p">[:</span><span class="n">num_samples_vis</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">posterior_samples</span><span class="p">[:</span><span class="n">num_samples_vis</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="n">zdir</span><span class="o">=</span><span class="s1">&#39;z&#39;</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;#2171b5&#39;</span><span class="p">,</span> <span class="n">depthshade</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">line</span> <span class="o">=</span> <span class="n">ax</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span>
+        <span class="n">posterior_samples</span><span class="p">[:</span><span class="n">num_samples_vis</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span>
+        <span class="n">posterior_samples</span><span class="p">[:</span><span class="n">num_samples_vis</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
+        <span class="n">posterior_samples</span><span class="p">[:</span><span class="n">num_samples_vis</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span>
+        <span class="n">zdir</span><span class="o">=</span><span class="s2">&quot;z&quot;</span><span class="p">,</span>
+        <span class="n">s</span><span class="o">=</span><span class="mi">15</span><span class="p">,</span>
+        <span class="n">c</span><span class="o">=</span><span class="s2">&quot;#2171b5&quot;</span><span class="p">,</span>
+        <span class="n">depthshade</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span>
     <span class="n">ax</span><span class="o">.</span><span class="n">view_init</span><span class="p">(</span><span class="mi">20</span><span class="p">,</span> <span class="n">angle</span><span class="p">)</span>
     <span class="k">return</span> <span class="p">(</span><span class="n">line</span><span class="p">,)</span>
 
-<span class="n">anim</span> <span class="o">=</span> <span class="n">animation</span><span class="o">.</span><span class="n">FuncAnimation</span><span class="p">(</span><span class="n">fig</span><span class="p">,</span> <span class="n">animate</span><span class="p">,</span> <span class="n">init_func</span><span class="o">=</span><span class="n">init</span><span class="p">,</span>
-                               <span class="n">frames</span><span class="o">=</span><span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mi">360</span><span class="p">,</span><span class="mi">5</span><span class="p">),</span> <span class="n">interval</span><span class="o">=</span><span class="mi">150</span><span class="p">,</span> <span class="n">blit</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="n">anim</span> <span class="o">=</span> <span class="n">animation</span><span class="o">.</span><span class="n">FuncAnimation</span><span class="p">(</span>
+    <span class="n">fig</span><span class="p">,</span> <span class="n">animate</span><span class="p">,</span> <span class="n">init_func</span><span class="o">=</span><span class="n">init</span><span class="p">,</span> <span class="n">frames</span><span class="o">=</span><span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">360</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span> <span class="n">interval</span><span class="o">=</span><span class="mi">150</span><span class="p">,</span> <span class="n">blit</span><span class="o">=</span><span class="kc">True</span>
+<span class="p">)</span>
 
 <span class="n">plt</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
 </code></pre></div>
@@ -16851,8 +16952,8 @@ AAAAAAAAAAAAAAAtaWxzdAAAACWpdG9vAAAAHWRhdGEAAAABAAAAAExhdmY1OC4yMC4xMDA=
 <span class="n">_</span> <span class="o">=</span> <span class="n">conditional_pairplot</span><span class="p">(</span>
     <span class="n">density</span><span class="o">=</span><span class="n">posterior</span><span class="p">,</span>
     <span class="n">condition</span><span class="o">=</span><span class="n">condition</span><span class="p">,</span>
-    <span class="n">limits</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([[</span><span class="o">-</span><span class="mf">2.</span><span class="p">,</span> <span class="mf">2.</span><span class="p">]]</span><span class="o">*</span><span class="mi">3</span><span class="p">),</span>
-    <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span><span class="mi">5</span><span class="p">)</span>
+    <span class="n">limits</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([[</span><span class="o">-</span><span class="mf">2.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">]]</span> <span class="o">*</span> <span class="mi">3</span><span class="p">),</span>
+    <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span>
 <span class="p">)</span>
 </code></pre></div>
 <p><img alt="png" src="../07_conditional_distributions_files/07_conditional_distributions_20_0.png" /></p>
@@ -16861,10 +16962,10 @@ AAAAAAAAAAAAAAAtaWxzdAAAACWpdG9vAAAAHWRhdGEAAAABAAAAAExhdmY1OC4yMC4xMDA=
 <div class="highlight"><pre><span></span><code><span class="n">cond_coeff_mat</span> <span class="o">=</span> <span class="n">conditional_corrcoeff</span><span class="p">(</span>
     <span class="n">density</span><span class="o">=</span><span class="n">posterior</span><span class="p">,</span>
     <span class="n">condition</span><span class="o">=</span><span class="n">condition</span><span class="p">,</span>
-    <span class="n">limits</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([[</span><span class="o">-</span><span class="mf">2.</span><span class="p">,</span> <span class="mf">2.</span><span class="p">]]</span><span class="o">*</span><span class="mi">3</span><span class="p">),</span>
+    <span class="n">limits</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([[</span><span class="o">-</span><span class="mf">2.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">]]</span> <span class="o">*</span> <span class="mi">3</span><span class="p">),</span>
 <span class="p">)</span>
-<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="mi">4</span><span class="p">))</span>
-<span class="n">im</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">cond_coeff_mat</span><span class="p">,</span> <span class="n">clim</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">&#39;PiYG&#39;</span><span class="p">)</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
+<span class="n">im</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">cond_coeff_mat</span><span class="p">,</span> <span class="n">clim</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;PiYG&quot;</span><span class="p">)</span>
 <span class="n">_</span> <span class="o">=</span> <span class="n">fig</span><span class="o">.</span><span class="n">colorbar</span><span class="p">(</span><span class="n">im</span><span class="p">)</span>
 </code></pre></div>
 <p><img alt="png" src="../07_conditional_distributions_files/07_conditional_distributions_23_0.png" /></p>
@@ -16878,10 +16979,12 @@ AAAAAAAAAAAAAAAtaWxzdAAAACWpdG9vAAAAHWRhdGEAAAABAAAAAExhdmY1OC4yMC4xMDA=
 <span class="kn">import</span> <span class="nn">torch</span>
 
 <span class="n">num_dim</span> <span class="o">=</span> <span class="mi">4</span>
-<span class="n">prior</span> <span class="o">=</span> <span class="n">BoxUniform</span><span class="p">(</span><span class="n">low</span><span class="o">=-</span><span class="mi">2</span><span class="o">*</span><span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">num_dim</span><span class="p">),</span> <span class="n">high</span><span class="o">=</span><span class="mi">2</span><span class="o">*</span><span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">num_dim</span><span class="p">))</span>
+<span class="n">prior</span> <span class="o">=</span> <span class="n">BoxUniform</span><span class="p">(</span><span class="n">low</span><span class="o">=-</span><span class="mi">2</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">num_dim</span><span class="p">),</span> <span class="n">high</span><span class="o">=</span><span class="mi">2</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">num_dim</span><span class="p">))</span>
+
 
 <span class="k">def</span> <span class="nf">linear_gaussian</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
     <span class="k">return</span> <span class="n">theta</span> <span class="o">+</span> <span class="mf">1.0</span> <span class="o">+</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn_like</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.1</span>
+
 
 <span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span> <span class="o">=</span> <span class="n">prepare_for_sbi</span><span class="p">(</span><span class="n">linear_gaussian</span><span class="p">,</span> <span class="n">prior</span><span class="p">)</span>
 
@@ -16901,13 +17004,15 @@ AAAAAAAAAAAAAAAtaWxzdAAAACWpdG9vAAAAHWRhdGEAAAABAAAAAExhdmY1OC4yMC4xMDA=
 <span class="p">)</span>
 </code></pre></div>
 <p>Now we want to build the conditional potential (please read throught the <a href="https://www.mackelab.org/sbi/tutorial/11_sampler_interface/">sampler interface tutorial</a> for an explanation of potential functions). For this, we have to pass a <code>condition</code>. In our case, we want to condition the forth parameter on <span class="arithmatex">\(\theta_4=0.2\)</span>. Regardless of how many parameters one wants to condition on, in <code>sbi</code>, one has to pass a <code>condition</code> value for all parameters. The first three values will simply be ignored. We can tell the algorithm which parameters should be kept fixed and which ones should be sampled with the argument <code>dims_to_sample</code>.</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.analysis</span> <span class="kn">import</span> <span class="n">conditonal_potential</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.analysis</span> <span class="kn">import</span> <span class="n">conditional_potential</span>
 
-<span class="n">conditioned_potential_fn</span><span class="p">,</span> <span class="n">restricted_tf</span><span class="p">,</span> <span class="n">restricted_prior</span> <span class="o">=</span> <span class="n">conditonal_potential</span><span class="p">(</span>
+<span class="n">conditioned_potential_fn</span><span class="p">,</span> <span class="n">restricted_tf</span><span class="p">,</span> <span class="n">restricted_prior</span> <span class="o">=</span> <span class="n">conditional_potential</span><span class="p">(</span>
     <span class="n">potential_fn</span><span class="o">=</span><span class="n">potential_fn</span><span class="p">,</span>
     <span class="n">theta_transform</span><span class="o">=</span><span class="n">theta_transform</span><span class="p">,</span>
     <span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span>
-    <span class="n">condition</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">as_tensor</span><span class="p">([</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">]),</span> <span class="c1"># the first three values are arbitrary and are ignored internally</span>
+    <span class="n">condition</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">as_tensor</span><span class="p">(</span>
+        <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">]</span>
+    <span class="p">),</span>  <span class="c1"># the first three values are arbitrary and are ignored internally</span>
     <span class="n">dims_to_sample</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span>
 <span class="p">)</span>
 </code></pre></div>
@@ -16942,11 +17047,6 @@ AAAAAAAAAAAAAAAtaWxzdAAAACWpdG9vAAAAHWRhdGEAAAABAAAAAExhdmY1OC4yMC4xMDA=
 <span class="n">_</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span><span class="n">cond_samples</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">]],</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
 </code></pre></div>
 <p><img alt="png" src="../07_conditional_distributions_files/07_conditional_distributions_37_0.png" /></p>
-                
-              
-              
-                
-
 
               
             </article>
@@ -16955,12 +17055,12 @@ AAAAAAAAAAAAAAAtaWxzdAAAACWpdG9vAAAAHWRhdGEAAAABAAAAAExhdmY1OC4yMC4xMDA=
         
       </main>
       
-        
-<footer class="md-footer">
+        <footer class="md-footer">
   
     <nav class="md-footer__inner md-grid" aria-label="Footer">
       
-        <a href="../13_diagnostics_simulation_based_calibration/" class="md-footer__link md-footer__link--prev" rel="prev">
+        
+        <a href="../15_mcmc_diagnostics_with_arviz/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Density plots and MCMC diagnostics with ArviZ" rel="prev">
           <div class="md-footer__button md-icon">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12z"/></svg>
           </div>
@@ -16969,13 +17069,14 @@ AAAAAAAAAAAAAAAtaWxzdAAAACWpdG9vAAAAHWRhdGEAAAABAAAAAExhdmY1OC4yMC4xMDA=
               <span class="md-footer__direction">
                 Previous
               </span>
-              Simulation-based calibration
+              Density plots and MCMC diagnostics with ArviZ
             </div>
           </div>
         </a>
       
       
-        <a href="../09_sensitivity_analysis/" class="md-footer__link md-footer__link--next" rel="next">
+        
+        <a href="../09_sensitivity_analysis/" class="md-footer__link md-footer__link--next" aria-label="Next: Posterior sensitivity analysis" rel="next">
           <div class="md-footer__title">
             <div class="md-ellipsis">
               <span class="md-footer__direction">
@@ -16993,28 +17094,29 @@ AAAAAAAAAAAAAAAtaWxzdAAAACWpdG9vAAAAHWRhdGEAAAABAAAAAExhdmY1OC4yMC4xMDA=
   
   <div class="md-footer-meta md-typeset">
     <div class="md-footer-meta__inner md-grid">
-      <div class="md-footer-copyright">
-        
-        Made with
-        <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
-          Material for MkDocs
-        </a>
-        
-      </div>
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
       
-  <div class="md-footer-social">
+        <div class="md-social">
+  
+    
     
       
       
-        
-        
-      
-      <a href="https://github.com/mackelab/sbi" target="_blank" rel="noopener" title="github.com" class="md-footer-social__link">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 512"><path d="M186.1 328.7c0 20.9-10.9 55.1-36.7 55.1s-36.7-34.2-36.7-55.1 10.9-55.1 36.7-55.1 36.7 34.2 36.7 55.1zM480 278.2c0 31.9-3.2 65.7-17.5 95-37.9 76.6-142.1 74.8-216.7 74.8-75.8 0-186.2 2.7-225.6-74.8-14.6-29-20.2-63.1-20.2-95 0-41.9 13.9-81.5 41.5-113.6-5.2-15.8-7.7-32.4-7.7-48.8 0-21.5 4.9-32.3 14.6-51.8 45.3 0 74.3 9 108.8 36 29-6.9 58.8-10 88.7-10 27 0 54.2 2.9 80.4 9.2 34-26.7 63-35.2 107.8-35.2 9.8 19.5 14.6 30.3 14.6 51.8 0 16.4-2.6 32.7-7.7 48.2 27.5 32.4 39 72.3 39 114.2zm-64.3 50.5c0-43.9-26.7-82.6-73.5-82.6-18.9 0-37 3.4-56 6-14.9 2.3-29.8 3.2-45.1 3.2-15.2 0-30.1-.9-45.1-3.2-18.7-2.6-37-6-56-6-46.8 0-73.5 38.7-73.5 82.6 0 87.8 80.4 101.3 150.4 101.3h48.2c70.3 0 150.6-13.4 150.6-101.3zm-82.6-55.1c-25.8 0-36.7 34.2-36.7 55.1s10.9 55.1 36.7 55.1 36.7-34.2 36.7-55.1-10.9-55.1-36.7-55.1z"/></svg>
-      </a>
     
-  </div>
-
+    <a href="https://github.com/mackelab/sbi" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 512"><!--! Font Awesome Free 6.1.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc.--><path d="M186.1 328.7c0 20.9-10.9 55.1-36.7 55.1s-36.7-34.2-36.7-55.1 10.9-55.1 36.7-55.1 36.7 34.2 36.7 55.1zM480 278.2c0 31.9-3.2 65.7-17.5 95-37.9 76.6-142.1 74.8-216.7 74.8-75.8 0-186.2 2.7-225.6-74.8-14.6-29-20.2-63.1-20.2-95 0-41.9 13.9-81.5 41.5-113.6-5.2-15.8-7.7-32.4-7.7-48.8 0-21.5 4.9-32.3 14.6-51.8 45.3 0 74.3 9 108.8 36 29-6.9 58.8-10 88.7-10 27 0 54.2 2.9 80.4 9.2 34-26.7 63-35.2 107.8-35.2 9.8 19.5 14.6 30.3 14.6 51.8 0 16.4-2.6 32.7-7.7 48.2 27.5 32.4 39 72.3 39 114.2zm-64.3 50.5c0-43.9-26.7-82.6-73.5-82.6-18.9 0-37 3.4-56 6-14.9 2.3-29.8 3.2-45.1 3.2-15.2 0-30.1-.9-45.1-3.2-18.7-2.6-37-6-56-6-46.8 0-73.5 38.7-73.5 82.6 0 87.8 80.4 101.3 150.4 101.3h48.2c70.3 0 150.6-13.4 150.6-101.3zm-82.6-55.1c-25.8 0-36.7 34.2-36.7 55.1s10.9 55.1 36.7 55.1 36.7-34.2 36.7-55.1-10.9-55.1-36.7-55.1z"/></svg>
+    </a>
+  
+</div>
+      
     </div>
   </div>
 </footer>
@@ -17023,10 +17125,10 @@ AAAAAAAAAAAAAAAtaWxzdAAAACWpdG9vAAAAHWRhdGEAAAABAAAAAExhdmY1OC4yMC4xMDA=
     <div class="md-dialog" data-md-component="dialog">
       <div class="md-dialog__inner md-typeset"></div>
     </div>
-    <script id="__config" type="application/json">{"base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.d351de03.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing"}, "version": null}</script>
+    <script id="__config" type="application/json">{"base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.5e67fbfe.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version.title": "Select version"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.a1609d9a.min.js"></script>
+      <script src="../../assets/javascripts/bundle.c44cc438.min.js"></script>
       
         <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-MML-AM_CHTML"></script>
       
