@@ -13,7 +13,6 @@ from sbi.inference import (
     SNPE_C,
     SRE,
     DirectPosterior,
-    MCMCPosterior,
     prepare_for_sbi,
     simulate_for_sbi,
 )
@@ -117,7 +116,8 @@ def test_inference_with_restriction_estimator():
     likelihood_shift = -1.0 * ones(num_dim)
     likelihood_cov = 0.3 * eye(num_dim)
     x_o = zeros(1, num_dim)
-    num_samples = 500
+    num_samples = 1000
+    num_simulations = 1000
 
     def linear_gaussian_nan(
         theta, likelihood_shift=likelihood_shift, likelihood_cov=likelihood_cov
@@ -143,7 +143,7 @@ def test_inference_with_restriction_estimator():
     num_rounds = 2
 
     for r in range(num_rounds):
-        theta, x = simulate_for_sbi(simulator, proposals[-1], 1000)
+        theta, x = simulate_for_sbi(simulator, proposals[-1], num_simulations)
         restriction_estimator.append_simulations(theta, x)
         if r < num_rounds - 1:
             _ = restriction_estimator.train()
