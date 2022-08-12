@@ -24,17 +24,15 @@ def test_mnle_on_device(device):
     x = torch.cat(
         (torch.rand(num_simulations, 1), torch.randint(0, 2, (num_simulations, 1))),
         dim=1,
-    )
+    ).to(device)
 
     # Train and infer.
-    prior = BoxUniform(torch.zeros(2), torch.ones(2))
+    prior = BoxUniform(torch.zeros(2), torch.ones(2), device=device)
     trainer = MNLE(prior=prior, device=device)
     trainer.append_simulations(theta, x).train(max_num_epochs=1)
 
     # Test sampling on device.
-    posterior = (
-        trainer.append_simulations(theta, x).train(max_num_epochs=1).build_posterior()
-    )
+    posterior = trainer.build_posterior()
     posterior.sample((1,), x=x[0], show_progress_bars=False)
 
 

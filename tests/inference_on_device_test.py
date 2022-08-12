@@ -271,15 +271,13 @@ def test_validate_theta_and_x_device(training_device: str, data_device: str) -> 
     theta = torch.empty((1, 1)).to(data_device)
     x = torch.empty((1, 1)).to(data_device)
 
-    if training_device != data_device:
-        with pytest.warns(UserWarning):
-            theta, x = validate_theta_and_x(theta, x, training_device=training_device)
-    else:
-        theta, x = validate_theta_and_x(theta, x, training_device=training_device)
+    theta, x = validate_theta_and_x(
+        theta, x, data_device=data_device, training_device=training_device
+    )
 
-    assert str(theta.device) == training_device, (
-        f"Data should have its device converted from '{data_device}' "
-        f"to training_device '{training_device}'."
+    assert str(theta.device) == data_device, (
+        f"Data and parameters must be on the same device but:"
+        f"data device='{data_device}' and training_device='{training_device}'."
     )
 
 
@@ -421,12 +419,9 @@ def test_embedding_nets_integration_training_device(
         ) if data_device != training_device else nullcontext():
             density_estimator_append = inference.append_simulations(theta, X)
 
-        with pytest.warns(UserWarning) if (round_idx == 0) and (
-            embedding_net_device != training_device
-        ) else nullcontext():
-            density_estimator_train = density_estimator_append.train(
-                max_num_epochs=2, **train_kwargs
-            )
+        density_estimator_train = density_estimator_append.train(
+            max_num_epochs=2, **train_kwargs
+        )
 
         posterior = inference.build_posterior(density_estimator_train)
         proposal = posterior.set_default_x(x_o)
