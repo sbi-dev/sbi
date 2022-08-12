@@ -33,7 +33,7 @@ def test_mnle_on_device(device):
 
     # Test sampling on device.
     posterior = trainer.build_posterior()
-    posterior.sample((1,), x=x[0], show_progress_bars=False)
+    posterior.sample((1,), x=x[0], show_progress_bars=False, mcmc_method="nuts")
 
 
 @pytest.mark.parametrize("sampler", ("mcmc", "rejection", "vi"))

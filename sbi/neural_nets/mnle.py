@@ -361,16 +361,18 @@ class MixedDensityEstimator(nn.Module):
         x_cont_repeated, x_disc_repeated = _separate_x(x_repeated)
         x_cont, x_disc = _separate_x(x)
 
-        log_prob_per_cat = torch.zeros(self.discrete_net.num_categories, batch_size)
         # repeat categories for parameters
         repeated_categories = torch.repeat_interleave(
             torch.arange(self.discrete_net.num_categories - 1), batch_size, dim=0
         )
         # repeat parameters for categories
         repeated_theta = theta.repeat(self.discrete_net.num_categories - 1, 1)
+        log_prob_per_cat = torch.zeros(self.discrete_net.num_categories, batch_size).to(
+            net_device
+        )
         log_prob_per_cat[:-1, :] = self.discrete_net.log_prob(
-            repeated_categories,
-            repeated_theta,
+            repeated_categories.to(net_device),
+            repeated_theta.to(net_device),
         ).reshape(-1, batch_size)
         # infer the last category logprob from sum to one.
         log_prob_per_cat[-1, :] = torch.log(1 - log_prob_per_cat[:-1, :].exp().sum(0))
