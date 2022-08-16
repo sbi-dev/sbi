@@ -194,11 +194,11 @@ def test_c2st_slice_np_parallelized(vectorized: bool, num_workers: int):
         "slice_np_vectorized",
     ),
 )
-def test_getting_inference_diagnostics(method):
+@pytest.mark.parametrize("num_chains", (1, 2))
+def test_getting_inference_diagnostics(method, num_chains):
 
     num_samples = 100
     num_dim = 2
-    num_chains = 2
 
     # Use composed prior to test MultipleIndependent case.
     prior = [

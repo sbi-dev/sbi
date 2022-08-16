@@ -688,11 +688,11 @@ class MCMCPosterior(NeuralPosterior):
                 )
             # For MultipleIndependent priors transforms first dim must be batch dim.
             # thus, reshape back and forth to have batch dim in front.
-            num_chains, samples_per_chain, dim_params = transformed_samples.shape
+            samples_shape = transformed_samples.shape
             samples = self.theta_transform.inv(  # type: ignore
-                transformed_samples.reshape(-1, dim_params)
+                transformed_samples.reshape(-1, samples_shape[-1])
             ).reshape(  # type: ignore
-                num_chains, samples_per_chain, dim_params
+                *samples_shape
             )
 
             inference_data = az.convert_to_inference_data(
