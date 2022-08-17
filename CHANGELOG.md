@@ -1,3 +1,7 @@
+# v0.19.1
+
+- bug fix for `ArviZ` integration (#727)
+
 # v0.19.0
 
 ## Major changes and bug fixes
