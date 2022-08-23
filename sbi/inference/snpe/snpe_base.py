@@ -171,8 +171,10 @@ class PosteriorEstimator(NeuralInference, ABC):
                     "run single-round inference with "
                     "`append_simulations(..., proposal=None)`."
                 )
-            theta_prior = self.get_simulations()[0]
-            self._prior = ImproperEmpirical(theta_prior, ones(theta_prior.shape[0]))
+            theta_prior = self.get_simulations()[0].to(self._device)
+            self._prior = ImproperEmpirical(
+                theta_prior, ones(theta_prior.shape[0], device=self._device)
+            )
 
         return self
 
