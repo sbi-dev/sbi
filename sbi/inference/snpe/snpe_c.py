@@ -161,7 +161,8 @@ class SNPE_C(PosteriorEstimator):
             # last proposal.
             proposal = self._proposal_roundwise[-1]
             self.use_non_atomic_loss = (
-                isinstance(proposal.posterior_estimator._distribution, mdn)
+                isinstance(proposal, DirectPosterior)
+                and isinstance(proposal.posterior_estimator._distribution, mdn)
                 and isinstance(self._neural_net._distribution, mdn)
                 and check_dist_class(
                     self._prior, class_to_check=(Uniform, MultivariateNormal)
