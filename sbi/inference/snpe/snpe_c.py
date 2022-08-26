@@ -413,8 +413,8 @@ class SNPE_C(PosteriorEstimator):
         )
         utils.assert_all_finite(
             log_prob_proposal_posterior,
-            """the evaluation of the MoG proposal posterior. This is likely due to too
-            little training data---consider increasing your simulation budget.""",
+            """the evaluation of the MoG proposal posterior. This is likely due to a 
+            numerical instability in the training procedure. Please create an issue on Github.""",
         )
 
         return log_prob_proposal_posterior

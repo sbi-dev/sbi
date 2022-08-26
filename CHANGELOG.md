@@ -1,3 +1,10 @@
+# v0.19.2
+
+- Rely on new version of `pyknos` with bigfix for APT with MDNs ()
+- bugfix: atomic SNPE-C now allows any kind of proposal (#732)
+- bugfix for SNPE with implicit prior on GPU (#730)
+- SNPE-A has `force_first_round_loss=True` as default (#729)
+
 # v0.19.1
 
 - bug fix for `ArviZ` integration (#727)

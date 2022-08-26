@@ -629,66 +629,23 @@ def test_example_posterior(snpe_method: type):
     assert posterior is not None
 
 
-@pytest.mark.parametrize("num_dim", (10, 12, 14))
-@pytest.mark.parametrize(
-    "prior_width",
-    (
-        70,
-        80,
-        90,
-    ),
-)
-@pytest.mark.parametrize(
-    "num_simulations",
-    (5000, 10000, 15000),
-)
-@pytest.mark.parametrize("density_estimator", ("mdn", "nsf", "maf"))
-def test_multiround_mog_training(
-    num_dim, prior_width, num_simulations, density_estimator, num_repetitions=1
-):
-    # num_dim = 2
-    # num_simulations = int(500 * (prior_width / 10))
-    prior = utils.torchutils.BoxUniform(
-        low=0.1 * ones(num_dim), high=prior_width * ones(num_dim)
-    )
+@pytest.mark.slow
+def test_multiround_mog_training():
+    "Test whether multi-round training with MDNs is stable. See #669."
 
-    from sbi.analysis import pairplot
+    def simulator(theta):
+        return theta + torch.randn(theta.shape)
 
-    simulator, prior = prepare_for_sbi(
-        lambda theta: torch.randn(theta.shape) + theta,
-        prior,
-    )
+    dim = 15
+    x_o = torch.zeros((1, dim))
 
-    theta_o = torch.ones(num_dim) + prior_width // 2
-    x_o = simulator(theta_o)
+    prior = utils.BoxUniform(-3*torch.ones(dim), 3*torch.ones(dim))
 
-    for _ in range(num_repetitions):
-        estimator = SNPE_C(prior, density_estimator=density_estimator)
-        proposal = prior
-        samples = []
-        for round_idx in range(3):
+    proposal = prior
+    inference = SNPE_C(prior, density_estimator="mdn")
 
-            theta = proposal.sample((num_simulations,))
-            samples.append(theta)
-            x = simulator(theta)
-
-            estimator.append_simulations(theta, x, proposal=proposal).train()
-
-            proposal = estimator.build_posterior().set_default_x(x_o)
-        samples.append(proposal.sample((num_simulations,)))
-        fig, ax = pairplot(
-            samples,
-            upper="contour",
-            kde_offdiag=dict(bw_method="scott", bins=100),
-            kde_diag=dict(bw_method="scott", bins=100),
-            contour_offdiag=dict(levels=[0.95], percentile=True),
-            points=theta_o,
-            points_offdiag=dict(marker="+", markersize=10),
-            points_colors=["k"],
-        )
-        # fig.savefig(f"prior+3rounds_width{prior_width}_dim{num_dim}_rep{_}.pdf")
-        fig.savefig(
-            f"""prior_num_dim{num_dim}_rounds_num_sims{num_simulations}_de
-            {density_estimator}"""
-        )
-        # posterior = proposal
+    for _ in range(3):
+        theta, x = simulate_for_sbi(simulator, proposal, 200)
+        _ = inference.append_simulations(theta, x, proposal=proposal).train()
+        posterior = inference.build_posterior().set_default_x(x_o)
+        proposal = posterior
