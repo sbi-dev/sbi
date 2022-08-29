@@ -639,7 +639,7 @@ def test_multiround_mog_training():
     dim = 15
     x_o = torch.zeros((1, dim))
 
-    prior = utils.BoxUniform(-3*torch.ones(dim), 3*torch.ones(dim))
+    prior = utils.BoxUniform(-3 * torch.ones(dim), 3 * torch.ones(dim))
 
     proposal = prior
     inference = SNPE_C(prior, density_estimator="mdn")
