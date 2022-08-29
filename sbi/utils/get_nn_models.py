@@ -181,6 +181,8 @@ def posterior_nn(
     num_bins: int = 10,
     embedding_net: nn.Module = nn.Identity(),
     num_components: int = 10,
+    sigmoid_theta: bool = False,
+    prior=None,
     **kwargs,
 ) -> Callable:
     r"""
@@ -225,6 +227,8 @@ def posterior_nn(
                 "num_bins",
                 "embedding_net",
                 "num_components",
+                "sigmoid_x",
+                "prior",
             ),
             (
                 z_score_theta,
@@ -234,6 +238,8 @@ def posterior_nn(
                 num_bins,
                 embedding_net,
                 num_components,
+                sigmoid_theta,
+                prior,
             ),
         ),
         **kwargs,

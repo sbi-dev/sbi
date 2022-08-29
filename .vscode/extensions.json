@@ -4,8 +4,6 @@
 	// List of extensions which should be recommended for users of this workspace.
 	"recommendations": [
 		"stkb.rewrap",
-		"ms-pyright.pyright",
-		"eamodio.gitlens",
 		"ms-vsliveshare.vsliveshare",
 		"ms-vsliveshare.vsliveshare-audio",
 		"karigari.chat",

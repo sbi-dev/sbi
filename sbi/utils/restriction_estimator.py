@@ -317,17 +317,28 @@ class RestrictionEstimator:
         subsample_weights: Tensor = torch.ones(num_examples)
         if subsample_invalid_sims == "auto":
             subsample_invalid = float(label.sum()) / float(theta.shape[0] - label.sum())
+            if subsample_invalid > 1.0:
+                print("subsample_invalid", subsample_invalid)
+                subsample_valid = 1.0 / subsample_invalid
+                subsample_invalid = 1.0
+            else:
+                print("subsample_invalid", subsample_invalid)
+                subsample_valid = 1.0
         else:
             assert isinstance(subsample_invalid_sims, float)
             subsample_invalid = subsample_invalid_sims
+            subsample_valid = 1.0
 
         subsample_weights[torch.logical_not(label.bool())] = subsample_invalid
+        subsample_weights[label.bool()] = subsample_valid
 
         subsample_weights = deepcopy(subsample_weights)
         subsample_weights[val_indices] = 0.0
 
         # Dataset is shared for training and validation loaders.
         dataset = data.TensorDataset(theta, label)
+
+        print("theta here", theta.shape)
 
         # Create neural_net and validation loaders using a subset sampler.
         train_loader = data.DataLoader(
@@ -408,7 +419,8 @@ class RestrictionEstimator:
                 for parameters, observations in val_loader:
                     outputs = self._classifier(parameters)
                     loss = criterion(outputs, observations)
-                    loss[~observations.bool()] *= subsample_invalid_sims
+                    loss[~observations.bool()] *= subsample_invalid
+                    loss[observations.bool()] *= subsample_valid
                     val_loss += loss.sum().item()
             self._val_log_prob = -val_loss / num_validation_examples
             self._validation_log_probs.append(self._val_log_prob)

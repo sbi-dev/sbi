@@ -101,6 +101,8 @@ def build_maf(
     hidden_features: int = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
+    sigmoid_x: bool = False,
+    prior=None,
     num_blocks: int = 2,
     dropout_probability: float = 0.0,
     use_batch_norm: bool = False,
@@ -159,7 +161,17 @@ def build_maf(
         transform_list += block
 
     z_score_x_bool, structured_x = z_score_parser(z_score_x)
-    if z_score_x_bool:
+    if sigmoid_x:
+        lower = prior.support.base_constraint.lower_bound  # type: ignore
+        upper = prior.support.base_constraint.upper_bound  # type: ignore
+        tf1 = transforms.InverseTransform(
+            transforms.PointwiseAffineTransform(shift=lower, scale=(upper - lower))
+        )
+        tf2 = transforms.Logit()
+        transform_x = transforms.CompositeTransform([tf1, tf2])
+        transform_list = [transform_x] + transform_list
+    elif z_score_x_bool:
+        # Prepend standardizing transform to nsf transforms.
         transform_list = [
             standardizing_transform(batch_x, structured_x)
         ] + transform_list
@@ -188,6 +200,8 @@ def build_nsf(
     num_transforms: int = 5,
     num_bins: int = 10,
     embedding_net: nn.Module = nn.Identity(),
+    sigmoid_x: bool = False,
+    prior=None,
     tail_bound: float = 3.0,
     hidden_layers_spline_context: int = 1,
     num_blocks: int = 2,
@@ -279,7 +293,17 @@ def build_nsf(
         transform_list += block
 
     z_score_x_bool, structured_x = z_score_parser(z_score_x)
-    if z_score_x_bool:
+
+    if sigmoid_x:
+        lower = prior.support.base_constraint.lower_bound  # type: ignore
+        upper = prior.support.base_constraint.upper_bound  # type: ignore
+        tf1 = transforms.InverseTransform(
+            transforms.PointwiseAffineTransform(shift=lower, scale=(upper - lower))
+        )
+        tf2 = transforms.Logit()
+        transform_x = transforms.CompositeTransform([tf1, tf2])
+        transform_list = [transform_x] + transform_list
+    elif z_score_x_bool:
         # Prepend standardizing transform to nsf transforms.
         transform_list = [
             standardizing_transform(batch_x, structured_x)
