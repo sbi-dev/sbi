@@ -396,7 +396,10 @@ def test_embedding_nets_integration_training_device(
                 num_transforms=2,
             )
         )
-        train_kwargs = dict(force_first_round_loss=True)
+        if inference_method == SNPE_A:
+            train_kwargs = dict()
+        else:
+            train_kwargs = dict(force_first_round_loss=True)
 
     with pytest.raises(Exception) if prior_device != training_device else nullcontext():
         inference = inference_method(prior=prior, **nn_kwargs, device=training_device)

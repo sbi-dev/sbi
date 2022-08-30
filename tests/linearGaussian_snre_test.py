@@ -160,7 +160,7 @@ def test_c2st_sre_variants_on_linearGaussian(
 
     x_o = zeros(num_trials, num_dim)
     num_samples = 500
-    num_simulations = 2600 if num_trials == 1 else 40500
+    num_simulations = 3000 if num_trials == 1 else 40500
 
     # `likelihood_mean` will be `likelihood_shift + theta`.
     likelihood_shift = -1.0 * ones(num_dim)

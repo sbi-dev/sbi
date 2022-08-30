@@ -143,7 +143,7 @@ def test_c2st_and_map_snl_on_linearGaussian_different(num_dim: int, prior_str: s
 
     """
     num_samples = 500
-    num_simulations = 3000
+    num_simulations = 4500
     trials_to_test = [1]
 
     # likelihood_mean will be likelihood_shift+theta
