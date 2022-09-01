@@ -153,6 +153,8 @@ class LikelihoodEstimator(NeuralInference, ABC):
             Density estimator that has learned the distribution $p(x|\theta)$.
         """
 
+        self._val_log_prob = float("-Inf")
+
         # Starting index for the training set (1 = discard round-0 samples).
         start_idx = int(discard_prior_samples and self._round > 0)
         # Load data from most recent round.
