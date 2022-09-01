@@ -24,6 +24,7 @@ from sbi.utils import (
     validate_theta_and_x,
     x_shape_from_simulation,
 )
+from multicompartment.utils.model_utils import experimental_stds
 
 
 class LikelihoodEstimator(NeuralInference, ABC):
@@ -129,6 +130,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
+        update_minimal_std: Optional[Tensor] = None,
     ) -> flows.Flow:
         r"""Train the density estimator to learn the distribution $p(x|\theta)$.
 
@@ -153,7 +155,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
             Density estimator that has learned the distribution $p(x|\theta)$.
         """
 
-        self._val_log_prob = float("-Inf")
+        self._best_val_log_prob = float("-Inf")
 
         # Starting index for the training set (1 = discard round-0 samples).
         start_idx = int(discard_prior_samples and self._round > 0)
@@ -189,6 +191,12 @@ class LikelihoodEstimator(NeuralInference, ABC):
         t_std = torch.as_tensor(t_std, dtype=torch.float32)
         shift = -t_mean / t_std
         scale = 1 / t_std
+
+        if update_minimal_std is not None and self._neural_net is not None:
+            corrected_minimal_std = update_minimal_std[newly_added_features] / t_std
+            self._neural_net._distribution._minimal_std[
+                newly_added_features
+            ] = corrected_minimal_std
 
         if self._neural_net is not None:
             self._neural_net._transform._transforms[0]._scale[

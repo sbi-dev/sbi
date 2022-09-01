@@ -170,7 +170,7 @@ def standardizing_transform(
     t_mean[torch.isnan(t_mean)] = 0.0
     t_std[torch.isnan(t_std)] = 1.0
 
-    return transforms.AffineTransform(shift=-t_mean / t_std, scale=1 / t_std)
+    return transforms.AffineTransform(shift=-t_mean / t_std, scale=1 / t_std), t_std
 
 
 class Standardize(nn.Module):

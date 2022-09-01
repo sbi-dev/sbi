@@ -92,6 +92,7 @@ def build_gauss(
     hidden_features: int = 50,
     num_components: int = 10,
     embedding_net: nn.Module = nn.Identity(),
+    minimal_std: Optional[Tensor] = None,
     **kwargs,
 ) -> nn.Module:
     """Builds MDN p(x|y).
@@ -126,8 +127,10 @@ def build_gauss(
 
     z_score_x_bool, structured_x = utils.z_score_parser(z_score_x)
     if z_score_x_bool:
-        transform_zx = utils.standardizing_transform(batch_x, structured_x)
+        transform_zx, std_sims = utils.standardizing_transform(batch_x, structured_x)
         transform = transforms.CompositeTransform([transform_zx, transform])
+
+    corrected_minimal_std = minimal_std / std_sims
 
     z_score_y_bool, structured_y = utils.z_score_parser(z_score_y)
     if z_score_y_bool:
@@ -148,6 +151,7 @@ def build_gauss(
             nn.ReLU(),
         ),
         custom_initialization=True,
+        minimal_std=corrected_minimal_std,
     )
 
     neural_net = flows.Flow(transform, distribution, embedding_net)

@@ -4,7 +4,7 @@
 
 from typing import Callable, Optional
 
-from torch import nn
+from torch import nn, Tensor
 
 from sbi.neural_nets.classifier import (
     build_linear_classifier,
@@ -99,6 +99,7 @@ def likelihood_nn(
     num_bins: int = 10,
     embedding_net: nn.Module = nn.Identity(),
     num_components: int = 10,
+    minimal_std: Optional[Tensor] = True,
     **kwargs,
 ) -> Callable:
     r"""
@@ -109,7 +110,7 @@ def likelihood_nn(
 
     Args:
         model: The type of density estimator that will be created. One of [`mdn`,
-            `made`, `maf`, `nsf`].
+            `made`, `maf`, `nsf`, `gauss`].
         z_score_theta: Whether to z-score parameters $\theta$ before passing them into
             the network, can take one of the following:
             - `none`, or None: do not z-score.
@@ -141,6 +142,7 @@ def likelihood_nn(
                 "num_bins",
                 "embedding_net",
                 "num_components",
+                "minimal_std",
             ),
             (
                 z_score_x,
@@ -150,6 +152,7 @@ def likelihood_nn(
                 num_bins,
                 embedding_net,
                 num_components,
+                minimal_std,
             ),
         ),
         **kwargs,
