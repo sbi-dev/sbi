@@ -6,6 +6,7 @@ from abc import ABC
 from copy import deepcopy
 from typing import Any, Callable, Dict, Optional, Tuple, Union
 
+import numpy as np
 import torch
 from pyknos.nflows import flows
 from torch import Tensor, nn, optim
@@ -75,6 +76,8 @@ class LikelihoodEstimator(NeuralInference, ABC):
 
         # SNLE-specific summary_writer fields.
         self._summary.update({"mcmc_times": []})  # type: ignore
+        self.features_that_have_been_trained = None
+        self._training_round = 0
 
     def append_simulations(
         self,
@@ -117,7 +120,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
         stop_after_epochs: int = 20,
-        max_num_epochs: int = 2**31 - 1,
+        max_num_epochs: int = 2 ** 31 - 1,
         clip_max_norm: Optional[float] = 5.0,
         exclude_invalid_x: bool = True,
         resume_training: bool = False,
@@ -157,6 +160,44 @@ class LikelihoodEstimator(NeuralInference, ABC):
         theta, x, _ = self.get_simulations(
             start_idx, exclude_invalid_x, warn_on_invalid=True
         )
+
+        # Initialize `features_that_have_been_trained`
+        if self.features_that_have_been_trained is None:
+            self.features_that_have_been_trained = torch.zeros(x.shape[1]).bool()
+
+        # Find features that have at least one entry that is not inf -> not inf means
+        # that the protocol has been simulated.
+        x_that_have_at_least_one_valid = torch.any(
+            torch.logical_not(torch.isinf(x)), dim=0
+        )
+        newly_added_features = torch.logical_xor(
+            self.features_that_have_been_trained, x_that_have_at_least_one_valid
+        )
+        print("Newly added features", newly_added_features)
+
+        # Obtain new std
+        min_std = 1e-14
+        batch_t_np = np.asarray(x[:, newly_added_features])
+        # inf shoud also be excluded from z-scoring behaviour.
+        batch_t_np[np.isinf(batch_t_np)] = float("nan")
+        t_mean = np.nanmean(batch_t_np, axis=0)
+        t_std = np.nanstd(batch_t_np, axis=0)
+        t_std[t_std < min_std] = min_std
+        t_mean = torch.as_tensor(t_mean, dtype=torch.float32)
+        t_std = torch.as_tensor(t_std, dtype=torch.float32)
+        shift = -t_mean / t_std
+        scale = 1 / t_std
+
+        if self._neural_net is not None:
+            self._neural_net._transform._transforms[0]._scale[
+                newly_added_features
+            ] = scale
+            self._neural_net._transform._transforms[0]._shift[
+                newly_added_features
+            ] = shift
+
+        # Update `features_that_have_been_trained`
+        self.features_that_have_been_trained = x_that_have_at_least_one_valid
 
         # Dataset is shared for training and validation loaders.
         dataset = data.TensorDataset(theta, x)
@@ -263,6 +304,8 @@ class LikelihoodEstimator(NeuralInference, ABC):
         # Update description for progress bar.
         if show_train_summary:
             print(self._describe_round(self._round, self._summary))
+
+        self._training_round += 1
 
         # Avoid keeping the gradients in the resulting network, which can
         # cause memory leakage when benchmarking.

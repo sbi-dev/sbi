@@ -12,7 +12,7 @@ from sbi.neural_nets.classifier import (
     build_resnet_classifier,
 )
 from sbi.neural_nets.flow import build_made, build_maf, build_nsf
-from sbi.neural_nets.mdn import build_mdn
+from sbi.neural_nets.mdn import build_mdn, build_gauss
 from sbi.neural_nets.mnle import build_mnle
 
 
@@ -158,6 +158,8 @@ def likelihood_nn(
     def build_fn(batch_theta, batch_x):
         if model == "mdn":
             return build_mdn(batch_x=batch_x, batch_y=batch_theta, **kwargs)
+        if model == "gauss":
+            return build_gauss(batch_x=batch_x, batch_y=batch_theta, **kwargs)
         if model == "made":
             return build_made(batch_x=batch_x, batch_y=batch_theta, **kwargs)
         if model == "maf":
@@ -263,6 +265,8 @@ def posterior_nn(
     def build_fn(batch_theta, batch_x):
         if model == "mdn":
             return build_mdn(batch_x=batch_theta, batch_y=batch_x, **kwargs)
+        if model == "gauss":
+            return build_gauss(batch_x=batch_x, batch_y=batch_theta, **kwargs)
         elif model == "made":
             return build_made(batch_x=batch_theta, batch_y=batch_x, **kwargs)
         elif model == "maf":

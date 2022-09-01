@@ -6,6 +6,7 @@ import warnings
 from math import pi
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, Union
 
+import numpy as np
 import pyknos.nflows.transforms as transforms
 import torch
 import torch.distributions.transforms as torch_tf
@@ -138,22 +139,36 @@ def standardizing_transform(
         Affine transform for z-scoring
     """
 
+    batch_t_np = np.asarray(batch_t)
+    batch_t_np[np.isinf(batch_t_np)] = float("nan")
+
     is_valid_t, *_ = handle_invalid_x(batch_t, True)
 
     if structured_dims:
         # Structured data so compute a single mean over all dimensions
         # equivalent to taking mean over per-sample mean, i.e.,
         # `torch.mean(torch.mean(.., dim=1))`.
-        t_mean = torch.mean(batch_t[is_valid_t])
+        t_mean = np.nanmean(batch_t_np)
+        # t_mean = torch.mean(batch_t[is_valid_t])
         # Compute std per-sample first.
-        sample_std = torch.std(batch_t[is_valid_t], dim=1)
+        sample_std = np.nanstd(batch_t_np, axis=1)
+        # sample_std = torch.std(batch_t[is_valid_t], dim=1)
         sample_std[sample_std < min_std] = min_std
         # Average over all samples for batch std.
         t_std = torch.mean(sample_std)
     else:
-        t_mean = torch.mean(batch_t[is_valid_t], dim=0)
-        t_std = torch.std(batch_t[is_valid_t], dim=0)
+        t_mean = np.nanmean(batch_t_np, axis=0)
+        t_std = np.nanstd(batch_t_np, axis=0)
+
+        # t_mean = torch.mean(batch_t[is_valid_t], dim=0)
+        # t_std = torch.std(batch_t[is_valid_t], dim=0)
         t_std[t_std < min_std] = min_std
+
+    t_mean = torch.as_tensor(t_mean, dtype=torch.float32)
+    t_std = torch.as_tensor(t_std, dtype=torch.float32)
+
+    t_mean[torch.isnan(t_mean)] = 0.0
+    t_std[torch.isnan(t_std)] = 1.0
 
     return transforms.AffineTransform(shift=-t_mean / t_std, scale=1 / t_std)
 
