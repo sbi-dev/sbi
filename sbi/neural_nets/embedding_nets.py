@@ -22,6 +22,8 @@ class FCEmbedding(nn.Module):
         """
         super().__init__()
         layers = [nn.Linear(input_dim, num_hiddens), nn.ReLU()]
+        # first and last layer is defined by the input and output dimension.
+        # therefor the "number of hidden layeres" is num_layers-2
         for _ in range(num_layers - 2):
             layers.append(nn.Linear(num_hiddens, num_hiddens))
             layers.append(nn.ReLU())
@@ -37,8 +39,7 @@ class FCEmbedding(nn.Module):
         Returns:
             Network output (batch_size, num_features).
         """
-        x = self.net(x)
-        return x
+        return self.net(x)
 
 
 class CNNEmbedding(nn.Module):
@@ -46,7 +47,7 @@ class CNNEmbedding(nn.Module):
         self,
         input_dim: int,
         output_dim: int,
-        num_fc: int = 2,
+        num_fully_connected: int = 2,
         num_hiddens: int = 120,
         out_channels_cnn_1: int = 10,
         out_channels_cnn_2: int = 16,
@@ -60,7 +61,7 @@ class CNNEmbedding(nn.Module):
         Args:
             input_dim: Dimensionality of input.
             num_conv: Number of convolutional layers.
-            num_fc: Number fully connected layer, minimum of 2.
+            num_fully_connected: Number fully connected layer, minimum of 2.
             num_hiddens: Number of hidden dimensions in fully-connected layers.
             out_channels_cnn_1: Number of oputput channels for the first convolutional
                 layer.
@@ -71,7 +72,8 @@ class CNNEmbedding(nn.Module):
                 layers.
 
             Remark: The implementation of the convolutional layers was not tested
-            rigourously. While it works for the default configuration parameters it might cause shape conflicts fot badly chosen parameters.
+            rigourously. While it works for the default configuration parameters it
+            might cause shape conflicts fot badly chosen parameters.
         """
         super().__init__()
         self.input_dim = input_dim
@@ -99,7 +101,10 @@ class CNNEmbedding(nn.Module):
             ),
             nn.ReLU(),
         ]
-        for _ in range(num_fc - 2):
+
+        # first and last layer is defined by the input and output dimension.
+        # therefor the "number of hidden layeres" is num_layers-2
+        for _ in range(num_fully_connected - 2):
             fc_layers.append(nn.Linear(num_hiddens, num_hiddens))
             fc_layers.append(nn.ReLU())
         fc_layers.append(nn.Linear(num_hiddens, output_dim))
@@ -120,11 +125,11 @@ class CNNEmbedding(nn.Module):
         return embedding
 
 
-class FCEmbeddingPermutationInv(nn.Module):
+class PermutationInvariantEmbedding(nn.Module):
     """Permutation invariant embedding network.
 
     Takes as input a tensor with (batch, permutation_dim, input_dim)
-    and outputs (batch,output_dim).
+    and outputs (batch, output_dim).
     """
 
     def __init__(
@@ -132,7 +137,7 @@ class FCEmbeddingPermutationInv(nn.Module):
         single_trial_net: nn.Module,
         input_dim: int,
         output_dim: int,
-        num_fc: int = 2,
+        num_fully_connected: int = 2,
         num_hiddens: int = 20,
         combining_operation: str = "mean",
     ):
@@ -149,7 +154,7 @@ class FCEmbeddingPermutationInv(nn.Module):
             input_dim: Dimensionality of input to the fully connected layers
                 (output_dimension of single_trial_net).
             output_dim: Dimensionality of the output.
-            num_fc: Number of fully connected layer, minimum of 2.
+            num_fully_connected: Number of fully connected layer, minimum of 2.
             num_hiddens: Number of hidden dimensions in fully-connected layers.
             combining_operation: How to combine the permutational dimensions, one of
                 'mean' or 'sum'.
@@ -162,8 +167,11 @@ class FCEmbeddingPermutationInv(nn.Module):
         self.combining_operation = combining_operation
 
         # construct fully connected layers
+
+        # first and last layer is defined by the input and output dimension.
+        # therefor the "number of hidden layeres" is num_fully_connected-2
         fc_layers = [nn.Linear(input_dim, num_hiddens), nn.ReLU()]
-        for _ in range(num_fc - 2):
+        for _ in range(num_fully_connected - 2):
             fc_layers.append(nn.Linear(num_hiddens, num_hiddens))
             fc_layers.append(nn.ReLU())
         fc_layers.append(nn.Linear(num_hiddens, output_dim))
@@ -179,14 +187,14 @@ class FCEmbeddingPermutationInv(nn.Module):
         """
         batch, permutation_dim, _ = x.shape
 
-        e = self.single_trial_net(x.view(batch * permutation_dim, -1)).view(
-            batch, permutation_dim, -1
-        )
+        iid_embeddings = self.single_trial_net(
+            x.view(batch * permutation_dim, -1)
+        ).view(batch, permutation_dim, -1)
 
         if self.combining_operation == "mean":
-            e = e.mean(1)
+            e = iid_embeddings.mean(1)
         elif self.combining_operation == "sum":
-            e = e.sum(1)
+            e = iid_embeddings.sum(1)
 
         embedding = self.fc_subnet(e)
 
