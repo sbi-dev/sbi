@@ -8,7 +8,7 @@ class FCEmbedding(nn.Module):
     def __init__(
         self,
         input_dim: int,
-        output_dim: int,
+        output_dim: int = 20,
         num_layers: int = 2,
         num_hiddens: int = 20,
     ):
