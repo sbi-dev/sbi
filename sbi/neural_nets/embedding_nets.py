@@ -166,6 +166,9 @@ class PermutationInvariantEmbedding(nn.Module):
         self.num_hiddens = num_hiddens
         self.combining_operation = combining_operation
 
+        if combining_operation not in ["sum", "mean"]:
+            raise ValueError("Please enter a valdi combining operation.")
+
         # construct fully connected layers
 
         # first and last layer is defined by the input and output dimension.
@@ -195,6 +198,8 @@ class PermutationInvariantEmbedding(nn.Module):
             e = iid_embeddings.mean(1)
         elif self.combining_operation == "sum":
             e = iid_embeddings.sum(1)
+        else:
+            raise ValueError("Please enter a valdi combining operation.")
 
         embedding = self.fc_subnet(e)
 
