@@ -28,6 +28,7 @@ class FCEmbedding(nn.Module):
             layers.append(nn.Linear(num_hiddens, num_hiddens))
             layers.append(nn.ReLU())
         layers.append(nn.Linear(num_hiddens, output_dim))
+        layers.append(nn.ReLU())
         self.net = nn.Sequential(*layers)
 
     def forward(self, x: Tensor) -> Tensor:
@@ -95,30 +96,23 @@ class CNNEmbedding(nn.Module):
         self.conv_subnet = nn.Sequential(*conv_layers)
 
         # construct fully connected layers
-        fc_layers = [
-            nn.Linear(
-                out_channels_cnn_2 * (int(input_dim / out_channels_cnn_2)), num_hiddens
-            ),
-            nn.ReLU(),
-        ]
+        input_dim_fc = out_channels_cnn_2 * (int(input_dim / out_channels_cnn_2))
 
-        # first and last layer is defined by the input and output dimension.
-        # therefor the "number of hidden layeres" is num_layers-2
-        for _ in range(num_fully_connected - 2):
-            fc_layers.append(nn.Linear(num_hiddens, num_hiddens))
-            fc_layers.append(nn.ReLU())
-        fc_layers.append(nn.Linear(num_hiddens, output_dim))
+        self.fc_subnet = FCEmbedding(
+            input_dim=input_dim_fc,
+            output_dim=output_dim,
+            num_layers=num_fully_connected,
+            num_hiddens=num_hiddens,
+        )
 
-        self.fc_subnet = nn.Sequential(*fc_layers)
-
-    def forward(self, x):
+    def forward(self, x: Tensor) -> Tensor:
         """Network forward pass.
         Args:
             x: Input tensor (batch_size, input_dim)
         Returns:
             Network output (batch_size, output_dim).
         """
-        x = self.conv_subnet(x)
+        x = self.conv_subnet(x.unsqueeze(1))
         x = torch.flatten(x, 1)  # flatten all dimensions except batch
         embedding = self.fc_subnet(x)
 
@@ -167,21 +161,17 @@ class PermutationInvariantEmbedding(nn.Module):
         self.combining_operation = combining_operation
 
         if combining_operation not in ["sum", "mean"]:
-            raise ValueError("Please enter a valdi combining operation.")
+            raise ValueError("combining_operation must be in ['sum', 'mean'].")
 
         # construct fully connected layers
+        self.fc_subnet = FCEmbedding(
+            input_dim=input_dim,
+            output_dim=output_dim,
+            num_layers=num_fully_connected,
+            num_hiddens=num_hiddens,
+        )
 
-        # first and last layer is defined by the input and output dimension.
-        # therefor the "number of hidden layeres" is num_fully_connected-2
-        fc_layers = [nn.Linear(input_dim, num_hiddens), nn.ReLU()]
-        for _ in range(num_fully_connected - 2):
-            fc_layers.append(nn.Linear(num_hiddens, num_hiddens))
-            fc_layers.append(nn.ReLU())
-        fc_layers.append(nn.Linear(num_hiddens, output_dim))
-
-        self.fc_subnet = nn.Sequential(*fc_layers)
-
-    def forward(self, x):
+    def forward(self, x: Tensor) -> Tensor:
         """Network forward pass.
         Args:
             x: Input tensor (batch_size, permutation_dim, input_dim)
@@ -195,11 +185,11 @@ class PermutationInvariantEmbedding(nn.Module):
         ).view(batch, permutation_dim, -1)
 
         if self.combining_operation == "mean":
-            e = iid_embeddings.mean(1)
+            e = iid_embeddings.mean(dim=1)
         elif self.combining_operation == "sum":
-            e = iid_embeddings.sum(1)
+            e = iid_embeddings.sum(dim=1)
         else:
-            raise ValueError("Please enter a valdi combining operation.")
+            raise ValueError("combining_operation must be in ['sum', 'mean'].")
 
         embedding = self.fc_subnet(e)
 
