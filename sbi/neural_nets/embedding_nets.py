@@ -1,7 +1,5 @@
-from typing import List, Tuple, Union
-
 import torch
-from torch import Size, Tensor, nn
+from torch import Tensor, nn
 
 
 class FCEmbedding(nn.Module):
@@ -10,7 +8,7 @@ class FCEmbedding(nn.Module):
         input_dim: int,
         output_dim: int = 20,
         num_layers: int = 2,
-        num_hiddens: int = 20,
+        num_hiddens: int = 40,
     ):
         """Fully-connected multi-layer neural network to be used as embedding network.
 
@@ -47,7 +45,7 @@ class CNNEmbedding(nn.Module):
     def __init__(
         self,
         input_dim: int,
-        output_dim: int,
+        output_dim: int = 20,
         num_fully_connected: int = 2,
         num_hiddens: int = 120,
         out_channels_cnn_1: int = 10,
@@ -61,6 +59,7 @@ class CNNEmbedding(nn.Module):
 
         Args:
             input_dim: Dimensionality of input.
+            output_dim: Dimensionality of the output.
             num_conv: Number of convolutional layers.
             num_fully_connected: Number fully connected layer, minimum of 2.
             num_hiddens: Number of hidden dimensions in fully-connected layers.
@@ -128,36 +127,38 @@ class PermutationInvariantEmbedding(nn.Module):
 
     def __init__(
         self,
-        single_trial_net: nn.Module,
-        input_dim: int,
-        output_dim: int,
-        num_fully_connected: int = 2,
-        num_hiddens: int = 20,
+        trial_net: nn.Module,
+        trial_net_output_dim: int,
         combining_operation: str = "mean",
+        num_layers: int = 2,
+        num_hiddens: int = 40,
+        output_dim: int = 20,
     ):
         """Permutation invariant multi-layer NN.
-            The single_trial_net is applied to each "trial" of the input
-            and is combined by the combining_operation (mean or sum).
+
+        The trial_net is applied to each "trial" of the input
+        and is combined by the combining_operation (mean or sum) to construct a
+        permutation invariant embedding across iid trials.
+        This embedding is embedded again using an additional fully connected net.
 
         Args:
-            single_trial_net: Network to process one trial, the combining_operation is
-                applied to its output. Taskes as input (batch, input_dim).
+            trial_net: Network to process one trial. The combining_operation is
+                applied to its output. Takes as input (batch, input_dim), where
+                input_dim is the dimensionality of a single trial. Produces output
+                (batch, latent_dim).
                 Remark: This network should be large enough as it acts on all (iid)
                 inputs seperatley and needs enough capacity to process the information
                 of all inputs.
-            input_dim: Dimensionality of input to the fully connected layers
-                (output_dimension of single_trial_net).
-            output_dim: Dimensionality of the output.
-            num_fully_connected: Number of fully connected layer, minimum of 2.
-            num_hiddens: Number of hidden dimensions in fully-connected layers.
+            trial_net_output_dim: Dimensionality of the output of the trial_net / input
+                to the fully connected layers.
             combining_operation: How to combine the permutational dimensions, one of
                 'mean' or 'sum'.
+            num_layers: Number of fully connected layer, minimum of 2.
+            num_hiddens: Number of hidden dimensions in fully-connected layers.
+            output_dim: Dimensionality of the output.
         """
         super().__init__()
-        self.single_trial_net = single_trial_net
-        self.input_dim = input_dim
-        self.output_dim = output_dim
-        self.num_hiddens = num_hiddens
+        self.trial_net = trial_net
         self.combining_operation = combining_operation
 
         if combining_operation not in ["sum", "mean"]:
@@ -165,9 +166,9 @@ class PermutationInvariantEmbedding(nn.Module):
 
         # construct fully connected layers
         self.fc_subnet = FCEmbedding(
-            input_dim=input_dim,
+            input_dim=trial_net_output_dim,
             output_dim=output_dim,
-            num_layers=num_fully_connected,
+            num_layers=num_layers,
             num_hiddens=num_hiddens,
         )
 
@@ -180,9 +181,9 @@ class PermutationInvariantEmbedding(nn.Module):
         """
         batch, permutation_dim, _ = x.shape
 
-        iid_embeddings = self.single_trial_net(
-            x.view(batch * permutation_dim, -1)
-        ).view(batch, permutation_dim, -1)
+        iid_embeddings = self.trial_net(x.view(batch * permutation_dim, -1)).view(
+            batch, permutation_dim, -1
+        )
 
         if self.combining_operation == "mean":
             e = iid_embeddings.mean(dim=1)
