@@ -113,7 +113,9 @@ class PosteriorEstimator(NeuralInference, ABC):
             NeuralInference object (returned so that this function is chainable).
         """
 
-        is_valid_x, num_nans, num_infs = handle_invalid_x(x, True)  # Hardcode to True
+        is_valid_x, num_nans, num_infs = handle_invalid_x(
+            x, exclude_invalid_x=True
+        )  # Hardcode to True
 
         x = x[is_valid_x]
         theta = theta[is_valid_x]
