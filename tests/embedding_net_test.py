@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 import torch
+
 from torch import eye, ones, zeros
 
 from sbi import utils as utils
