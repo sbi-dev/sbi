@@ -7,10 +7,9 @@ import pytest
 import torch
 from torch import eye, ones, zeros
 
-from sbi import analysis as analysis
 from sbi import utils as utils
 from sbi.inference import SNLE, SNPE, SNRE
-from sbi.neural_nets.embedding_nets import FCEmbedding
+from sbi.neural_nets.embedding_nets import FCEmbedding, PermutationInvariantEmbedding
 from sbi.simulators.linear_gaussian import linear_gaussian
 from sbi.utils import classifier_nn, likelihood_nn, posterior_nn
 
@@ -35,7 +34,7 @@ def test_embedding_net_api(method, num_dim: int, embedding_net: str):
     if embedding_net == "mlp":
         embedding = FCEmbedding(input_dim=num_dim)
     else:
-        raise NameError
+        raise NameError(f"{embedding_net} not supported.")
 
     if method == "SNPE":
         density_estimator = posterior_nn("maf", embedding_net=embedding)
@@ -52,6 +51,37 @@ def test_embedding_net_api(method, num_dim: int, embedding_net: str):
         inference = SNRE(prior, classifier=classifier, show_progress_bars=False)
     else:
         raise NameError
+
+    _ = inference.append_simulations(theta, x).train(max_num_epochs=5)
+    posterior = inference.build_posterior().set_default_x(x_o)
+
+    s = posterior.sample((1,))
+    _ = posterior.potential(s)
+
+
+@pytest.mark.parametrize("num_trials", [1, 10])
+@pytest.mark.parametrize("num_dim", [1, 2])
+def test_iid_embedding_api(num_trials, num_dim):
+
+    prior = utils.BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
+
+    num_thetas = 1000
+    theta = prior.sample((num_thetas,))
+
+    # simulate iid x.
+    iid_theta = theta.reshape(num_thetas, 1, num_dim).repeat(1, num_trials, 1)
+    x = torch.randn_like(iid_theta) + iid_theta
+    x_o = zeros(1, num_trials, num_dim)
+
+    output_dim = 5
+    single_trial_net = FCEmbedding(input_dim=num_dim, output_dim=output_dim)
+    embedding_net = PermutationInvariantEmbedding(
+        single_trial_net,
+        latent_dim=output_dim,
+    )
+
+    density_estimator = posterior_nn("maf", embedding_net=embedding_net)
+    inference = SNPE(prior, density_estimator=density_estimator)
 
     _ = inference.append_simulations(theta, x).train(max_num_epochs=5)
     posterior = inference.build_posterior().set_default_x(x_o)
