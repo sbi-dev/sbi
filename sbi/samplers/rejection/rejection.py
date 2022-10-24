@@ -1,14 +1,14 @@
 import logging
 import warnings
-from typing import Any, Callable, Optional, Tuple
+from typing import Any, Callable, Optional, Tuple, Union
 
 import torch
 import torch.distributions.transforms as torch_tf
-from torch import Tensor, as_tensor
+from torch import Tensor, as_tensor, nn
 from torch.distributions import Distribution
 from tqdm.auto import tqdm
 
-from sbi.utils import gradient_ascent, within_support
+from sbi.utils.sbiutils import gradient_ascent
 
 
 def rejection_sample(
@@ -183,15 +183,15 @@ def rejection_sample(
 
 
 @torch.no_grad()
-def rejection_sample_posterior_within_prior(
-    posterior_nn: Any,
-    prior: Distribution,
-    x: Tensor,
+def accept_reject_sample(
+    proposal: Union[nn.Module, Distribution],
+    accept_reject_fn: Callable,
     num_samples: int,
     show_progress_bars: bool = False,
     warn_acceptance: float = 0.01,
     sample_for_correction_factor: bool = False,
     max_sampling_batch_size: int = 10_000,
+    proposal_sampling_kwargs={},
     **kwargs,
 ) -> Tuple[Tensor, Tensor]:
     r"""Return samples from a posterior $p(\theta|x)$ only within the prior support.
@@ -253,12 +253,20 @@ def rejection_sample_posterior_within_prior(
     while num_remaining > 0:
 
         # Sample and reject.
-        candidates = posterior_nn.sample(sampling_batch_size, context=x).reshape(
-            sampling_batch_size, -1
-        )
+        # This if-case is annoying, but it will be gone when we move away from
+        # nflows and towards a flows-framework which takes a tuple as sample_size.
+        if isinstance(proposal, nn.Module):
+            candidates = proposal.sample(
+                sampling_batch_size, **proposal_sampling_kwargs  # type: ignore
+            ).reshape(sampling_batch_size, -1)
+        else:
+            candidates = proposal.sample(
+                (sampling_batch_size,), **proposal_sampling_kwargs  # type: ignore
+            )  # type: ignore
 
         # SNPE-style rejection-sampling when the proposal is the neural net.
-        are_within_prior = within_support(prior, candidates)
+        are_within_prior = accept_reject_fn(candidates)
+
         samples = candidates[are_within_prior]
 
         accepted.append(samples)
