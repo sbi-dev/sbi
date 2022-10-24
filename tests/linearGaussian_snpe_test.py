@@ -30,6 +30,7 @@ from sbi.simulators.linear_gaussian import (
     samples_true_posterior_linear_gaussian_uniform_prior,
     true_posterior_linear_gaussian_mvn_prior,
 )
+from sbi.utils import RestrictedPrior, threshold_distribution
 from tests.sbiutils_test import conditional_of_mvn
 from tests.test_utils import (
     check_c2st,
@@ -218,6 +219,8 @@ def test_c2st_snpe_on_linearGaussian_different_dims():
         ),
         "snpe_c",
         "snpe_c_non_atomic",
+        "tsnpe_rejection",
+        "tsnpe_sir",
     ),
 )
 def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
@@ -304,6 +307,22 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
             _ = inference.train(max_num_epochs=200, final_round=final_round)
             posterior = inference.build_posterior().set_default_x(x_o)
             proposal = posterior
+    elif method_str.startswith("tsnpe"):
+        sample_method = "rejection" if method_str == "tsnpe_rejection" else "sir"
+        inference = SNPE_C(**creation_args)
+        theta, x = simulate_for_sbi(simulator, prior, 900, simulation_batch_size=50)
+        posterior_estimator = inference.append_simulations(theta, x).train()
+        posterior1 = DirectPosterior(
+            prior=prior, posterior_estimator=posterior_estimator
+        ).set_default_x(x_o)
+        accept_reject_fn = threshold_distribution(posterior1, quantile=1e-4)
+        proposal = RestrictedPrior(
+            prior, accept_reject_fn, posterior=posterior1, sample_with=sample_method
+        )
+        theta = proposal.sample((1000,))
+        x = simulator(theta)
+        _ = inference.append_simulations(theta, x).train(force_first_round_loss=True)
+        posterior = inference.build_posterior().set_default_x(x_o)
 
     samples = posterior.sample((num_samples,))
 

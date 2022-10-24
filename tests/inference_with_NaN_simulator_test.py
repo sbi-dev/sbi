@@ -139,15 +139,15 @@ def test_inference_with_restriction_estimator():
 
     simulator, prior = prepare_for_sbi(linear_gaussian_nan, prior)
     restriction_estimator = RestrictionEstimator(prior=prior)
-    proposals = [prior]
+    proposal = prior
     num_rounds = 2
 
     for r in range(num_rounds):
-        theta, x = simulate_for_sbi(simulator, proposals[-1], num_simulations)
+        theta, x = simulate_for_sbi(simulator, proposal, num_simulations)
         restriction_estimator.append_simulations(theta, x)
         if r < num_rounds - 1:
             _ = restriction_estimator.train()
-        proposals.append(restriction_estimator.restrict_prior())
+        proposal = restriction_estimator.restrict_prior()
 
     all_theta, all_x, _ = restriction_estimator.get_simulations()
 
@@ -202,12 +202,12 @@ def test_restricted_prior_log_prob(prior):
 
     integal_restricted = integrate_grid(restricted_prior)
     error = torch.abs(integal_restricted - torch.as_tensor(1.0))
-    assert error < 0.01, "The restricted prior does not integrate to one."
+    assert error < 0.015, "The restricted prior does not integrate to one."
 
     theta = prior.sample((10_000,))
     restricted_prior_probs = torch.exp(restricted_prior.log_prob(theta))
 
-    valid_thetas = restricted_prior.predict(theta).bool()
+    valid_thetas = restricted_prior._accept_reject_fn(theta).bool()
     assert torch.all(
         restricted_prior_probs[valid_thetas] > 0.0
     ), "Accepted theta have zero probability."
