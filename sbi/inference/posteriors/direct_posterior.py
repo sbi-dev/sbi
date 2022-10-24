@@ -11,7 +11,7 @@ from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.posterior_based_potential import (
     posterior_estimator_based_potential,
 )
-from sbi.samplers.rejection.rejection import rejection_sample_posterior_within_prior
+from sbi.samplers.rejection.rejection import accept_reject_sample
 from sbi.types import Shape, TorchTransform
 from sbi.utils import check_prior, match_theta_and_x_batch_shapes, within_support
 from sbi.utils.torchutils import ensure_theta_batched
@@ -73,6 +73,7 @@ class DirectPosterior(NeuralPosterior):
 
         self.prior = prior
         self.posterior_estimator = posterior_estimator
+        self._accept_reject_fn = lambda theta: within_support(self.prior, theta)
 
         self.max_sampling_batch_size = max_sampling_batch_size
         self._leakage_density_correction_factor = None
@@ -114,13 +115,13 @@ class DirectPosterior(NeuralPosterior):
                 f"`.build_posterior(sample_with={sample_with}).`"
             )
 
-        samples = rejection_sample_posterior_within_prior(
-            posterior_nn=self.posterior_estimator,
-            prior=self.prior,
-            x=x,
+        samples = accept_reject_sample(
+            proposal=self.posterior_estimator,
+            accept_reject_fn=self._accept_reject_fn,
             num_samples=num_samples,
             show_progress_bars=show_progress_bars,
             max_sampling_batch_size=max_sampling_batch_size,
+            proposal_sampling_kwargs={"context": x},
         )[0]
         return samples
 
@@ -220,14 +221,14 @@ class DirectPosterior(NeuralPosterior):
 
         def acceptance_at(x: Tensor) -> Tensor:
 
-            return rejection_sample_posterior_within_prior(
-                posterior_nn=self.posterior_estimator,
-                prior=self.prior,
-                x=x.to(self._device),
+            return accept_reject_sample(
+                proposal=self.posterior_estimator,
+                accept_reject_fn=self._accept_reject_fn,
                 num_samples=num_rejection_samples,
                 show_progress_bars=show_progress_bars,
                 sample_for_correction_factor=True,
                 max_sampling_batch_size=rejection_sampling_batch_size,
+                proposal_sampling_kwargs={"context": x},
             )[1]
 
         # Check if the provided x matches the default x (short-circuit on identity).
