@@ -1,6 +1,6 @@
 from copy import deepcopy
 from math import floor
-from typing import Callable, Optional, Tuple, Union
+from typing import Any, Callable, Optional, Tuple, Union
 
 import torch
 import torch.nn.functional as F
@@ -12,6 +12,8 @@ from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler, WeightedRandomSampler
 from tqdm.auto import tqdm
 
+from sbi.samplers.importance.sir import sampling_importance_resampling
+from sbi.samplers.rejection.rejection import accept_reject_sample
 from sbi.types import Shape
 from sbi.utils.sbiutils import (
     get_simulations_since_round,
@@ -422,6 +424,7 @@ class RestrictionEstimator:
         self,
         classifier: Optional[nn.Module] = None,
         allowed_false_negatives: float = 0.0,
+        reweigh_factor: Optional[float] = None,
     ) -> "RestrictedPrior":
         r"""
         Return the restricted prior.
@@ -462,13 +465,15 @@ class RestrictionEstimator:
 
         classifier_.zero_grad(set_to_none=True)
 
-        return RestrictedPrior(
-            self._prior,
-            classifier_,
+        accept_reject_fn = threshold_classifier(
+            self._classifier,
             self._first_round_validation_theta,
             self._first_round_validation_label,
-            allowed_false_negatives,
+            allowed_false_negatives=allowed_false_negatives,
+            reweigh_factor=reweigh_factor,
         )
+
+        return RestrictedPrior(self._prior, accept_reject_fn)
 
     def _converged(self, epoch: int, stop_after_epochs: int) -> bool:
         r"""
@@ -504,14 +509,152 @@ class RestrictionEstimator:
         return converged
 
 
+def threshold_distribution(
+    dist: Any,
+    quantile: float = 1e-4,
+    num_samples_to_estimate_support: int = 1_000_000,
+) -> Callable:
+    """Return function that thresholds a density at a particular `1-quantile`.
+
+    Args:
+        density: Probability distribution to be thresholded, must have `.sample()` and
+            `.log_prob()`.
+        quantile: The returned will be `True` within the `1-quantile`
+            high-probability region of the density. In other words: `quantile` is the
+            fraction of mass that is excluded from `dist`.
+        num_samples_to_estimate_support: The number of samples that are drawn from
+            `dist` in order to obtain the threshold. Higher values are more accurate
+            but slower.
+
+    Returns:
+        Callabe which is true for $\theta$ in the `1-quantile` high-probability region
+        of the `dist`.
+    """
+    samples = dist.sample((num_samples_to_estimate_support,))
+    log_probs = dist.log_prob(samples)
+    sorted_log_probs, _ = torch.sort(log_probs)
+    log_prob_threshold = sorted_log_probs[
+        int(quantile * num_samples_to_estimate_support)
+    ]
+
+    def accept_reject(theta: Tensor) -> Tensor:
+        theta_log_probs = dist.log_prob(theta)
+        predictions = theta_log_probs > log_prob_threshold
+        return predictions.bool()
+
+    return accept_reject
+
+
+def threshold_classifier(
+    classifier: Any,
+    validation_theta: Tensor,
+    validation_label: Tensor,
+    allowed_false_negatives: Optional[float] = None,
+    reweigh_factor: Optional[float] = None,
+    print_fp_rate=False,
+    safety_margin: Optional[Union[str, float]] = "frequentist",
+) -> Callable:
+    r"""
+    Set the decision threshold of the classifier.
+
+    Compute the highest decision threshold at which the number of false negatives
+    is smaller than `allowed_false_negatives`. This threshold will then be set as
+    default when calling `.forward()` and for `.build_sim_informed_prior()`.
+
+    Args:
+        allowed_false_negatives: Allowed fraction of false negatives on a held-out
+            test set.
+        reweigh_factor: Post-hoc correction factor. Should be in [0, 1]. A large
+            reweigh factor will increase the probability of predicting a `invalid`
+            simulation.
+        print_fp_rate: Whether or not to compute and print the false-positive rate
+            at the obtained threshold.
+        safety_margin: When `allowed_false_negatives=0.0`, we might want to apply
+            an additional `safety_margin` to the threshold. If `None`, there will
+            be no margin and the threshold will be the minimum prediction among all
+            `valid' parameter sets. If it is a `float`, this float will be
+            subtracted from the minimum prediction. Lastly, if it is a `str`, we
+            reduce the classifier threshold using a statistical estimator (see
+            `German Tank Problem`). Only supported estimator is `frequentist`.
+            Small note: the procedure is fully correct only for a uniform
+            distribution of classifier predictions.
+    """
+    assert (
+        allowed_false_negatives is None or reweigh_factor is None
+    ), """Both the `allowed_false_negatives` and the `reweigh_factor` are set. You
+        can only set one of them."""
+
+    valid_val_theta = validation_theta[validation_label.bool()]
+    num_valid = valid_val_theta.shape[0]
+    clf_probs = F.softmax(classifier.forward(valid_val_theta), dim=1)[:, 1]
+
+    if allowed_false_negatives == 0.0:
+        if safety_margin is None:
+            classifier_thr = torch.min(clf_probs)
+        elif isinstance(safety_margin, float):
+            classifier_thr = torch.min(clf_probs) - safety_margin
+        elif safety_margin == "frequentist":
+            # We seek the minimum classifier output, not the maximum, as it usually
+            # is in the `German Tank Problem`. Hence, we transform the outputs with
+            # (1-output), apply the estimator, and then transform back.
+            tf_min_val = torch.max(1.0 - clf_probs)
+            tf_estimate = tf_min_val + tf_min_val / num_valid
+            classifier_thr = 1.0 - tf_estimate
+        else:
+            raise NameError(f"`safety_margin` {safety_margin} not supported.")
+    else:
+        assert allowed_false_negatives is not None, "Set allowed_false_negatives!"
+        quantile_index = floor(num_valid * allowed_false_negatives)
+        classifier_thr, _ = torch.kthvalue(clf_probs, quantile_index + 1)
+
+    classifier_thr = classifier_thr.detach()
+
+    def accept_reject(theta: Tensor) -> Tensor:
+        pred = F.softmax(classifier.forward(theta), dim=1)[:, 1]
+        if reweigh_factor is None:
+            threshold = classifier_thr
+            predictions = pred > threshold
+        else:
+            probs_invalid = pred * reweigh_factor
+            probs_valid = (1 - pred) * (1 - reweigh_factor)
+            predictions = probs_valid > probs_invalid
+        return predictions.bool()
+
+    if print_fp_rate:
+        print_false_positive_rate(accept_reject, validation_theta, validation_label)
+
+    return accept_reject
+
+
+def print_false_positive_rate(
+    accept_reject_fn: Callable, validation_theta: Tensor, validation_label: Tensor
+) -> float:
+    r"""
+    Print and return the rate of false positive predictions on the validation set.
+
+    Returns:
+        The flase positive rate.
+    """
+    invalid_val_theta = validation_theta[~validation_label.bool()]
+    predictions = accept_reject_fn(invalid_val_theta)
+    num_false_positives = int(predictions.sum())
+    fraction_false_positives = num_false_positives / invalid_val_theta.shape[0]
+    print(
+        f"Fraction of false positives: "
+        f"{num_false_positives} / {invalid_val_theta.shape[0]} = "
+        f"{fraction_false_positives:.3f}"
+    )
+    return fraction_false_positives
+
+
 class RestrictedPrior:
     def __init__(
         self,
         prior: Distribution,
-        classifier: nn.Module,
-        validation_theta: Tensor,
-        validation_label: Tensor,
-        allowed_false_negatives: float = 0.0,
+        accept_reject_fn: Callable,
+        posterior: Optional[Any] = None,
+        method: str = "rejection",
+        device: str = "cpu",
     ) -> None:
         r"""
         Initialize the simulation informed prior.
@@ -519,42 +662,26 @@ class RestrictedPrior:
         Args:
             prior: Prior distribution, will be used as proposal distribution whose
                 samples will be evaluated by the classifier.
-            classifier: Classifier that is evaluated to check if a parameter set
-                $\theta$ is valid or not.
-            validation_theta: The parameters in the latest validation set that the
-                classifier was trained on. Used to calibrate the classifier threshold.
-            validation_label: The labels in the latest validation set that the
-                classifier was trained on. Used to calibrate the classifier threshold.
+            accept_reject_fn: Callable that returns 1 inside the restricted region
+                and 0 outside of it.
+            posterior: Posterior distribution, only used as proposal distribution for
+                SIR sampling.
         """
 
         self._prior = prior
-        self._classifier = classifier
-        self._validation_theta = validation_theta
-        self._validation_label = validation_label
-        self._classifier_thr = None
-        self._reweigh_factor = None
+        self._accept_reject_fn = accept_reject_fn
+        self._posterior = posterior
         self.acceptance_rate = None
-
-        self.tune_rejection_threshold(allowed_false_negatives)
-
-    def classifier_probs(self, theta: Tensor) -> Tensor:
-        r"""
-        Return probability that the parameter set produces a `valid` simulation-output.
-
-        Args:
-            theta: Parameters whose label to predict.
-
-        Returns:
-            Probability that the parameter set is `valid'.
-        """
-        pred = F.softmax(self._classifier.forward(theta), dim=1)[:, 1]
-        return pred
+        self._device = device
+        self._method = method
 
     def sample(
         self,
         sample_shape: Shape = torch.Size(),
+        method: Optional[str] = None,
         show_progress_bars: bool = False,
         max_sampling_batch_size: int = 10_000,
+        oversampling_factor: int = 1024,
         save_acceptance_rate: bool = False,
     ) -> Tensor:
         """
@@ -577,59 +704,47 @@ class RestrictedPrior:
         Returns:
             Samples from the `RestrictedPrior`.
         """
-
         num_samples = torch.Size(sample_shape).numel()
-        num_sampled_total, num_remaining = 0, num_samples
-        accepted, acceptance_rate = [], float("Nan")
+        method = self._method if method is None else method
 
-        # Progress bar can be skipped.
-        pbar = tqdm(
-            disable=not show_progress_bars,
-            total=num_samples,
-            desc=f"Drawing {num_samples} posterior samples",
-        )
-
-        # To cover cases with few samples without leakage:
-        sampling_batch_size = min(num_samples, max_sampling_batch_size)
-        while num_remaining > 0:
-            # Sample and reject.
-            candidates = self._prior.sample(torch.Size((sampling_batch_size,))).reshape(
-                sampling_batch_size, -1
+        if method == "rejection":
+            samples, acceptance_rate = accept_reject_sample(
+                proposal=self._prior,
+                accept_reject_fn=self._accept_reject_fn,
+                num_samples=num_samples,
+                show_progress_bars=show_progress_bars,
+                max_sampling_batch_size=max_sampling_batch_size,
             )
-            are_accepted_by_classifier = self.predict(candidates)
-            samples = candidates[are_accepted_by_classifier.bool()]
-            accepted.append(samples)
+            if save_acceptance_rate:
+                self.acceptance_rate = torch.as_tensor(acceptance_rate)
+            print(
+                f"The classifier rejected {(1.0 - acceptance_rate) * 100:.1f}% of all "
+                f"samples. You will get a speed-up of "
+                f"{(1.0 / acceptance_rate - 1.0) * 100:.1f}%.",
+            )
+        elif method == "sir":
+            assert self._posterior is not None, (
+                "In order to use SIR sampling, you must provide a `posterior`: "
+                "`RestrictionEstimator(..., posterior=posterior)`."
+            )
+            num_samples = torch.Size(sample_shape).numel()
 
-            # Update.
-            num_sampled_total += sampling_batch_size
-            num_remaining -= samples.shape[0]
-            pbar.update(samples.shape[0])
+            accept_reject_fn = lambda theta: self._accept_reject_fn(theta).type(
+                torch.float32
+            )
+            samples = sampling_importance_resampling(
+                accept_reject_fn,
+                proposal=self._posterior,
+                num_samples=num_samples,
+                oversampling_factor=oversampling_factor,
+                show_progress_bars=show_progress_bars,
+                max_sampling_batch_size=max_sampling_batch_size,
+                device=self._device,
+            )
+        else:
+            raise ValueError("Only [rejection | sir] implemented as `method`")
 
-            # To avoid endless sampling when leakage is high, we raise a warning if the
-            # acceptance rate is too low after the first 1_000 samples.
-            acceptance_rate = (num_samples - num_remaining) / num_sampled_total
-
-            # For remaining iterations (leakage or many samples) continue sampling with
-            # fixed batch size.
-            sampling_batch_size = max_sampling_batch_size
-
-        if save_acceptance_rate:
-            self.acceptance_rate = torch.as_tensor(acceptance_rate)
-
-        pbar.close()
-        print(
-            f"The classifier rejected {(1.0 - acceptance_rate) * 100:.1f}% of all "
-            f"samples. You will get a speed-up of "
-            f"{(1.0 / acceptance_rate - 1.0) * 100:.1f}%.",
-        )
-
-        # When in case of leakage a batch size was used there could be too many samples.
-        samples = torch.cat(accepted)[:num_samples]
-        assert (
-            samples.shape[0] == num_samples
-        ), "Number of accepted samples must match required samples."
-
-        return samples
+        return samples.reshape((*sample_shape, -1)).to(self._device)
 
     def log_prob(
         self,
@@ -667,7 +782,7 @@ class RestrictedPrior:
 
             # Evaluate on device, move back to cpu for comparison with prior.
             prior_log_prob = self._prior.log_prob(theta)
-            accepted_by_classifer = self.predict(theta)
+            accepted_by_classifer = self._accept_reject_fn(theta)
 
             masked_log_prob = torch.where(
                 accepted_by_classifer.bool(),
@@ -714,109 +829,3 @@ class RestrictedPrior:
                 save_acceptance_rate=True,
             )
         return self.acceptance_rate  # type:ignore
-
-    def predict(self, theta: Tensor) -> Tensor:
-        r"""
-        Run classifier to predict whether the parameter set is `invalid` or `valid`.
-
-        Args:
-            theta: Parameters whose label to predict.
-
-        Returns:
-            Integers that indicate whether the parameter set is predicted to be
-            `invalid` (=0) or `valid` (=1).
-        """
-
-        pred = self.classifier_probs(theta)
-        if self._reweigh_factor is None:
-            threshold = self._classifier_thr
-            predictions = self.classifier_probs(theta) > threshold
-        else:
-            probs_invalid = pred * self._reweigh_factor
-            probs_valid = (1 - pred) * (1 - self._reweigh_factor)
-            predictions = probs_valid > probs_invalid
-        return predictions.int()
-
-    def tune_rejection_threshold(
-        self,
-        allowed_false_negatives: Optional[float] = None,
-        reweigh_factor: Optional[float] = None,
-        print_fp_rate=False,
-        safety_margin: Optional[Union[str, float]] = "frequentist",
-    ) -> None:
-        r"""
-        Set the decision threshold of the classifier.
-
-        Compute the highest decision threshold at which the number of false negatives
-        is smaller than `allowed_false_negatives`. This threshold will then be set as
-        default when calling `.forward()` and for `.build_sim_informed_prior()`.
-
-        Args:
-            allowed_false_negatives: Allowed fraction of false negatives on a held-out
-                test set.
-            reweigh_factor: Post-hoc correction factor. Should be in [0, 1]. A large
-                reweigh factor will increase the probability of predicting a `invalid`
-                simulation.
-            print_fp_rate: Whether to compute and print the false-positive rate
-                at the obtained threshold.
-            safety_margin: When `allowed_false_negatives=0.0`, we might want to apply
-                an additional `safety_margin` to the threshold. If `None`, there will
-                be no margin and the threshold will be the minimum prediction among all
-                `valid' parameter sets. If it is a `float`, this float will be
-                subtracted from the minimum prediction. Lastly, if it is a `str`, we
-                reduce the classifier threshold using a statistical estimator (see
-                `German Tank Problem`). Only supported estimator is `frequentist`.
-                Small note: the procedure is fully correct only for a uniform
-                distribution of classifier predictions.
-        """
-
-        assert (
-            allowed_false_negatives is None or reweigh_factor is None
-        ), """Both the `allowed_false_negatives` and the `reweigh_factor` are set. You
-            can only set one of them."""
-        self._reweigh_factor = reweigh_factor
-
-        valid_val_theta = self._validation_theta[self._validation_label.bool()]
-        num_valid = valid_val_theta.shape[0]
-        clf_probs = self.classifier_probs(valid_val_theta)
-
-        if allowed_false_negatives == 0.0:
-            if safety_margin is None:
-                self._classifier_thr = torch.min(clf_probs)
-            elif isinstance(safety_margin, float):
-                self._classifier_thr = torch.min(clf_probs) - safety_margin
-            elif safety_margin == "frequentist":
-                # We seek the minimum classifier output, not the maximum, as it usually
-                # is in the `German Tank Problem`. Hence, we transform the outputs with
-                # (1-output), apply the estimator, and then transform back.
-                tf_min_val = torch.max(1.0 - clf_probs)
-                tf_estimate = tf_min_val + tf_min_val / num_valid
-                self._classifier_thr = 1.0 - tf_estimate
-            else:
-                raise NameError(f"`safety_margin` {safety_margin} not supported.")
-        else:
-            assert allowed_false_negatives is not None, "Set allowed_false_negatives!"
-            quantile_index = floor(num_valid * allowed_false_negatives)
-            self._classifier_thr, _ = torch.kthvalue(clf_probs, quantile_index + 1)
-
-        self._classifier_thr = self._classifier_thr.detach()
-        if print_fp_rate:
-            self.print_false_positive_rate()
-
-    def print_false_positive_rate(self) -> float:
-        r"""
-        Print and return the rate of false positive predictions on the validation set.
-
-        Returns:
-            The flase positive rate.
-        """
-        invalid_val_theta = self._validation_theta[~self._validation_label.bool()]
-        predictions = self.predict(invalid_val_theta)
-        num_false_positives = int(predictions.sum())
-        fraction_false_positives = num_false_positives / invalid_val_theta.shape[0]
-        print(
-            f"Fraction of false positives: "
-            f"{num_false_positives} / {invalid_val_theta.shape[0]} = "
-            f"{fraction_false_positives:.3f}"
-        )
-        return fraction_false_positives
