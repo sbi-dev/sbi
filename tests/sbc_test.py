@@ -14,9 +14,10 @@ from sbi.simulators import linear_gaussian
 from sbi.utils import BoxUniform, MultipleIndependent
 
 
+@pytest.mark.parametrize("reduce_fn_str", ("marginals", "posterior_log_prob"))
 @pytest.mark.parametrize("prior", ("boxuniform", "independent"))
 @pytest.mark.parametrize("method", (SNPE, SNLE))
-def test_running_sbc(method, prior, model="mdn"):
+def test_running_sbc(method, prior, reduce_fn_str, model="mdn"):
     """Tests running inference and then SBC and obtaining nltp."""
 
     num_dim = 2
@@ -49,7 +50,15 @@ def test_running_sbc(method, prior, model="mdn"):
     thetas = prior.sample((num_sbc_runs,))
     xs = simulator(thetas)
 
-    run_sbc(thetas, xs, posterior, num_workers=1, num_posterior_samples=10)
+    reduce_fn = "marginals" if reduce_fn_str == "marginals" else posterior.log_prob
+    run_sbc(
+        thetas,
+        xs,
+        posterior,
+        num_workers=1,
+        num_posterior_samples=10,
+        reduce_fns=reduce_fn,
+    )
 
     # Check nltp
     get_nltp(thetas, xs, posterior)
