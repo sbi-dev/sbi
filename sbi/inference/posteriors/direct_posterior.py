@@ -35,34 +35,33 @@ class DirectPosterior(NeuralPosterior):
         self,
         posterior_estimator: flows.Flow,
         prior: Distribution,
-        theta_transform: Optional[TorchTransform] = None,
         max_sampling_batch_size: int = 10_000,
         device: Optional[str] = None,
         x_shape: Optional[torch.Size] = None,
+        enable_transform: bool = True,
     ):
         """
         Args:
             prior: Prior distribution with `.log_prob()` and `.sample()`.
             posterior_estimator: The trained neural posterior.
-            theta_transform: Custom transform to perform MAP optimization in
-                unconstrained space. If None (default), a suitable transform is
-                built from the prior support. In order to not use a transform at all,
-                pass an identity transform, e.g., `theta_transform=torch.distrbutions.
-                transforms`.
-                identity_transform()`.
             max_sampling_batch_size: Batchsize of samples being drawn from
                 the proposal at every iteration.
             device: Training device, e.g., "cpu", "cuda" or "cuda:0". If None,
                 `potential_fn.device` is used.
             x_shape: Shape of a single simulator output. If passed, it is used to check
                 the shape of the observed data and give a descriptive error.
+            enable_transform: Whether to transform parameters to unconstrained space
+                during MAP optimization.
         """
         # Because `DirectPosterior` does not take the `potential_fn` as input, it
         # builds it itself. The `potential_fn` and `theta_transform` are used only for
         # obtaining the MAP.
         check_prior(prior)
         potential_fn, theta_transform = posterior_estimator_based_potential(
-            posterior_estimator, prior, x_o=None, theta_transform=theta_transform
+            posterior_estimator,
+            prior,
+            x_o=None,
+            enable_transform=enable_transform,
         )
 
         super().__init__(
@@ -291,8 +290,8 @@ class DirectPosterior(NeuralPosterior):
                 `map`-attribute, and printed every `save_best_every`-th iteration.
                 Computing the best log-probability creates a significant overhead
                 (thus, the default is `10`.)
-            show_progress_bars: Whether or not to show a progressbar for sampling from
-                the posterior.
+            show_progress_bars: Whether to show a progressbar for sampling from the
+                posterior.
             force_update: Whether to re-calculate the MAP when x is unchanged and
                 have a cached value.
             log_prob_kwargs: Will be empty for SNLE and SNRE. Will contain

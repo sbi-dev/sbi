@@ -18,6 +18,7 @@ def ratio_estimator_based_potential(
     ratio_estimator: nn.Module,
     prior: Distribution,
     x_o: Optional[Tensor],
+    enable_transform: bool = True,
 ) -> Tuple[Callable, TorchTransform]:
     r"""Returns the potential for ratio-based methods.
 
@@ -28,6 +29,7 @@ def ratio_estimator_based_potential(
         ratio_estimator: The neural network modelling likelihood-to-evidence ratio.
         prior: The prior distribution.
         x_o: The observed data at which to evaluate the likelihood-to-evidence ratio.
+        enable_transform: Whether or not to transform parameters to unconstrained space.
 
     Returns:
         The potential function and a transformation that maps
@@ -37,7 +39,9 @@ def ratio_estimator_based_potential(
     device = str(next(ratio_estimator.parameters()).device)
 
     potential_fn = RatioBasedPotential(ratio_estimator, prior, x_o, device=device)
-    theta_transform = mcmc_transform(prior, device=device)
+    theta_transform = mcmc_transform(
+        prior, device=device, enable_transform=enable_transform
+    )
 
     return potential_fn, theta_transform
 

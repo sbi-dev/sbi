@@ -19,6 +19,7 @@ def likelihood_estimator_based_potential(
     likelihood_estimator: nn.Module,
     prior: Distribution,
     x_o: Optional[Tensor],
+    enable_transform: bool = True,
 ) -> Tuple[Callable, TorchTransform]:
     r"""Returns potential $\log(p(x_o|\theta)p(\theta))$ for likelihood-based methods.
 
@@ -29,6 +30,7 @@ def likelihood_estimator_based_potential(
         likelihood_estimator: The neural network modelling the likelihood.
         prior: The prior distribution.
         x_o: The observed data at which to evaluate the likelihood.
+        enable_transform: Whether or not to transform parameters to unconstrained space.
 
     Returns:
         The potential function $p(x_o|\theta)p(\theta)$ and a transformation that maps
@@ -40,7 +42,9 @@ def likelihood_estimator_based_potential(
     potential_fn = LikelihoodBasedPotential(
         likelihood_estimator, prior, x_o, device=device
     )
-    theta_transform = mcmc_transform(prior, device=device)
+    theta_transform = mcmc_transform(
+        prior, device=device, enable_transform=enable_transform
+    )
 
     return potential_fn, theta_transform
 
