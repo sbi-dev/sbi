@@ -374,7 +374,9 @@ class RatioEstimator(NeuralInference, ABC):
             device = next(density_estimator.parameters()).device.type
 
         potential_fn, theta_transform = ratio_estimator_based_potential(
-            ratio_estimator=ratio_estimator, prior=prior, x_o=None
+            ratio_estimator=ratio_estimator,
+            prior=prior,
+            x_o=None,
         )
 
         if sample_with == "mcmc":

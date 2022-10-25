@@ -341,7 +341,9 @@ class LikelihoodEstimator(NeuralInference, ABC):
             device = next(density_estimator.parameters()).device.type
 
         potential_fn, theta_transform = likelihood_estimator_based_potential(
-            likelihood_estimator=likelihood_estimator, prior=prior, x_o=None
+            likelihood_estimator=likelihood_estimator,
+            prior=prior,
+            x_o=None,
         )
 
         if sample_with == "mcmc":

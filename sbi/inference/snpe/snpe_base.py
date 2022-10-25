@@ -467,7 +467,9 @@ class PosteriorEstimator(NeuralInference, ABC):
             device = next(density_estimator.parameters()).device.type
 
         potential_fn, theta_transform = posterior_estimator_based_potential(
-            posterior_estimator=posterior_estimator, prior=prior, x_o=None
+            posterior_estimator=posterior_estimator,
+            prior=prior,
+            x_o=None,
         )
 
         if sample_with == "rejection":
