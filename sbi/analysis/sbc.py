@@ -1,5 +1,5 @@
 import warnings
-from typing import Dict, Tuple
+from typing import Callable, Dict, List, Tuple, Union
 
 import torch
 from joblib import Parallel, delayed
@@ -19,6 +19,7 @@ def run_sbc(
     xs: Tensor,
     posterior: NeuralPosterior,
     num_posterior_samples: int = 1000,
+    reduce_fns: Union[str, Callable, List[Callable]] = "marginals",
     num_workers: int = 1,
     sbc_batch_size: int = 1,
     show_progress_bar: bool = True,
@@ -36,6 +37,10 @@ def run_sbc(
         xs: observed data for sbc, simulated from thetas.
         posterior: a posterior obtained from sbi.
         num_posterior_samples: number of approximate posterior samples used for ranking.
+        reduce_fns: Function that is used to reduce the parameter space into 1D.
+            Simulation-based calibration can be recovered by setting this to the string
+            `marginals`. Sample-based expected coverage can be recovered by setting it
+            to `posterior.log_prob` (as a Callable).
         num_workers: number of CPU cores to use in parallel for running num_sbc_samples
             inferences.
         sbc_batch_size: batch size for workers.
@@ -100,6 +105,7 @@ def run_sbc(
                         xs_batch,
                         posterior,
                         num_posterior_samples,
+                        reduce_fns,
                     )
                 )
                 pbar.update(sbc_batch_size)
@@ -118,7 +124,11 @@ def run_sbc(
 
 
 def sbc_on_batch(
-    thetas: Tensor, xs: Tensor, posterior: NeuralPosterior, num_posterior_samples: int
+    thetas: Tensor,
+    xs: Tensor,
+    posterior: NeuralPosterior,
+    num_posterior_samples: int,
+    reduce_fns: Union[str, Callable, List[Callable]],
 ) -> Tuple[Tensor, Tensor]:
     """Return SBC results for a batch of SBC parameters and data from prior.
 
@@ -128,6 +138,10 @@ def sbc_on_batch(
         posterior: sbi posterior.
         num_posterior_samples: number of samples to draw from the posterior in each sbc
             run.
+        reduce_fns: Function that is used to reduce the parameter space into 1D.
+            Simulation-based calibration can be recovered by setting this to the string
+            `marginals`. Sample-based expected coverage can be recovered by setting it
+            to `posterior.log_prob` (as a Callable).
 
     Returns
         ranks: ranks of true parameters vs. posterior samples under the specified RV,
@@ -139,8 +153,18 @@ def sbc_on_batch(
             i.e., a single sample from each approximate posterior.
     """
 
+    if isinstance(reduce_fns, str):
+        assert reduce_fns == "marginals", (
+            "`reduce_fn` must either be the string `marginals` or a Callable or a List "
+            "of Callables."
+        )
+        reduce_fns = [(lambda theta, x: theta[i]) for i in range(thetas.shape[1])]
+
+    if isinstance(reduce_fns, Callable):
+        reduce_fns = [reduce_fns]
+
     dap_samples = torch.zeros_like(thetas)
-    ranks = torch.zeros_like(thetas)
+    ranks = torch.zeros((thetas.shape[0], len(reduce_fns)))
 
     for idx, (tho, xo) in enumerate(zip(thetas, xs)):
         # Draw posterior samples and save one for the data average posterior.
@@ -150,8 +174,8 @@ def sbc_on_batch(
         dap_samples[idx] = ths[0]
 
         # rank for each posterior dimension as in Talts et al. section 4.1.
-        for dim in range(thetas.shape[1]):
-            ranks[idx, dim] = (ths[:, dim] < tho[dim]).sum().item()
+        for i, reduce_fn in enumerate(reduce_fns):
+            ranks[idx, i] = (reduce_fn(ths, xo) < reduce_fn(tho, xo)).sum().item()
 
     return ranks, dap_samples
 
