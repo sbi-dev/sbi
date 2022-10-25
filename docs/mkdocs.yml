@@ -10,6 +10,7 @@ nav:
         - Amortized inference: tutorial/01_gaussian_amortized.md
         - Flexible interface: tutorial/02_flexible_interface.md
         - Sampler interface: tutorial/11_sampler_interface.md
+        - Implemented algorithms: tutorial/16_implemented_methods.md
       - Advanced:
         - Multi-round inference: tutorial/03_multiround_inference.md
         - Custom density estimators: tutorial/04_density_estimators.md
