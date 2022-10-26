@@ -23,7 +23,7 @@ def sampling_importance_resampling(
         potential_fn: Potential function $log(p(\theta))$ from which to draw samples.
         proposal: Proposal distribution for SIR.
         num_samples: Number of samples to draw.
-        num_candidate_samples: Number of proposed samples form which only one is
+        num_candidate_samples: Number of proposed samples from which only one is
             selected based on its importance weight.
         max_sampling_batch_size: The batchsize of samples being drawn from the
             proposal at every iteration.

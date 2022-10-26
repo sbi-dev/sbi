@@ -122,6 +122,7 @@ class DirectPosterior(NeuralPosterior):
             show_progress_bars=show_progress_bars,
             max_sampling_batch_size=max_sampling_batch_size,
             proposal_sampling_kwargs={"context": x},
+            alternative_method="build_posterior(..., sample_with='mcmc')",
         )[0]
         return samples
 

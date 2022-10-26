@@ -30,7 +30,7 @@ from sbi.simulators.linear_gaussian import (
     samples_true_posterior_linear_gaussian_uniform_prior,
     true_posterior_linear_gaussian_mvn_prior,
 )
-from sbi.utils import RestrictedPrior, threshold_distribution
+from sbi.utils import RestrictedPrior, get_density_thresholder
 from tests.sbiutils_test import conditional_of_mvn
 from tests.test_utils import (
     check_c2st,
@@ -315,7 +315,7 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
         posterior1 = DirectPosterior(
             prior=prior, posterior_estimator=posterior_estimator
         ).set_default_x(x_o)
-        accept_reject_fn = threshold_distribution(posterior1, quantile=1e-4)
+        accept_reject_fn = get_density_thresholder(posterior1, quantile=1e-4)
         proposal = RestrictedPrior(
             prior, accept_reject_fn, posterior=posterior1, sample_with=sample_method
         )

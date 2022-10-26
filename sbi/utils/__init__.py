@@ -8,7 +8,7 @@ from sbi.utils.potentialutils import pyro_potential_wrapper, transformed_potenti
 from sbi.utils.restriction_estimator import (
     RestrictedPrior,
     RestrictionEstimator,
-    threshold_distribution,
+    get_density_thresholder,
 )
 from sbi.utils.sbiutils import (
     batched_mixture_mv,

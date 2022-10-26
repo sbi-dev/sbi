@@ -37,7 +37,7 @@ def run_sbc(
         xs: observed data for sbc, simulated from thetas.
         posterior: a posterior obtained from sbi.
         num_posterior_samples: number of approximate posterior samples used for ranking.
-        reduce_fns: Function that is used to reduce the parameter space into 1D.
+        reduce_fns: Function used to reduce the parameter space into 1D.
             Simulation-based calibration can be recovered by setting this to the string
             `marginals`. Sample-based expected coverage can be recovered by setting it
             to `posterior.log_prob` (as a Callable).
