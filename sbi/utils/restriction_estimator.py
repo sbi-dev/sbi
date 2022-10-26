@@ -452,6 +452,9 @@ class RestrictionEstimator:
                 **exact** for `allowed_false_negatives=0.0`. The value specified here
                 corresponds approximately to the fraction of parameter sets that will
                 be systematically missed by the inference procedure.
+            reweigh_factor: Post-hoc correction factor. Should be in [0, 1]. A large
+                reweigh factor will increase the probability of predicting a `invalid`
+                simulation.
 
         Returns:
             Restricted prior with `.sample()` and `.predict()` methods.
@@ -465,7 +468,7 @@ class RestrictionEstimator:
 
         classifier_.zero_grad(set_to_none=True)
 
-        accept_reject_fn = threshold_classifier(
+        accept_reject_fn = get_classifier_thresholder(
             self._classifier,
             self._first_round_validation_theta,
             self._first_round_validation_label,
@@ -509,19 +512,19 @@ class RestrictionEstimator:
         return converged
 
 
-def threshold_distribution(
+def get_density_thresholder(
     dist: Any,
     quantile: float = 1e-4,
     num_samples_to_estimate_support: int = 1_000_000,
 ) -> Callable:
-    """Return function that thresholds a density at a particular `1-quantile`.
+    """Returns function that thresholds a density at a particular `1-quantile`.
 
     Args:
-        density: Probability distribution to be thresholded, must have `.sample()` and
+        dist: Probability distribution to be thresholded, must have `.sample()` and
             `.log_prob()`.
-        quantile: The returned will be `True` within the `1-quantile`
-            high-probability region of the density. In other words: `quantile` is the
-            fraction of mass that is excluded from `dist`.
+        quantile: The returned function will be `True` for $\theta$ within the
+            `1-quantile` high-probability region of the distribution. In other words:
+            `quantile` is the fraction of mass that is excluded from `dist`.
         num_samples_to_estimate_support: The number of samples that are drawn from
             `dist` in order to obtain the threshold. Higher values are more accurate
             but slower.
@@ -537,27 +540,27 @@ def threshold_distribution(
         int(quantile * num_samples_to_estimate_support)
     ]
 
-    def accept_reject(theta: Tensor) -> Tensor:
+    def density_thresholder(theta: Tensor) -> Tensor:
         theta_log_probs = dist.log_prob(theta)
         predictions = theta_log_probs > log_prob_threshold
         return predictions.bool()
 
-    return accept_reject
+    return density_thresholder
 
 
-def threshold_classifier(
+def get_classifier_thresholder(
     classifier: Any,
     validation_theta: Tensor,
     validation_label: Tensor,
     allowed_false_negatives: Optional[float] = None,
     reweigh_factor: Optional[float] = None,
-    print_fp_rate=False,
+    print_fp_rate: bool = False,
     safety_margin: Optional[Union[str, float]] = "frequentist",
 ) -> Callable:
     r"""
     Set the decision threshold of the classifier.
 
-    Compute the highest decision threshold at which the number of false negatives
+    Compute the highest decision threshold at which the fraction of false negatives
     is smaller than `allowed_false_negatives`. This threshold will then be set as
     default when calling `.forward()` and for `.build_sim_informed_prior()`.
 
@@ -567,8 +570,8 @@ def threshold_classifier(
         reweigh_factor: Post-hoc correction factor. Should be in [0, 1]. A large
             reweigh factor will increase the probability of predicting a `invalid`
             simulation.
-        print_fp_rate: Whether or not to compute and print the false-positive rate
-            at the obtained threshold.
+        print_fp_rate: Whether to compute and print the false-positive rate at the
+            obtained threshold.
         safety_margin: When `allowed_false_negatives=0.0`, we might want to apply
             an additional `safety_margin` to the threshold. If `None`, there will
             be no margin and the threshold will be the minimum prediction among all
@@ -603,13 +606,15 @@ def threshold_classifier(
         else:
             raise NameError(f"`safety_margin` {safety_margin} not supported.")
     else:
-        assert allowed_false_negatives is not None, "Set allowed_false_negatives!"
+        assert (
+            allowed_false_negatives is not None
+        ), "`allowed_false_negatives` must be set."
         quantile_index = floor(num_valid * allowed_false_negatives)
         classifier_thr, _ = torch.kthvalue(clf_probs, quantile_index + 1)
 
     classifier_thr = classifier_thr.detach()
 
-    def accept_reject(theta: Tensor) -> Tensor:
+    def classifier_thresholder(theta: Tensor) -> Tensor:
         pred = F.softmax(classifier.forward(theta), dim=1)[:, 1]
         if reweigh_factor is None:
             threshold = classifier_thr
@@ -621,9 +626,11 @@ def threshold_classifier(
         return predictions.bool()
 
     if print_fp_rate:
-        print_false_positive_rate(accept_reject, validation_theta, validation_label)
+        print_false_positive_rate(
+            classifier_thresholder, validation_theta, validation_label
+        )
 
-    return accept_reject
+    return classifier_thresholder
 
 
 def print_false_positive_rate(
@@ -633,7 +640,7 @@ def print_false_positive_rate(
     Print and return the rate of false positive predictions on the validation set.
 
     Returns:
-        The flase positive rate.
+        The false positive rate.
     """
     invalid_val_theta = validation_theta[~validation_label.bool()]
     predictions = accept_reject_fn(invalid_val_theta)
@@ -653,7 +660,7 @@ class RestrictedPrior:
         prior: Distribution,
         accept_reject_fn: Callable,
         posterior: Optional[Any] = None,
-        method: str = "rejection",
+        sample_with: str = "rejection",
         device: str = "cpu",
     ) -> None:
         r"""
@@ -662,10 +669,13 @@ class RestrictedPrior:
         Args:
             prior: Prior distribution, will be used as proposal distribution whose
                 samples will be evaluated by the classifier.
-            accept_reject_fn: Callable that returns 1 inside the restricted region
-                and 0 outside of it.
-            posterior: Posterior distribution, only used as proposal distribution for
-                SIR sampling.
+            accept_reject_fn: Callable that returns `True` inside the restricted region
+                and `False` outside of it.
+            posterior: Posterior distribution. Only used as proposal for `sir`.
+            sample_with: Either of [`rejection`|`sir`]. Sets that method that is used
+                to sample from the restricted prior. If `sir`, youu must have passed
+                a `posterior` at initialization.
+            device: Device used for sampling and evaluating.
         """
 
         self._prior = prior
@@ -673,16 +683,17 @@ class RestrictedPrior:
         self._posterior = posterior
         self.acceptance_rate = None
         self._device = device
-        self._method = method
+        self._sample_with = sample_with
 
     def sample(
         self,
         sample_shape: Shape = torch.Size(),
-        method: Optional[str] = None,
-        show_progress_bars: bool = False,
+        sample_with: Optional[str] = None,
         max_sampling_batch_size: int = 10_000,
         oversampling_factor: int = 1024,
         save_acceptance_rate: bool = False,
+        show_progress_bars: bool = False,
+        print_rejected_frac: bool = True,
     ) -> Tensor:
         """
         Return samples from the `RestrictedPrior`.
@@ -693,36 +704,44 @@ class RestrictedPrior:
 
         Args:
             sample_shape: Shape of the returned samples.
-            show_progress_bars: Whether to show a progressbar during sampling.
+            sample_with: Either of [`rejection`|`sir`]. Sets that method that is used
+                to sample from the restricted prior. If `sir`, youu must have passed
+                a `posterior` at initialization.
             max_sampling_batch_size: Batch size for drawing samples from the posterior.
                 Takes effect only in the second iteration of the loop below, i.e., in
                 case of leakage or `num_samples>max_sampling_batch_size`. Larger batch
                 size speeds up sampling.
+            oversampling_factor: Number of proposed samples for `sir` from which only
+                one is selected based on its importance weight.
             save_acceptance_rate: If `True`, the acceptance rate is saved and such that
                 it can potentially be used later in `log_prob()`.
+            show_progress_bars: Whether to show a progressbar during sampling.
+            print_rejected_frac: Whether to print the rejection rate of the restriction
+                estimator during sampling.
 
         Returns:
             Samples from the `RestrictedPrior`.
         """
         num_samples = torch.Size(sample_shape).numel()
-        method = self._method if method is None else method
+        sample_with = self._sample_with if sample_with is None else sample_with
 
-        if method == "rejection":
+        if sample_with == "rejection":
             samples, acceptance_rate = accept_reject_sample(
                 proposal=self._prior,
                 accept_reject_fn=self._accept_reject_fn,
                 num_samples=num_samples,
                 show_progress_bars=show_progress_bars,
                 max_sampling_batch_size=max_sampling_batch_size,
+                alternative_method="sample_with='sir'",
             )
             if save_acceptance_rate:
                 self.acceptance_rate = torch.as_tensor(acceptance_rate)
             print(
-                f"The classifier rejected {(1.0 - acceptance_rate) * 100:.1f}% of all "
-                f"samples. You will get a speed-up of "
-                f"{(1.0 / acceptance_rate - 1.0) * 100:.1f}%.",
+                f"""The `RestrictedPrior` rejected {(1.0 - acceptance_rate) * 100:.1f}%
+                of prior samples. You will get a speed-up of
+                {(1.0 / acceptance_rate - 1.0) * 100:.1f}%."""
             )
-        elif method == "sir":
+        elif sample_with == "sir":
             assert self._posterior is not None, (
                 "In order to use SIR sampling, you must provide a `posterior`: "
                 "`RestrictionEstimator(..., posterior=posterior)`."

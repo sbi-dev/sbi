@@ -1,6 +1,6 @@
 import logging
 import warnings
-from typing import Any, Callable, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Optional, Tuple, Union
 
 import torch
 import torch.distributions.transforms as torch_tf
@@ -164,10 +164,12 @@ def rejection_sample(
                 and not leakage_warning_raised
             ):
                 logging.warning(
-                    f"""Only {acceptance_rate:.0%} proposal samples were accepted. It
+                    f"""Only {acceptance_rate:.3%} proposal samples were accepted. It
                         may take a long time to collect the remaining {num_remaining}
-                        samples. Consider interrupting (Ctrl-C) and switching to
-                        `sample_with='mcmc`."""
+                        samples. Consider interrupting (Ctrl-C) and switching to a
+                        different sampling method with
+                        `build_posterior(..., sample_with='mcmc')`. or
+                        `build_posterior(..., sample_with='vi')`."""
                 )
                 leakage_warning_raised = True  # Ensure warning is raised just once.
 
@@ -191,10 +193,11 @@ def accept_reject_sample(
     warn_acceptance: float = 0.01,
     sample_for_correction_factor: bool = False,
     max_sampling_batch_size: int = 10_000,
-    proposal_sampling_kwargs={},
+    proposal_sampling_kwargs: Dict = {},
+    alternative_method: Optional[str] = None,
     **kwargs,
 ) -> Tuple[Tensor, Tensor]:
-    r"""Return samples from a posterior $p(\theta|x)$ only within the prior support.
+    r"""Returns samples from a proposal according to a acception criterion.
 
     This is relevant for snpe methods and flows for which the posterior tends to have
     mass outside the prior support.
@@ -210,8 +213,9 @@ def accept_reject_sample(
 
     Args:
         posterior_nn: Neural net representing the posterior.
-        prior: Distribution-like object that evaluates probabilities with `log_prob`.
-        x: Conditioning variable $x$ for the posterior $p(\theta|x)$.
+        accept_reject_fn: Function that evaluatuates which samples are accepted or
+            rejected. Must take a batch of parameters and return a boolean tensor which
+            indicates which parameters get accepted.
         num_samples: Desired number of samples.
         show_progress_bars: Whether to show a progressbar during sampling.
         warn_acceptance: A minimum acceptance rate under which to warn about slowness.
@@ -222,6 +226,10 @@ def accept_reject_sample(
             Takes effect only in the second iteration of the loop below, i.e., in case
             of leakage or `num_samples>max_sampling_batch_size`. Larger batch size
             speeds up sampling.
+        proposal_sampling_kwargs: Arguments that are passed to `proposal.sample()`.
+        alternative_method: An alternative method for sampling from the restricted
+            proposal. E.g., for SNPE, we suggest to sample with MCMC if the rejection
+            rate is too high. Used only for printing during a potential warning.
         kwargs: Absorb additional unused arguments that can be passed to
             `rejection_sample()`. Warn if not empty.
 
@@ -265,9 +273,9 @@ def accept_reject_sample(
             )  # type: ignore
 
         # SNPE-style rejection-sampling when the proposal is the neural net.
-        are_within_prior = accept_reject_fn(candidates)
+        are_accepted = accept_reject_fn(candidates)
 
-        samples = candidates[are_within_prior]
+        samples = candidates[are_accepted]
 
         accepted.append(samples)
 
@@ -297,7 +305,7 @@ def accept_reject_sample(
                 logging.warning(
                     f"""Drawing samples from posterior to estimate the normalizing
                         constant for `log_prob()`. However, only
-                        {acceptance_rate:.0%} posterior samples are within the
+                        {acceptance_rate:.3%} posterior samples are within the
                         prior support. It may take a long time to collect the
                         remaining {num_remaining} samples.
                         Consider interrupting (Ctrl-C) and either basing the
@@ -311,12 +319,14 @@ def accept_reject_sample(
                         result in an unnormalized `log_prob()`."""
                 )
             else:
-                logging.warning(
-                    f"""Only {acceptance_rate:.0%} posterior samples are within the
-                        prior support. It may take a long time to collect the
-                        remaining {num_remaining} samples. Consider interrupting
-                        (Ctrl-C) and switching to `sample_with='mcmc'`."""
-                )
+                warn_msg = f"""Only {acceptance_rate:.3%} proposal samples are
+                    accepted. It may take a long time to collect the remaining
+                    {num_remaining} samples. """
+                if alternative_method is not None:
+                    warn_msg += f"""Consider interrupting (Ctrl-C) and switching to
+                    `{alternative_method}`."""
+                logging.warning(warn_msg)
+
             leakage_warning_raised = True  # Ensure warning is raised just once.
 
     pbar.close()
