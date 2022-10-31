@@ -27,7 +27,7 @@ def sampling_importance_resampling(
             selected based on its importance weight.
         max_sampling_batch_size: The batchsize of samples being drawn from the
             proposal at every iteration.
-        show_progress_bars: Whether or not to show a progress bar.
+        show_progress_bars: Whether to show a progress bar.
         device: Device on which to sample.
 
     Returns:

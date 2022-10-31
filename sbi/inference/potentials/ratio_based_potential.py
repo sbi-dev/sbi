@@ -29,7 +29,7 @@ def ratio_estimator_based_potential(
         ratio_estimator: The neural network modelling likelihood-to-evidence ratio.
         prior: The prior distribution.
         x_o: The observed data at which to evaluate the likelihood-to-evidence ratio.
-        enable_transform: Whether or not to transform parameters to unconstrained space.
+        enable_transform: Whether to transform parameters to unconstrained space.
 
     Returns:
         The potential function and a transformation that maps

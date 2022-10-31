@@ -33,7 +33,7 @@ def posterior_estimator_based_potential(
         posterior_estimator: The neural network modelling the posterior.
         prior: The prior distribution.
         x_o: The observed data at which to evaluate the posterior.
-        enable_transform: Whether or not to transform parameters to unconstrained space.
+        enable_transform: Whether to transform parameters to unconstrained space.
 
     Returns:
         The potential function and a transformation that maps

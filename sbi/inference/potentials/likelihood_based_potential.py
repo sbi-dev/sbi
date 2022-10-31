@@ -30,7 +30,7 @@ def likelihood_estimator_based_potential(
         likelihood_estimator: The neural network modelling the likelihood.
         prior: The prior distribution.
         x_o: The observed data at which to evaluate the likelihood.
-        enable_transform: Whether or not to transform parameters to unconstrained space.
+        enable_transform: Whether to transform parameters to unconstrained space.
 
     Returns:
         The potential function $p(x_o|\theta)p(\theta)$ and a transformation that maps

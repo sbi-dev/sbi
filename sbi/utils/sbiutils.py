@@ -575,7 +575,7 @@ def mcmc_transform(
             to infer the `mean` and `stddev` of the prior used for z-scoring. Unused if
             the prior has bounded support or when the prior has `mean` and `stddev`
             attributes.
-        enable_transform: Whether or not to transform parameters to unconstrained space.
+        enable_transform: Whether to transform parameters to unconstrained space.
 
     Returns: A transformation that transforms whose `forward()` maps from unconstrained
         (or z-scored) to constrained (or non-z-scored) space.
@@ -775,7 +775,7 @@ def gradient_ascent(
             `map`-attribute, and printed every `save_best_every`-th iteration.
             Computing the best log-probability creates a significant overhead (thus,
             the default is `10`.)
-        show_progress_bars: Whether or not to show a progressbar for the optimization.
+        show_progress_bars: Whether to show a progressbar for the optimization.
         interruption_note: The message printed when the user interrupts the
             optimization.
 
