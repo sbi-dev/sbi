@@ -618,10 +618,17 @@ def mcmc_transform(
             transform = biject_to(prior.support)
         # For all other cases build affine transform with mean and std.
         else:
-            if hasattr(prior, "mean") and hasattr(prior, "stddev"):
+            try:
                 prior_mean = prior.mean.to(device)
                 prior_std = prior.stddev.to(device)
-            else:
+            except (NotImplementedError, AttributeError):
+                # NotImplementedError -> Distribution that inherits from torch dist but
+                # does not implement mean, e.g., TransformedDistribution.
+                # AttributeError -> Custom distribution that has no mean/std attribute.
+                warnings.warn(
+                    """The passed prior has no mean or stddev attribute, estimating
+                    them from samples to build affimed standardizing transform."""
+                )
                 theta = prior.sample(torch.Size((num_prior_samples_for_zscoring,)))
                 prior_mean = theta.mean(dim=0).to(device)
                 prior_std = theta.std(dim=0).to(device)
