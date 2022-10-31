@@ -3,7 +3,7 @@
 
 
 import contextlib
-from typing import Callable
+from typing import Callable, Optional
 
 import joblib
 import torch
@@ -11,12 +11,15 @@ from joblib import Parallel, delayed
 from torch import Tensor
 from tqdm.auto import tqdm
 
+from sbi.utils.sbiutils import seed_everything
+
 
 def simulate_in_batches(
     simulator: Callable,
     theta: Tensor,
     sim_batch_size: int = 1,
     num_workers: int = 1,
+    seed: Optional[int] = None,
     show_progress_bars: bool = True,
 ) -> Tensor:
     r"""
@@ -32,6 +35,7 @@ def simulate_in_batches(
             the entire theta in a single batch. When using multiple workers, increasing
             this batch size can further speed up simulations by reducing overhead.
         num_workers: Number of workers for multiprocessing.
+        seed: seed for reproducibility.
         show_progress_bars: Whether to show a progress bar during simulation.
 
     Returns:
@@ -39,6 +43,7 @@ def simulate_in_batches(
     """
 
     num_sims, *_ = theta.shape
+    seed_everything(seed)
 
     if num_sims == 0:
         x = torch.tensor([])
@@ -48,6 +53,13 @@ def simulate_in_batches(
         batches = torch.split(theta, sim_batch_size, dim=0)
 
         if num_workers != 1:
+            batch_seeds = torch.randint(high=1_000_000, size=(len(batches),))
+
+            # define seeded simulator.
+            def simulator_seeded(theta: Tensor, seed) -> Tensor:
+                seed_everything(seed)
+                return simulator(theta)
+
             # Parallelize the sequence of batches across workers.
             # We use the solution proposed here: https://stackoverflow.com/a/61689175
             # to update the pbar only after the workers finished a task.
@@ -58,9 +70,10 @@ def simulate_in_batches(
                     desc=f"Running {num_sims} simulations in {len(batches)} batches.",
                     total=len(batches),
                 )
-            ) as progress_bar:
+            ) as _:
                 simulation_outputs = Parallel(n_jobs=num_workers)(
-                    delayed(simulator)(batch) for batch in batches
+                    delayed(simulator_seeded)(batch, batch_seed)
+                    for batch, batch_seed in zip(batches, batch_seeds)
                 )
         else:
             pbar = tqdm(

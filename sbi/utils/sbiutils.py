@@ -2,16 +2,15 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 import logging
+import random
 import warnings
 from math import pi
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, Union
 
-import arviz as az
+import numpy as np
 import pyknos.nflows.transforms as transforms
 import torch
 import torch.distributions.transforms as torch_tf
-from arviz.data import InferenceData
-from numpy import ndarray
 from pyro.distributions import Empirical
 from torch import Tensor
 from torch import nn as nn
@@ -855,3 +854,17 @@ def gradient_ascent(
         return argmax_, max_val  # type: ignore
 
     return theta_transform.inv(best_theta_overall), max_val  # type: ignore
+
+
+def seed_everything(seed: Optional[int] = None) -> None:
+    """Sets all python, numpy and pytorch seeds."""
+
+    if seed is None:
+        seed = int(torch.randint(1_000_000, size=(1,)))
+
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.backends.cudnn.deterministic = True  # type: ignore
+    torch.backends.cudnn.benchmark = False  # type: ignore
