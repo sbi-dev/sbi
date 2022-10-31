@@ -42,6 +42,11 @@ def process_prior(
 ) -> Tuple[Distribution, int, bool]:
     """Return PyTorch distribution-like prior from user-provided prior.
 
+    NOTE: returns a tuple (processed_prior, num_params, whether_prior_returns_numpy).
+    The last two entries in the tuple can be passed on to `process_simulator` to prepare
+    the simulator as well. For example, it will take care of casting parameters to numpy
+    or adding a batch dimension to the simulator output, if needed.
+
     Args:
         prior: Prior object with `.sample()` and `.log_prob()` as provided by the user.
         custom_prior_wrapper_kwargs: kwargs to be passed to the class that wraps a
@@ -457,12 +462,20 @@ def check_data_device(datum_1: torch.Tensor, datum_2: torch.Tensor) -> None:
 
 def process_simulator(
     user_simulator: Callable,
-    prior,
+    prior: Distribution,
     is_numpy_simulator: bool,
 ) -> Callable:
-    """Return a simulator that meets the requirements for usage in sbi.
+    """Returns a simulator that meets the requirements for usage in sbi.
 
-    Wraps the simulator to return only `torch.Tensor` and handle batches of parameters.
+    Args:
+        user_simulator: simulator provided by the user, possibly written in numpy.
+        prior: prior as pytorch distribution or processed with `process_prior`.
+        is_numpy_simulator: whether the simulator needs theta in numpy types, returned
+            from `process_prior`.
+
+    Returns:
+        simulator: processed simulator that returns `torch.Tensor` can handle batches
+            of parameters.
     """
 
     assert isinstance(user_simulator, Callable), "Simulator must be a function."
@@ -575,9 +588,10 @@ def process_x(
 
 
 def prepare_for_sbi(simulator: Callable, prior) -> Tuple[Callable, Distribution]:
-    """Prepare simulator, prior and for usage in sbi.
+    """Prepare simulator and prior for usage in sbi.
 
-    One of the goals is to allow you to use sbi with inputs computed in numpy.
+    NOTE: This is a wrapper around `process_prior` and `process_simulator` which can be
+    used in isolation as well.
 
     Attempts to meet the following requirements by reshaping and type-casting:
 
@@ -593,7 +607,7 @@ def prepare_for_sbi(simulator: Callable, prior) -> Tuple[Callable, Distribution]
         prior: Prior as provided by the user.
 
     Returns:
-        Tuple (simulator, prior, x_shape) checked and matching the requirements of sbi.
+        Tuple (simulator, prior) checked and matching the requirements of sbi.
     """
 
     # Check prior, return PyTorch prior.
