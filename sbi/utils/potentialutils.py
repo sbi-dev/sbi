@@ -25,7 +25,7 @@ def transformed_potential(
         potential_fn: Potential function.
         theta_transform: Transformation applied before evaluating the `potential_fn`
         device: The device to which to move the parameters before evaluation.
-        track_gradients: Whether or not to track the gradients of the `potential_fn`
+        track_gradients: Whether to track the gradients of the `potential_fn`
             evaluation.
     """
 

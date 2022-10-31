@@ -566,7 +566,7 @@ class RestrictedPrior:
 
         Args:
             sample_shape: Shape of the returned samples.
-            show_progress_bars: Whether or not to show a progressbar during sampling.
+            show_progress_bars: Whether to show a progressbar during sampling.
             max_sampling_batch_size: Batch size for drawing samples from the posterior.
                 Takes effect only in the second iteration of the loop below, i.e., in
                 case of leakage or `num_samples>max_sampling_batch_size`. Larger batch
@@ -757,7 +757,7 @@ class RestrictedPrior:
             reweigh_factor: Post-hoc correction factor. Should be in [0, 1]. A large
                 reweigh factor will increase the probability of predicting a `invalid`
                 simulation.
-            print_fp_rate: Whether or not to compute and print the false-positive rate
+            print_fp_rate: Whether to compute and print the false-positive rate
                 at the obtained threshold.
             safety_margin: When `allowed_false_negatives=0.0`, we might want to apply
                 an additional `safety_margin` to the threshold. If `None`, there will

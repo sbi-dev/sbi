@@ -314,7 +314,7 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
                 `map`-attribute, and printed every `save_best_every`-th iteration.
                 Computing the best log-probability creates a significant overhead
                 (thus, the default is `10`.)
-            show_progress_bars: Whether or not to show a progressbar for sampling from
+            show_progress_bars: Whether to show a progressbar during sampling from
                 the posterior.
             individually: If true, returns log weights and MAPs individually.
 
