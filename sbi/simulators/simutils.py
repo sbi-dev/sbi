@@ -11,7 +11,7 @@ from joblib import Parallel, delayed
 from torch import Tensor
 from tqdm.auto import tqdm
 
-from sbi.utils.sbiutils import seed_everything
+from sbi.utils.sbiutils import seed_all_backends
 
 
 def simulate_in_batches(
@@ -43,7 +43,7 @@ def simulate_in_batches(
     """
 
     num_sims, *_ = theta.shape
-    seed_everything(seed)
+    seed_all_backends(seed)
 
     if num_sims == 0:
         x = torch.tensor([])
@@ -57,7 +57,7 @@ def simulate_in_batches(
 
             # define seeded simulator.
             def simulator_seeded(theta: Tensor, seed) -> Tensor:
-                seed_everything(seed)
+                seed_all_backends(seed)
                 return simulator(theta)
 
             # Parallelize the sequence of batches across workers.
