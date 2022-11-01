@@ -64,7 +64,7 @@ def test_1d_marginals_peaks_from_kde(num_candidates):
 
     num_samples = 10_000
     num_dim = 4
-    samples = torch.ones(num_samples, num_dim) + 1.0 * torch.randn(num_samples, num_dim)
+    samples = torch.ones(num_samples, num_dim) + 0.5 * torch.randn(num_samples, num_dim)
 
     peaks = get_1d_marginal_peaks_from_kde(samples, num_candidates=num_candidates)
     assert torch.allclose(peaks, torch.ones(num_dim), atol=1e-1)

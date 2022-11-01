@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import pytest
-import torch
 from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
@@ -83,7 +82,7 @@ def test_c2st_snl_on_linearGaussian():
 
     x_o = zeros(1, x_dim)
     num_samples = 1000
-    num_simulations = 3100
+    num_simulations = 3000
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(x_dim)
