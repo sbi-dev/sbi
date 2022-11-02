@@ -27,11 +27,11 @@ from sbi.utils import (
     RestrictedPrior,
     check_estimator_arg,
     handle_invalid_x,
+    nle_nre_apt_msg_on_invalid_x,
+    npe_msg_on_invalid_x,
     test_posterior_net_for_multi_d_x,
     validate_theta_and_x,
     warn_if_zscoring_changes_data,
-    warn_on_invalid_x,
-    warn_on_invalid_x_for_snpec_leakage,
     x_shape_from_simulation,
 )
 from sbi.utils.sbiutils import ImproperEmpirical, mask_sims_from_prior
@@ -89,6 +89,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         theta: Tensor,
         x: Tensor,
         proposal: Optional[DirectPosterior] = None,
+        exclude_invalid_x: Optional[bool] = None,
         data_device: Optional[str] = None,
     ) -> "PosteriorEstimator":
         r"""Store parameters and simulation outputs to use them for later training.
@@ -105,6 +106,11 @@ class PosteriorEstimator(NeuralInference, ABC):
             proposal: The distribution that the parameters $\theta$ were sampled from.
                 Pass `None` if the parameters were sampled from the prior. If not
                 `None`, it will trigger a different loss-function.
+            exclude_invalid_x: Whether invalid simulations are discarded during
+                training. For single-round SNPE, it is fine to discard invalid
+                simulations, but for multi-round SNPE (atomic), discarding invalid
+                simulations gives systematically wrong results. If `None`, it will
+                be `True` in the first round and `False` in later rounds.
             data_device: Where to store the data, default is on the same device where
                 the training is happening. If training a large dataset on a GPU with not
                 much VRAM can set to 'cpu' to store data on system memory instead.
@@ -112,29 +118,6 @@ class PosteriorEstimator(NeuralInference, ABC):
         Returns:
             NeuralInference object (returned so that this function is chainable).
         """
-
-        is_valid_x, num_nans, num_infs = handle_invalid_x(
-            x, exclude_invalid_x=True
-        )  # Hardcode to True
-
-        x = x[is_valid_x]
-        theta = theta[is_valid_x]
-
-        # Check for problematic z-scoring
-        warn_if_zscoring_changes_data(x)
-        warn_on_invalid_x(num_nans, num_infs, True)
-        warn_on_invalid_x_for_snpec_leakage(
-            num_nans, num_infs, True, type(self).__name__, self._round
-        )
-
-        if data_device is None:
-            data_device = self._device
-
-        theta, x = validate_theta_and_x(
-            theta, x, data_device=data_device, training_device=self._device
-        )
-        self._check_proposal(proposal)
-
         if (
             proposal is None
             or proposal is self._prior
@@ -145,16 +128,53 @@ class PosteriorEstimator(NeuralInference, ABC):
             # The `_data_round_index` will later be used to infer if one should train
             # with MLE loss or with atomic loss (see, in `train()`:
             # self._round = max(self._data_round_index))
-            self._data_round_index.append(0)
-            prior_masks = mask_sims_from_prior(0, theta.size(0))
+            current_round = 0
         else:
             if not self._data_round_index:
                 # This catches a pretty specific case: if, in the first round, one
                 # passes data that does not come from the prior.
-                self._data_round_index.append(1)
+                current_round = 1
             else:
-                self._data_round_index.append(max(self._data_round_index) + 1)
-            prior_masks = mask_sims_from_prior(1, theta.size(0))
+                current_round = max(self._data_round_index) + 1
+
+        if exclude_invalid_x is None:
+            if current_round > 0:
+                exclude_invalid_x = True
+            else:
+                exclude_invalid_x = False
+
+        is_valid_x, num_nans, num_infs = handle_invalid_x(
+            x, exclude_invalid_x=exclude_invalid_x
+        )
+
+        x = x[is_valid_x]
+        theta = theta[is_valid_x]
+
+        # Check for problematic z-scoring
+        warn_if_zscoring_changes_data(x)
+        if (
+            type(self).__name__ == "SNPE_C"
+            and current_round > 0
+            and not self.use_non_atomic_loss
+        ):
+            nle_nre_apt_msg_on_invalid_x(
+                num_nans, num_infs, exclude_invalid_x, "Multiround SNPE-C (atomic)"
+            )
+        else:
+            npe_msg_on_invalid_x(
+                num_nans, num_infs, exclude_invalid_x, "Single-round NPE"
+            )
+
+        if data_device is None:
+            data_device = self._device
+
+        theta, x = validate_theta_and_x(
+            theta, x, data_device=data_device, training_device=self._device
+        )
+        self._check_proposal(proposal)
+
+        self._data_round_index.append(current_round)
+        prior_masks = mask_sims_from_prior(int(current_round > 0), theta.size(0))
 
         self._theta_roundwise.append(theta)
         self._x_roundwise.append(x)

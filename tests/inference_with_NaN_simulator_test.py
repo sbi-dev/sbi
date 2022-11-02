@@ -65,7 +65,11 @@ def test_z_scoring_warning(snpe_method: type):
 @pytest.mark.slow
 @pytest.mark.parametrize(
     ("method", "percent_nans"),
-    ((SNPE_C, 0.05), (SNL, 0.05), (SRE, 0.05)),
+    (
+        (SNPE_C, 0.05),
+        pytest.param(SNL, 0.05, marks=pytest.mark.xfail),
+        pytest.param(SRE, 0.05, marks=pytest.mark.xfail),
+    ),
 )
 def test_inference_with_nan_simulator(method: type, percent_nans: float):
 
