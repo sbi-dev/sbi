@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import pytest
 import torch
-
 from torch import eye, ones, zeros
 
 from sbi import utils as utils
 from sbi.inference import SNLE, SNPE, SNRE
-from sbi.neural_nets.embedding_nets import FCEmbedding, PermutationInvariantEmbedding
+from sbi.neural_nets.embedding_nets import (
+    CNNEmbedding,
+    FCEmbedding,
+    PermutationInvariantEmbedding,
+)
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     true_posterior_linear_gaussian_mvn_prior,
@@ -179,3 +182,58 @@ def test_iid_inference(num_trials, num_dim, method):
             check_c2st(samples, reference_samples, alg=method + " permuted")
     else:
         check_c2st(samples, reference_samples, alg=method)
+
+
+@pytest.mark.parametrize(
+    "input_shape",
+    [
+        (32,),
+        (32, 32),
+        (32, 64),
+    ],
+)
+@pytest.mark.parametrize("num_channels", (1, 3))
+def test_1d_and_2d_cnn_embedding_net(input_shape, num_channels):
+    import torch
+    from torch.distributions import MultivariateNormal
+
+    estimator_provider = posterior_nn(
+        "mdn",
+        embedding_net=CNNEmbedding(
+            input_shape, in_channels=num_channels, output_dim=20
+        ),
+    )
+
+    num_dim = input_shape[0]
+
+    def simulator2d(theta):
+        x = MultivariateNormal(
+            loc=theta, covariance_matrix=0.5 * torch.eye(num_dim)
+        ).sample()
+        return x.unsqueeze(2).repeat(1, 1, input_shape[1])
+
+    def simulator1d(theta):
+        return torch.rand_like(theta) + theta
+
+    if len(input_shape) == 1:
+        simulator = simulator1d
+        xo = torch.ones(1, num_channels, *input_shape).squeeze(1)
+    else:
+        simulator = simulator2d
+        xo = torch.ones(1, num_channels, *input_shape).squeeze(1)
+
+    prior = MultivariateNormal(torch.zeros(num_dim), torch.eye(num_dim))
+
+    num_simulations = 1000
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
+    if num_channels > 1:
+        x = x.unsqueeze(1).repeat(
+            1, num_channels, *[1 for _ in range(len(input_shape))]
+        )
+
+    trainer = SNPE(prior=prior, density_estimator=estimator_provider)
+    trainer.append_simulations(theta, x).train(max_num_epochs=2)
+    posterior = trainer.build_posterior()
+
+    posterior.sample((10,), x=xo)
