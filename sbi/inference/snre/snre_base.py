@@ -18,9 +18,9 @@ from sbi.utils import (
     check_prior,
     clamp_and_warn,
     handle_invalid_x,
+    nle_nre_apt_msg_on_invalid_x,
     validate_theta_and_x,
     warn_if_zscoring_changes_data,
-    warn_on_invalid_x,
     x_shape_from_simulation,
 )
 from sbi.utils.sbiutils import mask_sims_from_prior
@@ -81,6 +81,7 @@ class RatioEstimator(NeuralInference, ABC):
         self,
         theta: Tensor,
         x: Tensor,
+        exclude_invalid_x: bool = False,
         from_round: int = 0,
         data_device: Optional[str] = None,
     ) -> "RatioEstimator":
@@ -95,6 +96,10 @@ class RatioEstimator(NeuralInference, ABC):
         Args:
             theta: Parameter sets.
             x: Simulation outputs.
+            exclude_invalid_x: Whether invalid simulations are discarded during
+                training. If `False`, SNRE raises an error when invalid simulations are
+                found. If `True`, invalid simulations are discarded and training
+                can proceed, but this gives systematically wrong results.
             from_round: Which round the data stemmed from. Round 0 means from the prior.
                 With default settings, this is not used at all for `SNRE`. Only when
                 the user later on requests `.train(discard_prior_samples=True)`, we
@@ -106,14 +111,14 @@ class RatioEstimator(NeuralInference, ABC):
             NeuralInference object (returned so that this function is chainable).
         """
 
-        is_valid_x, num_nans, num_infs = handle_invalid_x(x, True)  # Hardcode to True
+        is_valid_x, num_nans, num_infs = handle_invalid_x(x, exclude_invalid_x)
 
         x = x[is_valid_x]
         theta = theta[is_valid_x]
 
         # Check for problematic z-scoring
         warn_if_zscoring_changes_data(x)
-        warn_on_invalid_x(num_nans, num_infs, True)
+        nle_nre_apt_msg_on_invalid_x(num_nans, num_infs, exclude_invalid_x, "SNRE")
 
         if data_device is None:
             data_device = self._device

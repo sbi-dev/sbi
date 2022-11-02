@@ -256,8 +256,15 @@ def handle_invalid_x(
     return is_valid_x, num_nans, num_infs
 
 
-def warn_on_invalid_x(num_nans: int, num_infs: int, exclude_invalid_x: bool) -> None:
-    """Warn if there are NaNs or Infs. Warning text depends on `exclude_invalid_x`."""
+def npe_msg_on_invalid_x(
+    num_nans: int, num_infs: int, exclude_invalid_x: bool, algorithm: str
+) -> None:
+    """Warn if there are NaNs or Infs, appropriate to single-round NPE.
+
+    NPE allows to discard invalid simulations. Thus, we simply warn if invalid
+    simulations are found (and they are removed from the dataset in
+    `append_simulations()`.
+    """
 
     if num_nans + num_infs > 0:
         if exclude_invalid_x:
@@ -268,7 +275,37 @@ def warn_on_invalid_x(num_nans: int, num_infs: int, exclude_invalid_x: bool) -> 
         else:
             logging.warning(
                 f"Found {num_nans} NaN simulations and {num_infs} Inf simulations. "
-                "Training might fail. Consider setting `exclude_invalid_x=True`."
+                "They are not excluded from training due to `exclude_invalid_x=False`."
+                "Training will likely fail, we strongly recommend "
+                f"`exclude_invalid_x=True` for {algorithm}."
+            )
+
+
+def nle_nre_apt_msg_on_invalid_x(
+    num_nans: int, num_infs: int, exclude_invalid_x: bool, algorithm: str
+) -> None:
+    """Warn or raise if there are NaNs or Infs, appropriate to SNLE, SNRE, or APT.
+
+    This will raise an error in the default case of `exclude_invalid_x=False` since
+    SNLE/SNRE/APT do not allow to discard invalid simulations (Glöckler et al. 2021).
+    If `exclude_invalid_x` has explicitly been set to `True` by the user, this
+    function will give a warning about the systematic error.
+    """
+
+    if num_nans + num_infs > 0:
+        if exclude_invalid_x:
+            logging.warn(
+                f"Found {num_nans} NaN simulations and {num_infs} Inf simulations."
+                f"These will be discarded from training due to "
+                f"`exclude_invalid_x=True`. Please be aware that this gives "
+                f"systematically wrong results for {algorithm} and is only recommended "
+                f"for expert users."
+            )
+        else:
+            raise ValueError(
+                f"Found {num_nans} NaN simulations and {num_infs} Inf simulations."
+                f"{algorithm} does not allow invalid simulations."
+                f"Replace the invalid values with an unreasonably low or high value."
             )
 
 
@@ -283,20 +320,6 @@ def warn_on_iid_x(num_trials):
             same underlying (unknown) parameter. The resulting posterior will be with
             respect to entire batch, i.e,. p(theta | X)."""
         )
-
-
-def warn_on_invalid_x_for_snpec_leakage(
-    num_nans: int, num_infs: int, exclude_invalid_x: bool, algorithm: str, round_: int
-) -> None:
-    """Give a dedicated warning about invalid data for multi-round SNPE-C"""
-
-    if num_nans + num_infs > 0 and exclude_invalid_x:
-        if algorithm == "SNPE_C" and round_ > 0:
-            logging.warning(
-                "When invalid simulations are excluded, multi-round SNPE-C"
-                " can `leak` into the regions where parameters led to"
-                " invalid simulations. This can lead to poor results."
-            )
 
 
 def check_warn_and_setstate(
