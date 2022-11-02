@@ -73,7 +73,6 @@ class DirectPosterior(NeuralPosterior):
 
         self.prior = prior
         self.posterior_estimator = posterior_estimator
-        self._accept_reject_fn = lambda theta: within_support(self.prior, theta)
 
         self.max_sampling_batch_size = max_sampling_batch_size
         self._leakage_density_correction_factor = None
@@ -117,7 +116,7 @@ class DirectPosterior(NeuralPosterior):
 
         samples = accept_reject_sample(
             proposal=self.posterior_estimator,
-            accept_reject_fn=self._accept_reject_fn,
+            accept_reject_fn=lambda theta: within_support(self.prior, theta),
             num_samples=num_samples,
             show_progress_bars=show_progress_bars,
             max_sampling_batch_size=max_sampling_batch_size,
@@ -224,7 +223,7 @@ class DirectPosterior(NeuralPosterior):
 
             return accept_reject_sample(
                 proposal=self.posterior_estimator,
-                accept_reject_fn=self._accept_reject_fn,
+                accept_reject_fn=lambda theta: within_support(self.prior, theta),
                 num_samples=num_rejection_samples,
                 show_progress_bars=show_progress_bars,
                 sample_for_correction_factor=True,
