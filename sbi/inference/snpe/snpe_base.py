@@ -138,7 +138,7 @@ class PosteriorEstimator(NeuralInference, ABC):
                 current_round = max(self._data_round_index) + 1
 
         if exclude_invalid_x is None:
-            if current_round > 0:
+            if current_round == 0:
                 exclude_invalid_x = True
             else:
                 exclude_invalid_x = False
