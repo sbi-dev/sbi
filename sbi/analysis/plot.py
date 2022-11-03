@@ -1120,6 +1120,7 @@ def _sbc_rank_plot(
             fig, ax = plt.subplots(
                 num_rows, min(num_parameters, num_cols), figsize=figsize, sharey=sharey
             )
+            ax = np.atleast_1d(ax)  # type: ignore
         else:
             assert (
                 ax.size >= num_parameters
