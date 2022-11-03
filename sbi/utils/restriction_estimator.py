@@ -160,6 +160,10 @@ class RestrictionEstimator:
         The classifier learns to distinguish `valid` simulation outputs from `invalid`
         simulation outputs.
 
+        Reference:
+        Deistler et al. (2022): "Energy-efficient network activity from disparate
+        circuit parameters"
+
         Args:
             prior: Prior distribution.
             model: Neural network used to distinguish valid from invalid samples. If it
@@ -519,6 +523,10 @@ def get_density_thresholder(
 ) -> Callable:
     """Returns function that thresholds a density at a particular `1-quantile`.
 
+    Reference:
+    Deistler et al. (2022): "Truncated proposals for scalable and hassle-free
+    simulation-based inference"
+
     Args:
         dist: Probability distribution to be thresholded, must have `.sample()` and
             `.log_prob()`.
@@ -563,6 +571,10 @@ def get_classifier_thresholder(
     Compute the highest decision threshold at which the fraction of false negatives
     is smaller than `allowed_false_negatives`. This threshold will then be set as
     default when calling `.forward()` and for `.build_sim_informed_prior()`.
+
+    Reference:
+    Deistler et al. (2022): "Energy-efficient network activity from disparate circuit
+    parameters"
 
     Args:
         allowed_false_negatives: Allowed fraction of false negatives on a held-out
@@ -665,6 +677,12 @@ class RestrictedPrior:
     ) -> None:
         r"""
         Initialize the simulation informed prior.
+
+        References:
+        - Deistler et al. (2022): "Energy-efficient network activity from disparate
+        circuit parameters"
+        - Deistler et al. (2022): "Truncated proposals for scalable and hassle-free
+        simulation-based inference"
 
         Args:
             prior: Prior distribution, will be used as proposal distribution whose
