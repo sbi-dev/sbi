@@ -192,7 +192,7 @@ def test_iid_inference(num_trials, num_dim, method):
         (32, 64),
     ],
 )
-@pytest.mark.parametrize("num_channels", (1, 3))
+@pytest.mark.parametrize("num_channels", (1, 2, 3))
 def test_1d_and_2d_cnn_embedding_net(input_shape, num_channels):
     import torch
     from torch.distributions import MultivariateNormal
@@ -234,6 +234,7 @@ def test_1d_and_2d_cnn_embedding_net(input_shape, num_channels):
 
     trainer = SNPE(prior=prior, density_estimator=estimator_provider)
     trainer.append_simulations(theta, x).train(max_num_epochs=2)
-    posterior = trainer.build_posterior()
+    posterior = trainer.build_posterior().set_default_x(xo)
 
-    posterior.sample((10,), x=xo)
+    s = posterior.sample((10,))
+    posterior.potential(s)
