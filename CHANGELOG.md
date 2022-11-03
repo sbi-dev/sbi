@@ -1,3 +1,20 @@
+# v0.20.0
+
+## Major changes and bug fixes
+
+- implementation of ["Truncated proposals for scalable and hassle-free sbi"](https://openreview.net/forum?id=QW98XBAqNRa) (#754)
+- sample-based expected coverage tests (#754)
+- permutation invariant embedding to allow iid data in SNPE (thanks @coschroeder, #751)
+- convolutional neural network embedding (thanks @coschroeder, #745, #751, #769)
+- disallow invalid simulations when using SNLE, SNRE, or atomic SNPE-C (#768)
+
+## Enhancements
+
+- add tutorial on all available methods (#754)
+- allow seeding of `simulate_for_sbi` on multiple workers (#762)
+- expose `enable_transforms` in sampler interface (#756)
+- bugfix for building the transformation of transformed distributions (#756)
+
 # v0.19.2
 
 - Rely on new version of `pyknos` with bugfix for APT with MDNs (#734)
