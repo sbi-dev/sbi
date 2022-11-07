@@ -1,4 +1,4 @@
-from typing import Callable, Dict, Optional, Union
+from typing import Callable, Optional, Union
 
 import torch
 from torch import Tensor, nn, ones
@@ -18,13 +18,13 @@ class BNRE(SNRE_A):
         logging_level: Union[int, str] = "warning",
         summary_writer: Optional[TensorboardSummaryWriter] = None,
         show_progress_bars: bool = True,
-        regularization_strength = 100,
+        regularization_strength: float = 100.0,
     ):
 
         r"""Balenced neural ratio estimation (BNRE)[1].
 
-        [1] Delaunoy, A., Hermans, J., Rozet, F., Wehenkel, A., & Louppe, G.. 
-        Towards Reliable Simulation-Based Inference with Balanced Neural Ratio Estimation. 
+        [1] Delaunoy, A., Hermans, J., Rozet, F., Wehenkel, A., & Louppe, G..
+        Towards Reliable Simulation-Based Inference with Balanced Neural Ratio Estimation.
         NeurIPS 2022. https://arxiv.org/abs/2208.13624
 
         Args:
@@ -45,12 +45,14 @@ class BNRE(SNRE_A):
                 file location (default is `<current working directory>/logs`.)
             show_progress_bars: Whether to show a progressbar during simulation and
                 sampling.
-            regularization_strength: The multiplicative coefficient applied to the 
+            regularization_strength: The multiplicative coefficient applied to the
                 balancing regularizer ($\lambda$ in the paper)
         """
 
         self.regularization_strength = regularization_strength
-        kwargs = del_entries(locals(), entries=("self", "__class__", "regularization_strength"))
+        kwargs = del_entries(
+            locals(), entries=("self", "__class__", "regularization_strength")
+        )
         super().__init__(**kwargs)
 
     def _loss(self, theta: Tensor, x: Tensor, num_atoms: int) -> Tensor:
@@ -78,6 +80,10 @@ class BNRE(SNRE_A):
         bce = nn.BCELoss()(likelihood, labels)
 
         # Balancing regularizer
-        regularizer = (torch.sigmoid(logits[0::2]) + torch.sigmoid(logits[1::2]) - 1).mean().square()
+        regularizer = (
+            (torch.sigmoid(logits[0::2]) + torch.sigmoid(logits[1::2]) - 1)
+            .mean()
+            .square()
+        )
 
         return bce + self.regularization_strength * regularizer
