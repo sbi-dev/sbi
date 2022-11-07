@@ -266,11 +266,13 @@ class MultipleIndependent(Distribution):
         """Check type and shape of a single input distribution."""
 
         assert not isinstance(
-            dist, MultipleIndependent
+            dist, (MultipleIndependent, Sequence)
         ), "Nesting of combined distributions is not possible."
         assert isinstance(
             dist, Distribution
-        ), "Distribution must be a PyTorch distribution."
+        ), """priors passed to MultipleIndependent must be PyTorch distributions. Make
+            sure to process custom priors individually using process_prior before
+            passing them in a list to process_prior."""
         # Make sure batch shape is smaller or equal to 1.
         assert dist.batch_shape in (
             torch.Size([1]),
