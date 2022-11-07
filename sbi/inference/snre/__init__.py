@@ -1,3 +1,4 @@
+from sbi.inference.snre.bnre import BNRE
 from sbi.inference.snre.snre_a import SNRE_A
 from sbi.inference.snre.snre_b import SNRE_B
 
