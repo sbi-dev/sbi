@@ -161,6 +161,17 @@ def test_reinterpreted_batch_dim_prior():
         UserNumpyUniform(zeros(3), ones(3), return_numpy=False),
         UserNumpyUniform(zeros(3), ones(3), return_numpy=True),
         BoxUniform(zeros(3, dtype=torch.float64), ones(3, dtype=torch.float64)),
+        [
+            Uniform(zeros(1), ones(1)),
+            Uniform(zeros(1), ones(1)),
+        ],  # multiple independent prior
+        pytest.param(
+            [
+                UserNumpyUniform(zeros(3), ones(3), return_numpy=True),
+                Uniform(zeros(1), ones(1)),
+            ],  # combination multiple independent and custom prior
+            marks=pytest.mark.xfail,
+        ),
     ),
 )
 def test_process_prior(prior):
