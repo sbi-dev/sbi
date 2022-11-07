@@ -46,7 +46,7 @@ class BNRE(SNRE_A):
             show_progress_bars: Whether to show a progressbar during simulation and
                 sampling.
             regularization_strength: The multiplicative coefficient applied to the
-                balancing regularizer ($\lambda$ in the paper)
+                balancing regularizer ($\lambda$)
         """
 
         self.regularization_strength = regularization_strength
