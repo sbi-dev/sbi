@@ -5,7 +5,7 @@ import torch
 from torch import eye, ones, zeros
 
 from sbi import utils as utils
-from sbi.inference import SNLE, SNPE, SNRE
+from sbi.inference import SNLE, SNPE, SNRE, simulate_for_sbi
 from sbi.neural_nets.embedding_nets import (
     CNNEmbedding,
     FCEmbedding,
@@ -96,9 +96,9 @@ def test_iid_embedding_api(num_trials, num_dim):
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("num_trials", [10, 50])
+@pytest.mark.parametrize("num_trials", [1, 10, 50])
 @pytest.mark.parametrize("num_dim", [2])
-@pytest.mark.parametrize("method", ["SNPE", "SNLE", "SNRE"])
+@pytest.mark.parametrize("method", ("SNPE",))
 def test_iid_inference(num_trials, num_dim, method):
     """Test accuracy in Gaussian linear simulator with iid trials.
 
@@ -112,51 +112,39 @@ def test_iid_inference(num_trials, num_dim, method):
 
     # Scale number of training samples with num_trials.
     num_thetas = 1000 + 100 * num_trials
-    # Likelihood-based methods train on single trials.
-    num_simulations = num_thetas
 
-    if method == "SNPE":  # SNPE needs embedding and iid trials during training.
-        theta = prior.sample((num_thetas,))
-        # simulate iid x.
-        iid_theta = theta.reshape(num_thetas, 1, num_dim).repeat(1, num_trials, 1)
-        x = torch.randn_like(iid_theta) + iid_theta
-        x_o = zeros(1, num_trials, num_dim)
+    # simulate iid x.
+    def simulator(theta, num_trials=num_trials):
+        iid_theta = theta.reshape(theta.shape[0], 1, num_dim).repeat(1, num_trials, 1)
+        return torch.randn_like(iid_theta) + iid_theta
 
-        # embedding
-        latent_dim = 10
-        single_trial_net = FCEmbedding(
-            input_dim=num_dim,
-            num_hiddens=40,
-            num_layers=2,
-            output_dim=latent_dim,
-        )
-        embedding_net = PermutationInvariantEmbedding(
-            single_trial_net,
-            trial_net_output_dim=latent_dim,
-            # NOTE: post-embedding is not needed really.
-            num_layers=1,
-            num_hiddens=10,
-            output_dim=10,
-        )
+    theta, x = simulate_for_sbi(simulator, prior, num_simulations=num_thetas)
 
-        density_estimator = posterior_nn("maf", embedding_net=embedding_net)
+    # embedding
+    latent_dim = 10
+    single_trial_net = FCEmbedding(
+        input_dim=num_dim,
+        num_hiddens=40,
+        num_layers=2,
+        output_dim=latent_dim,
+    )
+    embedding_net = PermutationInvariantEmbedding(
+        single_trial_net,
+        trial_net_output_dim=latent_dim,
+        # NOTE: post-embedding is not needed really.
+        num_layers=1,
+        num_hiddens=10,
+        output_dim=10,
+    )
 
-        inference = SNPE(prior, density_estimator=density_estimator)
-    else:  # likelihood-based methods: single-trial training without embeddings.
+    density_estimator = posterior_nn("maf", embedding_net=embedding_net)
 
-        theta = prior.sample((num_simulations,))
-        x = torch.randn_like(theta) + theta
-        x_o = zeros(1, num_dim)
-
-        if method == "SNLE":
-            inference = SNLE(prior, density_estimator=likelihood_nn("maf"))
-        elif method == "SNRE":
-            inference = SNRE(prior, classifier=classifier_nn("resnet"))
-        else:
-            raise NameError
+    inference = SNPE(prior, density_estimator=density_estimator)
 
     # get reference samples from true posterior
     num_samples = 1000
+    # define x_o without batch dim to test handling below.
+    x_o = zeros(num_trials, num_dim)
     reference_samples = true_posterior_linear_gaussian_mvn_prior(
         x_o.squeeze(),
         likelihood_shift=torch.zeros(num_dim),
@@ -172,26 +160,16 @@ def test_iid_inference(num_trials, num_dim, method):
     posterior = inference.build_posterior().set_default_x(x_o)
     samples = posterior.sample((num_samples,))
 
-    if method == "SNPE":
-        check_c2st(samples, reference_samples, alg=method)
-        # permute and test again
-        num_repeats = 2
-        for _ in range(num_repeats):
-            trial_permutet_x_o = x_o[:, torch.randperm(x_o.shape[1]), :]
-            samples = posterior.sample((num_samples,), x=trial_permutet_x_o)
-            check_c2st(samples, reference_samples, alg=method + " permuted")
-    else:
-        check_c2st(samples, reference_samples, alg=method)
+    check_c2st(samples, reference_samples, alg=method)
+    # permute and test again
+    num_repeats = 2
+    for _ in range(num_repeats):
+        trial_permutet_x_o = x_o[torch.randperm(x_o.shape[0]), :]
+        samples = posterior.sample((num_samples,), x=trial_permutet_x_o)
+        check_c2st(samples, reference_samples, alg=method + " permuted")
 
 
-@pytest.mark.parametrize(
-    "input_shape",
-    [
-        (32,),
-        (32, 32),
-        (32, 64),
-    ],
-)
+@pytest.mark.parametrize("input_shape", [(32,), (32, 32), (32, 64)])
 @pytest.mark.parametrize("num_channels", (1, 2, 3))
 def test_1d_and_2d_cnn_embedding_net(input_shape, num_channels):
     import torch

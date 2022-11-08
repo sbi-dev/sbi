@@ -272,9 +272,12 @@ def check_for_possibly_batched_x_shape(x_shape):
                 has an inferred batch shape larger than one. This is not supported in
                 some sbi methods for reasons depending on the scenario:
 
-                    - in case you want to evaluate or sample conditioned on several xs
-                    e.g., (p(theta | [x1, x2, x3])), this is not supported yet except
-                    when using likelihood based SNLE and SNRE.
+                    - in case you want to evaluate or sample conditioned on several iid
+                      xs e.g., (p(theta | [x1, x2, x3])), this is fully supported only
+                      for likelihood based SNLE and SNRE. For SNPE it is supported only 
+                      for a fixed number of trials and using an appropriate embedding 
+                      net, i.e., by treating the trials as additional data dimension. In
+                      that case, make sure to pass xo with a leading batch dimensionen.
 
                     - in case you trained with a single round to do amortized inference
                     and now you want to evaluate or sample a given theta conditioned on
@@ -568,6 +571,10 @@ def process_x(
     """
 
     x = atleast_2d(torch.as_tensor(x, dtype=float32))
+
+    # If x_shape is provided, we can fix a missing batch dim for >1D data.
+    if x_shape is not None and len(x_shape) > len(x.shape):
+        x = x.unsqueeze(0)
 
     input_x_shape = x.shape
     if not allow_iid_x:
