@@ -13,11 +13,8 @@ from sbi.utils.torchutils import BoxUniform
 from sbi.utils.user_input_checks import prepare_for_sbi
 
 
-@pytest.mark.parametrize(
-    "num_sims",
-    (0, 1000),
-)
-@pytest.mark.parametrize("batch_size", (1, 100, 1000))
+@pytest.mark.parametrize("num_sims", (0, 10))
+@pytest.mark.parametrize("batch_size", (1, 10))
 @pytest.mark.parametrize(
     "simulator", (diagonal_linear_gaussian, lambda _: torch.randn((2,)))
 )
