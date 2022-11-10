@@ -48,6 +48,13 @@
     selection:
       filters: [ "!^_", "^__", "!^__class__" ]
       inherited_members: true
+      
+::: sbi.inference.snre.bnre.BNRE
+    rendering:
+      show_root_heading: true
+    selection:
+      filters: [ "!^_", "^__", "!^__class__" ]
+      inherited_members: true
 
 ::: sbi.inference.abc.mcabc.MCABC
     rendering:
