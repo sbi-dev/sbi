@@ -75,6 +75,8 @@ The following algorithms are currently available:
 
 * [`SNRE_B`](https://www.mackelab.org/sbi/reference/#sbi.inference.snre.snre_b.SNRE_B) or `SRE` from Durkan C, Murray I, and Papamakarios G. [_On Contrastive Learning for Likelihood-free Inference_](https://arxiv.org/abs/2002.03712) (ICML 2020).
 
+* [`BNRE`](https://www.mackelab.org/sbi/reference/#sbi.inference.snre.bnre.BNRE) from Delaunoy A, Hermans J, Rozet F, Wehenkel A, and Louppe G. [_Towards Reliable Simulation-Based Inference with Balanced Neural Ratio Estimation_](https://arxiv.org/abs/2208.13624) (NeurIPS 2022).
+
 #### Sequential Neural Variational Inference (SNVI)
 
 * [`SNVI`](https://www.mackelab.org/sbi/reference/#sbi.inference.posteriors.vi_posterior) from Glöckler M, Deistler M, Macke J, [_Variational methods for simulation-based inference_](https://openreview.net/forum?id=kZ0UYdhqkNY) (ICLR 2022).
