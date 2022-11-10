@@ -547,8 +547,10 @@ def get_batch_loop_simulator(simulator: Callable) -> Callable:
     def batch_loop_simulator(theta: Tensor) -> Tensor:
         """Return a batch of simulations by looping over a batch of parameters."""
         assert theta.ndim > 1, "Theta must have a batch dimension."
+        # Simulate in loop
         xs = list(map(simulator, theta))
-        return torch.cat(xs, dim=0).reshape(theta.shape[0], -1)
+        # Stack over batch to keep x_shape
+        return torch.stack(xs)
 
     return batch_loop_simulator
 

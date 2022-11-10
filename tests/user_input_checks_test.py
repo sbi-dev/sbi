@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Callable
+from typing import Callable, Tuple
 
 import pytest
 import torch
@@ -14,7 +14,6 @@ from torch.distributions import Beta, Distribution, Gamma, MultivariateNormal, U
 
 from sbi.inference import SNPE_A, SNPE_C, simulate_for_sbi
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
-from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
 from sbi.utils import mcmc_transform, within_support
 from sbi.utils.torchutils import BoxUniform
@@ -208,19 +207,22 @@ def test_process_x(x, x_shape, allow_iid):
 
 
 @pytest.mark.parametrize(
-    "simulator, prior",
+    "simulator, prior, x_shape",
     (
-        (diagonal_linear_gaussian, BoxUniform(zeros(1), ones(1))),
-        (diagonal_linear_gaussian, BoxUniform(zeros(2), ones(2))),
-        (numpy_linear_gaussian, UserNumpyUniform(zeros(2), ones(2), True)),
-        (linear_gaussian_no_batch, BoxUniform(zeros(2), ones(2))),
+        (diagonal_linear_gaussian, BoxUniform(zeros(1), ones(1)), (1,)),
+        (diagonal_linear_gaussian, BoxUniform(zeros(2), ones(2)), (2,)),
+        (numpy_linear_gaussian, UserNumpyUniform(zeros(2), ones(2), True), (2,)),
+        (linear_gaussian_no_batch, BoxUniform(zeros(2), ones(2)), (2,)),
         pytest.param(
             list_simulator,
             BoxUniform(zeros(2), ones(2)),
+            (2,),
         ),
+        # test simulator with 2D data.
+        (lambda _: torch.randn(10, 2), BoxUniform(zeros(2), ones(2)), (10, 2)),
     ),
 )
-def test_process_simulator(simulator: Callable, prior: Distribution):
+def test_process_simulator(simulator: Callable, prior: Distribution, x_shape: Tuple):
 
     prior, theta_dim, prior_returns_numpy = process_prior(prior)
     simulator = process_simulator(simulator, prior, prior_returns_numpy)
@@ -232,6 +234,7 @@ def test_process_simulator(simulator: Callable, prior: Distribution):
     assert (
         x.shape[0] == n_batch
     ), "Processed simulator must return as many data points as parameters in batch."
+    assert x.shape[1:] == x_shape
 
 
 @pytest.mark.parametrize(
