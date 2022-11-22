@@ -146,6 +146,7 @@ def test_c2st_sre_on_linearGaussian(SNRE: RatioEstimator):
         (1, 1, "gaussian", "sre"),
         (2, 1, "uniform", "sre"),
         (2, 5, "gaussian", "aalr"),
+        (2, 5, "gaussian", "nrec"),
     ),
 )
 def test_c2st_sre_variants_on_linearGaussian(
@@ -186,7 +187,14 @@ def test_c2st_sre_variants_on_linearGaussian(
         show_progress_bars=False,
     )
 
-    inference = SNRE_B(**kwargs) if method_str == "sre" else AALR(**kwargs)  # TODO SNRE_C add support for 
+    if method_str == "sre":
+        inference = SNRE_B(**kwargs) 
+    elif method_str == "aalr":
+        inference = AALR(**kwargs)
+    elif method_str == "nrec":
+        inference = SNRE_C(**kwargs)
+    else:
+        raise ValueError(f"{method_str} is not an allowed option")
 
     # Should use default `num_atoms=10` for SRE; `num_atoms=2` for AALR
     theta, x = simulate_for_sbi(
@@ -254,7 +262,7 @@ def test_c2st_sre_variants_on_linearGaussian(
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("num_dim, SNRE", product((1, 3), (SNRE_B, SNRE_C)))
+@pytest.mark.parametrize("num_trials, SNRE", product((1, 3), (SNRE_B, SNRE_C)))
 def test_c2st_multi_round_snr_on_linearGaussian_vi(num_trials: int, SNRE: RatioEstimator):
     """Test SNL on linear Gaussian, comparing to ground truth posterior via c2st."""
 

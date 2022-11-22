@@ -45,9 +45,9 @@ class RatioEstimator(NeuralInference, ABC):
         - SNRE_B / SRE can use more than two atoms, potentially boosting performance,
           but allows for posterior evaluation **only up to a normalizing constant**,
           even when training only one round.
-        - SNRE_C a generalization of SNRE_A and SNRE_B which can use multiple classes
+        - SNRE_C is a generalization of SNRE_A and SNRE_B which can use multiple classes
           (atoms) but encourages an exact likelihood-to-evidence ratio (density evaluation)
-          by introducing a independently drawn class. This holds only for the first round.
+          by introducing a independently drawn class. Exactness holds only for the first round.
 
         Args:
             classifier: Classifier trained to approximate likelihood ratios. If it is
