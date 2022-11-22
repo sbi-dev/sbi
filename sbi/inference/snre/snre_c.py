@@ -50,7 +50,7 @@ class SNRE_C(RatioEstimator):
 
     def train(
         self,
-        K: int = 10,
+        K: int = 9,
         gamma: float = 1.0,
         training_batch_size: int = 50,
         learning_rate: float = 5e-4,
@@ -68,9 +68,11 @@ class SNRE_C(RatioEstimator):
         r"""Return classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
 
         Args:
-            K: Number of theta to classify against. Minimum 1. Similar to, but not the same as, `num_atoms - 1` for SNRE_B.
-            gamma: Determines the relative weight of the sum of all $K$ dependently drawn classes against the marginally drawn one.
-                Specifically, $p(y=k) := p_K$, $p(y=0) := p_0$, $p_0 = 1 - K p_K$, and finally $\gamma := K p_K / p_0$.
+            K: Number of theta to classify against. Minimum 1. Similar to `num_atoms`
+                for SNRE_B except SNRE_C has an additional independently drawn sample.
+            gamma: Determines the relative weight of the sum of all $K$ dependently drawn 
+                classes against the marginally drawn one. Specifically, $p(y=k) := p_K$, 
+                $p(y=0) := p_0$, $p_0 = 1 - K p_K$, and finally $\gamma := K p_K / p_0$.
             training_batch_size: Training batch size.
             learning_rate: Learning rate for Adam optimizer.
             validation_fraction: The fraction of data to use for validation.
@@ -112,10 +114,11 @@ class SNRE_C(RatioEstimator):
         num_atoms: int, 
         gamma: float
     ) -> torch.Tensor:
-        r"""Return cross-entropy loss (via ''multi-class sigmoid'' activation) for 1-out-of-`K` classification.
+        r"""Return cross-entropy loss (via ''multi-class sigmoid'' activation) for 1-out-of-`K + 1` classification.
 
-        At optimum, this loss function returns the exact likelihood-to-evidence ratio. 
-        Details of loss computation are described in Contrastive Neural Ratio Estimation[1].
+        At optimum, this loss function returns the exact likelihood-to-evidence ratio in the first round. 
+        Details of loss computation are described in Contrastive Neural Ratio Estimation[1]. The paper
+        does not discuss the sequential case.
         
         [1] _Contrastive Neural Ratio Estimation_, Benajmin Kurt Miller, et. al.,
             NeurIPS 2022, https://arxiv.org/abs/2210.06170
@@ -127,24 +130,20 @@ class SNRE_C(RatioEstimator):
         
         assert theta.shape[0] == x.shape[0], "Batch sizes for theta and x must match."
         batch_size = theta.shape[0]
-        logits_marginal = self._classifier_logits(theta, x, K)
-        logits_joint = self._classifier_logits(theta, x, K)
+
+        # We append an contrastive theta to the marginal case because we will remove the jointly drawn
+        # sample in the logits_marginal[:, 0] position. That makes the remaining sample marginally drawn.
+        # We have a batch of `batch_size` datapoints.
+        logits_marginal = self._classifier_logits(theta, x, K + 1).reshape(batch_size, K + 1)
+        logits_joint = self._classifier_logits(theta, x, K).reshape(batch_size, K)
 
         dtype = logits_marginal.dtype
         device = logits_marginal.device
 
-        # For 1-out-of-`num_atoms` classification each datapoint consists
-        # of `num_atoms` points, with one of them being the correct one.
-        # We have a batch of `batch_size` such datapoints.
-        logits_marginal = logits_marginal.reshape(batch_size, K)
-        logits_joint = logits_joint.reshape(batch_size, K)
-
-        # Index 0 is the theta-x-pair sampled from the joint p(theta,x) and hence the
-        # "correct" one for the 1-out-of-N classification.
-        # We remove the jointly drawn sample from the logits_marginal
+        # Index 0 is the theta-x-pair sampled from the joint p(theta,x) and hence
+        # we remove the jointly drawn sample from the logits_marginal
         logits_marginal = logits_marginal[:, 1:]
-        # ... and retain it in the logits_joint.
-        logits_joint = logits_joint[:, :-1]
+        # ... and retain it in the logits_joint. Now we have two arrays with `K` choices.
 
         # To use logsumexp, we extend the denominator logits with loggamma
         loggamma = torch.tensor(gamma, dtype=dtype, device=device).log()
@@ -158,21 +157,23 @@ class SNRE_C(RatioEstimator):
             dim=-1,
         )
 
-        # Index 0 is the theta-x-pair sampled from the joint p(theta,x) and hence the
-        # "correct" one for the 1-out-of-N classification.
+        # Compute the contributions to the loss from each term in the classification.
         log_prob_marginal = logK - torch.logsumexp(denominator_marginal, dim=-1)
         log_prob_joint = (
             loggamma + logits_joint[:, 0] - torch.logsumexp(denominator_joint, dim=-1)
         )
 
-        # relative weights
+        # relative weights. p_marginal := p_0, and p_joint := p_K from the notation.
         p_marginal, p_joint = self._get_prior_probs_marginal_and_joint(K, gamma)
         return -torch.mean(p_marginal * log_prob_marginal + p_joint * K * log_prob_joint)
 
     @staticmethod
     def _get_prior_probs_marginal_and_joint(K: int, gamma: float) -> float:
-        """Return a tuple of (prior_marginal_probability, prior_single_class_joint_probability). 
-        We let the joint (dependently drawn) class to be equally likely across K options."""
+        """Return a tuple (p_marginal, p_joint) where `p_marginal := `$p_0$, `p_joint := `$p_K$.
+        
+        We let the joint (dependently drawn) class to be equally likely across K options.
+        The marginal class is therefore restricted to get the remaining probability.
+        """
         assert K >= 1
         p_joint = gamma / (1 + gamma * K)
         p_marginal = 1 / (1 + gamma * K)
