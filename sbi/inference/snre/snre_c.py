@@ -19,9 +19,11 @@ class SNRE_C(RatioEstimator):
         summary_writer: Optional[TensorboardSummaryWriter] = None,
         show_progress_bars: bool = True,
     ):
-        r"""In progress SNRE_C.
+        r"""A sequential extension to NRE-C[1], a generalization of SNRE_A and SNRE_B. 
+        We call the algorithm SNRE_C within sbi.
 
-        TODO SNRE_C
+        [1] _Contrastive Neural Ratio Estimation_, Benajmin Kurt Miller, et. al.,
+            NeurIPS 2022, https://arxiv.org/abs/2210.06170
 
         Args:
             prior: A probability distribution that expresses prior knowledge about the
@@ -66,8 +68,9 @@ class SNRE_C(RatioEstimator):
         r"""Return classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
 
         Args:
-            K: number of classes to draw from the joint distribution plus another drawn independently / marginally.
-            gamma: sum of the prior weight given to the dependently drawn samples over the weight given to the independently drawn one.
+            K: Number of theta to classify against. Minimum 1. Similar to, but not the same as, `num_atoms - 1` for SNRE_B.
+            gamma: Determines the relative weight of the sum of all $K$ dependently drawn classes against the marginally drawn one.
+                Specifically, $p(y=k) := p_K$, $p(y=0) := p_0$, $p_0 = 1 - K p_K$, and finally $\gamma := K p_K / p_0$.
             training_batch_size: Training batch size.
             learning_rate: Learning rate for Adam optimizer.
             validation_fraction: The fraction of data to use for validation.
@@ -98,7 +101,7 @@ class SNRE_C(RatioEstimator):
             Classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
         """
         kwargs = del_entries(locals(), entries=("self", "__class__"))
-        kwargs["num_atoms"] = kwargs.pop("K")
+        kwargs["num_atoms"] = kwargs.pop("K") + 1
         kwargs["loss_kwargs"] = {"gamma": kwargs.pop("gamma")}
         return super().train(**kwargs)
 
@@ -106,18 +109,22 @@ class SNRE_C(RatioEstimator):
         self, 
         theta: Tensor, 
         x: Tensor, 
-        K: int, 
+        num_atoms: int, 
         gamma: float
     ) -> torch.Tensor:
         r"""Return cross-entropy loss (via ''multi-class sigmoid'' activation) for 1-out-of-`K` classification.
 
-        The classifier takes as input `K` $(\theta,x)$ pairs. Out of these
-        pairs, one pair was sampled from the joint $p(\theta,x)$ and all others from the
-        marginals $p(\theta)p(x)$. The classifier is trained to predict whether a pair was sampled from
-        the independent distribution $p(\theta_0)\cdots p(\theta_K)p(x)$ or the dependent $p(\theta_0)\cdots p(\theta_K)p(x \mid \theta_k)$
-        distribution. If dependently drawn, the classifier must predict which $\theta_k$ produced the $x$.
+        At optimum, this loss function returns the exact likelihood-to-evidence ratio. 
+        Details of loss computation are described in Contrastive Neural Ratio Estimation[1].
+        
+        [1] _Contrastive Neural Ratio Estimation_, Benajmin Kurt Miller, et. al.,
+            NeurIPS 2022, https://arxiv.org/abs/2210.06170
         """
-        assert K >= 2
+
+        # The algorithm is written with K, so we convert back to K format rather than reasoning in num_atoms.
+        K = num_atoms - 1
+        assert K >= 1
+        
         assert theta.shape[0] == x.shape[0], "Batch sizes for theta and x must match."
         batch_size = theta.shape[0]
         logits_marginal = self._classifier_logits(theta, x, K)
