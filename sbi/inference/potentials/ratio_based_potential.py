@@ -39,7 +39,9 @@ def ratio_estimator_based_potential(
     device = str(next(ratio_estimator.parameters()).device)
 
     potential_fn = RatioBasedPotential(ratio_estimator, prior, x_o, device=device)
-    theta_transform = mcmc_transform(prior, device=device, enable_transform=enable_transform)
+    theta_transform = mcmc_transform(
+        prior, device=device, enable_transform=enable_transform
+    )
 
     return potential_fn, theta_transform
 

@@ -2,10 +2,10 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 from __future__ import annotations
+
 from itertools import product
 
 import pytest
-from sbi.inference.snre.snre_base import RatioEstimator
 from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
@@ -22,6 +22,7 @@ from sbi.inference import (
     ratio_estimator_based_potential,
     simulate_for_sbi,
 )
+from sbi.inference.snre.snre_base import RatioEstimator
 from sbi.simulators.linear_gaussian import (
     diagonal_linear_gaussian,
     linear_gaussian,
@@ -188,7 +189,7 @@ def test_c2st_sre_variants_on_linearGaussian(
     )
 
     if method_str == "sre":
-        inference = SNRE_B(**kwargs) 
+        inference = SNRE_B(**kwargs)
     elif method_str == "aalr":
         inference = AALR(**kwargs)
     elif method_str == "nrec":
@@ -263,7 +264,9 @@ def test_c2st_sre_variants_on_linearGaussian(
 
 @pytest.mark.slow
 @pytest.mark.parametrize("num_trials, SNRE", product((1, 3), (SNRE_B, SNRE_C)))
-def test_c2st_multi_round_snr_on_linearGaussian_vi(num_trials: int, SNRE: RatioEstimator):
+def test_c2st_multi_round_snr_on_linearGaussian_vi(
+    num_trials: int, SNRE: RatioEstimator
+):
     """Test SNL on linear Gaussian, comparing to ground truth posterior via c2st."""
 
     num_dim = 2

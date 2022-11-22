@@ -286,7 +286,9 @@ def test_validate_theta_and_x_device(training_device: str, data_device: str) -> 
 
 
 @pytest.mark.gpu
-@pytest.mark.parametrize("inference_method", [SNPE_A, SNPE_C, SNRE_A, SNRE_B, SNRE_C, SNLE])
+@pytest.mark.parametrize(
+    "inference_method", [SNPE_A, SNPE_C, SNRE_A, SNRE_B, SNRE_C, SNLE]
+)
 @pytest.mark.parametrize("data_device", ("cpu", "cuda:0"))
 @pytest.mark.parametrize("training_device", ("cpu", "cuda:0"))
 def test_train_with_different_data_and_training_device(
@@ -333,7 +335,9 @@ def test_train_with_different_data_and_training_device(
 
 
 @pytest.mark.gpu
-@pytest.mark.parametrize("inference_method", [SNPE_A, SNPE_C, SNRE_A, SNRE_B, SNRE_C, SNLE])
+@pytest.mark.parametrize(
+    "inference_method", [SNPE_A, SNPE_C, SNRE_A, SNRE_B, SNRE_C, SNLE]
+)
 @pytest.mark.parametrize("prior_device", ("cpu", "cuda"))
 @pytest.mark.parametrize("embedding_net_device", ("cpu", "cuda"))
 @pytest.mark.parametrize("data_device", ("cpu", "cuda"))
@@ -435,7 +439,9 @@ def test_embedding_nets_integration_training_device(
         theta = proposal.sample((samples_per_round,))
 
 
-@pytest.mark.parametrize("inference_method", [SNPE_A, SNPE_C, SNRE_A, SNRE_B, SNRE_C, SNLE])
+@pytest.mark.parametrize(
+    "inference_method", [SNPE_A, SNPE_C, SNRE_A, SNRE_B, SNRE_C, SNLE]
+)
 def test_nograd_after_inference_train(inference_method) -> None:
 
     num_dim = 2

@@ -238,7 +238,9 @@ class RatioEstimator(NeuralInference, ABC):
                     batch[1].to(self._device),
                 )
 
-                train_losses = self._loss(theta_batch, x_batch, num_atoms, **loss_kwargs)
+                train_losses = self._loss(
+                    theta_batch, x_batch, num_atoms, **loss_kwargs
+                )
                 train_loss = torch.mean(train_losses)
                 train_log_probs_sum -= train_losses.sum().item()
 
@@ -266,7 +268,9 @@ class RatioEstimator(NeuralInference, ABC):
                         batch[0].to(self._device),
                         batch[1].to(self._device),
                     )
-                    val_losses = self._loss(theta_batch, x_batch, num_atoms, **loss_kwargs)
+                    val_losses = self._loss(
+                        theta_batch, x_batch, num_atoms, **loss_kwargs
+                    )
                     val_log_prob_sum -= val_losses.sum().item()
                 # Take mean over all validation samples.
                 self._val_log_prob = val_log_prob_sum / (
@@ -386,9 +390,9 @@ class RatioEstimator(NeuralInference, ABC):
             device = next(density_estimator.parameters()).device.type
 
         potential_fn, theta_transform = ratio_estimator_based_potential(
-            ratio_estimator=ratio_estimator, 
-            prior=prior, 
-            x_o=None, 
+            ratio_estimator=ratio_estimator,
+            prior=prior,
+            x_o=None,
             enable_transform=enable_transform,
         )
 
