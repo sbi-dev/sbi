@@ -168,7 +168,9 @@ class SNRE_C(RatioEstimator):
         )
 
     @staticmethod
-    def _get_prior_probs_marginal_and_joint(K: int, gamma: float) -> float:
+    def _get_prior_probs_marginal_and_joint(
+        K: int, gamma: float
+    ) -> Tuple[float, float]:
         """Return a tuple (p_marginal, p_joint) where `p_marginal := `$p_0$, `p_joint := `$p_K$.
 
         We let the joint (dependently drawn) class to be equally likely across K options.
