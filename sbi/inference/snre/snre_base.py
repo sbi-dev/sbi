@@ -186,7 +186,7 @@ class RatioEstimator(NeuralInference, ABC):
             dataloader_kwargs=dataloader_kwargs,
         )
 
-        clipped_batch_size = min(training_batch_size, val_loader.batch_size)  # type: ignore
+        clipped_batch_size = min(training_batch_size, val_loader.batch_size)
 
         num_atoms = int(
             clamp_and_warn(
@@ -326,6 +326,7 @@ class RatioEstimator(NeuralInference, ABC):
         mcmc_parameters: Dict[str, Any] = {},
         vi_parameters: Dict[str, Any] = {},
         rejection_sampling_parameters: Dict[str, Any] = {},
+        enable_transform: bool = True,
     ) -> Union[MCMCPosterior, RejectionPosterior, VIPosterior]:
         r"""Build posterior from the neural density estimator.
 
@@ -354,6 +355,7 @@ class RatioEstimator(NeuralInference, ABC):
             vi_parameters: Additional kwargs passed to `VIPosterior`.
             rejection_sampling_parameters: Additional kwargs passed to
                 `RejectionPosterior`.
+            enable_transform: whether to compute a transform to unbounded space
 
         Returns:
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods
@@ -379,9 +381,10 @@ class RatioEstimator(NeuralInference, ABC):
             device = next(density_estimator.parameters()).device.type
 
         potential_fn, theta_transform = ratio_estimator_based_potential(
-            ratio_estimator=ratio_estimator,
-            prior=prior,
-            x_o=None,
+            ratio_estimator=ratio_estimator, 
+            prior=prior, 
+            x_o=None, 
+            enable_transform=enable_transform,
         )
 
         if sample_with == "mcmc":

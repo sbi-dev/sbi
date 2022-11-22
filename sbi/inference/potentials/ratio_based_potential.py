@@ -29,7 +29,7 @@ def ratio_estimator_based_potential(
         ratio_estimator: The neural network modelling likelihood-to-evidence ratio.
         prior: The prior distribution.
         x_o: The observed data at which to evaluate the likelihood-to-evidence ratio.
-        enable_transform: Whether to transform parameters to unconstrained space.
+        enable_transform: when false, theta_transform is the identity.
 
     Returns:
         The potential function and a transformation that maps
@@ -39,9 +39,7 @@ def ratio_estimator_based_potential(
     device = str(next(ratio_estimator.parameters()).device)
 
     potential_fn = RatioBasedPotential(ratio_estimator, prior, x_o, device=device)
-    theta_transform = mcmc_transform(
-        prior, device=device, enable_transform=enable_transform
-    )
+    theta_transform = mcmc_transform(prior, device=device, enable_transform=enable_transform)
 
     return potential_fn, theta_transform
 
