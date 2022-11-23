@@ -58,7 +58,6 @@ class SNRE_C(RatioEstimator):
         stop_after_epochs: int = 20,
         max_num_epochs: int = 2**31 - 1,
         clip_max_norm: Optional[float] = 5.0,
-        exclude_invalid_x: bool = True,
         resume_training: bool = False,
         discard_prior_samples: bool = False,
         retrain_from_scratch: bool = False,
