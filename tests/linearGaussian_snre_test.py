@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-from itertools import product
-
 import pytest
 from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
@@ -37,7 +35,8 @@ from tests.test_utils import (
 )
 
 
-@pytest.mark.parametrize("num_dim, SNRE", product((1, 3), (SNRE_B, SNRE_C)))
+@pytest.mark.parametrize("num_dim", (1, 3))
+@pytest.mark.parametrize("SNRE", (SNRE_B, SNRE_C))
 def test_api_sre_on_linearGaussian(num_dim: int, SNRE: RatioEstimator):
     """Test inference API of SRE with linear Gaussian model.
 
@@ -263,7 +262,8 @@ def test_c2st_sre_variants_on_linearGaussian(
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("num_trials, SNRE", product((1, 3), (SNRE_B, SNRE_C)))
+@pytest.mark.parametrize("num_trials", (1, 3))
+@pytest.mark.parametrize("SNRE", (SNRE_B, SNRE_C))
 def test_c2st_multi_round_snr_on_linearGaussian_vi(
     num_trials: int, SNRE: RatioEstimator
 ):
