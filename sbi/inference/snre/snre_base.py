@@ -38,13 +38,14 @@ class RatioEstimator(NeuralInference, ABC):
     ):
         r"""Sequential Neural Ratio Estimation.
 
-        We implement two inference methods in the respective subclasses.
+        We implement three inference methods in the respective subclasses.
 
         - SNRE_A / AALR is limited to `num_atoms=2`, but allows for density evaluation
           when training for one round.
         - SNRE_B / SRE can use more than two atoms, potentially boosting performance,
           but allows for posterior evaluation **only up to a normalizing constant**,
           even when training only one round.
+        - BNRE is a variation of SNRE_A aiming to produce more conservative posterior approximations.
 
         Args:
             classifier: Classifier trained to approximate likelihood ratios. If it is

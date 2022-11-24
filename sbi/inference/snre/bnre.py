@@ -21,7 +21,8 @@ class BNRE(SNRE_A):
         regularization_strength: float = 100.0,
     ):
 
-        r"""Balenced neural ratio estimation (BNRE)[1].
+        r"""Balanced neural ratio estimation (BNRE)[1]. BNRE is a variation of NRE aiming to
+        produce more conservative posterior approximations
 
         [1] Delaunoy, A., Hermans, J., Rozet, F., Wehenkel, A., & Louppe, G..
         Towards Reliable Simulation-Based Inference with Balanced Neural Ratio Estimation.
