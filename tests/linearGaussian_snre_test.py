@@ -10,6 +10,7 @@ from torch.distributions import MultivariateNormal
 from sbi import utils as utils
 from sbi.inference import (
     AALR,
+    BNRE,
     SNRE_B,
     ImportanceSamplingPosterior,
     MCMCPosterior,
@@ -142,6 +143,8 @@ def test_c2st_sre_on_linearGaussian():
         (1, 1, "gaussian", "sre"),
         (2, 1, "uniform", "sre"),
         (2, 5, "gaussian", "aalr"),
+        (2, 1, "gaussian", "bnre"),
+        (2, 5, "gaussian", "bnre"),
     ),
 )
 def test_c2st_sre_variants_on_linearGaussian(
@@ -182,7 +185,14 @@ def test_c2st_sre_variants_on_linearGaussian(
         show_progress_bars=False,
     )
 
-    inference = SNRE_B(**kwargs) if method_str == "sre" else AALR(**kwargs)
+    if method_str == "sre":
+        inference = SNRE_B(**kwargs)
+    elif method_str == "aalr":
+        inference = AALR(**kwargs)
+    elif method_str == "bnre":
+        inference = BNRE(**kwargs)
+    else:
+        raise ValueError(f"{method_str} is not an allowed option")
 
     # Should use default `num_atoms=10` for SRE; `num_atoms=2` for AALR
     theta, x = simulate_for_sbi(
@@ -221,7 +231,7 @@ def test_c2st_sre_variants_on_linearGaussian(
     map_ = posterior.map(num_init_samples=1_000, init_method="proposal")
 
     # Checks for log_prob()
-    if prior_str == "gaussian" and method_str == "aalr":
+    if prior_str == "gaussian" and (method_str == "aalr" or method_str == "bnre"):
         # For the Gaussian prior, we compute the KLd between ground truth and
         # posterior. We can do this only if the classifier_loss was as described in
         # Hermans et al. 2020 ('aalr') since Durkan et al. 2020 version only allows
