@@ -37,7 +37,8 @@ _snpe_family = ["SNPE_A", "SNPE_C", "SNPE", "APT"]
 
 SRE = SNRE_B
 AALR = SNRE_A
-_snre_family = ["SNRE_A", "AALR", "SNRE_B", "SNRE", "SRE", "SNRE_C"]
+CNRE = NREC = SNRE_C
+_snre_family = ["SNRE_A", "AALR", "SNRE_B", "SNRE", "SRE", "SNRE_C", "CNRE", "NREC"]
 
 ABC = MCABC
 SMC = SMCABC
