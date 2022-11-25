@@ -163,7 +163,10 @@ def test_c2st_sre_variants_on_linearGaussian(
 
     x_o = zeros(num_trials, num_dim)
     num_samples = 500
-    num_simulations = 3000 if num_trials == 1 else 40500
+    if method_str == "bnre":
+        num_simulations = 30000 if num_trials == 1 else 40500
+    else:
+        num_simulations = 3000 if num_trials == 1 else 40500
 
     # `likelihood_mean` will be `likelihood_shift + theta`.
     likelihood_shift = -1.0 * ones(num_dim)
@@ -190,7 +193,7 @@ def test_c2st_sre_variants_on_linearGaussian(
     elif method_str == "aalr":
         inference = AALR(**kwargs)
     elif method_str == "bnre":
-        inference = BNRE(**kwargs)
+        inference = BNRE(regularization_strength=20, **kwargs)
     else:
         raise ValueError(f"{method_str} is not an allowed option")
 
