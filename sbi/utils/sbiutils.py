@@ -598,6 +598,7 @@ def mcmc_transform(
             the prior has bounded support or when the prior has `mean` and `stddev`
             attributes.
         enable_transform: Whether to transform parameters to unconstrained space.
+            When False, an identity transform will be returned for `theta_transform`.
 
     Returns: A transformation that transforms whose `forward()` maps from unconstrained
         (or z-scored) to constrained (or non-z-scored) space.

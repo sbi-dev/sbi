@@ -51,7 +51,8 @@ class DirectPosterior(NeuralPosterior):
             x_shape: Shape of a single simulator output. If passed, it is used to check
                 the shape of the observed data and give a descriptive error.
             enable_transform: Whether to transform parameters to unconstrained space
-                during MAP optimization.
+                during MAP optimization. When False, an identity transform will be returned
+                for `theta_transform`.
         """
         # Because `DirectPosterior` does not take the `potential_fn` as input, it
         # builds it itself. The `potential_fn` and `theta_transform` are used only for

@@ -97,7 +97,8 @@ class SNRE_B(RatioEstimator):
         return super().train(**kwargs)
 
     def _loss(self, theta: Tensor, x: Tensor, num_atoms: int) -> Tensor:
-        r"""Return cross-entropy (via softmax activation) loss for 1-out-of-`num_atoms` classification.
+        r"""Return cross-entropy (via softmax activation) loss for 1-out-of-`num_atoms`
+        classification.
 
         The classifier takes as input `num_atoms` $(\theta,x)$ pairs. Out of these
         pairs, one pair was sampled from the joint $p(\theta,x)$ and all others from the

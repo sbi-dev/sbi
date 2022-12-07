@@ -153,7 +153,7 @@ class RatioEstimator(NeuralInference, ABC):
         discard_prior_samples: bool = False,
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
-        dataloader_kwargs: Optional[dict] = None,
+        dataloader_kwargs: Optional[Dict] = None,
         loss_kwargs: Dict[str, Any] = {},
     ) -> nn.Module:
         r"""Return classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
@@ -335,7 +335,6 @@ class RatioEstimator(NeuralInference, ABC):
         mcmc_parameters: Dict[str, Any] = {},
         vi_parameters: Dict[str, Any] = {},
         rejection_sampling_parameters: Dict[str, Any] = {},
-        enable_transform: bool = True,
     ) -> Union[MCMCPosterior, RejectionPosterior, VIPosterior]:
         r"""Build posterior from the neural density estimator.
 
@@ -364,7 +363,6 @@ class RatioEstimator(NeuralInference, ABC):
             vi_parameters: Additional kwargs passed to `VIPosterior`.
             rejection_sampling_parameters: Additional kwargs passed to
                 `RejectionPosterior`.
-            enable_transform: whether to compute a transform to unbounded space
 
         Returns:
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods
@@ -393,7 +391,6 @@ class RatioEstimator(NeuralInference, ABC):
             ratio_estimator=ratio_estimator,
             prior=prior,
             x_o=None,
-            enable_transform=enable_transform,
         )
 
         if sample_with == "mcmc":
