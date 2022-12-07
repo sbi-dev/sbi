@@ -143,6 +143,13 @@ class PosteriorEstimator(NeuralInference, ABC):
             else:
                 exclude_invalid_x = False
 
+        if data_device is None:
+            data_device = self._device
+
+        theta, x = validate_theta_and_x(
+            theta, x, data_device=data_device, training_device=self._device
+        )
+
         is_valid_x, num_nans, num_infs = handle_invalid_x(
             x, exclude_invalid_x=exclude_invalid_x
         )
@@ -165,12 +172,6 @@ class PosteriorEstimator(NeuralInference, ABC):
                 num_nans, num_infs, exclude_invalid_x, "Single-round NPE"
             )
 
-        if data_device is None:
-            data_device = self._device
-
-        theta, x = validate_theta_and_x(
-            theta, x, data_device=data_device, training_device=self._device
-        )
         self._check_proposal(proposal)
 
         self._data_round_index.append(current_round)
