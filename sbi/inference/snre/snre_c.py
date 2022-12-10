@@ -50,7 +50,7 @@ class SNRE_C(RatioEstimator):
 
     def train(
         self,
-        K: int = 9,
+        num_classes: int = 5,
         gamma: float = 1.0,
         training_batch_size: int = 50,
         learning_rate: float = 5e-4,
@@ -67,8 +67,11 @@ class SNRE_C(RatioEstimator):
         r"""Return classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
 
         Args:
-            K: Number of theta to classify against. Minimum 1. Similar to `num_atoms`
-                for SNRE_B except SNRE_C has an additional independently drawn sample.
+            num_classes: Number of theta to classify against, corresponds to $K$ in
+                _Contrastive Neural Ratio Estimation_. Minimum value is 1. Similar to
+                `num_atoms` for SNRE_B except SNRE_C has an additional independently
+                drawn sample. The total number of alternative parameters `NRE-C` "sees"
+                is $2K-1$ or `2 * num_classes - 1` divided between two loss terms.
             gamma: Determines the relative weight of the sum of all $K$ dependently drawn
                 classes against the marginally drawn one. Specifically, $p(y=k) := p_K$,
                 $p(y=0) := p_0$, $p_0 = 1 - K p_K$, and finally $\gamma := K p_K / p_0$.
@@ -102,7 +105,7 @@ class SNRE_C(RatioEstimator):
             Classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
         """
         kwargs = del_entries(locals(), entries=("self", "__class__"))
-        kwargs["num_atoms"] = kwargs.pop("K") + 1
+        kwargs["num_atoms"] = kwargs.pop("num_classes") + 1
         kwargs["loss_kwargs"] = {"gamma": kwargs.pop("gamma")}
         return super().train(**kwargs)
 
@@ -119,9 +122,10 @@ class SNRE_C(RatioEstimator):
             NeurIPS 2022, https://arxiv.org/abs/2210.06170
         """
 
+        # Reminder: K = num_classes
         # The algorithm is written with K, so we convert back to K format rather than reasoning in num_atoms.
-        K = num_atoms - 1
-        assert K >= 1, f"{K=} must be greater than 1."
+        num_classes = num_atoms - 1
+        assert num_classes >= 1, f"{num_classes=} must be greater than 1."
 
         assert theta.shape[0] == x.shape[0], "Batch sizes for theta and x must match."
         batch_size = theta.shape[0]
@@ -129,10 +133,12 @@ class SNRE_C(RatioEstimator):
         # We append an contrastive theta to the marginal case because we will remove the jointly drawn
         # sample in the logits_marginal[:, 0] position. That makes the remaining sample marginally drawn.
         # We have a batch of `batch_size` datapoints.
-        logits_marginal = self._classifier_logits(theta, x, K + 1).reshape(
-            batch_size, K + 1
+        logits_marginal = self._classifier_logits(theta, x, num_classes + 1).reshape(
+            batch_size, num_classes + 1
         )
-        logits_joint = self._classifier_logits(theta, x, K).reshape(batch_size, K)
+        logits_joint = self._classifier_logits(theta, x, num_classes).reshape(
+            batch_size, num_classes
+        )
 
         dtype = logits_marginal.dtype
         device = logits_marginal.device
@@ -140,11 +146,11 @@ class SNRE_C(RatioEstimator):
         # Index 0 is the theta-x-pair sampled from the joint p(theta,x) and hence
         # we remove the jointly drawn sample from the logits_marginal
         logits_marginal = logits_marginal[:, 1:]
-        # ... and retain it in the logits_joint. Now we have two arrays with `K` choices.
+        # ... and retain it in the logits_joint. Now we have two arrays with K choices.
 
         # To use logsumexp, we extend the denominator logits with loggamma
         loggamma = torch.tensor(gamma, dtype=dtype, device=device).log()
-        logK = torch.tensor(K, dtype=dtype, device=device).log()
+        logK = torch.tensor(num_classes, dtype=dtype, device=device).log()
         denominator_marginal = torch.concat(
             [loggamma + logits_marginal, logK.expand((batch_size, 1))],
             dim=-1,
@@ -161,21 +167,23 @@ class SNRE_C(RatioEstimator):
         )
 
         # relative weights. p_marginal := p_0, and p_joint := p_K from the notation.
-        p_marginal, p_joint = self._get_prior_probs_marginal_and_joint(K, gamma)
+        p_marginal, p_joint = self._get_prior_probs_marginal_and_joint(
+            num_classes, gamma
+        )
         return -torch.mean(
-            p_marginal * log_prob_marginal + p_joint * K * log_prob_joint
+            p_marginal * log_prob_marginal + p_joint * num_classes * log_prob_joint
         )
 
     @staticmethod
     def _get_prior_probs_marginal_and_joint(
-        K: int, gamma: float
+        num_classes: int, gamma: float
     ) -> Tuple[float, float]:
         """Return a tuple (p_marginal, p_joint) where `p_marginal := `$p_0$, `p_joint := `$p_K$.
 
         We let the joint (dependently drawn) class to be equally likely across K options.
         The marginal class is therefore restricted to get the remaining probability.
         """
-        assert K >= 1
-        p_joint = gamma / (1 + gamma * K)
-        p_marginal = 1 / (1 + gamma * K)
+        assert num_classes >= 1
+        p_joint = gamma / (1 + gamma * num_classes)
+        p_marginal = 1 / (1 + gamma * num_classes)
         return p_marginal, p_joint

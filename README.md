@@ -75,7 +75,7 @@ The following algorithms are currently available:
 
 * [`SNRE_B`](https://www.mackelab.org/sbi/reference/#sbi.inference.snre.snre_b.SNRE_B) or `SRE` from Durkan C, Murray I, and Papamakarios G. [_On Contrastive Learning for Likelihood-free Inference_](https://arxiv.org/abs/2002.03712) (ICML 2020).
 
-* [`SNRE_C](https://www.mackelab.org/sbi/reference/#sbi.inference.snre.snre_c.SNRE_C) or `NRE-C` from Miller BK, Weniger C, Forré P. [_Contrastive Neural Ratio Estimation_](https://arxiv.org/abs/2210.06170) (NeurIPS 2022). Sequential support introduced in this repository.
+* [`SNRE_C`](https://www.mackelab.org/sbi/reference/#sbi.inference.snre.snre_c.SNRE_C) or `NRE-C` from Miller BK, Weniger C, Forré P. [_Contrastive Neural Ratio Estimation_](https://arxiv.org/abs/2210.06170) (NeurIPS 2022).
 
 #### Sequential Neural Variational Inference (SNVI)
 
