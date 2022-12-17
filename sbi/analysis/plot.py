@@ -986,6 +986,9 @@ def sbc_rank_plot(
     parameter_labels: Optional[List[str]] = None,
     ranks_labels: Optional[List[str]] = None,
     colors: Optional[List[str]] = None,
+    fig: Optional[Figure] = None,
+    ax: Optional[Axes] = None,
+    figsize: Optional[tuple] = None,
     kwargs: Dict = {},
 ) -> Tuple[Figure, Axes]:
     """Plot simulation-based calibration ranks as empirical CDFs or histograms.
@@ -1016,6 +1019,9 @@ def sbc_rank_plot(
         parameter_labels,
         ranks_labels,
         colors,
+        fig=fig,
+        ax=ax,
+        figsize=figsize,
         **kwargs,
     )
 
@@ -1032,6 +1038,7 @@ def _sbc_rank_plot(
     line_alpha: float = 0.8,
     show_uniform_region: bool = True,
     uniform_region_alpha: float = 0.3,
+    uniform_region_color: str = "gray",
     xlim_offset_factor: float = 0.1,
     num_cols: int = 4,
     params_in_subplots: bool = False,
@@ -1145,7 +1152,7 @@ def _sbc_rank_plot(
                         num_repeats,
                         ranks_label=ranks_labels[ii],
                         color=f"C{ii}" if colors is None else colors[ii],
-                        xlabel=f"posterior rank {parameter_labels[jj]}",
+                        xlabel=f"posterior ranks {parameter_labels[jj]}",
                         # Show legend and ylabel only in first subplot.
                         show_ylabel=jj == 0,
                         show_legend=jj == 0,
@@ -1153,7 +1160,10 @@ def _sbc_rank_plot(
                     )
                     if ii == 0 and show_uniform_region:
                         _plot_cdf_region_expected_under_uniformity(
-                            num_sbc_runs, num_bins, num_repeats, alpha=0.1
+                            num_sbc_runs,
+                            num_bins,
+                            num_repeats,
+                            alpha=uniform_region_alpha,
                         )
                 elif plot_type == "hist":
                     _plot_ranks_as_hist(
@@ -1208,7 +1218,10 @@ def _sbc_rank_plot(
             )
         if show_uniform_region:
             _plot_cdf_region_expected_under_uniformity(
-                num_sbc_runs, num_bins, num_repeats, alpha=uniform_region_alpha
+                num_sbc_runs,
+                num_bins,
+                num_repeats,
+                alpha=uniform_region_alpha,
             )
 
     return fig, ax
@@ -1329,7 +1342,7 @@ def _plot_cdf_region_expected_under_uniformity(
     num_bins: int,
     num_repeats: int,
     alpha: float = 0.2,
-    color: str = "grey",
+    color: str = "gray",
 ) -> None:
     """Plot region of empirical cdfs expected under uniformity on the current axis."""
 
@@ -1358,7 +1371,7 @@ def _plot_hist_region_expected_under_uniformity(
     num_bins: int,
     num_posterior_samples: int,
     alpha: float = 0.2,
-    color: str = "grey",
+    color: str = "gray",
 ) -> None:
     """Plot region of empirical cdfs expected under uniformity."""
 
