@@ -10,6 +10,7 @@ from torch.distributions import MultivariateNormal
 from sbi import utils as utils
 from sbi.inference import (
     AALR,
+    BNRE,
     SNRE_B,
     SNRE_C,
     ImportanceSamplingPosterior,
@@ -146,6 +147,8 @@ def test_c2st_sre_on_linearGaussian(SNRE: RatioEstimator):
         (1, 1, "gaussian", "sre"),
         (2, 1, "uniform", "sre"),
         (2, 5, "gaussian", "aalr"),
+        (2, 1, "gaussian", "bnre"),
+        (2, 5, "gaussian", "bnre"),
         (2, 5, "gaussian", "nrec"),
     ),
 )
@@ -165,7 +168,10 @@ def test_c2st_sre_variants_on_linearGaussian(
 
     x_o = zeros(num_trials, num_dim)
     num_samples = 500
-    num_simulations = 3000 if num_trials == 1 else 40500
+    if method_str == "bnre":
+        num_simulations = 30000 if num_trials == 1 else 40500
+    else:
+        num_simulations = 3000 if num_trials == 1 else 40500
 
     # `likelihood_mean` will be `likelihood_shift + theta`.
     likelihood_shift = -1.0 * ones(num_dim)
@@ -191,6 +197,8 @@ def test_c2st_sre_variants_on_linearGaussian(
         inference = SNRE_B(**kwargs)
     elif method_str == "aalr":
         inference = AALR(**kwargs)
+    elif method_str == "bnre":
+        inference = BNRE(regularization_strength=20, **kwargs)
     elif method_str == "nrec":
         inference = SNRE_C(**kwargs)
     else:
@@ -233,7 +241,7 @@ def test_c2st_sre_variants_on_linearGaussian(
     map_ = posterior.map(num_init_samples=1_000, init_method="proposal")
 
     # Checks for log_prob()
-    if prior_str == "gaussian" and method_str == "aalr":
+    if prior_str == "gaussian" and (method_str == "aalr" or method_str == "bnre"):
         # For the Gaussian prior, we compute the KLd between ground truth and
         # posterior. We can do this only if the classifier_loss was as described in
         # Hermans et al. 2020 ('aalr') since Durkan et al. 2020 version only allows
