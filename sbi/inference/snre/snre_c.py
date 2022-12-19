@@ -138,7 +138,7 @@ class SNRE_C(RatioEstimator):
         # Reminder: K = num_classes
         # The algorithm is written with K, so we convert back to K format rather than reasoning in num_atoms.
         num_classes = num_atoms - 1
-        assert num_classes >= 1, f"{num_classes=} must be greater than 1."
+        assert num_classes >= 1, f"num_classes = {num_classes} must be greater than 1."
 
         assert theta.shape[0] == x.shape[0], "Batch sizes for theta and x must match."
         batch_size = theta.shape[0]
