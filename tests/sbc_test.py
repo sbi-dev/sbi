@@ -12,6 +12,7 @@ from sbi.analysis import check_sbc, get_nltp, run_sbc
 from sbi.inference import SNLE, SNPE, simulate_for_sbi
 from sbi.simulators import linear_gaussian
 from sbi.utils import BoxUniform, MultipleIndependent
+from tests.test_utils import PosteriorPotential, TractablePosterior
 
 
 @pytest.mark.parametrize("reduce_fn_str", ("marginals", "posterior_log_prob"))
@@ -62,6 +63,38 @@ def test_running_sbc(method, prior, reduce_fn_str, model="mdn"):
 
     # Check nltp
     get_nltp(thetas, xs, posterior)
+
+
+def test_sbc_accuracy():
+
+    num_dim = 2
+    # Gaussian toy problem, set posterior = prior
+    simulator = lambda theta: torch.randn_like(theta) + theta
+    prior = BoxUniform(-ones(num_dim), ones(num_dim))
+    posterior_dist = prior
+
+    potential = PosteriorPotential(posterior=posterior_dist, prior=prior)
+
+    posterior = TractablePosterior(potential_fn=potential)
+
+    N = L = 1000
+    thetas = prior.sample((N,))
+    xs = simulator(thetas)
+
+    ranks, daps = run_sbc(
+        thetas,
+        xs,
+        posterior,
+        num_workers=1,
+        num_posterior_samples=L,
+        reduce_fns="marginals",
+    )
+
+    pvals, c2st_ranks, _ = check_sbc(
+        ranks, prior.sample((N,)), daps, num_posterior_samples=L
+    ).values()
+    assert (c2st_ranks <= 0.6).all(), "posterior ranks must be close to uniform."
+    assert (pvals > 0.05).all(), "posterior ranks uniformity test p-values too small."
 
 
 @pytest.mark.slow
