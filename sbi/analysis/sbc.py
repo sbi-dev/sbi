@@ -158,7 +158,9 @@ def sbc_on_batch(
             "`reduce_fn` must either be the string `marginals` or a Callable or a List "
             "of Callables."
         )
-        reduce_fns = [(lambda theta, x: theta[i]) for i in range(thetas.shape[1])]
+        reduce_fns = [
+            eval(f"lambda theta, x: theta[:, {i}]") for i in range(thetas.shape[1])
+        ]
 
     if isinstance(reduce_fns, Callable):
         reduce_fns = [reduce_fns]
@@ -175,7 +177,9 @@ def sbc_on_batch(
 
         # rank for each posterior dimension as in Talts et al. section 4.1.
         for i, reduce_fn in enumerate(reduce_fns):
-            ranks[idx, i] = (reduce_fn(ths, xo) < reduce_fn(tho, xo)).sum().item()
+            ranks[idx, i] = (
+                (reduce_fn(ths, xo) < reduce_fn(tho.unsqueeze(0), xo)).sum().item()
+            )
 
     return ranks, dap_samples
 
