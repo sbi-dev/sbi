@@ -19,8 +19,21 @@ class SNRE_C(RatioEstimator):
         summary_writer: Optional[TensorboardSummaryWriter] = None,
         show_progress_bars: bool = True,
     ):
-        r"""A sequential extension to NRE-C[1], a generalization of SNRE_A and SNRE_B.
-        We call the algorithm SNRE_C within sbi.
+        r"""NRE-C[1] is a generalization of the non-sequential (amortized) versions of
+        SNRE_A and SNRE_B. We call the algorithm SNRE_C within `sbi`.
+
+        NRE-C:
+        (1) like SNRE_B, features a "multiclass" loss function where several marginally
+            drawn parameter-data pairs are contrasted against a jointly drawn pair.
+        (2) like AALR/NRE_A, i.e., the non-sequential version of SNRE_A, it encourages
+            the approximate ratio $p(\theta,x)/p(\theta)p(x)$, accessed through
+            `.potential()` within `sbi`, to be exact at optimum. This addresses the
+            issue that SNRE_B estimates this ratio only up to an arbitrary function
+            (normalizing constant) of the data $x$.
+
+        Just like for all ratio estimation algorithms, the sequential version of SNRE_C
+        will be estimated only up to a function (normalizing constant) of the data $x$
+        in rounds after the first.
 
         [1] _Contrastive Neural Ratio Estimation_, Benajmin Kurt Miller, et. al.,
             NeurIPS 2022, https://arxiv.org/abs/2210.06170
