@@ -21,6 +21,7 @@ from sbi.inference import (
     SNPE_C,
     SNRE_A,
     SNRE_B,
+    SNRE_C,
     DirectPosterior,
     MCMCPosterior,
     NeuralInference,
@@ -59,6 +60,9 @@ from sbi.utils.user_input_checks import (
         (SNRE_B, "resnet", "nuts"),
         (SNRE_B, "resnet", "rejection"),
         (SNRE_B, "resnet", "importance"),
+        (SNRE_C, "resnet", "nuts"),
+        (SNRE_C, "resnet", "rejection"),
+        (SNRE_C, "resnet", "importance"),
     ],
 )
 @pytest.mark.parametrize("data_device", ("cpu", "cuda:0"))
@@ -122,7 +126,7 @@ def test_training_and_mcmc_on_device(
             density_estimator=utils.likelihood_nn(model=model, num_transforms=2)
         )
         train_kwargs = dict()
-    elif method in (SNRE_A, SNRE_B):
+    elif method in (SNRE_A, SNRE_B, SNRE_C):
         kwargs = dict(classifier=utils.classifier_nn(model=model))
         train_kwargs = dict()
     else:
@@ -148,7 +152,7 @@ def test_training_and_mcmc_on_device(
             potential_fn, theta_transform = posterior_estimator_based_potential(
                 estimator, prior, x_o
             )
-        elif method == SNRE_A or method == SNRE_B:
+        elif method == SNRE_A or method == SNRE_B or method == SNRE_C:
             potential_fn, theta_transform = ratio_estimator_based_potential(
                 estimator, prior, x_o
             )
@@ -282,7 +286,9 @@ def test_validate_theta_and_x_device(training_device: str, data_device: str) -> 
 
 
 @pytest.mark.gpu
-@pytest.mark.parametrize("inference_method", [SNPE_A, SNPE_C, SNRE_A, SNRE_B, SNLE])
+@pytest.mark.parametrize(
+    "inference_method", [SNPE_A, SNPE_C, SNRE_A, SNRE_B, SNRE_C, SNLE]
+)
 @pytest.mark.parametrize("data_device", ("cpu", "cuda:0"))
 @pytest.mark.parametrize("training_device", ("cpu", "cuda:0"))
 def test_train_with_different_data_and_training_device(
@@ -301,7 +307,7 @@ def test_train_with_different_data_and_training_device(
         prior,
         **(
             dict(classifier="resnet")
-            if inference_method in [SNRE_A, SNRE_B]
+            if inference_method in [SNRE_A, SNRE_B, SNRE_C]
             else dict(
                 density_estimator=(
                     "mdn_snpe_a" if inference_method == SNPE_A else "maf"
@@ -329,7 +335,9 @@ def test_train_with_different_data_and_training_device(
 
 
 @pytest.mark.gpu
-@pytest.mark.parametrize("inference_method", [SNPE_A, SNPE_C, SNRE_A, SNRE_B, SNLE])
+@pytest.mark.parametrize(
+    "inference_method", [SNPE_A, SNPE_C, SNRE_A, SNRE_B, SNRE_C, SNLE]
+)
 @pytest.mark.parametrize("prior_device", ("cpu", "cuda"))
 @pytest.mark.parametrize("embedding_net_device", ("cpu", "cuda"))
 @pytest.mark.parametrize("data_device", ("cpu", "cuda"))
@@ -355,7 +363,7 @@ def test_embedding_nets_integration_training_device(
         low=-torch.ones((D_theta,)), high=torch.ones((D_theta,)), device=prior_device
     )
 
-    if inference_method in [SNRE_A, SNRE_B]:
+    if inference_method in [SNRE_A, SNRE_B, SNRE_C]:
         embedding_net_theta = nn.Linear(in_features=D_theta, out_features=2).to(
             embedding_net_device
         )
@@ -431,7 +439,9 @@ def test_embedding_nets_integration_training_device(
         theta = proposal.sample((samples_per_round,))
 
 
-@pytest.mark.parametrize("inference_method", [SNPE_A, SNPE_C, SNRE_A, SNRE_B, SNLE])
+@pytest.mark.parametrize(
+    "inference_method", [SNPE_A, SNPE_C, SNRE_A, SNRE_B, SNRE_C, SNLE]
+)
 def test_nograd_after_inference_train(inference_method) -> None:
 
     num_dim = 2
@@ -442,7 +452,7 @@ def test_nograd_after_inference_train(inference_method) -> None:
         prior,
         **(
             dict(classifier="resnet")
-            if inference_method in [SNRE_A, SNRE_B]
+            if inference_method in [SNRE_A, SNRE_B, SNRE_C]
             else dict(
                 density_estimator=(
                     "mdn_snpe_a" if inference_method == SNPE_A else "maf"

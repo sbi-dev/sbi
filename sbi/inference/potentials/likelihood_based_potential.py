@@ -31,6 +31,7 @@ def likelihood_estimator_based_potential(
         prior: The prior distribution.
         x_o: The observed data at which to evaluate the likelihood.
         enable_transform: Whether to transform parameters to unconstrained space.
+             When False, an identity transform will be returned for `theta_transform`.
 
     Returns:
         The potential function $p(x_o|\theta)p(\theta)$ and a transformation that maps

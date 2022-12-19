@@ -77,6 +77,8 @@ The following algorithms are currently available:
 
 * [`BNRE`](https://www.mackelab.org/sbi/reference/#sbi.inference.snre.bnre.BNRE) from Delaunoy A, Hermans J, Rozet F, Wehenkel A, and Louppe G. [_Towards Reliable Simulation-Based Inference with Balanced Neural Ratio Estimation_](https://arxiv.org/abs/2208.13624) (NeurIPS 2022).
 
+* [`SNRE_C`](https://www.mackelab.org/sbi/reference/#sbi.inference.snre.snre_c.SNRE_C) or `NRE-C` from Miller BK, Weniger C, Forré P. [_Contrastive Neural Ratio Estimation_](https://arxiv.org/abs/2210.06170) (NeurIPS 2022).
+
 #### Sequential Neural Variational Inference (SNVI)
 
 * [`SNVI`](https://www.mackelab.org/sbi/reference/#sbi.inference.posteriors.vi_posterior) from Glöckler M, Deistler M, Macke J, [_Variational methods for simulation-based inference_](https://openreview.net/forum?id=kZ0UYdhqkNY) (ICLR 2022).

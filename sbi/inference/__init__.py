@@ -24,7 +24,7 @@ from sbi.inference.snle.snle_a import SNLE_A
 from sbi.inference.snpe.snpe_a import SNPE_A
 from sbi.inference.snpe.snpe_b import SNPE_B
 from sbi.inference.snpe.snpe_c import SNPE_C  # noqa: F401
-from sbi.inference.snre import BNRE, SNRE, SNRE_A, SNRE_B  # noqa: F401
+from sbi.inference.snre import BNRE, SNRE, SNRE_A, SNRE_B, SNRE_C  # noqa: F401
 from sbi.utils.user_input_checks import prepare_for_sbi
 
 SNL = SNLE = SNLE_A
@@ -37,7 +37,8 @@ _snpe_family = ["SNPE_A", "SNPE_C", "SNPE", "APT"]
 
 SRE = SNRE_B
 AALR = SNRE_A
-_snre_family = ["SNRE_A", "AALR", "SNRE_B", "SNRE", "SRE"]
+CNRE = NREC = SNRE_C
+_snre_family = ["SNRE_A", "AALR", "SNRE_B", "SNRE", "SRE", "SNRE_C", "CNRE", "NREC"]
 
 ABC = MCABC
 SMC = SMCABC
