@@ -6,7 +6,6 @@ import torch
 from torch import Tensor, eye, nn, ones, optim
 from torch.distributions import Distribution
 from torch.nn.utils.clip_grad import clip_grad_norm_
-from torch.utils import data
 from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi import utils as utils

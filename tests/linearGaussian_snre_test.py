@@ -195,12 +195,16 @@ def test_c2st_sre_variants_on_linearGaussian(
 
     if method_str == "sre":
         inference = SNRE_B(**kwargs)
+        train_kwargs = {}
     elif method_str == "aalr":
         inference = AALR(**kwargs)
+        train_kwargs = {}
     elif method_str == "bnre":
-        inference = BNRE(regularization_strength=20, **kwargs)
+        inference = BNRE(**kwargs)
+        train_kwargs = {"regularization_strength": 20}
     elif method_str == "nrec":
         inference = SNRE_C(**kwargs)
+        train_kwargs = {}
     else:
         raise ValueError(f"{method_str} is not an allowed option")
 
@@ -208,7 +212,7 @@ def test_c2st_sre_variants_on_linearGaussian(
     theta, x = simulate_for_sbi(
         simulator, prior, num_simulations, simulation_batch_size=50
     )
-    ratio_estimator = inference.append_simulations(theta, x).train()
+    ratio_estimator = inference.append_simulations(theta, x).train(**train_kwargs)
     potential_fn, theta_transform = ratio_estimator_based_potential(
         ratio_estimator=ratio_estimator, prior=prior, x_o=x_o
     )
