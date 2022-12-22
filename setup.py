@@ -50,7 +50,7 @@ EXTRAS = {
         "mkdocs-material",
         "markdown-include",
         "mkdocs-redirects",
-        "mkdocstrings",
+        "mkdocstrings[python]>=0.18",
         "nbconvert",
         "pep517",
         "pytest",

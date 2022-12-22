@@ -86,8 +86,9 @@ plugins:
           rendering:
             show_source: true
             heading_level: 3
-      watch:
-        - ../sbi
+  
+watch:
+  - ../sbi
 
 extra_javascript:
   - 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-MML-AM_CHTML'

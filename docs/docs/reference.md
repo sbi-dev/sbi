@@ -9,7 +9,7 @@
 ::: sbi.utils.user_input_checks.prepare_for_sbi
     rendering:
       show_root_heading: true
-      
+
 ::: sbi.inference.base.simulate_for_sbi
     rendering:
       show_root_heading: true
@@ -48,15 +48,15 @@
     selection:
       filters: [ "!^_", "^__", "!^__class__" ]
       inherited_members: true
-      
-::: sbi.inference.snre.bnre.BNRE
+
+::: sbi.inference.snre.snre_c.SNRE_C
     rendering:
       show_root_heading: true
     selection:
       filters: [ "!^_", "^__", "!^__class__" ]
       inherited_members: true
 
-::: sbi.inference.snre.snre_c.SNRE_C
+::: sbi.inference.snre.bnre.BNRE
     rendering:
       show_root_heading: true
     selection:
@@ -85,21 +85,21 @@
     selection:
       filters: [ "!^_", "^__", "!^__class__" ]
       inherited_members: true
-      
+
 ::: sbi.inference.posteriors.importance_posterior.ImportanceSamplingPosterior
     rendering:
       show_root_heading: true
     selection:
       filters: [ "!^_", "^__", "!^__class__" ]
       inherited_members: true
-    
+
 ::: sbi.inference.posteriors.mcmc_posterior.MCMCPosterior
     rendering:
       show_root_heading: true
     selection:
       filters: [ "!^_", "^__", "!^__class__" ]
       inherited_members: true
-      
+
 ::: sbi.inference.posteriors.rejection_posterior.RejectionPosterior
     rendering:
       show_root_heading: true
@@ -139,14 +139,14 @@
     selection:
       filters: [ "!^_", "^__", "!^__class__" ]
       inherited_members: true
-      
+
 ::: sbi.inference.potentials.likelihood_based_potential.likelihood_estimator_based_potential
     rendering:
       show_root_heading: true
     selection:
       filters: [ "!^_", "^__", "!^__class__" ]
       inherited_members: true
-      
+
 ::: sbi.inference.potentials.ratio_based_potential.ratio_estimator_based_potential
     rendering:
       show_root_heading: true
@@ -165,12 +165,12 @@
     rendering:
       show_root_heading: true
       show_object_full_path: true
-      
+
 ::: sbi.analysis.plot.conditional_pairplot
     rendering:
       show_root_heading: true
       show_object_full_path: true
-      
+
 ::: sbi.analysis.conditional_density.conditional_corrcoeff
     rendering:
       show_root_heading: true
