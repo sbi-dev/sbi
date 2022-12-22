@@ -1,3 +1,9 @@
+# v0.21.0
+
+- implementation of ["Contrastive Neural Ratio Estimation"](https://openreview.net/forum?id=kOIaB1hzaLe) (thanks to @bkmi, #787)
+- implementation of ["Balanced Neural Ratio Estimation"](https://openreview.net/forum?id=o762mMj4XK) (thanks to @ADelau, #779)
+- bugfixes for SBC, device handling and iid-data (#793, #789, #780)
+
 # v0.20.0
 
 ## Major changes and bug fixes
