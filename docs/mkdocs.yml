@@ -27,7 +27,9 @@ nav:
         - Posterior sensitivity analysis: tutorial/09_sensitivity_analysis.md
       - Examples:
         - Hodgkin-Huxley example: examples/00_HH_simulator.md
-  - Contribute: contribute.md
+  - Contributing: 
+    - Guide: contribute.md
+    - Code of Conduct: code_of_conduct.md
   - API Reference: reference.md
   - FAQ: faq.md
   - Credits: credits.md

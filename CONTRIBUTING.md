@@ -9,13 +9,11 @@ number of rounds,...).
 To report bugs and suggest features (including better documentation), please equally
 head over to [issues on GitHub](https://github.com/mackelab/sbi/issues).
 
-
 ## Code contributions
 
 In general, we use pull requests to make changes to `sbi`. So, if you are planning to
 make a contribution, please fork, create a feature branch and then make a PR from
-your feature branch to the upstream `sbi` ([more details](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request-from-a-fork)).
-
+your feature branch to the upstream `sbi` ([details](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request-from-a-fork)).
 
 ### Development environment
 
@@ -26,18 +24,6 @@ dependencies, just run `conda env update -f environment.yml --prune`.
 
 Alternatively, you can install via `setup.py` using `pip install -e ".[dev]"` (the dev
 flag installs development and testing dependencies).
-
-### Contributing inference algorithms
-
-`sbi` was developed to be extensible and we welcome implementations of additional
-inference algorithms. Your new inference algorithm should be a class in
-`sbi/inference/your_type_of_algorithm/your_algorithm.py`. The class should have a
-`__call__()` function which runs inference and returns a posterior object. The posterior
-object itself should have a `.sample()` function following the signature of
-`sbi/inference/NeuralPosterior`, allowing to draw samples from the posterior.
-Currently, `SNPE`, `SNLE`, and `SNRE` all share the `NeuralPosterior` class in
-`sbi/inference/posterior.py`, but future versions of `sbi` will refactor them into
-separate classes.
 
 ### Style conventions
 
@@ -54,12 +40,11 @@ repository, which will format all files.
 imports. You can run isort manually from the console using `isort` in the top
 directory.
 
-**[pyright](https://github.com/Microsoft/pyright)**: Used for static type checking. 
+**[pyright](https://github.com/Microsoft/pyright)**: Used for static type checking.
 
 `black` and `isort` and `pyright` are checked as part of our CI actions. If these
 checks fail please make sure you have installed the latest versions for each of them
 and run them locally.
-
 
 ## Online documentation
 
