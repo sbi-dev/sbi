@@ -1,5 +1,5 @@
 import pytest
-from torch import eye, ones, zeros
+from torch import eye, norm, ones, zeros
 from torch.distributions import MultivariateNormal, biject_to
 
 from sbi.inference import MCABC, SMC
@@ -14,8 +14,10 @@ from tests.test_utils import check_c2st
 
 @pytest.mark.slow
 @pytest.mark.parametrize("num_dim", (1, 2))
+@pytest.mark.parametrize("distance", ("l2", lambda x, xo: norm((x - xo), dim=-1)))
 def test_mcabc_inference_on_linear_gaussian(
     num_dim,
+    distance,
     lra=False,
     sass=False,
     sass_expansion_degree=1,
@@ -40,7 +42,7 @@ def test_mcabc_inference_on_linear_gaussian(
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    inferer = MCABC(simulator, prior, simulation_batch_size=10000)
+    inferer = MCABC(simulator, prior, simulation_batch_size=10000, distance=distance)
 
     phat = inferer(
         x_o,
@@ -68,7 +70,11 @@ def test_mcabc_inference_on_linear_gaussian(
 def test_mcabc_sass_lra(lra, sass_expansion_degree):
 
     test_mcabc_inference_on_linear_gaussian(
-        num_dim=2, lra=lra, sass=True, sass_expansion_degree=sass_expansion_degree
+        num_dim=2,
+        lra=lra,
+        sass=True,
+        sass_expansion_degree=sass_expansion_degree,
+        distance="l2",
     )
 
 
@@ -161,7 +167,7 @@ def test_smcabc_sass_lra(lra, sass_expansion_degree):
 @pytest.mark.parametrize("kde_bandwidth", ("cv", "silvermann", "scott", 0.1))
 def test_mcabc_kde(kde_bandwidth):
     test_mcabc_inference_on_linear_gaussian(
-        num_dim=2, kde=True, kde_bandwidth=kde_bandwidth
+        num_dim=2, kde=True, kde_bandwidth=kde_bandwidth, distance="l2"
     )
 
 

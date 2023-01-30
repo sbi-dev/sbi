@@ -33,7 +33,7 @@ class ABCBASE(ABC):
                 object with `.log_prob()`and `.sample()` (for example, a PyTorch
                 distribution) can be used.
             distance: Distance function to compare observed and simulated data. Can be
-                a custom function or one of `l1`, `l2`, `mse`.
+                a custom callable function or one of `l1`, `l2`, `mse`.
             num_workers: Number of parallel workers to use for simulations.
             simulation_batch_size: Number of parameter sets that the simulator
                 maps to data x at once. If None, we simulate all parameter sets at the
@@ -48,12 +48,7 @@ class ABCBASE(ABC):
         self._show_progress_bars = show_progress_bars
 
         # Select distance function.
-        if type(distance) == str:
-            distances = ["l1", "l2", "mse"]
-            assert (
-                distance in distances
-            ), f"Distance function str must be one of {distances}."
-            self.distance = self.choose_distance_function(distance_type=distance)
+        self.distance = self.get_distance_function(distance)
 
         self._batched_simulator = lambda theta: simulate_in_batches(
             simulator=self._simulator,
@@ -66,8 +61,26 @@ class ABCBASE(ABC):
         self.logger = logging.getLogger(__name__)
 
     @staticmethod
-    def choose_distance_function(distance_type: str = "l2") -> Callable:
-        """Return distance function for given distance type."""
+    def get_distance_function(distance_type: Union[str, Callable] = "l2") -> Callable:
+        """Return distance function for given distance type.
+
+        Args:
+            distance_type: string indicating the distance type, e.g., 'l2', 'l1',
+                'mse'. Note that the returned distance function averages over the last
+                dimension, e.g., over the summary statistics.
+
+        Returns:
+            distance_fun: distance functions built from passe string. Returns
+                distance_type is callable.
+        """
+
+        if isinstance(distance_type, Callable):
+            return distance_type
+
+        distances = ["l1", "l2", "mse"]
+        assert (
+            distance_type in distances
+        ), f"{distance_type} must be one of {distances}."
 
         if distance_type == "mse":
             distance = lambda xo, x: torch.mean((xo - x) ** 2, dim=-1)
