@@ -34,7 +34,18 @@ def warn_if_zscoring_changes_data(x: Tensor, duplicate_tolerance: float = 0.1) -
     num_unique = torch.unique(x, dim=0).numel()
 
     # z-score.
-    zx = (x - x.mean(0)) / x.std(0)
+    xstd = x.std(0)
+    if (xstd==0).any():
+        warnings.warn(
+            """Variance along batches is 0. Therefore, Z-score could not be computed and will be skipped.
+            Check that data is different along all dimensions.""",
+            UserWarning,
+        )
+        
+        #Skip computation.
+        return
+
+    zx = (x - x.mean(0)) / xstd 
 
     # Count again and warn on too many new duplicates.
     num_unique_z = torch.unique(zx, dim=0).numel()
