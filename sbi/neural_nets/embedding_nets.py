@@ -248,12 +248,17 @@ class PermutationInvariantEmbedding(nn.Module):
         self.trial_net = trial_net
         self.combining_operation = combining_operation
 
-        if combining_operation not in ["sum", "mean"]:
+        # define function for permutation invariant embedding
+        if combining_operation == "mean":
+            self.combining_function = torch.mean
+        elif self.combining_operation == "sum":
+            self.combining_function = torch.sum
+        else:
             raise ValueError("combining_operation must be in ['sum', 'mean'].")
 
         # construct fully connected layers
         self.fc_subnet = FCEmbedding(
-            input_dim=trial_net_output_dim,
+            input_dim=trial_net_output_dim + 1,  # +1 to encode number of trials
             output_dim=output_dim,
             num_layers=num_layers,
             num_hiddens=num_hiddens,
@@ -268,17 +273,32 @@ class PermutationInvariantEmbedding(nn.Module):
         """
         batch, permutation_dim, _ = x.shape
 
-        iid_embeddings = self.trial_net(x.view(batch * permutation_dim, -1)).view(
-            batch, permutation_dim, -1
-        )
+        # if no NaNs for padding varying trial lengths we can batch the computation
+        if not torch.isnan(x).any():
+            trial_embeddings = self.trial_net(x.view(batch * permutation_dim, -1)).view(
+                batch, permutation_dim, -1
+            )
+            combined_embedding = self.combining_function(trial_embeddings, dim=1)
+            trial_counts = torch.ones(batch, 1, dtype=torch.float32) * permutation_dim
 
-        if self.combining_operation == "mean":
-            e = iid_embeddings.mean(dim=1)
-        elif self.combining_operation == "sum":
-            e = iid_embeddings.sum(dim=1)
+        # otherwise we need to loop over the batch to account for varying trial lengths
         else:
-            raise ValueError("combining_operation must be in ['sum', 'mean'].")
+            combined_embedding = []
+            trial_counts = torch.zeros(batch, 1)
+            for i in range(batch):
+                # remove NaNs
+                valid_x = x[i, ~torch.isnan(x[i, :, 0]), :]
+                trial_counts[i] = valid_x.shape[0]
+                trial_embeddings = self.trial_net(valid_x)
+                # apply combining operation over permutation dimension
+                combined_embedding.append(
+                    self.combining_function(trial_embeddings, dim=0)
+                )
 
-        embedding = self.fc_subnet(e)
+            combined_embedding = torch.stack(combined_embedding, dim=0)
 
-        return embedding
+        assert not torch.isnan(combined_embedding).any(), "NaNs in embedding."
+
+        # add number of trials as additional input
+        # print(torch.cat([combined_embedding, trial_counts], dim=1))
+        return self.fc_subnet(torch.cat([combined_embedding, trial_counts], dim=1))

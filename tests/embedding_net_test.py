@@ -95,6 +95,72 @@ def test_iid_embedding_api(num_trials, num_dim):
 
 
 @pytest.mark.slow
+def test_iid_embedding_varying_num_trials(max_num_trials=100, trial_factor=50):
+    """Test embedding net with varying number of trials."""
+    num_dim = 2
+    prior = torch.distributions.MultivariateNormal(
+        torch.zeros(num_dim), torch.eye(num_dim)
+    )
+
+    # Scale number of training samples with num_trials.
+    num_thetas = 5000 + trial_factor * max_num_trials
+
+    theta = prior.sample((num_thetas,))
+    num_trials = torch.randint(1, max_num_trials, size=(num_thetas,))
+
+    # simulate iid x, pad smaller number of trials with nans.
+    x = ones(num_thetas, max_num_trials, 2) * float("nan")
+
+    for i in range(num_thetas):
+        th = theta[i].repeat(num_trials[i], 1)
+        x[i, : num_trials[i]] = torch.randn_like(th) + th
+
+    # build embedding net
+    output_dim = 5
+    single_trial_net = FCEmbedding(input_dim=num_dim, output_dim=output_dim)
+    embedding_net = PermutationInvariantEmbedding(
+        single_trial_net,
+        trial_net_output_dim=output_dim,
+        output_dim=output_dim,
+    )
+
+    # test embedding net
+    e = embedding_net(x[:10])
+    assert e.shape == (10, output_dim)
+
+    density_estimator = posterior_nn(
+        "mdn", embedding_net=embedding_net, z_score_x="none"
+    )
+    inference = SNPE(prior, density_estimator=density_estimator)
+
+    # do not exclude invalid x, as we padded with nans.
+    _ = inference.append_simulations(theta, x, exclude_invalid_x=False).train(
+        training_batch_size=100
+    )
+
+    num_samples = 1000
+    # test different number of trials
+    num_test_trials = torch.linspace(1, max_num_trials, 5, dtype=int)
+    for num_trials in num_test_trials:
+        # x_o must have the same number of trials as x, thus we pad with nans.
+        x_o = ones(1, max_num_trials, num_dim) * float("nan")
+        x_o[:, :num_trials] = 0.0
+
+        # get reference samples from true posterior
+        reference_samples = true_posterior_linear_gaussian_mvn_prior(
+            x_o[0, :num_trials, :],  # omit nans
+            likelihood_shift=torch.zeros(num_dim),
+            likelihood_cov=torch.eye(num_dim),
+            prior_cov=prior.covariance_matrix,
+            prior_mean=prior.loc,
+        ).sample((num_samples,))
+
+        posterior = inference.build_posterior().set_default_x(x_o)
+        samples = posterior.sample((num_samples,))
+        check_c2st(samples, reference_samples, alg=f"SNPE with {num_trials} trials")
+
+
+@pytest.mark.slow
 @pytest.mark.parametrize("num_trials", [1, 10, 50])
 @pytest.mark.parametrize("num_dim", [2])
 @pytest.mark.parametrize("method", ("SNPE",))
