@@ -207,7 +207,6 @@ class RatioEstimator(NeuralInference, ABC):
         # This is passed into NeuralPosterior, to create a neural posterior which
         # can `sample()` and `log_prob()`. The network is accessible via `.net`.
         if self._neural_net is None or retrain_from_scratch:
-
             # Get theta,x to initialize NN
             theta, x, _ = self.get_simulations(starting_round=start_idx)
             # Use only training data for building the neural net (z-scoring transforms)
@@ -229,7 +228,6 @@ class RatioEstimator(NeuralInference, ABC):
         while self.epoch <= max_num_epochs and not self._converged(
             self.epoch, stop_after_epochs
         ):
-
             # Train for a single epoch.
             self._neural_net.train()
             train_log_probs_sum = 0

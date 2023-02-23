@@ -61,7 +61,6 @@ def test_analysis_modules(device: str) -> None:
 
 @pytest.mark.parametrize("num_candidates", (1_000,))
 def test_1d_marginals_peaks_from_kde(num_candidates):
-
     num_samples = 10_000
     num_dim = 4
     samples = torch.ones(num_samples, num_dim) + 0.5 * torch.randn(num_samples, num_dim)

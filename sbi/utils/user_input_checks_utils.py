@@ -112,7 +112,6 @@ class ScipyPytorchWrapper(Distribution):
         lower_bound: Optional[Tensor] = None,
         upper_bound: Optional[Tensor] = None,
     ):
-
         self.custom_arg_constraints = arg_constraints
         self.prior_scipy = prior_scipy
         self.return_type = return_type
@@ -289,7 +288,6 @@ class MultipleIndependent(Distribution):
         """
 
     def sample(self, sample_shape=torch.Size()) -> Tensor:
-
         # Sample from every sub distribution and concatenate samples.
         sample = torch.cat([d.sample(sample_shape) for d in self.dists], dim=-1)
 
@@ -302,7 +300,6 @@ class MultipleIndependent(Distribution):
         return sample
 
     def log_prob(self, value) -> Tensor:
-
         value = self._prepare_value(value)
 
         # Evaluate value per distribution, taking into account that individual

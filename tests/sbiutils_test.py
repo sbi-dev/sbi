@@ -375,7 +375,6 @@ def test_gaussian_transforms(snpe_method: str, plot_results: bool = False):
     ("cv", "scott"),
 )
 def test_kde(bandwidth, transform, sample_weights):
-
     num_dim = 3
     num_samples = 100
     num_draws = 10

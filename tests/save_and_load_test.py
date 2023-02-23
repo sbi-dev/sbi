@@ -18,7 +18,6 @@ from sbi.inference import SNLE, SNPE, SNRE
     ),
 )
 def test_picklability(inference_method, sampling_method: str, tmp_path):
-
     num_dim = 2
     prior = utils.BoxUniform(low=-2 * torch.ones(num_dim), high=2 * torch.ones(num_dim))
     x_o = torch.zeros(1, num_dim)

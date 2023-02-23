@@ -6,7 +6,6 @@ from sbi.inference import SNPE
 
 @pytest.mark.parametrize("training_batch_size", (1, 10, 100))
 def test_get_dataloaders(training_batch_size):
-
     N = 1000
     validation_fraction = 0.1
 

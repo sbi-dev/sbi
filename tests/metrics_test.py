@@ -43,7 +43,6 @@ TESTCASECONFIG = [
 def test_c2st_with_different_distributions(
     dist_sigma, c2st_lowerbound, c2st_upperbound
 ):
-
     ndim = 10
     nsamples = 1024
 
@@ -70,7 +69,6 @@ def test_c2st_with_different_distributions(
 def test_c2st_with_different_distributions_mlp(
     dist_sigma, c2st_lowerbound, c2st_upperbound
 ):
-
     ndim = 10
     nsamples = 1024
 
@@ -95,7 +93,6 @@ def test_c2st_with_different_distributions_mlp(
     TESTCASECONFIG,
 )
 def test_c2st_scores(dist_sigma, c2st_lowerbound, c2st_upperbound):
-
     ndim = 10
     nsamples = 1024
 

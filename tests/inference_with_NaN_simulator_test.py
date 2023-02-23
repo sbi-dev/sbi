@@ -35,7 +35,6 @@ from tests.test_utils import check_c2st
     ),
 )
 def test_handle_invalid_x(x_shape):
-
     x = torch.rand(x_shape)
     x[x < 0.1] = float("nan")
     x[x > 0.9] = float("inf")
@@ -47,7 +46,6 @@ def test_handle_invalid_x(x_shape):
 
 @pytest.mark.parametrize("snpe_method", [SNPE_A, SNPE_C])
 def test_z_scoring_warning(snpe_method: type):
-
     # Create data with large variance.
     num_dim = 2
     theta = torch.ones(100, num_dim)
@@ -72,7 +70,6 @@ def test_z_scoring_warning(snpe_method: type):
     ),
 )
 def test_inference_with_nan_simulator(method: type, percent_nans: float):
-
     # likelihood_mean will be likelihood_shift+theta
     num_dim = 3
     likelihood_shift = -1.0 * ones(num_dim)
@@ -114,7 +111,6 @@ def test_inference_with_nan_simulator(method: type, percent_nans: float):
 
 @pytest.mark.slow
 def test_inference_with_restriction_estimator():
-
     # likelihood_mean will be likelihood_shift+theta
     num_dim = 3
     likelihood_shift = -1.0 * ones(num_dim)

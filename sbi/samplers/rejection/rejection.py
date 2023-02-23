@@ -127,7 +127,6 @@ def rejection_sample(
         # To cover cases with few samples without leakage:
         sampling_batch_size = min(num_samples, max_sampling_batch_size)
         while num_remaining > 0:
-
             # Sample and reject.
             candidates = proposal.sample(sampling_batch_size).reshape(
                 sampling_batch_size, -1
@@ -259,7 +258,6 @@ def accept_reject_sample(
     # To cover cases with few samples without leakage:
     sampling_batch_size = min(num_samples, max_sampling_batch_size)
     while num_remaining > 0:
-
         # Sample and reject.
         # This if-case is annoying, but it will be gone when we move away from
         # nflows and towards a flows-framework which takes a tuple as sample_size.

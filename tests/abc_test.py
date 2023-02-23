@@ -68,7 +68,6 @@ def test_mcabc_inference_on_linear_gaussian(
 @pytest.mark.parametrize("lra", (True, False))
 @pytest.mark.parametrize("sass_expansion_degree", (1, 2))
 def test_mcabc_sass_lra(lra, sass_expansion_degree):
-
     test_mcabc_inference_on_linear_gaussian(
         num_dim=2,
         lra=lra,
@@ -152,7 +151,6 @@ def test_smcabc_inference_on_linear_gaussian(
 @pytest.mark.parametrize("lra", (True, False))
 @pytest.mark.parametrize("sass_expansion_degree", (1, 2))
 def test_smcabc_sass_lra(lra, sass_expansion_degree):
-
     test_smcabc_inference_on_linear_gaussian(
         num_dim=2,
         lra=lra,

@@ -840,9 +840,7 @@ def gradient_ascent(
     # Try-except block in case the user interrupts the program and wants to fall
     # back on the last saved `.map_`. We want to avoid a long error-message here.
     try:
-
         while iter_ < num_iter:
-
             optimizer.zero_grad()
             probs = potential_fn(theta_transform.inv(optimize_inits)).squeeze()
             loss = -probs.sum()

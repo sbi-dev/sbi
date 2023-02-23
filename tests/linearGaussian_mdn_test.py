@@ -34,7 +34,6 @@ def test_mdn_with_snle():
 
 
 def mdn_inference_with_different_methods(method):
-
     num_dim = 2
     x_o = torch.tensor([[1.0, 0.0]])
     num_samples = 500

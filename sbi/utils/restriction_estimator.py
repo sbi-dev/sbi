@@ -816,7 +816,6 @@ class RestrictedPrior:
         theta = ensure_theta_batched(torch.as_tensor(theta))
 
         with torch.set_grad_enabled(track_gradients):
-
             # Evaluate on device, move back to cpu for comparison with prior.
             prior_log_prob = self._prior.log_prob(theta)
             accepted_by_classifer = self._accept_reject_fn(theta)
