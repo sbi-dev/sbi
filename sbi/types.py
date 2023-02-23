@@ -12,6 +12,7 @@ from torch.distributions import Distribution
 from torch.distributions.transforms import Transform
 from torch.nn import Module
 from torch.utils.tensorboard.writer import SummaryWriter
+from typing_extensions import TypeAlias
 
 Array = Union[np.ndarray, torch.Tensor]
 Shape = Union[torch.Size, Tuple[int, ...]]
@@ -34,9 +35,8 @@ TensorboardSummaryWriter = NewType("Writer", SummaryWriter)
 TorchTransform = NewType("torch Transform", Transform)
 TorchModule = NewType("Module", Module)
 TorchDistribution = NewType("torch Distribution", Distribution)
-PyroTransformedDistribution = NewType(
-    "pyro TransformedDistribution", TransformedDistribution
-)
+# See PEP 613 for the reason why we need to use TypeAlias here.
+PyroTransformedDistribution: TypeAlias = TransformedDistribution
 TorchTensor = NewType("Tensor", Tensor)
 
 __all__ = [
