@@ -246,6 +246,7 @@ def adapt_variational_distribution(
         TransformedDistribution: Compatible variational distribution.
 
     """
+
     # Extract user define parameters
     def parameters_fn():
         """Returns the parameters of the distribution."""

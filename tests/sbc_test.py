@@ -66,7 +66,6 @@ def test_running_sbc(method, prior, reduce_fn_str, model="mdn"):
 
 
 def test_sbc_accuracy():
-
     num_dim = 2
     # Gaussian toy problem, set posterior = prior
     simulator = lambda theta: torch.randn_like(theta) + theta

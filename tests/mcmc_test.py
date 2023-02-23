@@ -196,7 +196,6 @@ def test_c2st_slice_np_parallelized(vectorized: bool, num_workers: int):
 )
 @pytest.mark.parametrize("num_chains", (1, 2))
 def test_getting_inference_diagnostics(method, num_chains):
-
     num_samples = 100
     num_dim = 2
 

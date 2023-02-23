@@ -204,7 +204,6 @@ class SMCABC(ABCBASE):
         all_x = [x]
 
         while self.simulation_counter < self.num_simulations:
-
             pop_idx += 1
             # Decay based on quantile of distances from previous pop.
             if distance_based_decay:
@@ -361,7 +360,6 @@ class SMCABC(ABCBASE):
         num_particles = particles.shape[0]
 
         while num_accepted_particles < num_particles:
-
             # Upperbound for batch size to not exceed simulation budget.
             num_batch = min(
                 num_particles - num_accepted_particles,
@@ -554,7 +552,6 @@ class SMCABC(ABCBASE):
         samples_per_dim: int = 100,
         kernel_variance_scale: float = 1.0,
     ) -> Tensor:
-
         if self.kernel == "gaussian":
             # For variant C, Beaumont et al. 2009, the kernel variance comes from the
             # previous population.
@@ -679,7 +676,12 @@ class SMCABC(ABCBASE):
 
         Sets self.x_o once the x_shape can be derived from simulations.
         """
-        (pilot_particles, _, _, pilot_xs,) = self._set_xo_and_sample_initial_population(
+        (
+            pilot_particles,
+            _,
+            _,
+            pilot_xs,
+        ) = self._set_xo_and_sample_initial_population(
             x_o, num_particles, num_pilot_simulations
         )
         # Adjust with LRA.

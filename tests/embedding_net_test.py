@@ -67,7 +67,6 @@ def test_embedding_net_api(method, num_dim: int, embedding_net: str):
 @pytest.mark.parametrize("num_trials", [1, 2])
 @pytest.mark.parametrize("num_dim", [1, 2])
 def test_iid_embedding_api(num_trials, num_dim):
-
     prior = utils.BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
 
     num_thetas = 1000

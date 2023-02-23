@@ -255,7 +255,6 @@ class MixedDensityEstimator(nn.Module):
         assert theta.shape[0] == 1, "Samples can be generated for a single theta only."
 
         with torch.set_grad_enabled(track_gradients):
-
             # Sample discrete data given parameters.
             discrete_x = self.discrete_net.sample(
                 theta=theta,

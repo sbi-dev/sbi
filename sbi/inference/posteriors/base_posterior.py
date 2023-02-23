@@ -229,7 +229,6 @@ class NeuralPosterior(ABC):
         return desc
 
     def __str__(self):
-
         desc = (
             f"Posterior conditional density p(θ|x) of type {self.__class__.__name__}. "
             f"{self._purpose}"

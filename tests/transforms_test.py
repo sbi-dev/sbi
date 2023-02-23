@@ -25,7 +25,6 @@ from tests.user_input_checks_test import UserNumpyUniform
     ),
 )
 def test_transforms(prior, target_transform):
-
     if isinstance(prior, UserNumpyUniform):
         prior, *_ = process_prior(
             prior,

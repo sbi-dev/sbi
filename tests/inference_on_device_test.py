@@ -216,7 +216,6 @@ def test_process_device(device_input: str, device_target: Optional[str]) -> None
 def test_check_embedding_net_device(
     device_datum: str, device_embedding_net: str
 ) -> None:
-
     datum = torch.zeros((1, 1)).to(device_datum)
     embedding_net = nn.Linear(in_features=1, out_features=1).to(device_embedding_net)
 
@@ -294,7 +293,6 @@ def test_validate_theta_and_x_device(training_device: str, data_device: str) -> 
 def test_train_with_different_data_and_training_device(
     inference_method, data_device: str, training_device: str
 ) -> None:
-
     assert torch.cuda.is_available(), "this test requires that cuda is available."
 
     num_dim = 2
@@ -349,7 +347,6 @@ def test_embedding_nets_integration_training_device(
     data_device: str,
     training_device: str,
 ) -> None:
-
     # add other methods
 
     D_theta = 2
@@ -443,7 +440,6 @@ def test_embedding_nets_integration_training_device(
     "inference_method", [SNPE_A, SNPE_C, SNRE_A, SNRE_B, SNRE_C, SNLE]
 )
 def test_nograd_after_inference_train(inference_method) -> None:
-
     num_dim = 2
     prior_ = BoxUniform(-torch.ones(num_dim), torch.ones(num_dim))
     simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior_)

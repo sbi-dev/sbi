@@ -167,7 +167,6 @@ class DirectPosterior(NeuralPosterior):
         theta_repeated, x_repeated = match_theta_and_x_batch_shapes(theta, x)
 
         with torch.set_grad_enabled(track_gradients):
-
             # Evaluate on device, move back to cpu for comparison with prior.
             unnorm_log_prob = self.posterior_estimator.log_prob(
                 theta_repeated, context=x_repeated
@@ -221,7 +220,6 @@ class DirectPosterior(NeuralPosterior):
         """
 
         def acceptance_at(x: Tensor) -> Tensor:
-
             return accept_reject_sample(
                 proposal=self.posterior_estimator,
                 accept_reject_fn=lambda theta: within_support(self.prior, theta),

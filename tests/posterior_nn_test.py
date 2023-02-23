@@ -27,7 +27,6 @@ from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
     ),
 )
 def test_log_prob_with_different_x(snpe_method: type, x_o_batch_dim: bool):
-
     num_dim = 2
 
     prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))

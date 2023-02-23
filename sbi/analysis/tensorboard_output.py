@@ -159,7 +159,6 @@ def _get_event_data_from_log_dir(
         all_event_data[tag_type] = {}
 
         if list_of_tags:
-
             for tag in list_of_tags:
                 all_event_data[tag_type][tag] = {}
 

@@ -237,7 +237,6 @@ def build_nsf(
     # If x is just a scalar then use a dummy mask and learn spline parameters using the
     # conditioning variables only.
     if x_numel == 1:
-
         # Conditioner ignores the data and uses the conditioning variables only.
         conditioner = partial(
             ContextSplineMap,

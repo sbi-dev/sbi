@@ -17,7 +17,6 @@ from tests.test_utils import check_c2st
 @pytest.mark.gpu
 @pytest.mark.parametrize("device", ("cpu", "cuda"))
 def test_mnle_on_device(device):
-
     # Generate mixed data.
     num_simulations = 100
     theta = torch.rand(num_simulations, 2)
@@ -38,7 +37,6 @@ def test_mnle_on_device(device):
 
 @pytest.mark.parametrize("sampler", ("mcmc", "rejection", "vi"))
 def test_mnle_api(sampler):
-
     # Generate mixed data.
     num_simulations = 100
     theta = torch.rand(num_simulations, 2)
@@ -160,7 +158,6 @@ class PotentialFunctionProvider(BasePotential):
         super().__init__(prior, x_o, device)
 
     def __call__(self, theta, track_gradients: bool = True):
-
         theta = atleast_2d(theta)
 
         with torch.set_grad_enabled(track_gradients):

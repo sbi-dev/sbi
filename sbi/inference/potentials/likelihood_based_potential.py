@@ -187,7 +187,6 @@ class MixedLikelihoodBasedPotential(LikelihoodBasedPotential):
         super().__init__(likelihood_estimator, prior, x_o, device)
 
     def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
-
         # Calculate likelihood in one batch.
         with torch.set_grad_enabled(track_gradients):
             # Call the specific log prob method of the mixed likelihood estimator as

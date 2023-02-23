@@ -19,7 +19,6 @@ class BNRE(SNRE_A):
         summary_writer: Optional[TensorboardSummaryWriter] = None,
         show_progress_bars: bool = True,
     ):
-
         r"""Balanced neural ratio estimation (BNRE)[1]. BNRE is a variation of NRE
         aiming to produce more conservative posterior approximations
 

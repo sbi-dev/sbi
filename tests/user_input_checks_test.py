@@ -174,7 +174,6 @@ def test_reinterpreted_batch_dim_prior():
     ),
 )
 def test_process_prior(prior):
-
     prior, parameter_dim, numpy_simulator = process_prior(
         prior,
         custom_prior_wrapper_kwargs=dict(lower_bound=zeros(3), upper_bound=ones(3)),
@@ -223,7 +222,6 @@ def test_process_x(x, x_shape, allow_iid):
     ),
 )
 def test_process_simulator(simulator: Callable, prior: Distribution, x_shape: Tuple):
-
     prior, theta_dim, prior_returns_numpy = process_prior(prior)
     simulator = process_simulator(simulator, prior, prior_returns_numpy)
 
@@ -439,7 +437,6 @@ def test_independent_joint_shapes_and_samples(dists):
 
 
 def test_invalid_inputs():
-
     dists = [
         Gamma(ones(1), ones(1)),
         Uniform(zeros(1), ones(1)),
@@ -479,7 +476,6 @@ def test_invalid_inputs():
     ],
 )
 def test_passing_custom_density_estimator(arg):
-
     x_numel = 2
     y_numel = 2
     hidden_features = 10

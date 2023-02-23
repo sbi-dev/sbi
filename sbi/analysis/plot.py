@@ -887,7 +887,6 @@ def _arrange_plots(
                 )
 
                 if len(points) > 0:
-
                     for n, v in enumerate(points):
                         plt.plot(
                             v[:, col],

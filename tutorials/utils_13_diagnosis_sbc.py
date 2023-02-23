@@ -15,7 +15,6 @@ class BiasedPosterior:
         self.posterior = posterior
 
     def set_default_x(self, x):
-
         self.posterior.set_default_x(x)
 
     def sample(
@@ -48,7 +47,6 @@ class DispersedPosterior:
         self.posterior = posterior
 
     def set_default_x(self, x):
-
         self.posterior.set_default_x(x)
 
     def sample(
@@ -57,7 +55,6 @@ class DispersedPosterior:
         x: Optional[torch.Tensor] = None,
         show_progress_bars: bool = False,
     ):
-
         value = self.posterior.sample(
             sample_shape, x, show_progress_bars=show_progress_bars
         )

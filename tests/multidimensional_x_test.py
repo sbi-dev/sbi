@@ -68,7 +68,6 @@ class CNNEmbedding(nn.Module):
     ),
 )
 def test_inference_with_2d_x(embedding, method):
-
     num_dim = 2
     num_samples = 10
     num_simulations = 100
