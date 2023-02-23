@@ -16,7 +16,8 @@ from sbi.simulators.linear_gaussian import (
     true_posterior_linear_gaussian_mvn_prior,
 )
 from sbi.utils import classifier_nn, likelihood_nn, posterior_nn
-from tests.test_utils import check_c2st
+
+from .test_utils import check_c2st
 
 
 @pytest.mark.parametrize("method", ["SNPE", "SNLE", "SNRE"])
@@ -95,7 +96,7 @@ def test_iid_embedding_api(num_trials, num_dim):
 
 
 @pytest.mark.slow
-def test_iid_embedding_varying_num_trials(max_num_trials=100, trial_factor=50):
+def test_iid_embedding_varying_num_trials(trial_factor=40, max_num_trials=100):
     """Test embedding net with varying number of trials."""
     num_dim = 2
     prior = torch.distributions.MultivariateNormal(
@@ -105,7 +106,7 @@ def test_iid_embedding_varying_num_trials(max_num_trials=100, trial_factor=50):
     # Scale number of training samples with num_trials.
     num_thetas = 5000 + trial_factor * max_num_trials
 
-    theta = prior.sample((num_thetas,))
+    theta = prior.sample(sample_shape=torch.Size((num_thetas,)))
     num_trials = torch.randint(1, max_num_trials, size=(num_thetas,))
 
     # simulate iid x, pad smaller number of trials with nans.
@@ -122,14 +123,17 @@ def test_iid_embedding_varying_num_trials(max_num_trials=100, trial_factor=50):
         single_trial_net,
         trial_net_output_dim=output_dim,
         output_dim=output_dim,
+        aggregation_fn="sum",
     )
 
     # test embedding net
-    e = embedding_net(x[:10])
-    assert e.shape == (10, output_dim)
+    assert embedding_net(x[:3]).shape == (3, output_dim)
 
     density_estimator = posterior_nn(
-        "mdn", embedding_net=embedding_net, z_score_x="none"
+        model="mdn",
+        embedding_net=embedding_net,
+        z_score_x="none",  # turn off z-scoring because of NaN encodinds.
+        z_score_theta="independent",
     )
     inference = SNPE(prior, density_estimator=density_estimator)
 
@@ -140,7 +144,7 @@ def test_iid_embedding_varying_num_trials(max_num_trials=100, trial_factor=50):
 
     num_samples = 1000
     # test different number of trials
-    num_test_trials = torch.linspace(1, max_num_trials, 5, dtype=int)
+    num_test_trials = torch.linspace(1, max_num_trials, 5, dtype=torch.int)
     for num_trials in num_test_trials:
         # x_o must have the same number of trials as x, thus we pad with nans.
         x_o = ones(1, max_num_trials, num_dim) * float("nan")
@@ -157,7 +161,7 @@ def test_iid_embedding_varying_num_trials(max_num_trials=100, trial_factor=50):
 
         posterior = inference.build_posterior().set_default_x(x_o)
         samples = posterior.sample((num_samples,))
-        check_c2st(samples, reference_samples, alg=f"SNPE with {num_trials} trials")
+        check_c2st(samples, reference_samples, alg=f"iid-NPE with {num_trials} trials")
 
 
 @pytest.mark.slow
@@ -176,7 +180,7 @@ def test_iid_inference(num_trials, num_dim, method):
     )
 
     # Scale number of training samples with num_trials.
-    num_thetas = 1000 + 100 * num_trials
+    num_thetas = 1000 + 110 * num_trials
 
     # simulate iid x.
     def simulator(theta, num_trials=num_trials):
@@ -268,7 +272,7 @@ def test_1d_and_2d_cnn_embedding_net(input_shape, num_channels):
     prior = MultivariateNormal(torch.zeros(num_dim), torch.eye(num_dim))
 
     num_simulations = 1000
-    theta = prior.sample((num_simulations,))
+    theta = prior.sample(torch.Size((num_simulations,)))
     x = simulator(theta)
     if num_channels > 1:
         x = x.unsqueeze(1).repeat(

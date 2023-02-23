@@ -10,7 +10,6 @@ import torch
 from torch import Tensor, nn, ones, optim
 from torch.distributions import Distribution
 from torch.nn.utils.clip_grad import clip_grad_norm_
-from torch.utils import data
 from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi import utils as utils
@@ -306,6 +305,7 @@ class PosteriorEstimator(NeuralInference, ABC):
             # Get theta,x to initialize NN
             theta, x, _ = self.get_simulations(starting_round=start_idx)
             # Use only training data for building the neural net (z-scoring transforms)
+
             self._neural_net = self._build_neural_net(
                 theta[self.train_indices].to("cpu"),
                 x[self.train_indices].to("cpu"),

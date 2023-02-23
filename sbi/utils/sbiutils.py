@@ -243,6 +243,8 @@ def handle_invalid_x(
     # Squeeze to cover all dimensions in case of multidimensional x.
     x = x.reshape(batch_size, -1)
 
+    # TODO: add option to allow for NaNs in certain dimensions, e.g., to encode varying
+    # numbers of trials.
     x_is_nan = torch.isnan(x).any(dim=1)
     x_is_inf = torch.isinf(x).any(dim=1)
     num_nans = int(x_is_nan.sum().item())

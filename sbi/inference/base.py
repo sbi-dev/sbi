@@ -161,8 +161,6 @@ class NeuralInference(ABC):
         Args:
             starting_round: The earliest round to return samples from (we start counting
                 from zero).
-            exclude_invalid_x: Whether to exclude simulation outputs `x=NaN` or `x=±∞`
-                during training.
             warn_on_invalid: Whether to give out a warning if invalid simulations were
                 found.
 
