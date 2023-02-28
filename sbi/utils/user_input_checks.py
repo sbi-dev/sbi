@@ -48,7 +48,8 @@ def process_prior(
     or adding a batch dimension to the simulator output, if needed.
 
     Args:
-        prior: Prior object with `.sample()` and `.log_prob()` as provided by the user.
+        prior: Prior object with `.sample()` and `.log_prob()` as provided by the user,
+            or a sequence of such objects.
         custom_prior_wrapper_kwargs: kwargs to be passed to the class that wraps a
             custom prior into a pytorch Distribution, e.g., for passing bounds for a
             prior with bounded support (lower_bound, upper_bound), or argument
