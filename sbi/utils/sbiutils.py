@@ -216,13 +216,19 @@ def standardizing_net(
             t_std = torch.std(batch_t[is_valid_t], dim=0)
             t_std[t_std < min_std] = min_std
     else:
-        t_std = 1
+        t_std = torch.ones(1)
         logging.warning(
             """Using a one-dimensional batch will instantiate a Standardize transform
             with (mean, std) parameters which are not representative of the data. We
-            allow this behavior because you might be loading a pre-trained. If this is
-            not the case, please be sure to use a larger batch."""
+            allow this behavior because you might be loading a pre-trained net.
+            If this is not the case, please be sure to use a larger batch."""
         )
+
+    nan_in_stats = torch.logical_or(torch.isnan(t_mean).any(), torch.isnan(t_std).any())
+    assert not nan_in_stats, """Training data mean or std for standardizing net must not
+                            contain NaNs. In case you are encoding missing trials with
+                            NaNs, consider setting z_score_x='none' to disable 
+                            z-scoring."""
 
     return Standardize(t_mean, t_std)
 
@@ -254,6 +260,12 @@ def handle_invalid_x(
         is_valid_x = ~x_is_nan & ~x_is_inf
     else:
         is_valid_x = ones(batch_size, dtype=torch.bool)
+
+    assert (
+        is_valid_x.sum() > 0
+    ), """No valid data entries left after excluding NaNs and Infs. In case you are
+        encoding missing trials with NaNs consider setting exclude_invalid_x=False and
+        z_score_x = 'none' to disable z-scoring."""
 
     return is_valid_x, num_nans, num_infs
 

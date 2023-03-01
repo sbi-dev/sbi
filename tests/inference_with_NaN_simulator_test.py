@@ -22,14 +22,13 @@ from sbi.simulators.linear_gaussian import (
 )
 from sbi.utils import RestrictionEstimator
 from sbi.utils.sbiutils import handle_invalid_x
-from tests.test_utils import check_c2st
+
+from .test_utils import check_c2st
 
 
 @pytest.mark.parametrize(
     "x_shape",
     (
-        torch.Size((1, 1)),
-        torch.Size((1, 10)),
         torch.Size((10, 1)),
         torch.Size((10, 10)),
     ),
@@ -38,6 +37,7 @@ def test_handle_invalid_x(x_shape):
     x = torch.rand(x_shape)
     x[x < 0.1] = float("nan")
     x[x > 0.9] = float("inf")
+    x[-1, :] = 1.0  # make sure there is one row of valid entries.
 
     x_is_valid, *_ = handle_invalid_x(x, exclude_invalid_x=True)
 
