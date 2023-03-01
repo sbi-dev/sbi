@@ -38,9 +38,15 @@ def check_prior(prior: Any) -> None:
 
 
 def process_prior(
-    prior, custom_prior_wrapper_kwargs: Dict = {}
+    prior: Union[Sequence[Distribution], Distribution, rv_frozen, multi_rv_frozen],
+    custom_prior_wrapper_kwargs: Dict = {},
 ) -> Tuple[Distribution, int, bool]:
     """Return PyTorch distribution-like prior from user-provided prior.
+
+    NOTE: If the prior argument is a sequence of PyTorch distributions, they will be
+    interpreted as independent prior dimensions wrapped in a `MultipleIndependent`
+    pytorch Distribution. In case the elements are not PyTorch distributions, make sure
+    to use process_prior on each element in the list beforehand. See FAQ 7 for details.
 
     NOTE: returns a tuple (processed_prior, num_params, whether_prior_returns_numpy).
     The last two entries in the tuple can be passed on to `process_simulator` to prepare
@@ -72,6 +78,8 @@ def process_prior(
             interpreted as independent of each other and matched in order to the
             components of the parameter."""
         )
+        # process individual priors
+        prior = [process_prior(p, custom_prior_wrapper_kwargs)[0] for p in prior]
         return process_pytorch_prior(MultipleIndependent(prior))
 
     if isinstance(prior, Distribution):
@@ -275,8 +283,8 @@ def check_for_possibly_batched_x_shape(x_shape):
 
                     - in case you want to evaluate or sample conditioned on several iid
                       xs e.g., (p(theta | [x1, x2, x3])), this is fully supported only
-                      for likelihood based SNLE and SNRE. For SNPE it is supported only 
-                      for a fixed number of trials and using an appropriate embedding 
+                      for likelihood based SNLE and SNRE. For SNPE it is supported only
+                      for a fixed number of trials and using an appropriate embedding
                       net, i.e., by treating the trials as additional data dimension. In
                       that case, make sure to pass xo with a leading batch dimensionen.
 
@@ -348,7 +356,7 @@ def check_prior_attributes(prior) -> None:
             prior.sample(({num_samples}, )) to sample a batch of 2 parameters. Consider
             using a PyTorch distribution."""
         )
-    except:  # Catch any other error.
+    except Exception:  # Catch any other error.
         raise ValueError(
             f"""Something went wrong when sampling a batch of parameters
             from the prior as `prior.sample(({num_samples}, ))`. Consider using a
@@ -360,7 +368,7 @@ def check_prior_attributes(prior) -> None:
         raise AttributeError(
             "Prior needs method `.log_prob()`. Consider using a PyTorch distribution."
         )
-    except:  # Catch any other error.
+    except Exception:  # Catch any other error.
         raise ValueError(
             """Something went wrong when evaluating a batch of parameters theta
             with `prior.log_prob(theta)`. Consider using a PyTorch distribution."""
@@ -533,7 +541,7 @@ def ensure_batched_simulator(simulator: Callable, prior) -> Callable:
         output_shape = simulator(prior.sample((batch_size,))).shape
         assert len(output_shape) > 1
         assert output_shape[0] == batch_size
-    except:
+    except Exception:
         is_batched_simulator = False
 
     return simulator if is_batched_simulator else get_batch_loop_simulator(simulator)

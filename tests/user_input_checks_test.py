@@ -167,9 +167,9 @@ def test_reinterpreted_batch_dim_prior():
         pytest.param(
             [
                 UserNumpyUniform(zeros(3), ones(3), return_numpy=True),
+                UserNumpyUniform(zeros(3), ones(3), return_numpy=False),
                 Uniform(zeros(1), ones(1)),
-            ],  # combination multiple independent and custom prior
-            marks=pytest.mark.xfail,
+            ],  # combination of multiple independent custom priors
         ),
     ),
 )
