@@ -186,14 +186,12 @@ class SNRE_C(RatioEstimator):
         )
 
         # relative weights. p_marginal := p_0, and p_joint := p_K * K from the notation.
-        p_marginal, p_joint = self._get_prior_probs_marginal_and_joint(
-            num_classes, gamma
-        )
+        p_marginal, p_joint = self._get_prior_probs_marginal_and_joint(gamma)
         return -torch.mean(p_marginal * log_prob_marginal + p_joint * log_prob_joint)
 
     @staticmethod
     def _get_prior_probs_marginal_and_joint(gamma: float) -> Tuple[float, float]:
-        """Return a tuple (p_marginal, p_joint) where `p_marginal := `$p_0$,
+        r"""Return a tuple (p_marginal, p_joint) where `p_marginal := `$p_0$,
         `p_joint := `$p_K \cdot K$.
 
         We let the joint (dependently drawn) class to be equally likely across K
