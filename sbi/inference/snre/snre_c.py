@@ -69,7 +69,7 @@ class SNRE_C(RatioEstimator):
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
         stop_after_epochs: int = 20,
-        max_num_epochs: int = 2 ** 31 - 1,
+        max_num_epochs: int = 2**31 - 1,
         clip_max_norm: Optional[float] = 5.0,
         resume_training: bool = False,
         discard_prior_samples: bool = False,
