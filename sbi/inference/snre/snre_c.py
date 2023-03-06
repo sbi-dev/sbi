@@ -185,7 +185,7 @@ class SNRE_C(RatioEstimator):
             loggamma + logits_joint[:, 0] - torch.logsumexp(denominator_joint, dim=-1)
         )
 
-        # relative weights. p_marginal := p_0, and p_joint := p_K from the notation.
+        # relative weights. p_marginal := p_0, and p_joint := p_K * K from the notation.
         p_marginal, p_joint = self._get_prior_probs_marginal_and_joint(
             num_classes, gamma
         )
