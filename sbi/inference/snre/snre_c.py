@@ -185,26 +185,19 @@ class SNRE_C(RatioEstimator):
             loggamma + logits_joint[:, 0] - torch.logsumexp(denominator_joint, dim=-1)
         )
 
-        # relative weights. p_marginal := p_0, and p_joint := p_K from the notation.
-        p_marginal, p_joint = self._get_prior_probs_marginal_and_joint(
-            num_classes, gamma
-        )
-        return -torch.mean(
-            p_marginal * log_prob_marginal + p_joint * num_classes * log_prob_joint
-        )
+        # relative weights. p_marginal := p_0, and p_joint := p_K * K from the notation.
+        p_marginal, p_joint = self._get_prior_probs_marginal_and_joint(gamma)
+        return -torch.mean(p_marginal * log_prob_marginal + p_joint * log_prob_joint)
 
     @staticmethod
-    def _get_prior_probs_marginal_and_joint(
-        num_classes: int, gamma: float
-    ) -> Tuple[float, float]:
-        """Return a tuple (p_marginal, p_joint) where `p_marginal := `$p_0$,
-        `p_joint := `$p_K$.
+    def _get_prior_probs_marginal_and_joint(gamma: float) -> Tuple[float, float]:
+        r"""Return a tuple (p_marginal, p_joint) where `p_marginal := `$p_0$,
+        `p_joint := `$p_K \cdot K$.
 
         We let the joint (dependently drawn) class to be equally likely across K
         options. The marginal class is therefore restricted to get the remaining
         probability.
         """
-        assert num_classes >= 1
-        p_joint = gamma / (1 + gamma * num_classes)
-        p_marginal = 1 / (1 + gamma * num_classes)
+        p_joint = gamma / (1 + gamma)
+        p_marginal = 1 / (1 + gamma)
         return p_marginal, p_joint
