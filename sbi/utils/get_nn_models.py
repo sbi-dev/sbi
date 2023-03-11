@@ -11,7 +11,9 @@ from sbi.neural_nets.classifier import (
     build_mlp_classifier,
     build_resnet_classifier,
 )
-from sbi.neural_nets.flow import build_made, build_maf, build_nsf
+from sbi.neural_nets.flow import (
+    build_made, build_maf, build_maf_rqs, build_nsf
+)
 from sbi.neural_nets.mdn import build_mdn
 from sbi.neural_nets.mnle import build_mnle
 
@@ -191,7 +193,7 @@ def posterior_nn(
 
     Args:
         model: The type of density estimator that will be created. One of [`mdn`,
-            `made`, `maf`, `nsf`].
+            `made`, `maf`, `maf_rqs`, `nsf`].
         z_score_theta: Whether to z-score parameters $\theta$ before passing them into
             the network, can take one of the following:
             - `none`, or None: do not z-score.
@@ -261,6 +263,10 @@ def posterior_nn(
             return build_made(batch_x=batch_theta, batch_y=batch_x, **kwargs)
         elif model == "maf":
             return build_maf(batch_x=batch_theta, batch_y=batch_x, **kwargs)
+        elif model == "maf_rqs":
+            return build_maf_rqs(
+                batch_x=batch_theta, batch_y=batch_x, **kwargs
+            )
         elif model == "nsf":
             return build_nsf(batch_x=batch_theta, batch_y=batch_x, **kwargs)
         else:
