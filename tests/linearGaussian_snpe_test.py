@@ -31,8 +31,9 @@ from sbi.simulators.linear_gaussian import (
     true_posterior_linear_gaussian_mvn_prior,
 )
 from sbi.utils import RestrictedPrior, get_density_thresholder
-from tests.sbiutils_test import conditional_of_mvn
-from tests.test_utils import (
+
+from .sbiutils_test import conditional_of_mvn
+from .test_utils import (
     check_c2st,
     get_dkl_gaussian_prior,
     get_normalization_uniform_prior,
@@ -144,12 +145,58 @@ def test_c2st_snpe_on_linearGaussian(
         assert ((map_ - ones(num_dim)) ** 2).sum() < 0.5
 
 
-def test_c2st_snpe_on_linearGaussian_different_dims():
+@pytest.mark.slow
+@pytest.mark.parametrize("density_estimtor", ["mdn", "maf", "nsf"])
+def test_density_estimators_on_linearGaussian(density_estimtor):
+    """Test SNPE with different density estimators on linear Gaussian example."""
+
+    theta_dim = 4
+    x_dim = 4
+
+    x_o = zeros(1, x_dim)
+    num_samples = 1000
+    num_simulations = 2000
+
+    # likelihood_mean will be likelihood_shift+theta
+    likelihood_shift = -1.0 * ones(x_dim)
+    likelihood_cov = 0.3 * eye(x_dim)
+
+    prior_mean = zeros(theta_dim)
+    prior_cov = eye(theta_dim)
+
+    prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
+    gt_posterior = true_posterior_linear_gaussian_mvn_prior(
+        x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
+    )
+    target_samples = gt_posterior.sample((num_samples,))
+
+    simulator, prior = prepare_for_sbi(
+        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov), prior
+    )
+
+    inference = SNPE_C(prior, density_estimator=density_estimtor)
+
+    theta, x = simulate_for_sbi(
+        simulator, prior, num_simulations, simulation_batch_size=1000
+    )
+    posterior_estimator = inference.append_simulations(theta, x).train(
+        training_batch_size=100
+    )
+    posterior = DirectPosterior(
+        prior=prior, posterior_estimator=posterior_estimator
+    ).set_default_x(x_o)
+    samples = posterior.sample((num_samples,))
+
+    # Compute the c2st and assert it is near chance level of 0.5.
+    check_c2st(samples, target_samples, alg=f"snpe_{density_estimtor}")
+
+
+def test_c2st_snpe_on_linearGaussian_different_dims(density_estimator="maf"):
     """Test whether SNPE B/C infer well a simple example with available ground truth.
 
-    This example has different number of parameters theta than number of x. Also
-    this implicitly tests simulation_batch_size=1. It also impleictly tests whether the
-    prior can be `None` and whether we can stop and resume training.
+    This test uses a linear Gaussian example with different number of parameters and
+    data dimensions. It tests different density estimators. Additionally, it implicitly
+    tests whether the prior can be `None` and whether we can stop and resume training.
 
     """
 
@@ -184,7 +231,9 @@ def test_c2st_snpe_on_linearGaussian_different_dims():
         prior,
     )
     # Test whether prior can be `None`.
-    inference = SNPE_C(prior=None, density_estimator="maf", show_progress_bars=False)
+    inference = SNPE_C(
+        prior=None, density_estimator=density_estimator, show_progress_bars=False
+    )
 
     # type: ignore
     theta, x = simulate_for_sbi(simulator, prior, 2000, simulation_batch_size=1)
