@@ -24,7 +24,6 @@ from sbi.inference import (
     SNRE_C,
     DirectPosterior,
     MCMCPosterior,
-    NeuralInference,
     RejectionPosterior,
     VIPosterior,
     likelihood_estimator_based_potential,
