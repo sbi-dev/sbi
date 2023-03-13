@@ -26,7 +26,8 @@ from sbi.simulators.linear_gaussian import (
     true_posterior_linear_gaussian_mvn_prior,
 )
 from sbi.utils import likelihood_nn
-from tests.test_utils import check_c2st, get_prob_outside_uniform_prior
+
+from .test_utils import check_c2st, get_prob_outside_uniform_prior
 
 
 @pytest.mark.parametrize("num_dim", (1, 3))
@@ -68,7 +69,7 @@ def test_api_snl_on_linearGaussian(num_dim: int):
         posterior.sample(sample_shape=(num_samples,))
 
 
-def test_c2st_snl_on_linearGaussian():
+def test_c2st_snl_on_linearGaussian(density_estimator="maf"):
     """Test whether SNL infers well a simple example with available ground truth.
 
     This example has different number of parameters theta than number of x. This test
@@ -106,7 +107,7 @@ def test_c2st_snl_on_linearGaussian():
         ),
         prior,
     )
-    density_estimator = likelihood_nn("maf", num_transforms=3)
+    density_estimator = likelihood_nn(model=density_estimator, num_transforms=3)
     inference = SNLE(density_estimator=density_estimator, show_progress_bars=False)
 
     theta, x = simulate_for_sbi(
@@ -127,7 +128,7 @@ def test_c2st_snl_on_linearGaussian():
     samples = posterior.sample((num_samples,))
 
     # Compute the c2st and assert it is near chance level of 0.5.
-    check_c2st(samples, target_samples, alg="snle_a")
+    check_c2st(samples, target_samples, alg=f"snle_a-{density_estimator}")
 
 
 @pytest.mark.slow
