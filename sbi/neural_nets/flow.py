@@ -190,7 +190,7 @@ def build_maf_rqs(
     embedding_net: nn.Module = nn.Identity(),
     num_blocks: int = 2,
     num_bins: int = 10,
-    tails: Optional[str] = 'linear',
+    tails: Optional[str] = "linear",
     tail_bound: float = 3.0,
     dropout_probability: float = 0.0,
     use_batch_norm: bool = False,
