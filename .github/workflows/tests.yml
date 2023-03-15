@@ -11,14 +11,14 @@ on:
 jobs:
   build:
     name: Tests
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
       with:
         lfs: true
 
-    - uses: actions/setup-python@v2
+    - uses: actions/setup-python@v4
       with:
         python-version: '3.7.6'
         architecture: 'x64'
@@ -47,7 +47,7 @@ jobs:
         pytest -m "not slow and not gpu" tests/ --cov=sbi --cov-report=xml
       
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v1
+      uses: codecov/codecov-action@v3
       with:
         file: ./coverage.xml
         flags: unittests
