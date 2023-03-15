@@ -146,7 +146,7 @@ def test_c2st_snpe_on_linearGaussian(
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("density_estimtor", ["mdn", "maf", "nsf"])
+@pytest.mark.parametrize("density_estimtor", ["mdn", "maf", "maf_rqs", "nsf"])
 def test_density_estimators_on_linearGaussian(density_estimtor):
     """Test SNPE with different density estimators on linear Gaussian example."""
 
