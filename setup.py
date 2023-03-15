@@ -53,6 +53,7 @@ EXTRAS = {
         "mkdocstrings[python]>=0.18",
         "nbconvert",
         "pep517",
+        "pre-commit",
         "pytest",
         "pyyaml",
         "pyright",
