@@ -1,10 +1,11 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
+from numpy import dtype
 import pytest
 import torch
 from pyro.distributions import InverseGamma
-from torch.distributions import Beta, Binomial, Gamma
+from torch.distributions import Beta, Binomial, Categorical, Gamma
 
 from sbi.inference import MNLE, MCMCPosterior, likelihood_estimator_based_potential
 from sbi.inference.potentials.base_potential import BasePotential
@@ -12,6 +13,20 @@ from sbi.utils import BoxUniform, likelihood_nn, mcmc_transform
 from sbi.utils.torchutils import atleast_2d
 from sbi.utils.user_input_checks_utils import MultipleIndependent
 from tests.test_utils import check_c2st
+
+
+# toy simulator for mixed data
+def mixed_simulator(theta, stimulus_condition=2.0):
+    # Extract parameters
+    beta, ps = theta[:, :1], theta[:, 1:]
+
+    # Sample choices and rts independently.
+    choices = Binomial(probs=ps).sample()
+    rts = InverseGamma(
+        concentration=stimulus_condition * torch.ones_like(beta), rate=beta
+    ).sample()
+
+    return torch.cat((rts, choices), dim=1)
 
 
 @pytest.mark.gpu
@@ -83,16 +98,6 @@ def test_mnle_api(sampler):
     ),
 )
 def test_mnle_accuracy(sampler):
-    def mixed_simulator(theta):
-        # Extract parameters
-        beta, ps = theta[:, :1], theta[:, 1:]
-
-        # Sample choices and rts independently.
-        choices = Binomial(probs=ps).sample()
-        rts = InverseGamma(concentration=2 * torch.ones_like(beta), rate=beta).sample()
-
-        return torch.cat((rts, choices), dim=1)
-
     prior = MultipleIndependent(
         [
             Gamma(torch.tensor([1.0]), torch.tensor([0.5])),
@@ -147,6 +152,76 @@ def test_mnle_accuracy(sampler):
             true_posterior_samples,
             alg=f"MNLE with {sampler}",
         )
+
+
+def test_mnle_with_experiment_conditions():
+    def sim_wrapper(theta):
+        # simulate with experiment conditions
+        return mixed_simulator(theta[:, :2], theta[:, 2:] + 1)
+
+    proposal = MultipleIndependent(
+        [
+            Gamma(torch.tensor([1.0]), torch.tensor([0.5])),
+            Beta(torch.tensor([2.0]), torch.tensor([2.0])),
+            Categorical(probs=torch.ones(1, 3)),
+        ],
+        validate_args=False,
+    )
+
+    num_simulations = 5000
+    num_samples = 1000
+    theta = proposal.sample((num_simulations,))
+    x = sim_wrapper(theta)
+    assert x.shape == (num_simulations, 2)
+
+    num_trials = 10
+    theta_o = proposal.sample((1,))
+    theta_o[0, 2] = 2.0  # set condition to 2 as in original simulator.
+    x_o = sim_wrapper(theta_o.repeat(num_trials, 1))
+
+    # MNLE
+    trainer = MNLE(proposal)
+    estimator = trainer.append_simulations(theta, x).train(max_num_epochs=1)
+    from sbi.inference.potentials.likelihood_based_potential import (
+        MixedLikelihoodBasedPotential,
+    )
+    from sbi.utils.conditional_density_utils import ConditionedPotential
+
+    potential_fn = MixedLikelihoodBasedPotential(estimator, proposal, x_o)
+
+    conditioned_potential_fn = ConditionedPotential(
+        potential_fn, condition=theta_o, dims_to_sample=[0, 1]
+    )
+
+    # mcmc_kwargs = dict(
+    #     num_chains=10,
+    #     warmup_steps=100,
+    #     method="slice_np_vectorized",
+    #     init_strategy="proposal",
+    # )
+
+    # mcmc_posterior = MCMCPosterior(
+    #     potential_fn=conditioned_potential_fn,
+    #     theta_transform=restricted_tf,
+    #     proposal=restricted_prior,
+    # )
+    # cond_samples = mcmc_posterior.sample((1000,))
+
+    # True posterior samples
+    # prior = MultipleIndependent(
+    #     [
+    #         Gamma(torch.tensor([1.0]), torch.tensor([0.5])),
+    #         Beta(torch.tensor([2.0]), torch.tensor([2.0])),
+    #     ],
+    #     validate_args=False,
+    # )
+    # transform = mcmc_transform(prior)
+    # true_posterior_samples = MCMCPosterior(
+    #     PotentialFunctionProvider(prior, atleast_2d(x_o)),
+    #     theta_transform=transform,
+    #     proposal=prior,
+    #     **mcmc_kwargs,
+    # ).sample((num_samples,), show_progress_bars=False)
 
 
 class PotentialFunctionProvider(BasePotential):
