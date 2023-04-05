@@ -50,10 +50,7 @@ def test_api_sre_on_linearGaussian(num_dim: int, SNRE: RatioEstimator):
     prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
 
     simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior)
-    inference = SNRE(
-        classifier="resnet",
-        show_progress_bars=False,
-    )
+    inference = SNRE(classifier="resnet", show_progress_bars=False)
 
     theta, x = simulate_for_sbi(simulator, prior, 1000, simulation_batch_size=50)
     ratio_estimator = inference.append_simulations(theta, x).train(max_num_epochs=5)
@@ -70,6 +67,7 @@ def test_api_sre_on_linearGaussian(num_dim: int, SNRE: RatioEstimator):
             num_chains=2,
         )
         posterior.sample(sample_shape=(10,))
+        posterior.map(num_iter=1)
 
 
 @pytest.mark.parametrize("SNRE", (SNRE_B, SNRE_C))
