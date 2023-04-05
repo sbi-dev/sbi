@@ -414,7 +414,9 @@ class EnsemblePotential(BasePotential):
     def set_x(self, x_o: Optional[Tensor]):
         """Check the shape of the observed data and, if valid, set it."""
         if x_o is not None:
-            x_o = process_x(x_o, allow_iid_x=False).to(self.device)
+            x_o = process_x(x_o, allow_iid_x=self.allow_iid_x).to(  # type: ignore
+                self.device
+            )
         self._x_o = x_o
         for comp_potential in self.potential_fns:
             comp_potential.set_x(x_o)

@@ -18,20 +18,22 @@ from tests.test_utils import check_c2st, get_dkl_gaussian_prior
 
 @pytest.mark.slow
 @pytest.mark.parametrize(
-    "inference_method",
-    [
-        "SNLE_A",
-        "SNRE_A",
-        "SNPE_C",
-    ],
+    "inference_method, num_trials",
+    (
+        ("SNPE_C", 1),
+        pytest.param("SNPE_C", 10, marks=pytest.mark.xfail),
+        ("SNLE_A", 1),
+        ("SNLE_A", 10),
+        ("SNLE_A", 1),
+        ("SNRE_A", 10),
+    ),
 )
-def test_c2st_posterior_ensemble_on_linearGaussian(inference_method):
+def test_c2st_posterior_ensemble_on_linearGaussian(inference_method, num_trials):
     """Test whether NeuralPosteriorEnsemble infers well a simple example with available
     ground truth.
 
     """
 
-    num_trials = 1
     num_dim = 2
     x_o = zeros(num_trials, num_dim)
     num_samples = 1000
@@ -65,7 +67,7 @@ def test_c2st_posterior_ensemble_on_linearGaussian(inference_method):
     posterior.set_default_x(x_o)
 
     # test sampling and evaluation.
-    if inference_method == "SNLE_A" or inference_method == "SNRE_A":
+    if inference_method in ["SNLE_A", "SNRE_A"]:
         samples = posterior.sample(
             (num_samples,), num_chains=20, method="slice_np_vectorized"
         )

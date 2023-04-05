@@ -272,7 +272,11 @@ def condition_mog(
 
 class ConditionedPotential:
     def __init__(
-        self, potential_fn: Callable, condition: Tensor, dims_to_sample: List[int]
+        self,
+        potential_fn: Callable,
+        condition: Tensor,
+        dims_to_sample: List[int],
+        allow_iid_x: bool = False,
     ):
         r"""
         Return conditional posterior log-probability or $-\infty$ if outside prior.
@@ -288,6 +292,7 @@ class ConditionedPotential:
         self.condition = condition
         self.dims_to_sample = dims_to_sample
         self.device = self.potential_fn.device
+        self.allow_iid_x = allow_iid_x
 
     def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
         r"""
@@ -316,7 +321,7 @@ class ConditionedPotential:
     def set_x(self, x_o: Optional[Tensor]):
         """Check the shape of the observed data and, if valid, set it."""
         if x_o is not None:
-            x_o = process_x(x_o, allow_iid_x=False).to(self.device)
+            x_o = process_x(x_o, allow_iid_x=self.allow_iid_x).to(self.device)
         self.potential_fn.set_x(x_o)
 
     @property
