@@ -6,9 +6,17 @@ import torch
 from pyro.distributions import InverseGamma
 from torch.distributions import Beta, Binomial, Gamma
 
-from sbi.inference import MNLE, MCMCPosterior, likelihood_estimator_based_potential
+from sbi.inference import (
+    MNLE,
+    MCMCPosterior,
+    likelihood_estimator_based_potential,
+)
 from sbi.inference.potentials.base_potential import BasePotential
+from sbi.inference.potentials.likelihood_based_potential import (
+    MixedLikelihoodBasedPotential,
+)
 from sbi.utils import BoxUniform, likelihood_nn, mcmc_transform
+from sbi.utils.conditional_density_utils import ConditionedPotential
 from sbi.utils.torchutils import atleast_2d
 from sbi.utils.user_input_checks_utils import MultipleIndependent
 from tests.test_utils import check_c2st
@@ -21,7 +29,10 @@ def test_mnle_on_device(device):
     num_simulations = 100
     theta = torch.rand(num_simulations, 2)
     x = torch.cat(
-        (torch.rand(num_simulations, 1), torch.randint(0, 2, (num_simulations, 1))),
+        (
+            torch.rand(num_simulations, 1),
+            torch.randint(0, 2, (num_simulations, 1)),
+        ),
         dim=1,
     ).to(device)
 
@@ -41,7 +52,10 @@ def test_mnle_api(sampler):
     num_simulations = 100
     theta = torch.rand(num_simulations, 2)
     x = torch.cat(
-        (torch.rand(num_simulations, 1), torch.randint(0, 2, (num_simulations, 1))),
+        (
+            torch.rand(num_simulations, 1),
+            torch.randint(0, 2, (num_simulations, 1)),
+        ),
         dim=1,
     )
 
@@ -89,7 +103,9 @@ def test_mnle_accuracy(sampler):
 
         # Sample choices and rts independently.
         choices = Binomial(probs=ps).sample()
-        rts = InverseGamma(concentration=2 * torch.ones_like(beta), rate=beta).sample()
+        rts = InverseGamma(
+            concentration=2 * torch.ones_like(beta), rate=beta
+        ).sample()
 
         return torch.cat((rts, choices), dim=1)
 
