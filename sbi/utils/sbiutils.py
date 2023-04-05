@@ -26,7 +26,7 @@ def warn_if_zscoring_changes_data(x: Tensor, duplicate_tolerance: float = 0.1) -
     """Raise warning if z-scoring would create duplicate data points.
 
     Args:
-        x: Simulation outputs.
+        x: Simulated data.
         duplicate_tolerance: Tolerated proportion of duplicates after z-scoring.
     """
 
@@ -36,8 +36,9 @@ def warn_if_zscoring_changes_data(x: Tensor, duplicate_tolerance: float = 0.1) -
     # Check we do have different data in the batch
     if num_unique == 1:
         warnings.warn(
-            """Variance along batches is 0. Therefore, Z-score could not be computed and will be skipped.
-            Check that data is different along all dimensions.""",
+            """Beware that there is only a single unique element in the simulated data.
+            If this is intended, make sure to set `z_score_x='none'` as z-scoring would
+            result in NaNs""",
             UserWarning,
         )
 
@@ -53,12 +54,12 @@ def warn_if_zscoring_changes_data(x: Tensor, duplicate_tolerance: float = 0.1) -
         if num_unique_z < num_unique * (1 - duplicate_tolerance):
             warnings.warn(
                 """Z-scoring these simulation outputs resulted in {num_unique_z} unique
-                datapoints. Before z-scoring, it had been {num_unique}. This can occur due
-                to numerical inaccuracies when the data covers a large range of values.
-                Consider either setting `z_score_x=False` (but beware that this can be
-                problematic for training the NN) or exclude outliers from your dataset.
-                Note: if you have already set `z_score_x=False`, this warning will still be
-                displayed, but you can ignore it.""",
+                datapoints. Before z-scoring, it had been {num_unique}. This can occur 
+                due to numerical inaccuracies when the data covers a large range of 
+                values. Consider either setting `z_score_x=False` (but beware that this 
+                can be problematic for training the NN) or exclude outliers from your 
+                dataset. Note: if you have already set `z_score_x=False`, this warning
+                will still be displayed, but you can ignore it.""",
                 UserWarning,
             )
 
