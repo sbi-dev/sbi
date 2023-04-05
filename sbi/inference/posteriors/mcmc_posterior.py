@@ -2,7 +2,7 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 from functools import partial
 from math import ceil
-from typing import Any, Callable, Dict, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Optional, Union
 from warnings import warn
 
 import arviz as az
@@ -198,7 +198,7 @@ class MCMCPosterior(NeuralPosterior):
         sample_with: Optional[str] = None,
         num_workers: Optional[int] = None,
         show_progress_bars: bool = True,
-    ) -> Union[Tensor, Tuple[Tensor, InferenceData]]:
+    ) -> Tensor:
         r"""Return samples from posterior distribution $p(\theta|x)$ with MCMC.
 
         Check the `__init__()` method for a description of all arguments as well as
@@ -452,7 +452,6 @@ class MCMCPosterior(NeuralPosterior):
 
         Returns:
             Tensor of shape (num_samples, shape_of_single_theta).
-            Arviz InferenceData object.
         """
 
         num_chains, dim_samples = initial_params.shape
@@ -516,7 +515,6 @@ class MCMCPosterior(NeuralPosterior):
 
         Returns:
             Tensor of shape (num_samples, shape_of_single_theta).
-            Arviz InferenceData object.
         """
         num_chains = mp.cpu_count() - 1 if num_chains is None else num_chains
 
