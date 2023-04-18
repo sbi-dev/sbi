@@ -12,7 +12,7 @@ from sbi.inference.potentials.posterior_based_potential import (
     posterior_estimator_based_potential,
 )
 from sbi.samplers.rejection.rejection import accept_reject_sample
-from sbi.types import Shape, TorchTransform
+from sbi.types import Shape
 from sbi.utils import check_prior, match_theta_and_x_batch_shapes, within_support
 from sbi.utils.torchutils import ensure_theta_batched
 
@@ -51,8 +51,8 @@ class DirectPosterior(NeuralPosterior):
             x_shape: Shape of a single simulator output. If passed, it is used to check
                 the shape of the observed data and give a descriptive error.
             enable_transform: Whether to transform parameters to unconstrained space
-                during MAP optimization. When False, an identity transform will be returned
-                for `theta_transform`.
+                during MAP optimization. When False, an identity transform will be
+                returned for `theta_transform`.
         """
         # Because `DirectPosterior` does not take the `potential_fn` as input, it
         # builds it itself. The `potential_fn` and `theta_transform` are used only for
