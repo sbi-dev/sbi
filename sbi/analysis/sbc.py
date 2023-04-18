@@ -10,6 +10,7 @@ from tqdm.auto import tqdm
 
 from sbi.inference import DirectPosterior
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.inference.posteriors.vi_posterior import VIPosterior
 from sbi.simulators.simutils import tqdm_joblib
 from sbi.utils.metrics import c2st
 
@@ -169,6 +170,11 @@ def sbc_on_batch(
     ranks = torch.zeros((thetas.shape[0], len(reduce_fns)))
 
     for idx, (tho, xo) in enumerate(zip(thetas, xs)):
+        # VI posterior needs to be trained on the current xo.
+        if isinstance(posterior, VIPosterior):
+            posterior.set_default_x(xo)
+            posterior.train()
+
         # Draw posterior samples and save one for the data average posterior.
         ths = posterior.sample((num_posterior_samples,), x=xo, show_progress_bars=False)
 

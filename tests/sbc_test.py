@@ -17,8 +17,10 @@ from tests.test_utils import PosteriorPotential, TractablePosterior
 
 @pytest.mark.parametrize("reduce_fn_str", ("marginals", "posterior_log_prob"))
 @pytest.mark.parametrize("prior", ("boxuniform", "independent"))
-@pytest.mark.parametrize("method", (SNPE, SNLE))
-def test_running_sbc(method, prior, reduce_fn_str, model="mdn"):
+@pytest.mark.parametrize(
+    "method, sampler", ((SNPE, None), (SNLE, "mcmc"), (SNLE, "vi"))
+)
+def test_running_sbc(method, prior, reduce_fn_str, sampler, model="mdn"):
     """Tests running inference and then SBC and obtaining nltp."""
 
     num_dim = 2
@@ -46,7 +48,12 @@ def test_running_sbc(method, prior, reduce_fn_str, model="mdn"):
     _ = inferer.append_simulations(theta, x).train(
         training_batch_size=100, max_num_epochs=max_num_epochs
     )
-    posterior = inferer.build_posterior()
+    if method == SNLE:
+        posterior_kwargs = {"sample_with": "mcmc" if sampler == "mcmc" else "vi"}
+    else:
+        posterior_kwargs = {}
+
+    posterior = inferer.build_posterior(**posterior_kwargs)
 
     thetas = prior.sample((num_sbc_runs,))
     xs = simulator(thetas)

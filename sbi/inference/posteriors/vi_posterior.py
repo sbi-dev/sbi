@@ -243,7 +243,8 @@ class VIPosterior(NeuralPosterior):
         move_all_tensor_to_device(q, self._device)
         assert isinstance(
             q, Distribution
-        ), "Something went wrong when initializing the variational distribution. Please create an issue on github https://github.com/mackelab/sbi/issues"
+        ), """Something went wrong when initializing the variational distribution.
+            Please create an issue on github https://github.com/mackelab/sbi/issues"""
         check_variational_distribution(q, self._prior)
         self._q = q
 
