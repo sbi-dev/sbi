@@ -26,19 +26,26 @@ def process_device(device: str) -> str:
     else:
         warnings.warn(
             "GPU was selected as a device for training the neural network. "
-            "Note that we expect **no** significant speed ups in training for the "
+            "Note that we expect no significant speed ups in training for the "
             "default architectures we provide. Using the GPU will be effective "
             "only for large neural networks with operations that are fast on the "
             "GPU, e.g., for a CNN or RNN `embedding_net`."
         )
-        current_gpu_index = torch.cuda.current_device()
         if device == "cuda":
+            assert torch.cuda.is_available(), "CUDA is not available."
+            current_gpu_index = torch.cuda.current_device()
             return f"cuda:{current_gpu_index}"
         else:
-            assert device == f"cuda:{current_gpu_index}", (
-                f"Unrecognized device {device}, "
-                "should be one of [`cpu`, `cuda`, f`cuda:{index}`]"
-            )
+            # Check if the device is a valid cuda device.
+            try:
+                torch.randn(1, device=device)
+            except RuntimeError:
+                raise RuntimeError(
+                    f"""Could not instantiate torch.randn(1, device={device}). Please
+                    use 'cuda', or cuda:<index> with <index> <
+                    {torch.cuda.device_count()}."""
+                )
+            torch.cuda.set_device(device)
             return device
 
 
