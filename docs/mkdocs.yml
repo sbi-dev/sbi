@@ -13,6 +13,7 @@ nav:
         - Implemented algorithms: tutorial/16_implemented_methods.md
       - Advanced:
         - Multi-round inference: tutorial/03_multiround_inference.md
+        - Using Variational Inference for Building Posteriors: tutorial/17_vi_posteriors.md
         - Custom density estimators: tutorial/04_density_estimators.md
         - Learning summary statistics: tutorial/05_embedding_net.md
         - Handling invalid simulations: tutorial/08_restriction_estimator.md
