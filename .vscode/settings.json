@@ -9,7 +9,7 @@
     // Editor settings for python
     //
     "[python]": {
-        "editor.defaultFormatter": "ms-python.python",
+        "editor.defaultFormatter": "ms-python.black-formatter",
         "editor.formatOnSave": true,
         "editor.codeActionsOnSave": {
             "source.sortImports": true
@@ -36,7 +36,7 @@
     // Formatting
     // https://code.visualstudio.com/docs/python/editing#_formatting
     //
-    "python.formatting.provider": "black",
+    "python.formatting.provider": "none",
     "python.formatting.blackArgs": [
         "--line-length=88"
     ],
