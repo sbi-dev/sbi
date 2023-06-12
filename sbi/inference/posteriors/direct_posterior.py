@@ -88,7 +88,7 @@ class DirectPosterior(NeuralPosterior):
         max_sampling_batch_size: int = 10_000,
         sample_with: Optional[str] = None,
         show_progress_bars: bool = True,
-    ):
+    ) -> Tensor:
         r"""Return samples from posterior distribution $p(\theta|x)$.
 
         Args:

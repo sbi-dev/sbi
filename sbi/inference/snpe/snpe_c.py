@@ -149,7 +149,8 @@ class SNPE_C(PosteriorEstimator):
         self._num_atoms = num_atoms
         self._use_combined_loss = use_combined_loss
         kwargs = del_entries(
-            locals(), entries=("self", "__class__", "num_atoms", "use_combined_loss")
+            locals(),
+            entries=("self", "__class__", "num_atoms", "use_combined_loss"),
         )
 
         self._round = max(self._data_round_index)
@@ -404,7 +405,12 @@ class SNPE_C(PosteriorEstimator):
         theta = self._maybe_z_score_theta(theta)
 
         # Compute the MoG parameters of the proposal posterior.
-        logits_pp, m_pp, prec_pp, cov_pp = self._automatic_posterior_transformation(
+        (
+            logits_pp,
+            m_pp,
+            prec_pp,
+            cov_pp,
+        ) = self._automatic_posterior_transformation(
             norm_logits_p, m_p, prec_p, norm_logits_d, m_d, prec_d
         )
 
@@ -414,8 +420,9 @@ class SNPE_C(PosteriorEstimator):
         )
         utils.assert_all_finite(
             log_prob_proposal_posterior,
-            """the evaluation of the MoG proposal posterior. This is likely due to a 
-            numerical instability in the training procedure. Please create an issue on Github.""",
+            """the evaluation of the MoG proposal posterior. This is likely due to a
+            numerical instability in the training procedure. Please create an issue on
+            Github.""",
         )
 
         return log_prob_proposal_posterior
