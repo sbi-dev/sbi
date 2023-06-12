@@ -159,14 +159,19 @@ class SNPE_A(PosteriorEstimator):
             Density estimator that approximates the distribution $p(\theta|x)$.
         """
 
-        assert not retrain_from_scratch, """Retraining from scratch is not supported in SNPE-A yet. The reason for
-        this is that, if we reininitialized the density estimator, the z-scoring would
-        change, which would break the posthoc correction. This is a pure implementation
-        issue."""
+        assert not retrain_from_scratch, """Retraining from scratch is not supported in
+            SNPE-A yet. The reason for this is that, if we reininitialized the density
+            estimator, the z-scoring would change, which would break the posthoc
+            correction. This is a pure implementation issue."""
 
         kwargs = utils.del_entries(
             locals(),
-            entries=("self", "__class__", "final_round", "component_perturbation"),
+            entries=(
+                "self",
+                "__class__",
+                "final_round",
+                "component_perturbation",
+            ),
         )
 
         # SNPE-A always discards the prior samples.
@@ -259,7 +264,10 @@ class SNPE_A(PosteriorEstimator):
 
         # Create the SNPE_A_MDN
         wrapped_density_estimator = SNPE_A_MDN(
-            flow=density_estimator, proposal=proposal, prior=self._prior, device=device
+            flow=density_estimator,  # type: ignore
+            proposal=proposal,
+            prior=self._prior,
+            device=device,
         )
         return wrapped_density_estimator
 
@@ -293,7 +301,7 @@ class SNPE_A(PosteriorEstimator):
             density_estimator=density_estimator
         )
         self._posterior = DirectPosterior(
-            posterior_estimator=wrapped_density_estimator,
+            posterior_estimator=wrapped_density_estimator,  # type: ignore
             prior=prior,
         )
         return deepcopy(self._posterior)
@@ -395,9 +403,13 @@ class SNPE_A_MDN(nn.Module):
             self._apply_correction = False
         else:
             self._apply_correction = True
-            logits_pp, m_pp, prec_pp = proposal.posterior_estimator._posthoc_correction(
+            (
+                logits_pp,
+                m_pp,
+                prec_pp,
+            ) = proposal.posterior_estimator._posthoc_correction(
                 proposal.default_x
-            )
+            )  # type: ignore
             self._logits_pp, self._m_pp, self._prec_pp = (
                 logits_pp.detach(),
                 m_pp.detach(),
@@ -521,7 +533,11 @@ class SNPE_A_MDN(nn.Module):
         if not self._apply_correction:
             return norm_logits_d, m_d, prec_d
         else:
-            logits_pp, m_pp, prec_pp = self._logits_pp, self._m_pp, self._prec_pp
+            logits_pp, m_pp, prec_pp = (
+                self._logits_pp,
+                self._m_pp,
+                self._prec_pp,
+            )
 
         # Compute the MoG parameters of the posterior.
         logits_p, m_p, prec_p, cov_p = self._proposal_posterior_transformation(
@@ -843,7 +859,8 @@ class SNPE_A_MDN(nn.Module):
             precisions_d, means_d  # m_k in eq (26) in Appendix C of [1]
         )
         exponent_post = utils.batched_mixture_vmv(
-            precisions_post, means_post  # m_k^\prime in eq (26) in Appendix C of [1]
+            precisions_post,
+            means_post,  # m_k^\prime in eq (26) in Appendix C of [1]
         )
 
         # Extend proposal and density estimator exponents to get LK terms.

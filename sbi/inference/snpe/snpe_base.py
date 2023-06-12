@@ -164,7 +164,10 @@ class PosteriorEstimator(NeuralInference, ABC):
             and not self.use_non_atomic_loss
         ):
             nle_nre_apt_msg_on_invalid_x(
-                num_nans, num_infs, exclude_invalid_x, "Multiround SNPE-C (atomic)"
+                num_nans,
+                num_infs,
+                exclude_invalid_x,
+                "Multiround SNPE-C (atomic)",
             )
         else:
             npe_msg_on_invalid_x(
@@ -229,8 +232,9 @@ class PosteriorEstimator(NeuralInference, ABC):
                 we train until validation loss increases (see also `stop_after_epochs`).
             clip_max_norm: Value at which to clip the total gradient norm in order to
                 prevent exploding gradients. Use None for no clipping.
-            calibration_kernel: A function to calibrate the loss with respect to the
-                simulations `x`. See Lueckmann, Gonçalves et al., NeurIPS 2017.
+            calibration_kernel: A function to calibrate the loss with respect
+                to the simulations `x` (optional). See Lueckmann, Gonçalves et al.,
+                NeurIPS 2017. If `None`, no calibration is used.
             resume_training: Can be used in case training time is limited, e.g. on a
                 cluster. If `True`, the split between train and validation set, the
                 optimizer, the number of epochs, and the best validation log-prob will
@@ -271,7 +275,11 @@ class PosteriorEstimator(NeuralInference, ABC):
 
         # Calibration kernels proposed in Lueckmann, Gonçalves et al., 2017.
         if calibration_kernel is None:
-            calibration_kernel = lambda x: ones([len(x)], device=self._device)
+
+            def default_calibration_kernel(x):
+                return ones([len(x)], device=self._device)
+
+            calibration_kernel = default_calibration_kernel
 
         # Starting index for the training set (1 = discard round-0 samples).
         start_idx = int(discard_prior_samples and self._round > 0)
@@ -501,7 +509,7 @@ class PosteriorEstimator(NeuralInference, ABC):
                 )
             else:
                 self._posterior = DirectPosterior(
-                    posterior_estimator=posterior_estimator,
+                    posterior_estimator=posterior_estimator,  # type: ignore
                     prior=prior,
                     x_shape=self._x_shape,
                     device=device,

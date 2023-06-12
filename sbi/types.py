@@ -6,7 +6,7 @@ from typing import NewType, Optional, Sequence, Tuple, TypeVar, Union
 
 import numpy as np
 import torch
-from pyro.distributions import TransformedDistribution
+from pyro.distributions import TransformedDistribution  # type: ignore
 from torch import Tensor
 from torch.distributions import Distribution
 from torch.distributions.transforms import Transform
