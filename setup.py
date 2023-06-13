@@ -56,7 +56,7 @@ EXTRAS = {
         "pre-commit",
         "pytest",
         "pyyaml",
-        "pyright",
+        "pyright>=1.1.300,<1.1.306",
         "torchtestcase",
         "twine",
     ],
