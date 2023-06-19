@@ -78,7 +78,7 @@ See [Cranmer, Brehmer, Louppe (2020)](https://doi.org/10.1073/pnas.1912789117) f
 review on simulation-based inference.
 
 The following papers offer additional details on the inference methods included in
-`sbi`. You can find a tutorial on how to run each of these methods [here](https://www.mackelab.org/sbi/tutorial/16_implemented_algorithms/).
+`sbi`. You can find a tutorial on how to run each of these methods [here](https://www.mackelab.org/sbi/tutorial/16_implemented_methods/).
 
 
 ### Posterior estimation (SNPE)
