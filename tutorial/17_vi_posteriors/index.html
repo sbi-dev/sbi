@@ -8,20 +8,20 @@
       
       
       
-        <link rel="canonical" href="https://mackelab.org/sbi/tutorial/00_getting_started/">
+        <link rel="canonical" href="https://mackelab.org/sbi/tutorial/17_vi_posteriors/">
       
       
-        <link rel="prev" href="../../install/">
+        <link rel="prev" href="../03_multiround_inference/">
       
       
-        <link rel="next" href="../01_gaussian_amortized/">
+        <link rel="next" href="../04_density_estimators/">
       
       <link rel="icon" href="../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.4.3, mkdocs-material-9.1.9">
     
     
       
-        <title>Getting started - sbi</title>
+        <title>Using Variational Inference for Building Posteriors - sbi</title>
       
     
     
@@ -73,7 +73,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#getting-started-with-sbi" class="md-skip">
+        <a href="#using-variational-inference-for-building-posteriors" class="md-skip">
           Skip to content
         </a>
       
@@ -107,7 +107,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Getting started
+              Using Variational Inference for Building Posteriors
             
           </span>
         </div>
@@ -275,16 +275,14 @@
               
   
   
-    
-  
   
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
       
       
       
-      <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_1" checked>
+      <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_1" >
       
       
       
@@ -293,7 +291,7 @@
           <span class="md-nav__icon md-icon"></span>
         </label>
       
-      <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="true">
+      <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="false">
         <label class="md-nav__title" for="__nav_3_1">
           <span class="md-nav__icon md-icon"></span>
           Introduction
@@ -304,100 +302,11 @@
               
   
   
-    
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          Getting started
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../00_getting_started/" class="md-nav__link">
         Getting started
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#running-the-inference-procedure" class="md-nav__link">
-    Running the inference procedure
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#next-steps" class="md-nav__link">
-    Next steps
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#requirements-for-the-simulator-prior-and-observation" class="md-nav__link">
-    Requirements for the simulator, prior, and observation
-  </a>
-  
-    <nav class="md-nav" aria-label="Requirements for the simulator, prior, and observation">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#prior" class="md-nav__link">
-    Prior
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#simulator" class="md-nav__link">
-    Simulator
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#observation" class="md-nav__link">
-    Observation
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#running-different-algorithms" class="md-nav__link">
-    Running different algorithms
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -470,14 +379,16 @@
               
   
   
+    
+  
   
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
       
       
       
-      <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" >
+      <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" checked>
       
       
       
@@ -486,7 +397,7 @@
           <span class="md-nav__icon md-icon"></span>
         </label>
       
-      <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="false">
+      <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="true">
         <label class="md-nav__title" for="__nav_3_2">
           <span class="md-nav__icon md-icon"></span>
           Advanced
@@ -511,11 +422,59 @@
               
   
   
+    
   
-    <li class="md-nav__item">
-      <a href="../17_vi_posteriors/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          Using Variational Inference for Building Posteriors
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         Using Variational Inference for Building Posteriors
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#main-syntax" class="md-nav__link">
+    Main syntax
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#linear-gaussian-example" class="md-nav__link">
+    Linear Gaussian example
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -925,56 +884,15 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#running-the-inference-procedure" class="md-nav__link">
-    Running the inference procedure
+  <a href="#main-syntax" class="md-nav__link">
+    Main syntax
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#next-steps" class="md-nav__link">
-    Next steps
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#requirements-for-the-simulator-prior-and-observation" class="md-nav__link">
-    Requirements for the simulator, prior, and observation
-  </a>
-  
-    <nav class="md-nav" aria-label="Requirements for the simulator, prior, and observation">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#prior" class="md-nav__link">
-    Prior
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#simulator" class="md-nav__link">
-    Simulator
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#observation" class="md-nav__link">
-    Observation
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#running-different-algorithms" class="md-nav__link">
-    Running different algorithms
+  <a href="#linear-gaussian-example" class="md-nav__link">
+    Linear Gaussian example
   </a>
   
 </li>
@@ -997,74 +915,118 @@
   
 
 
-<h1 id="getting-started-with-sbi">Getting started with <code>sbi</code><a class="headerlink" href="#getting-started-with-sbi" title="Permanent link">&para;</a></h1>
-<p>Note, you can find the original version of this notebook at <a href="https://github.com/mackelab/sbi/blob/main/tutorials/00_getting_started.ipynb">https://github.com/mackelab/sbi/blob/main/tutorials/00_getting_started.ipynb</a> in the <code>sbi</code> repository.</p>
+<h1 id="using-variational-inference-for-building-posteriors">Using Variational Inference for Building Posteriors<a class="headerlink" href="#using-variational-inference-for-building-posteriors" title="Permanent link">&para;</a></h1>
+<p>In the previous tutorial, we saw how to build the posterior and how to specialize on one specific observation <code>x_o</code>. If one uses SNPE, then the posterior can be sampled from directly, yet this comes at the expense of necessary correction terms during training, since the samples are obtained from the &ldquo;wrong&rdquo; prior for <code>num_rounds &gt; 1</code>. For SNLE or SNRE, MCMC sampling is required, which is computationally expensive. With SNVI (sequential neural variational inference), it is possible to directly sample from the posterior without any corrections during training or without expensive MCMC for sampling. This is possible by learning the posterior with variational inference techniques. For this, an additional network (one for the likelihood or likelihood-to-evidence-ratio) must be trained first.</p>
+<h2 id="main-syntax">Main syntax<a class="headerlink" href="#main-syntax" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><span class="n">inference</span> <span class="o">=</span> <span class="n">SNLE</span><span class="p">(</span><span class="n">prior</span><span class="p">)</span>
+
+<span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_rounds</span><span class="p">):</span>
+    <span class="n">theta</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="n">simulate_for_sbi</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">proposal</span><span class="p">,</span> <span class="n">num_simulations</span><span class="o">=</span><span class="mi">500</span><span class="p">)</span>
+
+    <span class="c1"># In `SNLE` and `SNRE`, you should not pass the `proposal` to `</span>
+    <span class="c1"># .append_simulations()`.</span>
+    <span class="n">likelihood_estimator</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span>
+        <span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+
+    <span class="c1"># Obtain potential (learned likelihood * prior) and theta transformation.</span>
+    <span class="n">potential_fn</span><span class="p">,</span> <span class="n">theta_transform</span> <span class="o">=</span> <span class="n">likelihood_estimator_based_potential</span><span class="p">(</span>
+        <span class="n">likelihood_estimator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">x_o</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Build posterior via variational inference.</span>
+    <span class="n">posterior</span> <span class="o">=</span> <span class="n">VIPosterior</span><span class="p">(</span>
+        <span class="n">potential_fn</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="s2">&quot;maf&quot;</span><span class="p">,</span> <span class="n">theta_transform</span><span class="p">,</span> <span class="n">vi_method</span><span class="o">=</span><span class="s2">&quot;fKL&quot;</span><span class="p">,</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+    <span class="n">proposal</span> <span class="o">=</span> <span class="n">posterior</span>
+</code></pre></div>
+<h2 id="linear-gaussian-example">Linear Gaussian example<a class="headerlink" href="#linear-gaussian-example" title="Permanent link">&para;</a></h2>
+<p>Below, we give a full example of inferring the posterior distribution with SNVI over multiple rounds. For this, we take the same example as in the previous tutorial.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">torch</span>
+
+<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">likelihood_estimator_based_potential</span><span class="p">,</span>
+    <span class="n">SNLE</span><span class="p">,</span>
+    <span class="n">prepare_for_sbi</span><span class="p">,</span>
+    <span class="n">simulate_for_sbi</span><span class="p">,</span>
+    <span class="n">VIPosterior</span><span class="p">,</span>
+<span class="p">)</span>
 <span class="kn">from</span> <span class="nn">sbi</span> <span class="kn">import</span> <span class="n">utils</span> <span class="k">as</span> <span class="n">utils</span>
 <span class="kn">from</span> <span class="nn">sbi</span> <span class="kn">import</span> <span class="n">analysis</span> <span class="k">as</span> <span class="n">analysis</span>
-<span class="kn">from</span> <span class="nn">sbi.inference.base</span> <span class="kn">import</span> <span class="n">infer</span>
+
+<span class="n">_</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
 </code></pre></div>
-<h2 id="running-the-inference-procedure">Running the inference procedure<a class="headerlink" href="#running-the-inference-procedure" title="Permanent link">&para;</a></h2>
-<p><code>sbi</code> provides a simple interface to run state-of-the-art algorithms for simulation-based inference.</p>
-<p>For inference, you need to provide two ingredients:</p>
-<p>1) a prior distribution that allows to sample parameter sets.<br />
-2) a simulator that takes parameter sets and produces simulation outputs.</p>
-<p>For example, we can have a 3-dimensional parameter space with a uniform prior between [-1,1] and a simple simulator that for the sake of example adds 1.0 and some Gaussian noise to the parameter set:</p>
 <div class="highlight"><pre><span></span><code><span class="n">num_dim</span> <span class="o">=</span> <span class="mi">3</span>
 <span class="n">prior</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">BoxUniform</span><span class="p">(</span><span class="n">low</span><span class="o">=-</span><span class="mi">2</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">num_dim</span><span class="p">),</span> <span class="n">high</span><span class="o">=</span><span class="mi">2</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">num_dim</span><span class="p">))</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="k">def</span> <span class="nf">linear_gaussian</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">theta</span> <span class="o">+</span> <span class="mf">1.0</span> <span class="o">+</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn_like</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.1</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span> <span class="o">=</span> <span class="n">prepare_for_sbi</span><span class="p">(</span><span class="n">linear_gaussian</span><span class="p">,</span> <span class="n">prior</span><span class="p">)</span>
+</code></pre></div>
+<p>Here, we decide to learn the likelihood directly, but learning the likelihood-to-evidence ratio would also be a viable option.</p>
+<div class="highlight"><pre><span></span><code><span class="n">inference</span> <span class="o">=</span> <span class="n">SNLE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">)</span>
+</code></pre></div>
+<p>Now we can run inference, where we first learn the likelihood, which is then in turn used to learn a posterior through variational inference.</p>
+<div class="highlight"><pre><span></span><code><span class="n">num_rounds</span> <span class="o">=</span> <span class="mi">2</span>
+<span class="n">x_o</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="p">,)</span>
+
+<span class="n">posteriors</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="n">proposal</span> <span class="o">=</span> <span class="n">prior</span>
+
+<span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_rounds</span><span class="p">):</span>
+    <span class="n">theta</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="n">simulate_for_sbi</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">proposal</span><span class="p">,</span> <span class="n">num_simulations</span><span class="o">=</span><span class="mi">500</span><span class="p">)</span>
+    <span class="n">likelihood_estimator</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span>
+        <span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+    <span class="n">potential_fn</span><span class="p">,</span> <span class="n">theta_transform</span> <span class="o">=</span> <span class="n">likelihood_estimator_based_potential</span><span class="p">(</span>
+        <span class="n">likelihood_estimator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">x_o</span>
+    <span class="p">)</span>
+
+    <span class="n">posterior</span> <span class="o">=</span> <span class="n">VIPosterior</span><span class="p">(</span>
+        <span class="n">potential_fn</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="s2">&quot;maf&quot;</span><span class="p">,</span> <span class="n">theta_transform</span><span class="p">,</span> <span class="n">vi_method</span><span class="o">=</span><span class="s2">&quot;fKL&quot;</span><span class="p">,</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+    <span class="n">posteriors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">posterior</span><span class="p">)</span>
+    <span class="n">proposal</span> <span class="o">=</span> <span class="n">posterior</span>
+</code></pre></div>
+<div class="codehilite"><pre><span></span><code>Running 500 simulations.:   0%|          | 0/500 [00:00&lt;?, ?it/s]
 
 
-<span class="k">def</span> <span class="nf">simulator</span><span class="p">(</span><span class="n">parameter_set</span><span class="p">):</span>
-    <span class="k">return</span> <span class="mf">1.0</span> <span class="o">+</span> <span class="n">parameter_set</span> <span class="o">+</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="n">parameter_set</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.1</span>
-</code></pre></div>
-<p><code>sbi</code> can then run inference:</p>
-<div class="highlight"><pre><span></span><code><span class="n">posterior</span> <span class="o">=</span> <span class="n">infer</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;SNPE&quot;</span><span class="p">,</span> <span class="n">num_simulations</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
-</code></pre></div>
-<div class="codehilite"><pre><span></span><code>Running 1000 simulations.:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
+ Neural network successfully converged after 50 epochs.
 
 
- Neural network successfully converged after 119 epochs.
+  0%|          | 0/2000 [00:00&lt;?, ?it/s]
+
+
+
+Converged with loss: -4.23
+Quality Score: -0.218    Good: Smaller than 0.5  Bad: Larger than 1.0            NOTE: Less sensitive to mode collapse.
+
+
+
+Running 500 simulations.:   0%|          | 0/500 [00:00&lt;?, ?it/s]
+
+
+ Neural network successfully converged after 47 epochs.
+
+
+  0%|          | 0/2000 [00:00&lt;?, ?it/s]
+
+
+
+Converged with loss: -4.2
+Quality Score: 0.025     Good: Smaller than 0.5  Bad: Larger than 1.0            NOTE: Less sensitive to mode collapse.
 </code></pre></div>
 
-<p>Let&rsquo;s say we have made some observation <span class="arithmatex">\(x\)</span>:</p>
-<div class="highlight"><pre><span></span><code><span class="n">observation</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
-</code></pre></div>
-<p>Given this observation, we can then sample from the posterior <span class="arithmatex">\(p(\theta|x)\)</span>, evaluate its log-probability, or plot it.</p>
-<div class="highlight"><pre><span></span><code><span class="n">samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">observation</span><span class="p">)</span>
-<span class="n">log_probability</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">log_prob</span><span class="p">(</span><span class="n">samples</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="n">observation</span><span class="p">)</span>
-<span class="n">_</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">pairplot</span><span class="p">(</span><span class="n">samples</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">]],</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="mi">6</span><span class="p">))</span>
-</code></pre></div>
-<div class="codehilite"><pre><span></span><code>Drawing 10000 posterior samples:   0%|          | 0/10000 [00:00&lt;?, ?it/s]
-</code></pre></div>
+<p>After having learned the posterior, we use <code>.pairplot()</code> to visualize the samples from the learned posterior.</p>
+<div class="highlight"><pre><span></span><code><span class="n">posterior_samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_o</span><span class="p">)</span>
 
-<p><img alt="png" src="../00_getting_started_files/00_getting_started_11_1.png" /></p>
-<h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
-<p>The single-line interface described above provides an easy entry for using <code>sbi</code>. However, if you are working on a larger project or need additional features, we strongly recommend using the <a href="https://www.mackelab.org/sbi/tutorial/02_flexible_interface/">flexible interface</a>.</p>
-<h2 id="requirements-for-the-simulator-prior-and-observation">Requirements for the simulator, prior, and observation<a class="headerlink" href="#requirements-for-the-simulator-prior-and-observation" title="Permanent link">&para;</a></h2>
-<p>In the interface described above, you need to provide a prior and a simulator for training. Let&rsquo;s talk about what requirements they need to satisfy.</p>
-<h3 id="prior">Prior<a class="headerlink" href="#prior" title="Permanent link">&para;</a></h3>
-<p>A prior is a distribution object that allows to sample parameter sets. Any class for the prior is allowed as long as it allows to call <code>prior.sample()</code> and <code>prior.log_prob()</code>.</p>
-<h3 id="simulator">Simulator<a class="headerlink" href="#simulator" title="Permanent link">&para;</a></h3>
-<p>The simulator is a Python callable that takes in a parameter set and outputs data with some (even if very small) stochasticity.</p>
-<p>Allowed data types and shapes for input and output:</p>
-<ul>
-<li>the input parameter set and the output have to be either a <code>np.ndarray</code> or a <code>torch.Tensor</code>. </li>
-<li>the input parameter set should have either shape <code>(1,N)</code> or <code>(N)</code>, and the output must have shape <code>(1,M)</code> or <code>(M)</code>.</li>
-</ul>
-<p>You can call simulators not written in Python as long as you wrap them in a Python function.</p>
-<h3 id="observation">Observation<a class="headerlink" href="#observation" title="Permanent link">&para;</a></h3>
-<p>Once you have a trained posterior, you will want to evaluate or sample the posterior <span class="arithmatex">\(p(\theta|x_o)\)</span> at certain observed values <span class="arithmatex">\(x_o\)</span>:</p>
-<ul>
-<li>The allowable data types are either Numpy <code>np.ndarray</code> or a torch <code>torch.Tensor</code>.</li>
-<li>The shape must be either <code>(1,M)</code> or just <code>(M)</code>.</li>
-</ul>
-<h2 id="running-different-algorithms">Running different algorithms<a class="headerlink" href="#running-different-algorithms" title="Permanent link">&para;</a></h2>
-<p><code>sbi</code> implements three classes of algorithms that can be used to obtain the posterior distribution: SNPE, SNLE, and SNRE. You can try the different algorithms by simply swapping out the <code>method</code>:</p>
-<div class="highlight"><pre><span></span><code><span class="n">posterior</span> <span class="o">=</span> <span class="n">infer</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;SNPE&quot;</span><span class="p">,</span> <span class="n">num_simulations</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
-<span class="n">posterior</span> <span class="o">=</span> <span class="n">infer</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;SNLE&quot;</span><span class="p">,</span> <span class="n">num_simulations</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
-<span class="n">posterior</span> <span class="o">=</span> <span class="n">infer</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;SNRE&quot;</span><span class="p">,</span> <span class="n">num_simulations</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
+<span class="c1"># Plot posterior samples.</span>
+<span class="n">_</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">pairplot</span><span class="p">(</span>
+    <span class="n">posterior_samples</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">]],</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>
+<span class="p">)</span>
 </code></pre></div>
-<p>You can then infer, sample, evaluate, and plot the posterior as described above.</p>
+<p><img alt="png" src="../17_vi_posteriors_files/17_vi_posteriors_15_0.png" /></p>
 
 
 
