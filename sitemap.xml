@@ -2,162 +2,162 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://mackelab.org/sbi/</loc>
-         <lastmod>2023-06-19</lastmod>
+         <lastmod>2023-06-22</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/code_of_conduct/</loc>
-         <lastmod>2023-06-19</lastmod>
+         <lastmod>2023-06-22</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/contribute/</loc>
-         <lastmod>2023-06-19</lastmod>
+         <lastmod>2023-06-22</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/credits/</loc>
-         <lastmod>2023-06-19</lastmod>
+         <lastmod>2023-06-22</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/faq/</loc>
-         <lastmod>2023-06-19</lastmod>
+         <lastmod>2023-06-22</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/install/</loc>
-         <lastmod>2023-06-19</lastmod>
+         <lastmod>2023-06-22</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/reference/</loc>
-         <lastmod>2023-06-19</lastmod>
+         <lastmod>2023-06-22</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/examples/00_HH_simulator/</loc>
-         <lastmod>2023-06-19</lastmod>
+         <lastmod>2023-06-22</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/faq/question_01/</loc>
-         <lastmod>2023-06-19</lastmod>
+         <lastmod>2023-06-22</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/faq/question_02/</loc>
-         <lastmod>2023-06-19</lastmod>
+         <lastmod>2023-06-22</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/faq/question_03/</loc>
-         <lastmod>2023-06-19</lastmod>
+         <lastmod>2023-06-22</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/faq/question_04/</loc>
-         <lastmod>2023-06-19</lastmod>
+         <lastmod>2023-06-22</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/faq/question_05/</loc>
-         <lastmod>2023-06-19</lastmod>
+         <lastmod>2023-06-22</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/faq/question_06/</loc>
-         <lastmod>2023-06-19</lastmod>
+         <lastmod>2023-06-22</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/faq/question_07/</loc>
-         <lastmod>2023-06-19</lastmod>
+         <lastmod>2023-06-22</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/tutorial/00_getting_started/</loc>
-         <lastmod>2023-06-19</lastmod>
+         <lastmod>2023-06-22</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/tutorial/01_gaussian_amortized/</loc>
-         <lastmod>2023-06-19</lastmod>
+         <lastmod>2023-06-22</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/tutorial/02_flexible_interface/</loc>
-         <lastmod>2023-06-19</lastmod>
+         <lastmod>2023-06-22</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/tutorial/03_multiround_inference/</loc>
-         <lastmod>2023-06-19</lastmod>
+         <lastmod>2023-06-22</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/tutorial/04_density_estimators/</loc>
-         <lastmod>2023-06-19</lastmod>
+         <lastmod>2023-06-22</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/tutorial/05_embedding_net/</loc>
-         <lastmod>2023-06-19</lastmod>
+         <lastmod>2023-06-22</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/tutorial/07_conditional_distributions/</loc>
-         <lastmod>2023-06-19</lastmod>
+         <lastmod>2023-06-22</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/tutorial/08_restriction_estimator/</loc>
-         <lastmod>2023-06-19</lastmod>
+         <lastmod>2023-06-22</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/tutorial/09_sensitivity_analysis/</loc>
-         <lastmod>2023-06-19</lastmod>
+         <lastmod>2023-06-22</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/tutorial/10_crafting_summary_statistics/</loc>
-         <lastmod>2023-06-19</lastmod>
+         <lastmod>2023-06-22</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/tutorial/11_sampler_interface/</loc>
-         <lastmod>2023-06-19</lastmod>
+         <lastmod>2023-06-22</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/tutorial/12_diagnostics_posterior_predictive_check/</loc>
-         <lastmod>2023-06-19</lastmod>
+         <lastmod>2023-06-22</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/tutorial/13_diagnostics_simulation_based_calibration/</loc>
-         <lastmod>2023-06-19</lastmod>
+         <lastmod>2023-06-22</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/tutorial/14_multi-trial-data-and-mixed-data-types/</loc>
-         <lastmod>2023-06-19</lastmod>
+         <lastmod>2023-06-22</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/tutorial/15_mcmc_diagnostics_with_arviz/</loc>
-         <lastmod>2023-06-19</lastmod>
+         <lastmod>2023-06-22</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/tutorial/16_implemented_methods/</loc>
-         <lastmod>2023-06-19</lastmod>
+         <lastmod>2023-06-22</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://mackelab.org/sbi/tutorial/17_vi_posteriors/</loc>
-         <lastmod>2023-06-19</lastmod>
+         <lastmod>2023-06-22</lastmod>
          <changefreq>daily</changefreq>
     </url>
 </urlset>
