@@ -1,0 +1,41 @@
+cff-version: 1.2.0
+message: "Please cite https://doi.org/10.21105/joss.02505 also"
+title: "sbi: Simulation-based inference toolkit"
+authors:
+- family-names: Tejero-Cantero
+  given-names: Alvaro
+  orcid: "http://orcid.org/0000-0002-8768-4227"
+- family-names: Boelts
+  given-names: Jan
+  orcid: "http://orcid.org/0000-0003-4979-7092"
+- family-names: Deistler
+  given-names: Michael
+  orcid: "http://orcid.org/0000-0002-3573-0404"
+- family-names: Lueckmann
+  given-names: Jan-Matthis
+  orcid: "http://orcid.org/0000-0003-4320-4663"
+- family-names: Durkan
+  given-names: Conor
+  orcid: "http://orcid.org/0000-0001-9333-7777"
+- family-names: Gonçalves
+  given-names: Pedro
+  orcid: "http://orcid.org/0000-0002-6987-4836"
+- family-names: Greenberg
+  given-names: David
+  orcid: "http://orcid.org/0000-0002-8515-0459"
+- family-names: Macke
+  given-names: Jakob
+  orcid: "https://orcid.org/0000-0001-5154-8912"
+
+version: 0.21.0
+date-released: "2022-12-22"
+identifiers:
+ - type: "ascl-id"
+   value: "2306.002"
+ - type: "doi"
+   value: 10.21105/joss.02505
+ - type: "bibcode"
+   value: "2023ascl.soft06002T"
+abstract: "Simulation-based inference is the process of finding parameters of a simulator from observations. The PyTorch package sbi performs simulation-based inference by taking a Bayesian approach to return a full posterior distribution over the parameters, conditional on the observations. This posterior can be amortized (<i>i.e.</i> useful for any observation) or focused (<i>i.e.</i>tailored to a particular observation), with different computational trade-offs. The code offers a simple interface for one-line posterior inference."
+license: AGPL-3.0
+repository-code: https://github.com/mackelab/sbi
