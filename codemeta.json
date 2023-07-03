@@ -1,0 +1,73 @@
+{
+    "@context": "https://doi.org/10.5063/schema/codemeta-2.0",
+    "@type": "SoftwareSourceCode",
+    "name": "sbi: Simulation-based inference toolkit",
+    "description": "Simulation-based inference is the process of finding parameters of a simulator from observations. The PyTorch package sbi performs simulation-based inference by taking a Bayesian approach to return a full posterior distribution over the parameters, conditional on the observations. This posterior can be amortized (<i>i.e.</i> useful for any observation) or focused (<i>i.e.</i>tailored to a particular observation), with different computational trade-offs. The code offers a simple interface for one-line posterior inference.",
+    "identifier": "ascl:2306.002",
+    "author": [
+        {
+            "@type": "Person",
+            "givenName": "Alvaro",
+            "familyName": "Tejero-Cantero",
+            "@id": "http://orcid.org/0000-0002-8768-4227"
+        },
+        {
+            "@type": "Person",
+            "givenName": "Jan",
+            "familyName": "Boelts",
+            "@id": "http://orcid.org/0000-0003-4979-7092"
+        },
+        {
+            "@type": "Person",
+            "givenName": "Michael",
+            "familyName": "Deistler",
+            "@id": "http://orcid.org/0000-0002-3573-0404"
+        },
+        {
+            "@type": "Person",
+            "givenName": "Jan-Matthis",
+            "familyName": "Lueckmann",
+            "@id": "http://orcid.org/0000-0003-4320-4663"
+        },
+        {
+            "@type": "Person",
+            "givenName": "Conor",
+            "familyName": "Durkan",
+            "@id": "http://orcid.org/0000-0001-9333-7777"
+        },
+        {
+            "@type": "Person",
+            "givenName": "Pedro",
+            "familyName": "Gonçalves",
+            "@id": "http://orcid.org/0000-0002-6987-4836"
+        },
+        {
+            "@type": "Person",
+            "givenName": "David",
+            "familyName": "Greenberg",
+            "@id": "http://orcid.org/0000-0002-8515-0459"
+        },
+        {
+            "@type": "Person",
+            "givenName": "Jakob",
+            "familyName": "Macke",
+            "https://orcid.org/0000-0001-5154-8912"
+        }
+    ],
+    "citation": "https://doi.org/10.21105/joss.02505",
+    "relatedLink": [
+        "https://www.mackelab.org/sbi/"
+    ],
+    "codeRepository": [
+        "https://github.com/mackelab/sbi/"
+    ],
+    "referencePublication": [
+        {
+            "@type": "ScholarlyArticle",
+            "url": "https://joss.theoj.org/papers/10.21105/joss.02505",
+            "@id": "https://doi.org/10.21105/joss.02505"
+        }
+    ],
+    "version": "0.21.0",
+    "license": "https://spdx.org/licenses/AGPL-3.0-only.html"
+}
