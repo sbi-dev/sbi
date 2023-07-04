@@ -49,6 +49,23 @@ def process_device(device: str) -> str:
             return device
 
 
+def infer_device(input: ScalarFloat) -> str:
+    """Infer the device of a torch tensor or float.
+
+    Args:
+        input: torch tensor or float
+
+    Returns:
+        str: device type, e.g., "cpu" or "cuda"
+    """
+    if hasattr(input, "device") and input.device.type != "cpu":  # type: ignore
+        device = input.device.type  # type: ignore
+    else:
+        device = "cpu"
+
+    return device
+
+
 def check_if_prior_on_device(
     device: Union[str, torch.device], prior: Optional[Any] = None
 ) -> None:
@@ -248,7 +265,7 @@ class BoxUniform(Independent):
         low: ScalarFloat,
         high: ScalarFloat,
         reinterpreted_batch_ndims: int = 1,
-        device: str = "cpu",
+        device: Optional[str] = None,
     ):
         """Multidimensional uniform distribution defined on a box.
 
@@ -270,6 +287,10 @@ class BoxUniform(Independent):
             device: device of the prior, defaults to "cpu", should match the training
                 device when used in SBI.
         """
+
+        # If device is not specified, infer it from low.
+        device = infer_device(low) if device is None else device
+        # Check device.
         device = process_device(device)
         super().__init__(
             Uniform(
