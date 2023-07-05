@@ -9,23 +9,21 @@
 
 [Getting Started](https://www.mackelab.org/sbi/tutorial/00_getting_started/) | [Documentation](https://www.mackelab.org/sbi/)
 
-`sbi` is a PyTorch package for simulation-based inference. Simulation-based inference is  
-the process of finding parameters of a simulator from observations.
+`sbi` is a PyTorch package for simulation-based inference. Simulation-based inference is the process of finding parameters of a simulator from observations.
 
 `sbi` takes a Bayesian approach and returns a full posterior distribution
-over the parameters, conditional on the observations. This posterior can be amortized (i.e.
-useful for any observation) or focused (i.e. tailored to a particular observation), with different
-computational trade-offs.
+over the parameters, conditional on the observations. This posterior can be amortized (i.e. once trained, it can be
+applied to any observation) or focused (i.e. tailored to a particular observation), with different computational trade-offs.
 
-`sbi` offers a simple interface for one-line posterior inference.
+`sbi` offers a simple interface for one-line posterior inference:
 
 ```python
 from sbi.inference import infer
 # import your simulator, define your prior over the parameters
-parameter_posterior = infer(simulator, prior, method='SNPE', num_simulations=100)
+parameter_posterior = infer(simulator, prior, method='NPE', num_simulations=100)
 ```
 
-See below for the available methods of inference, `SNPE`, `SNRE` and `SNLE`.
+`sbi` implements a variety of inference methods, including amortized and sequential algorithms. See below for an overview.
 
 ## Installation
 
@@ -56,34 +54,34 @@ print(posterior)
 
 The following algorithms are currently available:
 
-#### Sequential Neural Posterior Estimation (SNPE)
+### Neural Posterior Estimation: amortized (NPE) and sequential (SNPE)
 
-* [`SNPE_A`](https://www.mackelab.org/sbi/reference/#sbi.inference.snpe.snpe_a.SNPE_A) from Papamakarios G and Murray I [_Fast ε-free Inference of Simulation Models with Bayesian Conditional Density Estimation_](https://proceedings.neurips.cc/paper/2016/hash/6aca97005c68f1206823815f66102863-Abstract.html) (NeurIPS 2016).
+* [`SNPE_A`](https://www.mackelab.org/sbi/reference/#sbi.inference.snpe.snpe_a.SNPE_A) (including amortized single-round `NPE`) from Papamakarios G and Murray I [_Fast ε-free Inference of Simulation Models with Bayesian Conditional Density Estimation_](https://proceedings.neurips.cc/paper/2016/hash/6aca97005c68f1206823815f66102863-Abstract.html) (NeurIPS 2016).
   
 * [`SNPE_C`](https://www.mackelab.org/sbi/reference/#sbi.inference.snpe.snpe_c.SNPE_C) or `APT` from Greenberg D, Nonnenmacher M, and Macke J [_Automatic
   Posterior Transformation for likelihood-free
   inference_](https://arxiv.org/abs/1905.07488) (ICML 2019).
 
-#### Sequential Neural Likelihood Estimation (SNLE)
+### Neural Likelihood Estimation: amortized (NLE) and sequential (SNLE)
 
 * [`SNLE_A`](https://www.mackelab.org/sbi/reference/#sbi.inference.snle.snle_a.SNLE_A) or just `SNL` from Papamakarios G, Sterrat DC and Murray I [_Sequential
   Neural Likelihood_](https://arxiv.org/abs/1805.07226) (AISTATS 2019).
 
-#### Sequential Neural Ratio Estimation (SNRE)
+### Neural Ratio Estimation: amortized (NRE) and sequential (SNRE)
 
-* [`SNRE_A`](https://www.mackelab.org/sbi/reference/#sbi.inference.snre.snre_a.SNRE_A) or `AALR` from Hermans J, Begy V, and Louppe G. [_Likelihood-free Inference with Amortized Approximate Likelihood Ratios_](https://arxiv.org/abs/1903.04057) (ICML 2020).
+* [`(S)NRE_A`](https://www.mackelab.org/sbi/reference/#sbi.inference.snre.snre_a.SNRE_A) or `AALR` from Hermans J, Begy V, and Louppe G. [_Likelihood-free Inference with Amortized Approximate Likelihood Ratios_](https://arxiv.org/abs/1903.04057) (ICML 2020).
 
-* [`SNRE_B`](https://www.mackelab.org/sbi/reference/#sbi.inference.snre.snre_b.SNRE_B) or `SRE` from Durkan C, Murray I, and Papamakarios G. [_On Contrastive Learning for Likelihood-free Inference_](https://arxiv.org/abs/2002.03712) (ICML 2020).
+* [`(S)NRE_B`](https://www.mackelab.org/sbi/reference/#sbi.inference.snre.snre_b.SNRE_B) or `SRE` from Durkan C, Murray I, and Papamakarios G. [_On Contrastive Learning for Likelihood-free Inference_](https://arxiv.org/abs/2002.03712) (ICML 2020).
 
 * [`BNRE`](https://www.mackelab.org/sbi/reference/#sbi.inference.snre.bnre.BNRE) from Delaunoy A, Hermans J, Rozet F, Wehenkel A, and Louppe G. [_Towards Reliable Simulation-Based Inference with Balanced Neural Ratio Estimation_](https://arxiv.org/abs/2208.13624) (NeurIPS 2022).
 
-* [`SNRE_C`](https://www.mackelab.org/sbi/reference/#sbi.inference.snre.snre_c.SNRE_C) or `NRE-C` from Miller BK, Weniger C, Forré P. [_Contrastive Neural Ratio Estimation_](https://arxiv.org/abs/2210.06170) (NeurIPS 2022).
+* [`(S)NRE_C`](https://www.mackelab.org/sbi/reference/#sbi.inference.snre.snre_c.SNRE_C) or `NRE-C` from Miller BK, Weniger C, Forré P. [_Contrastive Neural Ratio Estimation_](https://arxiv.org/abs/2210.06170) (NeurIPS 2022).
 
-#### Sequential Neural Variational Inference (SNVI)
+### Neural Variational Inference, amortized (NVI) and sequential (SNVI)
 
 * [`SNVI`](https://www.mackelab.org/sbi/reference/#sbi.inference.posteriors.vi_posterior) from Glöckler M, Deistler M, Macke J, [_Variational methods for simulation-based inference_](https://openreview.net/forum?id=kZ0UYdhqkNY) (ICLR 2022).
 
-#### Mixed Neural Likelihood Estimation (MNLE)
+### Mixed Neural Likelihood Estimation (MNLE)
 
 * [`MNLE`](https://www.mackelab.org/sbi/reference/#sbi.inference.snle.mnle.MNLE) from Boelts J, Lueckmann JM, Gao R, Macke J, [_Flexible and efficient simulation-based inference for models of decision-making](https://elifesciences.org/articles/77220) (eLife 2022).
 
@@ -110,7 +108,7 @@ M. Durkan's `lfi`. `sbi` runs as a community project; development is coordinated
 
 ## Citation
 
-If you use `sbi` consider citing the [sbi software paper](https://doi.org/10.21105/joss.02505), in addition to the original research articles describing the specifc sbi-algorithm(s) you are using:
+If you use `sbi` consider citing the [sbi software paper](https://doi.org/10.21105/joss.02505), in addition to the original research articles describing the specific sbi-algorithm(s) you are using:
 
 ```
 @article{tejero-cantero2020sbi,
