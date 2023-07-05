@@ -4,12 +4,19 @@
 
 ![using sbi](static/infer_demo.gif)
 
-Inference can be run in a single
-line of code:
+Inference can be run in a single line of code:
 
 ```python
 posterior = infer(simulator, prior, method='SNPE', num_simulations=1000)
 ```
+
+and you can choose from a variety of _amortized_ and _sequential_ SBI methods.
+
+Amortized methods return a posterior that can be applied to many different observations without retraining,
+whereas sequential methods focus the inference on one particular observation to be more simulation-efficient.
+For an overview of implemented methods see below, or checkout or [GitHub page](https://github.com/mackelab/sbi).
+
+## Overview
 
 - To learn about the general motivation behind simulation-based inference, and the
   inference methods included in `sbi`, read on below.
@@ -36,12 +43,12 @@ In the case of simulators, a key quantity required for statistical inference, th
 likelihood of observed data given parameters, $\mathcal{L}(\theta) = p(x_o|\theta)$, is
 typically intractable, rendering conventional statistical approaches inapplicable.
 
-`sbi` implements powerful machine-learning methods that address this problem. Roughly, 
+`sbi` implements powerful machine-learning methods that address this problem. Roughly,
 these algorithms can be categorized as:
 
-- Sequential Neural Posterior Estimation (SNPE),
-- Sequential Neural Likelihood Estimation (SNLE), and
-- Sequential Neural Ratio Estimation (SNRE).
+- Neural Posterior Estimation (amortized `NPE` and sequential `SNPE`),
+- Neural Likelihood Estimation (`(S)NLE`), and
+- Neural Ratio Estimation (`(S)NRE`).
 
 Depending on the characteristics of the problem, e.g. the dimensionalities of the
 parameter space and the observation space, one of the methods will be more suitable.
@@ -71,17 +78,15 @@ The methods then proceed by
 4. If needed, an initial estimate of the posterior can be used to adaptively generate
    additional informative simulations.
 
-
 ## Publications
 
 See [Cranmer, Brehmer, Louppe (2020)](https://doi.org/10.1073/pnas.1912789117) for a recent
 review on simulation-based inference.
 
-The following papers offer additional details on the inference methods included in
-`sbi`. You can find a tutorial on how to run each of these methods [here](https://www.mackelab.org/sbi/tutorial/16_implemented_methods/).
+The following papers offer additional details on the inference methods implemented in `sbi`.
+You can find a tutorial on how to run each of these methods [here](https://www.mackelab.org/sbi/tutorial/16_implemented_methods/).
 
-
-### Posterior estimation (SNPE)
+### Posterior estimation (`(S)NPE`)
 
 - **Fast ε-free Inference of Simulation Models with Bayesian Conditional Density Estimation**<br> by Papamakarios & Murray (NeurIPS 2016) <br>[[PDF]](https://papers.nips.cc/paper/6084-fast-free-inference-of-simulation-models-with-bayesian-conditional-density-estimation.pdf) [[BibTeX]](https://papers.nips.cc/paper/6084-fast-free-inference-of-simulation-models-with-bayesian-conditional-density-estimation/bibtex)
 
@@ -92,7 +97,7 @@ The following papers offer additional details on the inference methods included 
 - **Truncated proposals for scalable and hassle-free simulation-based inference** <br> by Deistler, Goncalves & Macke (NeurIPS 2022) <br>[[Paper]](https://arxiv.org/abs/2210.04815)
 
 
-### Likelihood-estimation (SNLE)
+### Likelihood-estimation (`(S)NLE`)
 
 - **Sequential neural likelihood: Fast likelihood-free inference with autoregressive flows**<br>by Papamakarios, Sterratt & Murray (AISTATS 2019) <br>[[PDF]](http://proceedings.mlr.press/v89/papamakarios19a/papamakarios19a.pdf) [[BibTeX]](https://gpapamak.github.io/bibtex/snl.bib)
 
@@ -101,7 +106,7 @@ The following papers offer additional details on the inference methods included 
 - **Flexible and efficient simulation-based inference for models of decision-making** <br> by Boelts, Lueckmann, Gao, Macke (Elife 2022) <br>[[Paper]](https://elifesciences.org/articles/77220)
 
 
-### Likelihood-ratio-estimation (SNRE)
+### Likelihood-ratio-estimation (`(S)NRE`)
 
 - **Likelihood-free MCMC with Amortized Approximate Likelihood Ratios**<br>by Hermans, Begy & Louppe (ICML 2020) <br>[[PDF]](http://proceedings.mlr.press/v119/hermans20a/hermans20a.pdf)
 

@@ -11,19 +11,18 @@
 
 `sbi` is a PyTorch package for simulation-based inference. Simulation-based inference is the process of finding parameters of a simulator from observations.
 
-`sbi` takes a Bayesian approach and returns a full posterior distribution
-over the parameters, conditional on the observations. This posterior can be amortized (i.e. once trained, it can be
-applied to any observation) or focused (i.e. tailored to a particular observation), with different computational trade-offs.
+`sbi` takes a Bayesian approach and returns a full posterior distribution over the parameters of the simulator, conditional on the observations.
+The package implements a variety of inference algorithms, including _amortized_ and _sequential_ methods.
+Amortized methods return a posterior that can be applied to many different observations without retraining; sequential methods focus the inference on one particular observation to be more simulation-efficient.
+See below for an overview of implemented methods.
 
 `sbi` offers a simple interface for one-line posterior inference:
 
 ```python
 from sbi.inference import infer
 # import your simulator, define your prior over the parameters
-parameter_posterior = infer(simulator, prior, method='NPE', num_simulations=100)
+parameter_posterior = infer(simulator, prior, method='SNPE', num_simulations=100)
 ```
-
-`sbi` implements a variety of inference methods, including amortized and sequential algorithms. See below for an overview.
 
 ## Installation
 
