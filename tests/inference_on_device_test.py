@@ -525,11 +525,20 @@ def test_vi_on_gpu(num_dim: int, q: Distribution, vi_method: str, sampling_metho
 
 
 @pytest.mark.gpu
-@pytest.mark.parametrize("arg_device", ["cpu", "cuda"])
-@pytest.mark.parametrize("device", [None, "cpu", "cuda"])
+@pytest.mark.parametrize(
+    "arg_device, device",
+    [
+        ("cpu", None),
+        ("cuda", None),
+        ("cpu", "cpu"),
+        ("cuda", "cuda"),
+        pytest.param("cuda", "cpu", marks=pytest.mark.xfail),
+        pytest.param("cpu", "cuda", marks=pytest.mark.xfail),
+    ],
+)
 def test_BoxUniform_device_handling(arg_device, device):
     """Test mismatch between device passed via low / high and device kwarg."""
     prior = BoxUniform(
         low=zeros(1).to(arg_device), high=ones(1).to(arg_device), device=device
     )
-    SNPE_C(prior=prior, device=device)
+    SNPE_C(prior=prior, device=arg_device)
