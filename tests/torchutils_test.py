@@ -105,7 +105,9 @@ class TorchUtilsTest(torchtestcase.TorchTestCase):
 
 
 def test_box_uniform_distribution():
-    bu1 = torchutils.BoxUniform(low=0.0, high=torch.tensor([3.0, 3.0, 3.0]))
+    bu1 = torchutils.BoxUniform(
+        low=torch.ones(3), high=torch.tensor([3.0, 3.0, 3.0]), device="cpu"
+    )
 
     assert bu1.event_shape == torch.Size([3])
 

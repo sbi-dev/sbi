@@ -12,7 +12,7 @@ from torch import Tensor, float32
 from torch.distributions import Independent, Uniform
 
 from sbi import utils as utils
-from sbi.types import Array, OneOrMore, ScalarFloat
+from sbi.types import Array, OneOrMore
 
 
 def process_device(device: str) -> str:
@@ -47,23 +47,6 @@ def process_device(device: str) -> str:
                 )
             torch.cuda.set_device(device)
             return device
-
-
-def infer_device(input: ScalarFloat) -> str:
-    """Infer the device of a torch tensor or float.
-
-    Args:
-        input: torch tensor or float
-
-    Returns:
-        str: device type, e.g., "cpu" or "cuda"
-    """
-    if hasattr(input, "device") and input.device.type != "cpu":  # type: ignore
-        device = input.device.type  # type: ignore
-    else:
-        device = "cpu"
-
-    return device
 
 
 def check_if_prior_on_device(
@@ -262,8 +245,8 @@ def gaussian_kde_log_eval(samples, query):
 class BoxUniform(Independent):
     def __init__(
         self,
-        low: ScalarFloat,
-        high: ScalarFloat,
+        low: Tensor,
+        high: Tensor,
         reinterpreted_batch_ndims: int = 1,
         device: Optional[str] = None,
     ):
@@ -283,15 +266,25 @@ class BoxUniform(Independent):
             low: lower range (inclusive).
             high: upper range (exclusive).
             reinterpreted_batch_ndims (int): the number of batch dims to
-                                             reinterpret as event dims.
-            device: device of the prior, defaults to "cpu", should match the training
-                device when used in SBI.
+                reinterpret as event dims.
+            device: device of the prior, inferred from low arg, defaults to "cpu",
+                should match the training device when used in SBI.
         """
 
-        # If device is not specified, infer it from low.
-        device = infer_device(low) if device is None else device
-        # Check device.
+        # Type checks.
+        assert isinstance(low, Tensor) and isinstance(
+            high, Tensor
+        ), f"low and high must be tensors but are {type(low)} and {type(high)}."
+        if not low.device == high.device:
+            raise RuntimeError(
+                "Expected all tensors to be on the same device, but found at least"
+                f"two devices, {low.device} and {high.device}."
+            )
+
+        # Device handling
+        device = low.device.type if device is None else device
         device = process_device(device)
+
         super().__init__(
             Uniform(
                 low=torch.as_tensor(
