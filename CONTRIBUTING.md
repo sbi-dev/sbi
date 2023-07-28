@@ -11,9 +11,12 @@ head over to [issues on GitHub](https://github.com/mackelab/sbi/issues).
 
 ## Code contributions
 
+Contributions to the `sbi` package are welcome!
 In general, we use pull requests to make changes to `sbi`. So, if you are planning to
 make a contribution, please fork, create a feature branch and then make a PR from
 your feature branch to the upstream `sbi` ([details](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request-from-a-fork)).
+To give credits to contributors, we consider adding contributors who repeatedly and substantially contributed to `sbi` to the list of authors of the package at the end of every year.
+Additionally, we mention all contributors in the releases.
 
 ### Development environment
 

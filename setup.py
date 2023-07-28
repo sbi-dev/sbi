@@ -21,7 +21,9 @@ KEYWORDS = (
     "bayesian parameter inference system_identification simulator PyTorch"
 )
 URL = "https://github.com/mackelab/sbi"
+# TODO: update email to new organization email.
 EMAIL = "sbi@mackelab.org"
+# TODO: Update author list?
 AUTHOR = """Álvaro Tejero-Cantero, Jakob H. Macke, Jan-Matthis Lückmann, Conor M.
          Durkan, Michael Deistler, Jan Bölts"""
 REQUIRES_PYTHON = ">=3.6.0"
@@ -150,6 +152,7 @@ setup(
         "Topic :: Scientific/Engineering",
         "Topic :: Scientific/Engineering :: Artificial Intelligence",
         "Topic :: Scientific/Engineering :: Mathematics",
+        # TODO: Update python support?
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.6",
