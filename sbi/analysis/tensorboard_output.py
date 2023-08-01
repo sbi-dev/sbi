@@ -101,7 +101,10 @@ def plot_summary(
     plot_options.update(figsize=figsize, fontsize=fontsize)
     if fig is None or axes is None:
         fig, axes = plt.subplots(
-            1, len(tags), figsize=plot_options["figsize"], **plot_options["subplots"]
+            1,
+            len(tags),
+            figsize=plot_options["figsize"],
+            **plot_options["subplots"],
         )
     axes = np.atleast_1d(axes)  # type: ignore
 
@@ -143,10 +146,10 @@ def _get_event_data_from_log_dir(
 
     Args:
         log_dir: log dir of a tensorboard summary writer.
-        size_guidance: to avoid causing out of memory erros by loading too much data at
+        size_guidance: to avoid causing out of memory errors by loading too much data at
             once into memory. Defaults to tensorboards default size_guidance.
 
-    Returns a nested, exhaustive dictionary of all event data unter log_dir.
+    Returns a nested, exhaustive dictionary of all event data under log_dir.
 
     Based on: https://stackoverflow.com/a/45899735/7770835
     """
@@ -169,8 +172,8 @@ def _get_event_data_from_log_dir(
 
                 # ScalarEvent has three attributes, wall_time, step, and value
                 # a generic way to get data from all other EventType as for ScalarEvent,
-                # we inspect their argument signature. These events are namedtuples that
-                # can be found here:
+                # we inspect their argument signature. These events are named tuples
+                # that can be found here:
                 # https://github.com/tensorflow/tensorboard/blob/b84f3738032277894c6f3fd3e011f032a89d002c/tensorboard/backend/event_processing/event_accumulator.py#L37
                 _type = type(data[0])
                 for attribute in inspect.getfullargspec(_type).args:

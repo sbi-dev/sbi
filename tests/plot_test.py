@@ -68,6 +68,9 @@ def test_sbc_rank_plot(num_parameters, num_cols, custom_figure, plot_type):
     )
     if not custom_figure:
         if num_parameters > num_cols:
-            assert ax.shape == (int(np.ceil(num_parameters / num_cols)), num_cols)
+            assert ax.shape == (
+                int(np.ceil(num_parameters / num_cols)),
+                num_cols,
+            )
         else:
             assert ax.shape == (num_parameters,)
