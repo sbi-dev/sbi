@@ -77,11 +77,16 @@ def test_c2st_snpe_on_linearGaussian(
     else:
         prior = utils.BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
         target_samples = samples_true_posterior_linear_gaussian_uniform_prior(
-            x_o, likelihood_shift, likelihood_cov, prior=prior, num_samples=num_samples
+            x_o,
+            likelihood_shift,
+            likelihood_cov,
+            prior=prior,
+            num_samples=num_samples,
         )
 
     simulator, prior = prepare_for_sbi(
-        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov), prior
+        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov),
+        prior,
     )
 
     inference = snpe_method(prior, show_progress_bars=False)
@@ -106,7 +111,12 @@ def test_c2st_snpe_on_linearGaussian(
     if prior_str == "gaussian":
         # For the Gaussian prior, we compute the KLd between ground truth and posterior.
         dkl = get_dkl_gaussian_prior(
-            posterior, x_o[0], likelihood_shift, likelihood_cov, prior_mean, prior_cov
+            posterior,
+            x_o[0],
+            likelihood_shift,
+            likelihood_cov,
+            prior_mean,
+            prior_cov,
         )
 
         max_dkl = 0.15
@@ -171,7 +181,8 @@ def test_density_estimators_on_linearGaussian(density_estimtor):
     target_samples = gt_posterior.sample((num_samples,))
 
     simulator, prior = prepare_for_sbi(
-        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov), prior
+        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov),
+        prior,
     )
 
     inference = SNPE_C(prior, density_estimator=density_estimtor)
@@ -226,13 +237,18 @@ def test_c2st_snpe_on_linearGaussian_different_dims(density_estimator="maf"):
 
     simulator, prior = prepare_for_sbi(
         lambda theta: linear_gaussian(
-            theta, likelihood_shift, likelihood_cov, num_discarded_dims=discard_dims
+            theta,
+            likelihood_shift,
+            likelihood_cov,
+            num_discarded_dims=discard_dims,
         ),
         prior,
     )
     # Test whether prior can be `None`.
     inference = SNPE_C(
-        prior=None, density_estimator=density_estimator, show_progress_bars=False
+        prior=None,
+        density_estimator=density_estimator,
+        show_progress_bars=False,
     )
 
     # type: ignore
@@ -306,7 +322,8 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
         density_estimator = "maf"
 
     simulator, prior = prepare_for_sbi(
-        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov), prior
+        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov),
+        prior,
     )
     creation_args = dict(
         prior=prior,
@@ -366,7 +383,10 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
         ).set_default_x(x_o)
         accept_reject_fn = get_density_thresholder(posterior1, quantile=1e-4)
         proposal = RestrictedPrior(
-            prior, accept_reject_fn, posterior=posterior1, sample_with=sample_method
+            prior,
+            accept_reject_fn,
+            posterior=posterior1,
+            sample_with=sample_method,
         )
         theta = proposal.sample((1000,))
         x = simulator(theta)
@@ -412,7 +432,8 @@ def test_api_snpe_c_posterior_correction(sample_with, mcmc_method, prior_str):
         prior = utils.BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
 
     simulator, prior = prepare_for_sbi(
-        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov), prior
+        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov),
+        prior,
     )
     inference = SNPE_C(prior, show_progress_bars=False)
 
@@ -469,7 +490,8 @@ def test_api_force_first_round_loss(
     prior = utils.BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
 
     simulator, prior = prepare_for_sbi(
-        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov), prior
+        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov),
+        prior,
     )
     inference = SNPE_C(prior, show_progress_bars=False)
 
@@ -559,7 +581,7 @@ def test_sample_conditional():
         limits=[[-2, 2], [-2, 2], [-2, 2]],
         figsize=(2, 2),
         diag="kde",
-        upper="kde",
+        offdiag="kde",
     )
 
     limits = [[-2, 2], [-2, 2], [-2, 2]]
@@ -681,7 +703,8 @@ def test_example_posterior(snpe_method: type):
         extra_kwargs = dict()
 
     simulator, prior = prepare_for_sbi(
-        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov), prior
+        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov),
+        prior,
     )
     inference = snpe_method(prior, show_progress_bars=False)
 
