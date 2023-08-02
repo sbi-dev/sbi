@@ -17,9 +17,7 @@ from setuptools import Command, find_packages, setup
 # Package meta-data.
 NAME = "sbi"
 DESCRIPTION = "Simulation-based inference."
-KEYWORDS = (
-    "bayesian parameter inference system_identification simulator PyTorch"
-)
+KEYWORDS = "bayesian parameter inference system_identification simulator PyTorch"
 URL = "https://github.com/mackelab/sbi"
 EMAIL = "sbi@mackelab.org"
 AUTHOR = """Álvaro Tejero-Cantero, Jakob H. Macke, Jan-Matthis Lückmann, Conor M.
@@ -106,9 +104,7 @@ class UploadCommand(Command):
             pass
 
         self.status("Building Source and Wheel (universal) distribution…")
-        os.system(
-            "{0} setup.py sdist bdist_wheel --universal".format(sys.executable)
-        )
+        os.system("{0} setup.py sdist bdist_wheel --universal".format(sys.executable))
 
         self.status("Uploading the package to PyPI via Twine…")
         os.system("twine upload dist/*")
@@ -131,9 +127,7 @@ setup(
     author_email=EMAIL,
     python_requires=REQUIRES_PYTHON,
     url=URL,
-    packages=find_packages(
-        exclude=["tests", "*.tests", "*.tests.*", "tests.*"]
-    ),
+    packages=find_packages(exclude=["tests", "*.tests", "*.tests.*", "tests.*"]),
     install_requires=REQUIRED,
     extras_require=EXTRAS,
     include_package_data=True,
