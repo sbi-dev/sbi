@@ -3,12 +3,12 @@ repos:
         rev: v2.2.0
         hooks:
         - id: seed-isort-config
-    -   repo: https://github.com/pre-commit/mirrors-isort
-        rev: v5.10.1
+    -   repo: https://github.com/PyCQA/isort
+        rev: 5.11.5
         hooks:
         - id: isort
     -   repo: https://github.com/ambv/black
-        rev: 23.1.0
+        rev: 23.3.0
         hooks:
         - id: black
           language_version: python3.8
