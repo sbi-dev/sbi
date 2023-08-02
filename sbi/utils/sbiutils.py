@@ -349,7 +349,10 @@ def warn_on_iid_x(num_trials):
 
 
 def check_warn_and_setstate(
-    state_dict: Dict, key_name: str, replacement_value: Any, warning_msg: str = ""
+    state_dict: Dict,
+    key_name: str,
+    replacement_value: Any,
+    warning_msg: str = "",
 ) -> Tuple[Dict, str]:
     """
     Check if `key_name` is in `state_dict` and add it if not.
@@ -881,7 +884,7 @@ def gradient_ascent(
                     )
                     best_theta_iter = optimize_inits[  # type: ignore
                         torch.argmax(log_probs_of_optimized)
-                    ]
+                    ].view(1, -1)
                     best_log_prob_iter = potential_fn(
                         theta_transform.inv(best_theta_iter)
                     )

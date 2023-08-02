@@ -5,9 +5,8 @@ from __future__ import annotations
 
 import pytest
 from torch import eye, ones, zeros
-from torch.distributions import MultivariateNormal
+from torch.distributions import HalfNormal, MultivariateNormal
 
-from sbi import utils as utils
 from sbi.inference import (
     SNLE,
     ImportanceSamplingPosterior,
@@ -25,7 +24,7 @@ from sbi.simulators.linear_gaussian import (
     samples_true_posterior_linear_gaussian_uniform_prior,
     true_posterior_linear_gaussian_mvn_prior,
 )
-from sbi.utils import likelihood_nn
+from sbi.utils import BoxUniform, likelihood_nn, process_prior
 
 from .test_utils import check_c2st, get_prob_outside_uniform_prior
 
@@ -103,7 +102,10 @@ def test_c2st_snl_on_linearGaussian(density_estimator="maf"):
     )
     simulator, prior = prepare_for_sbi(
         lambda theta: linear_gaussian(
-            theta, likelihood_shift, likelihood_cov, num_discarded_dims=discard_dims
+            theta,
+            likelihood_shift,
+            likelihood_cov,
+            num_discarded_dims=discard_dims,
         ),
         prior,
     )
@@ -156,10 +158,11 @@ def test_c2st_and_map_snl_on_linearGaussian_different(num_dim: int, prior_str: s
         prior_cov = eye(num_dim)
         prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
     else:
-        prior = utils.BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
+        prior = BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
 
     simulator, prior = prepare_for_sbi(
-        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov), prior
+        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov),
+        prior,
     )
     density_estimator = likelihood_nn("maf", num_transforms=3)
     inference = SNLE(density_estimator=density_estimator, show_progress_bars=False)
@@ -204,11 +207,15 @@ def test_c2st_and_map_snl_on_linearGaussian_different(num_dim: int, prior_str: s
 
         # Check performance based on c2st accuracy.
         check_c2st(
-            samples, target_samples, alg=f"snle_a-{prior_str}-prior-{num_trials}-trials"
+            samples,
+            target_samples,
+            alg=f"snle_a-{prior_str}-prior-{num_trials}-trials",
         )
 
         map_ = posterior.map(
-            num_init_samples=1_000, init_method="proposal", show_progress_bars=False
+            num_init_samples=1_000,
+            init_method="proposal",
+            show_progress_bars=False,
         )
 
         # TODO: we do not have a test for SNL log_prob(). This is because the output
@@ -223,6 +230,43 @@ def test_c2st_and_map_snl_on_linearGaussian_different(num_dim: int, prior_str: s
             assert ((map_ - ones(num_dim)) ** 2).sum() < 0.5
         else:
             assert ((map_ - gt_posterior.mean) ** 2).sum() < 0.5
+
+
+@pytest.mark.parametrize("use_transform", (True, False))
+def test_map_with_multiple_independent_prior(use_transform):
+    """Test whether map works with multiple independent priors, see issue #841, #650."""
+
+    dim = 2
+    prior, *_ = process_prior(
+        [
+            BoxUniform(low=-ones(dim), high=ones(dim)),
+            HalfNormal(scale=ones(1) * 2),
+        ]
+    )
+
+    def simulator(theta):
+        return theta[:, 2:] * torch.randn_like(theta[:, :2]) + theta[:, :2]
+
+    num_simulations = 1000
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta)
+    x_o = zeros((1, dim))
+
+    trainer = SNLE(prior).append_simulations(theta, x)
+    likelihood_estimator = trainer.train(max_num_epochs=5)
+
+    potential_fn, parameter_transform = likelihood_estimator_based_potential(
+        likelihood_estimator,
+        prior,
+        x_o=x_o,
+    )
+    posterior = MCMCPosterior(
+        potential_fn,
+        proposal=prior,
+        theta_transform=parameter_transform if use_transform else None,
+    )
+    posterior.map()
+    posterior.set_default_x(x_o).map(num_iter=10)
 
 
 @pytest.mark.slow
@@ -248,7 +292,8 @@ def test_c2st_multi_round_snl_on_linearGaussian(num_trials: int):
     target_samples = gt_posterior.sample((num_samples,))
 
     simulator, prior = prepare_for_sbi(
-        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov), prior
+        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov),
+        prior,
     )
     inference = SNLE(show_progress_bars=False)
 
@@ -268,7 +313,10 @@ def test_c2st_multi_round_snl_on_linearGaussian(num_trials: int):
     )
 
     theta, x = simulate_for_sbi(
-        simulator, posterior1, num_simulations_per_round, simulation_batch_size=50
+        simulator,
+        posterior1,
+        num_simulations_per_round,
+        simulation_batch_size=50,
     )
     likelihood_estimator = inference.append_simulations(theta, x).train()
     potential_fn, theta_transform = likelihood_estimator_based_potential(
@@ -311,7 +359,8 @@ def test_c2st_multi_round_snl_on_linearGaussian_vi(num_trials: int):
     target_samples = gt_posterior.sample((num_samples,))
 
     simulator, prior = prepare_for_sbi(
-        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov), prior
+        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov),
+        prior,
     )
     inference = SNLE(show_progress_bars=False)
 
@@ -329,7 +378,10 @@ def test_c2st_multi_round_snl_on_linearGaussian_vi(num_trials: int):
     posterior1.train()
 
     theta, x = simulate_for_sbi(
-        simulator, posterior1, num_simulations_per_round, simulation_batch_size=50
+        simulator,
+        posterior1,
+        num_simulations_per_round,
+        simulation_batch_size=50,
     )
     likelihood_estimator = inference.append_simulations(theta, x).train()
     potential_fn, theta_transform = likelihood_estimator_based_potential(
@@ -408,7 +460,7 @@ def test_api_snl_sampling_methods(
     if prior_str == "gaussian":
         prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
     else:
-        prior = utils.BoxUniform(-1.0 * ones(num_dim), ones(num_dim))
+        prior = BoxUniform(-1.0 * ones(num_dim), ones(num_dim))
 
     # Why do we have this if-case? Only the `MCMCPosterior` uses the `init_strategy`.
     # Thus, we would not like to run, e.g., VI with all init_strategies, but only once
@@ -450,7 +502,9 @@ def test_api_snl_sampling_methods(
             )
         else:
             posterior = VIPosterior(
-                potential_fn, theta_transform=theta_transform, vi_method=sampling_method
+                potential_fn,
+                theta_transform=theta_transform,
+                vi_method=sampling_method,
             )
             posterior.train(max_num_iters=10)
 
