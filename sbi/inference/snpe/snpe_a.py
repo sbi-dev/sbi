@@ -734,7 +734,7 @@ class SNPE_A_MDN(nn.Module):
         # Check if precision matrix is positive definite.
         for idx_batch, batches in enumerate(precisions_p):
             for idx_comp, pp in enumerate(batches):
-                eig_pp = torch.symeig(pp, eigenvectors=False).eigenvalues
+                eig_pp = torch.linalg.eigvalsh(pp, UPLO="U")
                 if not (eig_pp > 0).all():
                     raise AssertionError(
                         "The precision matrix of a posterior is not positive "
