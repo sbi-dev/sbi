@@ -7,11 +7,24 @@ import torch
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.pyplot import subplots
-from torch.utils.tensorboard import SummaryWriter
+from torch.utils.tensorboard.writer import SummaryWriter
 
-from sbi.analysis import plot_summary, sbc_rank_plot
+from sbi.analysis import pairplot, plot_summary, sbc_rank_plot
 from sbi.inference import SNLE, SNPE, SNRE, prepare_for_sbi, simulate_for_sbi
 from sbi.utils import BoxUniform
+
+
+@pytest.mark.parametrize("samples", (torch.randn(100, 2), [torch.randn(100, 2)] * 2))
+@pytest.mark.parametrize("labels", (None, ["a", "b"]))
+@pytest.mark.parametrize("legend", (True, False))
+@pytest.mark.parametrize("offdiag", ("hist", "scatter"))
+@pytest.mark.parametrize("samples_labels", (["a", "b"], None))
+@pytest.mark.parametrize("points_labels", (["a", "b"], None))
+@pytest.mark.parametrize("points", (None, torch.ones(2)))
+def test_pairplot(
+    samples, labels, legend, offdiag, samples_labels, points_labels, points
+):
+    pairplot(**{k: v for k, v in locals().items() if v is not None})
 
 
 @pytest.mark.parametrize("method", (SNPE, SNLE, SNRE))
