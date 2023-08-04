@@ -1,3 +1,29 @@
+# v0.22.0
+
+## API change
+
+- `sbi.analysis.pairplot`: `upper` was replaced by `offdiag` and will be deprecated in a future release.
+
+## Features and enhancements
+- size-invariant embedding nets for amortized inference with iid-data (@janfb, #808)
+- option for new using MAF with rational quadratic splines (thanks to @ImahnShekhzadeh, #819)
+- improved docstring for `process_prior` (thanks to @musoke, #813)
+- extended tutorial for SBI with iid data (@janfb, #857)
+- new tutorial for SBI with experimental conditions and mixed data (@janfb, #829)
+- New options for `pairplot`:
+  - `upper` is now called `offdiag` to match other kwargs.
+  - alternating colors for `samples` and `points`
+  - option to add a `legend` and pass `kwargs` for the legend.
+
+## Bug fixes
+
+- fixed memory leak in in `append_simulations` (thanks to @VictorSven, #803)
+- bug fix for CNRE (thanks to @bkmi, #815)
+- bug fix for iid-inference with posterior ensembles (@janfb, #826)
+- bug fix for simulation-based calibration with VI posteriors (@janfb, #834, #838)
+- bug fix for BoxUniform device handling (@janfb, #854, #856)
+- bug fix for MAP estimates with independent priors (@janfb, #867)
+
 # v0.21.0
 
 - implementation of ["Contrastive Neural Ratio Estimation"](https://openreview.net/forum?id=kOIaB1hzaLe) (thanks to @bkmi, #787)
