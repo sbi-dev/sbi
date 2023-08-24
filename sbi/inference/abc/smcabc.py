@@ -246,8 +246,8 @@ class SMCABC(ABCBASE):
             # collect results
             all_particles.append(particles)
             all_log_weights.append(log_weights)
-            all_distances.append(distances)
-            all_epsilons.append(epsilon)
+            all_distances.append(distances.clone())
+            all_epsilons.append(epsilon.clone())
             all_x.append(x)
 
         # Maybe run LRA and adjust weights.
