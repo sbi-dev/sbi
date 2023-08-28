@@ -310,7 +310,7 @@ class SMCABC(ABCBASE):
         x_o: Array,
         num_particles: int,
         num_initial_pop: int,
-    ) -> Tuple[Tensor, float, Tensor, Tensor]:
+    ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
         """Return particles, epsilon and distances of initial population."""
 
         assert (
@@ -331,7 +331,7 @@ class SMCABC(ABCBASE):
         initial_epsilon = distances[sortidx][num_particles - 1]
 
         if not torch.isfinite(initial_epsilon):
-            initial_epsilon = 1e8
+            initial_epsilon = torch.tensor(1e8)
 
         return (
             particles,
