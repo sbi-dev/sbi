@@ -59,8 +59,8 @@ def test_c2st_snpe_on_linearGaussian(
     """Test whether SNPE infers well a simple example with available ground truth."""
 
     x_o = zeros(num_trials, num_dim)
-    num_samples = 1000
-    num_simulations = 2600
+    num_samples = 5000
+    num_simulations = 5000
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(num_dim)

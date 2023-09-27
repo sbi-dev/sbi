@@ -459,6 +459,7 @@ def simulate_for_sbi(
     num_simulations: int,
     num_workers: int = 1,
     simulation_batch_size: int = 1,
+    seed: Optional[int] = None,
     show_progress_bar: bool = True,
 ) -> Tuple[Tensor, Tensor]:
     r"""Returns ($\theta, x$) pairs obtained from sampling the proposal and simulating.
@@ -481,6 +482,7 @@ def simulate_for_sbi(
             maps to data x at once. If None, we simulate all parameter sets at the
             same time. If >= 1, the simulator has to process data of shape
             (simulation_batch_size, parameter_dimension).
+        seed: Seed for reproducibility.
         show_progress_bar: Whether to show a progress bar for simulating. This will not
             affect whether there will be a progressbar while drawing samples from the
             proposal.
@@ -491,7 +493,12 @@ def simulate_for_sbi(
     theta = proposal.sample((num_simulations,))
 
     x = simulate_in_batches(
-        simulator, theta, simulation_batch_size, num_workers, show_progress_bar
+        simulator=simulator,
+        theta=theta,
+        sim_batch_size=simulation_batch_size,
+        num_workers=num_workers,
+        seed=seed,
+        show_progress_bars=show_progress_bar,
     )
 
     return theta, x
