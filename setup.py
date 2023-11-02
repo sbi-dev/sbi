@@ -18,7 +18,7 @@ from setuptools import Command, find_packages, setup
 NAME = "sbi"
 DESCRIPTION = "Simulation-based inference."
 KEYWORDS = "bayesian parameter inference system_identification simulator PyTorch"
-URL = "https://github.com/mackelab/sbi"
+URL = "https://github.com/sbi-dev/sbi"
 EMAIL = "simulation.based.inference@gmail.com"
 AUTHOR = """Álvaro Tejero-Cantero, Jakob H. Macke, Jan-Matthis Lückmann, Conor M.
          Durkan, Michael Deistler, Jan Bölts"""
