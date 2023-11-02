@@ -61,6 +61,8 @@ The following algorithms are currently available:
   Posterior Transformation for likelihood-free
   inference_](https://arxiv.org/abs/1905.07488) (ICML 2019).
 
+* `TSNPE` from Deistler M, Goncalves P, and Macke J [_Truncated proposals for scalable and hassle-free simulation-based inference_](https://arxiv.org/abs/2210.04815) (NeurIPS 2022).
+
 ### Neural Likelihood Estimation: amortized (NLE) and sequential (SNLE)
 
 * [`SNLE_A`](https://sbi-dev.github.io/sbi/reference/#sbi.inference.snle.snle_a.SNLE_A) or just `SNL` from Papamakarios G, Sterrat DC and Murray I [_Sequential
@@ -82,7 +84,7 @@ The following algorithms are currently available:
 
 ### Mixed Neural Likelihood Estimation (MNLE)
 
-* [`MNLE`](https://sbi-dev.github.io/sbi/reference/#sbi.inference.snle.mnle.MNLE) from Boelts J, Lueckmann JM, Gao R, Macke J, [_Flexible and efficient simulation-based inference for models of decision-making](https://elifesciences.org/articles/77220) (eLife 2022).
+* [`MNLE`](https://sbi-dev.github.io/sbi/reference/#sbi.inference.snle.mnle.MNLE) from Boelts J, Lueckmann JM, Gao R, Macke J, [_Flexible and efficient simulation-based inference for models of decision-making_](https://elifesciences.org/articles/77220) (eLife 2022).
 
 ## Feedback and Contributions
 
