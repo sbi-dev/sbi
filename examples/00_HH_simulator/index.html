@@ -485,8 +485,8 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tutorial/14_multi-trial-data-and-mixed-data-types.md" class="md-nav__link">
-        SBI with trial-based (mixed) data
+      <a href="../../tutorial/14_iid_data_and_permutation_invariant_embeddings/" class="md-nav__link">
+        SBI with trial-based data
       </a>
     </li>
   
@@ -775,6 +775,20 @@
 
             
           
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../01_decision_making_model/" class="md-nav__link">
+        Decision making model
+      </a>
+    </li>
+  
+
+            
+          
         </ul>
       </nav>
     </li>
@@ -1003,7 +1017,7 @@
                 
                 <h1 id="inference-on-hodgkin-huxley-model-tutorial">Inference on Hodgkin-Huxley model: tutorial<a class="headerlink" href="#inference-on-hodgkin-huxley-model-tutorial" title="Permanent link">&para;</a></h1>
 <p>In this tutorial, we use <code>sbi</code> to do inference on a <a href="https://en.wikipedia.org/wiki/Hodgkin%E2%80%93Huxley_model">Hodgkin-Huxley model</a> from neuroscience (Hodgkin and Huxley, 1952). We will learn two parameters (<span class="arithmatex">\(\bar g_{Na}\)</span>,<span class="arithmatex">\(\bar g_K\)</span>) based on a current-clamp recording, that we generate synthetically (in practice, this would be an experimental observation).</p>
-<p>Note, you find the original version of this notebook at <a href="https://github.com/mackelab/sbi/blob/main/examples/00_HH_simulator.ipynb">https://github.com/mackelab/sbi/blob/main/examples/00_HH_simulator.ipynb</a> in the <code>sbi</code> repository.</p>
+<p>Note, you find the original version of this notebook at <a href="https://github.com/sbi-dev/sbi/blob/main/examples/00_HH_simulator.ipynb">https://github.com/sbi-dev/sbi/blob/main/examples/00_HH_simulator.ipynb</a> in the <code>sbi</code> repository.</p>
 <p>First we are going to import basic packages.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
 <span class="kn">import</span> <span class="nn">torch</span>
@@ -1260,13 +1274,13 @@ Neural network successfully converged after 233 epochs.
       
       
         
-        <a href="../../contribute/" class="md-footer__link md-footer__link--next" aria-label="Next: Guide" rel="next">
+        <a href="../01_decision_making_model/" class="md-footer__link md-footer__link--next" aria-label="Next: Decision making model" rel="next">
           <div class="md-footer__title">
             <div class="md-ellipsis">
               <span class="md-footer__direction">
                 Next
               </span>
-              Guide
+              Decision making model
             </div>
           </div>
           <div class="md-footer__button md-icon">

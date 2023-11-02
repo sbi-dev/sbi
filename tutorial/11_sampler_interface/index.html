@@ -543,8 +543,8 @@
   
   
     <li class="md-nav__item">
-      <a href="../14_multi-trial-data-and-mixed-data-types.md" class="md-nav__link">
-        SBI with trial-based (mixed) data
+      <a href="../14_iid_data_and_permutation_invariant_embeddings/" class="md-nav__link">
+        SBI with trial-based data
       </a>
     </li>
   
@@ -728,6 +728,20 @@
     <li class="md-nav__item">
       <a href="../../examples/00_HH_simulator/" class="md-nav__link">
         Hodgkin-Huxley example
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/01_decision_making_model/" class="md-nav__link">
+        Decision making model
       </a>
     </li>
   
@@ -920,7 +934,7 @@
                 
                 
                 <h1 id="the-sampler-interface">The sampler interface<a class="headerlink" href="#the-sampler-interface" title="Permanent link">&para;</a></h1>
-<p>Note: this tutorial requires that the user is already familiar with the <a href="https://www.mackelab.org/sbi/tutorial/02_flexible_interface/">flexible interface</a>.</p>
+<p>Note: this tutorial requires that the user is already familiar with the <a href="https://sbi-dev.github.io/sbi/tutorial/02_flexible_interface/">flexible interface</a>.</p>
 <p><code>sbi</code> implements three methods: SNPE, SNLE, and SNRE. When using SNPE, the trained neural network directly approximates the posterior. Thus, sampling from the posterior can be done by sampling from the trained neural network. The neural networks trained in SNLE and SNRE approximate the likelihood(-ratio). Thus, in order to draw samples from the posterior, one has to perform additional sampling steps, e.g. Markov-chain Monte-Carlo (MCMC). In <code>sbi</code>, the implemented samplers are:</p>
 <ul>
 <li>
@@ -933,7 +947,7 @@
 <p>Variational inference (VI)</p>
 </li>
 </ul>
-<p>When using the flexible interface, the sampler as well as its attributes can be set with <code>sample_with="mcmc"</code>, <code>mcmc_method="slice_np"</code>, and <code>mcmc_parameters={}</code>. However, for full flexibility in customizing the sampler, we recommend using the <strong>sampler interface</strong>. This interface is described here. Further details can be found <a href="https://github.com/mackelab/sbi/pull/573">here</a>.</p>
+<p>When using the flexible interface, the sampler as well as its attributes can be set with <code>sample_with="mcmc"</code>, <code>mcmc_method="slice_np"</code>, and <code>mcmc_parameters={}</code>. However, for full flexibility in customizing the sampler, we recommend using the <strong>sampler interface</strong>. This interface is described here. Further details can be found <a href="https://github.com/sbi-dev/sbi/pull/573">here</a>.</p>
 <h2 id="main-syntax-for-snle">Main syntax for SNLE<a class="headerlink" href="#main-syntax-for-snle" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">torch</span>
 

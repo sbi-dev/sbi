@@ -16,7 +16,7 @@
     
     
       
-        <title>SBI with iid data and permutation-invariant embeddings - sbi</title>
+        <title>SBI with trial-based data - sbi</title>
       
     
     
@@ -102,7 +102,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              SBI with iid data and permutation-invariant embeddings
+              SBI with trial-based data
             
           </span>
         </div>
@@ -242,12 +242,14 @@
 
   
   
+    
+  
   
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
       
-        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3" type="checkbox" id="__nav_3" >
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3" type="checkbox" id="__nav_3" checked>
       
       
       
@@ -371,12 +373,14 @@
               
   
   
+    
+  
   
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
       
-        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3_2" type="checkbox" id="__nav_3_2" >
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3_2" type="checkbox" id="__nav_3_2" checked>
       
       
       
@@ -481,11 +485,128 @@
               
   
   
+    
   
-    <li class="md-nav__item">
-      <a href="../14_multi-trial-data-and-mixed-data-types.md" class="md-nav__link">
-        SBI with trial-based (mixed) data
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" data-md-toggle="toc" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          SBI with trial-based data
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        SBI with trial-based data
       </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#amortization-of-neural-network-training-iid-inference-with-nle-nre" class="md-nav__link">
+    Amortization of neural network training: iid-inference with NLE / NRE
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#full-amortization-iid-inference-with-npe-and-permutation-invariant-embedding-nets" class="md-nav__link">
+    Full amortization: iid-inference with NPE and permutation-invariant embedding nets
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi-with-trial-based-data" class="md-nav__link">
+    SBI with trial-based data
+  </a>
+  
+    <nav class="md-nav" aria-label="SBI with trial-based data">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-analytical-posterior-concentrates-around-true-parameters-with-increasing-number-of-iid-trials" class="md-nav__link">
+    The analytical posterior concentrates around true parameters with increasing number of IID trials
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#iid-inference-with-nle" class="md-nav__link">
+    IID inference with NLE
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#iid-inference-with-npe-using-permutation-invariant-embedding-nets" class="md-nav__link">
+    IID inference with NPE using permutation-invariant embedding nets
+  </a>
+  
+    <nav class="md-nav" aria-label="IID inference with NPE using permutation-invariant embedding nets">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#construct-training-data-set" class="md-nav__link">
+    Construct training data set.
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#build-embedding-net" class="md-nav__link">
+    Build embedding net
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#run-training" class="md-nav__link">
+    Run training
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#amortized-inference" class="md-nav__link">
+    Amortized inference
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -668,6 +789,20 @@
     <li class="md-nav__item">
       <a href="../../examples/00_HH_simulator/" class="md-nav__link">
         Hodgkin-Huxley example
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/01_decision_making_model/" class="md-nav__link">
+        Decision making model
       </a>
     </li>
   
@@ -1347,6 +1482,41 @@ Drawing 5000 posterior samples:   0%|          | 0/5000 [00:00&lt;?, ?it/s]
       
         
 <footer class="md-footer">
+  
+    <nav class="md-footer__inner md-grid" aria-label="Footer">
+      
+        
+        <a href="../10_crafting_summary_statistics/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Crafting summary statistics" rel="prev">
+          <div class="md-footer__button md-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12z"/></svg>
+          </div>
+          <div class="md-footer__title">
+            <div class="md-ellipsis">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              Crafting summary statistics
+            </div>
+          </div>
+        </a>
+      
+      
+        
+        <a href="../12_diagnostics_posterior_predictive_check/" class="md-footer__link md-footer__link--next" aria-label="Next: Posterior predictive checks" rel="next">
+          <div class="md-footer__title">
+            <div class="md-ellipsis">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              Posterior predictive checks
+            </div>
+          </div>
+          <div class="md-footer__button md-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11H4z"/></svg>
+          </div>
+        </a>
+      
+    </nav>
   
   <div class="md-footer-meta md-typeset">
     <div class="md-footer-meta__inner md-grid">

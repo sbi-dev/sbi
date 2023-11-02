@@ -485,8 +485,8 @@
   
   
     <li class="md-nav__item">
-      <a href="../14_multi-trial-data-and-mixed-data-types.md" class="md-nav__link">
-        SBI with trial-based (mixed) data
+      <a href="../14_iid_data_and_permutation_invariant_embeddings/" class="md-nav__link">
+        SBI with trial-based data
       </a>
     </li>
   
@@ -754,6 +754,20 @@
 
             
           
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../examples/01_decision_making_model/" class="md-nav__link">
+        Decision making model
+      </a>
+    </li>
+  
+
+            
+          
         </ul>
       </nav>
     </li>
@@ -961,10 +975,9 @@
                 
                 <h1 id="mcmc-diagnostics-with-arviz">MCMC diagnostics with <a href="https://python.arviz.org/">Arviz</a><a class="headerlink" href="#mcmc-diagnostics-with-arviz" title="Permanent link">&para;</a></h1>
 <p>This tutorial shows how to evaluate the quality of MCMC samples generated via <code>sbi</code> using the <code>arviz</code> package. </p>
-<p>We demonstrate this case using the trial-based simulator presented in Tutorial 14: A toy simulator mimicking the drift-diffusion model of decision-making. </p>
 <p>Outline:</p>
-<p>1) Train MNLE to approximate the likelihood underlying the simulator
-2) Run MCMC using <code>pyro</code> MCMC samplers via <code>sbi</code> interface
+<p>1) Train MNLE to approximate the likelihood underlying the simulator<br />
+2) Run MCMC using <code>pyro</code> MCMC samplers via <code>sbi</code> interface<br />
 3) Use <code>arviz</code> to visualize the posterior, predictive distributions and MCMC diagnostics. </p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">arviz</span> <span class="k">as</span> <span class="nn">az</span>
 <span class="kn">import</span> <span class="nn">torch</span>
@@ -999,7 +1012,7 @@
 <span class="p">)</span>
 </code></pre></div>
 <h2 id="train-mnle-to-approximate-the-likelihood">Train MNLE to approximate the likelihood<a class="headerlink" href="#train-mnle-to-approximate-the-likelihood" title="Permanent link">&para;</a></h2>
-<p>For details see <a href="https://www.mackelab.org/sbi/tutorial/14_multi-trial-data-and-mixed-data-types/">tutorial 14</a>. </p>
+<p>For this tutorial, we will use a simple simulator with two parameters. For details see the <a href="https://sbi-dev.github.io/sbi/examples/01_decision_making_model.md/">example on the decision making model</a>. </p>
 <p>Here, we pass <code>mcmc_method="nuts"</code> in order to use the underlying <a href="https://docs.pyro.ai/en/1.8.1/mcmc.html#nuts"><code>pyro</code> No-U-turn sampler</a>, but it would work as well with other samplers (e.g. &ldquo;slice_np_vectorized&rdquo;, &ldquo;hmc&rdquo;). </p>
 <p>Additionally, when calling <code>posterior.sample(...)</code> we pass <code>return_arviz=True</code> so that the <a href="https://arviz-devs.github.io/arviz/api/generated/arviz.InferenceData.html#arviz.InferenceData"><code>Arviz InferenceData</code></a> object is returned. This object gives us access to the wealth of MCMC diagnostics tool provided by <code>arviz</code>.</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># Generate training data and train MNLE.</span>

@@ -46,6 +46,11 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
+         <loc>https://sbi-dev.github.io/sbi/examples/01_decision_making_model/</loc>
+         <lastmod>2023-11-02</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
          <loc>https://sbi-dev.github.io/sbi/faq/question_01/</loc>
          <lastmod>2023-11-02</lastmod>
          <changefreq>daily</changefreq>
