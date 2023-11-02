@@ -36,7 +36,7 @@ def my_simulator(parameters):
 
 You can also write your own code to parallelize simulations with whatever 
 multiprocessing framework you prefer. You can then simulate your data outside of `sbi` and pass the simulated data as shown in the 
-[flexible interface](https://www.mackelab.org/sbi/tutorial/02_flexible_interface/): 
+[flexible interface](https://sbi-dev.github.io/sbi/tutorial/02_flexible_interface/): 
 
 
 ### Some more background
@@ -44,4 +44,4 @@ multiprocessing framework you prefer. You can then simulate your data outside of
 `sbi` uses `joblib` to parallelize simulations, which in turn uses `pickle` or 
 `cloudpickle` to serialize the simulator. Almost all simulators will be picklable with 
 `cloudpickle`, but we have experienced issues e.g. with `neuron` simulators, see
-[here](https://github.com/mackelab/sbi/issues/317).
+[here](https://github.com/sbi-dev/sbi/issues/317).
