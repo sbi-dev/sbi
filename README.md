@@ -1,8 +1,8 @@
 [![PyPI version](https://badge.fury.io/py/sbi.svg)](https://badge.fury.io/py/sbi)
 [![Contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](https://github.com/sbi-dev/sbi/blob/master/CONTRIBUTING.md)
 [![Tests](https://github.com/sbi-dev/sbi/workflows/Tests/badge.svg?branch=main)](https://github.com/sbi-dev/sbi/actions)
-[![codecov](https://codecov.io/gh/mackelab/sbi/branch/main/graph/badge.svg)](https://codecov.io/gh/sbi-dev/sbi)
-[![GitHub license](https://img.shields.io/github/license/mackelab/sbi)](https://github.com/sbi-dev/sbi/blob/master/LICENSE.txt)
+[![codecov](https://codecov.io/gh/sbi-dev/sbi/branch/main/graph/badge.svg)](https://codecov.io/gh/sbi-dev/sbi)
+[![GitHub license](https://img.shields.io/github/license/sbi-dev/sbi)](https://github.com/sbi-dev/sbi/blob/master/LICENSE.txt)
 [![DOI](https://joss.theoj.org/papers/10.21105/joss.02505/status.svg)](https://doi.org/10.21105/joss.02505)
 
 ## sbi: simulation-based inference
@@ -97,7 +97,7 @@ We wish to maintain a positive community, please read our [Code of Conduct](CODE
 `sbi` is the successor (using PyTorch) of the
 [`delfi`](https://github.com/mackelab/delfi) package. It was started as a fork of Conor
 M. Durkan's `lfi`. `sbi` runs as a community project; development is coordinated at the
-[mackelab](https://uni-tuebingen.de/en/research/core-research/cluster-of-excellence-machine-learning/research/research/cluster-research-groups/professorships/machine-learning-in-science/). See also [credits](https://github.com/sbi-dev/sbi/blob/master/docs/docs/credits.md).
+[mackelab](https://www.mackelab.org/). See also [credits](https://github.com/sbi-dev/sbi/blob/master/docs/docs/credits.md).
 
 ## Support
 
