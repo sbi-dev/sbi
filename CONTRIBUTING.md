@@ -7,7 +7,7 @@ the output, as well as the setup you used to run inference (i.e. number of simul
 number of rounds,...).
 
 To report bugs and suggest features (including better documentation), please equally
-head over to [issues on GitHub](https://github.com/mackelab/sbi/issues).
+head over to [issues on GitHub](https://github.com/sbi-dev/sbi/issues).
 
 ## Code contributions
 
@@ -20,7 +20,7 @@ Additionally, we mention all contributors in the releases.
 
 ### Development environment
 
-Clone [the repo](https://github.com/mackelab/sbi) and install all the dependencies using
+Clone [the repo](https://github.com/sbi-dev/sbi) and install all the dependencies using
 the `environment.yml` file to create a conda environment: `conda env create -f
 environment.yml`. If you already have an `sbi` environment and want to refresh
 dependencies, just run `conda env update -f environment.yml --prune`.
@@ -51,9 +51,9 @@ and run them locally.
 
 ## Online documentation
 
-Most of [the documentation](http://mackelab.org/sbi) is written in markdown ([basic
+Most of [the documentation](http://sbi-dev.github.io/sbi) is written in markdown ([basic
 markdown guide](https://guides.github.com/features/mastering-markdown/)).
 
 You can directly fix mistakes and suggest clearer formulations in markdown files simply
 by initiating a PR on through GitHub. Click on [documentation
-file](https://github.com/mackelab/sbi/tree/master/docs/docs) and look for the little pencil at top right.
+file](https://github.com/sbi-dev/sbi/tree/master/docs/docs) and look for the little pencil at top right.

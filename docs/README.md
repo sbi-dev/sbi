@@ -1,6 +1,6 @@
 # Documentation
 
-The documentation is available at: <http://mackelab.org/sbi>
+The documentation is available at: <http://sbi-dev.github.io/sbi>
 
 ## Building the Documentation
 

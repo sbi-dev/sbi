@@ -1,5 +1,5 @@
 site_name: sbi
-site_url: "https://mackelab.org/sbi/"
+site_url: "https://sbi-dev.github.io/sbi/"
 
 nav:
   - Home: index.md
@@ -35,8 +35,8 @@ nav:
   - FAQ: faq.md
   - Credits: credits.md
 
-repo_name: 'mackelab/sbi'
-repo_url: http://github.com/mackelab/sbi
+repo_name: 'sbi-dev/sbi'
+repo_url: http://github.com/sbi-dev/sbi
 
 theme:
   name: 'material'
@@ -49,7 +49,7 @@ theme:
 extra:
   social:
     - icon: 'fontawesome/brands/github-alt'
-      link: 'https://github.com/mackelab/sbi'
+      link: 'https://github.com/sbi-dev/sbi'
 
 markdown_extensions:
   - extra

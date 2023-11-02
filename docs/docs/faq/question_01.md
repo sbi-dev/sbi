@@ -18,7 +18,7 @@ This will make sampling slower, but samples will not 'leak'.
 - if your prior is either Gaussian (torch.distributions.multivariateNormal) or Uniform 
 (sbi.utils.BoxUniform), you can avoid leakage by using a mixture density network as 
 density estimator. I.e., using the 
-[flexible interface](https://www.mackelab.org/sbi/tutorial/03_flexible_interface/), set 
+[flexible interface](https://sbi-dev.github.io/sbi/tutorial/03_flexible_interface/), set 
 `density_estimator='mdn'`. When running inference, there should be a print statement 
 "Using SNPE-C with non-atomic loss"
 

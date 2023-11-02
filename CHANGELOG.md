@@ -92,7 +92,7 @@
 `.build_posterior(sample_with=...)`. (#573)
 - the `posterior` no longer has the the method `.sample_conditional()`. Using this
   feature now requires using the `sampler interface` (see tutorial
-  [here](https://www.mackelab.org/sbi/tutorial/07_conditional_distributions/)) (#573)
+  [here](https://sbi-dev.github.io/sbi/tutorial/07_conditional_distributions/)) (#573)
 - `retrain_from_scratch_each_round` is now called `retrain_from_scratch` (#598, thanks to @jnsbck)
 - API changes that had been introduced in `sbi v0.14.0` and `v0.15.0` are not enforced. Using the interface prior to
   those changes leads to an error (#645)
@@ -208,7 +208,7 @@ posterior = inference.build_posterior(sample_with="mcmc")  # or "rejection"
 
 ## Major changes
 
-- Active subspaces for sensitivity analysis (#394, [tutorial](https://www.mackelab.org/sbi/tutorial/09_sensitivity_analysis/))
+- Active subspaces for sensitivity analysis (#394, [tutorial](https://sbi-dev.github.io/sbi/tutorial/09_sensitivity_analysis/))
 - Method to compute the maximum-a-posteriori estimate from the posterior (#412)
 
 ## API changes
@@ -272,7 +272,7 @@ density_estimator = inference.append_simulations(theta, x).train()
 posterior = inference.build_posterior(density_estimator)  # MCMC kwargs go here.
 ```
 
-More information can be found here [here](https://www.mackelab.org/sbi/tutorial/02_flexible_interface/).
+More information can be found here [here](https://sbi-dev.github.io/sbi/tutorial/02_flexible_interface/).
 
 - Fixed typo in docs for `infer` (thanks @glouppe, #370)
 - New `RestrictionEstimator` to learn regions of bad simulation outputs (#390)
