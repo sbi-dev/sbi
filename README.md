@@ -51,7 +51,7 @@ print(posterior)
 
 ## Inference Algorithms
 
-The following algorithms are currently available:
+The following algorithms are currently available. You can find a tutorial on how to run each of these methods [here](https://sbi-dev.github.io/sbi/tutorial/16_implemented_methods/).
 
 ### Neural Posterior Estimation: amortized (NPE) and sequential (SNPE)
 
