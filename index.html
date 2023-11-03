@@ -400,20 +400,6 @@
   
   
     <li class="md-nav__item">
-      <a href="tutorial/01_gaussian_amortized/" class="md-nav__link">
-        Amortized inference
-      </a>
-    </li>
-  
-
-            
-          
-            
-              
-  
-  
-  
-    <li class="md-nav__item">
       <a href="tutorial/02_flexible_interface/" class="md-nav__link">
         Flexible interface
       </a>
@@ -428,8 +414,8 @@
   
   
     <li class="md-nav__item">
-      <a href="tutorial/11_sampler_interface/" class="md-nav__link">
-        Sampler interface
+      <a href="tutorial/01_gaussian_amortized/" class="md-nav__link">
+        Amortized inference
       </a>
     </li>
   
@@ -503,8 +489,8 @@
   
   
     <li class="md-nav__item">
-      <a href="tutorial/17_vi_posteriors/" class="md-nav__link">
-        Using Variational Inference for Building Posteriors
+      <a href="tutorial/11_sampler_interface/" class="md-nav__link">
+        Sampling algorithms in sbi
       </a>
     </li>
   
@@ -545,6 +531,20 @@
   
   
     <li class="md-nav__item">
+      <a href="tutorial/14_iid_data_and_permutation_invariant_embeddings/" class="md-nav__link">
+        SBI with trial-based data
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
       <a href="tutorial/08_restriction_estimator/" class="md-nav__link">
         Handling invalid simulations
       </a>
@@ -561,20 +561,6 @@
     <li class="md-nav__item">
       <a href="tutorial/10_crafting_summary_statistics/" class="md-nav__link">
         Crafting summary statistics
-      </a>
-    </li>
-  
-
-            
-          
-            
-              
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="tutorial/14_iid_data_and_permutation_invariant_embeddings/" class="md-nav__link">
-        SBI with trial-based data
       </a>
     </li>
   
@@ -1000,10 +986,15 @@
                 <h1 id="sbi-simulation-based-inference"><code>sbi</code>: simulation-based inference<a class="headerlink" href="#sbi-simulation-based-inference" title="Permanent link">&para;</a></h1>
 <p><code>sbi</code>: A Python toolbox for simulation-based inference.</p>
 <p><img alt="using sbi" src="static/infer_demo.gif" /></p>
-<p>Inference can be run in a single line of code:</p>
+<p>Inference can be run in a single line of code</p>
 <div class="highlight"><pre><span></span><code><span class="n">posterior</span> <span class="o">=</span> <span class="n">infer</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">&#39;SNPE&#39;</span><span class="p">,</span> <span class="n">num_simulations</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
 </code></pre></div>
-<p>and you can choose from a variety of <em>amortized</em> and <em>sequential</em> SBI methods.</p>
+<p>or in a few lines for more flexibility:</p>
+<div class="highlight"><pre><span></span><code><span class="n">inference</span> <span class="o">=</span> <span class="n">SNPE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">)</span>
+<span class="n">_</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+<span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span>
+</code></pre></div>
+<p><code>sbi</code> lets you choose from a variety of <em>amortized</em> and <em>sequential</em> SBI methods:</p>
 <p>Amortized methods return a posterior that can be applied to many different observations without retraining,
 whereas sequential methods focus the inference on one particular observation to be more simulation-efficient.
 For an overview of implemented methods see below, or checkout or <a href="https://github.com/mackelab/sbi">GitHub page</a>.</p>

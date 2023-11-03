@@ -312,6 +312,20 @@
               
   
   
+  
+    <li class="md-nav__item">
+      <a href="../02_flexible_interface/" class="md-nav__link">
+        Flexible interface
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
     
   
   
@@ -366,34 +380,6 @@
   
 </nav>
       
-    </li>
-  
-
-            
-          
-            
-              
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../02_flexible_interface/" class="md-nav__link">
-        Flexible interface
-      </a>
-    </li>
-  
-
-            
-          
-            
-              
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../11_sampler_interface/" class="md-nav__link">
-        Sampler interface
-      </a>
     </li>
   
 
@@ -466,8 +452,8 @@
   
   
     <li class="md-nav__item">
-      <a href="../17_vi_posteriors/" class="md-nav__link">
-        Using Variational Inference for Building Posteriors
+      <a href="../11_sampler_interface/" class="md-nav__link">
+        Sampling algorithms in sbi
       </a>
     </li>
   
@@ -508,6 +494,20 @@
   
   
     <li class="md-nav__item">
+      <a href="../14_iid_data_and_permutation_invariant_embeddings/" class="md-nav__link">
+        SBI with trial-based data
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../08_restriction_estimator/" class="md-nav__link">
         Handling invalid simulations
       </a>
@@ -524,20 +524,6 @@
     <li class="md-nav__item">
       <a href="../10_crafting_summary_statistics/" class="md-nav__link">
         Crafting summary statistics
-      </a>
-    </li>
-  
-
-            
-          
-            
-              
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../14_iid_data_and_permutation_invariant_embeddings/" class="md-nav__link">
-        SBI with trial-based data
       </a>
     </li>
   
@@ -938,24 +924,14 @@
 <div class="highlight"><pre><span></span><code><span class="k">def</span> <span class="nf">linear_gaussian</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
     <span class="k">return</span> <span class="n">theta</span> <span class="o">+</span> <span class="mf">1.0</span> <span class="o">+</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn_like</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.1</span>
 </code></pre></div>
-<p>We can then run inference:</p>
+<p>We can then run inference (either with the simple interface of with the flexible interface):</p>
 <div class="highlight"><pre><span></span><code><span class="n">posterior</span> <span class="o">=</span> <span class="n">infer</span><span class="p">(</span><span class="n">linear_gaussian</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="s2">&quot;SNPE&quot;</span><span class="p">,</span> <span class="n">num_simulations</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>Running 1000 simulations.:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
-
-
- Neural network successfully converged after 97 epochs.
-</code></pre></div>
-
 <h2 id="amortized-inference">Amortized inference<a class="headerlink" href="#amortized-inference" title="Permanent link">&para;</a></h2>
 <p>Note that we have not yet provided an observation to the inference procedure. In fact, we can evaluate the posterior for different observations without having to re-run inference. This is called amortization. An amortized posterior is one that is not focused on any particular observation. Naturally, if the diversity of observations is large, any of the inference methods will need to run a sufficient number of simulations for the resulting posterior to perform well across these diverse observations.</p>
 <p>Let&rsquo;s say we have two observations <code>x_o_1 = [0,0,0]</code> and <code>x_o_2 = [2,2,2]</code>:</p>
-<div class="highlight"><pre><span></span><code><span class="n">x_o_1</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span>
-    <span class="mi">3</span><span class="p">,</span>
-<span class="p">)</span>
-<span class="n">x_o_2</span> <span class="o">=</span> <span class="mf">2.0</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span>
-    <span class="mi">3</span><span class="p">,</span>
-<span class="p">)</span>
+<div class="highlight"><pre><span></span><code><span class="n">x_o_1</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="p">,)</span>
+<span class="n">x_o_2</span> <span class="o">=</span> <span class="mf">2.0</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">3</span><span class="p">,)</span>
 </code></pre></div>
 <p>We can draw samples from the posterior given <code>x_o_1</code> and then plot them:</p>
 <div class="highlight"><pre><span></span><code><span class="n">posterior_samples_1</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">x_o_1</span><span class="p">)</span>
@@ -1003,7 +979,7 @@ This makes sense because the simulator always adds <code>1.0</code> in each dime
     <nav class="md-footer__inner md-grid" aria-label="Footer">
       
         
-        <a href="../00_getting_started/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Getting started" rel="prev">
+        <a href="../02_flexible_interface/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Flexible interface" rel="prev">
           <div class="md-footer__button md-icon">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12z"/></svg>
           </div>
@@ -1012,20 +988,20 @@ This makes sense because the simulator always adds <code>1.0</code> in each dime
               <span class="md-footer__direction">
                 Previous
               </span>
-              Getting started
+              Flexible interface
             </div>
           </div>
         </a>
       
       
         
-        <a href="../02_flexible_interface/" class="md-footer__link md-footer__link--next" aria-label="Next: Flexible interface" rel="next">
+        <a href="../16_implemented_methods/" class="md-footer__link md-footer__link--next" aria-label="Next: Implemented algorithms" rel="next">
           <div class="md-footer__title">
             <div class="md-ellipsis">
               <span class="md-footer__direction">
                 Next
               </span>
-              Flexible interface
+              Implemented algorithms
             </div>
           </div>
           <div class="md-footer__button md-icon">
