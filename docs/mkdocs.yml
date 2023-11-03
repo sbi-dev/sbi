@@ -7,18 +7,17 @@ nav:
   - Tutorials and Examples:
       - Introduction:
         - Getting started: tutorial/00_getting_started.md
-        - Amortized inference: tutorial/01_gaussian_amortized.md
         - Flexible interface: tutorial/02_flexible_interface.md
-        - Sampler interface: tutorial/11_sampler_interface.md
+        - Amortized inference: tutorial/01_gaussian_amortized.md
         - Implemented algorithms: tutorial/16_implemented_methods.md
       - Advanced:
         - Multi-round inference: tutorial/03_multiround_inference.md
-        - Using Variational Inference for Building Posteriors: tutorial/17_vi_posteriors.md
+        - Sampling algorithms in sbi: tutorial/11_sampler_interface.md
         - Custom density estimators: tutorial/04_density_estimators.md
         - Learning summary statistics: tutorial/05_embedding_net.md
+        - SBI with trial-based data: tutorial/14_iid_data_and_permutation_invariant_embeddings.md
         - Handling invalid simulations: tutorial/08_restriction_estimator.md
         - Crafting summary statistics: tutorial/10_crafting_summary_statistics.md
-        - SBI with trial-based data: tutorial/14_iid_data_and_permutation_invariant_embeddings.md
       - Diagnostics:
         - Posterior predictive checks: tutorial/12_diagnostics_posterior_predictive_check.md
         - Simulation-based calibration: tutorial/13_diagnostics_simulation_based_calibration.md
