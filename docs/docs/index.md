@@ -4,13 +4,21 @@
 
 ![using sbi](static/infer_demo.gif)
 
-Inference can be run in a single line of code:
+Inference can be run in a single line of code
 
 ```python
 posterior = infer(simulator, prior, method='SNPE', num_simulations=1000)
 ```
 
-and you can choose from a variety of _amortized_ and _sequential_ SBI methods.
+or in a few lines for more flexibility:
+
+```python
+inference = SNPE(prior=prior)
+_ = inference.append_simulations(theta, x).train()
+posterior = inference.build_posterior()
+```
+
+`sbi` lets you choose from a variety of _amortized_ and _sequential_ SBI methods:
 
 Amortized methods return a posterior that can be applied to many different observations without retraining,
 whereas sequential methods focus the inference on one particular observation to be more simulation-efficient.
