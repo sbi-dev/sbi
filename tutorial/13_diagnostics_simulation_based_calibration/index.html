@@ -1072,7 +1072,6 @@
 <p><strong>Note:</strong> SBC requires running inference several times. Using SBC with amortized methods like NPE is hence a justified endavour: repeated inference is cheap and SBC can be performed with little runtime penalty. This does not hold for sequential methods or anything relying on MCMC or VI (here, parallelization is your friend, <code>num_workers&gt;1</code>).</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">torch</span>
 
-<span class="n">_</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span>
 <span class="kn">from</span> <span class="nn">torch</span> <span class="kn">import</span> <span class="n">eye</span><span class="p">,</span> <span class="n">ones</span><span class="p">,</span> <span class="n">zeros</span>
 <span class="kn">from</span> <span class="nn">torch.distributions</span> <span class="kn">import</span> <span class="n">MultivariateNormal</span>
 
@@ -1110,27 +1109,32 @@
     <span class="k">return</span> <span class="n">value</span>
 
 
+<span class="n">_</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
 <span class="n">theta</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="n">simulate_for_sbi</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">num_simulations</span><span class="p">)</span>
 </code></pre></div>
 <div class="codehilite"><pre><span></span><code>Running 5000 simulations.:   0%|          | 0/5000 [00:00&lt;?, ?it/s]
 </code></pre></div>
 
-<div class="highlight"><pre><span></span><code><span class="c1"># let&#39;s obtain an observation</span>
+<div class="highlight"><pre><span></span><code><span class="n">_</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+<span class="c1"># let&#39;s obtain an observation</span>
 <span class="n">theta_o</span> <span class="o">=</span> <span class="n">prior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">1</span><span class="p">,))</span>
 <span class="n">x_o</span> <span class="o">=</span> <span class="n">simulator</span><span class="p">(</span><span class="n">theta_o</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;theta:&quot;</span><span class="p">,</span> <span class="n">theta_o</span><span class="o">.</span><span class="n">numpy</span><span class="p">())</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;x    :&quot;</span><span class="p">,</span> <span class="n">x_o</span><span class="o">.</span><span class="n">numpy</span><span class="p">())</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>theta: [[1.8523536 3.004352 ]]
-x    : [[1.7897944 3.1327424]]
+<div class="codehilite"><pre><span></span><code>theta: [[1.9352932 1.3774877]]
+x    : [[1.941461  1.4396194]]
 </code></pre></div>
 
-<div class="highlight"><pre><span></span><code><span class="c1"># we use a mdn model to have a fast turnaround with training.</span>
+<div class="highlight"><pre><span></span><code><span class="n">_</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+
+<span class="c1"># we use a mdn model to have a fast turnaround with training.</span>
 <span class="n">inferer</span> <span class="o">=</span> <span class="n">SNPE</span><span class="p">(</span><span class="n">prior</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="s2">&quot;mdn&quot;</span><span class="p">)</span>
 <span class="c1"># append simulations and run training.</span>
 <span class="n">inferer</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">train</span><span class="p">();</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 97 epochs.
+<div class="codehilite"><pre><span></span><code> Neural network successfully converged after 65 epochs.
 </code></pre></div>
 
 <div class="highlight"><pre><span></span><code><span class="n">posterior</span> <span class="o">=</span> <span class="n">inferer</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span>
@@ -1148,7 +1152,7 @@ x    : [[1.7897944 3.1327424]]
 <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span>
     <span class="n">samples</span><span class="o">=</span><span class="n">posterior_predictive_samples</span><span class="p">,</span>
     <span class="n">points</span><span class="o">=</span><span class="n">x_o</span><span class="p">,</span>
-    <span class="n">limits</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="mf">0.75</span> <span class="o">*</span> <span class="n">x_o</span><span class="o">.</span><span class="n">flatten</span><span class="p">(),</span> <span class="mf">1.25</span> <span class="o">*</span> <span class="n">x_o</span><span class="o">.</span><span class="n">flatten</span><span class="p">())),</span>
+    <span class="n">limits</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">x_o</span><span class="o">.</span><span class="n">flatten</span><span class="p">()</span> <span class="o">-</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">x_o</span><span class="o">.</span><span class="n">flatten</span><span class="p">()</span> <span class="o">+</span> <span class="mf">1.0</span><span class="p">)),</span>
     <span class="n">offdiag</span><span class="o">=</span><span class="s2">&quot;kde&quot;</span><span class="p">,</span>
     <span class="n">diag</span><span class="o">=</span><span class="s2">&quot;kde&quot;</span><span class="p">,</span>
     <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span>
@@ -1193,24 +1197,24 @@ x    : [[1.7897944 3.1327424]]
 <span class="p">)</span>
 </code></pre></div>
 <div class="codehilite"><pre><span></span><code>kolmogorov-smirnov p-values 
-check_stats[&#39;ks_pvals&#39;] = [0.50026375 0.9563929 ]
+check_stats[&#39;ks_pvals&#39;] = [0.1261853  0.07933955]
 </code></pre></div>
 
 <p>The Kolmogorov-Smirnov (KS test, see also <a href="https://en.wikipedia.org/wiki/Kolmogorov%E2%80%93Smirnov_test#Two-sample_Kolmogorov%E2%80%93Smirnov_test">here</a>) as used by <code>check_sbc</code> provides p-values <code>pvals</code> on the null hypothesis that the samples from <code>ranks</code> are drawn from a uniform distribution (in other words <code>H_0: PDF(ranks) == PDF(uniform)</code>). We are provided two values as our problem is two-dimensional - one p-value for each dimension. </p>
-<p>The null hypothesis (of both distributions being equal) is rejected if the p-values fall below a significance threshold (usually <code>&lt; 0.05</code>). Therefor, vanishing p-values (<code>ks_pvals=0</code>) are interpreted to indicate a vanishing false positive rate to (mistakenly) consider both distrubtions being &ldquo;equal&rdquo;. As we are provided high values of this statistic in dimension 0, samples appear to be from the same distribution, i.e. samples from <code>ranks</code> follow a uniform distribution here. The picture is not so clear cut with dimension 1. This merits a second test.</p>
+<p>The null hypothesis (of both distributions being equal) is rejected if the p-values fall below a significance threshold (usually <code>&lt; 0.05</code>). Therefor, vanishing p-values (<code>ks_pvals=0</code>) are interpreted to indicate a vanishing false positive rate to (mistakenly) consider both distrubtions being &ldquo;equal&rdquo;. Both values are above <code>0.05</code> and we, therefore, cannot claim that inference clearly went wrong. Nonetheless, we can add additional checks:</p>
 <div class="highlight"><pre><span></span><code><span class="nb">print</span><span class="p">(</span>
     <span class="sa">f</span><span class="s2">&quot;c2st accuracies </span><span class="se">\n</span><span class="s2">check_stats[&#39;c2st_ranks&#39;] = </span><span class="si">{</span><span class="n">check_stats</span><span class="p">[</span><span class="s1">&#39;c2st_ranks&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span>
 <span class="p">)</span>
 </code></pre></div>
 <div class="codehilite"><pre><span></span><code>c2st accuracies 
-check_stats[&#39;c2st_ranks&#39;] = [0.571 0.564]
+check_stats[&#39;c2st_ranks&#39;] = [0.604  0.5935]
 </code></pre></div>
 
 <p>The second tier of metrics comparing <code>ranks</code> with a uniform distributions is a <code>c2st</code> test (see <a href="http://arxiv.org/abs/1610.06545">here</a> for details). This is a nonparametric two sample test based on training a classifier to differented one of the ensembles (<code>ranks</code> versus samples from a uniform distribution) by being trained on the other. The values reported are the accuracies from cross-validation. If you see values around <code>0.5</code>, the classifier was unable to differentiate both ensembles, i.e. <code>ranks</code> are very uniform. If the values are high towards <code>1</code>, this matches the case where <code>ranks</code> is very unlike a uniform distribution.</p>
 <h3 id="data-averaged-posterior-dap-versus-prior">Data averaged posterior (DAP) versus prior<a class="headerlink" href="#data-averaged-posterior-dap-versus-prior" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;- c2st accuracies check_stats[&#39;c2st_dap&#39;] = </span><span class="si">{</span><span class="n">check_stats</span><span class="p">[</span><span class="s1">&#39;c2st_dap&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>- c2st accuracies check_stats[&#39;c2st_dap&#39;] = [0.489 0.507]
+<div class="codehilite"><pre><span></span><code>- c2st accuracies check_stats[&#39;c2st_dap&#39;] = [0.5195 0.4785]
 </code></pre></div>
 
 <p>The last metric reported is again based on <code>c2st</code> computed per dimension of <code>theta</code>. If you see values around <code>0.5</code>, the <code>c2st</code> classifier was unable to differentiate both ensembles for each dimension of <code>theta</code>, i.e. <code>dap</code> are much like (if not identical to) the prior. If the values are very high towards <code>1</code>, this represents the case where <code>dap</code> is very unlike the prior distribution.</p>
