@@ -2,6 +2,8 @@
 
 ## API change
 
+- We have moved `sbi` to an new github organization: `https://github.com/sbi-dev/sbi`
+- We have changed the website of the `sbi` docs: `https://sbi-dev.github.io/sbi/`.
 - `sbi.analysis.pairplot`: `upper` was replaced by `offdiag` and will be deprecated in a future release.
 
 ## Features and enhancements
@@ -23,6 +25,8 @@
 - bug fix for simulation-based calibration with VI posteriors (@janfb, #834, #838)
 - bug fix for BoxUniform device handling (@janfb, #854, #856)
 - bug fix for MAP estimates with independent priors (@janfb, #867)
+- bug fix for tutorial on SBC (@michaeldeistler, #891)
+- fix spurious seeding for `simulate_for_sbi` (@jan-matthis, #876)
 
 # v0.21.0
 
