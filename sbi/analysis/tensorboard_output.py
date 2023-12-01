@@ -175,9 +175,11 @@ def _get_event_data_from_log_dir(
                 # we inspect their argument signature. These events are named tuples
                 # that can be found here:
                 # https://github.com/tensorflow/tensorboard/blob/b84f3738032277894c6f3fd3e011f032a89d002c/tensorboard/backend/event_processing/event_accumulator.py#L37
+                # When looping over `inspect.getfullargspec()` there is also a `self`
+                # attribute.
                 _type = type(data[0])
                 for attribute in inspect.getfullargspec(_type).args:
-                    if not attribute.startswith("_"):
+                    if not attribute.startswith("_") and not attribute == "self":
                         if attribute not in all_event_data[tag_type][tag]:
                             all_event_data[tag_type][tag][attribute] = []
                         for datapoint in data:
