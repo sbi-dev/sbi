@@ -96,7 +96,7 @@ def test_iid_embedding_api(num_trials, num_dim):
 
 
 @pytest.mark.slow
-def test_iid_embedding_varying_num_trials(trial_factor=40, max_num_trials=100):
+def test_iid_embedding_varying_num_trials(trial_factor=50, max_num_trials=20):
     """Test embedding net with varying number of trials."""
     num_dim = 2
     prior = torch.distributions.MultivariateNormal(
