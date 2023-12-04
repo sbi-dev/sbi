@@ -27,6 +27,7 @@
 - bug fix for MAP estimates with independent priors (@janfb, #867)
 - bug fix for tutorial on SBC (@michaeldeistler, #891)
 - fix spurious seeding for `simulate_for_sbi` (@jan-matthis, #876)
+- bump python version of github action tests to `3.9.13` (@michaeldeistler, #888, #900)
 
 # v0.21.0
 
