@@ -20,7 +20,7 @@ jobs:
 
     - uses: actions/setup-python@v4
       with:
-        python-version: '3.7.6'
+        python-version: '3.9.13'
         architecture: 'x64'
 
     - name: Install dependencies
