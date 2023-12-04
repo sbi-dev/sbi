@@ -954,7 +954,7 @@ def _get_default_opts():
         "samples_colors": plt.rcParams["axes.prop_cycle"].by_key()["color"][0::2],
         "points_colors": plt.rcParams["axes.prop_cycle"].by_key()["color"][1::2],
         # ticks
-        "tickformatter": mpl.ticker.FormatStrFormatter("%g"),
+        "tickformatter": mpl.ticker.FormatStrFormatter("%g"),  # type: ignore
         "tick_labels": None,
         # options for hist
         "hist_diag": {
@@ -1068,7 +1068,7 @@ def _sbc_rank_plot(
     show_ylabel: bool = False,
     sharey: bool = False,
     fig: Optional[Figure] = None,
-    ax: Optional[Axes] = None,
+    ax=None,  # no type hint to avoid hassle with pyright. Should be `array(Axes).`
     figsize: Optional[tuple] = None,
 ) -> Tuple[Figure, Axes]:
     """Plot simulation-based calibration ranks as empirical CDFs or histograms.
