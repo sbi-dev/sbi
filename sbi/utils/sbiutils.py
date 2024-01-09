@@ -914,11 +914,14 @@ def gradient_ascent(
     return theta_transform.inv(best_theta_overall), max_val  # type: ignore
 
 
-def seed_all_backends(seed: Optional[int] = None) -> None:
+def seed_all_backends(seed: Optional[Union[int, Tensor]] = None) -> None:
     """Sets all python, numpy and pytorch seeds."""
 
     if seed is None:
         seed = int(torch.randint(1_000_000, size=(1,)))
+    else:
+        # Cast Tensor to int (required by math.random since Python 3.11)
+        seed = int(seed)
 
     random.seed(seed)
     np.random.seed(seed)
