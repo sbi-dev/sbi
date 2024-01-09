@@ -920,6 +920,7 @@ def seed_all_backends(seed: Optional[Union[int, Tensor]] = None) -> None:
     if seed is None:
         seed = int(torch.randint(1_000_000, size=(1,)))
     else:
+        # Cast Tensor to int (required by math.random since Python 3.11)
         seed = int(seed)
 
     random.seed(seed)
