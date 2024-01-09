@@ -919,6 +919,8 @@ def seed_all_backends(seed: Optional[int] = None) -> None:
 
     if seed is None:
         seed = int(torch.randint(1_000_000, size=(1,)))
+    else:
+        seed = int(seed)
 
     random.seed(seed)
     np.random.seed(seed)
