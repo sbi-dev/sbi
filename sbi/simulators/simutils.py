@@ -43,6 +43,7 @@ def simulate_in_batches(
     """
 
     num_sims, *_ = theta.shape
+    seed = int(seed)
     seed_all_backends(seed)
 
     if num_sims == 0:
