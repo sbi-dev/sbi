@@ -85,7 +85,7 @@ def check_device(device: str) -> None:
             f"""Could not instantiate torch.randn(1, device={device}). Make sure
              the device is set up properly and that you are passing the
              corresponding device string. It should be something like 'cuda',
-             'cuda:0', or 'mps'."""
+             'cuda:0', or 'mps'. Error message: {exc}."""
         ) from exc
 
 

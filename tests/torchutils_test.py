@@ -3,6 +3,7 @@
 
 """Test PyTorch utility functions."""
 from __future__ import annotations
+
 from typing import Optional
 
 import numpy as np
@@ -200,7 +201,7 @@ def test_dkl_gauss():
         )
 
 
-@pytest.mark.parametrize("device_input", ("cpu", "gpu", "cuda", "cuda:0", "mps", ))
+@pytest.mark.parametrize("device_input", ("cpu", "gpu", "cuda", "cuda:0", "mps"))
 def test_process_device(device_input: str) -> None:
     """Test whether the device is processed correctly."""
 
