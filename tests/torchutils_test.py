@@ -3,8 +3,10 @@
 
 """Test PyTorch utility functions."""
 from __future__ import annotations
+from typing import Optional
 
 import numpy as np
+import pytest
 import torch
 import torchtestcase
 from torch import distributions as distributions
@@ -196,3 +198,34 @@ def test_dkl_gauss():
             f"Monte-Carlo-based KLd={monte_carlo_dkl} is too far from the torch"
             f" implementation, {torch_dkl}."
         )
+
+
+@pytest.mark.parametrize("device_input", ("cpu", "gpu", "cuda", "cuda:0", "mps", ))
+def test_process_device(device_input: str) -> None:
+    """Test whether the device is processed correctly."""
+
+    try:
+        device_output = torchutils.process_device(device_input)
+        if device_input == "cpu":
+            assert device_output == "cpu"
+        elif device_input == "gpu":
+            if torch.cuda.is_available():
+                current_gpu_index = torch.cuda.current_device()
+                assert device_output == f"cuda:{current_gpu_index}"
+            elif torch.backends.mps.is_available():
+                assert device_output == "mps"
+
+        if device_input == "cuda" and torch.cuda.is_available():
+            assert device_output == "cuda:0"
+        if device_input == "cuda:0" and torch.cuda.is_available():
+            assert device_output == "cuda:0"
+        if device_input == "mps" and torch.backends.mps.is_available():
+            assert device_output == "mps"
+
+    except RuntimeError:
+        # this should not happen for cpu
+        assert not device_input == "cpu"
+
+        # should only happen if no gpu is available
+        if device_input == "gpu":
+            assert not torchutils.gpu_available()
