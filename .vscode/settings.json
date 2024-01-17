@@ -12,7 +12,7 @@
         "editor.defaultFormatter": "ms-python.black-formatter",
         "editor.formatOnSave": true,
         "editor.codeActionsOnSave": {
-            "source.sortImports": true
+            "source.sortImports": "explicit"
         }, // OK as long as isort 3rd parties managed in setup.cfg?, see below
         "editor.wordWrapColumn": 88,
         "editor.renderWhitespace": "boundary",
