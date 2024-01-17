@@ -3,6 +3,7 @@
 
 """Various PyTorch utility functions."""
 
+import os
 import warnings
 from typing import Any, Optional, Union
 
@@ -16,9 +17,12 @@ from sbi.types import Array, OneOrMore
 
 
 def process_device(device: str) -> str:
-    """Set and return the default device to cpu or cuda.
+    """Set and return the default device to cpu or gpu (cuda, mps).
 
-    Throws an AssertionError if the prior is not matching the training device not.
+    Args:
+        device: target torch device
+    Returns:
+        device: processed string, e.g., "cuda" is mapped to "cuda:0".
     """
 
     # NOTE: we might want to add support for other devices in the future, e.g., MPS
@@ -34,22 +38,55 @@ def process_device(device: str) -> str:
             "only for large neural networks with operations that are fast on the "
             "GPU, e.g., for a CNN or RNN `embedding_net`."
         )
-        if device in gpu_devices:
-            assert torch.cuda.is_available(), "CUDA is not available."
-            current_gpu_index = torch.cuda.current_device()
-            return f"cuda:{current_gpu_index}"
-        else:
-            # Check if the device is a valid cuda device.
-            try:
-                torch.randn(1, device=device)
-            except RuntimeError:
+        # If user just passes 'gpu', search for CUDA or MPS.
+        if device == "gpu":
+            # check whether either pytorch cuda or mps is available
+            if torch.cuda.is_available():
+                current_gpu_index = torch.cuda.current_device()
+                device = f"cuda:{current_gpu_index}"
+                check_device(device)
+                torch.cuda.set_device(device)
+            elif torch.backends.mps.is_available():
+                device = "mps:0"
+                # MPS support is not implemented for a number of operations.
+                # use CPU as fallback.
+                os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
+                # MPS framework does not support double precision.
+                torch.set_default_dtype(torch.float32)
+                check_device(device)
+            else:
                 raise RuntimeError(
-                    f"""Could not instantiate torch.randn(1, device={device}). Please
-                    use one in {gpu_devices}, or cuda:<index> with <index> <
-                    {torch.cuda.device_count()}."""
+                    "Neither CUDA nor MPS is available. "
+                    "Please make sure to install a version of PyTorch that supports "
+                    "CUDA or MPS."
                 )
-            torch.cuda.set_device(device)
-            return device
+        # Else, check whether the custom device is valid.
+        else:
+            check_device(device)
+
+        return device
+
+
+def gpu_available() -> bool:
+    """Check whether GPU is available."""
+    return torch.cuda.is_available() or torch.backends.mps.is_available()
+
+
+def check_device(device: str) -> None:
+    """Check whether the device is valid.
+
+    Args:
+        device: target torch device
+    """
+    try:
+        torch.randn(1, device=device)
+    except (RuntimeError, AssertionError) as exc:
+        raise RuntimeError(
+            f"""Could not instantiate torch.randn(1, device={device}). Make sure
+             the device is set up properly and that you are passing the
+             corresponding device string. It should be something like 'cuda',
+             'cuda:0', or 'mps'."""
+        ) from exc
 
 
 def check_if_prior_on_device(
