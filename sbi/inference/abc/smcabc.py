@@ -1,18 +1,20 @@
+"""Sequential Monte Carlo Approximate Bayesian Computation."""
 from typing import Any, Callable, Dict, Optional, Tuple, Union
 
 import numpy as np
 import torch
 from numpy import ndarray
-from pyro.distributions import Uniform
-from torch import Tensor, ones, tensor
+from torch import Tensor
 from torch.distributions import Distribution, Multinomial, MultivariateNormal
 
 from sbi.inference.abc.abc_base import ABCBASE
 from sbi.types import Array
-from sbi.utils import KDEWrapper, get_kde, process_x, within_support
+from sbi.utils import BoxUniform, KDEWrapper, get_kde, process_x, within_support
 
 
 class SMCABC(ABCBASE):
+    """Sequential Monte Carlo Approximate Bayesian Computation."""
+
     def __init__(
         self,
         simulator: Callable,
@@ -85,6 +87,7 @@ class SMCABC(ABCBASE):
         self.distance_to_x0 = None
         self.simulation_counter = 0
         self.num_simulations = 0
+        self.kernel_variance = None
 
         # Define simulator that keeps track of budget.
         def simulate_with_budget(theta):
@@ -106,7 +109,7 @@ class SMCABC(ABCBASE):
         use_last_pop_samples: bool = True,
         return_summary: bool = False,
         kde: bool = False,
-        kde_kwargs: Dict[str, Any] = {},
+        kde_kwargs: Optional[Dict[str, Any]] = None,
         kde_sample_weights: bool = False,
         lra: bool = False,
         lra_with_weights: bool = False,
@@ -135,7 +138,7 @@ class SMCABC(ABCBASE):
             lra: Whether to run linear regression adjustment as in Beaumont et al. 2002
             lra_with_weights: Whether to run lra as weighted linear regression with SMC
                 weights
-            sass: Whether to determine semi-automatic summary statistics as in
+            sass: Whether to determine semi-automatic summary statistics (sass) as in
                 Fearnhead & Prangle 2012.
             sass_fraction: Fraction of simulation budget used for the initial sass run.
             sass_expansion_degree: Degree of the polynomial feature expansion for the
@@ -165,12 +168,15 @@ class SMCABC(ABCBASE):
 
         pop_idx = 0
         self.num_simulations = num_simulations
+        if kde_kwargs is None:
+            kde_kwargs = {}
+        assert isinstance(epsilon_decay, float) and epsilon_decay > 0.0
 
         # Pilot run for SASS.
         if sass:
             num_pilot_simulations = int(sass_fraction * num_simulations)
             self.logger.info(
-                f"Running SASS with {num_pilot_simulations} pilot samples."
+                "Running SASS with %s pilot samples.", num_pilot_simulations
             )
             sass_transform = self.run_sass_set_xo(
                 num_particles, num_pilot_simulations, x_o, lra, sass_expansion_degree
@@ -188,12 +194,15 @@ class SMCABC(ABCBASE):
         particles, epsilon, distances, x = self._set_xo_and_sample_initial_population(
             x_o, num_particles, num_initial_pop
         )
-        log_weights = torch.log(1 / num_particles * ones(num_particles))
+        log_weights = torch.log(1 / num_particles * torch.ones(num_particles))
 
         self.logger.info(
             (
-                f"population={pop_idx}, eps={epsilon}, ess={1.0}, "
-                f"num_sims={num_initial_pop}"
+                "population=%s, eps=%s, ess=%s, num_sims=%s",
+                pop_idx,
+                epsilon,
+                1.0,
+                num_initial_pop,
             )
         )
 
@@ -238,8 +247,10 @@ class SMCABC(ABCBASE):
 
             self.logger.info(
                 (
-                    f"population={pop_idx} done: eps={epsilon:.6f},"
-                    f" num_sims={self.simulation_counter}."
+                    "population=%s done: eps={epsilon:.6f}, num_sims=%s.",
+                    pop_idx,
+                    epsilon,
+                    self.simulation_counter,
                 )
             )
 
@@ -253,7 +264,7 @@ class SMCABC(ABCBASE):
         # Maybe run LRA and adjust weights.
         if lra:
             self.logger.info("Running Linear regression adjustment.")
-            adjusted_particles, adjusted_weights = self.run_lra_update_weights(
+            adjusted_particles, _ = self.run_lra_update_weights(
                 particles=all_particles[-1],
                 xs=all_x[-1],
                 observation=process_x(x_o),
@@ -266,10 +277,11 @@ class SMCABC(ABCBASE):
 
         if kde:
             self.logger.info(
-                f"""KDE on {final_particles.shape[0]} samples with bandwidth option
-                {kde_kwargs["bandwidth"] if "bandwidth" in kde_kwargs else "cv"}.
-                Beware that KDE can give unreliable results when used with too few
-                samples and in high dimensions."""
+                """KDE on %s samples with bandwidth option %s. Beware that KDE can give
+                unreliable results when used with too few samples and in high
+                dimensions.""",
+                final_particles.shape[0],
+                kde_kwargs["bandwidth"] if "bandwidth" in kde_kwargs else "cv",
             )
             # Maybe get particles weights from last population for weighted KDE.
             if kde_sample_weights:
@@ -398,8 +410,9 @@ class SMCABC(ABCBASE):
                 if use_last_pop_samples:
                     num_remaining = num_particles - num_accepted_particles
                     self.logger.info(
-                        f"""Simulation Budget exceeded, filling up with {num_remaining}
-                        samples from last population."""
+                        """Simulation Budget exceeded, filling up with %s
+                        samples from last population.""",
+                        num_remaining,
                     )
                     # Some new particles have been accepted already, therefore
                     # fill up the remaining once with old particles and weights.
@@ -467,8 +480,10 @@ class SMCABC(ABCBASE):
         except IndexError:
             self.logger.warning(
                 (
-                    f"Accepted unique distances={distances} don't match "
-                    f"quantile={quantile:.2f}. Selecting last distance."
+                    """Accepted unique distances=%s don't match quantile=%s. Selecting
+                    last distance.""",
+                    distances,
+                    quantile,
                 )
             )
             qidx = -1
@@ -494,7 +509,7 @@ class SMCABC(ABCBASE):
 
         # We still have to loop over particles here because
         # the kernel log probs are already batched across old particles.
-        log_weighted_sum = tensor(
+        log_weighted_sum = torch.tensor(
             [
                 torch.logsumexp(old_log_weights + kernel_log_prob(new_particle), dim=0)
                 for new_particle in new_particles
@@ -552,6 +567,7 @@ class SMCABC(ABCBASE):
         samples_per_dim: int = 100,
         kernel_variance_scale: float = 1.0,
     ) -> Tensor:
+        """Return kernel variance for a given population of particles and weights."""
         if self.kernel == "gaussian":
             # For variant C, Beaumont et al. 2009, the kernel variance comes from the
             # previous population.
@@ -563,7 +579,7 @@ class SMCABC(ABCBASE):
                 )
                 # Make sure variance is nonsingular.
                 try:
-                    torch.cholesky(kernel_variance_scale * population_cov)
+                    torch.linalg.cholesky(kernel_variance_scale * population_cov)
                 except RuntimeError:
                     self.logger.warning(
                         """"Singular particle covariance, using unit covariance."""
@@ -591,6 +607,7 @@ class SMCABC(ABCBASE):
         """Return new kernel distribution for a given set of paramters."""
 
         if self.kernel == "gaussian":
+            assert self.kernel_variance is not None, "get kernel variance first."
             assert self.kernel_variance.ndim == 2
             return MultivariateNormal(
                 loc=thetas, covariance_matrix=self.kernel_variance
@@ -601,7 +618,7 @@ class SMCABC(ABCBASE):
             high = thetas + self.kernel_variance
             # Move batch shape to event shape to get Uniform that is multivariate in
             # parameter dimension.
-            return Uniform(low=low, high=high).to_event(1)
+            return BoxUniform(low=low, high=high)
         else:
             raise ValueError(f"Kernel, '{self.kernel}' not supported.")
 
@@ -620,12 +637,12 @@ class SMCABC(ABCBASE):
         ess = (1 / torch.sum(torch.exp(2.0 * log_weights), dim=0)) / num_particles
         # Resampling of weights for low ESS only for Sisson et al. 2007.
         if ess < ess_min:
-            self.logger.info(f"ESS={ess:.2f} too low, resampling pop {pop_idx}...")
+            self.logger.info("ESS=%s too low, resampling pop %s...", ess, pop_idx)
             # First resample, then set to uniform weights as in Sisson et al. 2007.
             particles = self.sample_from_population_with_weights(
                 particles, torch.exp(log_weights), num_samples=num_particles
             )
-            log_weights = torch.log(1 / num_particles * ones(num_particles))
+            log_weights = torch.log(1 / num_particles * torch.ones(num_particles))
 
         return particles, log_weights
 
@@ -684,6 +701,8 @@ class SMCABC(ABCBASE):
         ) = self._set_xo_and_sample_initial_population(
             x_o, num_particles, num_pilot_simulations
         )
+        assert self.x_o is not None, "x_o not set yet."
+
         # Adjust with LRA.
         if lra:
             pilot_particles = self.run_lra(pilot_particles, pilot_xs, self.x_o)

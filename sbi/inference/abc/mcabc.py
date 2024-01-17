@@ -1,3 +1,4 @@
+"""Monte-Carlo Approximate Bayesian Computation (Rejection ABC)."""
 from typing import Any, Callable, Dict, Optional, Tuple, Union
 
 import torch
@@ -9,6 +10,8 @@ from sbi.utils import KDEWrapper, get_kde, process_x
 
 
 class MCABC(ABCBASE):
+    """Monte-Carlo Approximate Bayesian Computation (Rejection ABC)."""
+
     def __init__(
         self,
         simulator: Callable,
@@ -64,7 +67,7 @@ class MCABC(ABCBASE):
         sass_fraction: float = 0.25,
         sass_expansion_degree: int = 1,
         kde: bool = False,
-        kde_kwargs: Dict[str, Any] = {},
+        kde_kwargs: Optional[Dict[str, Any]] = None,
         return_summary: bool = False,
     ) -> Union[Tuple[Tensor, dict], Tuple[KDEWrapper, dict], Tensor, KDEWrapper]:
         r"""Run MCABC and return accepted parameters or KDE object fitted on them.
@@ -107,12 +110,14 @@ class MCABC(ABCBASE):
         assert (eps is not None) ^ (
             quantile is not None
         ), "Eps or quantile must be passed, but not both."
+        if kde_kwargs is None:
+            kde_kwargs = {}
 
         # Run SASS and change the simulator and x_o accordingly.
         if sass:
             num_pilot_simulations = int(sass_fraction * num_simulations)
             self.logger.info(
-                f"Running SASS with {num_pilot_simulations} pilot samples."
+                "Running SASS with %s pilot samples.", num_pilot_simulations
             )
             num_simulations -= num_pilot_simulations
 
@@ -123,7 +128,10 @@ class MCABC(ABCBASE):
                 pilot_theta, pilot_x, sass_expansion_degree
             )
 
-            simulator = lambda theta: sass_transform(self._batched_simulator(theta))
+            # Add sass transform to simulator and x_o.
+            def simulator(theta):
+                return sass_transform(self._batched_simulator(theta))
+
             x_o = sass_transform(x_o)
         else:
             simulator = self._batched_simulator
@@ -168,10 +176,11 @@ class MCABC(ABCBASE):
 
         if kde:
             self.logger.info(
-                f"""KDE on {final_theta.shape[0]} samples with bandwidth option
+                """KDE on %s samples with bandwidth option
                 {kde_kwargs["bandwidth"] if "bandwidth" in kde_kwargs else "cv"}.
                 Beware that KDE can give unreliable results when used with too few
-                samples and in high dimensions."""
+                samples and in high dimensions.""",
+                final_theta.shape[0],
             )
 
             kde_dist = get_kde(final_theta, **kde_kwargs)

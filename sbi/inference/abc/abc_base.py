@@ -1,3 +1,4 @@
+"""Base class for Approximate Bayesian Computation methods."""
 import logging
 from abc import ABC
 from typing import Callable, Union
@@ -12,6 +13,8 @@ from sbi.simulators.simutils import simulate_in_batches
 
 
 class ABCBASE(ABC):
+    """Base class for Approximate Bayesian Computation methods."""
+
     def __init__(
         self,
         simulator: Callable,
@@ -47,6 +50,9 @@ class ABCBASE(ABC):
         self._simulator = simulator
         self._show_progress_bars = show_progress_bars
 
+        self.x_o = None
+        self.x_shape = None
+
         # Select distance function.
         self.distance = self.get_distance_function(distance)
 
@@ -77,19 +83,27 @@ class ABCBASE(ABC):
         if isinstance(distance_type, Callable):
             return distance_type
 
-        distances = ["l1", "l2", "mse"]
+        # Select distance function.
+        implemented_distances = ["l1", "l2", "mse"]
         assert (
-            distance_type in distances
-        ), f"{distance_type} must be one of {distances}."
+            distance_type in implemented_distances
+        ), f"{distance_type} must be one of {implemented_distances}."
 
-        if distance_type == "mse":
-            distance = lambda xo, x: torch.mean((xo - x) ** 2, dim=-1)
-        elif distance_type == "l2":
-            distance = lambda xo, x: torch.norm((xo - x), dim=-1)
-        elif distance_type == "l1":
-            distance = lambda xo, x: torch.mean(abs(xo - x), dim=-1)
-        else:
-            raise ValueError(r"Distance {distance_type} not supported.")
+        def mse_distance(xo, x):
+            return torch.mean((xo - x) ** 2, dim=-1)
+
+        def l2_distance(xo, x):
+            return torch.norm((xo - x), dim=-1)
+
+        def l1_distance(xo, x):
+            return torch.mean(abs(xo - x), dim=-1)
+
+        distance_functions = {"mse": mse_distance, "l2": l2_distance, "l1": l1_distance}
+
+        try:
+            distance = distance_functions[distance_type]
+        except KeyError as exc:
+            raise KeyError(f"Distance {distance_type} not supported.") from exc
 
         def distance_fun(observed_data: Tensor, simulated_data: Tensor) -> Tensor:
             """Return distance over batch dimension.
