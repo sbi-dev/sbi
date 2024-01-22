@@ -56,7 +56,7 @@
     ],
     "citation": "https://doi.org/10.21105/joss.02505",
     "relatedLink": [
-        "https://www.mackelab.org/sbi/"
+        "https://sbi-dev.github.io/sbi/"
     ],
     "codeRepository": [
         "https://github.com/mackelab/sbi/"
