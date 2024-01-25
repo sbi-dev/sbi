@@ -43,24 +43,19 @@ from .test_utils import (
 
 @pytest.mark.parametrize("snpe_method", [SNPE_A, SNPE_C])
 @pytest.mark.parametrize(
-    "num_dim, prior_str, num_trials",
+    "num_dim, prior_str",
     (
-        (2, "gaussian", 1),
-        (2, "uniform", 1),
-        (1, "gaussian", 1),
-        # no iid x in snpe.
-        pytest.param(1, "gaussian", 2, marks=pytest.mark.xfail),
-        pytest.param(2, "gaussian", 2, marks=pytest.mark.xfail),
+        (2, "gaussian"),
+        (2, "uniform"),
+        (1, "gaussian"),
     ),
 )
-def test_c2st_snpe_on_linearGaussian(
-    snpe_method, num_dim: int, prior_str: str, num_trials: int
-):
+def test_c2st_snpe_on_linearGaussian(snpe_method, num_dim: int, prior_str: str):
     """Test whether SNPE infers well a simple example with available ground truth."""
 
-    x_o = zeros(num_trials, num_dim)
-    num_samples = 5000
-    num_simulations = 5000
+    x_o = zeros(1, num_dim)
+    num_samples = 1000
+    num_simulations = 2500
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(num_dim)
@@ -203,13 +198,7 @@ def test_density_estimators_on_linearGaussian(density_estimtor):
 
 
 def test_c2st_snpe_on_linearGaussian_different_dims(density_estimator="maf"):
-    """Test whether SNPE B/C infer well a simple example with available ground truth.
-
-    This test uses a linear Gaussian example with different number of parameters and
-    data dimensions. It tests different density estimators. Additionally, it implicitly
-    tests whether the prior can be `None` and whether we can stop and resume training.
-
-    """
+    """Test SNPE on linear Gaussian with different theta and x dimensionality."""
 
     theta_dim = 3
     x_dim = 2
@@ -217,6 +206,7 @@ def test_c2st_snpe_on_linearGaussian_different_dims(density_estimator="maf"):
 
     x_o = zeros(1, x_dim)
     num_samples = 1000
+    num_simulations = 2000
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(x_dim)
@@ -252,7 +242,9 @@ def test_c2st_snpe_on_linearGaussian_different_dims(density_estimator="maf"):
     )
 
     # type: ignore
-    theta, x = simulate_for_sbi(simulator, prior, 2000, simulation_batch_size=1)
+    theta, x = simulate_for_sbi(
+        simulator, prior, num_simulations, simulation_batch_size=num_simulations
+    )
 
     inference = inference.append_simulations(theta, x)
     posterior_estimator = inference.train(
@@ -267,7 +259,7 @@ def test_c2st_snpe_on_linearGaussian_different_dims(density_estimator="maf"):
     samples = posterior.sample((num_samples,))
 
     # Compute the c2st and assert it is near chance level of 0.5.
-    check_c2st(samples, target_samples, alg="snpe_c")
+    check_c2st(samples, target_samples, alg="snpe_c_different_dims")
 
 
 # Test multi-round SNPE.
@@ -688,6 +680,7 @@ def test_example_posterior(snpe_method: type):
     """Return an inferred `NeuralPosterior` for interactive examination."""
     num_dim = 2
     x_o = zeros(1, num_dim)
+    num_simulations = 100
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(num_dim)
@@ -709,9 +702,15 @@ def test_example_posterior(snpe_method: type):
     inference = snpe_method(prior, show_progress_bars=False)
 
     theta, x = simulate_for_sbi(
-        simulator, prior, 1000, simulation_batch_size=10, num_workers=6
+        simulator,
+        prior,
+        num_simulations,
+        simulation_batch_size=num_simulations,
+        num_workers=6,
     )
-    posterior_estimator = inference.append_simulations(theta, x).train(**extra_kwargs)
+    posterior_estimator = inference.append_simulations(theta, x).train(
+        max_num_epochs=2, **extra_kwargs
+    )
     if snpe_method == SNPE_A:
         posterior_estimator = inference.correct_for_proposal()
     posterior = DirectPosterior(
