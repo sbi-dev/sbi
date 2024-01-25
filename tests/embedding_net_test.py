@@ -58,8 +58,11 @@ def test_embedding_net_api(method, num_dim: int, embedding_net: str):
     else:
         raise NameError
 
-    _ = inference.append_simulations(theta, x).train(max_num_epochs=5)
-    posterior = inference.build_posterior().set_default_x(x_o)
+    _ = inference.append_simulations(theta, x).train(max_num_epochs=2)
+    posterior = inference.build_posterior(
+        mcmc_method="slice_np_vectorized",
+        mcmc_parameters=dict(num_chains=2, warmup_steps=10, thin=5),
+    ).set_default_x(x_o)
 
     s = posterior.sample((1,))
     _ = posterior.potential(s)
