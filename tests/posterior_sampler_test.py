@@ -66,9 +66,10 @@ def test_api_posterior_sampler_set(sampling_method: str, set_seed):
         sample_shape=(num_samples, num_chains),
         x=x_o,
         mcmc_parameters={
-            "thin": 3,
+            "thin": 2,
             "num_chains": num_chains,
             "init_strategy": "prior",
+            "warmup_steps": 10,
         },
     )
 
