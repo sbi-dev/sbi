@@ -29,30 +29,38 @@ from sbi.utils import BoxUniform, likelihood_nn, process_prior
 
 from .test_utils import check_c2st, get_prob_outside_uniform_prior
 
+# mcmc params for fast testing.
+mcmc_parameters = {
+    "method": "slice_np_vectorized",
+    "num_chains": 20,
+    "thin": 5,
+    "warmup_steps": 50,
+}
 
-@pytest.mark.parametrize("num_dim", (1, 3))
-def test_api_snl_on_linearGaussian(num_dim: int):
-    """Test API for inference on linear Gaussian model using SNL.
 
-    Avoids expensive computations by training on few simulations and generating few
-    posterior samples.
-
-    Args:
-        num_dim: parameter dimension of the gaussian model
-    """
+@pytest.mark.parametrize("num_dim", (1,))  # dim 3 is tested below.
+@pytest.mark.parametrize("prior_str", ("uniform", "gaussian"))
+def test_api_snl_on_linearGaussian(num_dim: int, prior_str: str):
+    """Test SNLE API with different priors and different number of trials."""
     num_samples = 10
+    num_simulations = 100
 
-    prior_mean = zeros(num_dim)
-    prior_cov = eye(num_dim)
-    prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
+    if prior_str == "gaussian":
+        prior_mean = zeros(num_dim)
+        prior_cov = eye(num_dim)
+        prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
+    else:
+        prior = BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
 
     simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior)
     density_estimator = likelihood_nn("maf", num_transforms=3)
     inference = SNLE(density_estimator=density_estimator, show_progress_bars=False)
 
-    theta, x = simulate_for_sbi(simulator, prior, 1000, simulation_batch_size=50)
+    theta, x = simulate_for_sbi(
+        simulator, prior, num_simulations, simulation_batch_size=num_simulations
+    )
     likelihood_estimator = inference.append_simulations(theta, x).train(
-        training_batch_size=100
+        training_batch_size=100, max_num_epochs=2
     )
 
     for num_trials in [1, 2]:
@@ -64,26 +72,21 @@ def test_api_snl_on_linearGaussian(num_dim: int):
             proposal=prior,
             potential_fn=potential_fn,
             theta_transform=theta_transform,
-            thin=3,
+            **mcmc_parameters,
         )
         posterior.sample(sample_shape=(num_samples,))
 
 
-def test_c2st_snl_on_linearGaussian(density_estimator="maf"):
-    """Test whether SNL infers well a simple example with available ground truth.
-
-    This example has different number of parameters theta than number of x. This test
-    also acts as the only functional test for SNL not marked as slow.
-
-    """
+def test_c2st_snl_on_linearGaussian_different_dims(model_str="maf"):
+    """Test SNLE on linear Gaussian task with different theta and x dims."""
 
     theta_dim = 3
     x_dim = 2
     discard_dims = theta_dim - x_dim
 
     x_o = zeros(1, x_dim)
-    num_samples = 1000
-    num_simulations = 3000
+    num_samples = 500
+    num_simulations = 1000
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(x_dim)
@@ -110,11 +113,11 @@ def test_c2st_snl_on_linearGaussian(density_estimator="maf"):
         ),
         prior,
     )
-    density_estimator = likelihood_nn(model=density_estimator, num_transforms=3)
+    density_estimator = likelihood_nn(model=model_str, num_transforms=3)
     inference = SNLE(density_estimator=density_estimator, show_progress_bars=False)
 
     theta, x = simulate_for_sbi(
-        simulator, prior, num_simulations, simulation_batch_size=50
+        simulator, prior, num_simulations, simulation_batch_size=num_simulations
     )
     likelihood_estimator = inference.append_simulations(theta, x).train()
     potential_fn, theta_transform = likelihood_estimator_based_potential(
@@ -124,18 +127,16 @@ def test_c2st_snl_on_linearGaussian(density_estimator="maf"):
         proposal=prior,
         potential_fn=potential_fn,
         theta_transform=theta_transform,
-        method="slice_np_vectorized",
-        num_chains=5,
-        thin=10,
+        **mcmc_parameters,
     )
     samples = posterior.sample((num_samples,))
 
     # Compute the c2st and assert it is near chance level of 0.5.
-    check_c2st(samples, target_samples, alg=f"snle_a-{density_estimator}")
+    check_c2st(samples, target_samples, alg=f"snle_a-model_str")
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("num_dim", (1, 2))
+@pytest.mark.parametrize("num_dim", (2,))
 @pytest.mark.parametrize("prior_str", ("uniform", "gaussian"))
 def test_c2st_and_map_snl_on_linearGaussian_different(num_dim: int, prior_str: str):
     """Test SNL on linear Gaussian, comparing to ground truth posterior via c2st.
@@ -199,9 +200,7 @@ def test_c2st_and_map_snl_on_linearGaussian_different(num_dim: int, prior_str: s
             proposal=prior,
             potential_fn=potential_fn,
             theta_transform=theta_transform,
-            method="slice_np_vectorized",
-            thin=5,
-            num_chains=5,
+            **mcmc_parameters,
         )
 
         samples = posterior.sample(sample_shape=(num_samples,))
@@ -309,8 +308,7 @@ def test_c2st_multi_round_snl_on_linearGaussian(num_trials: int):
         proposal=prior,
         potential_fn=potential_fn,
         theta_transform=theta_transform,
-        thin=5,
-        num_chains=20,
+        **mcmc_parameters,
     )
 
     theta, x = simulate_for_sbi(
@@ -327,8 +325,7 @@ def test_c2st_multi_round_snl_on_linearGaussian(num_trials: int):
         proposal=prior,
         potential_fn=potential_fn,
         theta_transform=theta_transform,
-        thin=5,
-        num_chains=20,
+        **mcmc_parameters,
     )
 
     samples = posterior.sample(sample_shape=(num_samples,))
@@ -444,7 +441,7 @@ def test_api_snl_sampling_methods(
     num_simulations = 1000
     x_o = zeros((num_trials, num_dim))
     # Test for multiple chains is cheap when vectorized.
-    num_chains = 3 if sampling_method == "slice_np_vectorized" else 1
+    num_chains = 10 if sampling_method == "slice_np_vectorized" else 1
     if sampling_method == "rejection":
         sample_with = "rejection"
     elif (
@@ -491,7 +488,7 @@ def test_api_snl_sampling_methods(
                 proposal=prior,
                 theta_transform=theta_transform,
                 method=sampling_method,
-                thin=3,
+                thin=5,
                 num_chains=num_chains,
                 init_strategy=init_strategy,
             )
