@@ -1,4 +1,5 @@
 """Base class for Approximate Bayesian Computation methods."""
+
 import logging
 from abc import ABC
 from typing import Callable, Union

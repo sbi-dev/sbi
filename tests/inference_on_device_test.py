@@ -423,9 +423,11 @@ def test_embedding_nets_integration_training_device(
             .to(data_device)
         )
 
-        with pytest.warns(
-            UserWarning
-        ) if data_device != training_device else nullcontext():
+        with (
+            pytest.warns(UserWarning)
+            if data_device != training_device
+            else nullcontext()
+        ):
             density_estimator_append = inference.append_simulations(theta, X)
 
         density_estimator_train = density_estimator_append.train(

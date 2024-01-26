@@ -1,4 +1,5 @@
 """Sequential Monte Carlo Approximate Bayesian Computation."""
+
 from typing import Any, Callable, Dict, Optional, Tuple, Union
 
 import numpy as np

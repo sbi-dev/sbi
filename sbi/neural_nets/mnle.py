@@ -81,9 +81,9 @@ def build_mnle(
 
     # Set up a NSF for modelling the continuous data, conditioned on the discrete data.
     cont_nle = build_nsf(
-        batch_x=torch.log(cont_x)
-        if log_transform_x
-        else cont_x,  # log transform manually.
+        batch_x=(
+            torch.log(cont_x) if log_transform_x else cont_x
+        ),  # log transform manually.
         batch_y=torch.cat((batch_y, disc_x), dim=1),  # condition on discrete data too.
         z_score_y=z_score_y,
         z_score_x=z_score_x,

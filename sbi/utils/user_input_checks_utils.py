@@ -166,9 +166,9 @@ class PytorchReturnTypeWrapper(Distribution):
         super().__init__(
             batch_shape=batch_shape,
             event_shape=event_shape,
-            validate_args=prior._validate_args
-            if validate_args is None
-            else validate_args,
+            validate_args=(
+                prior._validate_args if validate_args is None else validate_args
+            ),
         )
 
         self.prior = prior
