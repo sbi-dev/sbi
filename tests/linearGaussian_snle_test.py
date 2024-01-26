@@ -133,11 +133,11 @@ def test_c2st_snl_on_linear_gaussian_different_dims(model_str="maf"):
     samples = posterior.sample((num_samples,))
 
     # Compute the c2st and assert it is near chance level of 0.5.
-    check_c2st(samples, target_samples, alg=f"snle_a-model_str")
+    check_c2st(samples, target_samples, alg=f"snle_a-{model_str}")
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("num_dim", (2,))
+@pytest.mark.parametrize("num_dim", (1, 2))
 @pytest.mark.parametrize("prior_str", ("uniform", "gaussian"))
 def test_c2st_and_map_snl_on_linearGaussian_different(num_dim: int, prior_str: str):
     """Test SNL on linear Gaussian, comparing to ground truth posterior via c2st.
