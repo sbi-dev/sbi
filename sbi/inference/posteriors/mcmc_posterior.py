@@ -117,9 +117,9 @@ class MCMCPosterior(NeuralPosterior):
                 v0.19.0. Instead, use e.g.,
                 `init_strategy_parameters={"num_candidate_samples": 1000}`"""
             )
-            self.init_strategy_parameters[
-                "num_candidate_samples"
-            ] = init_strategy_num_candidates
+            self.init_strategy_parameters["num_candidate_samples"] = (
+                init_strategy_num_candidates
+            )
 
         self.potential_ = self._prepare_potential(method)
 
@@ -239,9 +239,9 @@ class MCMCPosterior(NeuralPosterior):
                 v0.19.0. Instead, use e.g.,
                 `init_strategy_parameters={"num_candidate_samples": 1000}`"""
             )
-            self.init_strategy_parameters[
-                "num_candidate_samples"
-            ] = init_strategy_num_candidates
+            self.init_strategy_parameters["num_candidate_samples"] = (
+                init_strategy_num_candidates
+            )
         if sample_with is not None:
             raise ValueError(
                 f"You set `sample_with={sample_with}`. As of sbi v0.18.0, setting "
@@ -661,9 +661,9 @@ class MCMCPosterior(NeuralPosterior):
             self._posterior_sampler is not None
         ), """No samples have been generated, call .sample() first."""
 
-        sampler: Union[
-            MCMC, SliceSamplerSerial, SliceSamplerVectorized
-        ] = self._posterior_sampler
+        sampler: Union[MCMC, SliceSamplerSerial, SliceSamplerVectorized] = (
+            self._posterior_sampler
+        )
 
         # If Pyro sampler and samples not transformed, use arviz' from_pyro.
         # Exclude 'slice' kernel as it lacks the 'divergence' diagnostics key.

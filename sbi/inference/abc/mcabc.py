@@ -1,4 +1,5 @@
 """Monte-Carlo Approximate Bayesian Computation (Rejection ABC)."""
+
 from typing import Any, Callable, Dict, Optional, Tuple, Union
 
 import torch

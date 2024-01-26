@@ -49,7 +49,11 @@ def test_running_sbc(method, prior, reduce_fn_str, sampler, model="mdn"):
         training_batch_size=100, max_num_epochs=max_num_epochs
     )
     if method == SNLE:
-        posterior_kwargs = {"sample_with": "mcmc" if sampler == "mcmc" else "vi"}
+        posterior_kwargs = {
+            "sample_with": "mcmc" if sampler == "mcmc" else "vi",
+            "mcmc_method": "slice_np_vectorized",
+            "mcmc_parameters": {"num_chains": 10, "thin": 5, "warmup_steps": 10},
+        }
     else:
         posterior_kwargs = {}
 

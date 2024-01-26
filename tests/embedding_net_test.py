@@ -3,8 +3,9 @@ from __future__ import annotations
 import pytest
 import torch
 from torch import eye, ones, zeros
+from torch.distributions import MultivariateNormal
 
-from sbi import utils as utils
+from sbi import utils
 from sbi.inference import SNLE, SNPE, SNRE, simulate_for_sbi
 from sbi.neural_nets.embedding_nets import (
     CNNEmbedding,
@@ -58,8 +59,11 @@ def test_embedding_net_api(method, num_dim: int, embedding_net: str):
     else:
         raise NameError
 
-    _ = inference.append_simulations(theta, x).train(max_num_epochs=5)
-    posterior = inference.build_posterior().set_default_x(x_o)
+    _ = inference.append_simulations(theta, x).train(max_num_epochs=2)
+    posterior = inference.build_posterior(
+        mcmc_method="slice_np_vectorized",
+        mcmc_parameters=dict(num_chains=2, warmup_steps=10, thin=5),
+    ).set_default_x(x_o)
 
     s = posterior.sample((1,))
     _ = posterior.potential(s)
@@ -67,7 +71,8 @@ def test_embedding_net_api(method, num_dim: int, embedding_net: str):
 
 @pytest.mark.parametrize("num_trials", [1, 2])
 @pytest.mark.parametrize("num_dim", [1, 2])
-def test_iid_embedding_api(num_trials, num_dim):
+def test_embedding_api_with_multiple_trials(num_trials, num_dim):
+    """Tests the API when using iid trial-based data."""
     prior = utils.BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
 
     num_thetas = 1000
@@ -97,7 +102,7 @@ def test_iid_embedding_api(num_trials, num_dim):
 
 @pytest.mark.slow
 def test_iid_embedding_varying_num_trials(trial_factor=50, max_num_trials=20):
-    """Test embedding net with varying number of trials."""
+    """Test inference accuracy with embeddings for varying number of trials."""
     num_dim = 2
     prior = torch.distributions.MultivariateNormal(
         torch.zeros(num_dim), torch.eye(num_dim)
@@ -241,9 +246,6 @@ def test_iid_inference(num_trials, num_dim, method):
 @pytest.mark.parametrize("input_shape", [(32,), (32, 32), (32, 64)])
 @pytest.mark.parametrize("num_channels", (1, 2, 3))
 def test_1d_and_2d_cnn_embedding_net(input_shape, num_channels):
-    import torch
-    from torch.distributions import MultivariateNormal
-
     estimator_provider = posterior_nn(
         "mdn",
         embedding_net=CNNEmbedding(
