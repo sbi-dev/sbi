@@ -125,7 +125,9 @@ def test_inference_with_2d_x(embedding, method):
         theta_transform=theta_transform,
         proposal=prior,
         method="slice_np_vectorized",
-        num_chains=2,
+        num_chains=10,
+        warmup_steps=10,
+        thin=5,
     )
 
     posterior.potential(posterior.sample((num_samples,), show_progress_bars=False))

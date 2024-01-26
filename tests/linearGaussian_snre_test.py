@@ -46,37 +46,36 @@ mcmc_parameters = {
 
 @pytest.mark.parametrize("num_dim", (1,))  # dim 3 is tested below.
 @pytest.mark.parametrize("SNRE", (SNRE_B, SNRE_C))
-def test_api_sre_on_linearGaussian(num_dim: int, SNRE: RatioEstimator):
-    """Test inference API of SRE with linear Gaussian model.
+def test_api_snre_multiple_trials_and_rounds_map(num_dim: int, SNRE: RatioEstimator):
+    """Test SNRE API with 2 rounds, different priors num trials and MAP."""
 
-    Avoids intense computation for fast testing of API etc.
-
-    Args:
-        num_dim: parameter dimension of the Gaussian model
-    """
-
+    num_rounds = 2
+    num_samples = 10
+    num_simulations = 100
     prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
 
     simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior)
-    inference = SNRE(classifier="resnet", show_progress_bars=False)
+    inference = SNRE(prior=prior, classifier="mlp", show_progress_bars=False)
 
-    theta, x = simulate_for_sbi(
-        simulator, prior, num_simulations=100, simulation_batch_size=100
-    )
-    ratio_estimator = inference.append_simulations(theta, x).train(max_num_epochs=5)
-
-    for num_trials in [1, 2]:
-        x_o = zeros(num_trials, num_dim)
-        potential_fn, theta_transform = ratio_estimator_based_potential(
-            ratio_estimator=ratio_estimator, prior=prior, x_o=x_o
+    proposals = [prior]
+    for _ in range(num_rounds):
+        theta, x = simulate_for_sbi(
+            simulator,
+            proposals[-1],
+            num_simulations,
+            simulation_batch_size=num_simulations,
         )
-        posterior = MCMCPosterior(
-            potential_fn=potential_fn,
-            theta_transform=theta_transform,
-            proposal=prior,
-            **mcmc_parameters,
+        inference.append_simulations(theta, x).train(
+            training_batch_size=100, max_num_epochs=2
         )
-        posterior.sample(sample_shape=(10,))
+        for num_trials in [1, 3]:
+            x_o = zeros((num_trials, num_dim))
+            posterior = inference.build_posterior(
+                mcmc_method="slice_np_vectorized",
+                mcmc_parameters=dict(num_chains=10, thin=5, warmup_steps=10),
+            ).set_default_x(x_o)
+            posterior.sample(sample_shape=(num_samples,))
+        proposals.append(posterior)
         posterior.map(num_iter=1)
 
 

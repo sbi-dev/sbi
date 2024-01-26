@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from os import X_OK
+
 import pytest
 import torch
 from torch import eye, ones, zeros
@@ -40,8 +42,9 @@ mcmc_parameters = {
 
 @pytest.mark.parametrize("num_dim", (1,))  # dim 3 is tested below.
 @pytest.mark.parametrize("prior_str", ("uniform", "gaussian"))
-def test_api_snl_on_linearGaussian(num_dim: int, prior_str: str):
-    """Test SNLE API with different priors and different number of trials."""
+def test_api_snle_multiple_trials_and_rounds_map(num_dim: int, prior_str: str):
+    """Test SNLE API with 2 rounds, different priors num trials and MAP."""
+    num_rounds = 2
     num_samples = 10
     num_simulations = 100
 
@@ -53,31 +56,31 @@ def test_api_snl_on_linearGaussian(num_dim: int, prior_str: str):
         prior = BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
 
     simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior)
-    density_estimator = likelihood_nn("maf", num_transforms=3)
-    inference = SNLE(density_estimator=density_estimator, show_progress_bars=False)
+    inference = SNLE(prior=prior, density_estimator="mdn", show_progress_bars=False)
 
-    theta, x = simulate_for_sbi(
-        simulator, prior, num_simulations, simulation_batch_size=num_simulations
-    )
-    likelihood_estimator = inference.append_simulations(theta, x).train(
-        training_batch_size=100, max_num_epochs=2
-    )
-
-    for num_trials in [1, 2]:
-        x_o = zeros((num_trials, num_dim))
-        potential_fn, theta_transform = likelihood_estimator_based_potential(
-            prior=prior, likelihood_estimator=likelihood_estimator, x_o=x_o
+    proposals = [prior]
+    for _ in range(num_rounds):
+        theta, x = simulate_for_sbi(
+            simulator,
+            proposals[-1],
+            num_simulations,
+            simulation_batch_size=num_simulations,
         )
-        posterior = MCMCPosterior(
-            proposal=prior,
-            potential_fn=potential_fn,
-            theta_transform=theta_transform,
-            **mcmc_parameters,
+        inference.append_simulations(theta, x).train(
+            training_batch_size=100, max_num_epochs=2
         )
-        posterior.sample(sample_shape=(num_samples,))
+        for num_trials in [1, 3]:
+            x_o = zeros((num_trials, num_dim))
+            posterior = inference.build_posterior(
+                mcmc_method="slice_np_vectorized",
+                mcmc_parameters=dict(num_chains=10, thin=5, warmup_steps=10),
+            ).set_default_x(x_o)
+            posterior.sample(sample_shape=(num_samples,))
+        proposals.append(posterior)
+        posterior.map(num_iter=1)
 
 
-def test_c2st_snl_on_linearGaussian_different_dims(model_str="maf"):
+def test_c2st_snl_on_linear_gaussian_different_dims(model_str="maf"):
     """Test SNLE on linear Gaussian task with different theta and x dims."""
 
     theta_dim = 3
