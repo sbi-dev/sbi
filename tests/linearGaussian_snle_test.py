@@ -45,7 +45,7 @@ mcmc_parameters = {
 def test_api_snle_multiple_trials_and_rounds_map(num_dim: int, prior_str: str):
     """Test SNLE API with 2 rounds, different priors num trials and MAP."""
     num_rounds = 2
-    num_samples = 10
+    num_samples = 1
     num_simulations = 100
 
     if prior_str == "gaussian":

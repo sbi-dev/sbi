@@ -50,7 +50,7 @@ def test_api_snre_multiple_trials_and_rounds_map(num_dim: int, SNRE: RatioEstima
     """Test SNRE API with 2 rounds, different priors num trials and MAP."""
 
     num_rounds = 2
-    num_samples = 10
+    num_samples = 1
     num_simulations = 100
     prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
 

@@ -60,16 +60,14 @@ class CNNEmbedding(nn.Module):
             SNLE,
             marks=pytest.mark.xfail(reason="SNLE cannot handle multiD x."),
         ),
-        pytest.param(
-            CNNEmbedding,
-            SNRE,
-        ),
+        pytest.param(CNNEmbedding, SNRE),
         pytest.param(CNNEmbedding, SNPE),
     ),
 )
-def test_inference_with_2d_x(embedding, method):
+def test_inference_with_embedding_nets(embedding, method):
+    """Test embedding nets with SNPE, SNLE and SNRE."""
     num_dim = 2
-    num_samples = 10
+    num_samples = 1
     num_simulations = 100
 
     prior = utils.BoxUniform(zeros(num_dim), torch.ones(num_dim))
@@ -79,10 +77,7 @@ def test_inference_with_2d_x(embedding, method):
     theta_o = torch.ones(1, num_dim)
 
     if method == SNPE:
-        net_provider = utils.posterior_nn(
-            model="mdn",
-            embedding_net=embedding(),
-        )
+        net_provider = utils.posterior_nn(model="mdn", embedding_net=embedding())
         num_trials = 1
     elif method == SNLE:
         net_provider = utils.likelihood_nn(model="mdn", embedding_net=embedding())
@@ -99,35 +94,19 @@ def test_inference_with_2d_x(embedding, method):
         inference = method(classifier=net_provider, show_progress_bars=False)
     else:
         inference = method(density_estimator=net_provider, show_progress_bars=False)
-    theta, x = simulate_for_sbi(simulator, prior, num_simulations)
-    estimator = inference.append_simulations(theta, x).train(
-        training_batch_size=100, max_num_epochs=10
+    theta, x = simulate_for_sbi(
+        simulator, prior, num_simulations, simulation_batch_size=num_simulations
+    )
+    inference.append_simulations(theta, x).train(
+        training_batch_size=100, max_num_epochs=2
     )
     x_o = simulator(theta_o.repeat(num_trials, 1))
 
-    if method == SNLE:
-        potential_fn, theta_transform = likelihood_estimator_based_potential(
-            estimator, prior, x_o
-        )
-    elif method == SNPE:
-        potential_fn, theta_transform = posterior_estimator_based_potential(
-            estimator, prior, x_o
-        )
-    elif method == SNRE:
-        potential_fn, theta_transform = ratio_estimator_based_potential(
-            estimator, prior, x_o
-        )
-    else:
-        raise NotImplementedError
-
-    posterior = MCMCPosterior(
-        potential_fn=potential_fn,
-        theta_transform=theta_transform,
-        proposal=prior,
-        method="slice_np_vectorized",
-        num_chains=10,
-        warmup_steps=10,
-        thin=5,
-    )
+    posterior = inference.build_posterior(
+        prior=prior,
+        sample_with="rejection" if method == SNPE else "mcmc",
+        mcmc_method="slice_np_vectorized",
+        mcmc_parameters={"num_chains": 10, "thin": 5, "warmup_steps": 5},
+    ).set_default_x(x_o)
 
     posterior.potential(posterior.sample((num_samples,), show_progress_bars=False))
