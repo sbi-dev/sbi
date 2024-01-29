@@ -23,11 +23,8 @@ from sbi.inference import (
     SNRE_B,
     SNRE_C,
     DirectPosterior,
-    MCMCPosterior,
-    RejectionPosterior,
     VIPosterior,
     likelihood_estimator_based_potential,
-    posterior_estimator_based_potential,
     ratio_estimator_based_potential,
     simulate_for_sbi,
 )
@@ -46,45 +43,42 @@ from sbi.utils.user_input_checks import (
 @pytest.mark.slow
 @pytest.mark.gpu
 @pytest.mark.parametrize(
-    "method, model, mcmc_method",
+    "method, model, sampling_method",
     [
-        (SNPE_C, "mdn", "rejection"),
-        (SNPE_C, "maf", "slice"),
         (SNPE_C, "maf", "direct"),
-        (SNPE_C, "maf_rqs", "direct"),
-        (SNLE, "maf", "slice"),
-        (SNLE, "nsf", "slice_np"),
+        (SNPE_C, "mdn", "rejection"),
+        (SNPE_C, "maf", "slice_np_vectorized"),
+        (SNPE_C, "mdn", "slice"),
+        (SNLE, "nsf", "slice_np_vectorized"),
+        (SNLE, "mdn", "slice"),
         (SNLE, "nsf", "rejection"),
         (SNLE, "maf", "importance"),
-        (SNLE, "maf_rqs", "slice"),
         (SNRE_A, "mlp", "slice_np_vectorized"),
-        (SNRE_B, "resnet", "nuts"),
+        (SNRE_A, "mlp", "slice"),
         (SNRE_B, "resnet", "rejection"),
         (SNRE_B, "resnet", "importance"),
-        (SNRE_C, "resnet", "nuts"),
+        (SNRE_B, "resnet", "slice"),
         (SNRE_C, "resnet", "rejection"),
         (SNRE_C, "resnet", "importance"),
+        (SNRE_C, "resnet", "nuts"),
     ],
 )
-@pytest.mark.parametrize("data_device", ("cpu", "cuda:0"))
 @pytest.mark.parametrize(
     "training_device, prior_device",
     [
-        pytest.param("cpu", "cuda", marks=pytest.mark.xfail),
-        pytest.param("cuda:0", "cpu", marks=pytest.mark.xfail),
-        ("cuda:0", "cuda:0"),
-        ("cuda:0", "cuda:0"),
-        ("cpu", "cpu"),
+        ("gpu", "gpu"),
+        pytest.param("cpu", "gpu", marks=pytest.mark.xfail),
+        pytest.param("gpu", "cpu", marks=pytest.mark.xfail),
     ],
 )
+@pytest.mark.parametrize("prior_type", ["gaussian", "uniform"])
 def test_training_and_mcmc_on_device(
     method,
     model,
-    data_device,
-    mcmc_method,
+    sampling_method,
     training_device,
     prior_device,
-    prior_type="gaussian",
+    prior_type,
 ):
     """Test training on devices.
 
@@ -92,10 +86,15 @@ def test_training_and_mcmc_on_device(
 
     """
 
+    training_device = process_device(training_device)
+    data_device = "cpu"
+    prior_device = process_device(prior_device)
+
     num_dim = 2
     num_samples = 10
     num_simulations = 100
-    max_num_epochs = 5
+    max_num_epochs = 2
+    num_rounds = 2  # test proposal sampling in round 2.
 
     x_o = zeros(1, num_dim).to(data_device)
     likelihood_shift = -1.0 * ones(num_dim).to(prior_device)
@@ -115,8 +114,6 @@ def test_training_and_mcmc_on_device(
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    training_device = process_device(training_device)
-
     if method in [SNPE_A, SNPE_C]:
         kwargs = dict(
             density_estimator=utils.posterior_nn(model=model, num_transforms=2)
@@ -133,56 +130,59 @@ def test_training_and_mcmc_on_device(
     else:
         raise ValueError()
 
-    inferer = method(show_progress_bars=False, device=training_device, **kwargs)
+    inferer = method(
+        prior=prior, show_progress_bars=False, device=training_device, **kwargs
+    )
 
     proposals = [prior]
 
-    # Test for two rounds.
-    for _ in range(2):
-        theta, x = simulate_for_sbi(simulator, proposals[-1], num_simulations)
-        theta, x = theta.to(data_device), x.to(data_device)
+    for _ in range(num_rounds):
+        theta = proposals[-1].sample((num_simulations,))
+        x = simulator(theta).to(data_device)
+        theta = theta.to(data_device)
 
-        estimator = inferer.append_simulations(theta, x).train(
+        estimator = inferer.append_simulations(theta, x, data_device=data_device).train(
             training_batch_size=100, max_num_epochs=max_num_epochs, **train_kwargs
         )
-        if method == SNLE:
-            potential_fn, theta_transform = likelihood_estimator_based_potential(
-                estimator, prior, x_o
-            )
-        elif method == SNPE_A or method == SNPE_C:
-            potential_fn, theta_transform = posterior_estimator_based_potential(
-                estimator, prior, x_o
-            )
-        elif method == SNRE_A or method == SNRE_B or method == SNRE_C:
-            potential_fn, theta_transform = ratio_estimator_based_potential(
-                estimator, prior, x_o
-            )
-        else:
-            raise ValueError
 
-        if mcmc_method == "rejection":
-            posterior = RejectionPosterior(
-                proposal=prior,
-                potential_fn=potential_fn,
-                device=training_device,
+        # mcmc cases
+        if sampling_method in ["slice", "slice_np", "slice_np_vectorized", "nuts"]:
+            posterior = inferer.build_posterior(
+                sample_with="mcmc",
+                mcmc_method=sampling_method,
+                mcmc_parameters=dict(
+                    thin=5,
+                    num_chains=10 if sampling_method == "slice_np_vectorized" else 1,
+                ),
             )
-        elif mcmc_method == "direct":
-            posterior = DirectPosterior(
-                posterior_estimator=estimator, prior=prior
-            ).set_default_x(x_o)
-        elif mcmc_method == "importance":
-            posterior = ImportanceSamplingPosterior(
-                potential_fn=potential_fn, proposal=prior
+        elif sampling_method in ["rejection", "direct"]:
+            # all other cases: rejection, direct
+            posterior = inferer.build_posterior(
+                sample_with=(
+                    "rejection" if sampling_method == "direct" else sampling_method
+                ),
+                rejection_sampling_parameters=(
+                    {"proposal": prior}
+                    if sampling_method == "rejection" and method == SNPE_C
+                    else {}
+                ),
             )
         else:
-            posterior = MCMCPosterior(
-                potential_fn=potential_fn,
-                theta_transform=theta_transform,
-                proposal=prior,
-                method=mcmc_method,
-                device=training_device,
+            # build potential for SNLE or SNRE and construct ImportanceSamplingPosterior
+            if method == SNLE:
+                potential_fn, theta_transform = likelihood_estimator_based_potential(
+                    estimator, prior, x_o
+                )
+            elif method in [SNRE_A, SNRE_B, SNRE_C]:
+                potential_fn, theta_transform = ratio_estimator_based_potential(
+                    estimator, prior, x_o
+                )
+            else:
+                raise ValueError()
+            posterior = ImportanceSamplingPosterior(
+                potential_fn, prior, theta_transform
             )
-        proposals.append(posterior)
+        proposals.append(posterior.set_default_x(x_o))
 
     # Check for default device for inference object
     weights_device = next(inferer._neural_net.parameters()).device

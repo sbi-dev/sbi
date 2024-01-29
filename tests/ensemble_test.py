@@ -7,7 +7,7 @@ import pytest
 from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
-from sbi.inference import infer, prepare_for_sbi
+from sbi.inference import SNLE_A, SNPE_C, SNRE_A, prepare_for_sbi
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     true_posterior_linear_gaussian_mvn_prior,
@@ -20,24 +20,24 @@ from tests.test_utils import check_c2st, get_dkl_gaussian_prior
 @pytest.mark.parametrize(
     "inference_method, num_trials",
     (
-        ("SNPE_C", 1),
-        pytest.param("SNPE_C", 10, marks=pytest.mark.xfail),
-        ("SNLE_A", 1),
-        ("SNLE_A", 10),
-        ("SNLE_A", 1),
-        ("SNRE_A", 10),
+        (SNPE_C, 1),
+        pytest.param(SNPE_C, 5, marks=pytest.mark.xfail),
+        (SNLE_A, 1),
+        (SNLE_A, 5),
+        (SNRE_A, 1),
+        (SNRE_A, 5),
     ),
 )
 def test_c2st_posterior_ensemble_on_linearGaussian(inference_method, num_trials):
     """Test whether NeuralPosteriorEnsemble infers well a simple example with available
     ground truth.
-
     """
 
     num_dim = 2
+    ensemble_size = 2
     x_o = zeros(num_trials, num_dim)
-    num_samples = 1000
-    num_simulations = 4000 if inference_method == "SNRE_A" else 2000
+    num_samples = 500
+    num_simulations = 2000 if inference_method == SNRE_A else 1500
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(num_dim)
@@ -56,20 +56,29 @@ def test_c2st_posterior_ensemble_on_linearGaussian(inference_method, num_trials)
     )
 
     # train ensemble components
-    ensemble_size = 2
-    posteriors = [
-        infer(simulator, prior, inference_method, num_simulations)
-        for i in range(ensemble_size)
-    ]
+    posteriors = []
+    for _ in range(ensemble_size):
+        theta = prior.sample((num_simulations,))
+        x = simulator(theta)
+        inferer = inference_method(prior)
+        inferer.append_simulations(theta, x).train(
+            training_batch_size=100,
+            max_num_epochs=1 if inference_method == "SNPE" and num_trials > 1 else 100,
+        )
+        posteriors.append(inferer.build_posterior())
 
     # create ensemble
     posterior = NeuralPosteriorEnsemble(posteriors)
     posterior.set_default_x(x_o)
 
     # test sampling and evaluation.
-    if inference_method in ["SNLE_A", "SNRE_A"]:
+    if isinstance(inferer, (SNLE_A, SNRE_A)):
         samples = posterior.sample(
-            (num_samples,), num_chains=20, method="slice_np_vectorized"
+            (num_samples,),
+            num_chains=20,
+            method="slice_np_vectorized",
+            thin=5,
+            warmup_steps=50,
         )
     else:
         samples = posterior.sample((num_samples,))
@@ -77,7 +86,9 @@ def test_c2st_posterior_ensemble_on_linearGaussian(inference_method, num_trials)
 
     # Compute the c2st and assert it is near chance level of 0.5.
     check_c2st(
-        samples, target_samples, alg="{} posterior ensemble".format(inference_method)
+        samples,
+        target_samples,
+        alg="{} posterior ensemble".format(inference_method.__name__),
     )
 
     map_ = posterior.map(init_method=samples, show_progress_bars=False)
@@ -86,7 +97,7 @@ def test_c2st_posterior_ensemble_on_linearGaussian(inference_method, num_trials)
     # Checks for log_prob()
     # For the Gaussian prior, we compute the KLd between ground truth and posterior.
     # This step is skipped for NLE since the probabilities are not normalised.
-    if "snpe" in inference_method.lower() or "snre" in inference_method.lower():
+    if isinstance(inferer, (SNPE_C, SNRE_A)):
         dkl = get_dkl_gaussian_prior(
             posterior,
             x_o[0],

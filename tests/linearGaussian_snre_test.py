@@ -11,6 +11,7 @@ from sbi import utils as utils
 from sbi.inference import (
     AALR,
     BNRE,
+    SNRE_A,
     SNRE_B,
     SNRE_C,
     ImportanceSamplingPosterior,
@@ -142,25 +143,15 @@ def test_c2st_sre_on_linearGaussian(SNRE: RatioEstimator):
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize(
-    "num_dim, num_trials, prior_str, method_str",
-    (
-        (2, 5, "gaussian", "sre"),
-        (1, 1, "gaussian", "sre"),
-        (2, 1, "uniform", "sre"),
-        (2, 5, "gaussian", "aalr"),
-        (2, 1, "gaussian", "bnre"),
-        (2, 5, "gaussian", "bnre"),
-        (2, 5, "gaussian", "nrec"),
-    ),
-)
-def test_c2st_sre_variants_on_linearGaussian(
-    num_dim: int,
-    num_trials: int,
+@pytest.mark.parametrize("snre_method", (SNRE_A, SNRE_B, SNRE_C, BNRE))
+@pytest.mark.parametrize("prior_str", ("gaussian", "uniform"))
+@pytest.mark.parametrize("num_trials", (3,))  # num_trials=1 is tested above.
+def test_c2st_snre_variants_on_linearGaussian_with_multiple_trials(
+    snre_method: str,
     prior_str: str,
-    method_str: str,
+    num_trials: int,
 ):
-    """Test c2st accuracy of inference with SRE on linear Gaussian model.
+    """Test C2ST and MAP accuracy of SNRE variants on linear gaussian.
 
     Args:
         num_dim: parameter dimension of the gaussian model
@@ -168,12 +159,14 @@ def test_c2st_sre_variants_on_linearGaussian(
 
     """
 
-    x_o = zeros(num_trials, num_dim)
+    num_dim = 2
+    num_simulations = 1500
     num_samples = 500
-    if method_str == "bnre":
-        num_simulations = 30000 if num_trials == 1 else 40500
-    else:
-        num_simulations = 3000 if num_trials == 1 else 40500
+    x_o = zeros(num_trials, num_dim)
+
+    train_kwargs = {"training_batch_size": 100}
+    if snre_method == BNRE:
+        train_kwargs["regularization_strength"] = 20
 
     # `likelihood_mean` will be `likelihood_shift + theta`.
     likelihood_shift = -1.0 * ones(num_dim)
@@ -195,24 +188,11 @@ def test_c2st_sre_variants_on_linearGaussian(
         show_progress_bars=False,
     )
 
-    if method_str == "sre":
-        inference = SNRE_B(**kwargs)
-        train_kwargs = {}
-    elif method_str == "aalr":
-        inference = AALR(**kwargs)
-        train_kwargs = {}
-    elif method_str == "bnre":
-        inference = BNRE(**kwargs)
-        train_kwargs = {"regularization_strength": 20}
-    elif method_str == "nrec":
-        inference = SNRE_C(**kwargs)
-        train_kwargs = {}
-    else:
-        raise ValueError(f"{method_str} is not an allowed option")
+    inference = snre_method(**kwargs)
 
     # Should use default `num_atoms=10` for SRE; `num_atoms=2` for AALR
     theta, x = simulate_for_sbi(
-        simulator, prior, num_simulations, simulation_batch_size=50
+        simulator, prior, num_simulations, simulation_batch_size=num_simulations
     )
     ratio_estimator = inference.append_simulations(theta, x).train(**train_kwargs)
     potential_fn, theta_transform = ratio_estimator_based_potential(
@@ -239,13 +219,15 @@ def test_c2st_sre_variants_on_linearGaussian(
 
     # Check performance based on c2st accuracy.
     check_c2st(
-        samples, target_samples, alg=f"sre-{prior_str}-{method_str}-{num_trials}trials"
+        samples,
+        target_samples,
+        alg=f"snre-{prior_str}-{snre_method.__name__}-{num_trials}trials",
     )
 
     map_ = posterior.map(num_init_samples=1_000, init_method="proposal")
 
     # Checks for log_prob()
-    if prior_str == "gaussian" and (method_str == "aalr" or method_str == "bnre"):
+    if prior_str == "gaussian" and isinstance(snre_method, (AALR, BNRE)):
         # For the Gaussian prior, we compute the KLd between ground truth and
         # posterior. We can do this only if the classifier_loss was as described in
         # Hermans et al. 2020 ('aalr') since Durkan et al. 2020 version only allows
@@ -279,7 +261,7 @@ def test_c2st_sre_variants_on_linearGaussian(
 def test_c2st_multi_round_snr_on_linearGaussian_vi(
     num_trials: int, SNRE: RatioEstimator
 ):
-    """Test SNL on linear Gaussian, comparing to ground truth posterior via c2st."""
+    """Test C2ST accuracy of 2-round-SNRE with variational inference sampling."""
 
     num_dim = 2
     x_o = zeros((num_trials, num_dim))
@@ -374,10 +356,10 @@ def test_api_sre_sampling_methods(sampling_method: str, prior_str: str):
     num_dim = 2
     num_samples = 10
     num_trials = 2
-    num_simulations = 2100
+    num_simulations = 100
     x_o = zeros((num_trials, num_dim))
     # Test for multiple chains is cheap when vectorized.
-    num_chains = 3 if sampling_method == "slice_np_vectorized" else 1
+    num_chains = 5 if sampling_method == "slice_np_vectorized" else 1
     if sampling_method == "rejection":
         sample_with = "rejection"
     elif (
@@ -394,13 +376,13 @@ def test_api_sre_sampling_methods(sampling_method: str, prior_str: str):
     if prior_str == "gaussian":
         prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
     else:
-        prior = utils.BoxUniform(-1.0 * ones(num_dim), ones(num_dim))
+        prior = utils.BoxUniform(-ones(num_dim), ones(num_dim))
 
     simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior)
     inference = SNRE_B(classifier="resnet", show_progress_bars=False)
 
     theta, x = simulate_for_sbi(
-        simulator, prior, num_simulations, simulation_batch_size=50
+        simulator, prior, num_simulations, simulation_batch_size=num_simulations
     )
     ratio_estimator = inference.append_simulations(theta, x).train(max_num_epochs=5)
     potential_fn, theta_transform = ratio_estimator_based_potential(
@@ -413,11 +395,14 @@ def test_api_sre_sampling_methods(sampling_method: str, prior_str: str):
         or "nuts" in sampling_method
         or "hmc" in sampling_method
     ):
+        mcmc_parameters.update({"num_chains": num_chains})
+        mcmc_parameters.update({"method": sampling_method})
+
         posterior = MCMCPosterior(
             potential_fn,
             proposal=prior,
             theta_transform=theta_transform,
-            **mcmc_parameters.update({"method": sampling_method}),
+            **mcmc_parameters,
         )
     elif sample_with == "importance":
         posterior = ImportanceSamplingPosterior(

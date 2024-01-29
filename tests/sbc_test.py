@@ -112,15 +112,22 @@ def test_sbc_checks():
     """Test the uniformity checks for SBC."""
 
     num_dim = 2
-    N = 10000
-    L = 1000
+    num_posterior_samples = 1500
 
     prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
-    # Daps and ranks from prior for testing.
-    daps = prior.sample((N,))
-    ranks = torch.distributions.Uniform(zeros(num_dim), L * ones(num_dim)).sample((N,))
+    # Data averaged posterior samples should be distributed as prior.
+    daps = prior.sample((num_posterior_samples,))
+    # Ranks should be distributed uniformly in [0, num_posterior_samples]
+    ranks = torch.distributions.Uniform(
+        zeros(num_dim), num_posterior_samples * ones(num_dim)
+    ).sample((num_posterior_samples,))
 
-    checks = check_sbc(ranks, prior.sample((N,)), daps, num_posterior_samples=L)
+    checks = check_sbc(
+        ranks,
+        prior.sample((num_posterior_samples,)),
+        daps,
+        num_posterior_samples=num_posterior_samples,
+    )
     assert (checks["ks_pvals"] > 0.05).all()
     assert (checks["c2st_ranks"] < 0.55).all()
     assert (checks["c2st_dap"] < 0.55).all()
