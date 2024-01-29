@@ -21,6 +21,9 @@ def process_device(device: str) -> str:
     Throws an AssertionError if the prior is not matching the training device not.
     """
 
+    # NOTE: we might want to add support for other devices in the future, e.g., MPS
+    gpu_devices = ["cuda", "gpu"]
+
     if device == "cpu":
         return "cpu"
     else:
@@ -31,7 +34,7 @@ def process_device(device: str) -> str:
             "only for large neural networks with operations that are fast on the "
             "GPU, e.g., for a CNN or RNN `embedding_net`."
         )
-        if device == "cuda":
+        if device in gpu_devices:
             assert torch.cuda.is_available(), "CUDA is not available."
             current_gpu_index = torch.cuda.current_device()
             return f"cuda:{current_gpu_index}"
@@ -42,7 +45,7 @@ def process_device(device: str) -> str:
             except RuntimeError:
                 raise RuntimeError(
                     f"""Could not instantiate torch.randn(1, device={device}). Please
-                    use 'cuda', or cuda:<index> with <index> <
+                    use one in {gpu_devices}, or cuda:<index> with <index> <
                     {torch.cuda.device_count()}."""
                 )
             torch.cuda.set_device(device)
