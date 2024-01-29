@@ -513,6 +513,12 @@ def test_sample_conditional():
     num_dim = 3
     dim_to_sample_1 = 0
     dim_to_sample_2 = 2
+    num_simulations = 6000
+    num_conditional_samples = 500
+
+    mcmc_parameters = dict(
+        method="slice_np_vectorized", num_chains=20, warmup_steps=50, thin=5
+    )
 
     x_o = zeros(1, num_dim)
 
@@ -535,7 +541,9 @@ def test_sample_conditional():
     inference = SNPE_C(prior, density_estimator=net, show_progress_bars=False)
 
     # We need a pretty big dataset to properly model the bimodality.
-    theta, x = simulate_for_sbi(simulator, prior, 10000)
+    theta, x = simulate_for_sbi(
+        simulator, prior, num_simulations, simulation_batch_size=num_simulations
+    )
     posterior_estimator = inference.append_simulations(theta, x).train(
         max_num_epochs=60
     )
@@ -565,8 +573,9 @@ def test_sample_conditional():
         potential_fn=conditioned_potential_fn,
         theta_transform=restricted_tf,
         proposal=restricted_prior,
+        **mcmc_parameters,
     )
-    cond_samples = mcmc_posterior.sample((500,))
+    cond_samples = mcmc_posterior.sample((num_conditional_samples,))
 
     _ = analysis.pairplot(
         cond_samples,

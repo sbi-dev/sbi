@@ -66,13 +66,19 @@ def mdn_inference_with_different_methods(method):
             likelihood_estimator=estimator, prior=prior, x_o=x_o
         )
         posterior = MCMCPosterior(
-            potential_fn=potential_fn, theta_transform=theta_transform, proposal=prior
+            potential_fn=potential_fn,
+            theta_transform=theta_transform,
+            proposal=prior,
+            method="slice_np_vectorized",
+            num_chains=20,
+            warmup_steps=50,
+            thin=5,
         )
 
     samples = posterior.sample((num_samples,), x=x_o)
 
     # Compute the c2st and assert it is near chance level of 0.5.
-    check_c2st(samples, target_samples, alg=f"{method}")
+    check_c2st(samples, target_samples, alg=f"{method.__name__}")
 
 
 def test_mdn_with_1D_uniform_prior():

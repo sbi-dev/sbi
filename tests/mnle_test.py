@@ -36,10 +36,11 @@ def mixed_simulator(theta, stimulus_condition=2.0):
 
 
 mcmc_kwargs = dict(
-    num_chains=10,
-    warmup_steps=100,
+    num_chains=20,
+    warmup_steps=50,
     method="slice_np_vectorized",
     init_strategy="proposal",
+    thin=5,
 )
 
 
@@ -48,6 +49,7 @@ mcmc_kwargs = dict(
 def test_mnle_on_device(device):
     # Generate mixed data.
     num_simulations = 100
+    mcmc_method = "slice"
     theta = torch.rand(num_simulations, 2)
     x = torch.cat(
         (
@@ -64,7 +66,14 @@ def test_mnle_on_device(device):
 
     # Test sampling on device.
     posterior = trainer.build_posterior()
-    posterior.sample((1,), x=x[0], show_progress_bars=False, mcmc_method="nuts")
+    posterior.sample(
+        (1,),
+        x=x[0],
+        show_progress_bars=False,
+        mcmc_method=mcmc_method,
+        thin=1,
+        warmup_steps=1,
+    )
 
 
 @pytest.mark.parametrize("sampler", ("mcmc", "rejection", "vi"))
@@ -108,7 +117,13 @@ def test_mnle_api(sampler):
 
 @pytest.mark.slow
 @pytest.mark.parametrize("sampler", ("mcmc", "rejection", "vi"))
-def test_mnle_accuracy(sampler):
+@pytest.mark.parametrize("num_trials", [5, 10])
+def test_mnle_accuracy_with_different_samplers_and_trials(sampler, num_trials: int):
+    """Test MNLE c2st accuracy for different samplers and number of trials."""
+
+    num_simulations = 2000
+    num_samples = 500
+
     def mixed_simulator(theta):
         # Extract parameters
         beta, ps = theta[:, :1], theta[:, 1:]
@@ -127,8 +142,6 @@ def test_mnle_accuracy(sampler):
         validate_args=False,
     )
 
-    num_simulations = 2000
-    num_samples = 1000
     theta = prior.sample((num_simulations,))
     x = mixed_simulator(theta)
 
@@ -137,35 +150,34 @@ def test_mnle_accuracy(sampler):
     trainer.append_simulations(theta, x).train()
     posterior = trainer.build_posterior()
 
-    for num_trials in [10]:
-        theta_o = prior.sample((1,))
-        x_o = mixed_simulator(theta_o.repeat(num_trials, 1))
+    theta_o = prior.sample((1,))
+    x_o = mixed_simulator(theta_o.repeat(num_trials, 1))
 
-        # True posterior samples
-        transform = mcmc_transform(prior)
-        true_posterior_samples = MCMCPosterior(
-            PotentialFunctionProvider(prior, atleast_2d(x_o)),
-            theta_transform=transform,
-            proposal=prior,
-            **mcmc_kwargs,
-        ).sample((num_samples,), show_progress_bars=False)
+    # True posterior samples
+    transform = mcmc_transform(prior)
+    true_posterior_samples = MCMCPosterior(
+        PotentialFunctionProvider(prior, atleast_2d(x_o)),
+        theta_transform=transform,
+        proposal=prior,
+        **mcmc_kwargs,
+    ).sample((num_samples,), show_progress_bars=False)
 
-        posterior = trainer.build_posterior(prior=prior, sample_with=sampler)
-        posterior.set_default_x(x_o)
-        if sampler == "vi":
-            posterior.train()
+    posterior = trainer.build_posterior(prior=prior, sample_with=sampler)
+    posterior.set_default_x(x_o)
+    if sampler == "vi":
+        posterior.train()
 
-        mnle_posterior_samples = posterior.sample(
-            sample_shape=(num_samples,),
-            show_progress_bars=True,
-            **mcmc_kwargs if sampler == "mcmc" else {},
-        )
+    mnle_posterior_samples = posterior.sample(
+        sample_shape=(num_samples,),
+        show_progress_bars=True,
+        **mcmc_kwargs if sampler == "mcmc" else {},
+    )
 
-        check_c2st(
-            mnle_posterior_samples,
-            true_posterior_samples,
-            alg=f"MNLE with {sampler}",
-        )
+    check_c2st(
+        mnle_posterior_samples,
+        true_posterior_samples,
+        alg=f"MNLE with {sampler}",
+    )
 
 
 class PotentialFunctionProvider(BasePotential):
@@ -216,7 +228,17 @@ class PotentialFunctionProvider(BasePotential):
 
 
 @pytest.mark.slow
-def test_mnle_with_experiment_conditions():
+def test_mnle_with_experimental_conditions():
+    """Test MNLE c2st accuracy when conditioned on a subset of the parameters, e.g.,
+    experimental conditions.
+
+    MNLE is trained a on simulator with 3D parameter space. After training, the
+    categorical parameter is set to a fixed value (conditioned posterior), and the
+    accuracy of the conditioned posterior is tested against the true posterior.
+    """
+    num_simulations = 5000
+    num_samples = 500
+
     def sim_wrapper(theta):
         # simulate with experiment conditions
         return mixed_simulator(theta[:, :2], theta[:, 2:] + 1)
@@ -230,8 +252,6 @@ def test_mnle_with_experiment_conditions():
         validate_args=False,
     )
 
-    num_simulations = 10000
-    num_samples = 1000
     theta = proposal.sample((num_simulations,))
     x = sim_wrapper(theta)
     assert x.shape == (num_simulations, 2)
@@ -243,7 +263,7 @@ def test_mnle_with_experiment_conditions():
 
     # MNLE
     trainer = MNLE(proposal)
-    estimator = trainer.append_simulations(theta, x).train()
+    estimator = trainer.append_simulations(theta, x).train(training_batch_size=100)
 
     potential_fn = MixedLikelihoodBasedPotential(estimator, proposal, x_o)
 
@@ -272,16 +292,15 @@ def test_mnle_with_experiment_conditions():
         **mcmc_kwargs,
     ).sample((num_samples,), x=x_o)
 
-    mcmc_posterior = MCMCPosterior(
+    cond_samples = MCMCPosterior(
         potential_fn=conditioned_potential_fn,
         theta_transform=prior_transform,
         proposal=prior,
         **mcmc_kwargs,
-    )
-    cond_samples = mcmc_posterior.sample((num_samples,), x=x_o)
+    ).sample((num_samples,), x=x_o)
 
     check_c2st(
         cond_samples,
         true_posterior_samples,
-        alg="MNLE with experiment conditions",
+        alg=f"MNLE trained with {num_simulations}",
     )
