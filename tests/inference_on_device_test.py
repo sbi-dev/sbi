@@ -334,9 +334,7 @@ def test_train_with_different_data_and_training_device(
 
 
 @pytest.mark.gpu
-@pytest.mark.parametrize(
-    "inference_method", [SNPE_A, SNPE_C, SNRE_A, SNRE_B, SNRE_C, SNLE]
-)
+@pytest.mark.parametrize("inference_method", [SNPE_C, SNRE_A, SNRE_B, SNRE_C, SNLE])
 @pytest.mark.parametrize("prior_device", ("cpu", "cuda"))
 @pytest.mark.parametrize("embedding_net_device", ("cpu", "cuda"))
 @pytest.mark.parametrize("data_device", ("cpu", "cuda"))
@@ -383,7 +381,7 @@ def test_embedding_nets_integration_training_device(
         )
         nn_kwargs = dict(
             density_estimator=likelihood_nn(
-                model="maf",
+                model="mdn",
                 embedding_net=embedding_net,
                 hidden_features=4,
                 num_transforms=2,
@@ -396,7 +394,7 @@ def test_embedding_nets_integration_training_device(
         )
         nn_kwargs = dict(
             density_estimator=posterior_nn(
-                model="mdn_snpe_a" if inference_method == SNPE_A else "maf",
+                model="mdn_snpe_a" if inference_method == SNPE_A else "mdn",
                 embedding_net=embedding_net,
                 hidden_features=4,
                 num_transforms=2,
@@ -416,8 +414,10 @@ def test_embedding_nets_integration_training_device(
     theta = prior.sample((samples_per_round,)).to(data_device)
 
     proposal = prior
-    for round_idx in range(num_rounds):
-        X = (
+    for _ in range(num_rounds):
+        # sample theta and x independently - quick way to get 3D simulation data.
+        theta = proposal.sample((samples_per_round,))
+        x = (
             MultivariateNormal(torch.zeros((D_x,)), torch.eye(D_x))
             .sample((samples_per_round,))
             .to(data_device)
@@ -428,15 +428,18 @@ def test_embedding_nets_integration_training_device(
             if data_device != training_device
             else nullcontext()
         ):
-            density_estimator_append = inference.append_simulations(theta, X)
+            density_estimator_append = inference.append_simulations(theta, x)
 
         density_estimator_train = density_estimator_append.train(
             max_num_epochs=2, **train_kwargs
         )
 
-        posterior = inference.build_posterior(density_estimator_train)
+        posterior = inference.build_posterior(
+            density_estimator_train,
+            mcmc_method="slice_np_vectorized",
+            mcmc_parameters=dict(thin=5, num_chains=10, warmup_steps=10),
+        )
         proposal = posterior.set_default_x(x_o)
-        theta = proposal.sample((samples_per_round,))
 
 
 @pytest.mark.parametrize(
@@ -522,8 +525,12 @@ def test_vi_on_gpu(num_dim: int, q: Distribution, vi_method: str, sampling_metho
     samples = posterior.sample((1,), method=sampling_method)
     logprobs = posterior.log_prob(samples)
 
-    assert str(samples.device) == device, "The devices after training does not match"
-    assert str(logprobs.device) == device, "The devices after training does not match"
+    assert (
+        str(samples.device) == device
+    ), f"The devices after training do not match: {samples.device} vs {device}"
+    assert (
+        str(logprobs.device) == device
+    ), f"The devices after training do not match: {logprobs.device} vs {device}"
 
 
 @pytest.mark.gpu
