@@ -3,11 +3,10 @@
 
 import pytest
 import torch
-from numpy import isin
 from pyro.distributions import InverseGamma
 from torch.distributions import Beta, Binomial, Categorical, Gamma
 
-from sbi.inference import MNLE, MCMCPosterior, likelihood_estimator_based_potential
+from sbi.inference import MNLE, MCMCPosterior
 from sbi.inference.posteriors.rejection_posterior import RejectionPosterior
 from sbi.inference.posteriors.vi_posterior import VIPosterior
 from sbi.inference.potentials.base_potential import BasePotential
@@ -23,6 +22,7 @@ from tests.test_utils import check_c2st
 
 # toy simulator for mixed data
 def mixed_simulator(theta, stimulus_condition=2.0):
+    """Simulator for mixed data."""
     # Extract parameters
     beta, ps = theta[:, :1], theta[:, 1:]
 
@@ -35,6 +35,7 @@ def mixed_simulator(theta, stimulus_condition=2.0):
     return torch.cat((rts, choices), dim=1)
 
 
+# MCMC kwargs for faster testing
 mcmc_kwargs = dict(
     num_chains=20,
     warmup_steps=50,
@@ -47,6 +48,7 @@ mcmc_kwargs = dict(
 @pytest.mark.gpu
 @pytest.mark.parametrize("device", ("cpu", "cuda"))
 def test_mnle_on_device(device):
+    """Test MNLE API on device."""
     # Generate mixed data.
     num_simulations = 100
     mcmc_method = "slice"
@@ -78,6 +80,7 @@ def test_mnle_on_device(device):
 
 @pytest.mark.parametrize("sampler", ("mcmc", "rejection", "vi"))
 def test_mnle_api(sampler):
+    """Test MNLE API."""
     # Generate mixed data.
     num_simulations = 100
     theta = torch.rand(num_simulations, 2)
@@ -124,16 +127,6 @@ def test_mnle_accuracy_with_different_samplers_and_trials(sampler, num_trials: i
     num_simulations = 2000
     num_samples = 500
 
-    def mixed_simulator(theta):
-        # Extract parameters
-        beta, ps = theta[:, :1], theta[:, 1:]
-
-        # Sample choices and rts independently.
-        choices = Binomial(probs=ps).sample()
-        rts = InverseGamma(concentration=1 * torch.ones_like(beta), rate=beta).sample()
-
-        return torch.cat((rts, choices), dim=1)
-
     prior = MultipleIndependent(
         [
             Gamma(torch.tensor([1.0]), torch.tensor([0.5])),
@@ -143,7 +136,7 @@ def test_mnle_accuracy_with_different_samplers_and_trials(sampler, num_trials: i
     )
 
     theta = prior.sample((num_simulations,))
-    x = mixed_simulator(theta)
+    x = mixed_simulator(theta, stimulus_condition=1.0)
 
     # MNLE
     trainer = MNLE(prior)
@@ -236,7 +229,7 @@ def test_mnle_with_experimental_conditions():
     categorical parameter is set to a fixed value (conditioned posterior), and the
     accuracy of the conditioned posterior is tested against the true posterior.
     """
-    num_simulations = 5000
+    num_simulations = 6000
     num_samples = 500
 
     def sim_wrapper(theta):
