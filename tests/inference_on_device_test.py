@@ -73,12 +73,7 @@ from sbi.utils.user_input_checks import (
 )
 @pytest.mark.parametrize("prior_type", ["gaussian", "uniform"])
 def test_training_and_mcmc_on_device(
-    method,
-    model,
-    sampling_method,
-    training_device,
-    prior_device,
-    prior_type,
+    method, model, sampling_method, training_device, prior_device, prior_type
 ):
     """Test training on devices.
 
@@ -203,6 +198,7 @@ def test_training_and_mcmc_on_device(
     ],
 )
 def test_process_device(device_input: str, device_target: Optional[str]) -> None:
+    """Test process_device with different device combinations."""
     device_output = process_device(device_input)
     assert device_output == device_target, (
         f"Failure when processing device '{device_input}': "
@@ -217,6 +213,7 @@ def test_process_device(device_input: str, device_target: Optional[str]) -> None
 def test_check_embedding_net_device(
     device_datum: str, device_embedding_net: str
 ) -> None:
+    """Test check_embedding_net_device and data with different device combinations."""
     datum = torch.zeros((1, 1)).to(device_datum)
     embedding_net = nn.Linear(in_features=1, out_features=1).to(device_embedding_net)
 
@@ -234,18 +231,14 @@ def test_check_embedding_net_device(
     )
 
 
-@pytest.mark.parametrize(
-    "shape_x",
-    [
-        (3, 1),
-    ],
-)
+@pytest.mark.parametrize("shape_x", [(3, 1)])
 @pytest.mark.parametrize(
     "shape_theta", [(3, 2), pytest.param((2, 1), marks=pytest.mark.xfail)]
 )
 def test_validate_theta_and_x_shapes(
     shape_x: Tuple[int], shape_theta: Tuple[int]
 ) -> None:
+    """Test validate_theta_and_x with different shapes."""
     x = torch.empty(shape_x)
     theta = torch.empty(shape_theta)
 
@@ -253,6 +246,7 @@ def test_validate_theta_and_x_shapes(
 
 
 def test_validate_theta_and_x_tensor() -> None:
+    """Test whether validate_theta_and_x raises Exceptio when list is passed."""
     x = torch.empty((1, 1))
     theta = torch.ones((1, 1)).tolist()
 
@@ -261,6 +255,7 @@ def test_validate_theta_and_x_tensor() -> None:
 
 
 def test_validate_theta_and_x_type() -> None:
+    """Test whether validate_theta_and_x raises Exceptio when empty x is passed."""
     x = torch.empty((1, 1))
     theta = torch.empty((1, 1), dtype=int)
 
@@ -272,6 +267,7 @@ def test_validate_theta_and_x_type() -> None:
 @pytest.mark.parametrize("training_device", ["cpu", "cuda:0"])
 @pytest.mark.parametrize("data_device", ["cpu", "cuda:0"])
 def test_validate_theta_and_x_device(training_device: str, data_device: str) -> None:
+    """Test validate_theta_and_x with different devices."""
     theta = torch.empty((1, 1)).to(data_device)
     x = torch.empty((1, 1)).to(data_device)
 
@@ -294,6 +290,7 @@ def test_validate_theta_and_x_device(training_device: str, data_device: str) -> 
 def test_train_with_different_data_and_training_device(
     inference_method, data_device: str, training_device: str
 ) -> None:
+    """Test training with different data and training device."""
     assert torch.cuda.is_available(), "this test requires that cuda is available."
 
     num_dim = 2
@@ -346,24 +343,27 @@ def test_embedding_nets_integration_training_device(
     data_device: str,
     training_device: str,
 ) -> None:
+    """Test embedding nets integration with different devices, priors and methods."""
     # add other methods
 
-    D_theta = 2
-    D_x = 3
+    theta_dim = 2
+    x_dim = 3
     samples_per_round = 32
     num_rounds = 2
 
-    x_o = torch.ones((1, D_x))
+    x_o = torch.ones((1, x_dim))
 
     prior = utils.BoxUniform(
-        low=-torch.ones((D_theta,)), high=torch.ones((D_theta,)), device=prior_device
+        low=-torch.ones((theta_dim,)),
+        high=torch.ones((theta_dim,)),
+        device=prior_device,
     )
 
     if inference_method in [SNRE_A, SNRE_B, SNRE_C]:
-        embedding_net_theta = nn.Linear(in_features=D_theta, out_features=2).to(
+        embedding_net_theta = nn.Linear(in_features=theta_dim, out_features=2).to(
             embedding_net_device
         )
-        embedding_net_x = nn.Linear(in_features=D_x, out_features=2).to(
+        embedding_net_x = nn.Linear(in_features=x_dim, out_features=2).to(
             embedding_net_device
         )
         nn_kwargs = dict(
@@ -376,7 +376,7 @@ def test_embedding_nets_integration_training_device(
         )
         train_kwargs = dict()
     elif inference_method == SNLE:
-        embedding_net = nn.Linear(in_features=D_theta, out_features=2).to(
+        embedding_net = nn.Linear(in_features=theta_dim, out_features=2).to(
             embedding_net_device
         )
         nn_kwargs = dict(
@@ -389,7 +389,7 @@ def test_embedding_nets_integration_training_device(
         )
         train_kwargs = dict()
     else:
-        embedding_net = nn.Linear(in_features=D_x, out_features=2).to(
+        embedding_net = nn.Linear(in_features=x_dim, out_features=2).to(
             embedding_net_device
         )
         nn_kwargs = dict(
@@ -418,7 +418,7 @@ def test_embedding_nets_integration_training_device(
         # sample theta and x independently - quick way to get 3D simulation data.
         theta = proposal.sample((samples_per_round,))
         x = (
-            MultivariateNormal(torch.zeros((D_x,)), torch.eye(D_x))
+            MultivariateNormal(torch.zeros((x_dim,)), torch.eye(x_dim))
             .sample((samples_per_round,))
             .to(data_device)
         )
@@ -446,6 +446,7 @@ def test_embedding_nets_integration_training_device(
     "inference_method", [SNPE_A, SNPE_C, SNRE_A, SNRE_B, SNRE_C, SNLE]
 )
 def test_nograd_after_inference_train(inference_method) -> None:
+    """Test that no gradients are present after training."""
     num_dim = 2
     prior_ = BoxUniform(-torch.ones(num_dim), torch.ones(num_dim))
     simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior_)
@@ -545,7 +546,7 @@ def test_vi_on_gpu(num_dim: int, q: Distribution, vi_method: str, sampling_metho
         pytest.param("cpu", "cuda", marks=pytest.mark.xfail),
     ],
 )
-def test_BoxUniform_device_handling(arg_device, device):
+def test_boxuniform_device_handling(arg_device, device):
     """Test mismatch between device passed via low / high and device kwarg."""
     prior = BoxUniform(
         low=zeros(1).to(arg_device), high=ones(1).to(arg_device), device=device

@@ -44,11 +44,7 @@ from .test_utils import (
 @pytest.mark.parametrize("snpe_method", [SNPE_A, SNPE_C])
 @pytest.mark.parametrize(
     "num_dim, prior_str",
-    (
-        (2, "gaussian"),
-        (2, "uniform"),
-        (1, "gaussian"),
-    ),
+    ((2, "gaussian"), (2, "uniform"), (1, "gaussian")),
 )
 def test_c2st_snpe_on_linearGaussian(snpe_method, num_dim: int, prior_str: str):
     """Test whether SNPE infers well a simple example with available ground truth."""
@@ -398,8 +394,7 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
     (
         ("mcmc", "slice_np", "gaussian"),
         ("mcmc", "slice", "gaussian"),
-        # XXX (True, "slice", "uniform"),
-        # XXX takes very long. fix when refactoring pyro sampling
+        ("mcmc", "slice_np_vectorized", "gaussian"),
         ("rejection", "rejection", "uniform"),
     ),
 )
@@ -440,6 +435,9 @@ def test_api_snpe_c_posterior_correction(sample_with, mcmc_method, prior_str):
             theta_transform=theta_transform,
             proposal=prior,
             method=mcmc_method,
+            num_chains=10 if mcmc_method == "slice_np_vectorized" else 1,
+            warmup_steps=10,
+            thin=1,
         )
     elif sample_with == "rejection":
         posterior = RejectionPosterior(
