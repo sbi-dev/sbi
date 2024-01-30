@@ -148,7 +148,7 @@ def test_c2st_and_map_snl_on_linearGaussian_different(num_dim: int, prior_str: s
 
     """
     num_samples = 500
-    num_simulations = 4500
+    num_simulations = 5000
     trials_to_test = [1]
 
     # likelihood_mean will be likelihood_shift+theta
@@ -219,8 +219,6 @@ def test_c2st_and_map_snl_on_linearGaussian_different(num_dim: int, prior_str: s
             show_progress_bars=False,
         )
 
-        # TODO: we do not have a test for SNL log_prob(). This is because the output
-        # TODO: density is not normalized, so KLd does not make sense.
         if prior_str == "uniform":
             # Check whether the returned probability outside of the support is zero.
             posterior_prob = get_prob_outside_uniform_prior(posterior, prior, num_dim)
