@@ -7,7 +7,7 @@ import pytest
 from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
-from sbi import utils as utils
+from sbi import utils
 from sbi.inference import (
     AALR,
     BNRE,
@@ -46,8 +46,10 @@ mcmc_parameters = {
 
 
 @pytest.mark.parametrize("num_dim", (1,))  # dim 3 is tested below.
-@pytest.mark.parametrize("SNRE", (SNRE_B, SNRE_C))
-def test_api_snre_multiple_trials_and_rounds_map(num_dim: int, SNRE: RatioEstimator):
+@pytest.mark.parametrize("snre_method", (SNRE_B, SNRE_C))
+def test_api_snre_multiple_trials_and_rounds_map(
+    num_dim: int, snre_method: RatioEstimator
+):
     """Test SNRE API with 2 rounds, different priors num trials and MAP."""
 
     num_rounds = 2
@@ -56,7 +58,7 @@ def test_api_snre_multiple_trials_and_rounds_map(num_dim: int, SNRE: RatioEstima
     prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
 
     simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior)
-    inference = SNRE(prior=prior, classifier="mlp", show_progress_bars=False)
+    inference = snre_method(prior=prior, classifier="mlp", show_progress_bars=False)
 
     proposals = [prior]
     for _ in range(num_rounds):
@@ -80,8 +82,8 @@ def test_api_snre_multiple_trials_and_rounds_map(num_dim: int, SNRE: RatioEstima
         posterior.map(num_iter=1)
 
 
-@pytest.mark.parametrize("SNRE", (SNRE_B, SNRE_C))
-def test_c2st_sre_on_linearGaussian(SNRE: RatioEstimator):
+@pytest.mark.parametrize("snre_method", (SNRE_B, SNRE_C))
+def test_c2st_sre_on_linearGaussian(snre_method: RatioEstimator):
     """Test whether SRE infers well a simple example with available ground truth.
 
     This example has different number of parameters theta than number of x. This test
@@ -110,7 +112,7 @@ def test_c2st_sre_on_linearGaussian(SNRE: RatioEstimator):
         ),
         prior,
     )
-    inference = SNRE(classifier="resnet", show_progress_bars=False)
+    inference = snre_method(classifier="resnet", show_progress_bars=False)
 
     theta, x = simulate_for_sbi(
         simulator, prior, num_simulations, simulation_batch_size=100
@@ -139,7 +141,7 @@ def test_c2st_sre_on_linearGaussian(SNRE: RatioEstimator):
     samples = posterior.sample((num_samples,))
 
     # Compute the c2st and assert it is near chance level of 0.5.
-    check_c2st(samples, target_samples, alg=f"snre-{SNRE.__name__}")
+    check_c2st(samples, target_samples, alg=f"{snre_method.__name__}")
 
 
 @pytest.mark.slow
@@ -147,9 +149,7 @@ def test_c2st_sre_on_linearGaussian(SNRE: RatioEstimator):
 @pytest.mark.parametrize("prior_str", ("gaussian", "uniform"))
 @pytest.mark.parametrize("num_trials", (3,))  # num_trials=1 is tested above.
 def test_c2st_snre_variants_on_linearGaussian_with_multiple_trials(
-    snre_method: str,
-    prior_str: str,
-    num_trials: int,
+    snre_method: RatioEstimator, prior_str: str, num_trials: int
 ):
     """Test C2ST and MAP accuracy of SNRE variants on linear gaussian.
 
@@ -257,9 +257,9 @@ def test_c2st_snre_variants_on_linearGaussian_with_multiple_trials(
 
 @pytest.mark.slow
 @pytest.mark.parametrize("num_trials", (1, 3))
-@pytest.mark.parametrize("SNRE", (SNRE_B, SNRE_C))
+@pytest.mark.parametrize("snre_method", (SNRE_B, SNRE_C))
 def test_c2st_multi_round_snr_on_linearGaussian_vi(
-    num_trials: int, SNRE: RatioEstimator
+    num_trials: int, snre_method: RatioEstimator
 ):
     """Test C2ST accuracy of 2-round-SNRE with variational inference sampling."""
 
@@ -283,7 +283,7 @@ def test_c2st_multi_round_snr_on_linearGaussian_vi(
     simulator, prior = prepare_for_sbi(
         lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov), prior
     )
-    inference = SNRE(show_progress_bars=False)
+    inference = snre_method(show_progress_bars=False)
 
     theta, x = simulate_for_sbi(
         simulator, prior, num_simulations_per_round, simulation_batch_size=50
