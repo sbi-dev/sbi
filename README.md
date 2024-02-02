@@ -96,8 +96,7 @@ We wish to maintain a positive community, please read our [Code of Conduct](CODE
 
 `sbi` is the successor (using PyTorch) of the
 [`delfi`](https://github.com/mackelab/delfi) package. It was started as a fork of Conor
-M. Durkan's `lfi`. `sbi` runs as a community project; development is coordinated at the
-[mackelab](https://www.mackelab.org/). See also [credits](https://github.com/sbi-dev/sbi/blob/master/docs/docs/credits.md).
+M. Durkan's `lfi`. `sbi` runs as a community project. See also [credits](https://github.com/sbi-dev/sbi/blob/master/docs/docs/credits.md).
 
 ## Support
 
