@@ -89,7 +89,7 @@ def build_linear_classifier(
     z_score_y: Optional[str] = "independent",
     embedding_net_x: nn.Module = nn.Identity(),
     embedding_net_y: nn.Module = nn.Identity(),
-    **kwargs
+    **kwargs,
 ) -> nn.Module:
     """Builds linear classifier.
 
