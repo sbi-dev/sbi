@@ -13,12 +13,8 @@ from typing import (
 
 from sbi.inference.abc.mcabc import MCABC
 from sbi.inference.abc.smcabc import SMCABC
-from sbi.inference.base import (  # noqa: F401
-    NeuralInference,
-    check_if_proposal_has_default_x,
-    infer,
-    simulate_for_sbi,
-)
+from sbi.inference.base import NeuralInference  # noqa: F401
+from sbi.inference.base import check_if_proposal_has_default_x, infer, simulate_for_sbi
 from sbi.inference.snle.mnle import MNLE
 from sbi.inference.snle.snle_a import SNLE_A
 from sbi.inference.snpe.snpe_a import SNPE_A
