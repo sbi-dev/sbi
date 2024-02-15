@@ -18,6 +18,7 @@ from torch import multiprocessing as mp
 from tqdm.auto import tqdm
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.inference.potentials.base_potential import BasePotential
 from sbi.samplers.mcmc import (
     IterateParameters,
     Slice,
@@ -41,7 +42,7 @@ class MCMCPosterior(NeuralPosterior):
 
     def __init__(
         self,
-        potential_fn: Callable,
+        potential_fn: Union[Callable, BasePotential],
         proposal: Any,
         theta_transform: Optional[TorchTransform] = None,
         method: str = "slice_np",
@@ -57,7 +58,8 @@ class MCMCPosterior(NeuralPosterior):
     ):
         """
         Args:
-            potential_fn: The potential function from which to draw samples.
+            potential_fn: The potential function from which to draw samples. Must be a
+                `BasePotential` or a `Callable` which takes `theta` and `x_o` as inputs.
             proposal: Proposal distribution that is used to initialize the MCMC chain.
             theta_transform: Transformation that will be applied during sampling.
                 Allows to perform MCMC in unconstrained space.

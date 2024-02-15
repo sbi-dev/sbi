@@ -28,7 +28,7 @@ def test_callable_potential(sampling_method):
     x_o = 1 * ones((dim,))
     target_density = MultivariateNormal(mean * ones((dim,)), cov * eye(dim))
 
-    def potential(theta, x_o, **kwargs):
+    def potential(theta, x_o):
         return target_density.log_prob(theta + x_o)
 
     proposal = MultivariateNormal(zeros((dim,)), 5 * eye(dim))

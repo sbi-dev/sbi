@@ -11,6 +11,7 @@ from torch.distributions import Distribution
 from tqdm.auto import tqdm
 
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.inference.potentials.base_potential import BasePotential
 from sbi.samplers.vi import (
     adapt_variational_distribution,
     check_variational_distribution,
@@ -47,7 +48,7 @@ class VIPosterior(NeuralPosterior):
 
     def __init__(
         self,
-        potential_fn: Callable,
+        potential_fn: Union[Callable, BasePotential],
         prior: Optional[TorchDistribution] = None,
         q: Union[str, PyroTransformedDistribution, "VIPosterior", Callable] = "maf",
         theta_transform: Optional[TorchTransform] = None,
@@ -59,7 +60,8 @@ class VIPosterior(NeuralPosterior):
     ):
         """
         Args:
-            potential_fn: The potential function from which to draw samples.
+            potential_fn: The potential function from which to draw samples. Must be a
+                `BasePotential` or a `Callable` which takes `theta` and `x_o` as inputs.
             prior: This is the prior distribution. Note that this is only
                 used to check/construct the variational distribution or within some
                 quality metrics. Please make sure that this matches with the prior

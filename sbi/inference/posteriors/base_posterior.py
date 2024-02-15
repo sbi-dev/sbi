@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
+import inspect
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, Optional, Union
 
@@ -28,14 +29,15 @@ class NeuralPosterior(ABC):
 
     def __init__(
         self,
-        potential_fn: Callable,
+        potential_fn: Union[Callable, BasePotential],
         theta_transform: Optional[TorchTransform] = None,
         device: Optional[str] = None,
         x_shape: Optional[torch.Size] = None,
     ):
         """
         Args:
-            potential_fn: The potential function from which to draw samples.
+            potential_fn: The potential function from which to draw samples. Must be a
+                `BasePotential` or a `Callable` which takes `theta` and `x_o` as inputs.
             theta_transform: Transformation that will be applied during sampling.
                 Allows to perform, e.g. MCMC in unconstrained space.
             device: Training device, e.g., "cpu", "cuda" or "cuda:0". If None,
@@ -43,10 +45,19 @@ class NeuralPosterior(ABC):
             x_shape: Shape of the observed data.
         """
         if not isinstance(potential_fn, BasePotential):
-            callable_potential = potential_fn
+            kwargs_of_callable = list(inspect.signature(potential_fn).parameters.keys())
+            for key in ["theta", "x_o"]:
+                assert key in kwargs_of_callable, (
+                    "If you pass a `Callable` as `potential_fn` then it must have "
+                    "`theta` and `x_o` as inputs, even if some of these keyword "
+                    "arguments are unused."
+                )
+
+            # If the `potential_fn` is a Callable then we wrap it as a
+            # `CallablePotentialWrapper` which inherits from `BasePotential`.
             potential_device = "cpu" if device is None else device
             potential_fn = CallablePotentialWrapper(
-                callable_potential, prior=None, x_o=None, device=potential_device
+                potential_fn, prior=None, x_o=None, device=potential_device
             )
 
         # Ensure device string.

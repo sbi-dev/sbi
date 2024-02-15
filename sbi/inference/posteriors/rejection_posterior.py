@@ -9,6 +9,7 @@ from torch import Tensor
 
 from sbi import utils as utils
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.inference.potentials.base_potential import BasePotential
 from sbi.samplers.rejection.rejection import rejection_sample
 from sbi.types import Shape, TorchTransform
 from sbi.utils.torchutils import ensure_theta_batched
@@ -22,7 +23,7 @@ class RejectionPosterior(NeuralPosterior):
 
     def __init__(
         self,
-        potential_fn: Callable,
+        potential_fn: Union[Callable, BasePotential],
         proposal: Any,
         theta_transform: Optional[TorchTransform] = None,
         max_sampling_batch_size: int = 10_000,
@@ -34,7 +35,8 @@ class RejectionPosterior(NeuralPosterior):
     ):
         """
         Args:
-            potential_fn: The potential function from which to draw samples.
+            potential_fn: The potential function from which to draw samples. Must be a
+                `BasePotential` or a `Callable` which takes `theta` and `x_o` as inputs.
             proposal: The proposal distribution.
             theta_transform: Transformation that is applied to parameters. Is not used
                 during but only when calling `.map()`.
