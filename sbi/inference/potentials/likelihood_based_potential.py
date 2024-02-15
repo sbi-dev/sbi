@@ -96,7 +96,7 @@ class LikelihoodBasedPotential(BasePotential):
             track_gradients=track_gradients,
         )
 
-        return log_likelihood_trial_sum + self.prior.log_prob(theta)
+        return log_likelihood_trial_sum + self.prior.log_prob(theta)  # type: ignore
 
 
 def _log_likelihoods_over_trials(
@@ -201,4 +201,4 @@ class MixedLikelihoodBasedPotential(LikelihoodBasedPotential):
                 self.x_o.shape[0], -1
             ).sum(0)
 
-        return log_likelihood_trial_sum + self.prior.log_prob(theta)
+        return log_likelihood_trial_sum + self.prior.log_prob(theta)  # type: ignore

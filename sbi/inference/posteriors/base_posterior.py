@@ -8,11 +8,14 @@ import torch
 import torch.distributions.transforms as torch_tf
 from torch import Tensor
 
+from sbi.inference.potentials.base_potential import (
+    BasePotential,
+    CallablePotentialWrapper,
+)
 from sbi.types import Array, Shape, TorchTransform
 from sbi.utils import gradient_ascent
 from sbi.utils.torchutils import ensure_theta_batched, process_device
 from sbi.utils.user_input_checks import process_x
-from sbi.inference.potentials.base_potential import BasePotential
 
 
 class NeuralPosterior(ABC):
@@ -41,16 +44,10 @@ class NeuralPosterior(ABC):
         """
         if not isinstance(potential_fn, BasePotential):
             callable_potential = potential_fn
-
-            class CallablePotentialWrapper(BasePotential):
-                """If `potential_fn` is a callable it gets wrapped as this."""
-                allow_iid_x = True
-                
-                def __call__(self, theta, **kwargs):
-                    return callable_potential(theta=theta, x_o=self.x_o, **kwargs)
-
-            potential_fn = CallablePotentialWrapper(None, None)
-
+            potential_device = "cpu" if device is None else device
+            potential_fn = CallablePotentialWrapper(
+                callable_potential, prior=None, x_o=None, device=potential_device
+            )
 
         # Ensure device string.
         self._device = process_device(potential_fn.device if device is None else device)
