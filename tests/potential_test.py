@@ -21,6 +21,7 @@ from sbi.inference import (
     [ImportanceSamplingPosterior, MCMCPosterior, RejectionPosterior, VIPosterior],
 )
 def test_callable_potential(sampling_method):
+    """Test whether callable potentials can be used to sample from a Gaussian."""
     dim = 2
     mean = 2.5
     cov = 2.0

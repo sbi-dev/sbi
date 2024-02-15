@@ -9,7 +9,10 @@ from sbi.utils.user_input_checks import process_x
 
 class BasePotential(metaclass=ABCMeta):
     def __init__(
-        self, prior: Optional[Distribution], x_o: Optional[Tensor] = None, device: str = "cpu"
+        self,
+        prior: Optional[Distribution],
+        x_o: Optional[Tensor] = None,
+        device: str = "cpu",
     ):
         """Initialize potential function.
 
@@ -61,3 +64,22 @@ class BasePotential(metaclass=ABCMeta):
         `self._x_o` is `None`.
         """
         return self._x_o
+
+
+class CallablePotentialWrapper(BasePotential):
+    """If `potential_fn` is a callable it gets wrapped as this."""
+
+    allow_iid_x = True  # type: ignore
+
+    def __init__(
+        self,
+        callable_potential,
+        prior: Optional[Distribution],
+        x_o: Optional[Tensor] = None,
+        device: str = "cpu",
+    ):
+        super().__init__(prior, x_o, device)
+        self.callable_potential = callable_potential
+
+    def __call__(self, theta, **kwargs):
+        return self.callable_potential(theta=theta, x_o=self.x_o, **kwargs)

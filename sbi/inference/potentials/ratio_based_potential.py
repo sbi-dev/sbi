@@ -92,7 +92,7 @@ class RatioBasedPotential(BasePotential):
         )
 
         # Move to cpu for comparison with prior.
-        return log_likelihood_trial_sum + self.prior.log_prob(theta)
+        return log_likelihood_trial_sum + self.prior.log_prob(theta)  # type: ignore
 
 
 def _log_ratios_over_trials(
