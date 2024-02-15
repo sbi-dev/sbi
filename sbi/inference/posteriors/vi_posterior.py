@@ -115,7 +115,7 @@ class VIPosterior(NeuralPosterior):
             self._prior = q._prior
         else:
             raise ValueError(
-                "We could not find a suitable prior distribution within `potential_fn`"
+                "We could not find a suitable prior distribution within `potential_fn` "
                 "or `q` (if a VIPosterior is given). Please explicitly specify a prior."
             )
         move_all_tensor_to_device(self._prior, device)
@@ -461,9 +461,12 @@ class VIPosterior(NeuralPosterior):
                 self.evaluate(quality_control_metric=quality_control_metric)
             except Exception as e:
                 print(
-                    f"Quality control did not work, we reset the variational \
-                        posterior,please check your setting. \
-                        \n Following error occured {e}"
+                    f"Quality control showed a low quality of the variational "
+                    f"posterior. We are automatically retraining the variational "
+                    f"posterior from scratch with a smaller learning rate. "
+                    f"Alternatively, if you want to skip quality control, please "
+                    f"retrain with `VIPosterior.train(..., quality_control=False)`. "
+                    f"\nThe error that occured is: {e}"
                 )
                 self.train(
                     learning_rate=learning_rate * 0.1,
