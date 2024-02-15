@@ -1,6 +1,7 @@
 from abc import ABCMeta, abstractmethod
 from typing import Optional
 
+import torch
 from torch import Tensor
 from torch.distributions import Distribution
 
@@ -81,5 +82,6 @@ class CallablePotentialWrapper(BasePotential):
         super().__init__(prior, x_o, device)
         self.callable_potential = callable_potential
 
-    def __call__(self, theta, **kwargs):
-        return self.callable_potential(theta=theta, x_o=self.x_o, **kwargs)
+    def __call__(self, theta, track_gradients: bool = True):
+        with torch.set_grad_enabled(track_gradients):
+            return self.callable_potential(theta=theta, x_o=self.x_o)
