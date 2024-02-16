@@ -468,9 +468,7 @@ class PosteriorEstimator(NeuralInference, ABC):
             mcmc_parameters: Additional kwargs passed to `MCMCPosterior`.
             vi_parameters: Additional kwargs passed to `VIPosterior`.
             rejection_sampling_parameters: Additional kwargs passed to
-                `RejectionPosterior` or `DirectPosterior`. By default,
-                `DirectPosterior` is used. Only if `rejection_sampling_parameters`
-                contains `proposal`, a `RejectionPosterior` is instantiated.
+                `RejectionPosterior`.
 
         Returns:
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods
@@ -511,12 +509,12 @@ class PosteriorEstimator(NeuralInference, ABC):
             )
         elif sample_with == "rejection":
             if "proposal" not in rejection_sampling_parameters.keys():
-                warn(
-                    "You passed `sample_with='rejection'. As of sbi v0.23.0, this"
-                    "performs rejection sampling and does not directly sample from"
-                    "the density estimator (as had been the case until sbi v0.22.0."
-                    "If you want to recover the behavior of sbi v0.22.0 and earlier, "
-                    "please use `sample_with='direct'`."
+                raise ValueError(
+                    "You passed `sample_with='rejection' but you did not specify a "
+                    "`proposal` in `rejection_sampling_parameters`. Until sbi "
+                    "v0.22.0, this was interpreted as directly sampling from the "
+                    "posterior. As of sbi v0.23.0, you instead have to use "
+                    "`sample_with='direct'` to do so."
                 )
             self._posterior = RejectionPosterior(
                 potential_fn=potential_fn,
