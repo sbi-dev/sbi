@@ -343,24 +343,26 @@ def test_vi_with_multiple_independent_prior():
     )
 
 
-@pytest.mark.parametrize("num_dim", (1, 2,3,4,5,10,25,33))
+@pytest.mark.parametrize("num_dim", (1, 2, 3, 4, 5, 10, 25, 33))
 @pytest.mark.parametrize("q", FLOWS)
-def test_vi_flow_builders(num_dim:int, q:str):
-    """ Test if the flow builder build the flows correctly, such that at least sampling and log_prob works."""
-    
+def test_vi_flow_builders(num_dim: int, q: str):
+    """Test if the flow builder build the flows correctly, such that at least sampling and log_prob works."""
+
     try:
-        q = get_flow_builder(q)((num_dim,), torch.distributions.transforms.identity_transform)
+        q = get_flow_builder(q)(
+            (num_dim,), torch.distributions.transforms.identity_transform
+        )
     except AssertionError:
         # If the flow is not defined for the dimensionality, we pass the test
         return
-    
+
     # Without sample_shape
-    
+
     sample = q.sample()
     assert sample.shape == (num_dim,), "The sample shape is not as expected"
     log_prob = q.log_prob(sample)
     assert log_prob.shape == (), "The log_prob shape is not as expected"
-    
+
     # With sample_shape
     sample_batch = q.sample((10,))
     assert sample_batch.shape == (10, num_dim), "The sample shape is not as expected"
