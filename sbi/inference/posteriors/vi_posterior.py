@@ -2,7 +2,7 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 from copy import deepcopy
-from typing import Callable, Iterable, Optional, Union
+from typing import Callable, Dict, Iterable, Optional, Union
 
 import numpy as np
 import torch
@@ -566,3 +566,17 @@ class VIPosterior(NeuralPosterior):
             show_progress_bars=show_progress_bars,
             force_update=force_update,
         )
+
+    def __getstate__(self):
+        """This method is called when pickling the object."""
+        self._optimizer = None
+        self.__deepcopy__ = None
+        self._q_build_fn = None
+        self._q.__deepcopy__ = None
+        return self.__dict__
+
+    def __setstate__(self, state_dict: Dict):
+        self.__dict__ = state_dict
+        # Restore deepcopy compatibility
+        make_object_deepcopy_compatible(self)
+        make_object_deepcopy_compatible(self.q)
