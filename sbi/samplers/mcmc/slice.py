@@ -19,7 +19,7 @@ class Slice(MCMCKernel):
         max_width=float("inf"),
         transforms: Optional[Dict] = None,
         max_plate_nesting: Optional[int] = None,
-        jit_compile: Optional[bool] = False,
+        jit_compile: bool = False,
         jit_options: Optional[Dict] = None,
         ignore_jit_warnings: bool = False,
     ) -> None:

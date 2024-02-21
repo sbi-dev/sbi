@@ -13,14 +13,14 @@ from typing import (
 
 import numpy as np
 import torch
-from pyro.distributions import TransformedDistribution
+
 from pyro.distributions.torch_transform import TransformModule
 from torch import Tensor
-from torch.distributions import Distribution
+from torch.distributions import Distribution, TransformedDistribution
 from torch.distributions.transforms import ComposeTransform, IndependentTransform
 from torch.nn import Module
 
-from sbi.types import TorchTransform
+from sbi.types import TorchTransform, PyroTransformedDistribution
 
 
 def filter_kwrags_for_func(f: Callable, kwargs: Dict) -> Dict:
@@ -82,7 +82,7 @@ def get_modules(t: Union[TorchTransform, TransformModule]) -> Iterable:
         pass
 
 
-def check_parameters_modules_attribute(q: TransformedDistribution) -> None:
+def check_parameters_modules_attribute(q: PyroTransformedDistribution) -> None:
     """Checks a parameterized distribution object for valid `parameters` and `modules`.
 
     Args:
@@ -195,7 +195,7 @@ def add_parameters_module_attributes(
 
 
 def add_parameter_attributes_to_transformed_distribution(
-    q: TransformedDistribution,
+    q: PyroTransformedDistribution,
 ) -> None:
     """A function that will add `parameters` and `modules` to q automatically, if q is a
     TransformedDistribution.
@@ -224,7 +224,7 @@ def add_parameter_attributes_to_transformed_distribution(
 
 
 def adapt_variational_distribution(
-    q: TransformedDistribution,
+    q: PyroTransformedDistribution,
     prior: Distribution,
     link_transform: Callable,
     parameters: Iterable = [],

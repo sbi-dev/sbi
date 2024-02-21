@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from typing import Callable, Iterable, List, Optional
+from typing import Callable, Iterable, List, Optional, Type
 
 import torch
 from pyro.distributions import transforms
+from pyro.distributions.torch_transform import TransformModule
 from pyro.nn import AutoRegressiveNN, DenseNN
 from torch import nn
 from torch.distributions import Distribution, Independent, Normal
@@ -19,7 +20,7 @@ _FLOW_BUILDERS = {}
 
 
 def register_transform(
-    cls: Optional[TorchTransform] = None,
+    cls: Optional[Type[TorchTransform]] = None,
     name: Optional[str] = None,
     inits: Callable = lambda *args, **kwargs: (args, kwargs),
 ) -> Callable:
@@ -278,7 +279,7 @@ class AffineTransform(transforms.AffineTransform):
     """Trainable version of an Affine transform. This can be used to get diagonal
     Gaussian approximations."""
 
-    __doc__ += transforms.AffineTransform.__doc__
+    __doc__ = transforms.AffineTransform.__doc__
 
     def parameters(self):
         self.loc.requires_grad_(True)
@@ -306,7 +307,7 @@ class LowerCholeskyAffine(transforms.LowerCholeskyAffine):
     """Trainable version of a Lower Cholesky Affine transform. This can be used to get
     full Gaussian approximations."""
 
-    __doc__ += transforms.LowerCholeskyAffine.__doc__
+    __doc__ = transforms.LowerCholeskyAffine.__doc__
 
     def parameters(self):
         self.loc.requires_grad_(True)
@@ -337,7 +338,7 @@ class TransformedDistribution(torch.distributions.TransformedDistribution):
 
     assert __doc__ is not None
     assert torch.distributions.TransformedDistribution.__doc__ is not None
-    __doc__ += torch.distributions.TransformedDistribution.__doc__
+    __doc__ = torch.distributions.TransformedDistribution.__doc__
 
     def parameters(self):
         if hasattr(self.base_dist, "parameters"):
@@ -354,7 +355,7 @@ class TransformedDistribution(torch.distributions.TransformedDistribution):
 
 def build_flow(
     event_shape: torch.Size,
-    link_flow: transforms.Transform,
+    link_flow: TorchTransform,
     num_transforms: int = 5,
     transform: str = "affine_autoregressive",
     permute: bool = True,
@@ -388,7 +389,7 @@ def build_flow(
     # `unsqueeze(0)` because the `link_flow` requires a batch dimension if the prior is
     # a `MultipleIndependent`.
     additional_dim = (
-        len(link_flow(torch.zeros(event_shape, device=device).unsqueeze(0))[0])
+        len(link_flow(torch.zeros(event_shape, device=device).unsqueeze(0))[0]) # type: ignore # Since link flow should never be None
         - torch.tensor(event_shape, device=device).item()
     )
     event_shape = torch.Size(
