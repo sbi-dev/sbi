@@ -21,11 +21,6 @@ from sbi.inference.potentials import likelihood_estimator_based_potential
 from sbi.utils import (
     check_estimator_arg,
     check_prior,
-    handle_invalid_x,
-    mask_sims_from_prior,
-    nle_nre_apt_msg_on_invalid_x,
-    validate_theta_and_x,
-    warn_if_zscoring_changes_data,
     x_shape_from_simulation,
 )
 
@@ -112,30 +107,14 @@ class LikelihoodEstimator(NeuralInference, ABC):
             NeuralInference object (returned so that this function is chainable).
         """
 
-        is_valid_x, num_nans, num_infs = handle_invalid_x(x, exclude_invalid_x)
-
-        x = x[is_valid_x]
-        theta = theta[is_valid_x]
-
-        # Check for problematic z-scoring
-        warn_if_zscoring_changes_data(x)
-        nle_nre_apt_msg_on_invalid_x(num_nans, num_infs, exclude_invalid_x, "SNLE")
-
-        if data_device is None:
-            data_device = self._device
-        theta, x = validate_theta_and_x(
-            theta, x, data_device=data_device, training_device=self._device
+        return super().append_simulations(
+            theta=theta,
+            x=x,
+            exclude_invalid_x=exclude_invalid_x,
+            from_round=from_round,
+            algorithm="SNLE",
+            data_device=data_device,
         )
-
-        prior_masks = mask_sims_from_prior(int(from_round), theta.size(0))
-
-        self._theta_roundwise.append(theta)
-        self._x_roundwise.append(x)
-        self._prior_masks.append(prior_masks)
-
-        self._data_round_index.append(int(from_round))
-
-        return self
 
     def train(
         self,
