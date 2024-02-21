@@ -23,7 +23,7 @@ from tests.test_utils import check_c2st
 
 class FakePotential(BasePotential):
     def __call__(self, theta, **kwargs):
-        return torch.ones_like(torch.as_tensor(theta, dtype=torch.float32))
+        return torch.ones(theta.shape[0], dtype=torch.float32)
 
     def allow_iid_x(self) -> bool:
         return True
