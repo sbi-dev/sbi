@@ -18,7 +18,15 @@ from torch.utils.tensorboard.writer import SummaryWriter
 import sbi.inference
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.simulators.simutils import simulate_in_batches
-from sbi.utils import check_prior, get_log_root
+from sbi.utils import (
+    check_prior,
+    get_log_root,
+    handle_invalid_x,
+    mask_sims_from_prior,
+    nle_nre_apt_msg_on_invalid_x,
+    validate_theta_and_x,
+    warn_if_zscoring_changes_data,
+)
 from sbi.utils.sbiutils import get_simulations_since_round
 from sbi.utils.torchutils import check_if_prior_on_device, process_device
 from sbi.utils.user_input_checks import prepare_for_sbi
@@ -178,6 +186,66 @@ class NeuralInference(ABC):
         )
 
         return theta, x, prior_masks
+
+    def append_simulations(
+        self,
+        theta: Tensor,
+        x: Tensor,
+        exclude_invalid_x: bool = False,
+        from_round: int = 0,
+        algorithm: str = "SNLE or SNRE",
+        data_device: Optional[str] = None,
+    ) -> "NeuralInference":
+        r"""Store parameters and simulation outputs to use them for later training.
+
+        Data are stored as entries in lists for each type of variable (parameter/data).
+
+        Stores $\theta$, $x$, prior_masks (indicating if simulations are coming from the
+        prior or not) and an index indicating which round the batch of simulations came
+        from.
+
+        Args:
+            theta: Parameter sets.
+            x: Simulation outputs.
+            exclude_invalid_x: Whether invalid simulations are discarded during
+                training. If `False`, The inference algorithm raises an error when invalid simulations are
+                found. If `True`, invalid simulations are discarded and training
+                can proceed, but this gives systematically wrong results.
+            from_round: Which round the data stemmed from. Round 0 means from the prior.
+                With default settings, this is not used at all for the inference algorithm. Only when
+                the user later on requests `.train(discard_prior_samples=True)`, we
+                use these indices to find which training data stemmed from the prior.
+            data_device: Where to store the data, default is on the same device where
+                the training is happening. If training a large dataset on a GPU with not
+                much VRAM can set to 'cpu' to store data on system memory instead.
+        Returns:
+            NeuralInference object (returned so that this function is chainable).
+        """
+
+        is_valid_x, num_nans, num_infs = handle_invalid_x(x, exclude_invalid_x)
+
+        x = x[is_valid_x]
+        theta = theta[is_valid_x]
+
+        # Check for problematic z-scoring
+        warn_if_zscoring_changes_data(x)
+        nle_nre_apt_msg_on_invalid_x(num_nans, num_infs, exclude_invalid_x, algorithm)
+
+        if data_device is None:
+            data_device = self._device
+        theta, x = validate_theta_and_x(
+            theta, x, data_device=data_device, training_device=self._device
+        )
+
+        prior_masks = mask_sims_from_prior(int(from_round), theta.size(0))
+
+        self._theta_roundwise.append(theta)
+        self._x_roundwise.append(x)
+        self._prior_masks.append(prior_masks)
+
+        self._data_round_index.append(int(from_round))
+
+        return self
 
     @abstractmethod
     def train(
