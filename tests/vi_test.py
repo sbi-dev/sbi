@@ -3,9 +3,9 @@
 
 from __future__ import annotations
 
+import os
 from copy import deepcopy
 
-import os
 import numpy as np
 import pytest
 import torch
@@ -19,6 +19,7 @@ from sbi.inference.potentials.base_potential import BasePotential
 from sbi.simulators.linear_gaussian import true_posterior_linear_gaussian_mvn_prior
 from sbi.utils import MultipleIndependent
 from tests.test_utils import check_c2st
+
 
 class FakePotential(BasePotential):
     def __call__(self, theta, **kwargs):
@@ -215,8 +216,8 @@ def test_deepcopy_support(q: str):
     assert (
         posterior._x == posterior_copy._x
     ).all(), "Mhh, something with the copy is strange"
-    
-    # Try if they are the same 
+
+    # Try if they are the same
     torch.manual_seed(0)
     s1 = posterior._q.rsample()
     torch.manual_seed(0)
@@ -227,10 +228,11 @@ def test_deepcopy_support(q: str):
     posterior.q.rsample()
     posterior_copy = deepcopy(posterior)
 
+
 @pytest.mark.parametrize("q", ("maf", "nsf", "gaussian_diag", "gaussian", "mcf", "scf"))
 def test_pickle_support(q: str):
     """Tests if the VIPosterior can be saved and loaded via pickle.
-    
+
     Args:
         q: Different variational posteriors.
     """
@@ -247,23 +249,22 @@ def test_pickle_support(q: str):
         q=q,
     )
     posterior.set_default_x(torch.tensor(np.zeros((num_dim,)).astype(np.float32)))
-    
+
     torch.save(posterior, "posterior.pt")
     posterior_loaded = torch.load("posterior.pt")
     assert (
         posterior._x == posterior_loaded._x
     ).all(), "Mhh, something with the pickled is strange"
-    
-    # Try if they are the same 
+
+    # Try if they are the same
     torch.manual_seed(0)
     s1 = posterior._q.rsample()
     torch.manual_seed(0)
     s2 = posterior_loaded._q.rsample()
-    
+
     os.remove("posterior.pt")
-    
+
     assert torch.allclose(s1, s2), "Mhh, something with the pickled is strange"
-    
 
 
 def test_vi_posterior_inferface():
