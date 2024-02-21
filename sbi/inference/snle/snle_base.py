@@ -18,11 +18,7 @@ from sbi import utils as utils
 from sbi.inference import NeuralInference
 from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior, VIPosterior
 from sbi.inference.potentials import likelihood_estimator_based_potential
-from sbi.utils import (
-    check_estimator_arg,
-    check_prior,
-    x_shape_from_simulation,
-)
+from sbi.utils import check_estimator_arg, check_prior, x_shape_from_simulation
 
 
 class LikelihoodEstimator(NeuralInference, ABC):
