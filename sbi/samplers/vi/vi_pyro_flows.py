@@ -389,7 +389,7 @@ def build_flow(
     # `unsqueeze(0)` because the `link_flow` requires a batch dimension if the prior is
     # a `MultipleIndependent`.
     additional_dim = (
-        len(link_flow(torch.zeros(event_shape, device=device).unsqueeze(0))[0]) # type: ignore # Since link flow should never be None
+        len(link_flow(torch.zeros(event_shape, device=device).unsqueeze(0))[0])  # type: ignore # Since link flow should never be None
         - torch.tensor(event_shape, device=device).item()
     )
     event_shape = torch.Size(

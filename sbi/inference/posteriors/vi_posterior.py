@@ -572,7 +572,7 @@ class VIPosterior(NeuralPosterior):
         self._optimizer = None
         self.__deepcopy__ = None
         self._q_build_fn = None
-        self._q.__deepcopy__ = None
+        self._q.__deepcopy__ = None  # type: ignore
         return self.__dict__
 
     def __setstate__(self, state_dict: Dict):
