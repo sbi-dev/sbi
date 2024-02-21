@@ -13,14 +13,13 @@ from typing import (
 
 import numpy as np
 import torch
-
 from pyro.distributions.torch_transform import TransformModule
 from torch import Tensor
 from torch.distributions import Distribution, TransformedDistribution
 from torch.distributions.transforms import ComposeTransform, IndependentTransform
 from torch.nn import Module
 
-from sbi.types import TorchTransform, PyroTransformedDistribution
+from sbi.types import PyroTransformedDistribution, TorchTransform
 
 
 def filter_kwrags_for_func(f: Callable, kwargs: Dict) -> Dict:

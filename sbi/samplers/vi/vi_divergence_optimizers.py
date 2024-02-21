@@ -6,7 +6,6 @@ from typing import Callable, Dict, List, Optional, Tuple, Type, Union
 
 import numpy as np
 import torch
-
 from torch import Tensor, nn
 from torch.distributions import Distribution
 from torch.optim import ASGD, SGD, Adadelta, Adagrad, Adam, Adamax, AdamW, RMSprop
