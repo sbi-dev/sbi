@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
+import copy
 from copy import deepcopy
 from typing import Callable, Dict, Iterable, Optional, Union
 
@@ -567,10 +568,23 @@ class VIPosterior(NeuralPosterior):
             force_update=force_update,
         )
 
+    def __deepcopy__(self, memo: Optional[Dict] = None) -> "VIPosterior":
+        if memo is None:
+            memo = {}
+        # Create a new instance of the class
+        cls = self.__class__
+        result = cls.__new__(cls)
+        # Add to memo
+        memo[id(self)] = result
+        # Copy attributes
+        for k, v in self.__dict__.items():
+            setattr(result, k, copy.deepcopy(v, memo))
+        return result
+
     def __getstate__(self):
         """This method is called when pickling the object."""
         self._optimizer = None
-        self.__deepcopy__ = None
+        self.__deepcopy__ = None  # type: ignore
         self._q_build_fn = None
         self._q.__deepcopy__ = None  # type: ignore
         return self.__dict__
