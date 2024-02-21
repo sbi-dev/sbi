@@ -193,7 +193,7 @@ class NeuralInference(ABC):
         x: Tensor,
         exclude_invalid_x: bool = False,
         from_round: int = 0,
-        algorithm: str = "SNLE or SNRE",
+        algorithm: Optional[str] = None,
         data_device: Optional[str] = None,
     ) -> "NeuralInference":
         r"""Store parameters and simulation outputs to use them for later training.
@@ -215,6 +215,8 @@ class NeuralInference(ABC):
                 With default settings, this is not used at all for the inference algorithm. Only when
                 the user later on requests `.train(discard_prior_samples=True)`, we
                 use these indices to find which training data stemmed from the prior.
+            algorithm: Which algorithm is used. This is used to give a more informative
+                warning or error message when invalid simulations are found.
             data_device: Where to store the data, default is on the same device where
                 the training is happening. If training a large dataset on a GPU with not
                 much VRAM can set to 'cpu' to store data on system memory instead.
@@ -229,7 +231,9 @@ class NeuralInference(ABC):
 
         # Check for problematic z-scoring
         warn_if_zscoring_changes_data(x)
-        nle_nre_apt_msg_on_invalid_x(num_nans, num_infs, exclude_invalid_x, algorithm)
+        nle_nre_apt_msg_on_invalid_x(
+            num_nans, num_infs, exclude_invalid_x, algorithm or type(self).__name__
+        )
 
         if data_device is None:
             data_device = self._device
