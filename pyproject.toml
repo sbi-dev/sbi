@@ -46,11 +46,6 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "autoflake",
-    "black",
-    "deepdiff",
-    "flake8",
-    "isort",
     "jupyter",
     "mkdocs",
     "mkdocs-material",
@@ -61,9 +56,8 @@ dev = [
     "pre-commit",
     "pytest",
     "pyyaml",
-    "pyright >=1.1.300,<1.1.306",
+    "ruff",
     "torchtestcase",
-    "twine",
 ]
 
 [project.urls]
@@ -71,35 +65,42 @@ documentation = "https://sbi-dev.github.io/sbi/"
 source = "https://github.com/sbi-dev/sbi"
 tracker = "https://github.com/sbi-dev/sbi/issues"
 
-[tool.black]
+# ruff configs
+[tool.ruff]
+extend-include = ["*.ipynb"]
 line-length = 88
-target-version = ['py37', 'py38', 'py39', 'py310', 'py311']
-include = '\.pyi?$|\.ipynb$'
-extend-exclude = '''
-/(
-    \.git
-  | \.venv
-  | \.ipynb_checkpoints
-)/
-'''
 
-[tool.isort]
-line_length = 88
-include_trailing_comma = true
-use_parentheses = true
-skip_glob = [".ipynb_checkpoints", "docs/*"]
-known_first_party=["sbi", "tests", "examples", "tutorials"]
-known_third_party = ["arviz", "joblib", "matplotlib", "numpy", "pyknos", "pyro", "pytest", "scipy", "six", "sklearn", "tensorboard", "torch", "torchtestcase", "tqdm", "typing_extensions"]
-multi_line_output = 3
-
-[tool.flake8]
-max-line-length = 88
-exclude = [
-    "docs",
-    "build",
-    "dist",
-    ".ipynb_checkpoints"
+[tool.ruff.lint]
+select = [
+    # pycodestyle
+    "E",
+    # Pyflakes
+    "F",
+    # pyupgrade
+    "UP",
+    # flake8-bugbear
+    "B",
+    # flake8-simplify
+    "SIM",
+    # isort
+    "I",
 ]
+ignore = ["E731"]  # allow using lambda functions
+
+[tool.ruff.lint.extend-per-file-ignores]
+"__init__.py" = ["E402", "F401", "F403"]  # allow unused imports and undefined names
+"test_*.py" = ["F403", "F405"]
+
+[tool.ruff.lint.isort]
+case-sensitive = true
+lines-between-types = 0  # like isort default.
+relative-imports-order = "furthest-to-closest"  # like isort default.
+known-first-party = ["sbi", "tests", "examples", "tutorials"]
+
+[tool.ruff.format]
+exclude = ["*.ipynb"]
+preview = true
+quote-style = "preserve"
 
 # Pytest configuration
 [tool.pytest.ini_options]
