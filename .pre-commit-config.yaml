@@ -1,18 +1,18 @@
 repos:
-    -   repo: https://github.com/astral-sh/ruff-pre-commit
-        rev: v0.2.2
-        hooks:
-            - id: ruff  # linter
-            - id: ruff-format  # formatter, check only.
-              args: [--check]
-    -   repo: https://github.com/pre-commit/pre-commit-hooks
-        rev: v4.5.0
-        hooks:
-        - id: check-added-large-files
-        - id: check-merge-conflict
-        - id: check-toml
-        - id: check-yaml
-        - id: end-of-file-fixer
-        - id: mixed-line-ending
-          args: [--fix=no]
-        - id: trailing-whitespace
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  rev: v0.2.2
+  hooks:
+  - id: ruff  # linter
+  - id: ruff-format  # formatter, check only.
+    args: [--check]
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v4.5.0
+  hooks:
+  - id: check-added-large-files
+  - id: check-merge-conflict
+  - id: check-toml
+  - id: check-yaml
+  - id: end-of-file-fixer
+  - id: mixed-line-ending
+    args: [--fix=no]
+  - id: trailing-whitespace
