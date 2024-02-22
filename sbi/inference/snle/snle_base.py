@@ -11,7 +11,6 @@ from pyknos.nflows import flows
 from torch import Tensor, nn, optim
 from torch.distributions import Distribution
 from torch.nn.utils.clip_grad import clip_grad_norm_
-from torch.utils import data
 from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi import utils as utils
@@ -75,6 +74,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         x: Tensor,
         exclude_invalid_x: bool = False,
         from_round: int = 0,
+        algorithm: str = "SNLE",
         data_device: Optional[str] = None,
     ) -> "LikelihoodEstimator":
         r"""Store parameters and simulation outputs to use them for later training.
@@ -103,12 +103,13 @@ class LikelihoodEstimator(NeuralInference, ABC):
             NeuralInference object (returned so that this function is chainable).
         """
 
-        return super().append_simulations(
+        # pyright false positive, will be fixed with pyright 1.1.310
+        return super().append_simulations(  # type: ignore
             theta=theta,
             x=x,
             exclude_invalid_x=exclude_invalid_x,
             from_round=from_round,
-            algorithm="SNLE",
+            algorithm=algorithm,
             data_device=data_device,
         )
 

@@ -83,6 +83,7 @@ class RatioEstimator(NeuralInference, ABC):
         x: Tensor,
         exclude_invalid_x: bool = False,
         from_round: int = 0,
+        algorithm: str = "SNRE",
         data_device: Optional[str] = None,
     ) -> "RatioEstimator":
         r"""Store parameters and simulation outputs to use them for later training.
@@ -111,12 +112,12 @@ class RatioEstimator(NeuralInference, ABC):
             NeuralInference object (returned so that this function is chainable).
         """
 
-        return super().append_simulations(
+        return super().append_simulations(  # type: ignore
             theta=theta,
             x=x,
             exclude_invalid_x=exclude_invalid_x,
             from_round=from_round,
-            algorithm="SNRE",
+            algorithm=algorithm,
             data_device=data_device,
         )
 

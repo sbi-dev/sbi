@@ -187,6 +187,7 @@ class NeuralInference(ABC):
 
         return theta, x, prior_masks
 
+    @abstractmethod
     def append_simulations(
         self,
         theta: Tensor,
