@@ -8,7 +8,7 @@ import numpy as np
 import torch
 from torch import Tensor, nn
 from torch.distributions import Distribution
-from torch.optim import ASGD, SGD, Adadelta, Adagrad, Adam, Adamax, AdamW, RMSprop
+from torch.optim import ASGD, SGD, Adadelta, Adagrad, Adam, AdamW, Adamax, RMSprop
 from torch.optim.lr_scheduler import (
     CosineAnnealingLR,
     CosineAnnealingWarmRestarts,
@@ -365,7 +365,7 @@ def register_VI_method(
         name: Associated name
     """
 
-    def _register(cls: "DivergenceOptimizer") -> "DivergenceOptimizer":
+    def _register(cls: DivergenceOptimizer) -> DivergenceOptimizer:
         if name is None:
             cls_name = cls.__class__.__name__
         else:

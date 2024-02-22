@@ -719,8 +719,8 @@ def check_transform(
 
     assert torch.allclose(
         theta,
-        transform(theta_unconstrained),
-        atol=atol,  # type: ignore
+        transform(theta_unconstrained),  # type: ignore
+        atol=atol,
     ), "Original and re-transformed parameters must be close to each other."
 
 

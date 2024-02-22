@@ -11,7 +11,6 @@ from typing import (
     Union,
 )
 
-import numpy as np
 import torch
 from pyro.distributions.torch_transform import TransformModule
 from torch import Tensor
