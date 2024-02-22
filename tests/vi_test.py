@@ -211,18 +211,22 @@ def test_deepcopy_support(q: str):
     )
     posterior_copy = deepcopy(posterior)
     posterior.set_default_x(torch.tensor(np.zeros((num_dim,)).astype(np.float32)))
-    assert posterior._x != posterior_copy._x, "Mhh, something with the copy is strange"
+    assert (
+        posterior._x != posterior_copy._x
+    ), "Default x attributed of original and copied but modified VIPosterior must be the different, on change (otherwise it is not a deep copy)."
     posterior_copy = deepcopy(posterior)
     assert (
         posterior._x == posterior_copy._x
-    ).all(), "Mhh, something with the copy is strange"
+    ).all(), "Default x attributed of original and copied VIPosterior must be the same."
 
     # Try if they are the same
     torch.manual_seed(0)
     s1 = posterior._q.rsample()
     torch.manual_seed(0)
     s2 = posterior_copy._q.rsample()
-    assert torch.allclose(s1, s2), "Mhh, something with the pickled is strange"
+    assert torch.allclose(
+        s1, s2
+    ), "Samples from original and unpickled VIPosterior must be close."
 
     # Produces nonleaf tensors in the cache... -> Can lead to failure of deepcopy.
     posterior.q.rsample()

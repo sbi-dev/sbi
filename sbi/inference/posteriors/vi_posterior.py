@@ -569,6 +569,18 @@ class VIPosterior(NeuralPosterior):
         )
 
     def __deepcopy__(self, memo: Optional[Dict] = None) -> "VIPosterior":
+        """This method is called when using `copy.deepcopy` on the object.
+
+        It defines how the object is copied. We need to overwrite this method, since
+        the default implementation does use __getstate__ and __setstate__ which we
+        overwrite to enable pickling (and in particular the necessary modifications are incompatible deep copying).
+
+        Args:
+            memo (Optional[Dict], optional): Deep copy internal memo. Defaults to None.
+
+        Returns:
+            VIPosterior: Deep copy of the VIPosterior.
+        """
         if memo is None:
             memo = {}
         # Create a new instance of the class
@@ -581,8 +593,15 @@ class VIPosterior(NeuralPosterior):
             setattr(result, k, copy.deepcopy(v, memo))
         return result
 
-    def __getstate__(self):
-        """This method is called when pickling the object."""
+    def __getstate__(self) -> Dict:
+        """This method is called when pickling the object.
+
+        It defines what is pickled. We need to overwrite this method,
+        since some parts due not support pickle protocols (e.g. due to local functions, etc.).
+
+        Returns:
+            Dict: All attributes of the VIPosterior.
+        """
         self._optimizer = None
         self.__deepcopy__ = None  # type: ignore
         self._q_build_fn = None
@@ -590,6 +609,14 @@ class VIPosterior(NeuralPosterior):
         return self.__dict__
 
     def __setstate__(self, state_dict: Dict):
+        """This method is called when unpickling the object.
+
+        Especially, we need to restore the removed attributes and ensure that the
+        object e.g. remains deep copy compatible.
+
+        Args:
+            state_dict (Dict): Given state dictionary, we will restore the object from it.
+        """
         self.__dict__ = state_dict
         q = deepcopy(self._q)
         # Restore removed attributes
