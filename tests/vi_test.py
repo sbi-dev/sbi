@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 from copy import deepcopy
 
 import numpy as np
@@ -22,6 +23,14 @@ from tests.test_utils import check_c2st
 
 # Tests should be run for all default flows
 FLOWS = get_default_flows()
+
+
+class FakePotential(BasePotential):
+    def __call__(self, theta, **kwargs):
+        return torch.ones(theta.shape[0], dtype=torch.float32)
+
+    def allow_iid_x(self) -> bool:
+        return True
 
 
 @pytest.mark.slow
@@ -194,13 +203,6 @@ def test_deepcopy_support(q: str):
 
     num_dim = 2
 
-    class FakePotential(BasePotential):
-        def __call__(self, theta, **kwargs):
-            return torch.ones_like(torch.as_tensor(theta, dtype=torch.float32))
-
-        def allow_iid_x(self) -> bool:
-            return True
-
     prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
     potential_fn = FakePotential(prior=prior)
     theta_transform = torch_tf.identity_transform
@@ -213,26 +215,68 @@ def test_deepcopy_support(q: str):
     )
     posterior_copy = deepcopy(posterior)
     posterior.set_default_x(torch.tensor(np.zeros((num_dim,)).astype(np.float32)))
-    assert posterior._x != posterior_copy._x, "Mhh, something with the copy is strange"
+    assert (
+        posterior._x != posterior_copy._x
+    ), "Default x attributed of original and copied but modified VIPosterior must be the different, on change (otherwise it is not a deep copy)."
     posterior_copy = deepcopy(posterior)
     assert (
         posterior._x == posterior_copy._x
-    ).all(), "Mhh, something with the copy is strange"
+    ).all(), "Default x attributed of original and copied VIPosterior must be the same."
+
+    # Try if they are the same
+    torch.manual_seed(0)
+    s1 = posterior._q.rsample()
+    torch.manual_seed(0)
+    s2 = posterior_copy._q.rsample()
+    assert torch.allclose(
+        s1, s2
+    ), "Samples from original and unpickled VIPosterior must be close."
 
     # Produces nonleaf tensors in the cache... -> Can lead to failure of deepcopy.
     posterior.q.rsample()
     posterior_copy = deepcopy(posterior)
 
 
-def test_vi_posterior_inferface():
+@pytest.mark.parametrize("q", ("maf", "nsf", "gaussian_diag", "gaussian", "mcf", "scf"))
+def test_pickle_support(q: str):
+    """Tests if the VIPosterior can be saved and loaded via pickle.
+
+    Args:
+        q: Different variational posteriors.
+    """
     num_dim = 2
 
-    class FakePotential(BasePotential):
-        def __call__(self, theta, **kwargs):
-            return torch.ones_like(torch.as_tensor(theta[:, 0], dtype=torch.float32))
+    prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
+    potential_fn = FakePotential(prior=prior)
+    theta_transform = torch_tf.identity_transform
 
-        def allow_iid_x(self) -> bool:
-            return True
+    posterior = VIPosterior(
+        potential_fn,
+        prior,
+        theta_transform=theta_transform,
+        q=q,
+    )
+    posterior.set_default_x(torch.tensor(np.zeros((num_dim,)).astype(np.float32)))
+
+    torch.save(posterior, "posterior.pt")
+    posterior_loaded = torch.load("posterior.pt")
+    assert (
+        posterior._x == posterior_loaded._x
+    ).all(), "Mhh, something with the pickled is strange"
+
+    # Try if they are the same
+    torch.manual_seed(0)
+    s1 = posterior._q.rsample()
+    torch.manual_seed(0)
+    s2 = posterior_loaded._q.rsample()
+
+    os.remove("posterior.pt")
+
+    assert torch.allclose(s1, s2), "Mhh, something with the pickled is strange"
+
+
+def test_vi_posterior_inferface():
+    num_dim = 2
 
     prior = MultivariateNormal(zeros(num_dim), eye(num_dim))
     potential_fn = FakePotential(prior=prior)
