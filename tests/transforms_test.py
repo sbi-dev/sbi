@@ -59,9 +59,10 @@ def test_transforms(prior, target_transform):
         (Exponential(rate=ones(1)), True),
         (LogNormal(zeros(1), ones(1)), True),
         (
-            MultipleIndependent(
-                [Exponential(rate=ones(1)), BoxUniform(zeros(5), ones(5))]
-            ),
+            MultipleIndependent([
+                Exponential(rate=ones(1)),
+                BoxUniform(zeros(5), ones(5)),
+            ]),
             True,
         ),
     ),

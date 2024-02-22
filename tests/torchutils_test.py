@@ -2,6 +2,7 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 """Test PyTorch utility functions."""
+
 from __future__ import annotations
 
 from typing import Optional

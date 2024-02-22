@@ -263,11 +263,13 @@ def accept_reject_sample(
         # nflows and towards a flows-framework which takes a tuple as sample_size.
         if isinstance(proposal, nn.Module):
             candidates = proposal.sample(
-                sampling_batch_size, **proposal_sampling_kwargs  # type: ignore
+                sampling_batch_size,
+                **proposal_sampling_kwargs,  # type: ignore
             ).reshape(sampling_batch_size, -1)
         else:
             candidates = proposal.sample(
-                (sampling_batch_size,), **proposal_sampling_kwargs  # type: ignore
+                (sampling_batch_size,),
+                **proposal_sampling_kwargs,  # type: ignore
             )  # type: ignore
 
         # SNPE-style rejection-sampling when the proposal is the neural net.

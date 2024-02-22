@@ -384,9 +384,10 @@ class RestrictionEstimator:
         # Factor of two such that the average learning rate remains the same.
         # Needed because the average of reweigh_factor and 1-reweigh_factor will be 0.5
         # only.
-        importance_weights = 2 * torch.tensor(
-            [importance_weights, 1 - importance_weights]
-        )
+        importance_weights = 2 * torch.tensor([
+            importance_weights,
+            1 - importance_weights,
+        ])
 
         criterion = nn.CrossEntropyLoss(importance_weights, reduction="none")
 

@@ -31,9 +31,9 @@ def hex2rgb(hex):
 def rgb2hex(RGB):
     # Components need to be integers for hex to make sense
     RGB = [int(x) for x in RGB]
-    return "#" + "".join(
-        ["0{0:x}".format(v) if v < 16 else "{0:x}".format(v) for v in RGB]
-    )
+    return "#" + "".join([
+        "0{0:x}".format(v) if v < 16 else "{0:x}".format(v) for v in RGB
+    ])
 
 
 def _update(d, u):
@@ -872,12 +872,10 @@ def _arrange_plots(
                 else:
                     _format_axis(ax, xhide=True, yhide=True)
             if opts["tick_labels"] is not None:
-                ax.set_xticklabels(
-                    (
-                        str(opts["tick_labels"][col][0]),
-                        str(opts["tick_labels"][col][1]),
-                    )
-                )
+                ax.set_xticklabels((
+                    str(opts["tick_labels"][col][0]),
+                    str(opts["tick_labels"][col][1]),
+                ))
 
             # Diagonals
             if current == "diag":
@@ -1137,9 +1135,9 @@ def _sbc_rank_plot(
         figsize = (num_parameters * 4, num_rows * 5) if params_in_subplots else (8, 5)
 
     if parameter_labels is None:
-        parameter_labels = [f"dim {i+1}" for i in range(num_parameters)]
+        parameter_labels = [f"dim {i + 1}" for i in range(num_parameters)]
     if ranks_labels is None:
-        ranks_labels = [f"rank set {i+1}" for i in range(num_ranks)]
+        ranks_labels = [f"rank set {i + 1}" for i in range(num_ranks)]
     if num_bins is None:
         # Recommendation from Talts et al.
         num_bins = num_sbc_runs // 20

@@ -145,24 +145,22 @@ def conditional_corrcoeff(
     correlation_matrices = []
     for cond in condition:
         correlation_matrices.append(
-            torch.stack(
-                [
-                    compute_corrcoeff(
-                        eval_conditional_density(
-                            density,
-                            cond.to(device),
-                            limits.to(device),
-                            dim1=dim1,
-                            dim2=dim2,
-                            resolution=resolution,
-                        ),
-                        limits[[dim1, dim2]].to(device),
-                    )
-                    for dim1 in subset_
-                    for dim2 in subset_
-                    if dim1 < dim2
-                ]
-            )
+            torch.stack([
+                compute_corrcoeff(
+                    eval_conditional_density(
+                        density,
+                        cond.to(device),
+                        limits.to(device),
+                        dim1=dim1,
+                        dim2=dim2,
+                        resolution=resolution,
+                    ),
+                    limits[[dim1, dim2]].to(device),
+                )
+                for dim1 in subset_
+                for dim2 in subset_
+                if dim1 < dim2
+            ])
         )
 
     average_correlations = torch.mean(torch.stack(correlation_matrices), dim=0)
@@ -294,7 +292,9 @@ def conditional_potential(
     condition = atleast_2d_float32_tensor(condition)
 
     conditioned_potential_fn = ConditionedPotential(
-        potential_fn, condition, dims_to_sample  # type: ignore
+        potential_fn,
+        condition,
+        dims_to_sample,  # type: ignore
     )
 
     restricted_prior = RestrictedPriorForConditional(prior, dims_to_sample)
