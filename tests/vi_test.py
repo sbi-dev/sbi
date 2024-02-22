@@ -237,7 +237,7 @@ def test_deepcopy_support(q: str):
     posterior_copy = deepcopy(posterior)
 
 
-@pytest.mark.parametrize("q", ("maf", "nsf", "gaussian_diag", "gaussian", "mcf", "scf"))
+@pytest.mark.parametrize("q", FLOWS)
 def test_pickle_support(q: str):
     """Tests if the VIPosterior can be saved and loaded via pickle.
 
