@@ -207,7 +207,7 @@ class VIPosterior(NeuralPosterior):
             modules: List of modules associated with the distribution object.
 
         """
-        self._q_arg = q
+        self._q_arg = (q, parameters, modules)
         if isinstance(q, Distribution):
             q = adapt_variational_distribution(
                 q,
@@ -591,6 +591,9 @@ class VIPosterior(NeuralPosterior):
 
     def __setstate__(self, state_dict: Dict):
         self.__dict__ = state_dict
-        # Restore deepcopy compatibility
+        q = deepcopy(self._q)
+        # Restore removed attributes
+        self.set_q(*self._q_arg)
+        self._q = q
         make_object_deepcopy_compatible(self)
         make_object_deepcopy_compatible(self.q)
