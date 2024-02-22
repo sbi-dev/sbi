@@ -43,9 +43,7 @@ class GaussianChain:
         loc = self.loc_0
         lambda_prec = self.lambda_prec
         for i in range(1, self.chain_len + 1):
-            loc = pyro.sample(
-                "loc_{}".format(i), dist.Normal(loc=loc, scale=lambda_prec)
-            )
+            loc = pyro.sample(f"loc_{i}", dist.Normal(loc=loc, scale=lambda_prec))
         pyro.sample("obs", dist.Normal(loc, lambda_prec), obs=data)
 
     @property
@@ -53,9 +51,7 @@ class GaussianChain:
         return torch.ones(self.num_obs, self.dim)
 
     def id_fn(self):
-        return "dim={}_chain-len={}_num_obs={}".format(
-            self.dim, self.chain_len, self.num_obs
-        )
+        return f"dim={self.dim}_chain-len={self.chain_len}_num_obs={self.num_obs}"
 
 
 def rmse(t1, t2):
@@ -134,7 +130,7 @@ def mark_jit(*args, **kwargs):
 
 
 def jit_idfn(param):
-    return "JIT={}".format(param)
+    return f"JIT={param}"
 
 
 @pytest.mark.parametrize(
@@ -167,16 +163,16 @@ def test_slice_conjugate_gaussian(
         expected_std = 1 / torch.sqrt(torch.ones(fixture.dim) * expected_precs[i - 1])
 
         # Actual vs expected posterior means for the latents
-        logger.debug("Posterior mean (actual) - {}".format(param_name))
+        logger.debug(f"Posterior mean (actual) - {param_name}")
         logger.debug(latent_loc)
-        logger.debug("Posterior mean (expected) - {}".format(param_name))
+        logger.debug(f"Posterior mean (expected) - {param_name}")
         logger.debug(expected_mean)
         assert_equal(rmse(latent_loc, expected_mean).item(), 0.0, prec=mean_tol)
 
         # Actual vs expected posterior precisions for the latents
-        logger.debug("Posterior std (actual) - {}".format(param_name))
+        logger.debug(f"Posterior std (actual) - {param_name}")
         logger.debug(latent_std)
-        logger.debug("Posterior std (expected) - {}".format(param_name))
+        logger.debug(f"Posterior std (expected) - {param_name}")
         logger.debug(expected_std)
         assert_equal(rmse(latent_std, expected_std).item(), 0.0, prec=std_tol)
 
@@ -365,12 +361,12 @@ def test_gaussian_hmm(num_steps):
         with ignore_jit_warnings([("Iterating over a tensor", RuntimeWarning)]):
             for t, y in pyro.markov(enumerate(data)):
                 x = pyro.sample(
-                    "x_{}".format(t),
+                    f"x_{t}",
                     dist.Categorical(initialize if x is None else transition[x]),
                     infer={"enumerate": "parallel"},
                 )
                 pyro.sample(
-                    "y_{}".format(t),
+                    f"y_{t}",
                     dist.Normal(emission_loc[x], emission_scale[x]),
                     obs=y,
                 )

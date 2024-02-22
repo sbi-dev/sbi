@@ -31,9 +31,7 @@ def hex2rgb(hex):
 def rgb2hex(RGB):
     # Components need to be integers for hex to make sense
     RGB = [int(x) for x in RGB]
-    return "#" + "".join([
-        "0{0:x}".format(v) if v < 16 else "{0:x}".format(v) for v in RGB
-    ])
+    return "#" + "".join([f"0{v:x}" if v < 16 else f"{v:x}" for v in RGB])
 
 
 def _update(d, u):
@@ -744,7 +742,7 @@ def _arrange_plots(
 
     # Prepare labels
     if opts["labels"] == [] or opts["labels"] is None:
-        labels_dim = ["dim {}".format(i + 1) for i in range(dim)]
+        labels_dim = [f"dim {i + 1}" for i in range(dim)]
     else:
         labels_dim = opts["labels"]
 
@@ -808,9 +806,7 @@ def _arrange_plots(
             else:
                 col_idx += 1
 
-            if flat:
-                current = "diag"
-            elif row == col:
+            if flat or row == col:
                 current = "diag"
             elif row < col:
                 current = "offdiag"

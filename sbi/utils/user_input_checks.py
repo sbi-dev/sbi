@@ -213,7 +213,7 @@ def process_pytorch_prior(prior: Distribution) -> Tuple[Distribution, int, bool]
     check_prior_batch_behavior(prior)
     check_prior_batch_dims(prior)
 
-    if not prior.sample().dtype == float32:
+    if prior.sample().dtype != float32:
         prior = PytorchReturnTypeWrapper(
             prior, return_type=float32, validate_args=False
         )

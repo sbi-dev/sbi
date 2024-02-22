@@ -5,8 +5,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 import numpy as np
 import pytest
 import torch
@@ -226,7 +224,7 @@ def test_process_device(device_input: str) -> None:
 
     except RuntimeError:
         # this should not happen for cpu
-        assert not device_input == "cpu"
+        assert device_input != "cpu"
 
         # should only happen if no gpu is available
         if device_input == "gpu":

@@ -10,7 +10,6 @@ from torch.distributions import Distribution
 from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler, WeightedRandomSampler
-from tqdm.auto import tqdm
 
 from sbi.samplers.importance.sir import sampling_importance_resampling
 from sbi.samplers.rejection.rejection import accept_reject_sample

@@ -81,11 +81,11 @@ def tensors_default_to(host):
     assert host in ("cpu", "cuda"), host
     old_module, name = torch.Tensor().type().rsplit(".", 1)
     new_module = "torch.cuda" if host == "cuda" else "torch"
-    torch.set_default_tensor_type("{}.{}".format(new_module, name))
+    torch.set_default_tensor_type(f"{new_module}.{name}")
     try:
         yield
     finally:
-        torch.set_default_tensor_type("{}.{}".format(old_module, name))
+        torch.set_default_tensor_type(f"{old_module}.{name}")
 
 
 @contextlib.contextmanager
@@ -104,7 +104,7 @@ def xfail_if_not_implemented(msg="Not implemented"):
     try:
         yield
     except NotImplementedError as e:
-        pytest.xfail(reason="{}: {}".format(msg, e))
+        pytest.xfail(reason=f"{msg}: {e}")
 
 
 def iter_indices(tensor):
@@ -173,15 +173,13 @@ def _safe_coalesce(t):
 
 def assert_close(actual, expected, atol=1e-7, rtol=0, msg=""):
     if not msg:
-        msg = "{} vs {}".format(actual, expected)
+        msg = f"{actual} vs {expected}"
     if isinstance(actual, numbers.Number) and isinstance(expected, numbers.Number):
         assert actual == approx(expected, abs=atol, rel=rtol), msg
     # Placing this as a second check allows for coercing of numeric types above;
     # this can be moved up to harden type checks.
     elif type(actual) != type(expected):
-        raise AssertionError(
-            "cannot compare {} and {}".format(type(actual), type(expected))
-        )
+        raise AssertionError(f"cannot compare {type(actual)} and {type(expected)}")
     elif torch.is_tensor(actual) and torch.is_tensor(expected):
         prec = atol + rtol * abs(expected) if rtol > 0 else atol
         assert actual.is_sparse == expected.is_sparse, msg
@@ -206,14 +204,14 @@ def assert_close(actual, expected, atol=1e-7, rtol=0, msg=""):
                 expected[key],
                 atol=atol,
                 rtol=rtol,
-                msg="At key{}: {} vs {}".format(key, x_val, expected[key]),
+                msg=f"At key{key}: {x_val} vs {expected[key]}",
             )
     elif isinstance(actual, str):
         assert actual == expected, msg
     elif is_iterable(actual) and is_iterable(expected):
         assert len(actual) == len(expected), msg
         for xi, yi in zip(actual, expected):
-            assert_close(xi, yi, atol=atol, rtol=rtol, msg="{} vs {}".format(xi, yi))
+            assert_close(xi, yi, atol=atol, rtol=rtol, msg=f"{xi} vs {yi}")
     else:
         assert actual == expected, msg
 
@@ -223,15 +221,13 @@ def assert_equal(actual, expected, prec=1e-5, msg=""):
     if prec > 0.0:
         return assert_close(actual, expected, atol=prec, msg=msg)
     if not msg:
-        msg = "{} vs {}".format(actual, expected)
+        msg = f"{actual} vs {expected}"
     if isinstance(actual, numbers.Number) and isinstance(expected, numbers.Number):
         assert actual == expected, msg
     # Placing this as a second check allows for coercing of numeric types above;
     # this can be moved up to harden type checks.
     elif type(actual) != type(expected):
-        raise AssertionError(
-            "cannot compare {} and {}".format(type(actual), type(expected))
-        )
+        raise AssertionError(f"cannot compare {type(actual)} and {type(expected)}")
     elif torch.is_tensor(actual) and torch.is_tensor(expected):
         assert actual.is_sparse == expected.is_sparse, msg
         if actual.is_sparse:
@@ -250,14 +246,14 @@ def assert_equal(actual, expected, prec=1e-5, msg=""):
                 x_val,
                 expected[key],
                 prec=0.0,
-                msg="At key{}: {} vs {}".format(key, x_val, expected[key]),
+                msg=f"At key{key}: {x_val} vs {expected[key]}",
             )
     elif isinstance(actual, str):
         assert actual == expected, msg
     elif is_iterable(actual) and is_iterable(expected):
         assert len(actual) == len(expected), msg
         for xi, yi in zip(actual, expected):
-            assert_equal(xi, yi, prec=0.0, msg="{} vs {}".format(xi, yi))
+            assert_equal(xi, yi, prec=0.0, msg=f"{xi} vs {yi}")
     else:
         assert actual == expected, msg
 
@@ -267,6 +263,4 @@ def assert_not_equal(x, y, prec=1e-5, msg=""):
         assert_equal(x, y, prec)
     except AssertionError:
         return
-    raise AssertionError(
-        "{} \nValues are equal: x={}, y={}, prec={}".format(msg, x, y, prec)
-    )
+    raise AssertionError(f"{msg} \nValues are equal: x={x}, y={y}, prec={prec}")

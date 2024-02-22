@@ -88,7 +88,7 @@ def test_c2st_posterior_ensemble_on_linearGaussian(inference_method, num_trials)
     check_c2st(
         samples,
         target_samples,
-        alg="{} posterior ensemble".format(inference_method.__name__),
+        alg=f"{inference_method.__name__} posterior ensemble",
     )
 
     map_ = posterior.map(init_method=samples, show_progress_bars=False)

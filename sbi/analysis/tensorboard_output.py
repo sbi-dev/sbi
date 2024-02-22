@@ -75,13 +75,11 @@ def plot_summary(
 
     if not disable_tensorboard_prompt:
         logger.warning(
-            (
-                "For an interactive, detailed view of the summary, launch tensorboard "
-                f" with 'tensorboard --logdir={log_dir}' from a"
-                " terminal on your machine, visit http://127.0.0.1:6006 afterwards."
-                " Requires port forwarding if tensorboard runs on a remote machine, as"
-                " e.g. https://stackoverflow.com/a/42445070/7770835 explains.\n"
-            )
+            "For an interactive, detailed view of the summary, launch tensorboard "
+            f" with 'tensorboard --logdir={log_dir}' from a"
+            " terminal on your machine, visit http://127.0.0.1:6006 afterwards."
+            " Requires port forwarding if tensorboard runs on a remote machine, as"
+            " e.g. https://stackoverflow.com/a/42445070/7770835 explains.\n"
         )
         logger.warning(f"Valid tags are: {sorted(list(scalars.keys()))}.")
 
@@ -89,12 +87,10 @@ def plot_summary(
 
     if len(scalars[tags[0]]["step"]) == tensorboard_scalar_limit:
         logger.warning(
-            (
-                "Event data as large as the chosen limit for tensorboard scalars."
-                "Tensorboard might be subsampling your data, as "
-                "https://stackoverflow.com/a/65564389/7770835 explains."
-                " Consider increasing tensorboard_scalar_limit to see all data.\n"
-            )
+            "Event data as large as the chosen limit for tensorboard scalars."
+            "Tensorboard might be subsampling your data, as "
+            "https://stackoverflow.com/a/65564389/7770835 explains."
+            " Consider increasing tensorboard_scalar_limit to see all data.\n"
         )
 
     plot_options = _get_default_opts()
@@ -180,7 +176,7 @@ def _get_event_data_from_log_dir(
                 # attribute.
                 _type = type(data[0])
                 for attribute in inspect.getfullargspec(_type).args:
-                    if not attribute.startswith("_") and not attribute == "self":
+                    if not attribute.startswith("_") and attribute != "self":
                         if attribute not in all_event_data[tag_type][tag]:
                             all_event_data[tag_type][tag][attribute] = []
                         for datapoint in data:

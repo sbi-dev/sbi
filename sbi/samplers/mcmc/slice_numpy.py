@@ -3,7 +3,6 @@
 
 import os
 import sys
-from math import ceil
 from typing import Callable, Optional, Union
 from warnings import warn
 
@@ -14,7 +13,6 @@ from matplotlib import pyplot as plt
 from tqdm.auto import tqdm, trange
 
 from sbi.simulators.simutils import tqdm_joblib
-from sbi.utils import tensor2numpy
 
 
 class MCMCSampler:
