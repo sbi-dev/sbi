@@ -21,14 +21,14 @@ nav:
       - Diagnostics:
         - Posterior predictive checks: tutorial/12_diagnostics_posterior_predictive_check.md
         - Simulation-based calibration: tutorial/13_diagnostics_simulation_based_calibration.md
-        - Density plots and MCMC diagnostics with ArviZ: tutorial/15_mcmc_diagnostics_with_arviz.md 
+        - Density plots and MCMC diagnostics with ArviZ: tutorial/15_mcmc_diagnostics_with_arviz.md
       - Analysis:
         - Conditional distributions: tutorial/07_conditional_distributions.md
         - Posterior sensitivity analysis: tutorial/09_sensitivity_analysis.md
       - Examples:
         - Hodgkin-Huxley example: examples/00_HH_simulator.md
         - Decision making model: examples/01_decision_making_model.md
-  - Contributing: 
+  - Contributing:
     - Guide: contribute.md
     - Code of Conduct: code_of_conduct.md
   - API Reference: reference.md
@@ -70,7 +70,7 @@ markdown_extensions:
   - pymdownx.critic
   - pymdownx.details
   - pymdownx.emoji:
-      emoji_generator: !!python/name:pymdownx.emoji.to_svg
+      emoji_generator: '!!python/name:pymdownx.emoji.to_svg'
   - pymdownx.inlinehilite
   - pymdownx.magiclink
   - pymdownx.mark
@@ -89,7 +89,7 @@ plugins:
           rendering:
             show_source: true
             heading_level: 3
-  
+
 watch:
   - ../sbi
 
