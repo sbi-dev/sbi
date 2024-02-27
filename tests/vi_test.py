@@ -16,9 +16,13 @@ from torch.distributions import Beta, Binomial, Gamma, MultivariateNormal
 from sbi.inference import SNLE, likelihood_estimator_based_potential
 from sbi.inference.posteriors import VIPosterior
 from sbi.inference.potentials.base_potential import BasePotential
+from sbi.samplers.vi.vi_pyro_flows import get_default_flows, get_flow_builder
 from sbi.simulators.linear_gaussian import true_posterior_linear_gaussian_mvn_prior
 from sbi.utils import MultipleIndependent
 from tests.test_utils import check_c2st
+
+# Tests should be run for all default flows
+FLOWS = get_default_flows()
 
 
 class FakePotential(BasePotential):
@@ -84,7 +88,7 @@ def test_c2st_vi_on_Gaussian(num_dim: int, vi_method: str, sampling_method: str)
 
 @pytest.mark.slow
 @pytest.mark.parametrize("num_dim", (1, 2))
-@pytest.mark.parametrize("q", ("maf", "nsf", "gaussian_diag", "gaussian", "mcf", "scf"))
+@pytest.mark.parametrize("q", FLOWS)
 def test_c2st_vi_flows_on_Gaussian(num_dim: int, q: str):
     """Test VI on Gaussian, comparing to ground truth target via c2st.
 
@@ -189,7 +193,7 @@ def test_c2st_vi_external_distributions_on_Gaussian(num_dim: int):
     check_c2st(samples, target_samples, alg="slice_np")
 
 
-@pytest.mark.parametrize("q", ("maf", "nsf", "gaussian_diag", "gaussian", "mcf", "scf"))
+@pytest.mark.parametrize("q", FLOWS)
 def test_deepcopy_support(q: str):
     """Tests if the variational does support deepcopy.
 
@@ -233,7 +237,7 @@ def test_deepcopy_support(q: str):
     posterior_copy = deepcopy(posterior)
 
 
-@pytest.mark.parametrize("q", ("maf", "nsf", "gaussian_diag", "gaussian", "mcf", "scf"))
+@pytest.mark.parametrize("q", FLOWS)
 def test_pickle_support(q: str):
     """Tests if the VIPosterior can be saved and loaded via pickle.
 
@@ -380,3 +384,30 @@ def test_vi_with_multiple_independent_prior():
         sample_shape=(10,),
         show_progress_bars=False,
     )
+
+
+@pytest.mark.parametrize("num_dim", (1, 2, 3, 4, 5, 10, 25, 33))
+@pytest.mark.parametrize("q", FLOWS)
+def test_vi_flow_builders(num_dim: int, q: str):
+    """Test if the flow builder build the flows correctly, such that at least sampling and log_prob works."""
+
+    try:
+        q = get_flow_builder(q)(
+            (num_dim,), torch.distributions.transforms.identity_transform
+        )
+    except AssertionError:
+        # If the flow is not defined for the dimensionality, we pass the test
+        return
+
+    # Without sample_shape
+
+    sample = q.sample()
+    assert sample.shape == (num_dim,), "The sample shape is not as expected"
+    log_prob = q.log_prob(sample)
+    assert log_prob.shape == (), "The log_prob shape is not as expected"
+
+    # With sample_shape
+    sample_batch = q.sample((10,))
+    assert sample_batch.shape == (10, num_dim), "The sample shape is not as expected"
+    log_prob_batch = q.log_prob(sample_batch)
+    assert log_prob_batch.shape == (10,), "The log_prob shape is not as expected"
