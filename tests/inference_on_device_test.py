@@ -153,9 +153,7 @@ def test_training_and_mcmc_on_device(
         elif sampling_method in ["rejection", "direct"]:
             # all other cases: rejection, direct
             posterior = inferer.build_posterior(
-                sample_with=(
-                    "rejection" if sampling_method == "direct" else sampling_method
-                ),
+                sample_with=sampling_method,
                 rejection_sampling_parameters=(
                     {"proposal": prior}
                     if sampling_method == "rejection" and method == SNPE_C

@@ -10,7 +10,7 @@ from sbi.inference import SNLE, SNPE, SNRE
 @pytest.mark.parametrize(
     "inference_method, sampling_method",
     (
-        (SNPE, "rejection"),
+        (SNPE, "direct"),
         (SNLE, "mcmc"),
         (SNRE, "mcmc"),
         pytest.param(SNRE, "vi", marks=pytest.mark.xfail),  # bug: see #684

@@ -11,23 +11,13 @@ from pyknos.nflows import flows
 from torch import Tensor, nn, optim
 from torch.distributions import Distribution
 from torch.nn.utils.clip_grad import clip_grad_norm_
-from torch.utils import data
 from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi import utils as utils
 from sbi.inference import NeuralInference
 from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior, VIPosterior
 from sbi.inference.potentials import likelihood_estimator_based_potential
-from sbi.utils import (
-    check_estimator_arg,
-    check_prior,
-    handle_invalid_x,
-    mask_sims_from_prior,
-    nle_nre_apt_msg_on_invalid_x,
-    validate_theta_and_x,
-    warn_if_zscoring_changes_data,
-    x_shape_from_simulation,
-)
+from sbi.utils import check_estimator_arg, check_prior, x_shape_from_simulation
 
 
 class LikelihoodEstimator(NeuralInference, ABC):
@@ -84,6 +74,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         x: Tensor,
         exclude_invalid_x: bool = False,
         from_round: int = 0,
+        algorithm: str = "SNLE",
         data_device: Optional[str] = None,
     ) -> "LikelihoodEstimator":
         r"""Store parameters and simulation outputs to use them for later training.
@@ -112,30 +103,15 @@ class LikelihoodEstimator(NeuralInference, ABC):
             NeuralInference object (returned so that this function is chainable).
         """
 
-        is_valid_x, num_nans, num_infs = handle_invalid_x(x, exclude_invalid_x)
-
-        x = x[is_valid_x]
-        theta = theta[is_valid_x]
-
-        # Check for problematic z-scoring
-        warn_if_zscoring_changes_data(x)
-        nle_nre_apt_msg_on_invalid_x(num_nans, num_infs, exclude_invalid_x, "SNLE")
-
-        if data_device is None:
-            data_device = self._device
-        theta, x = validate_theta_and_x(
-            theta, x, data_device=data_device, training_device=self._device
+        # pyright false positive, will be fixed with pyright 1.1.310
+        return super().append_simulations(  # type: ignore
+            theta=theta,
+            x=x,
+            exclude_invalid_x=exclude_invalid_x,
+            from_round=from_round,
+            algorithm=algorithm,
+            data_device=data_device,
         )
-
-        prior_masks = mask_sims_from_prior(int(from_round), theta.size(0))
-
-        self._theta_roundwise.append(theta)
-        self._x_roundwise.append(x)
-        self._prior_masks.append(prior_masks)
-
-        self._data_round_index.append(int(from_round))
-
-        return self
 
     def train(
         self,

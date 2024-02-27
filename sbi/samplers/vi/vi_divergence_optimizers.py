@@ -6,7 +6,6 @@ from typing import Callable, Dict, List, Optional, Tuple, Type, Union
 
 import numpy as np
 import torch
-from pyro.distributions import TransformedDistribution
 from torch import Tensor, nn
 from torch.distributions import Distribution
 from torch.optim import ASGD, SGD, Adadelta, Adagrad, Adam, Adamax, AdamW, RMSprop
@@ -25,7 +24,7 @@ from sbi.samplers.vi.vi_utils import (
     make_object_deepcopy_compatible,
     move_all_tensor_to_device,
 )
-from sbi.types import Array
+from sbi.types import Array, PyroTransformedDistribution
 from sbi.utils import check_prior
 
 _VI_method = {}
@@ -42,7 +41,7 @@ class DivergenceOptimizer(ABC):
     def __init__(
         self,
         potential_fn: BasePotential,
-        q: TransformedDistribution,
+        q: PyroTransformedDistribution,
         prior: Optional[Distribution] = None,
         n_particles: int = 256,
         clip_value: float = 5.0,

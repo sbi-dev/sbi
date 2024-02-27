@@ -433,9 +433,10 @@ class PosteriorEstimator(NeuralInference, ABC):
         self,
         density_estimator: Optional[nn.Module] = None,
         prior: Optional[Distribution] = None,
-        sample_with: str = "rejection",
+        sample_with: str = "direct",
         mcmc_method: str = "slice_np",
         vi_method: str = "rKL",
+        direct_sampling_parameters: Dict[str, Any] = {},
         mcmc_parameters: Dict[str, Any] = {},
         vi_parameters: Dict[str, Any] = {},
         rejection_sampling_parameters: Dict[str, Any] = {},
@@ -455,7 +456,7 @@ class PosteriorEstimator(NeuralInference, ABC):
                 If `None`, use the latest neural density estimator that was trained.
             prior: Prior distribution.
             sample_with: Method to use for sampling from the posterior. Must be one of
-                [`mcmc` | `rejection` | `vi`].
+                [`direct` | `mcmc` | `rejection` | `vi`].
             mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`,
                 `hmc`, `nuts`. Currently defaults to `slice_np` for a custom numpy
                 implementation of slice sampling; select `hmc`, `nuts` or `slice` for
@@ -463,12 +464,11 @@ class PosteriorEstimator(NeuralInference, ABC):
             vi_method: Method used for VI, one of [`rKL`, `fKL`, `IW`, `alpha`]. Note
                 some of the methods admit a `mode seeking` property (e.g. rKL) whereas
                 some admit a `mass covering` one (e.g fKL).
+            direct_sampling_parameters: Additional kwargs passed to `DirectPosterior`.
             mcmc_parameters: Additional kwargs passed to `MCMCPosterior`.
             vi_parameters: Additional kwargs passed to `VIPosterior`.
             rejection_sampling_parameters: Additional kwargs passed to
-                `RejectionPosterior` or `DirectPosterior`. By default,
-                `DirectPosterior` is used. Only if `rejection_sampling_parameters`
-                contains `proposal`, a `RejectionPosterior` is instantiated.
+                `RejectionPosterior`.
 
         Returns:
             Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods
@@ -499,21 +499,29 @@ class PosteriorEstimator(NeuralInference, ABC):
             x_o=None,
         )
 
-        if sample_with == "rejection":
-            if "proposal" in rejection_sampling_parameters.keys():
-                self._posterior = RejectionPosterior(
-                    potential_fn=potential_fn,
-                    device=device,
-                    x_shape=self._x_shape,
-                    **rejection_sampling_parameters,
+        if sample_with == "direct":
+            self._posterior = DirectPosterior(
+                posterior_estimator=posterior_estimator,  # type: ignore
+                prior=prior,
+                x_shape=self._x_shape,
+                device=device,
+                **direct_sampling_parameters,
+            )
+        elif sample_with == "rejection":
+            if "proposal" not in rejection_sampling_parameters.keys():
+                raise ValueError(
+                    "You passed `sample_with='rejection' but you did not specify a "
+                    "`proposal` in `rejection_sampling_parameters`. Until sbi "
+                    "v0.22.0, this was interpreted as directly sampling from the "
+                    "posterior. As of sbi v0.23.0, you instead have to use "
+                    "`sample_with='direct'` to do so."
                 )
-            else:
-                self._posterior = DirectPosterior(
-                    posterior_estimator=posterior_estimator,  # type: ignore
-                    prior=prior,
-                    x_shape=self._x_shape,
-                    device=device,
-                )
+            self._posterior = RejectionPosterior(
+                potential_fn=potential_fn,
+                device=device,
+                x_shape=self._x_shape,
+                **rejection_sampling_parameters,
+            )
         elif sample_with == "mcmc":
             self._posterior = MCMCPosterior(
                 potential_fn=potential_fn,

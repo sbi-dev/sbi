@@ -53,5 +53,9 @@ def test_api_density_estimator(density_estimator, input_dim, context_dim):
     samples = estimator.sample((nsamples_test,), batch_context[0])
     assert samples.shape == (nsamples_test, input_dim), "samples shape is not correct"
 
-    samples = estimator.sample((2,nsamples_test), batch_context[0])
-    assert samples.shape == (2,nsamples_test, input_dim), "samples shape is not correct"
+    samples = estimator.sample((2, nsamples_test), batch_context[0])
+    assert samples.shape == (
+        2,
+        nsamples_test,
+        input_dim,
+    ), "samples shape is not correct"
