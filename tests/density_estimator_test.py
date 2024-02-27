@@ -7,33 +7,28 @@ import pytest
 from torch import eye, zeros
 from torch.distributions import MultivariateNormal
 
-from sbi.neural_nets.density_estimators.flow import NFlowsNSF
+from sbi.neural_nets.density_estimators.flow import NFlows
 from sbi.neural_nets.flow import build_nsf
 
 
-@pytest.mark.parametrize("density_estimator", (NFlowsNSF,))
+@pytest.mark.parametrize("density_estimator", (NFlows,))
 @pytest.mark.parametrize(
     "input_dim",
-    (
-        1,
-        2,
-    ),
+    (1, 2),
 )
 @pytest.mark.parametrize(
     "context_dim",
-    (
-        1,
-        2,
-    ),
+    (1, 2),
 )
 def test_api_density_estimator(density_estimator, input_dim, context_dim):
-    """Runs SNL and checks that posterior_sampler is correctly set.
+    r"""Checks whether we can evaluate and sample from density estimators correctly.
 
     Args:
-        mcmc_method: which mcmc method to use for sampling
-        set_seed: fixture for manual seeding
-
+        density_estimator: DensityEstimator subclass.
+        input_dim: Dimensionality of the input.
+        context_dim: Dimensionality of the context.
     """
+
     nsamples = 10
     nsamples_test = 5
 
@@ -53,9 +48,10 @@ def test_api_density_estimator(density_estimator, input_dim, context_dim):
     assert log_probs.shape == (nsamples,), "log_prob shape is not correct"
 
     loss = estimator.loss(batch_input, batch_context)
-    loss_item = loss.item()  # test loss is scalar
+    assert loss.shape == (nsamples,), "loss shape is not correct"
 
-    samples = estimator.sample((nsamples_test,), batch_context[0]).reshape(
-        nsamples_test, -1
-    )
+    samples = estimator.sample((nsamples_test,), batch_context[0])
     assert samples.shape == (nsamples_test, input_dim), "samples shape is not correct"
+
+    samples = estimator.sample((2,nsamples_test), batch_context[0])
+    assert samples.shape == (2,nsamples_test, input_dim), "samples shape is not correct"
