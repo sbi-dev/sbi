@@ -7,19 +7,13 @@ import pytest
 from torch import eye, zeros
 from torch.distributions import MultivariateNormal
 
-from sbi.neural_nets.density_estimators.flow import NFlows
+from sbi.neural_nets.density_estimators.flow import NFlowsFlow
 from sbi.neural_nets.flow import build_nsf
 
 
-@pytest.mark.parametrize("density_estimator", (NFlows,))
-@pytest.mark.parametrize(
-    "input_dim",
-    (1, 2),
-)
-@pytest.mark.parametrize(
-    "context_dim",
-    (1, 2),
-)
+@pytest.mark.parametrize("density_estimator", (NFlowsFlow,))
+@pytest.mark.parametrize("input_dim", (1, 2))
+@pytest.mark.parametrize("context_dim", (1, 2))
 def test_api_density_estimator(density_estimator, input_dim, context_dim):
     r"""Checks whether we can evaluate and sample from density estimators correctly.
 

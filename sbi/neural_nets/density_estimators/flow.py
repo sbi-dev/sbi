@@ -6,8 +6,8 @@ from sbi.neural_nets.density_estimators.base import DensityEstimator
 from sbi.types import Shape
 
 
-class NFlows(DensityEstimator):
-    r"""`nflows`- based neural spline flow density estimator.
+class NFlowsFlow(DensityEstimator):
+    r"""`nflows`- based normalizing flow density estimator.
 
     Flow type objects already have a .log_prob() and .sample() method, so here we just
     wrap them and add the .loss() method.

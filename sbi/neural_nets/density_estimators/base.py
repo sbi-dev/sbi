@@ -10,10 +10,7 @@ class DensityEstimator:
     pairs.
     """
 
-    def __init__(
-        self,
-        net: nn.Module,
-    ) -> None:
+    def __init__(self, net: nn.Module) -> None:
         r"""Base class for density estimators.
 
         Args:
