@@ -2,7 +2,7 @@ import torch
 from torch import Tensor, nn
 
 
-class DensityEstimator:
+class DensityEstimator(nn.Module):
     r"""Base class for density estimators.
 
     The density estimator class is a wrapper around neural networks that
@@ -16,7 +16,7 @@ class DensityEstimator:
         Args:
             net: Neural network.
         """
-
+        super().__init__()
         self.net = net
 
     def log_prob(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
@@ -50,9 +50,29 @@ class DensityEstimator:
 
         Args:
             sample_shape: Shape of the samples to return.
+            condition: Conditions.
 
         Returns:
             Samples.
         """
 
         raise NotImplementedError
+
+    def sample_and_log_prob(
+        self, sample_shape: torch.Size, condition: Tensor, **kwargs
+    ) -> Tensor:
+        r"""Return samples from the density estimator.
+
+        Note: For some density estimators, computing log_probs for current samples is
+              more efficient than computing them separately (then override this).
+
+        Args:
+            sample_shape: Shape of the samples to return.
+            condition: Conditions.
+        Returns:
+            Samples and associated log probabilities.
+        """
+
+        x = self.sample(sample_shape, condition, **kwargs)
+        log_prob = self.log_prob(x, condition, **kwargs)
+        return x, log_prob
