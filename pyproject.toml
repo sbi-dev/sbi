@@ -68,7 +68,7 @@ tracker = "https://github.com/sbi-dev/sbi/issues"
 
 # ruff configs
 [tool.ruff]
-extend-include = ["*.ipynb"]
+# extend-include = ["*.ipynb"]
 line-length = 88
 
 [tool.ruff.lint]
