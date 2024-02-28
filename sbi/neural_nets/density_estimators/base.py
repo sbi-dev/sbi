@@ -1,6 +1,8 @@
 import torch
 from torch import Tensor, nn
 
+from typing import Tuple
+
 
 class DensityEstimator(nn.Module):
     r"""Base class for density estimators.
@@ -60,7 +62,7 @@ class DensityEstimator(nn.Module):
 
     def sample_and_log_prob(
         self, sample_shape: torch.Size, condition: Tensor, **kwargs
-    ) -> Tensor:
+    ) -> Tuple[Tensor, Tensor]:
         r"""Return samples from the density estimator.
 
         Note: For some density estimators, computing log_probs for current samples is
