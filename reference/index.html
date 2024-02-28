@@ -11,6 +11,10 @@
         <link rel="canonical" href="https://sbi-dev.github.io/sbi/reference/">
       
       
+        <link rel="prev" href="../code_of_conduct/">
+      
+      
+        <link rel="next" href="../faq/">
       
       
       <link rel="icon" href="../assets/images/favicon.png">
@@ -912,7 +916,7 @@
             
   
   <span class="md-ellipsis">
-    API Reference
+    Contributing
   </span>
   
 
@@ -921,153 +925,6 @@
         
         <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_4">
-            <span class="md-nav__icon md-icon"></span>
-            API Reference
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="inference/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Inference
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="models/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Neural Networks
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="posteriors/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Posteriors
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="potentials/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Potentials
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="analysis/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Analysis
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    
-    
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
-        
-          
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
-            
-  
-  <span class="md-ellipsis">
-    Contributing
-  </span>
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5">
             <span class="md-nav__icon md-icon"></span>
             Contributing
           </label>
@@ -1117,6 +974,903 @@
             
           </ul>
         </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    API Reference
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    API Reference
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#inference" class="md-nav__link">
+    <span class="md-ellipsis">
+      Inference
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.base.infer" class="md-nav__link">
+    <span class="md-ellipsis">
+      infer
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.utils.user_input_checks.prepare_for_sbi" class="md-nav__link">
+    <span class="md-ellipsis">
+      prepare_for_sbi
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.base.simulate_for_sbi" class="md-nav__link">
+    <span class="md-ellipsis">
+      simulate_for_sbi
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.snpe.snpe_a.SNPE_A" class="md-nav__link">
+    <span class="md-ellipsis">
+      SNPE_A
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.snpe.snpe_a.SNPE_A.__init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      __init__
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.snpe.snpe_a.SNPE_A.build_posterior" class="md-nav__link">
+    <span class="md-ellipsis">
+      build_posterior
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.snpe.snpe_a.SNPE_A.correct_for_proposal" class="md-nav__link">
+    <span class="md-ellipsis">
+      correct_for_proposal
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.snpe.snpe_a.SNPE_A.train" class="md-nav__link">
+    <span class="md-ellipsis">
+      train
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.snpe.snpe_c.SNPE_C" class="md-nav__link">
+    <span class="md-ellipsis">
+      SNPE_C
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.snpe.snpe_c.SNPE_C.__init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      __init__
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.snpe.snpe_c.SNPE_C.train" class="md-nav__link">
+    <span class="md-ellipsis">
+      train
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.snle.snle_a.SNLE_A" class="md-nav__link">
+    <span class="md-ellipsis">
+      SNLE_A
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.snle.snle_a.SNLE_A.__init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      __init__
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.snre.snre_a.SNRE_A" class="md-nav__link">
+    <span class="md-ellipsis">
+      SNRE_A
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.snre.snre_a.SNRE_A.__init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      __init__
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.snre.snre_a.SNRE_A.train" class="md-nav__link">
+    <span class="md-ellipsis">
+      train
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.snre.snre_b.SNRE_B" class="md-nav__link">
+    <span class="md-ellipsis">
+      SNRE_B
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.snre.snre_b.SNRE_B.__init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      __init__
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.snre.snre_b.SNRE_B.train" class="md-nav__link">
+    <span class="md-ellipsis">
+      train
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.snre.snre_c.SNRE_C" class="md-nav__link">
+    <span class="md-ellipsis">
+      SNRE_C
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.snre.snre_c.SNRE_C.__init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      __init__
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.snre.snre_c.SNRE_C.train" class="md-nav__link">
+    <span class="md-ellipsis">
+      train
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.snre.bnre.BNRE" class="md-nav__link">
+    <span class="md-ellipsis">
+      BNRE
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.snre.bnre.BNRE.__init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      __init__
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.snre.bnre.BNRE.train" class="md-nav__link">
+    <span class="md-ellipsis">
+      train
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.abc.mcabc.MCABC" class="md-nav__link">
+    <span class="md-ellipsis">
+      MCABC
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.abc.mcabc.MCABC.__call__" class="md-nav__link">
+    <span class="md-ellipsis">
+      __call__
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.abc.mcabc.MCABC.__init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      __init__
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.abc.smcabc.SMCABC" class="md-nav__link">
+    <span class="md-ellipsis">
+      SMCABC
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.abc.smcabc.SMCABC.__call__" class="md-nav__link">
+    <span class="md-ellipsis">
+      __call__
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.abc.smcabc.SMCABC.__init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      __init__
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.abc.smcabc.SMCABC.get_kernel_variance" class="md-nav__link">
+    <span class="md-ellipsis">
+      get_kernel_variance
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.abc.smcabc.SMCABC.get_new_kernel" class="md-nav__link">
+    <span class="md-ellipsis">
+      get_new_kernel
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.abc.smcabc.SMCABC.get_particle_ranges" class="md-nav__link">
+    <span class="md-ellipsis">
+      get_particle_ranges
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.abc.smcabc.SMCABC.resample_if_ess_too_small" class="md-nav__link">
+    <span class="md-ellipsis">
+      resample_if_ess_too_small
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.abc.smcabc.SMCABC.run_lra_update_weights" class="md-nav__link">
+    <span class="md-ellipsis">
+      run_lra_update_weights
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.abc.smcabc.SMCABC.run_sass_set_xo" class="md-nav__link">
+    <span class="md-ellipsis">
+      run_sass_set_xo
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.abc.smcabc.SMCABC.sample_from_population_with_weights" class="md-nav__link">
+    <span class="md-ellipsis">
+      sample_from_population_with_weights
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#posteriors" class="md-nav__link">
+    <span class="md-ellipsis">
+      Posteriors
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.posteriors.direct_posterior.DirectPosterior" class="md-nav__link">
+    <span class="md-ellipsis">
+      DirectPosterior
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.posteriors.direct_posterior.DirectPosterior.__init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      __init__
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.posteriors.direct_posterior.DirectPosterior.leakage_correction" class="md-nav__link">
+    <span class="md-ellipsis">
+      leakage_correction
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.posteriors.direct_posterior.DirectPosterior.log_prob" class="md-nav__link">
+    <span class="md-ellipsis">
+      log_prob
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.posteriors.direct_posterior.DirectPosterior.map" class="md-nav__link">
+    <span class="md-ellipsis">
+      map
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.posteriors.direct_posterior.DirectPosterior.sample" class="md-nav__link">
+    <span class="md-ellipsis">
+      sample
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.posteriors.importance_posterior.ImportanceSamplingPosterior" class="md-nav__link">
+    <span class="md-ellipsis">
+      ImportanceSamplingPosterior
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.posteriors.importance_posterior.ImportanceSamplingPosterior.__init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      __init__
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.posteriors.importance_posterior.ImportanceSamplingPosterior.estimate_normalization_constant" class="md-nav__link">
+    <span class="md-ellipsis">
+      estimate_normalization_constant
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.posteriors.importance_posterior.ImportanceSamplingPosterior.log_prob" class="md-nav__link">
+    <span class="md-ellipsis">
+      log_prob
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.posteriors.importance_posterior.ImportanceSamplingPosterior.map" class="md-nav__link">
+    <span class="md-ellipsis">
+      map
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.posteriors.importance_posterior.ImportanceSamplingPosterior.sample" class="md-nav__link">
+    <span class="md-ellipsis">
+      sample
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.posteriors.mcmc_posterior.MCMCPosterior" class="md-nav__link">
+    <span class="md-ellipsis">
+      MCMCPosterior
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.posteriors.mcmc_posterior.MCMCPosterior.mcmc_method" class="md-nav__link">
+    <span class="md-ellipsis">
+      mcmc_method
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.posteriors.mcmc_posterior.MCMCPosterior.posterior_sampler" class="md-nav__link">
+    <span class="md-ellipsis">
+      posterior_sampler
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.posteriors.mcmc_posterior.MCMCPosterior.__init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      __init__
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.posteriors.mcmc_posterior.MCMCPosterior.get_arviz_inference_data" class="md-nav__link">
+    <span class="md-ellipsis">
+      get_arviz_inference_data
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.posteriors.mcmc_posterior.MCMCPosterior.log_prob" class="md-nav__link">
+    <span class="md-ellipsis">
+      log_prob
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.posteriors.mcmc_posterior.MCMCPosterior.map" class="md-nav__link">
+    <span class="md-ellipsis">
+      map
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.posteriors.mcmc_posterior.MCMCPosterior.sample" class="md-nav__link">
+    <span class="md-ellipsis">
+      sample
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.posteriors.mcmc_posterior.MCMCPosterior.set_mcmc_method" class="md-nav__link">
+    <span class="md-ellipsis">
+      set_mcmc_method
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.posteriors.rejection_posterior.RejectionPosterior" class="md-nav__link">
+    <span class="md-ellipsis">
+      RejectionPosterior
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.posteriors.rejection_posterior.RejectionPosterior.__init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      __init__
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.posteriors.rejection_posterior.RejectionPosterior.log_prob" class="md-nav__link">
+    <span class="md-ellipsis">
+      log_prob
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.posteriors.rejection_posterior.RejectionPosterior.map" class="md-nav__link">
+    <span class="md-ellipsis">
+      map
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.posteriors.rejection_posterior.RejectionPosterior.sample" class="md-nav__link">
+    <span class="md-ellipsis">
+      sample
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.posteriors.vi_posterior.VIPosterior" class="md-nav__link">
+    <span class="md-ellipsis">
+      VIPosterior
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.posteriors.vi_posterior.VIPosterior.q" class="md-nav__link">
+    <span class="md-ellipsis">
+      q
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.posteriors.vi_posterior.VIPosterior.vi_method" class="md-nav__link">
+    <span class="md-ellipsis">
+      vi_method
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.posteriors.vi_posterior.VIPosterior.__deepcopy__" class="md-nav__link">
+    <span class="md-ellipsis">
+      __deepcopy__
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.posteriors.vi_posterior.VIPosterior.__getstate__" class="md-nav__link">
+    <span class="md-ellipsis">
+      __getstate__
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.posteriors.vi_posterior.VIPosterior.__init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      __init__
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.posteriors.vi_posterior.VIPosterior.__setstate__" class="md-nav__link">
+    <span class="md-ellipsis">
+      __setstate__
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.posteriors.vi_posterior.VIPosterior.evaluate" class="md-nav__link">
+    <span class="md-ellipsis">
+      evaluate
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.posteriors.vi_posterior.VIPosterior.log_prob" class="md-nav__link">
+    <span class="md-ellipsis">
+      log_prob
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.posteriors.vi_posterior.VIPosterior.map" class="md-nav__link">
+    <span class="md-ellipsis">
+      map
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.posteriors.vi_posterior.VIPosterior.sample" class="md-nav__link">
+    <span class="md-ellipsis">
+      sample
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.posteriors.vi_posterior.VIPosterior.set_q" class="md-nav__link">
+    <span class="md-ellipsis">
+      set_q
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.posteriors.vi_posterior.VIPosterior.set_vi_method" class="md-nav__link">
+    <span class="md-ellipsis">
+      set_vi_method
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.posteriors.vi_posterior.VIPosterior.train" class="md-nav__link">
+    <span class="md-ellipsis">
+      train
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#models" class="md-nav__link">
+    <span class="md-ellipsis">
+      Models
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.utils.get_nn_models.posterior_nn" class="md-nav__link">
+    <span class="md-ellipsis">
+      posterior_nn
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.utils.get_nn_models.likelihood_nn" class="md-nav__link">
+    <span class="md-ellipsis">
+      likelihood_nn
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.utils.get_nn_models.classifier_nn" class="md-nav__link">
+    <span class="md-ellipsis">
+      classifier_nn
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#potentials" class="md-nav__link">
+    <span class="md-ellipsis">
+      Potentials
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.potentials.posterior_based_potential.posterior_estimator_based_potential" class="md-nav__link">
+    <span class="md-ellipsis">
+      posterior_estimator_based_potential
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.potentials.likelihood_based_potential.likelihood_estimator_based_potential" class="md-nav__link">
+    <span class="md-ellipsis">
+      likelihood_estimator_based_potential
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.inference.potentials.ratio_based_potential.ratio_estimator_based_potential" class="md-nav__link">
+    <span class="md-ellipsis">
+      ratio_estimator_based_potential
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      Analysis
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.analysis.plot.pairplot" class="md-nav__link">
+    <span class="md-ellipsis">
+      pairplot
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.analysis.plot.marginal_plot" class="md-nav__link">
+    <span class="md-ellipsis">
+      marginal_plot
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.analysis.plot.conditional_pairplot" class="md-nav__link">
+    <span class="md-ellipsis">
+      conditional_pairplot
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbi.analysis.conditional_density.conditional_corrcoeff" class="md-nav__link">
+    <span class="md-ellipsis">
+      conditional_corrcoeff
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -1309,33 +2063,6 @@
   <a href="#sbi.inference.snle.snle_a.SNLE_A.__init__" class="md-nav__link">
     <span class="md-ellipsis">
       __init__
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#sbi.inference.snle.mnle.MNLE" class="md-nav__link">
-    <span class="md-ellipsis">
-      MNLE
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#sbi.inference.snle.mnle.MNLE.__init__" class="md-nav__link">
-    <span class="md-ellipsis">
-      __init__
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#sbi.inference.snle.mnle.MNLE.build_posterior" class="md-nav__link">
-    <span class="md-ellipsis">
-      build_posterior
     </span>
   </a>
   
@@ -3792,7 +4519,7 @@ If <code>None</code>, use the latest neural density estimator that was trained.<
     <tbody>
         <tr>
           <td>
-                <code><a class="autorefs autorefs-internal" title="sbi.inference.posteriors.direct_posterior.DirectPosterior" href="posteriors/#sbi.inference.posteriors.direct_posterior.DirectPosterior">DirectPosterior</a></code>
+                <code><a class="autorefs autorefs-internal" title="sbi.inference.posteriors.direct_posterior.DirectPosterior" href="#sbi.inference.posteriors.direct_posterior.DirectPosterior">DirectPosterior</a></code>
           </td>
           <td>
             <div class="doc-md-description">
@@ -6929,1039 +7656,6 @@ sampling.</p>
 
 
 
-<a id="sbi.inference.snle.mnle.MNLE"></a>
-  <div class="doc doc-contents first">
-          <p class="doc doc-class-bases">
-            Bases: <code><span title="sbi.inference.snle.snle_base.LikelihoodEstimator">LikelihoodEstimator</span></code></p>
-
-
-            <details class="quote">
-              <summary>Source code in <code>sbi/inference/snle/mnle.py</code></summary>
-              <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 18</span>
-<span class="normal"> 19</span>
-<span class="normal"> 20</span>
-<span class="normal"> 21</span>
-<span class="normal"> 22</span>
-<span class="normal"> 23</span>
-<span class="normal"> 24</span>
-<span class="normal"> 25</span>
-<span class="normal"> 26</span>
-<span class="normal"> 27</span>
-<span class="normal"> 28</span>
-<span class="normal"> 29</span>
-<span class="normal"> 30</span>
-<span class="normal"> 31</span>
-<span class="normal"> 32</span>
-<span class="normal"> 33</span>
-<span class="normal"> 34</span>
-<span class="normal"> 35</span>
-<span class="normal"> 36</span>
-<span class="normal"> 37</span>
-<span class="normal"> 38</span>
-<span class="normal"> 39</span>
-<span class="normal"> 40</span>
-<span class="normal"> 41</span>
-<span class="normal"> 42</span>
-<span class="normal"> 43</span>
-<span class="normal"> 44</span>
-<span class="normal"> 45</span>
-<span class="normal"> 46</span>
-<span class="normal"> 47</span>
-<span class="normal"> 48</span>
-<span class="normal"> 49</span>
-<span class="normal"> 50</span>
-<span class="normal"> 51</span>
-<span class="normal"> 52</span>
-<span class="normal"> 53</span>
-<span class="normal"> 54</span>
-<span class="normal"> 55</span>
-<span class="normal"> 56</span>
-<span class="normal"> 57</span>
-<span class="normal"> 58</span>
-<span class="normal"> 59</span>
-<span class="normal"> 60</span>
-<span class="normal"> 61</span>
-<span class="normal"> 62</span>
-<span class="normal"> 63</span>
-<span class="normal"> 64</span>
-<span class="normal"> 65</span>
-<span class="normal"> 66</span>
-<span class="normal"> 67</span>
-<span class="normal"> 68</span>
-<span class="normal"> 69</span>
-<span class="normal"> 70</span>
-<span class="normal"> 71</span>
-<span class="normal"> 72</span>
-<span class="normal"> 73</span>
-<span class="normal"> 74</span>
-<span class="normal"> 75</span>
-<span class="normal"> 76</span>
-<span class="normal"> 77</span>
-<span class="normal"> 78</span>
-<span class="normal"> 79</span>
-<span class="normal"> 80</span>
-<span class="normal"> 81</span>
-<span class="normal"> 82</span>
-<span class="normal"> 83</span>
-<span class="normal"> 84</span>
-<span class="normal"> 85</span>
-<span class="normal"> 86</span>
-<span class="normal"> 87</span>
-<span class="normal"> 88</span>
-<span class="normal"> 89</span>
-<span class="normal"> 90</span>
-<span class="normal"> 91</span>
-<span class="normal"> 92</span>
-<span class="normal"> 93</span>
-<span class="normal"> 94</span>
-<span class="normal"> 95</span>
-<span class="normal"> 96</span>
-<span class="normal"> 97</span>
-<span class="normal"> 98</span>
-<span class="normal"> 99</span>
-<span class="normal">100</span>
-<span class="normal">101</span>
-<span class="normal">102</span>
-<span class="normal">103</span>
-<span class="normal">104</span>
-<span class="normal">105</span>
-<span class="normal">106</span>
-<span class="normal">107</span>
-<span class="normal">108</span>
-<span class="normal">109</span>
-<span class="normal">110</span>
-<span class="normal">111</span>
-<span class="normal">112</span>
-<span class="normal">113</span>
-<span class="normal">114</span>
-<span class="normal">115</span>
-<span class="normal">116</span>
-<span class="normal">117</span>
-<span class="normal">118</span>
-<span class="normal">119</span>
-<span class="normal">120</span>
-<span class="normal">121</span>
-<span class="normal">122</span>
-<span class="normal">123</span>
-<span class="normal">124</span>
-<span class="normal">125</span>
-<span class="normal">126</span>
-<span class="normal">127</span>
-<span class="normal">128</span>
-<span class="normal">129</span>
-<span class="normal">130</span>
-<span class="normal">131</span>
-<span class="normal">132</span>
-<span class="normal">133</span>
-<span class="normal">134</span>
-<span class="normal">135</span>
-<span class="normal">136</span>
-<span class="normal">137</span>
-<span class="normal">138</span>
-<span class="normal">139</span>
-<span class="normal">140</span>
-<span class="normal">141</span>
-<span class="normal">142</span>
-<span class="normal">143</span>
-<span class="normal">144</span>
-<span class="normal">145</span>
-<span class="normal">146</span>
-<span class="normal">147</span>
-<span class="normal">148</span>
-<span class="normal">149</span>
-<span class="normal">150</span>
-<span class="normal">151</span>
-<span class="normal">152</span>
-<span class="normal">153</span>
-<span class="normal">154</span>
-<span class="normal">155</span>
-<span class="normal">156</span>
-<span class="normal">157</span>
-<span class="normal">158</span>
-<span class="normal">159</span>
-<span class="normal">160</span>
-<span class="normal">161</span>
-<span class="normal">162</span>
-<span class="normal">163</span>
-<span class="normal">164</span>
-<span class="normal">165</span>
-<span class="normal">166</span>
-<span class="normal">167</span>
-<span class="normal">168</span>
-<span class="normal">169</span>
-<span class="normal">170</span>
-<span class="normal">171</span>
-<span class="normal">172</span>
-<span class="normal">173</span>
-<span class="normal">174</span>
-<span class="normal">175</span>
-<span class="normal">176</span>
-<span class="normal">177</span>
-<span class="normal">178</span>
-<span class="normal">179</span>
-<span class="normal">180</span>
-<span class="normal">181</span>
-<span class="normal">182</span>
-<span class="normal">183</span>
-<span class="normal">184</span>
-<span class="normal">185</span>
-<span class="normal">186</span>
-<span class="normal">187</span>
-<span class="normal">188</span>
-<span class="normal">189</span>
-<span class="normal">190</span>
-<span class="normal">191</span>
-<span class="normal">192</span>
-<span class="normal">193</span>
-<span class="normal">194</span>
-<span class="normal">195</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span> <span class="nc">MNLE</span><span class="p">(</span><span class="n">LikelihoodEstimator</span><span class="p">):</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span>
-        <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;mnle&quot;</span><span class="p">,</span>
-        <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
-        <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">,</span>
-        <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TensorboardSummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
-    <span class="p">):</span>
-<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Mixed Neural Likelihood Estimation (MNLE) [1].</span>
-
-<span class="sd">        Like SNLE, but not sequential and designed to be applied to data with mixed</span>
-<span class="sd">        types, e.g., continuous data and discrete data like they occur in</span>
-<span class="sd">        decision-making experiments (reation times and choices).</span>
-
-<span class="sd">        [1] Flexible and efficient simulation-based inference for models of</span>
-<span class="sd">        decision-making, Boelts et al. 2021,</span>
-<span class="sd">        https://www.biorxiv.org/content/10.1101/2021.12.22.473472v2</span>
-
-<span class="sd">        Args:</span>
-<span class="sd">            prior: A probability distribution that expresses prior knowledge about the</span>
-<span class="sd">                parameters, e.g. which ranges are meaningful for them. If `None`, the</span>
-<span class="sd">                prior must be passed to `.build_posterior()`.</span>
-<span class="sd">            density_estimator: If it is a string, it must be &quot;mnle&quot; to use the</span>
-<span class="sd">                preconfiugred neural nets for MNLE. Alternatively, a function</span>
-<span class="sd">                that builds a custom neural network can be provided. The function will</span>
-<span class="sd">                be called with the first batch of simulations (theta, x), which can</span>
-<span class="sd">                thus be used for shape inference and potentially for z-scoring. It</span>
-<span class="sd">                needs to return a PyTorch `nn.Module` implementing the density</span>
-<span class="sd">                estimator. The density estimator needs to provide the methods</span>
-<span class="sd">                `.log_prob`, `.log_prob_iid()` and `.sample()`.</span>
-<span class="sd">            device: Training device, e.g., &quot;cpu&quot;, &quot;cuda&quot; or &quot;cuda:{0, 1, ...}&quot;.</span>
-<span class="sd">            logging_level: Minimum severity of messages to log. One of the strings</span>
-<span class="sd">                INFO, WARNING, DEBUG, ERROR and CRITICAL.</span>
-<span class="sd">            summary_writer: A tensorboard `SummaryWriter` to control, among others, log</span>
-<span class="sd">                file location (default is `&lt;current working directory&gt;/logs`.)</span>
-<span class="sd">            show_progress_bars: Whether to show a progressbar during simulation and</span>
-<span class="sd">                sampling.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-
-        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">density_estimator</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
-            <span class="k">assert</span> <span class="p">(</span>
-                <span class="n">density_estimator</span> <span class="o">==</span> <span class="s2">&quot;mnle&quot;</span>
-            <span class="p">),</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;MNLE can be used with preconfigured &#39;mnle&#39; density estimator only,</span>
-<span class="s2">                not with </span><span class="si">{</span><span class="n">density_estimator</span><span class="si">}</span><span class="s2">.&quot;&quot;&quot;</span>
-        <span class="n">kwargs</span> <span class="o">=</span> <span class="n">del_entries</span><span class="p">(</span><span class="nb">locals</span><span class="p">(),</span> <span class="n">entries</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;self&quot;</span><span class="p">,</span> <span class="s2">&quot;__class__&quot;</span><span class="p">))</span>
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-
-    <span class="k">def</span> <span class="nf">train</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span>
-        <span class="n">training_batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">50</span><span class="p">,</span>
-        <span class="n">learning_rate</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">5e-4</span><span class="p">,</span>
-        <span class="n">validation_fraction</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.1</span><span class="p">,</span>
-        <span class="n">stop_after_epochs</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">20</span><span class="p">,</span>
-        <span class="n">max_num_epochs</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2</span><span class="o">**</span><span class="mi">31</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span>
-        <span class="n">clip_max_norm</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="mf">5.0</span><span class="p">,</span>
-        <span class="n">resume_training</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
-        <span class="n">discard_prior_samples</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
-        <span class="n">retrain_from_scratch</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
-        <span class="n">show_train_summary</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
-        <span class="n">dataloader_kwargs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MixedDensityEstimator</span><span class="p">:</span>
-        <span class="n">density_estimator</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">train</span><span class="p">(</span>
-            <span class="o">**</span><span class="n">del_entries</span><span class="p">(</span><span class="nb">locals</span><span class="p">(),</span> <span class="n">entries</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;self&quot;</span><span class="p">,</span> <span class="s2">&quot;__class__&quot;</span><span class="p">))</span>
-        <span class="p">)</span>
-        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span>
-            <span class="n">density_estimator</span><span class="p">,</span> <span class="n">MixedDensityEstimator</span>
-        <span class="p">),</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;Internal net must be of type</span>
-<span class="s2">            MixedDensityEstimator but is </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">density_estimator</span><span class="p">)</span><span class="si">}</span><span class="s2">.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="n">density_estimator</span>
-
-    <span class="k">def</span> <span class="nf">build_posterior</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span>
-        <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TorchModule</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">sample_with</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;mcmc&quot;</span><span class="p">,</span>
-        <span class="n">mcmc_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;slice_np&quot;</span><span class="p">,</span>
-        <span class="n">vi_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;rKL&quot;</span><span class="p">,</span>
-        <span class="n">mcmc_parameters</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{},</span>
-        <span class="n">vi_parameters</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{},</span>
-        <span class="n">rejection_sampling_parameters</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{},</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">MCMCPosterior</span><span class="p">,</span> <span class="n">RejectionPosterior</span><span class="p">,</span> <span class="n">VIPosterior</span><span class="p">]:</span>
-<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Build posterior from the neural density estimator.</span>
-
-<span class="sd">        SNLE trains a neural network to approximate the likelihood $p(x|\theta)$. The</span>
-<span class="sd">        posterior wraps the trained network such that one can directly evaluate the</span>
-<span class="sd">        unnormalized posterior log probability $p(\theta|x) \propto p(x|\theta) \cdot</span>
-<span class="sd">        p(\theta)$ and draw samples from the posterior with MCMC or rejection sampling.</span>
-
-<span class="sd">        Args:</span>
-<span class="sd">            density_estimator: The density estimator that the posterior is based on.</span>
-<span class="sd">                If `None`, use the latest neural density estimator that was trained.</span>
-<span class="sd">            prior: Prior distribution.</span>
-<span class="sd">            sample_with: Method to use for sampling from the posterior. Must be one of</span>
-<span class="sd">                [`mcmc` | `rejection` | `vi`].</span>
-<span class="sd">            mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`,</span>
-<span class="sd">                `hmc`, `nuts`. Currently defaults to `slice_np` for a custom numpy</span>
-<span class="sd">                implementation of slice sampling; select `hmc`, `nuts` or `slice` for</span>
-<span class="sd">                Pyro-based sampling.</span>
-<span class="sd">            vi_method: Method used for VI, one of [`rKL`, `fKL`, `IW`, `alpha`]. Note</span>
-<span class="sd">                some of the methods admit a `mode seeking` property (e.g. rKL) whereas</span>
-<span class="sd">                some admit a `mass covering` one (e.g fKL).</span>
-<span class="sd">            mcmc_parameters: Additional kwargs passed to `MCMCPosterior`.</span>
-<span class="sd">            vi_parameters: Additional kwargs passed to `VIPosterior`.</span>
-<span class="sd">            rejection_sampling_parameters: Additional kwargs passed to</span>
-<span class="sd">                `RejectionPosterior`.</span>
-
-<span class="sd">        Returns:</span>
-<span class="sd">            Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods</span>
-<span class="sd">            (the returned log-probability is unnormalized).</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="n">prior</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">assert</span> <span class="p">(</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">_prior</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-            <span class="p">),</span> <span class="s2">&quot;&quot;&quot;You did not pass a prior. You have to pass the prior either at</span>
-<span class="s2">            initialization `inference = SNLE(prior)` or to `.build_posterior</span>
-<span class="s2">            (prior=prior)`.&quot;&quot;&quot;</span>
-            <span class="n">prior</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prior</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="n">check_prior</span><span class="p">(</span><span class="n">prior</span><span class="p">)</span>
-
-        <span class="k">if</span> <span class="n">density_estimator</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">likelihood_estimator</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span>
-            <span class="c1"># If internal net is used device is defined.</span>
-            <span class="n">device</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_device</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="n">likelihood_estimator</span> <span class="o">=</span> <span class="n">density_estimator</span>
-            <span class="c1"># Otherwise, infer it from the device of the net parameters.</span>
-            <span class="n">device</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">density_estimator</span><span class="o">.</span><span class="n">parameters</span><span class="p">())</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">type</span>
-
-        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span>
-            <span class="n">likelihood_estimator</span><span class="p">,</span> <span class="n">MixedDensityEstimator</span>
-        <span class="p">),</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;net must be of type MixedDensityEstimator but is </span><span class="si">{</span><span class="nb">type</span>
-<span class="w">            </span><span class="p">(</span><span class="n">likelihood_estimator</span><span class="p">)</span><span class="si">}</span><span class="s2">.&quot;&quot;&quot;</span>
-
-        <span class="p">(</span>
-            <span class="n">potential_fn</span><span class="p">,</span>
-            <span class="n">theta_transform</span><span class="p">,</span>
-        <span class="p">)</span> <span class="o">=</span> <span class="n">mixed_likelihood_estimator_based_potential</span><span class="p">(</span>
-            <span class="n">likelihood_estimator</span><span class="o">=</span><span class="n">likelihood_estimator</span><span class="p">,</span> <span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">x_o</span><span class="o">=</span><span class="kc">None</span>
-        <span class="p">)</span>
-
-        <span class="k">if</span> <span class="n">sample_with</span> <span class="o">==</span> <span class="s2">&quot;mcmc&quot;</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_posterior</span> <span class="o">=</span> <span class="n">MCMCPosterior</span><span class="p">(</span>
-                <span class="n">potential_fn</span><span class="o">=</span><span class="n">potential_fn</span><span class="p">,</span>
-                <span class="n">theta_transform</span><span class="o">=</span><span class="n">theta_transform</span><span class="p">,</span>
-                <span class="n">proposal</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span>
-                <span class="n">method</span><span class="o">=</span><span class="n">mcmc_method</span><span class="p">,</span>
-                <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span>
-                <span class="n">x_shape</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_x_shape</span><span class="p">,</span>
-                <span class="o">**</span><span class="n">mcmc_parameters</span><span class="p">,</span>
-            <span class="p">)</span>
-        <span class="k">elif</span> <span class="n">sample_with</span> <span class="o">==</span> <span class="s2">&quot;rejection&quot;</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_posterior</span> <span class="o">=</span> <span class="n">RejectionPosterior</span><span class="p">(</span>
-                <span class="n">potential_fn</span><span class="o">=</span><span class="n">potential_fn</span><span class="p">,</span>
-                <span class="n">proposal</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span>
-                <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span>
-                <span class="n">x_shape</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_x_shape</span><span class="p">,</span>
-                <span class="o">**</span><span class="n">rejection_sampling_parameters</span><span class="p">,</span>
-            <span class="p">)</span>
-        <span class="k">elif</span> <span class="n">sample_with</span> <span class="o">==</span> <span class="s2">&quot;vi&quot;</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_posterior</span> <span class="o">=</span> <span class="n">VIPosterior</span><span class="p">(</span>
-                <span class="n">potential_fn</span><span class="o">=</span><span class="n">potential_fn</span><span class="p">,</span>
-                <span class="n">theta_transform</span><span class="o">=</span><span class="n">theta_transform</span><span class="p">,</span>
-                <span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span>  <span class="c1"># type: ignore</span>
-                <span class="n">vi_method</span><span class="o">=</span><span class="n">vi_method</span><span class="p">,</span>
-                <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span>
-                <span class="n">x_shape</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_x_shape</span><span class="p">,</span>
-                <span class="o">**</span><span class="n">vi_parameters</span><span class="p">,</span>
-            <span class="p">)</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">NotImplementedError</span>
-
-        <span class="c1"># Store models at end of each round.</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_model_bank</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">deepcopy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_posterior</span><span class="p">))</span>
-
-        <span class="k">return</span> <span class="n">deepcopy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_posterior</span><span class="p">)</span>
-</code></pre></div></td></tr></table></div>
-            </details>
-
-  
-
-  <div class="doc doc-children">
-
-
-
-
-
-
-
-
-
-
-<div class="doc doc-object doc-function">
-
-
-
-<h2 id="sbi.inference.snle.mnle.MNLE.__init__" class="doc doc-heading">
-          <code class=" language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="s1">&#39;mnle&#39;</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s1">&#39;cpu&#39;</span><span class="p">,</span> <span class="n">logging_level</span><span class="o">=</span><span class="s1">&#39;WARNING&#39;</span><span class="p">,</span> <span class="n">summary_writer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">show_progress_bars</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></code>
-
-<a href="#sbi.inference.snle.mnle.MNLE.__init__" class="headerlink" title="Permanent link">&para;</a></h2>
-
-
-  <div class="doc doc-contents ">
-  
-      <p>Mixed Neural Likelihood Estimation (MNLE) [1].</p>
-<p>Like SNLE, but not sequential and designed to be applied to data with mixed
-types, e.g., continuous data and discrete data like they occur in
-decision-making experiments (reation times and choices).</p>
-<p>[1] Flexible and efficient simulation-based inference for models of
-decision-making, Boelts et al. 2021,
-<a href="https://www.biorxiv.org/content/10.1101/2021.12.22.473472v2">https://www.biorxiv.org/content/10.1101/2021.12.22.473472v2</a></p>
-
-
-
-  <p><strong>Parameters:</strong></p>
-  <table>
-    <thead>
-      <tr>
-        <th>Name</th>
-        <th>Type</th>
-        <th>Description</th>
-        <th>Default</th>
-      </tr>
-    </thead>
-    <tbody>
-        <tr>
-          <td><code>prior</code></td>
-          <td>
-                <code><span title="typing.Optional">Optional</span>[<span title="torch.distributions.Distribution">Distribution</span>]</code>
-          </td>
-          <td>
-            <div class="doc-md-description">
-              <p>A probability distribution that expresses prior knowledge about the
-parameters, e.g. which ranges are meaningful for them. If <code>None</code>, the
-prior must be passed to <code>.build_posterior()</code>.</p>
-            </div>
-          </td>
-          <td>
-                <code>None</code>
-          </td>
-        </tr>
-        <tr>
-          <td><code>density_estimator</code></td>
-          <td>
-                <code><span title="typing.Union">Union</span>[str, <span title="typing.Callable">Callable</span>]</code>
-          </td>
-          <td>
-            <div class="doc-md-description">
-              <p>If it is a string, it must be &ldquo;mnle&rdquo; to use the
-preconfiugred neural nets for MNLE. Alternatively, a function
-that builds a custom neural network can be provided. The function will
-be called with the first batch of simulations (theta, x), which can
-thus be used for shape inference and potentially for z-scoring. It
-needs to return a PyTorch <code>nn.Module</code> implementing the density
-estimator. The density estimator needs to provide the methods
-<code>.log_prob</code>, <code>.log_prob_iid()</code> and <code>.sample()</code>.</p>
-            </div>
-          </td>
-          <td>
-                <code>&#39;mnle&#39;</code>
-          </td>
-        </tr>
-        <tr>
-          <td><code>device</code></td>
-          <td>
-                <code>str</code>
-          </td>
-          <td>
-            <div class="doc-md-description">
-              <p>Training device, e.g., &ldquo;cpu&rdquo;, &ldquo;cuda&rdquo; or &ldquo;cuda:{0, 1, &hellip;}&rdquo;.</p>
-            </div>
-          </td>
-          <td>
-                <code>&#39;cpu&#39;</code>
-          </td>
-        </tr>
-        <tr>
-          <td><code>logging_level</code></td>
-          <td>
-                <code><span title="typing.Union">Union</span>[int, str]</code>
-          </td>
-          <td>
-            <div class="doc-md-description">
-              <p>Minimum severity of messages to log. One of the strings
-INFO, WARNING, DEBUG, ERROR and CRITICAL.</p>
-            </div>
-          </td>
-          <td>
-                <code>&#39;WARNING&#39;</code>
-          </td>
-        </tr>
-        <tr>
-          <td><code>summary_writer</code></td>
-          <td>
-                <code><span title="typing.Optional">Optional</span>[<span title="sbi.types.TensorboardSummaryWriter">TensorboardSummaryWriter</span>]</code>
-          </td>
-          <td>
-            <div class="doc-md-description">
-              <p>A tensorboard <code>SummaryWriter</code> to control, among others, log
-file location (default is <code>&lt;current working directory&gt;/logs</code>.)</p>
-            </div>
-          </td>
-          <td>
-                <code>None</code>
-          </td>
-        </tr>
-        <tr>
-          <td><code>show_progress_bars</code></td>
-          <td>
-                <code>bool</code>
-          </td>
-          <td>
-            <div class="doc-md-description">
-              <p>Whether to show a progressbar during simulation and
-sampling.</p>
-            </div>
-          </td>
-          <td>
-                <code>True</code>
-          </td>
-        </tr>
-    </tbody>
-  </table>
-
-          <details class="quote">
-            <summary>Source code in <code>sbi/inference/snle/mnle.py</code></summary>
-            <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">19</span>
-<span class="normal">20</span>
-<span class="normal">21</span>
-<span class="normal">22</span>
-<span class="normal">23</span>
-<span class="normal">24</span>
-<span class="normal">25</span>
-<span class="normal">26</span>
-<span class="normal">27</span>
-<span class="normal">28</span>
-<span class="normal">29</span>
-<span class="normal">30</span>
-<span class="normal">31</span>
-<span class="normal">32</span>
-<span class="normal">33</span>
-<span class="normal">34</span>
-<span class="normal">35</span>
-<span class="normal">36</span>
-<span class="normal">37</span>
-<span class="normal">38</span>
-<span class="normal">39</span>
-<span class="normal">40</span>
-<span class="normal">41</span>
-<span class="normal">42</span>
-<span class="normal">43</span>
-<span class="normal">44</span>
-<span class="normal">45</span>
-<span class="normal">46</span>
-<span class="normal">47</span>
-<span class="normal">48</span>
-<span class="normal">49</span>
-<span class="normal">50</span>
-<span class="normal">51</span>
-<span class="normal">52</span>
-<span class="normal">53</span>
-<span class="normal">54</span>
-<span class="normal">55</span>
-<span class="normal">56</span>
-<span class="normal">57</span>
-<span class="normal">58</span>
-<span class="normal">59</span>
-<span class="normal">60</span>
-<span class="normal">61</span>
-<span class="normal">62</span>
-<span class="normal">63</span>
-<span class="normal">64</span>
-<span class="normal">65</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
-    <span class="bp">self</span><span class="p">,</span>
-    <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;mnle&quot;</span><span class="p">,</span>
-    <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
-    <span class="n">logging_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">,</span>
-    <span class="n">summary_writer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TensorboardSummaryWriter</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">show_progress_bars</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
-<span class="p">):</span>
-<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Mixed Neural Likelihood Estimation (MNLE) [1].</span>
-
-<span class="sd">    Like SNLE, but not sequential and designed to be applied to data with mixed</span>
-<span class="sd">    types, e.g., continuous data and discrete data like they occur in</span>
-<span class="sd">    decision-making experiments (reation times and choices).</span>
-
-<span class="sd">    [1] Flexible and efficient simulation-based inference for models of</span>
-<span class="sd">    decision-making, Boelts et al. 2021,</span>
-<span class="sd">    https://www.biorxiv.org/content/10.1101/2021.12.22.473472v2</span>
-
-<span class="sd">    Args:</span>
-<span class="sd">        prior: A probability distribution that expresses prior knowledge about the</span>
-<span class="sd">            parameters, e.g. which ranges are meaningful for them. If `None`, the</span>
-<span class="sd">            prior must be passed to `.build_posterior()`.</span>
-<span class="sd">        density_estimator: If it is a string, it must be &quot;mnle&quot; to use the</span>
-<span class="sd">            preconfiugred neural nets for MNLE. Alternatively, a function</span>
-<span class="sd">            that builds a custom neural network can be provided. The function will</span>
-<span class="sd">            be called with the first batch of simulations (theta, x), which can</span>
-<span class="sd">            thus be used for shape inference and potentially for z-scoring. It</span>
-<span class="sd">            needs to return a PyTorch `nn.Module` implementing the density</span>
-<span class="sd">            estimator. The density estimator needs to provide the methods</span>
-<span class="sd">            `.log_prob`, `.log_prob_iid()` and `.sample()`.</span>
-<span class="sd">        device: Training device, e.g., &quot;cpu&quot;, &quot;cuda&quot; or &quot;cuda:{0, 1, ...}&quot;.</span>
-<span class="sd">        logging_level: Minimum severity of messages to log. One of the strings</span>
-<span class="sd">            INFO, WARNING, DEBUG, ERROR and CRITICAL.</span>
-<span class="sd">        summary_writer: A tensorboard `SummaryWriter` to control, among others, log</span>
-<span class="sd">            file location (default is `&lt;current working directory&gt;/logs`.)</span>
-<span class="sd">        show_progress_bars: Whether to show a progressbar during simulation and</span>
-<span class="sd">            sampling.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-
-    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">density_estimator</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
-        <span class="k">assert</span> <span class="p">(</span>
-            <span class="n">density_estimator</span> <span class="o">==</span> <span class="s2">&quot;mnle&quot;</span>
-        <span class="p">),</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;MNLE can be used with preconfigured &#39;mnle&#39; density estimator only,</span>
-<span class="s2">            not with </span><span class="si">{</span><span class="n">density_estimator</span><span class="si">}</span><span class="s2">.&quot;&quot;&quot;</span>
-    <span class="n">kwargs</span> <span class="o">=</span> <span class="n">del_entries</span><span class="p">(</span><span class="nb">locals</span><span class="p">(),</span> <span class="n">entries</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;self&quot;</span><span class="p">,</span> <span class="s2">&quot;__class__&quot;</span><span class="p">))</span>
-    <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-</code></pre></div></td></tr></table></div>
-          </details>
-  </div>
-
-</div>
-
-
-<div class="doc doc-object doc-function">
-
-
-
-<h2 id="sbi.inference.snle.mnle.MNLE.build_posterior" class="doc doc-heading">
-          <code class=" language-python"><span class="n">build_posterior</span><span class="p">(</span><span class="n">density_estimator</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">prior</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sample_with</span><span class="o">=</span><span class="s1">&#39;mcmc&#39;</span><span class="p">,</span> <span class="n">mcmc_method</span><span class="o">=</span><span class="s1">&#39;slice_np&#39;</span><span class="p">,</span> <span class="n">vi_method</span><span class="o">=</span><span class="s1">&#39;rKL&#39;</span><span class="p">,</span> <span class="n">mcmc_parameters</span><span class="o">=</span><span class="p">{},</span> <span class="n">vi_parameters</span><span class="o">=</span><span class="p">{},</span> <span class="n">rejection_sampling_parameters</span><span class="o">=</span><span class="p">{})</span></code>
-
-<a href="#sbi.inference.snle.mnle.MNLE.build_posterior" class="headerlink" title="Permanent link">&para;</a></h2>
-
-
-  <div class="doc doc-contents ">
-  
-      <p>Build posterior from the neural density estimator.</p>
-<p>SNLE trains a neural network to approximate the likelihood <span class="arithmatex">\(p(x|\theta)\)</span>. The
-posterior wraps the trained network such that one can directly evaluate the
-unnormalized posterior log probability <span class="arithmatex">\(p(\theta|x) \propto p(x|\theta) \cdot
-p(\theta)\)</span> and draw samples from the posterior with MCMC or rejection sampling.</p>
-
-
-
-  <p><strong>Parameters:</strong></p>
-  <table>
-    <thead>
-      <tr>
-        <th>Name</th>
-        <th>Type</th>
-        <th>Description</th>
-        <th>Default</th>
-      </tr>
-    </thead>
-    <tbody>
-        <tr>
-          <td><code>density_estimator</code></td>
-          <td>
-                <code><span title="typing.Optional">Optional</span>[<span title="sbi.types.TorchModule">TorchModule</span>]</code>
-          </td>
-          <td>
-            <div class="doc-md-description">
-              <p>The density estimator that the posterior is based on.
-If <code>None</code>, use the latest neural density estimator that was trained.</p>
-            </div>
-          </td>
-          <td>
-                <code>None</code>
-          </td>
-        </tr>
-        <tr>
-          <td><code>prior</code></td>
-          <td>
-                <code><span title="typing.Optional">Optional</span>[<span title="torch.distributions.Distribution">Distribution</span>]</code>
-          </td>
-          <td>
-            <div class="doc-md-description">
-              <p>Prior distribution.</p>
-            </div>
-          </td>
-          <td>
-                <code>None</code>
-          </td>
-        </tr>
-        <tr>
-          <td><code>sample_with</code></td>
-          <td>
-                <code>str</code>
-          </td>
-          <td>
-            <div class="doc-md-description">
-              <p>Method to use for sampling from the posterior. Must be one of
-[<code>mcmc</code> | <code>rejection</code> | <code>vi</code>].</p>
-            </div>
-          </td>
-          <td>
-                <code>&#39;mcmc&#39;</code>
-          </td>
-        </tr>
-        <tr>
-          <td><code>mcmc_method</code></td>
-          <td>
-                <code>str</code>
-          </td>
-          <td>
-            <div class="doc-md-description">
-              <p>Method used for MCMC sampling, one of <code>slice_np</code>, <code>slice</code>,
-<code>hmc</code>, <code>nuts</code>. Currently defaults to <code>slice_np</code> for a custom numpy
-implementation of slice sampling; select <code>hmc</code>, <code>nuts</code> or <code>slice</code> for
-Pyro-based sampling.</p>
-            </div>
-          </td>
-          <td>
-                <code>&#39;slice_np&#39;</code>
-          </td>
-        </tr>
-        <tr>
-          <td><code>vi_method</code></td>
-          <td>
-                <code>str</code>
-          </td>
-          <td>
-            <div class="doc-md-description">
-              <p>Method used for VI, one of [<code>rKL</code>, <code>fKL</code>, <code>IW</code>, <code>alpha</code>]. Note
-some of the methods admit a <code>mode seeking</code> property (e.g. rKL) whereas
-some admit a <code>mass covering</code> one (e.g fKL).</p>
-            </div>
-          </td>
-          <td>
-                <code>&#39;rKL&#39;</code>
-          </td>
-        </tr>
-        <tr>
-          <td><code>mcmc_parameters</code></td>
-          <td>
-                <code><span title="typing.Dict">Dict</span>[str, <span title="typing.Any">Any</span>]</code>
-          </td>
-          <td>
-            <div class="doc-md-description">
-              <p>Additional kwargs passed to <code>MCMCPosterior</code>.</p>
-            </div>
-          </td>
-          <td>
-                <code>{}</code>
-          </td>
-        </tr>
-        <tr>
-          <td><code>vi_parameters</code></td>
-          <td>
-                <code><span title="typing.Dict">Dict</span>[str, <span title="typing.Any">Any</span>]</code>
-          </td>
-          <td>
-            <div class="doc-md-description">
-              <p>Additional kwargs passed to <code>VIPosterior</code>.</p>
-            </div>
-          </td>
-          <td>
-                <code>{}</code>
-          </td>
-        </tr>
-        <tr>
-          <td><code>rejection_sampling_parameters</code></td>
-          <td>
-                <code><span title="typing.Dict">Dict</span>[str, <span title="typing.Any">Any</span>]</code>
-          </td>
-          <td>
-            <div class="doc-md-description">
-              <p>Additional kwargs passed to
-<code>RejectionPosterior</code>.</p>
-            </div>
-          </td>
-          <td>
-                <code>{}</code>
-          </td>
-        </tr>
-    </tbody>
-  </table>
-
-
-
-  <p><strong>Returns:</strong></p>
-  <table>
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-        <tr>
-          <td>
-                <code><span title="typing.Union">Union</span>[<a class="autorefs autorefs-internal" title="sbi.inference.posteriors.MCMCPosterior" href="posteriors/#sbi.inference.posteriors.mcmc_posterior.MCMCPosterior">MCMCPosterior</a>, <a class="autorefs autorefs-internal" title="sbi.inference.posteriors.RejectionPosterior" href="posteriors/#sbi.inference.posteriors.rejection_posterior.RejectionPosterior">RejectionPosterior</a>, <a class="autorefs autorefs-internal" title="sbi.inference.posteriors.VIPosterior" href="posteriors/#sbi.inference.posteriors.vi_posterior.VIPosterior">VIPosterior</a>]</code>
-          </td>
-          <td>
-            <div class="doc-md-description">
-              <p>Posterior <span class="arithmatex">\(p(\theta|x)\)</span>  with <code>.sample()</code> and <code>.log_prob()</code> methods</p>
-            </div>
-          </td>
-        </tr>
-        <tr>
-          <td>
-                <code><span title="typing.Union">Union</span>[<a class="autorefs autorefs-internal" title="sbi.inference.posteriors.MCMCPosterior" href="posteriors/#sbi.inference.posteriors.mcmc_posterior.MCMCPosterior">MCMCPosterior</a>, <a class="autorefs autorefs-internal" title="sbi.inference.posteriors.RejectionPosterior" href="posteriors/#sbi.inference.posteriors.rejection_posterior.RejectionPosterior">RejectionPosterior</a>, <a class="autorefs autorefs-internal" title="sbi.inference.posteriors.VIPosterior" href="posteriors/#sbi.inference.posteriors.vi_posterior.VIPosterior">VIPosterior</a>]</code>
-          </td>
-          <td>
-            <div class="doc-md-description">
-              <p>(the returned log-probability is unnormalized).</p>
-            </div>
-          </td>
-        </tr>
-    </tbody>
-  </table>
-
-          <details class="quote">
-            <summary>Source code in <code>sbi/inference/snle/mnle.py</code></summary>
-            <div class="codehilite"><table class="codehilitetable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 90</span>
-<span class="normal"> 91</span>
-<span class="normal"> 92</span>
-<span class="normal"> 93</span>
-<span class="normal"> 94</span>
-<span class="normal"> 95</span>
-<span class="normal"> 96</span>
-<span class="normal"> 97</span>
-<span class="normal"> 98</span>
-<span class="normal"> 99</span>
-<span class="normal">100</span>
-<span class="normal">101</span>
-<span class="normal">102</span>
-<span class="normal">103</span>
-<span class="normal">104</span>
-<span class="normal">105</span>
-<span class="normal">106</span>
-<span class="normal">107</span>
-<span class="normal">108</span>
-<span class="normal">109</span>
-<span class="normal">110</span>
-<span class="normal">111</span>
-<span class="normal">112</span>
-<span class="normal">113</span>
-<span class="normal">114</span>
-<span class="normal">115</span>
-<span class="normal">116</span>
-<span class="normal">117</span>
-<span class="normal">118</span>
-<span class="normal">119</span>
-<span class="normal">120</span>
-<span class="normal">121</span>
-<span class="normal">122</span>
-<span class="normal">123</span>
-<span class="normal">124</span>
-<span class="normal">125</span>
-<span class="normal">126</span>
-<span class="normal">127</span>
-<span class="normal">128</span>
-<span class="normal">129</span>
-<span class="normal">130</span>
-<span class="normal">131</span>
-<span class="normal">132</span>
-<span class="normal">133</span>
-<span class="normal">134</span>
-<span class="normal">135</span>
-<span class="normal">136</span>
-<span class="normal">137</span>
-<span class="normal">138</span>
-<span class="normal">139</span>
-<span class="normal">140</span>
-<span class="normal">141</span>
-<span class="normal">142</span>
-<span class="normal">143</span>
-<span class="normal">144</span>
-<span class="normal">145</span>
-<span class="normal">146</span>
-<span class="normal">147</span>
-<span class="normal">148</span>
-<span class="normal">149</span>
-<span class="normal">150</span>
-<span class="normal">151</span>
-<span class="normal">152</span>
-<span class="normal">153</span>
-<span class="normal">154</span>
-<span class="normal">155</span>
-<span class="normal">156</span>
-<span class="normal">157</span>
-<span class="normal">158</span>
-<span class="normal">159</span>
-<span class="normal">160</span>
-<span class="normal">161</span>
-<span class="normal">162</span>
-<span class="normal">163</span>
-<span class="normal">164</span>
-<span class="normal">165</span>
-<span class="normal">166</span>
-<span class="normal">167</span>
-<span class="normal">168</span>
-<span class="normal">169</span>
-<span class="normal">170</span>
-<span class="normal">171</span>
-<span class="normal">172</span>
-<span class="normal">173</span>
-<span class="normal">174</span>
-<span class="normal">175</span>
-<span class="normal">176</span>
-<span class="normal">177</span>
-<span class="normal">178</span>
-<span class="normal">179</span>
-<span class="normal">180</span>
-<span class="normal">181</span>
-<span class="normal">182</span>
-<span class="normal">183</span>
-<span class="normal">184</span>
-<span class="normal">185</span>
-<span class="normal">186</span>
-<span class="normal">187</span>
-<span class="normal">188</span>
-<span class="normal">189</span>
-<span class="normal">190</span>
-<span class="normal">191</span>
-<span class="normal">192</span>
-<span class="normal">193</span>
-<span class="normal">194</span>
-<span class="normal">195</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">build_posterior</span><span class="p">(</span>
-    <span class="bp">self</span><span class="p">,</span>
-    <span class="n">density_estimator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TorchModule</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">prior</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Distribution</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">sample_with</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;mcmc&quot;</span><span class="p">,</span>
-    <span class="n">mcmc_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;slice_np&quot;</span><span class="p">,</span>
-    <span class="n">vi_method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;rKL&quot;</span><span class="p">,</span>
-    <span class="n">mcmc_parameters</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{},</span>
-    <span class="n">vi_parameters</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{},</span>
-    <span class="n">rejection_sampling_parameters</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{},</span>
-<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">MCMCPosterior</span><span class="p">,</span> <span class="n">RejectionPosterior</span><span class="p">,</span> <span class="n">VIPosterior</span><span class="p">]:</span>
-<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Build posterior from the neural density estimator.</span>
-
-<span class="sd">    SNLE trains a neural network to approximate the likelihood $p(x|\theta)$. The</span>
-<span class="sd">    posterior wraps the trained network such that one can directly evaluate the</span>
-<span class="sd">    unnormalized posterior log probability $p(\theta|x) \propto p(x|\theta) \cdot</span>
-<span class="sd">    p(\theta)$ and draw samples from the posterior with MCMC or rejection sampling.</span>
-
-<span class="sd">    Args:</span>
-<span class="sd">        density_estimator: The density estimator that the posterior is based on.</span>
-<span class="sd">            If `None`, use the latest neural density estimator that was trained.</span>
-<span class="sd">        prior: Prior distribution.</span>
-<span class="sd">        sample_with: Method to use for sampling from the posterior. Must be one of</span>
-<span class="sd">            [`mcmc` | `rejection` | `vi`].</span>
-<span class="sd">        mcmc_method: Method used for MCMC sampling, one of `slice_np`, `slice`,</span>
-<span class="sd">            `hmc`, `nuts`. Currently defaults to `slice_np` for a custom numpy</span>
-<span class="sd">            implementation of slice sampling; select `hmc`, `nuts` or `slice` for</span>
-<span class="sd">            Pyro-based sampling.</span>
-<span class="sd">        vi_method: Method used for VI, one of [`rKL`, `fKL`, `IW`, `alpha`]. Note</span>
-<span class="sd">            some of the methods admit a `mode seeking` property (e.g. rKL) whereas</span>
-<span class="sd">            some admit a `mass covering` one (e.g fKL).</span>
-<span class="sd">        mcmc_parameters: Additional kwargs passed to `MCMCPosterior`.</span>
-<span class="sd">        vi_parameters: Additional kwargs passed to `VIPosterior`.</span>
-<span class="sd">        rejection_sampling_parameters: Additional kwargs passed to</span>
-<span class="sd">            `RejectionPosterior`.</span>
-
-<span class="sd">    Returns:</span>
-<span class="sd">        Posterior $p(\theta|x)$  with `.sample()` and `.log_prob()` methods</span>
-<span class="sd">        (the returned log-probability is unnormalized).</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">if</span> <span class="n">prior</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="k">assert</span> <span class="p">(</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_prior</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-        <span class="p">),</span> <span class="s2">&quot;&quot;&quot;You did not pass a prior. You have to pass the prior either at</span>
-<span class="s2">        initialization `inference = SNLE(prior)` or to `.build_posterior</span>
-<span class="s2">        (prior=prior)`.&quot;&quot;&quot;</span>
-        <span class="n">prior</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prior</span>
-    <span class="k">else</span><span class="p">:</span>
-        <span class="n">check_prior</span><span class="p">(</span><span class="n">prior</span><span class="p">)</span>
-
-    <span class="k">if</span> <span class="n">density_estimator</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">likelihood_estimator</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_neural_net</span>
-        <span class="c1"># If internal net is used device is defined.</span>
-        <span class="n">device</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_device</span>
-    <span class="k">else</span><span class="p">:</span>
-        <span class="n">likelihood_estimator</span> <span class="o">=</span> <span class="n">density_estimator</span>
-        <span class="c1"># Otherwise, infer it from the device of the net parameters.</span>
-        <span class="n">device</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">density_estimator</span><span class="o">.</span><span class="n">parameters</span><span class="p">())</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">type</span>
-
-    <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span>
-        <span class="n">likelihood_estimator</span><span class="p">,</span> <span class="n">MixedDensityEstimator</span>
-    <span class="p">),</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;net must be of type MixedDensityEstimator but is </span><span class="si">{</span><span class="nb">type</span>
-<span class="w">        </span><span class="p">(</span><span class="n">likelihood_estimator</span><span class="p">)</span><span class="si">}</span><span class="s2">.&quot;&quot;&quot;</span>
-
-    <span class="p">(</span>
-        <span class="n">potential_fn</span><span class="p">,</span>
-        <span class="n">theta_transform</span><span class="p">,</span>
-    <span class="p">)</span> <span class="o">=</span> <span class="n">mixed_likelihood_estimator_based_potential</span><span class="p">(</span>
-        <span class="n">likelihood_estimator</span><span class="o">=</span><span class="n">likelihood_estimator</span><span class="p">,</span> <span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">x_o</span><span class="o">=</span><span class="kc">None</span>
-    <span class="p">)</span>
-
-    <span class="k">if</span> <span class="n">sample_with</span> <span class="o">==</span> <span class="s2">&quot;mcmc&quot;</span><span class="p">:</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_posterior</span> <span class="o">=</span> <span class="n">MCMCPosterior</span><span class="p">(</span>
-            <span class="n">potential_fn</span><span class="o">=</span><span class="n">potential_fn</span><span class="p">,</span>
-            <span class="n">theta_transform</span><span class="o">=</span><span class="n">theta_transform</span><span class="p">,</span>
-            <span class="n">proposal</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span>
-            <span class="n">method</span><span class="o">=</span><span class="n">mcmc_method</span><span class="p">,</span>
-            <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span>
-            <span class="n">x_shape</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_x_shape</span><span class="p">,</span>
-            <span class="o">**</span><span class="n">mcmc_parameters</span><span class="p">,</span>
-        <span class="p">)</span>
-    <span class="k">elif</span> <span class="n">sample_with</span> <span class="o">==</span> <span class="s2">&quot;rejection&quot;</span><span class="p">:</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_posterior</span> <span class="o">=</span> <span class="n">RejectionPosterior</span><span class="p">(</span>
-            <span class="n">potential_fn</span><span class="o">=</span><span class="n">potential_fn</span><span class="p">,</span>
-            <span class="n">proposal</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span>
-            <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span>
-            <span class="n">x_shape</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_x_shape</span><span class="p">,</span>
-            <span class="o">**</span><span class="n">rejection_sampling_parameters</span><span class="p">,</span>
-        <span class="p">)</span>
-    <span class="k">elif</span> <span class="n">sample_with</span> <span class="o">==</span> <span class="s2">&quot;vi&quot;</span><span class="p">:</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_posterior</span> <span class="o">=</span> <span class="n">VIPosterior</span><span class="p">(</span>
-            <span class="n">potential_fn</span><span class="o">=</span><span class="n">potential_fn</span><span class="p">,</span>
-            <span class="n">theta_transform</span><span class="o">=</span><span class="n">theta_transform</span><span class="p">,</span>
-            <span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span>  <span class="c1"># type: ignore</span>
-            <span class="n">vi_method</span><span class="o">=</span><span class="n">vi_method</span><span class="p">,</span>
-            <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span>
-            <span class="n">x_shape</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_x_shape</span><span class="p">,</span>
-            <span class="o">**</span><span class="n">vi_parameters</span><span class="p">,</span>
-        <span class="p">)</span>
-    <span class="k">else</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">NotImplementedError</span>
-
-    <span class="c1"># Store models at end of each round.</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">_model_bank</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">deepcopy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_posterior</span><span class="p">))</span>
-
-    <span class="k">return</span> <span class="n">deepcopy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_posterior</span><span class="p">)</span>
-</code></pre></div></td></tr></table></div>
-          </details>
-  </div>
-
-</div>
-
-
-
-  </div>
-
-  </div>
-
-
-</div>
-
-<div class="doc doc-object doc-class">
-
-
-
 <a id="sbi.inference.snre.snre_a.SNRE_A"></a>
   <div class="doc doc-contents first">
           <p class="doc doc-class-bases">
@@ -10644,7 +10338,7 @@ and validation dataloaders (like, e.g., a collate_fn)</p>
 <a id="sbi.inference.snre.bnre.BNRE"></a>
   <div class="doc doc-contents first">
           <p class="doc doc-class-bases">
-            Bases: <code><a class="autorefs autorefs-internal" title="sbi.inference.snre.snre_a.SNRE_A" href="inference/#sbi.inference.snre.snre_a.SNRE_A">SNRE_A</a></code></p>
+            Bases: <code><a class="autorefs autorefs-internal" title="sbi.inference.snre.snre_a.SNRE_A" href="#sbi.inference.snre.snre_a.SNRE_A">SNRE_A</a></code></p>
 
 
             <details class="quote">
@@ -24991,7 +24685,7 @@ overwrite to enable pickling (and in particular the necessary modifications are 
     <tbody>
         <tr>
 <td><code>VIPosterior</code></td>          <td>
-                <code><a class="autorefs autorefs-internal" title="sbi.inference.posteriors.vi_posterior.VIPosterior" href="posteriors/#sbi.inference.posteriors.vi_posterior.VIPosterior">VIPosterior</a></code>
+                <code><a class="autorefs autorefs-internal" title="sbi.inference.posteriors.vi_posterior.VIPosterior" href="#sbi.inference.posteriors.vi_posterior.VIPosterior">VIPosterior</a></code>
           </td>
           <td>
             <div class="doc-md-description">
@@ -25196,7 +24890,7 @@ from potential_fn or q, if this fails we raise an Error.</p>
         <tr>
           <td><code>q</code></td>
           <td>
-                <code><span title="typing.Union">Union</span>[str, <span title="sbi.types.PyroTransformedDistribution">PyroTransformedDistribution</span>, <a class="autorefs autorefs-internal" title="sbi.inference.posteriors.vi_posterior.VIPosterior" href="posteriors/#sbi.inference.posteriors.vi_posterior.VIPosterior">VIPosterior</a>, <span title="typing.Callable">Callable</span>]</code>
+                <code><span title="typing.Union">Union</span>[str, <span title="sbi.types.PyroTransformedDistribution">PyroTransformedDistribution</span>, <a class="autorefs autorefs-internal" title="sbi.inference.posteriors.vi_posterior.VIPosterior" href="#sbi.inference.posteriors.vi_posterior.VIPosterior">VIPosterior</a>, <span title="typing.Callable">Callable</span>]</code>
           </td>
           <td>
             <div class="doc-md-description">
@@ -26364,7 +26058,7 @@ if called.</p>
         <tr>
           <td><code>q</code></td>
           <td>
-                <code><span title="typing.Union">Union</span>[str, <span title="sbi.types.PyroTransformedDistribution">PyroTransformedDistribution</span>, <a class="autorefs autorefs-internal" title="sbi.inference.posteriors.vi_posterior.VIPosterior" href="posteriors/#sbi.inference.posteriors.vi_posterior.VIPosterior">VIPosterior</a>, <span title="typing.Callable">Callable</span>]</code>
+                <code><span title="typing.Union">Union</span>[str, <span title="sbi.types.PyroTransformedDistribution">PyroTransformedDistribution</span>, <a class="autorefs autorefs-internal" title="sbi.inference.posteriors.vi_posterior.VIPosterior" href="#sbi.inference.posteriors.vi_posterior.VIPosterior">VIPosterior</a>, <span title="typing.Callable">Callable</span>]</code>
           </td>
           <td>
             <div class="doc-md-description">
@@ -26636,7 +26330,7 @@ is already a <code>VIPosterior</code>, then the arguments will be copied from it
     <tbody>
         <tr>
           <td>
-                <code><a class="autorefs autorefs-internal" title="sbi.inference.posteriors.vi_posterior.VIPosterior" href="posteriors/#sbi.inference.posteriors.vi_posterior.VIPosterior">VIPosterior</a></code>
+                <code><a class="autorefs autorefs-internal" title="sbi.inference.posteriors.vi_posterior.VIPosterior" href="#sbi.inference.posteriors.vi_posterior.VIPosterior">VIPosterior</a></code>
           </td>
           <td>
             <div class="doc-md-description">
