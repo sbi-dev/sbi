@@ -28,10 +28,15 @@ nav:
       - Examples:
         - Hodgkin-Huxley example: examples/00_HH_simulator.md
         - Decision making model: examples/01_decision_making_model.md
+  - API Reference:
+    - Inference: reference/inference.md
+    - Neural Networks: reference/models.md
+    - Posteriors: reference/posteriors.md
+    - Potentials: reference/potentials.md
+    - Analysis: reference/analysis.md
   - Contributing: 
     - Guide: contribute.md
     - Code of Conduct: code_of_conduct.md
-  - API Reference: reference.md
   - FAQ: faq.md
   - Credits: credits.md
 
