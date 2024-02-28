@@ -63,10 +63,12 @@ class DensityEstimator(nn.Module):
     def sample_and_log_prob(
         self, sample_shape: torch.Size, condition: Tensor, **kwargs
     ) -> Tuple[Tensor, Tensor]:
-        r"""Return samples from the density estimator.
+        r"""Return samples and their density from the density estimator.
 
-        Note: For some density estimators, computing log_probs for current samples is
-              more efficient than computing them separately (then override this).
+        Note:
+            For some density estimators, computing log_probs for samples is
+            more efficient than computing them separately. This method should
+            then be overwritten to provide a more efficient implementation.
 
         Args:
             sample_shape: Shape of the samples to return.
