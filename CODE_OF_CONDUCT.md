@@ -23,18 +23,18 @@ community include:
 * Giving and gracefully accepting constructive feedback
 * Accepting responsibility and apologizing to those affected by our mistakes,
   and learning from the experience
-* Focusing on what is best not just for us as individuals, but for the overall
+* Focusing on what is best not just for us as individuals but for the overall
   community
 
 Examples of unacceptable behavior include:
 
-* The use of sexualized language or imagery, and sexual attention or advances of
+* The use of sexualized language or imagery and sexual attention or advances of
   any kind
 * Trolling, insulting or derogatory comments, and personal or political attacks
 * Public or private harassment
-* Publishing others' private information, such as a physical or email address,
+* Publishing others' confidential information, such as a physical or email address,
   without their explicit permission
-* Other conduct which could reasonably be considered inappropriate in a
+* Other conduct that could reasonably be considered inappropriate in a
   professional setting
 
 ## Enforcement Responsibilities
@@ -53,14 +53,16 @@ decisions when appropriate.
 
 This Code of Conduct applies within all community spaces, and also applies when
 an individual is officially representing the community in public spaces.
-Examples of representing our community include using an official e-mail address,
-posting via an official social media account, or acting as an appointed
-representative at an online or offline event.
+Representing our community includes using an official e-mail address, posting
+via an official social media account, or acting as an appointed representative
+at an online or offline event.
 
 ## Enforcement
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
-reported by contacting `sbi` developer Jan Boelts via email (jan.boelts@uni-tuebingen.de). All
+reported by contacting `sbi` developer Jan Boelts via email
+(jan.boelts@mailbox.org) or anonymously via
+[https://forms.gle/AEmwEznWAKdvrBQbA](https://forms.gle/AEmwEznWAKdvrBQbA). All
 complaints will be reviewed and investigated promptly and fairly.
 
 All community leaders are obligated to respect the privacy and security of the
@@ -118,8 +120,8 @@ This Code of Conduct is adapted from the [Contributor Covenant][homepage],
 version 2.1, available at
 [https://www.contributor-covenant.org/version/2/1/code_of_conduct.html][v2.1].
 
-Community Impact Guidelines were inspired by
-[Mozilla's code of conduct enforcement ladder][Mozilla CoC].
+Community Impact Guidelines were inspired by [Mozilla's code of conduct
+enforcement ladder][Mozilla CoC].
 
 For answers to common questions about this code of conduct, see the FAQ at
 [https://www.contributor-covenant.org/faq][FAQ]. Translations are available at
