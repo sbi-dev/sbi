@@ -1,7 +1,7 @@
+from typing import Tuple
+
 import torch
 from torch import Tensor, nn
-
-from typing import Tuple
 
 
 class DensityEstimator(nn.Module):
