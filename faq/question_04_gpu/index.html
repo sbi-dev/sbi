@@ -8,21 +8,21 @@
       
       
       
-        <link rel="canonical" href="https://sbi-dev.github.io/sbi/faq/question_05/">
+        <link rel="canonical" href="https://sbi-dev.github.io/sbi/faq/question_04_gpu/">
       
       
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.5.3">
+      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.5.9">
     
     
       
-        <title>How should I save and load objects in sbi? - sbi</title>
+        <title>Can I use the GPU for training the density estimator? - sbi</title>
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.50c56a3b.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.f2e4d321.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
@@ -72,7 +72,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#how-should-i-save-and-load-objects-in-sbi" class="md-skip">
+        <a href="#can-i-use-the-gpu-for-training-the-density-estimator" class="md-skip">
           Skip to content
         </a>
       
@@ -107,7 +107,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              How should I save and load objects in sbi?
+              Can I use the GPU for training the density estimator?
             
           </span>
         </div>
@@ -266,10 +266,8 @@
     
     
     
-    
     <li class="md-nav__item md-nav__item--nested">
       
-        
         
         
         <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
@@ -303,10 +301,8 @@
     
     
     
-    
     <li class="md-nav__item md-nav__item--nested">
       
-        
         
         
         <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_1" >
@@ -432,10 +428,8 @@
     
     
     
-    
     <li class="md-nav__item md-nav__item--nested">
       
-        
         
         
         <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" >
@@ -624,10 +618,8 @@
     
     
     
-    
     <li class="md-nav__item md-nav__item--nested">
       
-        
         
         
         <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_3" >
@@ -732,10 +724,8 @@
     
     
     
-    
     <li class="md-nav__item md-nav__item--nested">
       
-        
         
         
         <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_4" >
@@ -819,10 +809,8 @@
     
     
     
-    
     <li class="md-nav__item md-nav__item--nested">
       
-        
         
         
         <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5" >
@@ -913,10 +901,8 @@
     
     
     
-    
     <li class="md-nav__item md-nav__item--nested">
       
-        
         
         
         <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
@@ -1069,6 +1055,32 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      Setup
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#performance" class="md-nav__link">
+    <span class="md-ellipsis">
+      Performance
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -1085,36 +1097,39 @@
   
 
 
-<h1 id="how-should-i-save-and-load-objects-in-sbi">How should I save and load objects in <code>sbi</code>?<a class="headerlink" href="#how-should-i-save-and-load-objects-in-sbi" title="Permanent link">&para;</a></h1>
-<p><code>NeuralPosterior</code> objects are picklable.
-<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">pickle</span>
-
-<span class="c1"># ... run inference</span>
-<span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span>
-
-<span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;/path/to/my_posterior.pkl&quot;</span><span class="p">,</span> <span class="s2">&quot;wb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">handle</span><span class="p">:</span>
-    <span class="n">pickle</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">posterior</span><span class="p">,</span> <span class="n">handle</span><span class="p">)</span>
-</code></pre></div></p>
-<p>Note: posterior objects that were saved under <code>sbi v0.17.2</code> or older can not be loaded under <code>sbi v0.18.0</code> or newer.</p>
-<p>Note: if you try to load a posterior that was saved under <code>sbi v0.14.x</code> or earlier under <code>sbi v0.15.x</code> until <code>sbi v0.17.x</code>, you have to add:
-<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">sys</span>
-<span class="kn">from</span> <span class="nn">sbi.utils</span> <span class="kn">import</span> <span class="n">user_input_checks_utils</span>
-
-<span class="n">sys</span><span class="o">.</span><span class="n">modules</span><span class="p">[</span><span class="s2">&quot;sbi.user_input.user_input_checks_utils&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">user_input_checks_utils</span>
+<h1 id="can-i-use-the-gpu-for-training-the-density-estimator">Can I use the GPU for training the density estimator?<a class="headerlink" href="#can-i-use-the-gpu-for-training-the-density-estimator" title="Permanent link">&para;</a></h1>
+<p><strong>TLDR</strong>; Yes, by passing <code>device="cuda"</code> and by passing a prior that lives on the
+device name you passed. But we expect no speed-ups for default density estimators.</p>
+<h2 id="setup">Setup<a class="headerlink" href="#setup" title="Permanent link">&para;</a></h2>
+<p>Yes, we support GPU training. When creating the inference object in the flexible
+interface, you can pass the <code>device</code> as an argument, e.g.,</p>
+<div class="highlight"><pre><span></span><code><span class="n">inference</span> <span class="o">=</span> <span class="n">SNPE</span><span class="p">(</span><span class="n">prior</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s2">&quot;cuda&quot;</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="s2">&quot;maf&quot;</span><span class="p">)</span>
 </code></pre></div>
-to your script before loading the posterior.</p>
-<p>As of <code>sbi v0.18.0</code>, <code>NeuralInference</code> objects are also picklable.
-<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">pickle</span>
-
-<span class="c1"># ... run inference</span>
-<span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span>
-
-<span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;/path/to/my_inference.pkl&quot;</span><span class="p">,</span> <span class="s2">&quot;wb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">handle</span><span class="p">:</span>
-    <span class="n">pickle</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">inference</span><span class="p">,</span> <span class="n">handle</span><span class="p">)</span>
+<p>The device is set to <code>"cpu"</code> by default. But it can be set to anything, as long
+as it maps to an existing PyTorch GPU device, e.g., <code>device="cuda"</code> or
+<code>device="cuda:2"</code>. <code>sbi</code> will take care of copying the <code>net</code> and the training
+data to and from the <code>device</code>.
+We also support MPS as a GPU device for GPU-accelarated training on an Apple
+Silicon chip, e.g., it is possible to pass <code>device="mps"</code>.</p>
+<p>Note that the prior must be on the training device already, e.g., when passing
+<code>device="cuda:0"</code>, make sure to pass a prior object that was created on that
+device, e.g.,</p>
+<div class="highlight"><pre><span></span><code><span class="n">prior</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">distributions</span><span class="o">.</span><span class="n">MultivariateNormal</span><span class="p">(</span><span class="n">loc</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span>
+<span class="n">device</span><span class="o">=</span><span class="s2">&quot;cuda:0&quot;</span><span class="p">),</span> <span class="n">covariance_matrix</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s2">&quot;cuda:0&quot;</span><span class="p">))</span>
 </code></pre></div>
-However, saving and loading the <code>inference</code> object will slightly modify the object (in order to make it serializable). These modifications lead to the following two changes in behaviour:
-1) Retraining from scratch is not supported, i.e. <code>.train(..., retrain_from_scratch=True)</code> does not work.
-2) When the loaded object calls the <code>.train()</code> method, it generates a new tensorboard summary writer (instead of appending to the current one).</p>
+<h2 id="performance">Performance<a class="headerlink" href="#performance" title="Permanent link">&para;</a></h2>
+<p>Whether or not you reduce your training time when training on a GPU depends on
+the problem at hand. We provide a couple of default density estimators for
+<code>SNPE</code>, <code>SNLE</code> and <code>SNRE</code>, e.g., a mixture density network
+(<code>density_estimator="mdn"</code>) or a Masked Autoregressive Flow
+(<code>density_estimator="maf"</code>). For these default density estimators, we do <strong>not</strong>
+expect a speed-up. This is because the underlying neural networks are relatively
+shallow and not tall, e.g., they do not have many parameters or matrix
+operations that benefit from being executed on the GPU.</p>
+<p>A speed-up through training on the GPU will most likely become visible when
+using convolutional modules in your neural networks. E.g., when passing an
+embedding net for image processing like in this example:
+<a href="https://github.com/sbi-dev/sbi/blob/main/tutorials/05_embedding_net.ipynb">https://github.com/sbi-dev/sbi/blob/main/tutorials/05_embedding_net.ipynb</a>.</p>
 
 
 
@@ -1176,10 +1191,10 @@ However, saving and loading the <code>inference</code> object will slightly modi
     </div>
     
     
-    <script id="__config" type="application/json">{"base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.f886a092.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    <script id="__config" type="application/json">{"base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.b8dbb3d2.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.d7c377c4.min.js"></script>
+      <script src="../../assets/javascripts/bundle.8fd75fb4.min.js"></script>
       
         <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-MML-AM_CHTML"></script>
       

@@ -8,21 +8,21 @@
       
       
       
-        <link rel="canonical" href="https://sbi-dev.github.io/sbi/faq/question_02/">
+        <link rel="canonical" href="https://sbi-dev.github.io/sbi/faq/question_02_nans/">
       
       
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.5.3">
+      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.5.9">
     
     
       
-        <title>Can the algorithms deal with invalid data, e.g. NaN or inf? - sbi</title>
+        <title>Can the algorithms deal with invalid data, e.g., NaN or inf? - sbi</title>
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.50c56a3b.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.f2e4d321.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
@@ -107,7 +107,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Can the algorithms deal with invalid data, e.g. NaN or inf?
+              Can the algorithms deal with invalid data, e.g., NaN or inf?
             
           </span>
         </div>
@@ -266,10 +266,8 @@
     
     
     
-    
     <li class="md-nav__item md-nav__item--nested">
       
-        
         
         
         <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
@@ -303,10 +301,8 @@
     
     
     
-    
     <li class="md-nav__item md-nav__item--nested">
       
-        
         
         
         <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_1" >
@@ -432,10 +428,8 @@
     
     
     
-    
     <li class="md-nav__item md-nav__item--nested">
       
-        
         
         
         <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" >
@@ -624,10 +618,8 @@
     
     
     
-    
     <li class="md-nav__item md-nav__item--nested">
       
-        
         
         
         <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_3" >
@@ -732,10 +724,8 @@
     
     
     
-    
     <li class="md-nav__item md-nav__item--nested">
       
-        
         
         
         <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_4" >
@@ -819,10 +809,8 @@
     
     
     
-    
     <li class="md-nav__item md-nav__item--nested">
       
-        
         
         
         <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5" >
@@ -913,10 +901,8 @@
     
     
     
-    
     <li class="md-nav__item md-nav__item--nested">
       
-        
         
         
         <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
@@ -1085,23 +1071,30 @@
   
 
 
-<h1 id="can-the-algorithms-deal-with-invalid-data-eg-nan-or-inf">Can the algorithms deal with invalid data, e.g. NaN or inf?<a class="headerlink" href="#can-the-algorithms-deal-with-invalid-data-eg-nan-or-inf" title="Permanent link">&para;</a></h1>
-<p>Yes. By default, whenever a simulation returns at least one <code>NaN</code> or <code>inf</code>, it is 
-completely excluded from the training data. In other words, the simulation is simply 
+<h1 id="can-the-algorithms-deal-with-invalid-data-eg-nan-or-inf">Can the algorithms deal with invalid data, e.g., NaN or inf?<a class="headerlink" href="#can-the-algorithms-deal-with-invalid-data-eg-nan-or-inf" title="Permanent link">&para;</a></h1>
+<p>Yes. By default, whenever a simulation returns at least one <code>NaN</code> or <code>inf</code>, it is
+completely excluded from the training data. In other words, the simulation is simply
 discarded.</p>
-<p>In cases where a very large fraction of simulations return <code>NaN</code> or <code>inf</code>, discarding many simulations can be wasteful. There are two options to deal with this: Either, you use the <code>RestrictionEstimator</code> to learn regions in parameter space that do not produce <code>NaN</code> or <code>inf</code>, see <a href="https://sbi-dev.github.io/sbi/tutorial/08_restriction_estimator/">here</a>. Alternatively, you can manually substitute the &lsquo;invalid&rsquo; values with a reasonable replacement. 
-I.e., at the end of your simulation code, you search for invalid entries and replace 
-them with a floating point number. Importantly, in order for neural network training 
-work well, the floating point number should still be in a reasonable range, i.e. maybe a
- few standard deviations outside of &lsquo;good&rsquo; values.</p>
-<p>If you are running <strong>multi-round</strong> SNPE, however, things can go fully wrong if invalid
- data are encountered. In that case, you will get the following warning
-<div class="highlight"><pre><span></span><code>When invalid simulations are excluded, multi-round SNPE-C can leak into the regions where parameters led to invalid simulations. This can lead to poor results.
+<p>In cases where a very large fraction of simulations return <code>NaN</code> or <code>inf</code>,
+discarding many simulations can be wasteful. There are two options to deal with
+this: Either you use the <code>RestrictionEstimator</code> to learn regions in parameter
+space that do not produce <code>NaN</code> or <code>inf</code>, see
+<a href="https://sbi-dev.github.io/sbi/tutorial/08_restriction_estimator/">here</a>.
+Alternatively, you can manually substitute the &lsquo;invalid&rsquo; values with a
+reasonable replacement. For example, at the end of your simulation code, you
+search for invalid entries and replace them with a floating point number.
+Importantly, in order for neural network training work well, the floating point
+number should still be in a reasonable range, i.e., maybe a few standard
+deviations outside of &lsquo;good&rsquo; values.</p>
+<p>If you are running <strong>multi-round</strong> SNPE, however, things can go fully wrong if
+invalid data are encountered. In that case, you will get the following warning</p>
+<div class="highlight"><pre><span></span><code><span class="n">When</span> <span class="n">invalid</span> <span class="n">simulations</span> <span class="n">are</span> <span class="n">excluded</span><span class="p">,</span> <span class="n">multi</span><span class="o">-</span><span class="nb">round</span> <span class="n">SNPE</span><span class="o">-</span><span class="n">C</span> <span class="n">can</span> <span class="n">leak</span> <span class="n">into</span> <span class="n">the</span> <span class="n">regions</span>
+<span class="n">where</span> <span class="n">parameters</span> <span class="n">led</span> <span class="n">to</span> <span class="n">invalid</span> <span class="n">simulations</span><span class="o">.</span> <span class="n">This</span> <span class="n">can</span> <span class="n">lead</span> <span class="n">to</span> <span class="n">poor</span> <span class="n">results</span><span class="o">.</span>
 </code></pre></div>
-Hence, if you are running multi-round SNPE and a significant fraction of simulations
-returns at least one invalid number, we strongly recommend to manually replace the value
- in your simulation code as described above (or resort to single-round SNPE or use a 
- different method).</p>
+<p>Hence, if you are running multi-round SNPE and a significant fraction of
+simulations returns at least one invalid number, we strongly recommend manually
+replacing the value in your simulation code as described above (or resorting to
+single-round SNPE, or using a different <code>sbi</code> method entirely).</p>
 
 
 
@@ -1163,10 +1156,10 @@ returns at least one invalid number, we strongly recommend to manually replace t
     </div>
     
     
-    <script id="__config" type="application/json">{"base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.f886a092.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    <script id="__config" type="application/json">{"base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.b8dbb3d2.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.d7c377c4.min.js"></script>
+      <script src="../../assets/javascripts/bundle.8fd75fb4.min.js"></script>
       
         <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-MML-AM_CHTML"></script>
       

@@ -8,21 +8,21 @@
       
       
       
-        <link rel="canonical" href="https://sbi-dev.github.io/sbi/faq/question_01/">
+        <link rel="canonical" href="https://sbi-dev.github.io/sbi/faq/question_01_leakage/">
       
       
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.5.3">
+      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.5.9">
     
     
       
-        <title>What should I do when my ‘posterior samples are outside of the prior support’ in SNPE? - sbi</title>
+        <title>What should I do when my ‘posterior samples are outside the prior support’ in SNPE? - sbi</title>
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.50c56a3b.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.f2e4d321.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
@@ -72,7 +72,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#what-should-i-do-when-my-posterior-samples-are-outside-of-the-prior-support-in-snpe" class="md-skip">
+        <a href="#what-should-i-do-when-my-posterior-samples-are-outside-the-prior-support-in-snpe" class="md-skip">
           Skip to content
         </a>
       
@@ -107,7 +107,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              What should I do when my &lsquo;posterior samples are outside of the prior support&rsquo; in SNPE?
+              What should I do when my &lsquo;posterior samples are outside the prior support&rsquo; in SNPE?
             
           </span>
         </div>
@@ -266,10 +266,8 @@
     
     
     
-    
     <li class="md-nav__item md-nav__item--nested">
       
-        
         
         
         <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
@@ -303,10 +301,8 @@
     
     
     
-    
     <li class="md-nav__item md-nav__item--nested">
       
-        
         
         
         <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_1" >
@@ -432,10 +428,8 @@
     
     
     
-    
     <li class="md-nav__item md-nav__item--nested">
       
-        
         
         
         <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" >
@@ -624,10 +618,8 @@
     
     
     
-    
     <li class="md-nav__item md-nav__item--nested">
       
-        
         
         
         <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_3" >
@@ -732,10 +724,8 @@
     
     
     
-    
     <li class="md-nav__item md-nav__item--nested">
       
-        
         
         
         <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_4" >
@@ -819,10 +809,8 @@
     
     
     
-    
     <li class="md-nav__item md-nav__item--nested">
       
-        
         
         
         <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5" >
@@ -913,10 +901,8 @@
     
     
     
-    
     <li class="md-nav__item md-nav__item--nested">
       
-        
         
         
         <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
@@ -1085,32 +1071,34 @@
   
 
 
-<h1 id="what-should-i-do-when-my-posterior-samples-are-outside-of-the-prior-support-in-snpe">What should I do when my &lsquo;posterior samples are outside of the prior support&rsquo; in SNPE?<a class="headerlink" href="#what-should-i-do-when-my-posterior-samples-are-outside-of-the-prior-support-in-snpe" title="Permanent link">&para;</a></h1>
+<h1 id="what-should-i-do-when-my-posterior-samples-are-outside-the-prior-support-in-snpe">What should I do when my &lsquo;posterior samples are outside the prior support&rsquo; in SNPE?<a class="headerlink" href="#what-should-i-do-when-my-posterior-samples-are-outside-the-prior-support-in-snpe" title="Permanent link">&para;</a></h1>
 <p>When working with <strong>multi-round</strong> SNPE, you might have experienced the following
-warning: 
-<div class="highlight"><pre><span></span><code>Only x% posterior samples are within the prior support. It may take a long time to collect the remaining 10000 samples. Consider interrupting (Ctrl-C) and switching to &#39;sample_with_mcmc=True&#39;.
-</code></pre></div></p>
-<p>This reason for this issue is described in more detail 
-<a href="https://arxiv.org/abs/2002.03712">here</a> and <a href="https://arxiv.org/abs/1905.07488">here</a>. 
-The following fixes are possible:  </p>
+warning:</p>
+<div class="highlight"><pre><span></span><code><span class="n">Only</span> <span class="n">x</span><span class="o">%</span> <span class="n">posterior</span> <span class="n">samples</span> <span class="n">are</span> <span class="n">within</span> <span class="n">the</span> <span class="n">prior</span> <span class="n">support</span><span class="o">.</span> <span class="n">It</span> <span class="n">may</span> <span class="n">take</span> <span class="n">a</span> <span class="n">long</span> <span class="n">time</span> <span class="n">to</span>
+<span class="n">collect</span> <span class="n">the</span> <span class="n">remaining</span> <span class="mi">10000</span> <span class="n">samples</span><span class="o">.</span> <span class="n">Consider</span> <span class="n">interrupting</span> <span class="p">(</span><span class="n">Ctrl</span><span class="o">-</span><span class="n">C</span><span class="p">)</span> <span class="ow">and</span> <span class="n">switching</span> <span class="n">to</span>
+<span class="s1">&#39;sample_with_mcmc=True&#39;</span><span class="o">.</span>
+</code></pre></div>
+<p>The reason for this issue is described in more detail
+<a href="https://arxiv.org/abs/2002.03712">here</a> and
+<a href="https://arxiv.org/abs/1905.07488">here</a>. The following fixes are possible:  </p>
 <ul>
 <li>
 <p>sample with MCMC: <code>samples = posterior((num_samples,), x=x_o, sample_with_mcmc=True)</code>.
-This will make sampling slower, but samples will not &lsquo;leak&rsquo;.  </p>
+This approach will make sampling slower, but samples will not &ldquo;leak&rdquo;.</p>
 </li>
 <li>
-<p>resort to single-round SNPE and (if necessary) increase your simulation budget.  </p>
+<p>resort to single-round SNPE and (if necessary) increase your simulation budget.</p>
 </li>
 <li>
-<p>if your prior is either Gaussian (torch.distributions.multivariateNormal) or Uniform 
-(sbi.utils.BoxUniform), you can avoid leakage by using a mixture density network as 
-density estimator. I.e., using the 
-<a href="https://sbi-dev.github.io/sbi/tutorial/03_flexible_interface/">flexible interface</a>, set 
-<code>density_estimator='mdn'</code>. When running inference, there should be a print statement 
-&ldquo;Using SNPE-C with non-atomic loss&rdquo;</p>
+<p>if your prior is either Gaussian (torch.distributions.MultivariateNormal) or
+Uniform (sbi.utils.BoxUniform), you can avoid leakage by using a mixture density
+network as density estimator. I.e., using the <a href="https://sbi-dev.github.io/sbi/tutorial/03_flexible_interface/">flexible
+interface</a>, set
+<code>density_estimator='mdn'</code>. When running inference, there should be a print
+statement &ldquo;Using SNPE-C with non-atomic loss&rdquo;.</p>
 </li>
 <li>
-<p>use a different algorithm, e.g. SNRE and SNLE. Note, however, that these algorithms
+<p>use a different algorithm, e.g., SNRE and SNLE. Note, however, that these algorithms
 can have different issues and potential pitfalls.  </p>
 </li>
 </ul>
@@ -1175,10 +1163,10 @@ can have different issues and potential pitfalls.  </p>
     </div>
     
     
-    <script id="__config" type="application/json">{"base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.f886a092.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    <script id="__config" type="application/json">{"base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.b8dbb3d2.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.d7c377c4.min.js"></script>
+      <script src="../../assets/javascripts/bundle.8fd75fb4.min.js"></script>
       
         <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-MML-AM_CHTML"></script>
       

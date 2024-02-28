@@ -8,21 +8,21 @@
       
       
       
-        <link rel="canonical" href="https://sbi-dev.github.io/sbi/faq/question_03/">
+        <link rel="canonical" href="https://sbi-dev.github.io/sbi/faq/question_06_resume_training/">
       
       
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.5.3">
+      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.5.9">
     
     
       
-        <title>When using multiple workers, I get a pickling error. Can I still use multiprocessing? - sbi</title>
+        <title>Can I stop neural network training and resume it later? - sbi</title>
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.50c56a3b.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.f2e4d321.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
@@ -72,7 +72,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#when-using-multiple-workers-i-get-a-pickling-error-can-i-still-use-multiprocessing" class="md-skip">
+        <a href="#can-i-stop-neural-network-training-and-resume-it-later" class="md-skip">
           Skip to content
         </a>
       
@@ -107,7 +107,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              When using multiple workers, I get a pickling error. Can I still use multiprocessing?
+              Can I stop neural network training and resume it later?
             
           </span>
         </div>
@@ -266,10 +266,8 @@
     
     
     
-    
     <li class="md-nav__item md-nav__item--nested">
       
-        
         
         
         <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
@@ -303,10 +301,8 @@
     
     
     
-    
     <li class="md-nav__item md-nav__item--nested">
       
-        
         
         
         <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_1" >
@@ -432,10 +428,8 @@
     
     
     
-    
     <li class="md-nav__item md-nav__item--nested">
       
-        
         
         
         <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" >
@@ -624,10 +618,8 @@
     
     
     
-    
     <li class="md-nav__item md-nav__item--nested">
       
-        
         
         
         <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_3" >
@@ -732,10 +724,8 @@
     
     
     
-    
     <li class="md-nav__item md-nav__item--nested">
       
-        
         
         
         <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_4" >
@@ -819,10 +809,8 @@
     
     
     
-    
     <li class="md-nav__item md-nav__item--nested">
       
-        
         
         
         <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5" >
@@ -913,10 +901,8 @@
     
     
     
-    
     <li class="md-nav__item md-nav__item--nested">
       
-        
         
         
         <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
@@ -1069,32 +1055,6 @@
     
   
   
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#alternative-parallelize-yourself" class="md-nav__link">
-    <span class="md-ellipsis">
-      Alternative: parallelize yourself
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#some-more-background" class="md-nav__link">
-    <span class="md-ellipsis">
-      Some more background
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
 </nav>
                   </div>
                 </div>
@@ -1111,43 +1071,25 @@
   
 
 
-<h1 id="when-using-multiple-workers-i-get-a-pickling-error-can-i-still-use-multiprocessing">When using multiple workers, I get a pickling error. Can I still use multiprocessing?<a class="headerlink" href="#when-using-multiple-workers-i-get-a-pickling-error-can-i-still-use-multiprocessing" title="Permanent link">&para;</a></h1>
-<p>Yes, but you will have to make a few adjustments to your code. </p>
-<p>Some background: when using <code>num_workers &gt; 1</code>, you might experience an error that a 
-certain object from your simulator could not be pickled (an example can be found
-<a href="https://github.com/mackelab/sbi/issues/317">here</a>).</p>
-<p>This can be fixed by forcing <code>sbi</code> to pickle with <code>dill</code> instead of the default 
-<code>cloudpickle</code>. To do so, adjust your code as 
-follows:</p>
-<ul>
-<li>Install <code>dill</code>:
-<div class="highlight"><pre><span></span><code>pip install dill
-</code></pre></div></li>
-<li>At the very beginning of your python script, set the pickler to <code>dill</code>:
-<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">joblib.externals.loky</span> <span class="kn">import</span> <span class="n">set_loky_pickler</span>
-<span class="n">set_loky_pickler</span><span class="p">(</span><span class="s2">&quot;dill&quot;</span><span class="p">)</span>
-</code></pre></div></li>
-<li>Move all imports required by your simulator into the simulator:
-<div class="highlight"><pre><span></span><code><span class="c1"># Imports specified outside of the simulator will break dill:</span>
-<span class="kn">import</span> <span class="nn">torch</span>
-<span class="k">def</span> <span class="nf">my_simulator</span><span class="p">(</span><span class="n">parameters</span><span class="p">):</span>
-    <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">10</span><span class="p">)</span>
+<h1 id="can-i-stop-neural-network-training-and-resume-it-later">Can I stop neural network training and resume it later?<a class="headerlink" href="#can-i-stop-neural-network-training-and-resume-it-later" title="Permanent link">&para;</a></h1>
+<p>Many clusters have a time limit, and <code>sbi</code> might exceed this limit. You can
+circumvent this problem by using the <a href="https://sbi-dev.github.io/sbi/tutorial/02_flexible_interface/">flexible
+interface</a>. After
+simulations are finished, <code>sbi</code> trains a neural network. If this process takes
+too long, you can stop training and resume it later. The syntax is:</p>
+<div class="highlight"><pre><span></span><code><span class="n">inference</span> <span class="o">=</span> <span class="n">SNPE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">)</span>
+<span class="n">inference</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
+<span class="n">inference</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="n">max_num_epochs</span><span class="o">=</span><span class="mi">300</span><span class="p">)</span>  <span class="c1"># Pick `max_num_epochs` such that it does not exceed the runtime.</span>
 
-<span class="c1"># Therefore, move the imports into the simulator:</span>
-<span class="k">def</span> <span class="nf">my_simulator</span><span class="p">(</span><span class="n">parameters</span><span class="p">):</span>
-    <span class="kn">import</span> <span class="nn">torch</span>
-    <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">10</span><span class="p">)</span>
-</code></pre></div></li>
-</ul>
-<h3 id="alternative-parallelize-yourself">Alternative: parallelize yourself<a class="headerlink" href="#alternative-parallelize-yourself" title="Permanent link">&para;</a></h3>
-<p>You can also write your own code to parallelize simulations with whatever 
-multiprocessing framework you prefer. You can then simulate your data outside of <code>sbi</code> and pass the simulated data as shown in the 
-<a href="https://sbi-dev.github.io/sbi/tutorial/02_flexible_interface/">flexible interface</a>: </p>
-<h3 id="some-more-background">Some more background<a class="headerlink" href="#some-more-background" title="Permanent link">&para;</a></h3>
-<p><code>sbi</code> uses <code>joblib</code> to parallelize simulations, which in turn uses <code>pickle</code> or 
-<code>cloudpickle</code> to serialize the simulator. Almost all simulators will be picklable with 
-<code>cloudpickle</code>, but we have experienced issues e.g. with <code>neuron</code> simulators, see
-<a href="https://github.com/sbi-dev/sbi/issues/317">here</a>.</p>
+<span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;path/to/my/inference.pkl&quot;</span><span class="p">,</span> <span class="s2">&quot;wb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">handle</span><span class="p">:</span>
+    <span class="n">pickle</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">inference</span><span class="p">,</span> <span class="n">handle</span><span class="p">)</span>
+
+<span class="c1"># To resume training:</span>
+<span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;path/to/my/inference.pkl&quot;</span><span class="p">,</span> <span class="s2">&quot;rb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">handle</span><span class="p">:</span>
+    <span class="n">inference_from_disk</span> <span class="o">=</span> <span class="n">pickle</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">handle</span><span class="p">)</span>
+<span class="n">inference_from_disk</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="n">resume_training</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">max_num_epochs</span><span class="o">=</span><span class="mi">600</span><span class="p">)</span>  <span class="c1"># Run epochs 301 until 600 (or stop early).</span>
+<span class="n">posterior</span> <span class="o">=</span> <span class="n">inference_from_disk</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span>
+</code></pre></div>
 
 
 
@@ -1209,10 +1151,10 @@ multiprocessing framework you prefer. You can then simulate your data outside of
     </div>
     
     
-    <script id="__config" type="application/json">{"base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.f886a092.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    <script id="__config" type="application/json">{"base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.b8dbb3d2.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.d7c377c4.min.js"></script>
+      <script src="../../assets/javascripts/bundle.8fd75fb4.min.js"></script>
       
         <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-MML-AM_CHTML"></script>
       
