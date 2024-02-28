@@ -57,31 +57,52 @@ class NFlowsFlow(DensityEstimator):
 
         num_samples = torch.Size(sample_shape).numel()
 
-        # nflows.sample() expects conditions to be batched.
         if len(condition.shape) == 1:
+            # nflows.sample() expects conditions to be batched.
             condition = condition.unsqueeze(0)
-            batch_dim = 1
+            samples = self.net.sample(num_samples, context=condition).reshape(
+                (*sample_shape, -1)
+            )
         else:
-            batch_dim = condition.shape[0]
-        samples = self.net.sample(num_samples, context=condition).reshape(
-            (batch_dim, *sample_shape, -1)
-        )
-        return samples.squeeze(0)
+            # For batched conditions, we need to reshape the conditions and the samples
+            batch_dims = condition.shape[:-1]
+            condition = condition.reshape(-1, condition.shape[-1])
+            samples = self.net.sample(num_samples, context=condition).reshape(
+                (*batch_dims, *sample_shape, -1)
+            )
+        return samples
 
     def sample_and_log_prob(
         self, sample_shape: torch.Size, condition: Tensor, **kwargs
-    ) -> Tuple:
+    ) -> Tuple[Tensor, Tensor]:
+        """Return samples and their density from the density estimator.
+
+        Args:
+            sample_shape (torch.Size): Shape of the samples to return.
+            condition (Tensor): Conditions.
+
+        Returns:
+            Tuple[Tensor, Tensor]: samples and log_probs.
+        """
 
         num_samples = torch.Size(sample_shape).numel()
 
         if len(condition.shape) == 1:
+            # nflows.sample() expects conditions to be batched.
             condition = condition.unsqueeze(0)
-            batch_dim = 1
+            samples, log_probs = self.net.sample_and_log_prob(
+                num_samples, context=condition
+            )
+            samples = samples.reshape((*sample_shape, -1))
+            log_probs = log_probs.reshape((*sample_shape,))
         else:
-            batch_dim = condition.shape[0]
+            # For batched conditions, we need to reshape the conditions and the samples
+            batch_dims = condition.shape[:-1]
+            condition = condition.reshape(-1, condition.shape[-1])
+            samples, log_probs = self.net.sample_and_log_prob(
+                num_samples, context=condition
+            )
+            samples = samples.reshape((*batch_dims, *sample_shape, -1))
+            log_probs = log_probs.reshape((*batch_dims, *sample_shape))
 
-        samples, log_prob = self.net.sample_and_log_prob(num_samples, context=condition)
-        samples = samples.reshape((batch_dim, *sample_shape, -1)).squeeze(0)
-        log_prob = log_prob.reshape((batch_dim, *sample_shape)).squeeze(0)
-
-        return samples, log_prob
+        return samples, log_probs
