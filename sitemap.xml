@@ -86,6 +86,31 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
+         <loc>https://sbi-dev.github.io/sbi/reference/analysis/</loc>
+         <lastmod>2024-02-28</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://sbi-dev.github.io/sbi/reference/inference/</loc>
+         <lastmod>2024-02-28</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://sbi-dev.github.io/sbi/reference/models/</loc>
+         <lastmod>2024-02-28</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://sbi-dev.github.io/sbi/reference/posteriors/</loc>
+         <lastmod>2024-02-28</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://sbi-dev.github.io/sbi/reference/potentials/</loc>
+         <lastmod>2024-02-28</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
          <loc>https://sbi-dev.github.io/sbi/tutorial/00_getting_started/</loc>
          <lastmod>2024-02-28</lastmod>
          <changefreq>daily</changefreq>
