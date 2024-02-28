@@ -1,4 +1,5 @@
 from typing import Tuple
+
 import torch
 from pyknos.nflows import flows
 from torch import Tensor
@@ -62,14 +63,16 @@ class NFlowsFlow(DensityEstimator):
         return self.net.sample(num_samples, context=condition).reshape(
             (*sample_shape, -1)
         )
-        
-    def sample_and_log_prob(self, sample_shape: torch.Size, condition: Tensor, **kwargs) -> Tuple:
-        
+
+    def sample_and_log_prob(
+        self, sample_shape: torch.Size, condition: Tensor, **kwargs
+    ) -> Tuple:
+
         sample = self.sample(sample_shape, condition, **kwargs)
         if condition.shape[0] != sample_shape[0]:
             # If the condition is not batched, repeat it to match the sample_shape.
             # This is necessary because nflows.log_prob() expects conditions to be batched.
             condition = condition.repeat(sample_shape[0], 1)
         log_prob = self.log_prob(sample, condition, **kwargs)
-        
+
         return sample, log_prob
