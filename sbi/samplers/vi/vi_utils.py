@@ -188,8 +188,8 @@ def add_parameters_module_attributes(
 
 
     """
-    setattr(q, "parameters", parameters)
-    setattr(q, "modules", modules)
+    q.parameters = parameters  # type: ignore
+    q.modules = modules  # type: ignore
 
 
 def add_parameter_attributes_to_transformed_distribution(
@@ -380,5 +380,5 @@ def make_object_deepcopy_compatible(obj: object):
             setattr(result, k, deepcopy(v, memo))
         return result
 
-    setattr(obj, "__deepcopy__", __deepcopy__)
+    obj.__deepcopy__ = __deepcopy__  # type: ignore
     return obj

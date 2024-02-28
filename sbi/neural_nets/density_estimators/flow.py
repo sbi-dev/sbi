@@ -14,7 +14,6 @@ class NFlowsFlow(DensityEstimator):
     """
 
     def __init__(self, net: flows.Flow):
-
         super().__init__(net)
 
     def log_prob(self, input: Tensor, condition: Tensor) -> Tensor:
@@ -58,6 +57,7 @@ class NFlowsFlow(DensityEstimator):
         # nflows.sample() expects conditions to be batched.
         if len(condition.shape) == 1:
             condition = condition.unsqueeze(0)
-        return self.net.sample(num_samples, context=condition).reshape(
-            (*sample_shape, -1)
-        )
+        return self.net.sample(num_samples, context=condition).reshape((
+            *sample_shape,
+            -1,
+        ))
