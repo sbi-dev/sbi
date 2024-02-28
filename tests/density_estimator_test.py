@@ -53,5 +53,3 @@ def test_api_density_estimator(density_estimator, input_dim, context_dim):
         nsamples_test,
         input_dim,
     ), "samples shape is not correct"
-    
-    
