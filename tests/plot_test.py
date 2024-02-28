@@ -21,8 +21,9 @@ from sbi.utils import BoxUniform
 @pytest.mark.parametrize("samples_labels", (["a", "b"], None))
 @pytest.mark.parametrize("points_labels", (["a", "b"], None))
 @pytest.mark.parametrize("points", (None, torch.ones(2)))
+@pytest.mark.parametrize("tick_labels", (None, [["a", "b"], ["c", "d"]]))
 def test_pairplot(
-    samples, labels, legend, offdiag, samples_labels, points_labels, points
+    samples, labels, legend, offdiag, samples_labels, points_labels, points, tick_labels
 ):
     pairplot(**{k: v for k, v in locals().items() if v is not None})
 
