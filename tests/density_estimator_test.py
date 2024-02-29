@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import pytest
+import torch
 from torch import eye, zeros
 from torch.distributions import MultivariateNormal
 
@@ -13,14 +14,16 @@ from sbi.neural_nets.flow import build_nsf
 
 @pytest.mark.parametrize("density_estimator", (NFlowsFlow,))
 @pytest.mark.parametrize("input_dim", (1, 2))
-@pytest.mark.parametrize("context_dim", (1, 2))
-def test_api_density_estimator(density_estimator, input_dim, context_dim):
+@pytest.mark.parametrize(
+    "context_shape", ((1,), (2,), (1, 1), (2, 2), (1, 1, 1), (2, 2, 2))
+)
+def test_api_density_estimator(density_estimator, input_dim, context_shape):
     r"""Checks whether we can evaluate and sample from density estimators correctly.
 
     Args:
         density_estimator: DensityEstimator subclass.
         input_dim: Dimensionality of the input.
-        context_dim: Dimensionality of the context.
+        context_shape: Dimensionality of the context.
     """
 
     nsamples = 10
@@ -31,24 +34,30 @@ def test_api_density_estimator(density_estimator, input_dim, context_dim):
     )
     batch_input = input_mvn.sample((nsamples,))
     context_mvn = MultivariateNormal(
-        loc=zeros(context_dim), covariance_matrix=eye(context_dim)
+        loc=zeros(*context_shape), covariance_matrix=eye(context_shape[-1])
     )
     batch_context = context_mvn.sample((nsamples,))
 
-    net = build_nsf(batch_input, batch_context, hidden_features=10, num_transforms=2)
-    estimator = density_estimator(net)
+    class EmbeddingNet(torch.nn.Module):
+        def forward(self, x):
+            for i in range(len(context_shape) - 1):
+                x = torch.sum(x, dim=-1)
+            return x
+
+    net = build_nsf(
+        batch_input,
+        batch_context,
+        hidden_features=10,
+        num_transforms=2,
+        embedding_net=EmbeddingNet(),
+    )
+    estimator = density_estimator(net, x_shape=context_shape)
 
     # Loss is only required to work for batched inputs and contexts
     loss = estimator.loss(batch_input, batch_context)
     assert loss.shape == (
         nsamples,
     ), f"Loss shape is not correct. It is of shape {loss.shape}, but should be {(nsamples, )}"
-
-    # Same for log_prob
-    log_probs = estimator.log_prob(batch_input, batch_context)
-    assert log_probs.shape == (
-        nsamples,
-    ), f"log_prob shape is not correct. It is of shape {log_probs.shape}, but should be {(nsamples, )}"
 
     # Sample and log_prob should work for batched and unbatched contexts
 
@@ -58,6 +67,10 @@ def test_api_density_estimator(density_estimator, input_dim, context_dim):
         nsamples_test,
         input_dim,
     ), f"Samples shape is not correct. It is of shape {samples.shape}, but should be {(nsamples_test, input_dim)}"
+    log_probs = estimator.log_prob(samples, batch_context[0])
+    assert log_probs.shape == (
+        nsamples_test,
+    ), f"log_prob shape is not correct. It is of shape {log_probs.shape}, but should be {(nsamples_test, )}"
 
     samples = estimator.sample((1, nsamples_test), batch_context[0])
     assert samples.shape == (
@@ -65,6 +78,11 @@ def test_api_density_estimator(density_estimator, input_dim, context_dim):
         nsamples_test,
         input_dim,
     ), f"Samples shape is not correct. It is of shape {samples.shape}, but should be {(1, nsamples_test, input_dim)}"
+    log_probs = estimator.log_prob(samples, batch_context[0])
+    assert log_probs.shape == (
+        1,
+        nsamples_test,
+    ), f"log_prob shape is not correct. It is of shape {log_probs.shape}, but should be {(1, nsamples_test)}"
 
     samples = estimator.sample((2, nsamples_test), batch_context[0])
     assert samples.shape == (
@@ -72,6 +90,11 @@ def test_api_density_estimator(density_estimator, input_dim, context_dim):
         nsamples_test,
         input_dim,
     ), f"Samples shape is not correct. It is of shape {samples.shape}, but should be {(batch_context.shape[0], nsamples_test, input_dim)}"
+    log_probs = estimator.log_prob(samples, batch_context[0])
+    assert log_probs.shape == (
+        2,
+        nsamples_test,
+    ), f"log_prob shape is not correct. It is of shape {log_probs.shape}, but should be {(batch_context.shape[0], nsamples_test)}"
 
     # Batched context
     samples = estimator.sample((nsamples_test,), batch_context)
@@ -80,6 +103,15 @@ def test_api_density_estimator(density_estimator, input_dim, context_dim):
         nsamples_test,
         input_dim,
     ), f"Samples shape is not correct. It is of shape {samples.shape}, but should be {(batch_context.shape[0], nsamples_test, input_dim)}"
+    try:
+        log_probs = estimator.log_prob(samples, batch_context)
+    except RuntimeError:
+        # Shapes (10,) and (5,) are not broadcastable, so we expect a ValueError
+        pass
+    except:
+        assert (
+            False
+        ), f"Expected RuntimeError as shapes {batch_context.shape} and {samples.shape} are not broadcastable, but got a different/no error."
 
     samples = estimator.sample((nsamples_test,), batch_context[0].unsqueeze(0))
     assert samples.shape == (
@@ -87,6 +119,11 @@ def test_api_density_estimator(density_estimator, input_dim, context_dim):
         nsamples_test,
         input_dim,
     ), f"Samples shape is not correct. It is of shape {samples.shape}, but should be {(batch_context.shape[0], nsamples_test, input_dim)}"
+    log_probs = estimator.log_prob(samples, batch_context[0].unsqueeze(0))
+    assert log_probs.shape == (
+        1,
+        nsamples_test,
+    ), f"log_prob shape is not correct. It is of shape {log_probs.shape}, but should be {(batch_context.shape[0], nsamples_test)}"
 
     # Both batched
     samples = estimator.sample((2, nsamples_test), batch_context.unsqueeze(0))
@@ -97,6 +134,15 @@ def test_api_density_estimator(density_estimator, input_dim, context_dim):
         nsamples_test,
         input_dim,
     ), f"Samples shape is not correct. It is of shape {samples.shape}, but should be {(1,batch_context.shape[0],2,nsamples_test,input_dim)}"
+    try:
+        log_probs = estimator.log_prob(samples, batch_context.unsqueeze(0))
+    except RuntimeError:
+        # Shapes (10,) and (5,) are not broadcastable, so we expect a ValueError
+        pass
+    except:
+        assert (
+            False
+        ), f"Expected RuntimeError as shapes {batch_context.shape} and {samples.shape} are not broadcastable, but got a different/no error."
 
     # Sample and log_prob work for batched and unbatched contexts
     samples, log_probs = estimator.sample_and_log_prob(
