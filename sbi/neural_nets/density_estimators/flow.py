@@ -28,16 +28,16 @@ class NFlowsFlow(DensityEstimator):
             - (batch_size, input_size) + (batch_size, *condition_shape) -> (batch_size,)
             - (batch_size1, input_size) + (batch_size2, *condition_shape)
                                                   -> RuntimeError i.e. not broadcastable
-            - (batch_size1,1, input_size) + (batch_size2, *condition_shape) 
+            - (batch_size1,1, input_size) + (batch_size2, *condition_shape)
                                                   -> (batch_size1,batch_size2)
-            - (batch_size1, input_size) + (batch_size2,1, *condition_shape) 
+            - (batch_size1, input_size) + (batch_size2,1, *condition_shape)
                                                   -> (batch_size2,batch_size1)
 
         Args:
-            input: Inputs to evaluate the log probability on of shape 
+            input: Inputs to evaluate the log probability on of shape
                     (*batch_shape1, input_size).
-            condition: Conditions of shape (*batch_shape2, *condition_shape). 
-                       
+            condition: Conditions of shape (*batch_shape2, *condition_shape).
+
         Raises:
             RuntimeError: If batch_shape1 and batch_shape2 are not broadcastable.
 
@@ -82,7 +82,7 @@ class NFlowsFlow(DensityEstimator):
             This function should support batched conditions and should admit the
             following behavior for different condition shapes:
             - (*condition_shape) -> (*sample_shape,d)
-            - (*batch_shapes, *condition_shape) 
+            - (*batch_shapes, *condition_shape)
                                         -> (*batch_shapes, *sample_shape, input_size)
 
         Args:
@@ -126,7 +126,7 @@ class NFlowsFlow(DensityEstimator):
         Args:
             sample_shape: Shape of the samples to return.
             condition: Conditions of shape (*batch_shape, *condition_shape).
-            
+
         Returns:
             Samples and associated log probabilities.
         """
