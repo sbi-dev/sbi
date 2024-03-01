@@ -19,6 +19,17 @@ class NFlowsFlow(DensityEstimator):
         r"""Return the log probabilities of the inputs given a condition or multiple
         i.e. batched conditions.
 
+        Args:
+            input: Inputs to evaluate the log probability on of shape
+                    (*batch_shape1, input_size).
+            condition: Conditions of shape (*batch_shape2, *condition_shape).
+
+        Raises:
+            RuntimeError: If batch_shape1 and batch_shape2 are not broadcastable.
+
+        Returns:
+            Sample-wise log probabilities.
+
         Note:
             This function should support PyTorch's automatic broadcasting. This means
             the function should behave as follows for different input and condition
@@ -32,17 +43,6 @@ class NFlowsFlow(DensityEstimator):
                                                   -> (batch_size1,batch_size2)
             - (batch_size1, input_size) + (batch_size2,1, *condition_shape)
                                                   -> (batch_size2,batch_size1)
-
-        Args:
-            input: Inputs to evaluate the log probability on of shape
-                    (*batch_shape1, input_size).
-            condition: Conditions of shape (*batch_shape2, *condition_shape).
-
-        Raises:
-            RuntimeError: If batch_shape1 and batch_shape2 are not broadcastable.
-
-        Returns:
-            Sample-wise log probabilities.
         """
         self._check_condition_shape(condition)
         condition_dims = len(self._condition_shape)
@@ -66,7 +66,7 @@ class NFlowsFlow(DensityEstimator):
         r"""Return the loss for training the density estimator.
 
         Args:
-            input: Inputs to evaluate the loss on of shape (batch_size, d).
+            input: Inputs to evaluate the loss on of shape (batch_size, input_size).
             condition: Conditions of shape (batch_size, *condition_shape).
 
         Returns:
@@ -78,19 +78,19 @@ class NFlowsFlow(DensityEstimator):
     def sample(self, sample_shape: Shape, condition: Tensor) -> Tensor:
         r"""Return samples from the density estimator.
 
-        Note:
-            This function should support batched conditions and should admit the
-            following behavior for different condition shapes:
-            - (*condition_shape) -> (*sample_shape,d)
-            - (*batch_shapes, *condition_shape)
-                                        -> (*batch_shapes, *sample_shape, input_size)
-
         Args:
             sample_shape: Shape of the samples to return.
             condition: Conditions of shape (*batch_shape, *condition_shape).
 
         Returns:
             Samples of shape (*batch_shape, *sample_shape, input_size).
+
+        Note:
+            This function should support batched conditions and should admit the
+            following behavior for different condition shapes:
+            - (*condition_shape) -> (*sample_shape, input_size)
+            - (*batch_shape, *condition_shape)
+                                        -> (*batch_shape, *sample_shape, input_size)
         """
         self._check_condition_shape(condition)
 
@@ -105,10 +105,10 @@ class NFlowsFlow(DensityEstimator):
             )
         else:
             # For batched conditions, we need to reshape the conditions and the samples
-            batch_dims = condition.shape[:-condition_dims]
+            batch_shape = condition.shape[:-condition_dims]
             condition = condition.reshape(-1, *self._condition_shape)
             samples = self.net.sample(num_samples, context=condition).reshape(
-                (*batch_dims, *sample_shape, -1)
+                (*batch_shape, *sample_shape, -1)
             )
 
         return samples
@@ -117,11 +117,6 @@ class NFlowsFlow(DensityEstimator):
         self, sample_shape: torch.Size, condition: Tensor, **kwargs
     ) -> Tuple[Tensor, Tensor]:
         r"""Return samples and their density from the density estimator.
-
-        Note:
-            For some density estimators, computing log_probs for samples is
-            more efficient than computing them separately. This method should
-            then be overwritten to provide a more efficient implementation.
 
         Args:
             sample_shape: Shape of the samples to return.

@@ -35,6 +35,17 @@ class DensityEstimator(nn.Module):
         r"""Return the log probabilities of the inputs given a condition or multiple
         i.e. batched conditions.
 
+        Args:
+            input: Inputs to evaluate the log probability on of shape
+                    (*batch_shape1, input_size).
+            condition: Conditions of shape (*batch_shape2, *condition_shape).
+
+        Raises:
+            RuntimeError: If batch_shape1 and batch_shape2 are not broadcastable.
+
+        Returns:
+            Sample-wise log probabilities.
+
         Note:
             This function should support PyTorch's automatic broadcasting. This means
             the function should behave as follows for different input and condition
@@ -48,17 +59,6 @@ class DensityEstimator(nn.Module):
                                                   -> (batch_size1,batch_size2)
             - (batch_size1, input_size) + (batch_size2,1, *condition_shape)
                                                   -> (batch_size2,batch_size1)
-
-        Args:
-            input: Inputs to evaluate the log probability on of shape
-                    (*batch_shape1, input_size).
-            condition: Conditions of shape (*batch_shape2, *condition_shape).
-
-        Raises:
-            RuntimeError: If batch_shape1 and batch_shape2 are not broadcastable.
-
-        Returns:
-            Sample-wise log probabilities.
         """
 
         raise NotImplementedError
@@ -67,7 +67,7 @@ class DensityEstimator(nn.Module):
         r"""Return the loss for training the density estimator.
 
         Args:
-            input: Inputs to evaluate the loss on of shape (batch_size, d).
+            input: Inputs to evaluate the loss on of shape (batch_size, input_size).
             condition: Conditions of shape (batch_size, *condition_shape).
 
         Returns:
@@ -79,19 +79,19 @@ class DensityEstimator(nn.Module):
     def sample(self, sample_shape: torch.Size, condition: Tensor, **kwargs) -> Tensor:
         r"""Return samples from the density estimator.
 
-        Note:
-            This function should support batched conditions and should admit the
-            following behavior for different condition shapes:
-            - (*condition_shape) -> (*sample_shape,d)
-            - (*batch_shapes, *condition_shape)
-                                        -> (*batch_shapes, *sample_shape, input_size)
-
         Args:
             sample_shape: Shape of the samples to return.
             condition: Conditions of shape (*batch_shape, *condition_shape).
 
         Returns:
             Samples of shape (*batch_shape, *sample_shape, input_size).
+
+        Note:
+            This function should support batched conditions and should admit the
+            following behavior for different condition shapes:
+            - (*condition_shape) -> (*sample_shape, input_size)
+            - (*batch_shape, *condition_shape)
+                                        -> (*batch_shape, *sample_shape, input_size)
         """
 
         raise NotImplementedError
@@ -101,22 +101,23 @@ class DensityEstimator(nn.Module):
     ) -> Tuple[Tensor, Tensor]:
         r"""Return samples and their density from the density estimator.
 
-        Note:
-            For some density estimators, computing log_probs for samples is
-            more efficient than computing them separately. This method should
-            then be overwritten to provide a more efficient implementation.
-
         Args:
             sample_shape: Shape of the samples to return.
             condition: Conditions of shape (*batch_shape, *condition_shape).
 
         Returns:
             Samples and associated log probabilities.
+
+
+        Note:
+            For some density estimators, computing log_probs for samples is
+            more efficient than computing them separately. This method should
+            then be overwritten to provide a more efficient implementation.
         """
 
-        x = self.sample(sample_shape, condition, **kwargs)
-        log_prob = self.log_prob(x, condition, **kwargs)
-        return x, log_prob
+        samples = self.sample(sample_shape, condition, **kwargs)
+        log_probs = self.log_prob(samples, condition, **kwargs)
+        return samples, log_probs
 
     def _check_condition_shape(self, condition: Tensor):
         r"""This method checks whether the condition has the correct shape.
