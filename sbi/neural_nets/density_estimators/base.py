@@ -135,7 +135,7 @@ class DensityEstimator(nn.Module):
             raise ValueError(
                 f"Dimensionality of condition is to small and does not match the\
                 expected input dimensionality {len(self._condition_shape)}, as provided\
-                by x_shape."
+                by condition_shape."
             )
         else:
             condition_shape = condition.shape[-len(self._condition_shape) :]
@@ -143,5 +143,5 @@ class DensityEstimator(nn.Module):
                 raise ValueError(
                     f"Shape of condition {tuple(condition_shape)} does not match the \
                     expected input dimensionality {tuple(self._condition_shape)}, as \
-                    provided by x_shape. Please reshape it accordingly."
+                    provided by condition_shape. Please reshape it accordingly."
                 )
