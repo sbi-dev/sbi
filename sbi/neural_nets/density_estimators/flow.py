@@ -23,16 +23,23 @@ class NFlowsFlow(DensityEstimator):
             This function should support PyTorch's automatic broadcasting. This means
             the function should behave as follows for different input and condition
             shapes:
-            - (d,) + (b,*condition_shape) -> (b,)
-            - (b, d) + (*condition_shape) -> (b,)
-            - (b, d) + (b, *condition_shape) -> (b,)
-            - (b1, d) + (b2, *condition_shape) -> RuntimeError i.e. not broadcastable
-            - (b1,1, d) + (b2, *condition_shape) -> (b1,b2)
-            - (b1, d) + (b2,1, *condition_shape) -> (b2,b1)
+            - (input_size,) + (batch_size,*condition_shape) -> (batch_size,)
+            - (batch_size, input_size) + (*condition_shape) -> (batch_size,)
+            - (batch_size, input_size) + (batch_size, *condition_shape) -> (batch_size,)
+            - (batch_size1, input_size) + (batch_size2, *condition_shape)
+                                                  -> RuntimeError i.e. not broadcastable
+            - (batch_size1,1, input_size) + (batch_size2, *condition_shape) 
+                                                  -> (batch_size1,batch_size2)
+            - (batch_size1, input_size) + (batch_size2,1, *condition_shape) 
+                                                  -> (batch_size2,batch_size1)
 
         Args:
-            input: Inputs to evaluate the log probability on.
-            condition: Conditions.
+            input: Inputs to evaluate the log probability on of shape 
+                    (*batch_shape1, input_size).
+            condition: Conditions of shape (*batch_shape2, *condition_shape). 
+                       
+        Raises:
+            RuntimeError: If batch_shape1 and batch_shape2 are not broadcastable.
 
         Returns:
             Sample-wise log probabilities.
@@ -59,11 +66,11 @@ class NFlowsFlow(DensityEstimator):
         r"""Return the loss for training the density estimator.
 
         Args:
-            input: Inputs to evaluate the loss on. Must be batched.
-            condition: Conditions. Must be batched.
+            input: Inputs to evaluate the loss on of shape (batch_size, d).
+            condition: Conditions of shape (batch_size, *condition_shape).
 
         Returns:
-            Negative log-probability.
+            Negative log_probability (batch_size,)
         """
 
         return -self.log_prob(input, condition)
@@ -75,14 +82,15 @@ class NFlowsFlow(DensityEstimator):
             This function should support batched conditions and should admit the
             following behavior for different condition shapes:
             - (*condition_shape) -> (*sample_shape,d)
-            - (*batch_shapes, *condition_shape) -> (*batch_shapes, *sample_shape, d)
+            - (*batch_shapes, *condition_shape) 
+                                        -> (*batch_shapes, *sample_shape, input_size)
 
         Args:
             sample_shape: Shape of the samples to return.
-            condition: Conditions.
+            condition: Conditions of shape (*batch_shape, *condition_shape).
 
         Returns:
-            Samples.
+            Samples of shape (*batch_shape, *sample_shape, input_size).
         """
         self._check_condition_shape(condition)
 
@@ -110,12 +118,17 @@ class NFlowsFlow(DensityEstimator):
     ) -> Tuple[Tensor, Tensor]:
         r"""Return samples and their density from the density estimator.
 
+        Note:
+            For some density estimators, computing log_probs for samples is
+            more efficient than computing them separately. This method should
+            then be overwritten to provide a more efficient implementation.
+
         Args:
             sample_shape: Shape of the samples to return.
-            condition: Conditions.
-
+            condition: Conditions of shape (*batch_shape, *condition_shape).
+            
         Returns:
-            Tuple[Tensor, Tensor]: samples and log_probs.
+            Samples and associated log probabilities.
         """
         self._check_condition_shape(condition)
 
