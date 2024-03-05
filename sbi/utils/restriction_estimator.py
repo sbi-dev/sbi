@@ -59,88 +59,6 @@ def build_input_layer(
     return input_layer
 
 
-def build_classifier(
-    model: Union[str, Callable] = "resnet",
-    hidden_features: int = 100,
-    num_blocks: int = 2,
-    dropout_probability: float = 0.5,
-    z_score_theta: Optional[str] = "independent",
-    embedding_net_theta: nn.Module = nn.Identity(),
-) -> Callable:
-    """
-    Return function that will be the neural network when called with parameters.
-
-    We need data to estimate the mean and std used for z-scoring. Once this data is
-    provided, we build the neural network with this function.
-
-    Args:
-        model: Neural network used to distinguish valid from invalid samples. If it is
-            a string, use a pre-configured network of the provided type (either
-            mlp or resnet). Alternatively, a function that builds a custom
-            neural network can be provided. The function will be called with the
-            first batch of parameters (theta,), which can thus be used for shape
-            inference and potentially for z-scoring. It needs to return a PyTorch
-            `nn.Module` implementing the classifier.
-        hidden_features: Number of hidden units of the classifier if `model` is a
-            string.
-        num_blocks: Number of hidden layers of the classifier if `model` is a
-            string.
-        dropout_probability: Dropout probability of the classifier if `model` is
-            `resnet`.
-        z_score_theta: Whether to z-score parameters $\theta$ before passing them into
-            the network, can take one of the following:
-            - `none`, or None: do not z-score.
-            - `independent`: z-score each dimension independently.
-            - `structured`: treat dimensions as related, therefore compute mean and std
-            over the entire batch, instead of per-dimension. Should be used when each
-            sample is, for example, a time series or an image.
-        embedding_net_theta: Neural network used to encode the parameters before they
-            are passed to the classifier.
-
-    Returns:
-        Function that, when called with a batch of parameters, builds the classifier.
-    """
-    if model == "resnet":
-
-        def build_nn(theta) -> nn.Module:
-            classifier = nets.ResidualNet(
-                in_features=theta.shape[1],
-                out_features=2,
-                hidden_features=hidden_features,
-                context_features=None,
-                num_blocks=num_blocks,
-                activation=relu,
-                dropout_probability=dropout_probability,
-                use_batch_norm=True,
-            )
-            input_layer = build_input_layer(theta, z_score_theta, embedding_net_theta)
-            classifier = nn.Sequential(input_layer, classifier)
-            return classifier
-
-    elif model == "mlp":
-
-        def build_nn(theta) -> nn.Module:
-            classifier = nn.Sequential(
-                nn.Linear(theta.shape[1], hidden_features),
-                nn.BatchNorm1d(hidden_features),
-                nn.ReLU(),
-                nn.Linear(hidden_features, hidden_features),
-                nn.BatchNorm1d(hidden_features),
-                nn.ReLU(),
-                nn.Linear(hidden_features, 2),
-            )
-            input_layer = build_input_layer(theta, z_score_theta, embedding_net_theta)
-            classifier = nn.Sequential(input_layer, classifier)
-            return classifier
-
-    else:
-        raise NameError(
-            f"The `model` must be either of [resnet|mlp]. You passed {model}."
-        )
-
-    return build_nn
-
-
 class RestrictionEstimator:
     def __init__(
         self,
@@ -193,18 +111,24 @@ class RestrictionEstimator:
         self._device = "cpu"  # TODO hot fix to prevent the tests from crashing
 
         if isinstance(model, str):
-            build_nn = build_classifier(
-                model,
-                hidden_features,
-                num_blocks,
-                dropout_probability,
-                z_score,
-                embedding_net,
-            )
-        else:
-            build_nn = model
+            self._model = model
+            self._hidden_features = hidden_features
+            self._num_blocks = num_blocks
+            self._dropout_probability = dropout_probability
+            self._z_score = z_score
+            self._embedding_net = embedding_net
 
-        self._build_nn = build_nn
+            if model == "resnet":
+                self._build_nn = self.build_resnet
+            elif model == "mlp":
+                self._build_nn = self.build_mlp
+            else:
+                raise NameError(
+                    f"The `model` must be either of [resnet|mlp]. You passed {model}."
+                )
+        else:
+            self._build_nn = model
+
         self._valid_or_invalid_criterion = decision_criterion
 
         self._theta_roundwise = []
@@ -212,6 +136,39 @@ class RestrictionEstimator:
         self._label_roundwise = []
         self._data_round_index = []
         self._validation_log_probs = []
+
+    def build_resnet(self, theta) -> nn.Module:
+        classifier = nets.ResidualNet(
+            in_features=theta.shape[1],
+            out_features=2,
+            hidden_features=self._hidden_features,
+            context_features=None,
+            num_blocks=self._num_blocks,
+            activation=relu,
+            dropout_probability=self._dropout_probability,
+            use_batch_norm=True,
+        )
+        z_score_theta = self._z_score
+        embedding_net_theta = self._embedding_net
+        input_layer = build_input_layer(theta, z_score_theta, embedding_net_theta)
+        classifier = nn.Sequential(input_layer, classifier)
+        return classifier
+
+    def build_mlp(self, theta) -> nn.Module:
+        classifier = nn.Sequential(
+            nn.Linear(theta.shape[1], self._hidden_features),
+            nn.BatchNorm1d(self._hidden_features),
+            nn.ReLU(),
+            nn.Linear(self._hidden_features, self._hidden_features),
+            nn.BatchNorm1d(self._hidden_features),
+            nn.ReLU(),
+            nn.Linear(self._hidden_features, 2),
+        )
+        z_score_theta = self._z_score
+        embedding_net_theta = self._embedding_net
+        input_layer = build_input_layer(theta, z_score_theta, embedding_net_theta)
+        classifier = nn.Sequential(input_layer, classifier)
+        return classifier
 
     def append_simulations(self, theta: Tensor, x: Tensor) -> "RestrictionEstimator":
         r"""
@@ -472,7 +429,7 @@ class RestrictionEstimator:
 
         classifier_.zero_grad(set_to_none=True)
 
-        accept_reject_fn = get_classifier_thresholder(
+        accept_reject_fn = AcceptRejectFunction(
             self._classifier,
             self._first_round_validation_theta,
             self._first_round_validation_label,
@@ -556,93 +513,65 @@ def get_density_thresholder(
     return density_thresholder
 
 
-def get_classifier_thresholder(
-    classifier: Any,
-    validation_theta: Tensor,
-    validation_label: Tensor,
-    allowed_false_negatives: Optional[float] = None,
-    reweigh_factor: Optional[float] = None,
-    print_fp_rate: bool = False,
-    safety_margin: Optional[Union[str, float]] = "frequentist",
-) -> Callable:
-    r"""
-    Set the decision threshold of the classifier.
+class AcceptRejectFunction:
+    def __init__(
+        self,
+        classifier: Any,
+        validation_theta: Tensor,
+        validation_label: Tensor,
+        allowed_false_negatives: Optional[float] = None,
+        reweigh_factor: Optional[float] = None,
+        print_fp_rate: bool = False,
+        safety_margin: Optional[Union[str, float]] = "frequentist",
+    ) -> None:
+        self._classifier = classifier
+        self._validation_theta = validation_theta
+        self._validation_label = validation_label
+        self._allowed_false_negatives = allowed_false_negatives
+        self._reweigh_factor = reweigh_factor
+        self._print_fp_rate = print_fp_rate
+        self._safety_margin = safety_margin
 
-    Compute the highest decision threshold at which the fraction of false negatives
-    is smaller than `allowed_false_negatives`. This threshold will then be set as
-    default when calling `.forward()` and for `.build_sim_informed_prior()`.
-
-    Reference:
-    Deistler et al. (2022): "Energy-efficient network activity from disparate circuit
-    parameters"
-
-    Args:
-        allowed_false_negatives: Allowed fraction of false negatives on a held-out
-            test set.
-        reweigh_factor: Post-hoc correction factor. Should be in [0, 1]. A large
-            reweigh factor will increase the probability of predicting a `invalid`
-            simulation.
-        print_fp_rate: Whether to compute and print the false-positive rate at the
-            obtained threshold.
-        safety_margin: When `allowed_false_negatives=0.0`, we might want to apply
-            an additional `safety_margin` to the threshold. If `None`, there will
-            be no margin and the threshold will be the minimum prediction among all
-            `valid' parameter sets. If it is a `float`, this float will be
-            subtracted from the minimum prediction. Lastly, if it is a `str`, we
-            reduce the classifier threshold using a statistical estimator (see
-            `German Tank Problem`). Only supported estimator is `frequentist`.
-            Small note: the procedure is fully correct only for a uniform
-            distribution of classifier predictions.
-    """
-    assert (
-        allowed_false_negatives is None or reweigh_factor is None
-    ), """Both the `allowed_false_negatives` and the `reweigh_factor` are set. You
-        can only set one of them."""
-
-    valid_val_theta = validation_theta[validation_label.bool()]
-    num_valid = valid_val_theta.shape[0]
-    clf_probs = F.softmax(classifier.forward(valid_val_theta), dim=1)[:, 1]
-
-    if allowed_false_negatives == 0.0:
-        if safety_margin is None:
-            classifier_thr = torch.min(clf_probs)
-        elif isinstance(safety_margin, float):
-            classifier_thr = torch.min(clf_probs) - safety_margin
-        elif safety_margin == "frequentist":
-            # We seek the minimum classifier output, not the maximum, as it usually
-            # is in the `German Tank Problem`. Hence, we transform the outputs with
-            # (1-output), apply the estimator, and then transform back.
-            tf_min_val = torch.max(1.0 - clf_probs)
-            tf_estimate = tf_min_val + tf_min_val / num_valid
-            classifier_thr = 1.0 - tf_estimate
-        else:
-            raise NameError(f"`safety_margin` {safety_margin} not supported.")
-    else:
         assert (
-            allowed_false_negatives is not None
-        ), "`allowed_false_negatives` must be set."
-        quantile_index = floor(num_valid * allowed_false_negatives)
-        classifier_thr, _ = torch.kthvalue(clf_probs, quantile_index + 1)
+            allowed_false_negatives is None or reweigh_factor is None
+        ), """Both the `allowed_false_negatives` and the `reweigh_factor` are set. You
+            can only set one of them."""
 
-    classifier_thr = classifier_thr.detach()
+        valid_val_theta = validation_theta[validation_label.bool()]
+        num_valid = valid_val_theta.shape[0]
+        clf_probs = F.softmax(classifier.forward(valid_val_theta), dim=1)[:, 1]
 
-    def classifier_thresholder(theta: Tensor) -> Tensor:
-        pred = F.softmax(classifier.forward(theta), dim=1)[:, 1]
-        if reweigh_factor is None:
-            threshold = classifier_thr
+        if allowed_false_negatives == 0.0:
+            if safety_margin is None:
+                self._classifier_thr = torch.min(clf_probs)
+            elif isinstance(safety_margin, float):
+                self._classifier_thr = torch.min(clf_probs) - safety_margin
+            elif safety_margin == "frequentist":
+                # We seek the minimum classifier output, not the maximum, as it usually
+                # is in the `German Tank Problem`. Hence, we transform the outputs with
+                # (1-output), apply the estimator, and then transform back.
+                tf_min_val = torch.max(1.0 - clf_probs)
+                tf_estimate = tf_min_val + tf_min_val / num_valid
+                self._classifier_thr = 1.0 - tf_estimate
+            else:
+                raise NameError(f"`safety_margin` {safety_margin} not supported.")
+        else:
+            assert (
+                allowed_false_negatives is not None
+            ), "`allowed_false_negatives` must be set."
+            quantile_index = floor(num_valid * allowed_false_negatives)
+            self._classifier_thr, _ = torch.kthvalue(clf_probs, quantile_index + 1)
+
+    def __call__(self, theta):
+        pred = F.softmax(self._classifier.forward(theta), dim=1)[:, 1]
+        if self._reweigh_factor is None:
+            threshold = self._classifier_thr
             predictions = pred > threshold
         else:
-            probs_invalid = pred * reweigh_factor
-            probs_valid = (1 - pred) * (1 - reweigh_factor)
+            probs_invalid = pred * self._reweigh_factor
+            probs_valid = (1 - pred) * (1 - self._reweigh_factor)
             predictions = probs_valid > probs_invalid
         return predictions.bool()
-
-    if print_fp_rate:
-        print_false_positive_rate(
-            classifier_thresholder, validation_theta, validation_label
-        )
-
-    return classifier_thresholder
 
 
 def print_false_positive_rate(
