@@ -562,6 +562,11 @@ class AcceptRejectFunction:
             quantile_index = floor(num_valid * allowed_false_negatives)
             self._classifier_thr, _ = torch.kthvalue(clf_probs, quantile_index + 1)
 
+        if self._print_fp_rate:
+            self.print_false_positive_rate(
+                self.__call__, self._validation_theta, self._validation_label
+            )
+
     def __call__(self, theta):
         pred = F.softmax(self._classifier.forward(theta), dim=1)[:, 1]
         if self._reweigh_factor is None:
@@ -573,26 +578,27 @@ class AcceptRejectFunction:
             predictions = probs_valid > probs_invalid
         return predictions.bool()
 
+    def print_false_positive_rate(
+            self, accept_reject_fn: Callable, validation_theta: Tensor, validation_label: Tensor
+    ) -> float:
+        r"""
+        Print and return the rate of false positive predictions on the validation set.
 
-def print_false_positive_rate(
-    accept_reject_fn: Callable, validation_theta: Tensor, validation_label: Tensor
-) -> float:
-    r"""
-    Print and return the rate of false positive predictions on the validation set.
+        Returns:
+            The false positive rate.
+        """
+        invalid_val_theta = validation_theta[~validation_label.bool()]
+        predictions = accept_reject_fn(invalid_val_theta)
+        num_false_positives = int(predictions.sum())
+        fraction_false_positives = num_false_positives / invalid_val_theta.shape[0]
+        print(
+            f"Fraction of false positives: "
+            f"{num_false_positives} / {invalid_val_theta.shape[0]} = "
+            f"{fraction_false_positives:.3f}"
+        )
+        return fraction_false_positives
 
-    Returns:
-        The false positive rate.
-    """
-    invalid_val_theta = validation_theta[~validation_label.bool()]
-    predictions = accept_reject_fn(invalid_val_theta)
-    num_false_positives = int(predictions.sum())
-    fraction_false_positives = num_false_positives / invalid_val_theta.shape[0]
-    print(
-        f"Fraction of false positives: "
-        f"{num_false_positives} / {invalid_val_theta.shape[0]} = "
-        f"{fraction_false_positives:.3f}"
-    )
-    return fraction_false_positives
+
 
 
 class RestrictedPrior:
