@@ -1,6 +1,7 @@
 from typing import Tuple
 
 import torch
+from pyknos.nflows.flows import Flow
 from torch import Tensor
 
 from sbi.neural_nets.density_estimators.base import DensityEstimator
@@ -13,6 +14,9 @@ class NFlowsFlow(DensityEstimator):
     Flow type objects already have a .log_prob() and .sample() method, so here we just
     wrap them and add the .loss() method.
     """
+
+    def __init__(self, net: Flow, condition_shape: torch.Size) -> None:
+        super().__init__(net, condition_shape)
 
     def log_prob(self, input: Tensor, condition: Tensor) -> Tensor:
         r"""Return the log probabilities of the inputs given a condition or multiple

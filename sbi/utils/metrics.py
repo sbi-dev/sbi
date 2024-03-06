@@ -107,7 +107,7 @@ def c2st_scores(
     noise_scale: Optional[float] = None,
     verbosity: int = 0,
     clf_class: Any = RandomForestClassifier,
-    clf_kwargs: Dict[str, Any] = None,
+    clf_kwargs: Optional[Dict[str, Any]] = None,
 ) -> Tensor:
     """
     Return accuracy of classifier trained to distinguish samples from supposedly two

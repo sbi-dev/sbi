@@ -195,7 +195,7 @@ def accept_reject_sample(
     warn_acceptance: float = 0.01,
     sample_for_correction_factor: bool = False,
     max_sampling_batch_size: int = 10_000,
-    proposal_sampling_kwargs: Dict = {},
+    proposal_sampling_kwargs: Optional[Dict] = None,
     alternative_method: Optional[str] = None,
     **kwargs,
 ) -> Tuple[Tensor, Tensor]:
@@ -267,12 +267,12 @@ def accept_reject_sample(
         if isinstance(proposal, nn.Module):
             candidates = proposal.sample(
                 sampling_batch_size,
-                **proposal_sampling_kwargs,  # type: ignore
+                **proposal_sampling_kwargs or {},  # type: ignore
             ).reshape(sampling_batch_size, -1)
         else:
             candidates = proposal.sample(
-                (sampling_batch_size,),
-                **proposal_sampling_kwargs,  # type: ignore
+                torch.Size((sampling_batch_size,)),
+                **proposal_sampling_kwargs or {},  # type: ignore
             )  # type: ignore
 
         # SNPE-style rejection-sampling when the proposal is the neural net.

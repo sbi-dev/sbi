@@ -39,7 +39,7 @@ def check_prior(prior: Any) -> None:
 
 def process_prior(
     prior: Union[Sequence[Distribution], Distribution, rv_frozen, multi_rv_frozen],
-    custom_prior_wrapper_kwargs: Dict = None,
+    custom_prior_wrapper_kwargs: Optional[Dict] = None,
 ) -> Tuple[Distribution, int, bool]:
     """Return PyTorch distribution-like prior from user-provided prior.
 

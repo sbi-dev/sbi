@@ -6,7 +6,7 @@ import inspect
 import logging
 from copy import deepcopy
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -31,13 +31,13 @@ def plot_summary(
     tags: Optional[List[str]] = None,
     disable_tensorboard_prompt: bool = False,
     tensorboard_scalar_limit: int = 10_000,
-    figsize: List[int] = (20, 6),
+    figsize: Sequence[int] = (20, 6),
     fontsize: float = 12,
     fig: Optional[Figure] = None,
     axes: Optional[Axes] = None,
     xlabel: str = "epochs_trained",
-    ylabel: str = "value",
-    plot_kwargs: Dict[str, Any] = None,
+    ylabel: Optional[List[str]] = None,
+    plot_kwargs: Optional[Dict[str, Any]] = None,
 ) -> Tuple[Figure, Axes]:
     """Plots data logged by the tensorboard summary writer of an inference object.
 
