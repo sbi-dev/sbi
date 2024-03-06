@@ -54,10 +54,10 @@ def warn_if_zscoring_changes_data(x: Tensor, duplicate_tolerance: float = 0.1) -
         if num_unique_z < num_unique * (1 - duplicate_tolerance):
             warnings.warn(
                 """Z-scoring these simulation outputs resulted in {num_unique_z} unique
-                datapoints. Before z-scoring, it had been {num_unique}. This can occur 
-                due to numerical inaccuracies when the data covers a large range of 
-                values. Consider either setting `z_score_x=False` (but beware that this 
-                can be problematic for training the NN) or exclude outliers from your 
+                datapoints. Before z-scoring, it had been {num_unique}. This can occur
+                due to numerical inaccuracies when the data covers a large range of
+                values. Consider either setting `z_score_x=False` (but beware that this
+                can be problematic for training the NN) or exclude outliers from your
                 dataset. Note: if you have already set `z_score_x=False`, this warning
                 will still be displayed, but you can ignore it.""",
                 UserWarning,
@@ -239,7 +239,7 @@ def standardizing_net(
     nan_in_stats = torch.logical_or(torch.isnan(t_mean).any(), torch.isnan(t_std).any())
     assert not nan_in_stats, """Training data mean or std for standardizing net must not
                             contain NaNs. In case you are encoding missing trials with
-                            NaNs, consider setting z_score_x='none' to disable 
+                            NaNs, consider setting z_score_x='none' to disable
                             z-scoring."""
 
     return Standardize(t_mean, t_std)

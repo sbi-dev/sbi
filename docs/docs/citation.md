@@ -1,6 +1,6 @@
 # Citation
 
-If you use `sbi` consider citing the [sbi software paper](https://doi.org/10.21105/joss.02505), in addition to the original research articles describing the specific sbi-algorithm(s) you are using. 
+If you use `sbi` consider citing the [sbi software paper](https://doi.org/10.21105/joss.02505), in addition to the original research articles describing the specific sbi-algorithm(s) you are using.
 
 ```latex
 @article{tejero-cantero2020sbi,

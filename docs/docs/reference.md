@@ -153,7 +153,7 @@
     selection:
       filters: [ "!^_", "^__", "!^__class__" ]
       inherited_members: true
-  
+
 ## Analysis
 
 ::: sbi.analysis.plot.pairplot
