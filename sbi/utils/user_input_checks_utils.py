@@ -40,7 +40,8 @@ class CustomPriorWrapper(Distribution):
 
     def log_prob(self, value) -> Tensor:
         return torch.as_tensor(
-            self.custom_prior.log_prob(value), dtype=self.return_type  # type: ignore
+            self.custom_prior.log_prob(value),
+            dtype=self.return_type,  # type: ignore
         )
 
     def sample(self, sample_shape=torch.Size()) -> Tensor:
@@ -241,9 +242,9 @@ class MultipleIndependent(Distribution):
 
         super().__init__(
             batch_shape=torch.Size([]),  # batch size was ensured to be <= 1 above.
-            event_shape=torch.Size(
-                [self.ndims]
-            ),  # Event shape is the sum of all ndims.
+            event_shape=torch.Size([
+                self.ndims
+            ]),  # Event shape is the sum of all ndims.
             validate_args=validate_args,
         )
 

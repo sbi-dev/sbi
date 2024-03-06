@@ -407,9 +407,7 @@ class SNPE_A_MDN(nn.Module):
                 logits_pp,
                 m_pp,
                 prec_pp,
-            ) = proposal.posterior_estimator._posthoc_correction(
-                proposal.default_x
-            )  # type: ignore
+            ) = proposal.posterior_estimator._posthoc_correction(proposal.default_x)  # type: ignore
             self._logits_pp, self._m_pp, self._prec_pp = (
                 logits_pp.detach(),
                 m_pp.detach(),
@@ -853,10 +851,12 @@ class SNPE_A_MDN(nn.Module):
 
         # Compute for proposal, density estimator, and proposal posterior:
         exponent_pp = utils.batched_mixture_vmv(
-            precisions_pp, means_pp  # m_0 in eq (26) in Appendix C of [1]
+            precisions_pp,
+            means_pp,  # m_0 in eq (26) in Appendix C of [1]
         )
         exponent_d = utils.batched_mixture_vmv(
-            precisions_d, means_d  # m_k in eq (26) in Appendix C of [1]
+            precisions_d,
+            means_d,  # m_k in eq (26) in Appendix C of [1]
         )
         exponent_post = utils.batched_mixture_vmv(
             precisions_post,

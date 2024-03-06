@@ -214,15 +214,15 @@ def calculate_summary_statistics(x):
     )
 
     # concatenation of summary statistics
-    sum_stats_vec = np.concatenate(
-        (
-            np.array([spike_times_stim.shape[0]]),
-            np.array(
-                [rest_pot, rest_pot_std, np.mean(x["data"][(t > t_on) & (t < t_off)])]
-            ),
-            moments,
-        )
-    )
+    sum_stats_vec = np.concatenate((
+        np.array([spike_times_stim.shape[0]]),
+        np.array([
+            rest_pot,
+            rest_pot_std,
+            np.mean(x["data"][(t > t_on) & (t < t_off)]),
+        ]),
+        moments,
+    ))
     sum_stats_vec = sum_stats_vec[0:n_summary]
 
     return sum_stats_vec

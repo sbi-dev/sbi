@@ -397,9 +397,9 @@ def get_simulations_since_round(
         starting_round_index: From which round onwards to return the data. We start
             counting from 0.
     """
-    return torch.cat(
-        [t for t, r in zip(data, data_round_indices) if r >= starting_round_index]
-    )
+    return torch.cat([
+        t for t, r in zip(data, data_round_indices) if r >= starting_round_index
+    ])
 
 
 def mask_sims_from_prior(round_: int, num_simulations: int) -> Tensor:
@@ -594,9 +594,10 @@ def match_theta_and_x_batch_shapes(theta: Tensor, x: Tensor) -> Tuple[Tensor, Te
 
     # Double check: batch size for log prob evaluation must match.
     assert x_repeated.shape == torch.Size([theta_batch_size * x_batch_size, *x_shape])
-    assert theta_repeated.shape == torch.Size(
-        [theta_batch_size * x_batch_size, *theta_shape]
-    )
+    assert theta_repeated.shape == torch.Size([
+        theta_batch_size * x_batch_size,
+        *theta_shape,
+    ])
 
     return theta_repeated, x_repeated
 
@@ -717,7 +718,9 @@ def check_transform(
     use a transforms when using a MultipleIndependent prior with a Dirichlet prior."""
 
     assert torch.allclose(
-        theta, transform(theta_unconstrained), atol=atol  # type: ignore
+        theta,
+        transform(theta_unconstrained),
+        atol=atol,  # type: ignore
     ), "Original and re-transformed parameters must be close to each other."
 
 
@@ -894,9 +897,9 @@ def gradient_ascent(
                 if show_progress_bars:
                     print(
                         "\r",
-                        f"Optimizing MAP estimate. Iterations: {iter_+1} / "
+                        f"Optimizing MAP estimate. Iterations: {iter_ + 1} / "
                         f"{num_iter}. Performance in iteration "
-                        f"{divmod(iter_+1, save_best_every)[0] * save_best_every}: "
+                        f"{divmod(iter_ + 1, save_best_every)[0] * save_best_every}: "
                         f"{best_log_prob_iter.item():.2f} (= unnormalized log-prob)",
                         end="",
                     )
