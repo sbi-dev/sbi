@@ -174,7 +174,8 @@ class MCMCPosterior(NeuralPosterior):
         """
         warn(
             """`.log_prob()` is deprecated for methods that can only evaluate the
-            log-probability up to a normalizing constant. Use `.potential()` instead.""",
+            log-probability up to a normalizing constant. Use `.potential()`
+            instead.""",
             stacklevel=2,
         )
         warn("The log-probability is unnormalized!", stacklevel=2)

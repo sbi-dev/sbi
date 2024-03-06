@@ -39,7 +39,8 @@ class RatioEstimator(NeuralInference, ABC):
         - SNRE_B / SRE can use more than two atoms, potentially boosting performance,
           but allows for posterior evaluation **only up to a normalizing constant**,
           even when training only one round.
-        - BNRE is a variation of SNRE_A aiming to produce more conservative posterior approximations.
+        - BNRE is a variation of SNRE_A aiming to produce more conservative posterior
+          approximations.
         - SNRE_C / NRE-C is a generalization of SNRE_A and SNRE_B which can use multiple
           classes (similar to atoms) but encourages an exact likelihood-to-evidence
           ratio (density evaluation) by introducing an independently drawn class.

@@ -221,7 +221,7 @@ class NeuralPosteriorEnsemble(NeuralPosterior):
             return torch.logsumexp(log_weights.expand_as(log_probs) + log_probs, dim=0)
 
     def set_default_x(self, x: Tensor) -> "NeuralPosterior":
-        r"""Set new default x for `.sample(), .log_prob()` to use as conditioning context.
+        r"""Set new default x for `.sample(), .log_prob()` as conditioning context.
 
         This is a pure convenience to avoid having to repeatedly specify `x` in calls to
         `.sample()` and `.log_prob()` - only θ needs to be passed.
@@ -401,15 +401,12 @@ class EnsemblePotential(BasePotential):
         super().__init__(prior, x_o, device)
 
     def allow_iid_x(self) -> bool:
-        if any(
+        # in case there is different kinds of posteriors, this will produce an error
+        # in `set_x()`
+        return any(
             isinstance(potential, PosteriorBasedPotential)
             for potential in self.potential_fns
-        ):
-            # in case there is different kinds of posteriors, this will produce an error
-            # in `set_x()`
-            return False
-        else:
-            return True
+        )
 
     def set_x(self, x_o: Optional[Tensor]):
         """Check the shape of the observed data and, if valid, set it."""

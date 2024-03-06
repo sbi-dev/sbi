@@ -220,7 +220,7 @@ class VIPosterior(NeuralPosterior):
             self_custom_q_init_cache = deepcopy(q)
             self._q_build_fn = lambda *args, **kwargs: self_custom_q_init_cache
             self._trained_on = None
-        elif isinstance(q, str) or isinstance(q, Callable):
+        elif isinstance(q, (str, Callable)):
             if isinstance(q, str):
                 self._q_build_fn = get_flow_builder(q)
             else:
@@ -450,11 +450,10 @@ class VIPosterior(NeuralPosterior):
                     f"Std: {np.round(float(std_loss), 2)}"
                 )
             # Check for convergence
-            if check_for_convergence and i > min_num_iters:
-                if optimizer.converged():
-                    if show_progress_bar:
-                        print(f"\nConverged with loss: {np.round(float(mean_loss), 2)}")
-                    break
+            if check_for_convergence and i > min_num_iters and optimizer.converged():
+                if show_progress_bar:
+                    print(f"\nConverged with loss: {np.round(float(mean_loss), 2)}")
+                break
         # Training finished:
         self._trained_on = x
 
@@ -571,9 +570,10 @@ class VIPosterior(NeuralPosterior):
     def __deepcopy__(self, memo: Optional[Dict] = None) -> "VIPosterior":
         """This method is called when using `copy.deepcopy` on the object.
 
-        It defines how the object is copied. We need to overwrite this method, since
-        the default implementation does use __getstate__ and __setstate__ which we
-        overwrite to enable pickling (and in particular the necessary modifications are incompatible deep copying).
+        It defines how the object is copied. We need to overwrite this method, since the
+        default implementation does use __getstate__ and __setstate__ which we overwrite
+        to enable pickling (and in particular the necessary modifications are
+        incompatible deep copying).
 
         Args:
             memo (Optional[Dict], optional): Deep copy internal memo. Defaults to None.
@@ -596,8 +596,8 @@ class VIPosterior(NeuralPosterior):
     def __getstate__(self) -> Dict:
         """This method is called when pickling the object.
 
-        It defines what is pickled. We need to overwrite this method,
-        since some parts due not support pickle protocols (e.g. due to local functions, etc.).
+        It defines what is pickled. We need to overwrite this method, since some parts
+        due not support pickle protocols (e.g. due to local functions, etc.).
 
         Returns:
             Dict: All attributes of the VIPosterior.
@@ -611,11 +611,12 @@ class VIPosterior(NeuralPosterior):
     def __setstate__(self, state_dict: Dict):
         """This method is called when unpickling the object.
 
-        Especially, we need to restore the removed attributes and ensure that the
-        object e.g. remains deep copy compatible.
+        Especially, we need to restore the removed attributes and ensure that the object
+        e.g. remains deep copy compatible.
 
         Args:
-            state_dict (Dict): Given state dictionary, we will restore the object from it.
+            state_dict (Dict): Given state dictionary, we will restore the object from
+            it.
         """
         self.__dict__ = state_dict
         q = deepcopy(self._q)

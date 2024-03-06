@@ -206,16 +206,17 @@ class NeuralInference(ABC):
         from.
 
         Args:
-            theta: Parameter sets.
-            x: Simulation outputs.
-            exclude_invalid_x: Whether invalid simulations are discarded during
-                training. If `False`, The inference algorithm raises an error when invalid simulations are
-                found. If `True`, invalid simulations are discarded and training
-                can proceed, but this gives systematically wrong results.
+            theta: Parameter sets. x: Simulation outputs. exclude_invalid_x: Whether
+            invalid simulations are discarded during
+                training. If `False`, The inference algorithm raises an error when
+                invalid simulations are found. If `True`, invalid simulations are
+                discarded and training can proceed, but this gives systematically wrong
+                results.
             from_round: Which round the data stemmed from. Round 0 means from the prior.
-                With default settings, this is not used at all for the inference algorithm. Only when
-                the user later on requests `.train(discard_prior_samples=True)`, we
-                use these indices to find which training data stemmed from the prior.
+                With default settings, this is not used at all for the inference
+                algorithm. Only when the user later on requests
+                `.train(discard_prior_samples=True)`, we use these indices to find which
+                training data stemmed from the prior.
             algorithm: Which algorithm is used. This is used to give a more informative
                 warning or error message when invalid simulations are found.
             data_device: Where to store the data, default is on the same device where
@@ -508,7 +509,7 @@ class NeuralInference(ABC):
         )
         dict_to_save = {}
         unpicklable_attributes = ["_summary_writer", "_build_neural_net"]
-        for key in self.__dict__.keys():
+        for key in self.__dict__:
             if key in unpicklable_attributes:
                 dict_to_save[key] = None
             else:
@@ -585,10 +586,9 @@ def check_if_proposal_has_default_x(proposal: Any):
     If the proposal is a `NeuralPosterior`, we check if the default_x is set and
     if it matches the `_x_o_training_focused_on`.
     """
-    if isinstance(proposal, NeuralPosterior):
-        if proposal.default_x is None:
-            raise ValueError(
-                "`proposal.default_x` is None, i.e. there is no "
-                "x_o for training. Set it with "
-                "`posterior.set_default_x(x_o)`."
-            )
+    if isinstance(proposal, NeuralPosterior) and proposal.default_x is None:
+        raise ValueError(
+            "`proposal.default_x` is None, i.e. there is no "
+            "x_o for training. Set it with "
+            "`posterior.set_default_x(x_o)`."
+        )
