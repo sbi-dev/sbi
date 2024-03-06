@@ -1,40 +1,47 @@
-name: Tests
+name: Continuous Integration
 
 on:
   push:
     branches:
     - main
   pull_request:
-    branches:
-      - main
+  workflow_dispatch:
 
 jobs:
-  build:
+  pre-commit:
+    name: ruff and hooks.
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.8'
+    - uses: pre-commit/action@v3.0.1
+      with:
+        extra_args: --all-files
+
+  test:
     name: Tests
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.8"]
+        torch-version: ["1.11", "2.2"]
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         lfs: true
-
-    - uses: actions/setup-python@v4
+    - uses: actions/setup-python@v5
       with:
-        python-version: '3.9.13'
-        architecture: 'x64'
+        python-version: ${{ matrix.python-version }}
 
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
+        pip install torch==${{ matrix.torch-version }} --extra-index-url https://download.pytorch.org/whl/cpu
         pip install -e .[dev]
-    
-    - name: Check formatting with black
-      run: |
-        black --check sbi tests
-    
-    - name: Check imports with isort
-      run: |
-        isort -c sbi tests
 
     - name: Check types with pyright
       run: |
@@ -45,7 +52,7 @@ jobs:
         pip install torchtestcase
         pip install pytest pytest-cov
         pytest -m "not slow and not gpu" tests/ --cov=sbi --cov-report=xml
-      
+
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
       with:
