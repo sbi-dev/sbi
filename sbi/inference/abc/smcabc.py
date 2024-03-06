@@ -278,7 +278,7 @@ class SMCABC(ABCBASE):
                 unreliable results when used with too few samples and in high
                 dimensions.""",
                 final_particles.shape[0],
-                kde_kwargs["bandwidth"] if "bandwidth" in kde_kwargs else "cv",
+                kde_kwargs.get("bandwidth", "cv"),
             )
             # Maybe get particles weights from last population for weighted KDE.
             if kde_sample_weights:

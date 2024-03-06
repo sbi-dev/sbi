@@ -25,9 +25,6 @@ def process_device(device: str) -> str:
         device: processed string, e.g., "cuda" is mapped to "cuda:0".
     """
 
-    # NOTE: we might want to add support for other devices in the future, e.g., MPS
-    gpu_devices = ["cuda", "gpu"]
-
     if device == "cpu":
         return "cpu"
     else:

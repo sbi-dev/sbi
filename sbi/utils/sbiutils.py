@@ -124,7 +124,7 @@ def z_score_parser(z_score_flag: Optional["str"]) -> Tuple[bool, bool]:
     elif (z_score_flag == "independent") or (z_score_flag == "structured"):
         # Got one of two valid z-scoring methods.
         z_score_bool = True
-        structured_data = True if z_score_flag == "structured" else False
+        structured_data = z_score_flag == "structured"
 
     else:
         # Return warning due to invalid option, defaults to not z-scoring.
@@ -924,11 +924,8 @@ def gradient_ascent(
 def seed_all_backends(seed: Optional[Union[int, Tensor]] = None) -> None:
     """Sets all python, numpy and pytorch seeds."""
 
-    if seed is None:
-        seed = int(torch.randint(1_000_000, size=(1,)))
-    else:
-        # Cast Tensor to int (required by math.random since Python 3.11)
-        seed = int(seed)
+    # Cast Tensor to int (required by math.random since Python 3.11)
+    seed = int(torch.randint(1000000, size=(1,))) if seed is None else int(seed)
 
     random.seed(seed)
     np.random.seed(seed)

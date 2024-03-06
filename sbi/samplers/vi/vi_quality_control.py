@@ -33,10 +33,7 @@ def register_quality_metric(
     """
 
     def _register(cls: Callable) -> Callable:
-        if name is None:
-            cls_name = cls.__name__
-        else:
-            cls_name = name
+        cls_name = cls.__name__ if name is None else name
         if cls_name in _QUALITY_METRIC:
             raise ValueError(f"The metric {cls_name} is already registered")
         else:

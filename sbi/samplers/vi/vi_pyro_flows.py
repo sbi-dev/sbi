@@ -35,10 +35,7 @@ def register_transform(
     """
 
     def _register(cls):
-        if name is None:
-            cls_name = cls.__name__
-        else:
-            cls_name = name
+        cls_name = cls.__name__ if name is None else name
         if cls_name in _TRANSFORMS:
             raise ValueError(f"The transform {cls_name} is already registered")
         else:
@@ -100,10 +97,7 @@ def register_flow_builder(
     """
 
     def _register(cls):
-        if name is None:
-            cls_name = cls.__name__
-        else:
-            cls_name = name
+        cls_name = cls.__name__ if name is None else name
         if cls_name in _FLOW_BUILDERS:
             raise ValueError(f"The flow {cls_name} is not registered as default.")
         else:

@@ -1,7 +1,6 @@
 """Base class for Approximate Bayesian Computation methods."""
 
 import logging
-from abc import ABC
 from typing import Callable, Union
 
 import numpy as np
@@ -13,7 +12,7 @@ from torch import Tensor
 from sbi.simulators.simutils import simulate_in_batches
 
 
-class ABCBASE(ABC):
+class ABCBASE:
     """Base class for Approximate Bayesian Computation methods."""
 
     def __init__(
