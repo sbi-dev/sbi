@@ -115,7 +115,7 @@ def c2st_scores(
     noise_scale: Optional[float] = None,
     verbosity: int = 0,
     clf_class: Any = RandomForestClassifier,
-    clf_kwargs: Dict[str, Any] = {},
+    clf_kwargs: Dict[str, Any] = None,
 ) -> Tensor:
     """
     Return accuracy of classifier trained to distinguish samples from supposedly
@@ -187,7 +187,7 @@ def c2st_scores(
     X = X.cpu().numpy()
     Y = Y.cpu().numpy()
 
-    clf = clf_class(random_state=seed, **clf_kwargs)
+    clf = clf_class(random_state=seed, **clf_kwargs or {})
 
     # prepare data
     data = np.concatenate((X, Y))

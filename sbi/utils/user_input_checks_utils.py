@@ -20,11 +20,11 @@ class CustomPriorWrapper(Distribution):
         batch_shape=torch.Size(),
         event_shape=torch.Size(),
         validate_args=None,
-        arg_constraints: Dict[str, constraints.Constraint] = {},
+        arg_constraints: Optional[Dict[str, constraints.Constraint]] = None,
         lower_bound: Optional[Tensor] = None,
         upper_bound: Optional[Tensor] = None,
     ):
-        self.custom_arg_constraints = arg_constraints
+        self.custom_arg_constraints = arg_constraints or {}
         self.custom_prior = custom_prior
         self.return_type = return_type
 
@@ -111,11 +111,11 @@ class ScipyPytorchWrapper(Distribution):
         batch_shape=torch.Size(),
         event_shape=torch.Size(),
         validate_args=None,
-        arg_constraints: Dict[str, constraints.Constraint] = {},
+        arg_constraints: Optional[Dict[str, constraints.Constraint]] = None,
         lower_bound: Optional[Tensor] = None,
         upper_bound: Optional[Tensor] = None,
     ):
-        self.custom_arg_constraints = arg_constraints
+        self.custom_arg_constraints = arg_constraints or {}
         self.prior_scipy = prior_scipy
         self.return_type = return_type
         self.custom_support = build_support(lower_bound, upper_bound)
@@ -227,7 +227,7 @@ class MultipleIndependent(Distribution):
         self,
         dists: Sequence[Distribution],
         validate_args=None,
-        arg_constraints: Dict[str, constraints.Constraint] = {},
+        arg_constraints: Optional[Dict[str, constraints.Constraint]] = None,
     ):
         self._check_distributions(dists)
         if validate_args is not None:
@@ -239,7 +239,7 @@ class MultipleIndependent(Distribution):
         self.dims_per_dist = [d.sample().numel() for d in self.dists]
 
         self.ndims = int(torch.sum(torch.as_tensor(self.dims_per_dist)).item())
-        self.custom_arg_constraints = arg_constraints
+        self.custom_arg_constraints = arg_constraints or {}
         self.validate_args = validate_args
 
         super().__init__(

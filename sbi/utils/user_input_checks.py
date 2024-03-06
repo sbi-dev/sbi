@@ -39,7 +39,7 @@ def check_prior(prior: Any) -> None:
 
 def process_prior(
     prior: Union[Sequence[Distribution], Distribution, rv_frozen, multi_rv_frozen],
-    custom_prior_wrapper_kwargs: Dict = {},
+    custom_prior_wrapper_kwargs: Dict = None,
 ) -> Tuple[Distribution, int, bool]:
     """Return PyTorch distribution-like prior from user-provided prior.
 
@@ -101,7 +101,7 @@ def process_prior(
 
 
 def process_custom_prior(
-    prior, custom_prior_wrapper_kwargs: Dict = {}
+    prior, custom_prior_wrapper_kwargs: Optional[Dict] = None
 ) -> Tuple[Distribution, int, bool]:
     """Check and return corrected prior object defined by the user.
 
@@ -131,7 +131,7 @@ def process_custom_prior(
 
 
 def maybe_wrap_prior_as_pytorch(
-    prior, custom_prior_wrapper_kwargs: Dict[str, Any] = {}
+    prior, custom_prior_wrapper_kwargs: Optional[Dict[str, Any]] = None
 ) -> Tuple[Distribution, bool]:
     """Check prior return type and maybe wrap as PyTorch.
 
@@ -161,14 +161,16 @@ def maybe_wrap_prior_as_pytorch(
         prior = CustomPriorWrapper(
             custom_prior=prior,
             event_shape=torch.Size([theta.numel()]),
-            **custom_prior_wrapper_kwargs,
+            **custom_prior_wrapper_kwargs or {},
         )
         is_prior_numpy = False
     elif isinstance(theta, ndarray) and isinstance(log_probs, ndarray):
         # infer event shape from single numpy sample.
         event_shape = torch.Size([theta.size])
         prior = CustomPriorWrapper(
-            custom_prior=prior, event_shape=event_shape, **custom_prior_wrapper_kwargs
+            custom_prior=prior,
+            event_shape=event_shape,
+            **custom_prior_wrapper_kwargs or {},
         )
         is_prior_numpy = True
     else:

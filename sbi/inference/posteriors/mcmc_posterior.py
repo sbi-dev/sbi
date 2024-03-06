@@ -50,7 +50,7 @@ class MCMCPosterior(NeuralPosterior):
         warmup_steps: int = 10,
         num_chains: int = 1,
         init_strategy: str = "resample",
-        init_strategy_parameters: Dict[str, Any] = {},
+        init_strategy_parameters: Optional[Dict[str, Any]] = None,
         init_strategy_num_candidates: Optional[int] = None,
         num_workers: int = 1,
         device: Optional[str] = None,
@@ -107,7 +107,7 @@ class MCMCPosterior(NeuralPosterior):
         self.warmup_steps = warmup_steps
         self.num_chains = num_chains
         self.init_strategy = init_strategy
-        self.init_strategy_parameters = init_strategy_parameters
+        self.init_strategy_parameters = init_strategy_parameters or {}
         self.num_workers = num_workers
         self._posterior_sampler = None
         # Hardcode parameter name to reduce clutter kwargs.
@@ -197,7 +197,7 @@ class MCMCPosterior(NeuralPosterior):
         init_strategy: Optional[str] = None,
         init_strategy_parameters: Optional[Dict[str, Any]] = None,
         init_strategy_num_candidates: Optional[int] = None,
-        mcmc_parameters: Dict = {},
+        mcmc_parameters: Optional[Dict] = None,
         mcmc_method: Optional[str] = None,
         sample_with: Optional[str] = None,
         num_workers: Optional[int] = None,
@@ -271,7 +271,7 @@ class MCMCPosterior(NeuralPosterior):
             )
         # The following lines are only for backwards compatibility with sbi v0.17.2 or
         # older.
-        m_p = mcmc_parameters  # define to shorten the variable name
+        m_p = mcmc_parameters or {}  # define to shorten the variable name
         method = _maybe_use_dict_entry(method, "mcmc_method", m_p)
         thin = _maybe_use_dict_entry(thin, "thin", m_p)
         warmup_steps = _maybe_use_dict_entry(warmup_steps, "warmup_steps", m_p)

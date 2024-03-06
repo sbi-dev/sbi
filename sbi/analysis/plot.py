@@ -288,7 +288,7 @@ def pairplot(
     diag: Optional[Union[List[str], str]] = "hist",
     figsize: Tuple = (10, 10),
     labels: Optional[List[str]] = None,
-    ticks: Union[List, torch.Tensor] = [],
+    ticks: Union[List, torch.Tensor] = None,
     upper: Optional[str] = None,
     fig=None,
     axes=None,
@@ -473,7 +473,7 @@ def marginal_plot(
     diag: Optional[str] = "hist",
     figsize: Tuple = (10, 10),
     labels: Optional[List[str]] = None,
-    ticks: Union[List, torch.Tensor] = [],
+    ticks: Union[List, torch.Tensor] = None,
     fig=None,
     axes=None,
     **kwargs,
@@ -537,7 +537,7 @@ def conditional_marginal_plot(
     resolution: int = 50,
     figsize: Tuple = (10, 10),
     labels: Optional[List[str]] = None,
-    ticks: Union[List, torch.Tensor] = [],
+    ticks: Union[List, torch.Tensor] = None,
     fig=None,
     axes=None,
     **kwargs,
@@ -610,7 +610,7 @@ def conditional_pairplot(
     resolution: int = 50,
     figsize: Tuple = (10, 10),
     labels: Optional[List[str]] = None,
-    ticks: Union[List, torch.Tensor] = [],
+    ticks: Union[List, torch.Tensor] = None,
     fig=None,
     axes=None,
     **kwargs,
@@ -950,6 +950,7 @@ def _get_default_opts():
         "samples_colors": plt.rcParams["axes.prop_cycle"].by_key()["color"][0::2],
         "points_colors": plt.rcParams["axes.prop_cycle"].by_key()["color"][1::2],
         # ticks
+        "ticks": [],
         "tickformatter": mpl.ticker.FormatStrFormatter("%g"),  # type: ignore
         "tick_labels": None,
         # options for hist
@@ -1008,7 +1009,7 @@ def sbc_rank_plot(
     fig: Optional[Figure] = None,
     ax: Optional[Axes] = None,
     figsize: Optional[tuple] = None,
-    kwargs: Dict = {},
+    **kwargs,
 ) -> Tuple[Figure, Axes]:
     """Plot simulation-based calibration ranks as empirical CDFs or histograms.
 
@@ -1261,7 +1262,7 @@ def _plot_ranks_as_hist(
     show_legend: bool = False,
     num_ticks: int = 3,
     xlim_offset_factor: float = 0.1,
-    legend_kwargs: dict = {},
+    legend_kwargs: Optional[Dict] = None,
 ) -> None:
     """Plot ranks as histograms on the current axis.
 
@@ -1294,7 +1295,7 @@ def _plot_ranks_as_hist(
     else:
         plt.yticks([])
     if show_legend and ranks_label:
-        plt.legend(loc=1, handlelength=0.8, **legend_kwargs)
+        plt.legend(loc=1, handlelength=0.8, **legend_kwargs or {})
 
     plt.xlim(-xlim_offset, num_posterior_samples + xlim_offset)
     plt.xticks(np.linspace(0, num_posterior_samples, num_ticks))
@@ -1312,7 +1313,7 @@ def _plot_ranks_as_cdf(
     show_ylabel: bool = True,
     show_legend: bool = False,
     num_ticks: int = 3,
-    legend_kwargs: dict = {},
+    legend_kwargs: Optional[Dict] = None,
 ) -> None:
     """Plot ranks as empirical CDFs on the current axis.
 
@@ -1351,7 +1352,7 @@ def _plot_ranks_as_cdf(
         # Plot ticks only
         plt.yticks(np.linspace(0, 1, 3), [])
     if show_legend and ranks_label:
-        plt.legend(loc=2, handlelength=0.8, **legend_kwargs)
+        plt.legend(loc=2, handlelength=0.8, **legend_kwargs or {})
 
     plt.ylim(0, 1)
     plt.xlim(0, num_bins)
