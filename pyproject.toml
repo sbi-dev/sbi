@@ -110,6 +110,13 @@ markers = [
     "gpu: marks tests that require a gpu (deselect with '-m \"not gpu\"')"
 ]
 
+# Pyright configuration
+ [tool.pyright]
+ include = ["sbi", "tests"]
+ exclude = ["**/__pycache__", "**/__node_modules__", ".git", "docs", "examples", "tutorials"]
+ python_version = "3.8"
+ reportUnsupportedDunderAll = false
+
 [tool.setuptools.packages.find]
 where = ["."]  # list of folders that contain the packages (["."] by default)
 include = ["sbi*"]  # package names should match these glob patterns (["*"] by default)
