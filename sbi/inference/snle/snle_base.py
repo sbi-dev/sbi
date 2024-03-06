@@ -267,9 +267,9 @@ class LikelihoodEstimator(NeuralInference, ABC):
         sample_with: str = "mcmc",
         mcmc_method: str = "slice_np",
         vi_method: str = "rKL",
-        mcmc_parameters: Dict[str, Any] = {},
-        vi_parameters: Dict[str, Any] = {},
-        rejection_sampling_parameters: Dict[str, Any] = {},
+        mcmc_parameters: Optional[Dict[str, Any]] = None,
+        vi_parameters: Optional[Dict[str, Any]] = None,
+        rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
     ) -> Union[MCMCPosterior, RejectionPosterior, VIPosterior]:
         r"""Build posterior from the neural density estimator.
 
@@ -333,7 +333,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
                 method=mcmc_method,
                 device=device,
                 x_shape=self._x_shape,
-                **mcmc_parameters,
+                **mcmc_parameters or {},
             )
         elif sample_with == "rejection":
             self._posterior = RejectionPosterior(
@@ -341,7 +341,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
                 proposal=prior,
                 device=device,
                 x_shape=self._x_shape,
-                **rejection_sampling_parameters,
+                **rejection_sampling_parameters or {},
             )
         elif sample_with == "vi":
             self._posterior = VIPosterior(
@@ -351,7 +351,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
                 vi_method=vi_method,
                 device=device,
                 x_shape=self._x_shape,
-                **vi_parameters,
+                **vi_parameters or {},
             )
         else:
             raise NotImplementedError

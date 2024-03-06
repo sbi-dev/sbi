@@ -108,7 +108,7 @@ class CNNEmbedding(nn.Module):
         self,
         input_shape: Tuple,
         in_channels: int = 1,
-        out_channels_per_layer: List = [6, 12],
+        out_channels_per_layer: List = (6, 12),
         num_conv_layers: int = 2,
         num_linear_layers: int = 2,
         num_linear_units: int = 50,

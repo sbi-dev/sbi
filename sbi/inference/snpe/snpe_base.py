@@ -436,10 +436,10 @@ class PosteriorEstimator(NeuralInference, ABC):
         sample_with: str = "direct",
         mcmc_method: str = "slice_np",
         vi_method: str = "rKL",
-        direct_sampling_parameters: Dict[str, Any] = {},
-        mcmc_parameters: Dict[str, Any] = {},
-        vi_parameters: Dict[str, Any] = {},
-        rejection_sampling_parameters: Dict[str, Any] = {},
+        direct_sampling_parameters: Optional[Dict[str, Any]] = None,
+        mcmc_parameters: Optional[Dict[str, Any]] = None,
+        vi_parameters: Optional[Dict[str, Any]] = None,
+        rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
     ) -> Union[MCMCPosterior, RejectionPosterior, VIPosterior, DirectPosterior]:
         r"""Build posterior from the neural density estimator.
 
@@ -505,7 +505,7 @@ class PosteriorEstimator(NeuralInference, ABC):
                 prior=prior,
                 x_shape=self._x_shape,
                 device=device,
-                **direct_sampling_parameters,
+                **direct_sampling_parameters or {},
             )
         elif sample_with == "rejection":
             if "proposal" not in rejection_sampling_parameters:
@@ -520,7 +520,7 @@ class PosteriorEstimator(NeuralInference, ABC):
                 potential_fn=potential_fn,
                 device=device,
                 x_shape=self._x_shape,
-                **rejection_sampling_parameters,
+                **rejection_sampling_parameters or {},
             )
         elif sample_with == "mcmc":
             self._posterior = MCMCPosterior(
@@ -530,7 +530,7 @@ class PosteriorEstimator(NeuralInference, ABC):
                 method=mcmc_method,
                 device=device,
                 x_shape=self._x_shape,
-                **mcmc_parameters,
+                **mcmc_parameters or {},
             )
         elif sample_with == "vi":
             self._posterior = VIPosterior(
@@ -540,7 +540,7 @@ class PosteriorEstimator(NeuralInference, ABC):
                 vi_method=vi_method,
                 device=device,
                 x_shape=self._x_shape,
-                **vi_parameters,
+                **vi_parameters or {},
             )
         else:
             raise NotImplementedError
