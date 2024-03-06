@@ -21,7 +21,7 @@ class StandardizeInputs(nn.Module):
 
     def forward(self, inputs: list) -> Tensor:
         assert (
-            type(inputs) is list and len(inputs) == 2
+            isinstance(inputs, list) and len(inputs) == 2
         ), """Inputs to (s)nre classifier must be a list containing raw theta and x."""
         out = torch.cat(
             [
