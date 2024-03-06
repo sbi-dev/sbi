@@ -12,9 +12,8 @@ import pyknos.nflows.transforms as transforms
 import torch
 import torch.distributions.transforms as torch_tf
 from pyro.distributions import Empirical
-from torch import Tensor
+from torch import Tensor, ones, optim, zeros
 from torch import nn as nn
-from torch import ones, optim, zeros
 from torch.distributions import Distribution, Independent, biject_to, constraints
 
 from sbi import utils as utils
@@ -378,7 +377,7 @@ def check_warn_and_setstate(
         appended warning message.
     """
 
-    if key_name not in state_dict.keys():
+    if key_name not in state_dict:
         state_dict[key_name] = replacement_value
         warning_msg += " `self." + key_name + f" = {str(replacement_value)}`"
     return state_dict, warning_msg

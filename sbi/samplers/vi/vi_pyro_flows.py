@@ -4,7 +4,6 @@ from typing import Callable, Iterable, List, Optional, Type
 
 import torch
 from pyro.distributions import transforms
-from pyro.distributions.torch_transform import TransformModule
 from pyro.nn import AutoRegressiveNN, DenseNN
 from torch import nn
 from torch.distributions import Distribution, Independent, Normal

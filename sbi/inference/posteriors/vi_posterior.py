@@ -16,9 +16,9 @@ from sbi.inference.potentials.base_potential import BasePotential
 from sbi.samplers.vi import (
     adapt_variational_distribution,
     check_variational_distribution,
+    get_VI_method,
     get_flow_builder,
     get_quality_metric,
-    get_VI_method,
     make_object_deepcopy_compatible,
     move_all_tensor_to_device,
 )
