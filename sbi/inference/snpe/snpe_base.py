@@ -505,6 +505,7 @@ class PosteriorEstimator(NeuralInference, ABC):
                 **direct_sampling_parameters or {},
             )
         elif sample_with == "rejection":
+            rejection_sampling_parameters = rejection_sampling_parameters or {}
             if "proposal" not in rejection_sampling_parameters:
                 raise ValueError(
                     "You passed `sample_with='rejection' but you did not specify a "
@@ -517,7 +518,7 @@ class PosteriorEstimator(NeuralInference, ABC):
                 potential_fn=potential_fn,
                 device=device,
                 x_shape=self._x_shape,
-                **rejection_sampling_parameters or {},
+                **rejection_sampling_parameters,
             )
         elif sample_with == "mcmc":
             self._posterior = MCMCPosterior(

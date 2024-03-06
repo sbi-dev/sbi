@@ -684,7 +684,9 @@ def mcmc_transform(
                 # AttributeError -> Custom distribution that has no mean/std attribute.
                 warnings.warn(
                     """The passed prior has no mean or stddev attribute, estimating
-                    them from samples to build affimed standardizing transform."""
+                    them from samples to build affimed standardizing
+                    transform.""",
+                    stacklevel=2,
                 )
                 theta = prior.sample(torch.Size((num_prior_samples_for_zscoring,)))
                 prior_mean = theta.mean(dim=0).to(device)
@@ -724,8 +726,8 @@ def check_transform(
 
     assert torch.allclose(
         theta,
-        transform(theta_unconstrained),
-        atol=atol,  # type: ignore
+        transform(theta_unconstrained),  # type: ignore
+        atol=atol,
     ), "Original and re-transformed parameters must be close to each other."
 
 

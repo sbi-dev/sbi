@@ -19,7 +19,7 @@ from sbi.analysis import eval_conditional_density
 
 try:
     collectionsAbc = collections.abc  # type: ignore
-except:
+except AttributeError:
     collectionsAbc = collections
 
 
@@ -40,9 +40,9 @@ def _update(d, u):
     # https://stackoverflow.com/a/3233356
     for k, v in six.iteritems(u):
         dv = d.get(k, {})
-        if not isinstance(dv, collectionsAbc.Mapping):  # tpye: ignore
+        if not isinstance(dv, collectionsAbc.Mapping):  # type: ignore
             d[k] = v
-        elif isinstance(v, collectionsAbc.Mapping):  # tpye: ignore
+        elif isinstance(v, collectionsAbc.Mapping):  # type: ignore
             d[k] = _update(dv, v)
         else:
             d[k] = v
@@ -285,7 +285,7 @@ def pairplot(
     diag: Optional[Union[List[str], str]] = "hist",
     figsize: Tuple = (10, 10),
     labels: Optional[List[str]] = None,
-    ticks: Union[List, torch.Tensor] = None,
+    ticks: Optional[Union[List, torch.Tensor]] = None,
     upper: Optional[str] = None,
     fig=None,
     axes=None,
@@ -470,7 +470,7 @@ def marginal_plot(
     diag: Optional[str] = "hist",
     figsize: Tuple = (10, 10),
     labels: Optional[List[str]] = None,
-    ticks: Union[List, torch.Tensor] = None,
+    ticks: Optional[Union[List, torch.Tensor]] = None,
     fig=None,
     axes=None,
     **kwargs,
@@ -534,7 +534,7 @@ def conditional_marginal_plot(
     resolution: int = 50,
     figsize: Tuple = (10, 10),
     labels: Optional[List[str]] = None,
-    ticks: Union[List, torch.Tensor] = None,
+    ticks: Optional[Union[List, torch.Tensor]] = None,
     fig=None,
     axes=None,
     **kwargs,
@@ -607,7 +607,7 @@ def conditional_pairplot(
     resolution: int = 50,
     figsize: Tuple = (10, 10),
     labels: Optional[List[str]] = None,
-    ticks: Union[List, torch.Tensor] = None,
+    ticks: Optional[Union[List, torch.Tensor]] = None,
     fig=None,
     axes=None,
     **kwargs,
