@@ -350,33 +350,33 @@ def check_prior_attributes(prior) -> None:
     num_samples = 2
     try:
         theta = prior.sample((num_samples,))
-    except AttributeError:
+    except AttributeError as err:
         raise AttributeError(
             "Prior needs method `.sample()`. Consider using a PyTorch distribution."
-        )
-    except TypeError:
+        ) from err
+    except TypeError as err:
         raise TypeError(
             f"""The `prior.sample()` method must accept Tuple arguments, e.g.,
             prior.sample(({num_samples}, )) to sample a batch of 2 parameters. Consider
             using a PyTorch distribution."""
-        )
-    except Exception:  # Catch any other error.
+        ) from err
+    except Exception as err:  # Catch any other error.
         raise ValueError(
             f"""Something went wrong when sampling a batch of parameters
             from the prior as `prior.sample(({num_samples}, ))`. Consider using a
             PyTorch distribution."""
-        )
+        ) from err
     try:
         prior.log_prob(theta)
-    except AttributeError:
+    except AttributeError as err:
         raise AttributeError(
             "Prior needs method `.log_prob()`. Consider using a PyTorch distribution."
-        )
-    except Exception:  # Catch any other error.
+        ) from err
+    except Exception as err:  # Catch any other error.
         raise ValueError(
             """Something went wrong when evaluating a batch of parameters theta
             with `prior.log_prob(theta)`. Consider using a PyTorch distribution."""
-        )
+        ) from err
 
 
 def check_prior_return_type(
@@ -424,11 +424,11 @@ def check_prior_support(prior):
 
     try:
         within_support(prior, prior.sample((1,)))
-    except NotImplementedError:
+    except NotImplementedError as err:
         raise NotImplementedError(
             """The prior must implement the support property or allow to call
             .log_prob() outside of support."""
-        )
+        ) from err
 
 
 def check_embedding_net_device(embedding_net: nn.Module, datum: torch.Tensor) -> None:
@@ -764,4 +764,4 @@ def test_posterior_net_for_multi_d_x(net: flows.Flow, theta: Tensor, x: Tensor) 
         else:
             message = ""
 
-        raise RuntimeError(rte, message)
+        raise RuntimeError(message) from rte

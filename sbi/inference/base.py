@@ -69,10 +69,10 @@ def infer(
 
     try:
         method_fun: Callable = getattr(sbi.inference, method.upper())
-    except AttributeError:
+    except AttributeError as err:
         raise NameError(
             "Method not available. `method` must be one of 'SNPE', 'SNLE', 'SNRE'."
-        )
+        ) from err
 
     simulator, prior = prepare_for_sbi(simulator, prior)
 
