@@ -107,7 +107,7 @@ def z_score_parser(z_score_flag: Optional["str"]) -> Tuple[bool, bool]:
     Returns:
         Flag for whether or not to z-score, and whether data is structured
     """
-    if type(z_score_flag) is bool:
+    if isinstance(z_score_flag, bool):
         # Raise warning if boolean was passed.
         warnings.warn(
             "Boolean flag for z-scoring is deprecated as of sbi v0.18.0. It will be "

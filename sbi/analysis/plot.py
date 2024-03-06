@@ -147,11 +147,11 @@ def prepare_for_plot(samples, limits):
     """
 
     # Prepare samples
-    if type(samples) != list:
+    if not isinstance(samples, list):
         samples = ensure_numpy(samples)
         samples = [samples]
     else:
-        for i, sample_pack in enumerate(samples):
+        for i, _ in enumerate(samples):
             samples[i] = ensure_numpy(samples[i])
 
     # Dimensionality of the problem.
@@ -170,10 +170,7 @@ def prepare_for_plot(samples, limits):
                 max = max_ if max_ > max else max
             limits.append([min, max])
     else:
-        if len(limits) == 1:
-            limits = [limits[0] for _ in range(dim)]
-        else:
-            limits = limits
+        limits = [limits[0] for _ in range(dim)] if len(limits) == 1 else limits
     limits = torch.as_tensor(limits)
     return samples, dim, limits
 
@@ -230,7 +227,7 @@ def get_diag_func(samples, limits, opts, **kwargs):
                         ys,
                         color=opts["samples_colors"][n],
                     )
-                elif "offdiag" in opts.keys() and opts["offdiag"][n] == "scatter":
+                elif "offdiag" in opts and opts["offdiag"][n] == "scatter":
                     for single_sample in v:
                         plt.axvline(
                             single_sample[row],
@@ -348,9 +345,9 @@ def pairplot(
         opts["offdiag"] = opts["upper"]
 
     # Prepare diag/upper/lower
-    if type(opts["diag"]) is not list:
+    if not isinstance(opts["diag"], list):
         opts["diag"] = [opts["diag"] for _ in range(len(samples))]
-    if type(opts["offdiag"]) is not list:
+    if not isinstance(opts["offdiag"], list):
         opts["offdiag"] = [opts["offdiag"] for _ in range(len(samples))]
     # if type(opts['lower']) is not list:
     #    opts['lower'] = [opts['lower'] for _ in range(len(samples))]
@@ -516,7 +513,7 @@ def marginal_plot(
     samples, dim, limits = prepare_for_plot(samples, limits)
 
     # Prepare diag/upper/lower
-    if type(opts["diag"]) is not list:
+    if not isinstance(opts["diag"], list):
         opts["diag"] = [opts["diag"] for _ in range(len(samples))]
 
     diag_func = get_diag_func(samples, limits, opts, **kwargs)
@@ -734,7 +731,7 @@ def _arrange_plots(
     # Prepare points
     if points is None:
         points = []
-    if type(points) != list:
+    if not isinstance(points, list):
         points = ensure_numpy(points)  # type: ignore
         points = [points]
     points = [np.atleast_2d(p) for p in points]
@@ -763,9 +760,9 @@ def _arrange_plots(
         rows = cols = dim
         subset = [i for i in range(dim)]
     else:
-        if type(subset) == int:
+        if isinstance(subset, int):
             subset = [subset]
-        elif type(subset) == list:
+        elif isinstance(subset, list):
             pass
         else:
             raise NotImplementedError
@@ -1155,10 +1152,7 @@ def _sbc_rank_plot(
             assert (
                 ax.size >= num_parameters
             ), "There must be at least as many subplots as parameters."
-            if ax.ndim > 1:
-                num_rows = ax.shape[0]
-            else:
-                num_rows = 1
+            num_rows = ax.shape[0] if ax.ndim > 1 else 1
         assert ax is not None
 
         col_idx, row_idx = 0, 0
