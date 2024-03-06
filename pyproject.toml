@@ -80,8 +80,10 @@ line-length = 88
 [tool.ruff.lint]
 # pycodestyle, Pyflakes, pyupgrade, flake8-bugbear, flake8-simplify, isort
 select = ["E", "F", "W", "B", "SIM", "I"]
-
-ignore = ["E731"]  # allow using lambda functions
+ignore = [
+    "E731",  # allow using lambda functions
+    "B008",  # allow function calls in default args.
+]
 
 [tool.ruff.lint.extend-per-file-ignores]
 "__init__.py" = ["E402", "F401", "F403"]  # allow unused imports and undefined names
