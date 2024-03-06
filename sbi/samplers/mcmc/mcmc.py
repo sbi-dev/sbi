@@ -118,7 +118,8 @@ class MCMC(BaseMCMC):
                     "num_chains={} is more than available_cpu={}. "
                     "Chains will be drawn sequentially.".format(
                         num_chains, available_cpu
-                    )
+                    ),
+                    stacklevel=2,
                 )
         else:
             if initial_params:

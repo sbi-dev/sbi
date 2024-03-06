@@ -56,12 +56,14 @@ def run_sbc(
     if num_sbc_samples < 1000:
         warnings.warn(
             """Number of SBC samples should be on the order of 100s to give realiable
-            results. We recommend using 300."""
+            results. We recommend using 300.""",
+            stacklevel=2,
         )
     if num_posterior_samples < 100:
         warnings.warn(
             """Number of posterior samples for ranking should be on the order
-            of 100s to give reliable SBC results. We recommend using at least 300."""
+            of 100s to give reliable SBC results. We recommend using at least 300.""",
+            stacklevel=2,
         )
 
     assert (
@@ -229,7 +231,8 @@ def get_nltp(thetas: Tensor, xs: Tensor, posterior: NeuralPosterior) -> Tensor:
     if unnormalized_log_prob:
         warnings.warn(
             """Note that log probs of the true parameters under the posteriors
-        are not normalized because the posterior used is likelihood-based."""
+        are not normalized because the posterior used is likelihood-based.""",
+            stacklevel=2,
         )
 
     return nltp
@@ -263,7 +266,8 @@ def check_sbc(
         warnings.warn(
             """You are computing SBC checks with less than 100 samples. These checks
             should be based on a large number of test samples theta_o, x_o. We
-            recommend using at least 100."""
+            recommend using at least 100.""",
+            stacklevel=2,
         )
 
     ks_pvals = check_uniformity_frequentist(ranks, num_posterior_samples)
@@ -360,7 +364,8 @@ def check_uniformity_c2st(
         warnings.warn(
             f"""C2ST score variability is larger than {0.05}: std={c2st_scores.std(0)},
             result may be unreliable. Consider increasing the number of samples.
-            """
+            """,
+            stacklevel=2,
         )
 
     # Return the mean over repetitions as c2st score estimate.

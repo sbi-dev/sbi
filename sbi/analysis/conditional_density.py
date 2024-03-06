@@ -211,7 +211,7 @@ class ConditionedMDN:
         )
         self.prec = self.precfs.transpose(3, 2) @ self.precfs
 
-    def sample(self, sample_shape: Shape = torch.Size()) -> Tensor:
+    def sample(self, sample_shape: Shape) -> Tensor:
         num_samples = torch.Size(sample_shape).numel()
         samples = mdn.sample_mog(num_samples, self.logits, self.means, self.precfs)
         return samples.detach().reshape((*sample_shape, -1))
@@ -244,7 +244,8 @@ def conditonal_potential(
     """
     warn(
         "The misspelled function `conditonal_potential` will be removed in a future "
-        "release of sbi. Please use `conditional_potential` (spelled correctly)."
+        "release of sbi. Please use `conditional_potential` (spelled correctly).",
+        stacklevel=2,
     )
     return conditional_potential(
         potential_fn, theta_transform, prior, condition, dims_to_sample

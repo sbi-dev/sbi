@@ -60,7 +60,10 @@ def build_made(
     y_numel = embedding_net(batch_y[:1]).numel()
 
     if x_numel == 1:
-        warn("In one-dimensional output space, this flow is limited to Gaussians")
+        warn(
+            "In one-dimensional output space, this flow is limited to Gaussians",
+            stacklevel=2,
+        )
 
     transform = transforms.IdentityTransform()
 
@@ -139,7 +142,10 @@ def build_maf(
     y_numel = embedding_net(batch_y[:1]).numel()
 
     if x_numel == 1:
-        warn("In one-dimensional output space, this flow is limited to Gaussians")
+        warn(
+            "In one-dimensional output space, this flow is limited to Gaussians",
+            stacklevel=2,
+        )
 
     transform_list = []
     for _ in range(num_transforms):
@@ -243,7 +249,10 @@ def build_maf_rqs(
     y_numel = embedding_net(batch_y[:1]).numel()
 
     if x_numel == 1:
-        warn("In one-dimensional output space, this flow is limited to Gaussians")
+        warn(
+            "In one-dimensional output space, this flow is limited to Gaussians",
+            stacklevel=2,
+        )
 
     transform_list = []
     for _ in range(num_transforms):
