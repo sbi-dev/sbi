@@ -245,8 +245,9 @@ class NeuralPosterior(ABC):
         return self._map
 
     def __repr__(self):
-        desc = f"""{self.__class__.__name__} sampler for potential_fn=<{self.
-                potential_fn.__class__.__name__}>"""
+        desc = f"""{self.__class__.__name__} sampler for potential_fn=<{
+            self.potential_fn.__class__.__name__
+        }>"""
         return desc
 
     def __str__(self):

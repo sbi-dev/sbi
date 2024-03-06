@@ -749,7 +749,7 @@ def test_posterior_net_for_multi_d_x(net: flows.Flow, theta: Tensor, x: Tensor) 
     except RuntimeError as rte:
         ndims = x.ndim
         if ndims > 2:
-            message = f"""Debug hint: The simulated data x has {ndims-1} dimensions.
+            message = f"""Debug hint: The simulated data x has {ndims - 1} dimensions.
             With default settings, sbi cannot deal with multidimensional simulations.
             Make sure to use an embedding net that reduces the dimensionality, e.g., a
             CNN in case of images, or change the simulator to return one-dimensional x.

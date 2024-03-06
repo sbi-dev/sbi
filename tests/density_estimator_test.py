@@ -58,7 +58,7 @@ def test_api_density_estimator(density_estimator, input_dims, condition_shape):
     assert loss.shape == (
         nsamples,
     ), f"Loss shape is not correct. It is of shape {loss.shape}, but should \
-        be {(nsamples, )}"
+        be {(nsamples,)}"
 
     # Sample and log_prob should work for batched and unbatched contexts
 
@@ -73,7 +73,7 @@ def test_api_density_estimator(density_estimator, input_dims, condition_shape):
     assert log_probs.shape == (
         nsamples_test,
     ), f"log_prob shape is not correct. It is of shape {log_probs.shape}, but should \
-        be {(nsamples_test, )}"
+        be {(nsamples_test,)}"
 
     samples = estimator.sample((1, nsamples_test), batch_context[0])
     assert samples.shape == (
@@ -145,7 +145,7 @@ def test_api_density_estimator(density_estimator, input_dims, condition_shape):
         nsamples_test,
         input_dims,
     ), f"Samples shape is not correct. It is of shape {samples.shape}, but should \
-        be {(1,batch_context.shape[0],2,nsamples_test,input_dims)}"
+        be {(1, batch_context.shape[0], 2, nsamples_test, input_dims)}"
     try:
         log_probs = estimator.log_prob(samples, batch_context.unsqueeze(0))
     except RuntimeError:
@@ -169,7 +169,7 @@ def test_api_density_estimator(density_estimator, input_dims, condition_shape):
     assert log_probs.shape == (
         nsamples_test,
     ), f"log_prob shape is not correct. It is of shape {log_probs.shape}, but should \
-        be {(nsamples_test, )}"
+        be {(nsamples_test,)}"
 
     samples, log_probs = estimator.sample_and_log_prob((nsamples_test,), batch_context)
 
@@ -199,11 +199,11 @@ def test_api_density_estimator(density_estimator, input_dims, condition_shape):
         nsamples_test,
         input_dims,
     ), f"Samples shape is not correct. It is of shape {samples.shape}, but should \
-        be {(1,batch_context.shape[0],2,nsamples_test,input_dims)}"
+        be {(1, batch_context.shape[0], 2, nsamples_test, input_dims)}"
     assert log_probs.shape == (
         1,
         batch_context.shape[0],
         2,
         nsamples_test,
     ), f"log_prob shape is not correct. It is of shape {log_probs.shape}, but should \
-        be {(1,batch_context.shape[0],2,nsamples_test)}"
+        be {(1, batch_context.shape[0], 2, nsamples_test)}"

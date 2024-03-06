@@ -148,8 +148,9 @@ class MNLE(LikelihoodEstimator):
 
         assert isinstance(
             likelihood_estimator, MixedDensityEstimator
-        ), f"""net must be of type MixedDensityEstimator but is {type
-            (likelihood_estimator)}."""
+        ), f"""net must be of type MixedDensityEstimator but is {
+            type(likelihood_estimator)
+        }."""
 
         (
             potential_fn,

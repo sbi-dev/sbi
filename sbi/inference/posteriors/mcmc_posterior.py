@@ -534,7 +534,8 @@ class MCMCPosterior(NeuralPosterior):
         )
         sampler.run()
         samples = next(iter(sampler.get_samples().values())).reshape(
-            -1, initial_params.shape[1]  # .shape[1] = dim of theta
+            -1,
+            initial_params.shape[1],  # .shape[1] = dim of theta
         )
 
         # Save posterior sampler.
@@ -695,9 +696,9 @@ class MCMCPosterior(NeuralPosterior):
                 *samples_shape
             )
 
-            inference_data = az.convert_to_inference_data(
-                {f"{self.param_name}": samples}
-            )
+            inference_data = az.convert_to_inference_data({
+                f"{self.param_name}": samples
+            })
 
         return inference_data
 

@@ -99,16 +99,19 @@ class NFlowsFlow(DensityEstimator):
         if len(condition.shape) == condition_dims:
             # nflows.sample() expects conditions to be batched.
             condition = condition.unsqueeze(0)
-            samples = self.net.sample(num_samples, context=condition).reshape(
-                (*sample_shape, -1)
-            )
+            samples = self.net.sample(num_samples, context=condition).reshape((
+                *sample_shape,
+                -1,
+            ))
         else:
             # For batched conditions, we need to reshape the conditions and the samples
             batch_shape = condition.shape[:-condition_dims]
             condition = condition.reshape(-1, *self._condition_shape)
-            samples = self.net.sample(num_samples, context=condition).reshape(
-                (*batch_shape, *sample_shape, -1)
-            )
+            samples = self.net.sample(num_samples, context=condition).reshape((
+                *batch_shape,
+                *sample_shape,
+                -1,
+            ))
 
         return samples
 

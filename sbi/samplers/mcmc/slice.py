@@ -154,20 +154,16 @@ class Slice(MCMCKernel):
         def _log_prob_d(x):
             assert self.potential_fn is not None, "Chain not initialized."
 
-            return -self.potential_fn(
-                {
-                    self._site_name: torch.cat(
-                        (
-                            params[self._site_name].view(-1)[:dim],
-                            x.reshape(1),
-                            params[self._site_name].view(-1)[dim + 1 :],
-                        )
-                    ).unsqueeze(
-                        0
-                    )  # TODO: The unsqueeze seems to give a speed up, figure out when
-                    # this is the case exactly
-                }
-            )
+            return -self.potential_fn({
+                self._site_name: torch.cat((
+                    params[self._site_name].view(-1)[:dim],
+                    x.reshape(1),
+                    params[self._site_name].view(-1)[dim + 1 :],
+                )).unsqueeze(
+                    0
+                )  # TODO: The unsqueeze seems to give a speed up, figure out when
+                # this is the case exactly
+            })
 
         assert (
             self._site_name is not None and self._width is not None

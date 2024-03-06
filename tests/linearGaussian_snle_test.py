@@ -236,12 +236,10 @@ def test_map_with_multiple_independent_prior(use_transform):
     """Test whether map works with multiple independent priors, see issue #841, #650."""
 
     dim = 2
-    prior, *_ = process_prior(
-        [
-            BoxUniform(low=-ones(dim), high=ones(dim)),
-            HalfNormal(scale=ones(1) * 2),
-        ]
-    )
+    prior, *_ = process_prior([
+        BoxUniform(low=-ones(dim), high=ones(dim)),
+        HalfNormal(scale=ones(1) * 2),
+    ])
 
     def simulator(theta):
         return theta[:, 2:] * torch.randn_like(theta[:, :2]) + theta[:, :2]
