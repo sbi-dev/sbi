@@ -179,7 +179,7 @@ def _get_event_data_from_log_dir(
                 # attribute.
                 _type = type(data[0])
                 for attribute in inspect.getfullargspec(_type).args:
-                    if not attribute.startswith("_") and not attribute == "self":
+                    if not attribute.startswith("_") and attribute != "self":
                         if attribute not in all_event_data[tag_type][tag]:
                             all_event_data[tag_type][tag][attribute] = []
                         for datapoint in data:

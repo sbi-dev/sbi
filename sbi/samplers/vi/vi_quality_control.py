@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Callable, Optional, Tuple
 
-import numpy as np
 import torch
 from torch import Size
 from torch.distributions import Distribution

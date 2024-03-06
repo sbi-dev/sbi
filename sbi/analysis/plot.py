@@ -808,9 +808,7 @@ def _arrange_plots(
             else:
                 col_idx += 1
 
-            if flat:
-                current = "diag"
-            elif row == col:
+            if flat or row == col:
                 current = "diag"
             elif row < col:
                 current = "offdiag"

@@ -508,7 +508,7 @@ class PosteriorEstimator(NeuralInference, ABC):
                 **direct_sampling_parameters,
             )
         elif sample_with == "rejection":
-            if "proposal" not in rejection_sampling_parameters.keys():
+            if "proposal" not in rejection_sampling_parameters:
                 raise ValueError(
                     "You passed `sample_with='rejection' but you did not specify a "
                     "`proposal` in `rejection_sampling_parameters`. Until sbi "

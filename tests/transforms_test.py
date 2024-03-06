@@ -4,7 +4,6 @@ from torch import eye, ones, zeros
 from torch.distributions import Exponential, LogNormal, MultivariateNormal, Uniform
 from torch.distributions.transforms import (
     AffineTransform,
-    ComposeTransform,
     ExpTransform,
     IndependentTransform,
     SigmoidTransform,

@@ -6,13 +6,12 @@ from __future__ import annotations
 from contextlib import nullcontext
 from typing import Tuple
 
-import numpy as np
 import pytest
 import torch
 import torch.distributions.transforms as torch_tf
 import torch.nn as nn
 from torch import eye, ones, zeros
-from torch.distributions import Distribution, MultivariateNormal
+from torch.distributions import MultivariateNormal
 
 from sbi import utils as utils
 from sbi.inference import (
