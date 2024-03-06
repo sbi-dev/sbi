@@ -107,7 +107,8 @@ class SliceSampler(MCMCSampler):
         order = list(range(self.n_dims))
         L_trace = []
         samples = np.empty([int(n_samples), int(self.n_dims)])
-        logger = open(os.devnull, "w") if logger is None else logger
+        with open(os.devnull, "w") as devnull:
+            logger = devnull if logger is None else logger
 
         if self.width is None:
             # logger.write('tuning bracket width...\n')

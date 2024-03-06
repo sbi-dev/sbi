@@ -725,5 +725,5 @@ def _maybe_use_dict_entry(default: Any, key: str, dict_to_check: Dict) -> Any:
     Returns:
         The potentially replaced value.
     """
-    attribute = default if key not in dict_to_check else dict_to_check[key]
+    attribute = dict_to_check.get(key, default)
     return attribute

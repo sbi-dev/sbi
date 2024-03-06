@@ -366,10 +366,7 @@ def register_VI_method(
     """
 
     def _register(cls: "DivergenceOptimizer") -> "DivergenceOptimizer":
-        if name is None:
-            cls_name = cls.__class__.__name__
-        else:
-            cls_name = name
+        cls_name = cls.__class__.__name__ if name is None else name
         if cls_name in _VI_method:
             raise ValueError(f"The VI method {cls_name} is already registered")
         else:

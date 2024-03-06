@@ -52,10 +52,7 @@ def build_mnle(
     """
 
     check_data_device(batch_x, batch_y)
-    if z_score_y == "independent":
-        embedding = standardizing_net(batch_y)
-    else:
-        embedding = None
+    embedding = standardizing_net(batch_y) if z_score_y == "independent" else None
 
     warnings.warn(
         """The mixed neural likelihood estimator assumes that x contains
