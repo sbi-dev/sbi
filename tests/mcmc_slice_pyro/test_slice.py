@@ -138,7 +138,7 @@ def jit_idfn(param):
 
 
 @pytest.mark.parametrize(
-    "fixture, num_samples, warmup_steps, expected_means, expected_precs, mean_tol, std_tol",
+    T._fields,
     TEST_CASES,
     ids=TEST_IDS,
 )

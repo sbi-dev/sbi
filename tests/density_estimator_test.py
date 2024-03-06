@@ -40,7 +40,7 @@ def test_api_density_estimator(density_estimator, input_dims, condition_shape):
 
     class EmbeddingNet(torch.nn.Module):
         def forward(self, x):
-            for i in range(len(condition_shape) - 1):
+            for _ in range(len(condition_shape) - 1):
                 x = torch.sum(x, dim=-1)
             return x
 
@@ -116,11 +116,10 @@ def test_api_density_estimator(density_estimator, input_dims, condition_shape):
     except RuntimeError:
         # Shapes (10,) and (5,) are not broadcastable, so we expect a ValueError
         pass
-    except:
-        assert (
-            False
-        ), f"Expected RuntimeError as shapes {batch_context.shape} and {samples.shape} \
-            are not broadcastable, but got a different/no error."
+    except Exception as err:
+        raise AssertionError(f"Expected RuntimeError as shapes {batch_context.shape} \
+                             and {samples.shape} are not broadcastable, but got a \
+                             different/no error.") from err
 
     samples = estimator.sample((nsamples_test,), batch_context[0].unsqueeze(0))
     assert samples.shape == (
@@ -151,11 +150,10 @@ def test_api_density_estimator(density_estimator, input_dims, condition_shape):
     except RuntimeError:
         # Shapes (10,) and (5,) are not broadcastable, so we expect a ValueError
         pass
-    except:
-        assert (
-            False
-        ), f"Expected RuntimeError as shapes {batch_context.shape} and {samples.shape} \
-            are not broadcastable, but got a different/no error."
+    except Exception as err:
+        raise AssertionError(f"Expected RuntimeError as shapes {batch_context.shape} \
+                            and {samples.shape} are not broadcastable, but got a \
+                            different/no error.") from err
 
     # Sample and log_prob work for batched and unbatched contexts
     samples, log_probs = estimator.sample_and_log_prob(

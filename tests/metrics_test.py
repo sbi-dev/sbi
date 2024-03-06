@@ -22,7 +22,8 @@ TESTCASECONFIG = [
         0.55,  # c2st_upperbound
     ),
     (
-        # both samples are rather close, the mean accuracy should be larger than 0.5 and be lower than 1.
+        # both samples are rather close, the mean accuracy should be larger than 0.5 and
+        # be lower than 1.
         1.0,
         0.85,
         1.0,
