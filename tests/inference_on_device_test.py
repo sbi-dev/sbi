@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from contextlib import nullcontext
-from typing import Tuple
+from typing import Optional, Tuple
 
 import pytest
 import torch
@@ -249,7 +249,7 @@ def test_validate_theta_and_x_tensor() -> None:
     x = torch.empty((1, 1))
     theta = torch.ones((1, 1)).tolist()
 
-    with pytest.raises(Exception):
+    with pytest.raises(AssertionError):
         validate_theta_and_x(theta, x, training_device="cpu")
 
 
@@ -258,7 +258,7 @@ def test_validate_theta_and_x_type() -> None:
     x = torch.empty((1, 1))
     theta = torch.empty((1, 1), dtype=int)
 
-    with pytest.raises(Exception):
+    with pytest.raises(AssertionError):
         validate_theta_and_x(theta, x, training_device="cpu")
 
 

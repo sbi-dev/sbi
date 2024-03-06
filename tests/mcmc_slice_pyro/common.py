@@ -17,10 +17,11 @@ from numpy.testing import assert_allclose
 from pytest import approx
 
 """
-Contains test utilities for assertions, approximate comparison (of tensors and other objects).
+Contains test utilities for assertions, approximate comparison (of tensors and other
+objects).
 
-Code has been largely adapted from pytorch/test/common.py
-Source: https://github.com/pytorch/pytorch/blob/master/test/common.py
+Code has been largely adapted from pytorch/test/common.py Source:
+https://github.com/pytorch/pytorch/blob/master/test/common.py
 """
 
 TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
