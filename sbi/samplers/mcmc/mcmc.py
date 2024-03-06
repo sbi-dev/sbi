@@ -85,12 +85,12 @@ class MCMC(BaseMCMC):
         if (
             isinstance(self.kernel, (HMC, NUTS))
             and self.kernel.potential_fn is not None
+            and initial_params is None
         ):
-            if initial_params is None:
-                raise ValueError(
-                    "Must provide valid initial parameters to begin sampling"
-                    " when using `potential_fn` in HMC/NUTS kernel."
-                )
+            raise ValueError(
+                "Must provide valid initial parameters to begin sampling"
+                " when using `potential_fn` in HMC/NUTS kernel."
+            )
         parallel = False
         if num_chains > 1:
             # check that initial_params is different for each chain
@@ -101,13 +101,13 @@ class MCMC(BaseMCMC):
                             "The leading dimension of tensors in `initial_params` "
                             "must match the number of chains."
                         )
-                # FIXME: probably we want to use "spawn" method by default to avoid the error
-                # CUDA initialization error https://github.com/pytorch/pytorch/issues/2517
-                # even that we run MCMC in CPU.
-                if mp_context is None:
-                    # change multiprocessing context to 'spawn' for CUDA tensors.
-                    if list(initial_params.values())[0].is_cuda:
-                        mp_context = "spawn"
+                # FIXME: probably we want to use "spawn" method by default to avoid the
+                # error CUDA initialization error
+                # https://github.com/pytorch/pytorch/issues/2517 even that we run MCMC
+                # in CPU.
+                # change multiprocessing context to 'spawn' for CUDA tensors.
+                if mp_context is None and list(initial_params.values())[0].is_cuda:
+                    mp_context = "spawn"
 
             # verify num_chains is compatible with available CPU.
             available_cpu = max(available_cpu, 1)

@@ -277,8 +277,8 @@ class SliceSamplerSerial:
             tqdm(
                 range(num_chains),  # type: ignore
                 disable=not self.verbose or self.num_workers == 1,
-                desc=f"""Running {self.num_chains} MCMC chains with
-                      {self.num_workers} worker{"s" if self.num_workers > 1 else ""}.""",
+                desc=f"""Running {self.num_chains} MCMC chains with {self.num_workers}
+                    worker(s).""",
                 total=self.num_chains,
             )
         ):
@@ -555,9 +555,8 @@ class SliceSamplerVectorized:
                                 self.state[c]["order"] = list(range(self.n_dims))
                                 self.rng.shuffle(self.state[c]["order"])
 
-                                if self.verbose:
-                                    if sc["t"] % 10 == 0:
-                                        pbar.update(10)  # type: ignore
+                                if self.verbose and sc["t"] % 10 == 0:
+                                    pbar.update(10)  # type: ignore
 
                         else:
                             sc["state"] = "DONE"
