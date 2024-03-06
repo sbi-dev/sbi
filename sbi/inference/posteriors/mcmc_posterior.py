@@ -117,7 +117,8 @@ class MCMCPosterior(NeuralPosterior):
             warn(
                 """Passing `init_strategy_num_candidates` is deprecated as of sbi
                 v0.19.0. Instead, use e.g.,
-                `init_strategy_parameters={"num_candidate_samples": 1000}`"""
+                `init_strategy_parameters={"num_candidate_samples": 1000}`""",
+                stacklevel=2,
             )
             self.init_strategy_parameters["num_candidate_samples"] = (
                 init_strategy_num_candidates
@@ -173,9 +174,10 @@ class MCMCPosterior(NeuralPosterior):
         """
         warn(
             """`.log_prob()` is deprecated for methods that can only evaluate the
-            log-probability up to a normalizing constant. Use `.potential()` instead."""
+            log-probability up to a normalizing constant. Use `.potential()` instead.""",
+            stacklevel=2,
         )
-        warn("The log-probability is unnormalized!")
+        warn("The log-probability is unnormalized!", stacklevel=2)
 
         self.potential_fn.set_x(self._x_else_default_x(x))
 
@@ -239,7 +241,8 @@ class MCMCPosterior(NeuralPosterior):
             warn(
                 """Passing `init_strategy_num_candidates` is deprecated as of sbi
                 v0.19.0. Instead, use e.g.,
-                `init_strategy_parameters={"num_candidate_samples": 1000}`"""
+                `init_strategy_parameters={"num_candidate_samples": 1000}`""",
+                stacklevel=2,
             )
             self.init_strategy_parameters["num_candidate_samples"] = (
                 init_strategy_num_candidates
@@ -254,7 +257,8 @@ class MCMCPosterior(NeuralPosterior):
             warn(
                 "You passed `mcmc_method` to `.sample()`. As of sbi v0.18.0, this "
                 "is deprecated and will be removed in a future release. Use `method` "
-                "instead of `mcmc_method`."
+                "instead of `mcmc_method`.",
+                stacklevel=2,
             )
             method = mcmc_method
         if mcmc_parameters:
@@ -262,7 +266,8 @@ class MCMCPosterior(NeuralPosterior):
                 "You passed `mcmc_parameters` to `.sample()`. As of sbi v0.18.0, this "
                 "is deprecated and will be removed in a future release. Instead, pass "
                 "the variable to `.sample()` directly, e.g. "
-                "`posterior.sample((1,), num_chains=5)`."
+                "`posterior.sample((1,), num_chains=5)`.",
+                stacklevel=2,
             )
         # The following lines are only for backwards compatibility with sbi v0.17.2 or
         # older.
@@ -341,14 +346,16 @@ class MCMCPosterior(NeuralPosterior):
                 warn(
                     "You set `init_strategy=prior`. As of sbi v0.18.0, this is "
                     "deprecated and it will be removed in a future release. Use "
-                    "`init_strategy=proposal` instead."
+                    "`init_strategy=proposal` instead.",
+                    stacklevel=2,
                 )
             return lambda: proposal_init(proposal, transform=transform, **kwargs)
         elif init_strategy == "sir":
             warn(
                 "As of sbi v0.19.0, the behavior of the SIR initialization for MCMC "
                 "has changed. If you wish to restore the behavior of sbi v0.18.0, set "
-                "`init_strategy='resample'.`"
+                "`init_strategy='resample'.`",
+                stacklevel=2,
             )
             return lambda: sir_init(
                 proposal, potential_fn, transform=transform, **kwargs

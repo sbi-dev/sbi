@@ -390,7 +390,8 @@ class SliceSamplerVectorized:
         if num_workers > 1:
             warn(
                 """Parallelization of vectorized slice sampling not implement, running
-                serially."""
+                serially.""",
+                stacklevel=2,
             )
         self._reset()
 

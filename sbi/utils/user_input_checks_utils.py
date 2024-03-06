@@ -70,6 +70,7 @@ class CustomPriorWrapper(Distribution):
             warnings.warn(
                 "Prior is lacking mean attribute, estimating prior mean from samples.",
                 UserWarning,
+                stacklevel=2,
             )
         if hasattr(self.custom_prior, "variance"):
             pass
@@ -82,6 +83,7 @@ class CustomPriorWrapper(Distribution):
                 """Prior is lacking variance attribute, estimating prior variance from
                 samples...""",
                 UserWarning,
+                stacklevel=2,
             )
 
     @property
@@ -389,7 +391,8 @@ def build_support(
         support = constraints.real
         warnings.warn(
             """No prior bounds were passed, consider passing lower_bound
-            and / or upper_bound if your prior has bounded support."""
+            and / or upper_bound if your prior has bounded support.""",
+            stacklevel=2,
         )
     # Only lower bound is specified.
     elif upper_bound is None:

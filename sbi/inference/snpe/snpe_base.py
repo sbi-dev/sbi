@@ -606,7 +606,8 @@ class PosteriorEstimator(NeuralInference, ABC):
                         "proposal distribution it uses is not the prior (it can be "
                         "accessed via `RestrictedPrior._prior`). We do not "
                         "recommend to mix the `RestrictedPrior` with multi-round "
-                        "SNPE."
+                        "SNPE.",
+                        stacklevel=2,
                     )
             elif (
                 not isinstance(proposal, NeuralPosterior)
@@ -616,7 +617,8 @@ class PosteriorEstimator(NeuralInference, ABC):
                     "The proposal you passed is neither the prior nor a "
                     "`NeuralPosterior` object. If you are an expert user and did so "
                     "for research purposes, this is fine. If not, you might be doing "
-                    "something wrong: feel free to create an issue on Github."
+                    "something wrong: feel free to create an issue on Github.",
+                    stacklevel=2,
                 )
         elif self._round > 0:
             raise ValueError(

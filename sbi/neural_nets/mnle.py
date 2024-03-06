@@ -61,7 +61,8 @@ def build_mnle(
         """The mixed neural likelihood estimator assumes that x contains
         continuous data in the first n-1 columns (e.g., reaction times) and
         categorical data in the last column (e.g., corresponding choices). If
-        this is not the case for the passed `x` do not use this function."""
+        this is not the case for the passed `x` do not use this function.""",
+        stacklevel=2,
     )
     # Separate continuous and discrete data.
     cont_x, disc_x = _separate_x(batch_x)

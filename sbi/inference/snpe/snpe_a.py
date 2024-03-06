@@ -205,6 +205,7 @@ class SNPE_A(PosteriorEstimator):
                     "correction applied in SNPE-A. Thus, you will get an error when "
                     "calling `.build_posterior()` after training.",
                     UserWarning,
+                    stacklevel=2,
                 )
         else:
             # Run Algorithm 1 from [1].

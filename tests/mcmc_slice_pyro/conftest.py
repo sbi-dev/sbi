@@ -98,9 +98,9 @@ def pytest_collection_modifyitems(config, items):
         if not stage_marker:
             selected_items.append(item)
             warnings.warn(
-                "No stage associated with the test {}. Will run on each stage invocation.".format(
-                    item.name
-                )
+                f"""No stage associated with the test {item.name}. Will run on
+                 each stage invocation.""",
+                stacklevel=2,
             )
             continue
         item_stage_markers = _get_highest_specificity_marker(stage_marker)

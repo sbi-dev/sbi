@@ -81,7 +81,10 @@ def rejection_sample(
     )
 
     if m < 1.0:
-        warnings.warn("A value of m < 1.0 will lead to systematically wrong results.")
+        warnings.warn(
+            "A value of m < 1.0 will lead to systematically wrong results.",
+            stacklevel=2,
+        )
 
     class ScaledProposal:
         """

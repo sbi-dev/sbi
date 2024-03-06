@@ -421,7 +421,8 @@ class ActiveSubspace:
             warn(
                 "You specified a property with `.add_property()`, but also set "
                 "`posterior_log_prob_as_property=True`. The specified property will "
-                "be ignored."
+                "be ignored.",
+                stacklevel=2,
             )
 
         thetas = self._posterior.sample((num_monte_carlo_samples,))

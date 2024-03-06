@@ -412,7 +412,8 @@ class NeuralInference(ABC):
         elif max_num_epochs == epoch:
             warn(
                 "Maximum number of epochs `max_num_epochs={max_num_epochs}` reached,"
-                "but network has not yet fully converged. Consider increasing it."
+                "but network has not yet fully converged. Consider increasing it.",
+                stacklevel=2,
             )
 
     def _summarize(
@@ -502,7 +503,8 @@ class NeuralInference(ABC):
             "changes in the following two ways: "
             "1) `.train(..., retrain_from_scratch=True)` is not supported. "
             "2) When the loaded object calls the `.train()` method, it generates a new "
-            "tensorboard summary writer (instead of appending to the current one)."
+            "tensorboard summary writer (instead of appending to the current one).",
+            stacklevel=2,
         )
         dict_to_save = {}
         unpicklable_attributes = ["_summary_writer", "_build_neural_net"]

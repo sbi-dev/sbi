@@ -344,7 +344,7 @@ def pairplot(
             samples
         ), "Provide at least as many labels as samples."
     if opts["upper"] is not None:
-        warn("upper is deprecated, use offdiag instead.")
+        warn("upper is deprecated, use offdiag instead.", stacklevel=2)
         opts["offdiag"] = opts["upper"]
 
     # Prepare diag/upper/lower

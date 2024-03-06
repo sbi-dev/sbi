@@ -76,7 +76,8 @@ def process_prior(
         warnings.warn(
             f"""Prior was provided as a sequence of {len(prior)} priors. They will be
             interpreted as independent of each other and matched in order to the
-            components of the parameter."""
+            components of the parameter.""",
+            stacklevel=2,
         )
         # process individual priors
         prior = [process_prior(p, custom_prior_wrapper_kwargs)[0] for p in prior]
@@ -207,7 +208,8 @@ def process_pytorch_prior(prior: Distribution) -> Tuple[Distribution, int, bool]
     elif isinstance(prior, Uniform) and prior.batch_shape.numel() == 1:
         prior = BoxUniform(low=prior.low, high=prior.high)
         warnings.warn(
-            "Casting 1D Uniform prior to BoxUniform to match sbi batch requirements."
+            "Casting 1D Uniform prior to BoxUniform to match sbi batch requirements.",
+            stacklevel=2,
         )
 
     check_prior_batch_behavior(prior)
@@ -449,7 +451,8 @@ def check_embedding_net_device(embedding_net: nn.Module, datum: torch.Tensor) ->
                 f"device '{embedding_net_device}'. "
                 "Automatically switching the embedding_net's device to "
                 f"'{datum_device}', which could otherwise be done manually "
-                f"""using the line `embedding_net.to('{datum_device}')`."""
+                f"""using the line `embedding_net.to('{datum_device}')`.""",
+                stacklevel=2,
             )
             embedding_net.to(datum_device)
     else:
@@ -720,7 +723,8 @@ def validate_theta_and_x(
         warnings.warn(
             f"Data x has device '{x.device}'."
             f"Moving x to the data_device '{data_device}'."
-            f"Training will proceed on device '{training_device}'."
+            f"Training will proceed on device '{training_device}'.",
+            stacklevel=2,
         )
         x = x.to(data_device)
 
@@ -728,7 +732,8 @@ def validate_theta_and_x(
         warnings.warn(
             f"Parameters theta has device '{theta.device}'. "
             f"Moving theta to the data_device '{data_device}'."
-            f"Training will proceed on device '{training_device}'."
+            f"Training will proceed on device '{training_device}'.",
+            stacklevel=2,
         )
         theta = theta.to(data_device)
 

@@ -39,6 +39,7 @@ def warn_if_zscoring_changes_data(x: Tensor, duplicate_tolerance: float = 0.1) -
             If this is intended, make sure to set `z_score_x='none'` as z-scoring would
             result in NaNs""",
             UserWarning,
+            stacklevel=2,
         )
 
         # Skip computation.
@@ -60,6 +61,7 @@ def warn_if_zscoring_changes_data(x: Tensor, duplicate_tolerance: float = 0.1) -
                 dataset. Note: if you have already set `z_score_x=False`, this warning
                 will still be displayed, but you can ignore it.""",
                 UserWarning,
+                stacklevel=2,
             )
 
 
@@ -110,7 +112,8 @@ def z_score_parser(z_score_flag: Optional["str"]) -> Tuple[bool, bool]:
         warnings.warn(
             "Boolean flag for z-scoring is deprecated as of sbi v0.18.0. It will be "
             "removed in a future release. Use 'none', 'independent', or 'structured' "
-            "to indicate z-scoring option."
+            "to indicate z-scoring option.",
+            stacklevel=2,
         )
         z_score_bool, structured_data = z_score_flag, False
 
@@ -343,7 +346,8 @@ def warn_on_iid_x(num_trials):
             + """It will be interpreted as a batch of independent and identically
             distributed data X={x_1, ..., x_n}, i.e., data generated based on the
             same underlying (unknown) parameter. The resulting posterior will be with
-            respect to entire batch, i.e,. p(theta | X)."""
+            respect to entire batch, i.e,. p(theta | X).""",
+            stacklevel=2,
         )
 
 
@@ -646,7 +650,8 @@ def mcmc_transform(
             warnings.warn(
                 """The passed prior has no support property, transform will be
                 constructed from mean and std. If the passed prior is supposed to be
-                bounded consider implementing the prior.support property."""
+                bounded consider implementing the prior.support property.""",
+                stacklevel=2,
             )
             has_support = False
 
