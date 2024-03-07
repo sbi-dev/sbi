@@ -4,11 +4,12 @@ import torch
 from sbi.analysis import ActiveSubspace, conditional_corrcoeff, conditional_pairplot
 from sbi.inference import SNPE
 from sbi.utils import BoxUniform, get_1d_marginal_peaks_from_kde
+from sbi.utils.torchutils import process_device
 
 
 @pytest.mark.slow
 @pytest.mark.gpu
-@pytest.mark.parametrize("device", ["cpu", "cuda:0"])
+@pytest.mark.parametrize("device", ["cpu", "gpu"])
 def test_analysis_modules(device: str) -> None:
     """Tests sensitivity analysis and conditional posterior utils on GPU and CPU.
 
@@ -18,6 +19,7 @@ def test_analysis_modules(device: str) -> None:
         device: Which device to run the inference on.
     """
     num_dim = 3
+    device = process_device(device)
     prior = BoxUniform(
         low=-2 * torch.ones(num_dim), high=2 * torch.ones(num_dim), device=device
     )

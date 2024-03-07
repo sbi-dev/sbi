@@ -15,7 +15,7 @@ from sbi.inference.potentials.likelihood_based_potential import (
 )
 from sbi.utils import BoxUniform, likelihood_nn, mcmc_transform
 from sbi.utils.conditional_density_utils import ConditionedPotential
-from sbi.utils.torchutils import atleast_2d
+from sbi.utils.torchutils import atleast_2d, process_device
 from sbi.utils.user_input_checks_utils import MultipleIndependent
 from tests.test_utils import check_c2st
 
@@ -46,9 +46,11 @@ mcmc_kwargs = dict(
 
 
 @pytest.mark.gpu
-@pytest.mark.parametrize("device", ("cpu", "cuda"))
+@pytest.mark.parametrize("device", ("cpu", "gpu"))
 def test_mnle_on_device(device):
     """Test MNLE API on device."""
+
+    device = process_device(device)
     # Generate mixed data.
     num_simulations = 100
     mcmc_method = "slice"

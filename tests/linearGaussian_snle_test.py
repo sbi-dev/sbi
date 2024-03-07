@@ -71,7 +71,7 @@ def test_api_snle_multiple_trials_and_rounds_map(num_dim: int, prior_str: str):
             x_o = zeros((num_trials, num_dim))
             posterior = inference.build_posterior(
                 mcmc_method="slice_np_vectorized",
-                mcmc_parameters=dict(num_chains=10, thin=5, warmup_steps=10),
+                mcmc_parameters=dict(num_chains=10, thin=10, warmup_steps=10),
             ).set_default_x(x_o)
             posterior.sample(sample_shape=(num_samples,))
         proposals.append(posterior)
