@@ -80,6 +80,6 @@ def build_mdn(
     )
 
     neural_net = flows.Flow(transform, distribution, embedding_net)
-    flow = NFlowsFlow(neural_net,condition_shape = embedding_net(batch_y[0]).shape)
+    flow = NFlowsFlow(neural_net,condition_shape = batch_y[0].shape)
 
     return flow

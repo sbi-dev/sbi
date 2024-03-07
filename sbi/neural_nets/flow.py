@@ -90,7 +90,7 @@ def build_made(
     )
 
     neural_net = flows.Flow(transform, distribution, embedding_net)
-    flow = NFlowsFlow(neural_net,condition_shape = embedding_net(batch_y[0]).shape)
+    flow = NFlowsFlow(neural_net,condition_shape = batch_y[0].shape)
 
     return flow
 
@@ -177,7 +177,7 @@ def build_maf(
 
     distribution = distributions_.StandardNormal((x_numel,))
     neural_net = flows.Flow(transform, distribution, embedding_net)
-    flow = NFlowsFlow(neural_net,condition_shape = embedding_net(batch_y[0]).shape)
+    flow = NFlowsFlow(neural_net,condition_shape = batch_y[0].shape)
 
     return flow
 
@@ -288,7 +288,7 @@ def build_maf_rqs(
 
     distribution = distributions_.StandardNormal((x_numel,))
     neural_net = flows.Flow(transform, distribution, embedding_net)
-    flow = NFlowsFlow(neural_net,condition_shape = embedding_net(batch_y[0]).shape)
+    flow = NFlowsFlow(neural_net,condition_shape = batch_y[0].shape)
 
     return flow
 
@@ -410,7 +410,7 @@ def build_nsf(
     # Combine transforms.
     transform = transforms.CompositeTransform(transform_list)
     neural_net = flows.Flow(transform, distribution, embedding_net)
-    flow = NFlowsFlow(neural_net,condition_shape = embedding_net(batch_y[0]).shape)
+    flow = NFlowsFlow(neural_net,condition_shape = batch_y[0].shape)
 
     return flow
 
