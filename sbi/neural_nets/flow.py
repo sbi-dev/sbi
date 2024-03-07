@@ -19,7 +19,7 @@ from sbi.utils.sbiutils import (
 )
 from sbi.utils.torchutils import create_alternating_binary_mask
 from sbi.utils.user_input_checks import check_data_device, check_embedding_net_device
-
+from sbi.neural_nets.density_estimators import NFlowsFlow
 
 def build_made(
     batch_x: Tensor,
@@ -30,7 +30,7 @@ def build_made(
     num_mixture_components: int = 10,
     embedding_net: nn.Module = nn.Identity(),
     **kwargs,
-) -> nn.Module:
+) -> NFlowsFlow:
     """Builds MADE p(x|y).
 
     Args:
@@ -90,8 +90,9 @@ def build_made(
     )
 
     neural_net = flows.Flow(transform, distribution, embedding_net)
+    flow = NFlowsFlow(neural_net,condition_shape = embedding_net(batch_y[0]).shape)
 
-    return neural_net
+    return flow
 
 
 def build_maf(
@@ -106,7 +107,7 @@ def build_maf(
     dropout_probability: float = 0.0,
     use_batch_norm: bool = False,
     **kwargs,
-) -> nn.Module:
+) -> NFlowsFlow:
     """Builds MAF p(x|y).
 
     Args:
@@ -176,8 +177,9 @@ def build_maf(
 
     distribution = distributions_.StandardNormal((x_numel,))
     neural_net = flows.Flow(transform, distribution, embedding_net)
+    flow = NFlowsFlow(neural_net,condition_shape = embedding_net(batch_y[0]).shape)
 
-    return neural_net
+    return flow
 
 
 def build_maf_rqs(
@@ -198,7 +200,7 @@ def build_maf_rqs(
     min_bin_height: float = rational_quadratic.DEFAULT_MIN_BIN_HEIGHT,
     min_derivative: float = rational_quadratic.DEFAULT_MIN_DERIVATIVE,
     **kwargs,
-) -> nn.Module:
+) -> NFlowsFlow:
     """Builds MAF p(x|y), where the diffeomorphisms are rational-quadratic
     splines (RQS).
 
@@ -286,8 +288,9 @@ def build_maf_rqs(
 
     distribution = distributions_.StandardNormal((x_numel,))
     neural_net = flows.Flow(transform, distribution, embedding_net)
+    flow = NFlowsFlow(neural_net,condition_shape = embedding_net(batch_y[0]).shape)
 
-    return neural_net
+    return flow
 
 
 def build_nsf(
@@ -305,7 +308,7 @@ def build_nsf(
     dropout_probability: float = 0.0,
     use_batch_norm: bool = False,
     **kwargs,
-) -> nn.Module:
+) -> NFlowsFlow:
     """Builds NSF p(x|y).
 
     Args:
@@ -407,8 +410,9 @@ def build_nsf(
     # Combine transforms.
     transform = transforms.CompositeTransform(transform_list)
     neural_net = flows.Flow(transform, distribution, embedding_net)
+    flow = NFlowsFlow(neural_net,condition_shape = embedding_net(batch_y[0]).shape)
 
-    return neural_net
+    return flow
 
 
 class ContextSplineMap(nn.Module):
