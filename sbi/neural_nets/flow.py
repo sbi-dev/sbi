@@ -12,6 +12,7 @@ from pyknos.nflows.nn import nets
 from pyknos.nflows.transforms.splines import rational_quadratic
 from torch import Tensor, nn, relu, tanh, tensor, uint8
 
+from sbi.neural_nets.density_estimators import NFlowsFlow
 from sbi.utils.sbiutils import (
     standardizing_net,
     standardizing_transform,
@@ -19,7 +20,7 @@ from sbi.utils.sbiutils import (
 )
 from sbi.utils.torchutils import create_alternating_binary_mask
 from sbi.utils.user_input_checks import check_data_device, check_embedding_net_device
-from sbi.neural_nets.density_estimators import NFlowsFlow
+
 
 def build_made(
     batch_x: Tensor,
@@ -90,7 +91,7 @@ def build_made(
     )
 
     neural_net = flows.Flow(transform, distribution, embedding_net)
-    flow = NFlowsFlow(neural_net,condition_shape = batch_y[0].shape)
+    flow = NFlowsFlow(neural_net, condition_shape=batch_y[0].shape)
 
     return flow
 
@@ -177,7 +178,7 @@ def build_maf(
 
     distribution = distributions_.StandardNormal((x_numel,))
     neural_net = flows.Flow(transform, distribution, embedding_net)
-    flow = NFlowsFlow(neural_net,condition_shape = batch_y[0].shape)
+    flow = NFlowsFlow(neural_net, condition_shape=batch_y[0].shape)
 
     return flow
 
@@ -288,7 +289,7 @@ def build_maf_rqs(
 
     distribution = distributions_.StandardNormal((x_numel,))
     neural_net = flows.Flow(transform, distribution, embedding_net)
-    flow = NFlowsFlow(neural_net,condition_shape = batch_y[0].shape)
+    flow = NFlowsFlow(neural_net, condition_shape=batch_y[0].shape)
 
     return flow
 
@@ -410,7 +411,7 @@ def build_nsf(
     # Combine transforms.
     transform = transforms.CompositeTransform(transform_list)
     neural_net = flows.Flow(transform, distribution, embedding_net)
-    flow = NFlowsFlow(neural_net,condition_shape = batch_y[0].shape)
+    flow = NFlowsFlow(neural_net, condition_shape=batch_y[0].shape)
 
     return flow
 

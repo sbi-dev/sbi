@@ -1,11 +1,12 @@
 from typing import Tuple
 
 import torch
-from zuko.flows import Flow
 from torch import Tensor
+from zuko.flows import Flow
 
 from sbi.neural_nets.density_estimators.base import DensityEstimator
 from sbi.types import Shape
+
 
 class ZukoFlow(DensityEstimator):
     r"""`zuko`- based normalizing flow density estimator.
@@ -13,6 +14,7 @@ class ZukoFlow(DensityEstimator):
     Flow type objects already have a .log_prob() and .sample() method, so here we just
     wrap them and add the .loss() method.
     """
+
     def __init__(self, net: Flow, condition_shape: torch.Size):
         r"""Initialize the density estimator.
 
@@ -23,7 +25,6 @@ class ZukoFlow(DensityEstimator):
 
         assert len(condition_shape) == 1, "Zuko Flows require 1D conditions."
         super().__init__(net=net, condition_shape=condition_shape)
-        
 
     def log_prob(self, input: Tensor, condition: Tensor) -> Tensor:
         r"""Return the log probabilities of the inputs given a condition or multiple
@@ -64,7 +65,7 @@ class ZukoFlow(DensityEstimator):
         # Expand the input and condition to the same batch shape
         input = input.expand(batch_shape + (input.shape[-1],))
         condition = condition.expand(batch_shape + self._condition_shape)
-        
+
         dists = self.net(condition)
         log_probs = dists.log_prob(input)
 
@@ -102,7 +103,6 @@ class ZukoFlow(DensityEstimator):
         """
         self._check_condition_shape(condition)
 
-        
         condition_dims = len(self._condition_shape)
         batch_shape = condition.shape[:-condition_dims] if condition_dims > 0 else ()
 
@@ -128,11 +128,10 @@ class ZukoFlow(DensityEstimator):
         batch_shape = condition.shape[:-condition_dims] if condition_dims > 0 else ()
 
         dists = self.net(condition)
-        samples,log_probs = dists.rsample_and_log_prob(sample_shape)
+        samples, log_probs = dists.rsample_and_log_prob(sample_shape)
         # zuko.sample_and_log_prob() returns (*sample_shape, *batch_shape, ...).
 
         samples = samples.reshape(*batch_shape, *sample_shape, -1)
         log_probs = log_probs.reshape(*batch_shape, *sample_shape)
-
 
         return samples, log_probs
