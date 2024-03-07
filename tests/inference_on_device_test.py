@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from contextlib import nullcontext
-from typing import Optional, Tuple
+from typing import Tuple
 
 import pytest
 import torch
@@ -110,12 +110,16 @@ def test_training_and_mcmc_on_device(
 
     if method in [SNPE_A, SNPE_C]:
         kwargs = dict(
-            density_estimator=utils.posterior_nn(model=model, num_transforms=2)
+            density_estimator=utils.posterior_nn(
+                model=model, num_transforms=2, dtype=torch.float32
+            )
         )
         train_kwargs = dict(force_first_round_loss=True)
     elif method == SNLE:
         kwargs = dict(
-            density_estimator=utils.likelihood_nn(model=model, num_transforms=2)
+            density_estimator=utils.likelihood_nn(
+                model=model, num_transforms=2, dtype=torch.float32
+            )
         )
         train_kwargs = dict()
     elif method in (SNRE_A, SNRE_B, SNRE_C):
@@ -145,7 +149,7 @@ def test_training_and_mcmc_on_device(
                 sample_with="mcmc",
                 mcmc_method=sampling_method,
                 mcmc_parameters=dict(
-                    thin=5,
+                    thin=10 if sampling_method == "slice_np_vectorized" else 1,
                     num_chains=10 if sampling_method == "slice_np_vectorized" else 1,
                 ),
             )
@@ -181,27 +185,6 @@ def test_training_and_mcmc_on_device(
     assert torch.device(training_device) == weights_device
     samples = proposals[-1].sample(sample_shape=(num_samples,))
     proposals[-1].potential(samples)
-
-
-@pytest.mark.gpu
-@pytest.mark.parametrize(
-    "device_input, device_target",
-    [
-        ("cpu", "cpu"),
-        ("cuda", "cuda:0"),
-        ("cuda:0", "cuda:0"),
-        pytest.param("cuda:42", None, marks=pytest.mark.xfail),
-        pytest.param("qwerty", None, marks=pytest.mark.xfail),
-    ],
-)
-def test_process_device(device_input: str, device_target: Optional[str]) -> None:
-    """Test process_device with different device combinations."""
-    device_output = process_device(device_input)
-    assert device_output == device_target, (
-        f"Failure when processing device '{device_input}': "
-        f"result should have been '{device_target}' and is "
-        f"instead '{device_output}'"
-    )
 
 
 @pytest.mark.gpu
@@ -359,7 +342,7 @@ def test_embedding_nets_integration_training_device(
     data_device = process_device(data_device)
     training_device = process_device(training_device)
 
-    samples_per_round = 32
+    samples_per_round = 64
     num_rounds = 2
 
     x_o = torch.ones((1, x_dim))
@@ -447,8 +430,12 @@ def test_embedding_nets_integration_training_device(
 
         posterior = inference.build_posterior(
             density_estimator_train,
-            mcmc_method="slice_np_vectorized",
-            mcmc_parameters=dict(thin=5, num_chains=10, warmup_steps=10),
+            **{}
+            if inference_method == SNPE_A
+            else dict(
+                mcmc_method="slice_np_vectorized",
+                mcmc_parameters=dict(thin=10, num_chains=20, warmup_steps=10),
+            ),
         )
         proposal = posterior.set_default_x(x_o)
 

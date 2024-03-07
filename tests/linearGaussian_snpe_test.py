@@ -573,7 +573,7 @@ def test_sample_conditional():
         proposal=restricted_prior,
         **mcmc_parameters,
     )
-    cond_samples = mcmc_posterior.sample((num_conditional_samples,))
+    cond_samples = mcmc_posterior.sample((num_conditional_samples,), x=x_o)
 
     _ = analysis.pairplot(
         cond_samples,
