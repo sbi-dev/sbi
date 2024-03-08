@@ -199,4 +199,4 @@ class MNLE(LikelihoodEstimator):
         Returns:
             Negative log prob.
         """
-        return -self._density_estimator.log_prob(x, context=theta)
+        return -self._neural_net.log_prob(x, context=theta)

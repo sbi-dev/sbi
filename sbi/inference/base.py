@@ -122,7 +122,7 @@ class NeuralInference(ABC):
         self._prior = prior
 
         self._posterior = None
-        self._density_estimator = None
+        self._neural_net = None
         self._x_shape = None
 
         self._show_progress_bars = show_progress_bars
@@ -349,20 +349,20 @@ class NeuralInference(ABC):
         """
         converged = False
 
-        assert self._density_estimator is not None
-        density_estimator = self._density_estimator
+        assert self._neural_net is not None
+        neural_net = self._neural_net
 
         # (Re)-start the epoch count with the first epoch or any improvement.
         if epoch == 0 or self._val_log_prob > self._best_val_log_prob:
             self._best_val_log_prob = self._val_log_prob
             self._epochs_since_last_improvement = 0
-            self._best_model_state_dict = deepcopy(density_estimator.state_dict())
+            self._best_model_state_dict = deepcopy(neural_net.state_dict())
         else:
             self._epochs_since_last_improvement += 1
 
         # If no validation improvement over many epochs, stop training.
         if self._epochs_since_last_improvement > stop_after_epochs - 1:
-            density_estimator.load_state_dict(self._best_model_state_dict)
+            neural_net.load_state_dict(self._best_model_state_dict)
             converged = True
 
         return converged

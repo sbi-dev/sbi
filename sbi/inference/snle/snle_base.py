@@ -166,11 +166,11 @@ class LikelihoodEstimator(NeuralInference, ABC):
         # arguments, which will build the neural network
         # This is passed into NeuralPosterior, to create a neural posterior which
         # can `sample()` and `log_prob()`. The network is accessible via `.net`.
-        if self._density_estimator is None or retrain_from_scratch:
+        if self._neural_net is None or retrain_from_scratch:
             # Get theta,x to initialize NN
             theta, x, _ = self.get_simulations(starting_round=start_idx)
             # Use only training data for building the neural net (z-scoring transforms)
-            self._density_estimator = self._build_neural_net(
+            self._neural_net = self._build_neural_net(
                 theta[self.train_indices].to("cpu"),
                 x[self.train_indices].to("cpu"),
             )
@@ -180,10 +180,10 @@ class LikelihoodEstimator(NeuralInference, ABC):
                 len(self._x_shape) < 3
             ), "SNLE cannot handle multi-dimensional simulator output."
 
-        self._density_estimator.to(self._device)
+        self._neural_net.to(self._device)
         if not resume_training:
             self.optimizer = optim.Adam(
-                list(self._density_estimator.parameters()),
+                list(self._neural_net.parameters()),
                 lr=learning_rate,
             )
             self.epoch, self._val_log_prob = 0, float("-Inf")
@@ -192,7 +192,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
             self.epoch, stop_after_epochs
         ):
             # Train for a single epoch.
-            self._density_estimator.train()
+            self._neural_net.train()
             train_log_probs_sum = 0
             for batch in train_loader:
                 self.optimizer.zero_grad()
@@ -208,7 +208,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
                 train_loss.backward()
                 if clip_max_norm is not None:
                     clip_grad_norm_(
-                        self._density_estimator.parameters(),
+                        self._neural_net.parameters(),
                         max_norm=clip_max_norm,
                     )
                 self.optimizer.step()
@@ -221,7 +221,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
             self._summary["training_log_probs"].append(train_log_prob_average)
 
             # Calculate validation performance.
-            self._density_estimator.eval()
+            self._neural_net.eval()
             val_log_prob_sum = 0
             with torch.no_grad():
                 for batch in val_loader:
@@ -257,9 +257,9 @@ class LikelihoodEstimator(NeuralInference, ABC):
 
         # Avoid keeping the gradients in the resulting network, which can
         # cause memory leakage when benchmarking.
-        self._density_estimator.zero_grad(set_to_none=True)
+        self._neural_net.zero_grad(set_to_none=True)
 
-        return deepcopy(self._density_estimator)
+        return deepcopy(self._neural_net)
 
     def build_posterior(
         self,
@@ -312,7 +312,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
             check_prior(prior)
 
         if density_estimator is None:
-            likelihood_estimator = self._density_estimator
+            likelihood_estimator = self._neural_net
             # If internal net is used device is defined.
             device = self._device
         else:
@@ -368,4 +368,4 @@ class LikelihoodEstimator(NeuralInference, ABC):
         Returns:
             Negative log prob.
         """
-        return self._density_estimator.loss(x, condition=theta)
+        return self._neural_net.loss(x, condition=theta)
