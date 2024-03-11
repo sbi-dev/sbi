@@ -140,7 +140,9 @@ def test_c2st_snl_on_linear_gaussian_different_dims(model_str="maf"):
 @pytest.mark.parametrize("num_dim", (1, 2))
 @pytest.mark.parametrize("prior_str", ("uniform", "gaussian"))
 @pytest.mark.parametrize("model_str", ("maf", "zuko_maf"))
-def test_c2st_and_map_snl_on_linearGaussian_different(num_dim: int, prior_str: str,model_str: str):
+def test_c2st_and_map_snl_on_linearGaussian_different(
+    num_dim: int, prior_str: str, model_str: str
+):
     """Test SNL on linear Gaussian, comparing to ground truth posterior via c2st.
 
     Args:

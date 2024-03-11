@@ -63,7 +63,9 @@ def test_api_density_estimator(density_estimator, input_dims, condition_shape):
             hidden_features=(10,),
             bins=8,
         )
-        estimator = density_estimator(net,embedding_net=EmbeddingNet(), condition_shape=condition_shape)
+        estimator = density_estimator(
+            net, embedding_net=EmbeddingNet(), condition_shape=condition_shape
+        )
 
     # Loss is only required to work for batched inputs and contexts
     loss = estimator.loss(batch_input, batch_context)

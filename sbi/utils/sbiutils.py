@@ -9,9 +9,9 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Type, U
 
 import numpy as np
 import pyknos.nflows.transforms as transforms
-import zuko
 import torch
 import torch.distributions.transforms as torch_tf
+import zuko
 from pyro.distributions import Empirical
 from torch import Tensor
 from torch import nn as nn
@@ -135,8 +135,11 @@ def z_score_parser(z_score_flag: Optional["str"]) -> Tuple[bool, bool]:
 
 
 def standardizing_transform(
-    batch_t: Tensor, structured_dims: bool = False, min_std: float = 1e-14, backend: str = "nflows"
-) -> Union[transforms.AffineTransform,zuko.transforms.MonotonicAffineTransform]:
+    batch_t: Tensor,
+    structured_dims: bool = False,
+    min_std: float = 1e-14,
+    backend: str = "nflows",
+) -> Union[transforms.AffineTransform, zuko.transforms.MonotonicAffineTransform]:
     """Builds standardizing transform
 
     Args:
@@ -173,8 +176,13 @@ def standardizing_transform(
     if backend == "nflows":
         return transforms.AffineTransform(shift=-t_mean / t_std, scale=1 / t_std)
     elif backend == "zuko":
-        return zuko.flows.Unconditional(zuko.transforms.MonotonicAffineTransform,shift=-t_mean / t_std, scale=1 / t_std,buffer=True)
-    
+        return zuko.flows.Unconditional(
+            zuko.transforms.MonotonicAffineTransform,
+            shift=-t_mean / t_std,
+            scale=1 / t_std,
+            buffer=True,
+        )
+
     else:
         raise ValueError("Invalid backend. Use 'nflows' or 'zuko'.")
 

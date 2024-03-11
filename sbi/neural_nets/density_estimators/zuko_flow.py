@@ -1,8 +1,8 @@
 from typing import Tuple
 
 import torch
-from torch import nn, Tensor
-from zuko.flows import Flow,LazyComposedTransform
+from torch import Tensor, nn
+from zuko.flows import Flow, LazyComposedTransform
 
 from sbi.neural_nets.density_estimators.base import DensityEstimator
 from sbi.types import Shape
@@ -15,7 +15,9 @@ class ZukoFlow(DensityEstimator):
     wrap them and add the .loss() method.
     """
 
-    def __init__(self, net: Flow, embedding_net: nn.Module, condition_shape: torch.Size):
+    def __init__(
+        self, net: Flow, embedding_net: nn.Module, condition_shape: torch.Size
+    ):
         r"""Initialize the density estimator.
 
         Args:
@@ -27,7 +29,7 @@ class ZukoFlow(DensityEstimator):
         super().__init__(net=net, condition_shape=condition_shape)
         self._embedding_net = embedding_net
 
-    def _maybe_z_score(self)->bool:
+    def _maybe_z_score(self) -> bool:
         return True
 
     def log_prob(self, input: Tensor, condition: Tensor) -> Tensor:

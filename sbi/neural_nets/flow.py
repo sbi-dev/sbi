@@ -3,16 +3,17 @@
 
 
 from functools import partial
-from typing import Optional, Union, Sequence
+from typing import Optional, Sequence, Union
 from warnings import warn
 
+import zuko
 from pyknos.nflows import distributions as distributions_
 from pyknos.nflows import flows, transforms
 from pyknos.nflows.nn import nets
 from pyknos.nflows.transforms.splines import rational_quadratic
 from torch import Tensor, nn, relu, tanh, tensor, uint8
 
-from sbi.neural_nets.density_estimators import NFlowsFlow,ZukoFlow
+from sbi.neural_nets.density_estimators import NFlowsFlow, ZukoFlow
 from sbi.utils.sbiutils import (
     standardizing_net,
     standardizing_transform,
@@ -20,7 +21,6 @@ from sbi.utils.sbiutils import (
 )
 from sbi.utils.torchutils import create_alternating_binary_mask
 from sbi.utils.user_input_checks import check_data_device, check_embedding_net_device
-import zuko
 
 
 def build_made(
@@ -416,16 +416,17 @@ def build_nsf(
 
     return flow
 
+
 def build_zuko_maf(
     batch_x: Tensor,
     batch_y: Tensor,
     z_score_x: Optional[str] = "independent",
     z_score_y: Optional[str] = "independent",
-    hidden_features: Union[Sequence[int],int] = 50,
+    hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
-    residual: bool=True,
-    randperm: bool=False,
+    residual: bool = True,
+    randperm: bool = False,
     **kwargs,
 ) -> ZukoFlow:
     """Builds MAF p(x|y).
@@ -460,19 +461,33 @@ def build_zuko_maf(
     if x_numel == 1:
         warn("In one-dimensional output space, this flow is limited to Gaussians")
 
-  
-    if isinstance(hidden_features,int):
-        hidden_features = [hidden_features]*num_transforms
+    if isinstance(hidden_features, int):
+        hidden_features = [hidden_features] * num_transforms
         if x_numel == 1:
-            maf = zuko.flows.MAF(features = x_numel, context=y_numel, hidden_features = hidden_features, transforms = num_transforms)
+            maf = zuko.flows.MAF(
+                features=x_numel,
+                context=y_numel,
+                hidden_features=hidden_features,
+                transforms=num_transforms,
+            )
         else:
-            maf = zuko.flows.MAF(features = x_numel, context=y_numel, hidden_features = hidden_features, transforms = num_transforms, randperm= randperm,residual=residual)
+            maf = zuko.flows.MAF(
+                features=x_numel,
+                context=y_numel,
+                hidden_features=hidden_features,
+                transforms=num_transforms,
+                randperm=randperm,
+                residual=residual,
+            )
 
     transforms = maf.transform.transforms
     z_score_x_bool, structured_x = z_score_parser(z_score_x)
     if z_score_x_bool:
-        #transforms = transforms
-        transforms = (*transforms,standardizing_transform(batch_x, structured_x,backend="zuko"))
+        # transforms = transforms
+        transforms = (
+            *transforms,
+            standardizing_transform(batch_x, structured_x, backend="zuko"),
+        )
 
     z_score_y_bool, structured_y = z_score_parser(z_score_y)
     if z_score_y_bool:
@@ -482,7 +497,7 @@ def build_zuko_maf(
         )
 
     # Combine transforms.
-    neural_net = zuko.flows.Flow(transforms,maf.base)
+    neural_net = zuko.flows.Flow(transforms, maf.base)
 
     flow = ZukoFlow(neural_net, embedding_net, condition_shape=batch_y[0].shape)
 
