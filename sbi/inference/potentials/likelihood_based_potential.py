@@ -180,7 +180,7 @@ def mixed_likelihood_estimator_based_potential(
 class MixedLikelihoodBasedPotential(LikelihoodBasedPotential):
     def __init__(
         self,
-        likelihood_estimator: MixedDensityEstimator,
+        likelihood_estimator: MixedDensityEstimator, # type: ignore TODO fix pyright
         prior: Distribution,
         x_o: Optional[Tensor],
         device: str = "cpu",

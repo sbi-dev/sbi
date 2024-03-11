@@ -259,16 +259,9 @@ def accept_reject_sample(
     sampling_batch_size = min(num_samples, max_sampling_batch_size)
     while num_remaining > 0:
         # Sample and reject.
-        # This if-case is annoying, but it will be gone when we move away from
-        # nflows and towards a flows-framework which takes a tuple as sample_size.
-        if isinstance(proposal, nn.Module):
-            candidates = proposal.sample(
-                sampling_batch_size, **proposal_sampling_kwargs  # type: ignore
-            ).reshape(sampling_batch_size, -1)
-        else:
-            candidates = proposal.sample(
-                (sampling_batch_size,), **proposal_sampling_kwargs  # type: ignore
-            )  # type: ignore
+        candidates = proposal.sample(
+            (sampling_batch_size,), **proposal_sampling_kwargs  # type: ignore
+        )  # type: ignore
 
         # SNPE-style rejection-sampling when the proposal is the neural net.
         are_accepted = accept_reject_fn(candidates)
@@ -330,9 +323,9 @@ def accept_reject_sample(
     pbar.close()
 
     # When in case of leakage a batch size was used there could be too many samples.
-    samples = torch.cat(accepted)[:num_samples]
+    samples = torch.cat(accepted, dim=-2)[..., :num_samples, :]
     assert (
-        samples.shape[0] == num_samples
+        samples.shape[-2] == num_samples
     ), "Number of accepted samples must match required samples."
 
     return samples, as_tensor(acceptance_rate)

@@ -10,6 +10,7 @@ from torch import Tensor, nn, unique
 from torch.distributions import Categorical
 from torch.nn import Sigmoid, Softmax
 
+from sbi.neural_nets.density_estimators.base import DensityEstimator
 from sbi.neural_nets.flow import build_nsf
 from sbi.utils.sbiutils import match_theta_and_x_batch_shapes, standardizing_net
 from sbi.utils.torchutils import atleast_2d
@@ -216,7 +217,7 @@ class MixedDensityEstimator(nn.Module):
     def __init__(
         self,
         discrete_net: CategoricalNet,
-        continuous_net: flows.Flow,
+        continuous_net: DensityEstimator,
         log_transform_x: bool = False,
     ):
         """Initialize class for combining density estimators for MNLE.

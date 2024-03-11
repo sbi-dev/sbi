@@ -22,6 +22,7 @@ from sbi.inference.posteriors import (
 )
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials import posterior_estimator_based_potential
+from sbi.neural_nets.density_estimators import DensityEstimator
 from sbi.utils import (
     RestrictedPrior,
     check_estimator_arg,
@@ -218,7 +219,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[dict] = None,
-    ) -> nn.Module:
+    ) -> DensityEstimator:
         r"""Return density estimator that approximates the distribution $p(\theta|x)$.
 
         Args:
@@ -431,7 +432,7 @@ class PosteriorEstimator(NeuralInference, ABC):
 
     def build_posterior(
         self,
-        density_estimator: Optional[nn.Module] = None,
+        density_estimator: Optional[DensityEstimator] = None,
         prior: Optional[Distribution] = None,
         sample_with: str = "direct",
         mcmc_method: str = "slice_np",

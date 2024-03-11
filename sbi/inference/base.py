@@ -122,7 +122,7 @@ class NeuralInference(ABC):
         self._prior = prior
 
         self._posterior = None
-        self._density_estimator = None
+        self._neural_net = None
         self._x_shape = None
 
         self._show_progress_bars = show_progress_bars
@@ -349,8 +349,8 @@ class NeuralInference(ABC):
         """
         converged = False
 
-        assert self._density_estimator is not None
-        density_estimator = self._density_estimator
+        assert self._neural_net is not None
+        density_estimator = self._neural_net
 
         # (Re)-start the epoch count with the first epoch or any improvement.
         if epoch == 0 or self._val_log_prob > self._best_val_log_prob:

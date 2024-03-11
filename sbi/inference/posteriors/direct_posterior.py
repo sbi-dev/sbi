@@ -11,6 +11,7 @@ from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.posterior_based_potential import (
     posterior_estimator_based_potential,
 )
+from sbi.neural_nets.density_estimators.base import DensityEstimator
 from sbi.samplers.rejection.rejection import accept_reject_sample
 from sbi.types import Shape
 from sbi.utils import check_prior, match_theta_and_x_batch_shapes, within_support
@@ -33,7 +34,7 @@ class DirectPosterior(NeuralPosterior):
 
     def __init__(
         self,
-        posterior_estimator: flows.Flow,
+        posterior_estimator: DensityEstimator,
         prior: Distribution,
         max_sampling_batch_size: int = 10_000,
         device: Optional[str] = None,
@@ -121,9 +122,11 @@ class DirectPosterior(NeuralPosterior):
             num_samples=num_samples,
             show_progress_bars=show_progress_bars,
             max_sampling_batch_size=max_sampling_batch_size,
-            proposal_sampling_kwargs={"context": x},
+            proposal_sampling_kwargs={"condition": x},
             alternative_method="build_posterior(..., sample_with='mcmc')",
         )[0]
+        samples = samples.view(sample_shape + (-1,))  # TODO: Why is this necessary?
+
         return samples
 
     def log_prob(
@@ -163,17 +166,15 @@ class DirectPosterior(NeuralPosterior):
         # TODO Train exited here, entered after sampling?
         self.posterior_estimator.eval()
 
-        theta = ensure_theta_batched(torch.as_tensor(theta))
-        theta_repeated, x_repeated = match_theta_and_x_batch_shapes(theta, x)
+        # theta = ensure_theta_batched(torch.as_tensor(theta))
+        # theta_repeated, x_repeated = match_theta_and_x_batch_shapes(theta, x)
 
         with torch.set_grad_enabled(track_gradients):
             # Evaluate on device, move back to cpu for comparison with prior.
-            unnorm_log_prob = self.posterior_estimator.log_prob(
-                theta_repeated, context=x_repeated
-            )
+            unnorm_log_prob = self.posterior_estimator.log_prob(theta, condition=x)
 
             # Force probability to be zero outside prior support.
-            in_prior_support = within_support(self.prior, theta_repeated)
+            in_prior_support = within_support(self.prior, theta)
 
             masked_log_prob = torch.where(
                 in_prior_support,
@@ -227,7 +228,7 @@ class DirectPosterior(NeuralPosterior):
                 show_progress_bars=show_progress_bars,
                 sample_for_correction_factor=True,
                 max_sampling_batch_size=rejection_sampling_batch_size,
-                proposal_sampling_kwargs={"context": x},
+                proposal_sampling_kwargs={"condition": x},
             )[1]
 
         # Check if the provided x matches the default x (short-circuit on identity).

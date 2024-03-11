@@ -152,7 +152,10 @@ class MNLE(LikelihoodEstimator):
         ), f"""net must be of type MixedDensityEstimator but is {type
             (likelihood_estimator)}."""
 
-        (potential_fn, theta_transform,) = mixed_likelihood_estimator_based_potential(
+        (
+            potential_fn,
+            theta_transform,
+        ) = mixed_likelihood_estimator_based_potential(
             likelihood_estimator=likelihood_estimator, prior=prior, x_o=None
         )
 
@@ -199,4 +202,4 @@ class MNLE(LikelihoodEstimator):
         Returns:
             Negative log prob.
         """
-        return -self._density_estimator.log_prob(x, context=theta)
+        return -self._neural_net.log_prob(x, context=theta)
