@@ -278,13 +278,22 @@ class SNPE_C(PosteriorEstimator):
         """
 
         if self.use_non_atomic_loss:
-            # TODO Add checks for mixture of gaussian
+            if not (
+                hasattr(self._neural_net.net, "_distribution")
+                and isinstance(self._neural_net.net._distribution, mdn)
+            ):
+                raise ValueError(
+                    "The density estimator must be a MDNtext for non-atomic loss."
+                )
+
             return self._log_prob_proposal_posterior_mog(theta, x, proposal)
         else:
             if not hasattr(self._neural_net, "log_prob"):
-                raise ValueError("The neural estimator must have a log_prob method, for\
+                raise ValueError(
+                    "The neural estimator must have a log_prob method, for\
                                  atomic loss. It should at best follow the \
-                                 sbi.neural_nets 'DensityEstiamtor' interface.")
+                                 sbi.neural_nets 'DensityEstiamtor' interface."
+                )
             return self._log_prob_proposal_posterior_atomic(theta, x, masks)
 
     def _log_prob_proposal_posterior_atomic(

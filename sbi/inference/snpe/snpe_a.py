@@ -507,7 +507,7 @@ class SNPE_A_MDN(DensityEstimator):
             embedded_context = torchutils.repeat_rows(
                 embedded_context, num_reps=num_samples
             )
-        # TODO
+
         theta, _ = self._neural_net.net._transform.inverse(
             theta, context=embedded_context
         )
