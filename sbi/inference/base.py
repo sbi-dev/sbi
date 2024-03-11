@@ -206,8 +206,9 @@ class NeuralInference(ABC):
         from.
 
         Args:
-            theta: Parameter sets. x: Simulation outputs. exclude_invalid_x: Whether
-            invalid simulations are discarded during
+            theta: Parameter sets.
+            x: Simulation outputs.
+            exclude_invalid_x: Whether invalid simulations are discarded during
                 training. If `False`, The inference algorithm raises an error when
                 invalid simulations are found. If `True`, invalid simulations are
                 discarded and training can proceed, but this gives systematically wrong

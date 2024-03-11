@@ -211,7 +211,7 @@ class ConditionedMDN:
         )
         self.prec = self.precfs.transpose(3, 2) @ self.precfs
 
-    def sample(self, sample_shape: Shape) -> Tensor:
+    def sample(self, sample_shape: Shape = torch.Size()) -> Tensor:
         num_samples = torch.Size(sample_shape).numel()
         samples = mdn.sample_mog(num_samples, self.logits, self.means, self.precfs)
         return samples.detach().reshape((*sample_shape, -1))
