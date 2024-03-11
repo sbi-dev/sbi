@@ -17,6 +17,7 @@ from torch.distributions import Distribution, MultivariateNormal
 import sbi.utils as utils
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.inference.snpe.snpe_base import PosteriorEstimator
+from sbi.neural_nets.density_estimators.base import DensityEstimator
 from sbi.types import TensorboardSummaryWriter, TorchModule
 from sbi.utils import torchutils
 
@@ -110,7 +111,7 @@ class SNPE_A(PosteriorEstimator):
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
         component_perturbation: float = 5e-3,
-    ) -> nn.Module:
+    ) -> DensityEstimator:
         r"""Return density estimator that approximates the proposal posterior.
 
         [1] _Fast epsilon-free Inference of Simulation Models with Bayesian Conditional
@@ -360,7 +361,7 @@ class SNPE_A(PosteriorEstimator):
                     param.grad = None  # let autograd construct a new gradient
 
 
-class SNPE_A_MDN(nn.Module):
+class SNPE_A_MDN(DensityEstimator):
     """Generates a posthoc-corrected MDN which approximates the posterior.
 
     This class takes as input the density estimator (abbreviated with `_d` suffix, aka
@@ -379,7 +380,7 @@ class SNPE_A_MDN(nn.Module):
 
     def __init__(
         self,
-        flow: flows.Flow,
+        flow: DensityEstimator,
         proposal: Union["utils.BoxUniform", "MultivariateNormal", "DirectPosterior"],
         prior: Distribution,
         device: str,
@@ -392,7 +393,8 @@ class SNPE_A_MDN(nn.Module):
             prior: The prior distribution.
         """
         # Call nn.Module's constructor.
-        super().__init__()
+
+        super().__init__(flow, flow._condition_shape)
 
         self._neural_net = flow
         self._prior = prior
@@ -419,18 +421,19 @@ class SNPE_A_MDN(nn.Module):
         # Take care of z-scoring, pre-compute and store prior terms.
         self._set_state_for_mog_proposal()
 
-    def log_prob(self, inputs: Tensor, context: Tensor) -> Tensor:
-        inputs, context = inputs.to(self._device), context.to(self._device)
+    def log_prob(self, inputs: Tensor, condition: Tensor, **kwargs) -> Tensor:
+
+        inputs, condition = inputs.to(self._device), condition.to(self._device)
 
         if not self._apply_correction:
-            return self._neural_net.log_prob(inputs, context)
+            return self._neural_net.log_prob(inputs, condition)
         else:
             # When we want to compute the approx. posterior, a proposal prior \tilde{p}
             # has already been observed. To analytically calculate the log-prob of the
             # Gaussian, we first need to compute the mixture components.
 
             # Compute the mixture components of the proposal posterior.
-            logits_pp, m_pp, prec_pp = self._posthoc_correction(context)
+            logits_pp, m_pp, prec_pp = self._posthoc_correction(condition)
 
             # z-score theta if it z-scoring had been requested.
             theta = self._maybe_z_score_theta(inputs)
@@ -444,16 +447,20 @@ class SNPE_A_MDN(nn.Module):
             )
             return log_prob_proposal_posterior  # \hat{p} from eq (3) in [1]
 
-    def sample(self, num_samples: int, context: Tensor, batch_size: int = 1) -> Tensor:
-        context = context.to(self._device)
+    def sample(self, sample_shape: torch.Size, condition: Tensor, **kwargs) -> Tensor:
+        condition = condition.to(self._device)
 
         if not self._apply_correction:
-            return self._neural_net.sample(num_samples, context, batch_size)
+            return self._neural_net.sample(sample_shape, condition=condition)
         else:
             # When we want to sample from the approx. posterior, a proposal prior
             # \tilde{p} has already been observed. To analytically calculate the
             # log-prob of the Gaussian, we first need to compute the mixture components.
-            return self._sample_approx_posterior_mog(num_samples, context, batch_size)
+            num_samples = torch.Size(sample_shape).numel()
+            condition_ndim = len(self._condition_shape)
+            batch_size = condition.shape[:-condition_ndim]
+            batch_size = torch.Size(batch_size).numel()
+            return self._sample_approx_posterior_mog(num_samples, condition, batch_size)
 
     def _sample_approx_posterior_mog(
         self, num_samples, x: Tensor, batch_size: int

@@ -163,7 +163,7 @@ class SNPE_C(PosteriorEstimator):
             proposal = self._proposal_roundwise[-1]
             self.use_non_atomic_loss = (
                 isinstance(proposal, DirectPosterior)
-                and isinstance(proposal.posterior_estimator._distribution, mdn)
+                and isinstance(proposal.posterior_estimator.net._distribution, mdn)
                 and isinstance(self._neural_net.net._distribution, mdn)
                 and check_dist_class(
                     self._prior, class_to_check=(Uniform, MultivariateNormal)
@@ -390,9 +390,9 @@ class SNPE_C(PosteriorEstimator):
         # Evaluate the proposal. MDNs do not have functionality to run the embedding_net
         # and then get the mixture_components (**without** calling log_prob()). Hence,
         # we call them separately here.
-        encoded_x = proposal.posterior_estimator._embedding_net(proposal.default_x)
+        encoded_x = proposal.posterior_estimator.net._embedding_net(proposal.default_x)
         dist = (
-            proposal.posterior_estimator._distribution
+            proposal.posterior_estimator.net._distribution
         )  # defined to avoid ugly black formatting.
         logits_p, m_p, prec_p, _, _ = dist.get_mixture_components(encoded_x)
         norm_logits_p = logits_p - torch.logsumexp(logits_p, dim=-1, keepdim=True)
