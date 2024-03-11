@@ -217,7 +217,7 @@ class MixedDensityEstimator(nn.Module):
     def __init__(
         self,
         discrete_net: CategoricalNet,
-        continuous_net: DensityEstimator,
+        continuous_net: flows.Flow,
         log_transform_x: bool = False,
     ):
         """Initialize class for combining density estimators for MNLE.

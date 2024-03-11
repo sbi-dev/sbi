@@ -262,18 +262,19 @@ def accept_reject_sample(
         candidates = proposal.sample(
             (sampling_batch_size,), **proposal_sampling_kwargs  # type: ignore
         )  # type: ignore
-
+        print(candidates.shape)
         # SNPE-style rejection-sampling when the proposal is the neural net.
         are_accepted = accept_reject_fn(candidates)
-
+        print(are_accepted.shape)
         samples = candidates[are_accepted]
-
+        print(samples.shape)
+        print(are_accepted.shape)
         accepted.append(samples)
 
         # Update.
         num_sampled_total += sampling_batch_size
-        num_remaining -= samples.shape[0]
-        pbar.update(samples.shape[0])
+        num_remaining -= samples.shape[-2]
+        pbar.update(samples.shape[-2])
 
         # To avoid endless sampling when leakage is high, we raise a warning if the
         # acceptance rate is too low after the first 1_000 samples.

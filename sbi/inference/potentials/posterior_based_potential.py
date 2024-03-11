@@ -97,6 +97,7 @@ class PosteriorBasedPotential(BasePotential):
         # theta = ensure_theta_batched(torch.as_tensor(theta))
         # theta, x_repeated = match_theta_and_x_batch_shapes(theta, self.x_o)
         # theta, x_repeated = theta.to(self.device), x_repeated.to(self.device)
+        assert self._x_o is not None, "No observed data is available."
 
         with torch.set_grad_enabled(track_gradients):
             posterior_log_prob = self.posterior_estimator.log_prob(

@@ -180,12 +180,13 @@ def mixed_likelihood_estimator_based_potential(
 class MixedLikelihoodBasedPotential(LikelihoodBasedPotential):
     def __init__(
         self,
-        likelihood_estimator: MixedDensityEstimator, # type: ignore TODO fix pyright
+        likelihood_estimator: MixedDensityEstimator,  # type: ignore TODO fix pyright
         prior: Distribution,
         x_o: Optional[Tensor],
         device: str = "cpu",
     ):
-        super().__init__(likelihood_estimator, prior, x_o, device)
+        # TODO Fix pyright issue by making MixedDensityEstimator a subclass of DensityEstimator
+        super().__init__(likelihood_estimator, prior, x_o, device)  # type: ignore
 
     def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
         # Calculate likelihood in one batch.
