@@ -552,7 +552,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         return deepcopy(self._posterior)
 
     @abstractmethod
-    def _log_prob_proposal_posterior(
+    def _loss_proposal_posterior(
         self,
         theta: Tensor,
         x: Tensor,
@@ -583,11 +583,11 @@ class PosteriorEstimator(NeuralInference, ABC):
         """
         if self._round == 0 or force_first_round_loss:
             # Use posterior log prob (without proposal correction) for first round.
-            log_prob = self._neural_net.log_prob(theta, x)
+            loss = self._neural_net.loss(theta, x)
         else:
-            log_prob = self._log_prob_proposal_posterior(theta, x, masks, proposal)
+            loss = self._loss_proposal_posterior(theta, x, masks, proposal)
 
-        return -(calibration_kernel(x) * log_prob)
+        return -(calibration_kernel(x) * loss)
 
     def _check_proposal(self, proposal):
         """

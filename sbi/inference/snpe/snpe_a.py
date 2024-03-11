@@ -307,7 +307,7 @@ class SNPE_A(PosteriorEstimator):
         )
         return deepcopy(self._posterior)
 
-    def _log_prob_proposal_posterior(
+    def _loss_proposal_posterior(
         self,
         theta: Tensor,
         x: Tensor,
