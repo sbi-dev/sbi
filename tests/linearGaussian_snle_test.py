@@ -139,7 +139,10 @@ def test_c2st_snl_on_linear_gaussian_different_dims(model_str="maf"):
 @pytest.mark.slow
 @pytest.mark.parametrize("num_dim", (1, 2))
 @pytest.mark.parametrize("prior_str", ("uniform", "gaussian"))
-def test_c2st_and_map_snl_on_linearGaussian_different(num_dim: int, prior_str: str):
+@pytest.mark.parametrize("model_str", ("maf", "zuko_maf"))
+def test_c2st_and_map_snl_on_linearGaussian_different(
+    num_dim: int, prior_str: str, model_str: str
+):
     """Test SNL on linear Gaussian, comparing to ground truth posterior via c2st.
 
     Args:
@@ -167,7 +170,7 @@ def test_c2st_and_map_snl_on_linearGaussian_different(num_dim: int, prior_str: s
         lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov),
         prior,
     )
-    density_estimator = likelihood_nn("maf", num_transforms=3)
+    density_estimator = likelihood_nn(model_str, num_transforms=3)
     inference = SNLE(density_estimator=density_estimator, show_progress_bars=False)
 
     theta, x = simulate_for_sbi(

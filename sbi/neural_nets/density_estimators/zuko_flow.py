@@ -1,8 +1,8 @@
 from typing import Tuple
 
 import torch
-from torch import Tensor
-from zuko.flows import Flow
+from torch import Tensor, nn
+from zuko.flows import Flow, LazyComposedTransform
 
 from sbi.neural_nets.density_estimators.base import DensityEstimator
 from sbi.types import Shape
@@ -15,7 +15,9 @@ class ZukoFlow(DensityEstimator):
     wrap them and add the .loss() method.
     """
 
-    def __init__(self, net: Flow, condition_shape: torch.Size):
+    def __init__(
+        self, net: Flow, embedding_net: nn.Module, condition_shape: torch.Size
+    ):
         r"""Initialize the density estimator.
 
         Args:
@@ -23,8 +25,12 @@ class ZukoFlow(DensityEstimator):
             condition_shape: Shape of the condition.
         """
 
-        assert len(condition_shape) == 1, "Zuko Flows require 1D conditions."
+        # assert len(condition_shape) == 1, "Zuko Flows require 1D conditions."
         super().__init__(net=net, condition_shape=condition_shape)
+        self._embedding_net = embedding_net
+
+    def _maybe_z_score(self) -> bool:
+        return True
 
     def log_prob(self, input: Tensor, condition: Tensor) -> Tensor:
         r"""Return the log probabilities of the inputs given a condition or multiple
@@ -64,9 +70,10 @@ class ZukoFlow(DensityEstimator):
         batch_shape = torch.broadcast_shapes(batch_shape_in, batch_shape_cond)
         # Expand the input and condition to the same batch shape
         input = input.expand(batch_shape + (input.shape[-1],))
-        condition = condition.expand(batch_shape + self._condition_shape)
+        emb_cond = self._embedding_net(condition)
+        emb_cond = emb_cond.expand(batch_shape + (emb_cond.shape[-1],))
 
-        dists = self.net(condition)
+        dists = self.net(emb_cond)
         log_probs = dists.log_prob(input)
 
         return log_probs
@@ -106,7 +113,8 @@ class ZukoFlow(DensityEstimator):
         condition_dims = len(self._condition_shape)
         batch_shape = condition.shape[:-condition_dims] if condition_dims > 0 else ()
 
-        dists = self.net(condition)
+        emb_cond = self._embedding_net(condition)
+        dists = self.net(emb_cond)
         # zuko.sample() returns (*sample_shape, *batch_shape, input_size).
         samples = dists.sample(sample_shape).reshape(*batch_shape, *sample_shape, -1)
 
@@ -124,10 +132,13 @@ class ZukoFlow(DensityEstimator):
         Returns:
             Samples and associated log probabilities.
         """
+        self._check_condition_shape(condition)
+
         condition_dims = len(self._condition_shape)
         batch_shape = condition.shape[:-condition_dims] if condition_dims > 0 else ()
 
-        dists = self.net(condition)
+        emb_cond = self._embedding_net(condition)
+        dists = self.net(emb_cond)
         samples, log_probs = dists.rsample_and_log_prob(sample_shape)
         # zuko.sample_and_log_prob() returns (*sample_shape, *batch_shape, ...).
 

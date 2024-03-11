@@ -54,8 +54,8 @@ def test_api_density_estimator(density_estimator, input_dims, condition_shape):
             embedding_net=EmbeddingNet(),
         )
     elif density_estimator == ZukoFlow:
-        if len(condition_shape) > 1:
-            pytest.skip("ZukoFlow does not support multi-dimensional contexts.")
+        # if len(condition_shape) > 1:
+        #     pytest.skip("ZukoFlow does not support multi-dimensional contexts.")
         net = NSF(
             features=input_dims,
             context=condition_shape[-1],
@@ -63,7 +63,9 @@ def test_api_density_estimator(density_estimator, input_dims, condition_shape):
             hidden_features=(10,),
             bins=8,
         )
-        estimator = density_estimator(net, condition_shape)
+        estimator = density_estimator(
+            net, embedding_net=EmbeddingNet(), condition_shape=condition_shape
+        )
 
     # Loss is only required to work for batched inputs and contexts
     loss = estimator.loss(batch_input, batch_context)

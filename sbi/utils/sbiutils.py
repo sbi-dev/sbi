@@ -11,6 +11,7 @@ import numpy as np
 import pyknos.nflows.transforms as transforms
 import torch
 import torch.distributions.transforms as torch_tf
+import zuko
 from pyro.distributions import Empirical
 from torch import Tensor
 from torch import nn as nn
@@ -134,8 +135,11 @@ def z_score_parser(z_score_flag: Optional["str"]) -> Tuple[bool, bool]:
 
 
 def standardizing_transform(
-    batch_t: Tensor, structured_dims: bool = False, min_std: float = 1e-14
-) -> transforms.AffineTransform:
+    batch_t: Tensor,
+    structured_dims: bool = False,
+    min_std: float = 1e-14,
+    backend: str = "nflows",
+) -> Union[transforms.AffineTransform, zuko.transforms.MonotonicAffineTransform]:
     """Builds standardizing transform
 
     Args:
@@ -169,7 +173,18 @@ def standardizing_transform(
         t_std = torch.std(batch_t[is_valid_t], dim=0)
         t_std[t_std < min_std] = min_std
 
-    return transforms.AffineTransform(shift=-t_mean / t_std, scale=1 / t_std)
+    if backend == "nflows":
+        return transforms.AffineTransform(shift=-t_mean / t_std, scale=1 / t_std)
+    elif backend == "zuko":
+        return zuko.flows.Unconditional(
+            zuko.transforms.MonotonicAffineTransform,
+            shift=-t_mean / t_std,
+            scale=1 / t_std,
+            buffer=True,
+        )
+
+    else:
+        raise ValueError("Invalid backend. Use 'nflows' or 'zuko'.")
 
 
 class Standardize(nn.Module):
