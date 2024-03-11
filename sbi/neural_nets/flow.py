@@ -463,22 +463,23 @@ def build_zuko_maf(
 
     if isinstance(hidden_features, int):
         hidden_features = [hidden_features] * num_transforms
-        if x_numel == 1:
-            maf = zuko.flows.MAF(
-                features=x_numel,
-                context=y_numel,
-                hidden_features=hidden_features,
-                transforms=num_transforms,
-            )
-        else:
-            maf = zuko.flows.MAF(
-                features=x_numel,
-                context=y_numel,
-                hidden_features=hidden_features,
-                transforms=num_transforms,
-                randperm=randperm,
-                residual=residual,
-            )
+
+    if x_numel == 1:
+        maf = zuko.flows.MAF(
+            features=x_numel,
+            context=y_numel,
+            hidden_features=hidden_features,
+            transforms=num_transforms,
+        )
+    else:
+        maf = zuko.flows.MAF(
+            features=x_numel,
+            context=y_numel,
+            hidden_features=hidden_features,
+            transforms=num_transforms,
+            randperm=randperm,
+            residual=residual,
+        )
 
     transforms = maf.transform.transforms
     z_score_x_bool, structured_x = z_score_parser(z_score_x)
