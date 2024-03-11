@@ -300,6 +300,7 @@ class ConditionedPotential:
 
         Args:
             theta: Free parameters $\theta_i$, batch dimension 1.
+            track_gradients: Whether to track gradients.
 
         Returns:
             Conditional posterior log-probability $\log(p(\theta_i|\theta_j, x))$,
@@ -352,12 +353,11 @@ class RestrictedPriorForConditional:
 
     The resulting prior samples only from the free dimensions of the conditional.
 
-    This is needed for the the MCMC initialization functions when conditioning.
-    For the prior init, we could post-hoc select the relevant dimensions. But
-    for SIR, we want to evaluate the `potential_fn` of the conditional
-    posterior, which takes only a subset of the full parameter vector theta
-    (only the `dims_to_sample`). This subset is provided by `.sample()` from
-    this class.
+    This is needed for the the MCMC initialization functions when conditioning. For the
+    prior init, we could post-hoc select the relevant dimensions. But for SIR, we want
+    to evaluate the `potential_fn` of the conditional posterior, which takes only a
+    subset of the full parameter vector theta (only the `dims_to_sample`). This subset
+    is provided by `.sample()` from this class.
     """
 
     def __init__(self, full_prior: Distribution, dims_to_sample: List[int]):
@@ -388,14 +388,13 @@ class RestrictedTransformForConditional(torch_tf.Transform):
     `log_abs_det` stemming from the fixed dimensions is a constant and drops out during
     MCMC.
 
-    All methods work in a similar way:
-    `full_theta`` will first have all entries of the `condition` and then override the
-    entries that should be sampled with `theta`. In case `theta` is a batch of `theta`
-    (e.g. multi-chain MCMC), we have to repeat `theta_condition`` to the match the
-    batchsize.
+    All methods work in a similar way: `full_theta`` will first have all entries of the
+    `condition` and then override the entries that should be sampled with `theta`. In
+    case `theta` is a batch of `theta` (e.g. multi-chain MCMC), we have to repeat
+    `theta_condition`` to the match the batchsize.
 
-    This is needed for the the MCMC initialization functions when conditioning and
-    when transforming the samples back into the original theta space after sampling.
+    This is needed for the the MCMC initialization functions when conditioning and when
+    transforming the samples back into the original theta space after sampling.
     """
 
     def __init__(

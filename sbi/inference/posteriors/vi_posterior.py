@@ -615,8 +615,7 @@ class VIPosterior(NeuralPosterior):
         e.g. remains deep copy compatible.
 
         Args:
-            state_dict (Dict): Given state dictionary, we will restore the object from
-            it.
+            state_dict: Given state dictionary, we will restore the object from it.
         """
         self.__dict__ = state_dict
         q = deepcopy(self._q)

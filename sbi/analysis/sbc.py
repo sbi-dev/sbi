@@ -53,16 +53,16 @@ def run_sbc(
     """
     num_sbc_samples = thetas.shape[0]
 
-    if num_sbc_samples < 1000:
+    if num_sbc_samples < 100:
         warnings.warn(
             """Number of SBC samples should be on the order of 100s to give realiable
-            results. We recommend using 300.""",
+            results.""",
             stacklevel=2,
         )
     if num_posterior_samples < 100:
         warnings.warn(
             """Number of posterior samples for ranking should be on the order
-            of 100s to give reliable SBC results. We recommend using at least 300.""",
+            of 100s to give reliable SBC results.""",
             stacklevel=2,
         )
 
