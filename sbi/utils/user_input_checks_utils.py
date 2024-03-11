@@ -365,7 +365,7 @@ class MultipleIndependent(Distribution):
         # Wrap as `independent` in order to have the correct shape of the
         # `log_abs_det`, i.e. summed over the parameter dimensions.
         return constraints.independent(
-            constraints.cat(supports, dim=1, lengths=self.dims_per_dist),
+            constraints.cat(supports, dim=-1, lengths=self.dims_per_dist),
             reinterpreted_batch_ndims=1,
         )
 

@@ -10,6 +10,7 @@ from pyknos.mdn.mdn import MultivariateGaussianMDN as mdn
 from torch import Tensor, nn
 from torch.distributions import Distribution
 
+from sbi.neural_nets.density_estimators.base import DensityEstimator
 from sbi.types import Shape, TorchTransform
 from sbi.utils.conditional_density_utils import (
     ConditionedPotential,
@@ -187,7 +188,7 @@ def conditional_corrcoeff(
 class ConditionedMDN:
     def __init__(
         self,
-        net: nn.Module,
+        net: DensityEstimator,  # TODO: Must be MDN!!!
         x_o: Tensor,
         condition: Tensor,
         dims_to_sample: List[int],
@@ -207,7 +208,7 @@ class ConditionedMDN:
         """
         condition = atleast_2d_float32_tensor(condition)
 
-        logits, means, precfs, _ = extract_and_transform_mog(net=net, context=x_o)
+        logits, means, precfs, _ = extract_and_transform_mog(net=net.net, context=x_o)
         self.logits, self.means, self.precfs, self.sumlogdiag = condition_mog(
             condition, dims_to_sample, logits, means, precfs
         )

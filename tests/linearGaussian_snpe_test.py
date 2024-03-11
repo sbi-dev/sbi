@@ -573,6 +573,7 @@ def test_sample_conditional():
         proposal=restricted_prior,
         **mcmc_parameters,
     )
+    mcmc_posterior.set_default_x(x_o)  # TODO: This test has a bug? Needed to add this
     cond_samples = mcmc_posterior.sample((num_conditional_samples,))
 
     _ = analysis.pairplot(

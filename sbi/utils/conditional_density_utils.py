@@ -294,7 +294,7 @@ class ConditionedPotential:
         self.device = self.potential_fn.device
         self.allow_iid_x = allow_iid_x
 
-    def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
+    def __call__(self, theta: Tensor, track_gradients: bool = True, x_o=None) -> Tensor:
         r"""
         Returns the conditional potential $\log(p(\theta_i|\theta_j, x))$.
 
