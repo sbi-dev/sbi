@@ -587,7 +587,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         else:
             loss = self._loss_proposal_posterior(theta, x, masks, proposal)
 
-        return -(calibration_kernel(x) * loss)
+        return (calibration_kernel(x) * loss)
 
     def _check_proposal(self, proposal):
         """
