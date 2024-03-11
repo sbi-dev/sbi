@@ -340,10 +340,10 @@ class SNPE_A(PosteriorEstimator):
         Args:
             eps: Standard deviation for the random perturbation.
         """
-        assert isinstance(self._neural_net._distribution, MultivariateGaussianMDN)
+        assert isinstance(self._neural_net.net._distribution, MultivariateGaussianMDN)
 
         # Increase the number of components
-        self._neural_net._distribution._num_components = self._num_components
+        self._neural_net.net._distribution._num_components = self._num_components
 
         # Expand the 1-dim Gaussian.
         for name, param in self._neural_net.named_parameters():
@@ -492,7 +492,7 @@ class SNPE_A_MDN(nn.Module):
             num_samples, logits_p, m_p, prec_factors_p
         )
 
-        embedded_context = self._neural_net._embedding_net(x)
+        embedded_context = self._neural_net.net._embedding_net(x)
         if embedded_context is not None:
             # Merge the context dimension with sample dimension in order to
             # apply the transform.
@@ -501,7 +501,9 @@ class SNPE_A_MDN(nn.Module):
                 embedded_context, num_reps=num_samples
             )
         # TODO
-        theta, _ = self._neural_net._transform.inverse(theta, context=embedded_context)
+        theta, _ = self._neural_net.net._transform.inverse(
+            theta, context=embedded_context
+        )
 
         if embedded_context is not None:
             # Split the context dimension from sample dimension.
@@ -522,8 +524,8 @@ class SNPE_A_MDN(nn.Module):
         """
 
         # Evaluate the density estimator.
-        encoded_x = self._neural_net._embedding_net(x)
-        dist = self._neural_net._distribution  # defined to avoid black formatting.
+        encoded_x = self._neural_net.net._embedding_net(x)
+        dist = self._neural_net.net._distribution  # defined to avoid black formatting.
         logits_d, m_d, prec_d, _, _ = dist.get_mixture_components(encoded_x)
         norm_logits_d = logits_d - torch.logsumexp(logits_d, dim=-1, keepdim=True)
 
@@ -617,7 +619,9 @@ class SNPE_A_MDN(nn.Module):
             training step if the prior is Gaussian.
         """
 
-        self.z_score_theta = isinstance(self._neural_net._transform, CompositeTransform)
+        self.z_score_theta = isinstance(
+            self._neural_net.net._transform, CompositeTransform
+        )
 
         self._set_maybe_z_scored_prior()
 
@@ -649,8 +653,8 @@ class SNPE_A_MDN(nn.Module):
         prior will not be exactly have mean=0 and std=1.
         """
         if self.z_score_theta:
-            scale = self._neural_net._transform._transforms[0]._scale
-            shift = self._neural_net._transform._transforms[0]._shift
+            scale = self._neural_net.net._transform._transforms[0]._scale
+            shift = self._neural_net.net._transform._transforms[0]._shift
 
             # Following the definition of the linear transform in
             # `standardizing_transform` in `sbiutils.py`:
@@ -684,7 +688,7 @@ class SNPE_A_MDN(nn.Module):
         """Return potentially standardized theta if z-scoring was requested."""
 
         if self.z_score_theta:
-            theta, _ = self._neural_net._transform(theta)
+            theta, _ = self._neural_net.net._transform(theta)
 
         return theta
 
