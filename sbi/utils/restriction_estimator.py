@@ -579,7 +579,10 @@ class AcceptRejectFunction:
         return predictions.bool()
 
     def print_false_positive_rate(
-            self, accept_reject_fn: Callable, validation_theta: Tensor, validation_label: Tensor
+        self,
+        accept_reject_fn: Callable,
+        validation_theta: Tensor,
+        validation_label: Tensor,
     ) -> float:
         r"""
         Print and return the rate of false positive predictions on the validation set.
@@ -597,8 +600,6 @@ class AcceptRejectFunction:
             f"{fraction_false_positives:.3f}"
         )
         return fraction_false_positives
-
-
 
 
 class RestrictedPrior:
