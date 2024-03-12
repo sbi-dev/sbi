@@ -257,6 +257,9 @@ def accept_reject_sample(
     num_sampled_total, num_remaining = 0, num_samples
     accepted, acceptance_rate = [], float("Nan")
     leakage_warning_raised = False
+    # Ruff suggestion
+    if proposal_sampling_kwargs is None:
+        proposal_sampling_kwargs = {}
 
     # To cover cases with few samples without leakage:
     sampling_batch_size = min(num_samples, max_sampling_batch_size)
@@ -264,7 +267,7 @@ def accept_reject_sample(
         # Sample and reject.
         candidates = proposal.sample(
             (sampling_batch_size,),
-            **proposal_sampling_kwargs,  # type: ignore
+            **proposal_sampling_kwargs,
         )  # type: ignore
 
         # SNPE-style rejection-sampling when the proposal is the neural net.
