@@ -175,8 +175,6 @@ def likelihood_nn(
         elif model == "mnle":
             return build_mnle(batch_x=batch_x, batch_y=batch_theta, **kwargs)
         elif model == "zuko_maf":
-            del kwargs["num_bins"]
-            del kwargs["num_components"]
             return build_zuko_maf(batch_x=batch_x, batch_y=batch_theta, **kwargs)
         else:
             raise NotImplementedError
@@ -277,6 +275,8 @@ def posterior_nn(
             return build_maf_rqs(batch_x=batch_theta, batch_y=batch_x, **kwargs)
         elif model == "nsf":
             return build_nsf(batch_x=batch_theta, batch_y=batch_x, **kwargs)
+        elif model == "zuko_maf":
+            return build_zuko_maf(batch_x=batch_theta, batch_y=batch_x, **kwargs)
         else:
             raise NotImplementedError
 

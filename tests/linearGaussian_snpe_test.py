@@ -147,8 +147,10 @@ def test_c2st_snpe_on_linearGaussian(snpe_method, num_dim: int, prior_str: str):
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("density_estimtor", ["mdn", "maf", "maf_rqs", "nsf"])
-def test_density_estimators_on_linearGaussian(density_estimtor):
+@pytest.mark.parametrize(
+    "density_estimator", ["mdn", "maf", "maf_rqs", "nsf", "zuko_maf"]
+)
+def test_density_estimators_on_linearGaussian(density_estimator):
     """Test SNPE with different density estimators on linear Gaussian example."""
 
     theta_dim = 4
@@ -176,7 +178,7 @@ def test_density_estimators_on_linearGaussian(density_estimtor):
         prior,
     )
 
-    inference = SNPE_C(prior, density_estimator=density_estimtor)
+    inference = SNPE_C(prior, density_estimator=density_estimator)
 
     theta, x = simulate_for_sbi(
         simulator, prior, num_simulations, simulation_batch_size=1000
@@ -190,7 +192,7 @@ def test_density_estimators_on_linearGaussian(density_estimtor):
     samples = posterior.sample((num_samples,))
 
     # Compute the c2st and assert it is near chance level of 0.5.
-    check_c2st(samples, target_samples, alg=f"snpe_{density_estimtor}")
+    check_c2st(samples, target_samples, alg=f"snpe_{density_estimator}")
 
 
 def test_c2st_snpe_on_linearGaussian_different_dims(density_estimator="maf"):
