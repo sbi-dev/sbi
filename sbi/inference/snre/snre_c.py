@@ -147,7 +147,7 @@ class SNRE_C(RatioEstimator):
         assert theta.shape[0] == x.shape[0], "Batch sizes for theta and x must match."
         batch_size = theta.shape[0]
 
-        # We append an contrastive theta to the marginal case because we will remove
+        # We append a contrastive theta to the marginal case because we will remove
         # the jointly drawn
         # sample in the logits_marginal[:, 0] position. That makes the remaining sample
         # marginally drawn.
