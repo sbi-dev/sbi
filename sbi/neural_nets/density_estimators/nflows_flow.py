@@ -2,7 +2,7 @@ from typing import Tuple
 
 import torch
 from pyknos.nflows import flows
-from torch import Tensor
+from torch import Tensor, nn
 
 from sbi.neural_nets.density_estimators.base import DensityEstimator
 from sbi.types import Shape
@@ -14,6 +14,11 @@ class NFlowsFlow(DensityEstimator):
     Flow type objects already have a .log_prob() and .sample() method, so here we just
     wrap them and add the .loss() method.
     """
+
+    @property
+    def embedding_net(self) -> nn.Module:
+        r"""Return the embedding network."""
+        return self.net._embedding_net
 
     def log_prob(self, input: Tensor, condition: Tensor) -> Tensor:
         r"""Return the log probabilities of the inputs given a condition or multiple
