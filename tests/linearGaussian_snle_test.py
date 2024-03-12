@@ -71,7 +71,7 @@ def test_api_snle_multiple_trials_and_rounds_map(num_dim: int, prior_str: str):
             x_o = zeros((num_trials, num_dim))
             posterior = inference.build_posterior(
                 mcmc_method="slice_np_vectorized",
-                mcmc_parameters=dict(num_chains=10, thin=5, warmup_steps=10),
+                mcmc_parameters=dict(num_chains=10, thin=10, warmup_steps=10),
             ).set_default_x(x_o)
             posterior.sample(sample_shape=(num_samples,))
         proposals.append(posterior)
@@ -239,12 +239,10 @@ def test_map_with_multiple_independent_prior(use_transform):
     """Test whether map works with multiple independent priors, see issue #841, #650."""
 
     dim = 2
-    prior, *_ = process_prior(
-        [
-            BoxUniform(low=-ones(dim), high=ones(dim)),
-            HalfNormal(scale=ones(1) * 2),
-        ]
-    )
+    prior, *_ = process_prior([
+        BoxUniform(low=-ones(dim), high=ones(dim)),
+        HalfNormal(scale=ones(1) * 2),
+    ])
 
     def simulator(theta):
         return theta[:, 2:] * torch.randn_like(theta[:, :2]) + theta[:, :2]

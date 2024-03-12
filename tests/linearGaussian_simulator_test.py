@@ -24,9 +24,10 @@ def test_standardlinearGaussian_simulator(D: int, N: int):
     xs = diagonal_linear_gaussian(parameters)
 
     # Check shapes.
-    assert parameters.shape == torch.Size(
-        (N, D)
-    ), f"wrong shape of parameters: {parameters.shape} != {torch.Size((N, D))}"
+    assert parameters.shape == torch.Size((
+        N,
+        D,
+    )), f"wrong shape of parameters: {parameters.shape} != {torch.Size((N, D))}"
     assert xs.shape == torch.Size([N, D])
 
     # Check mean and std.
@@ -53,9 +54,10 @@ def test_linearGaussian_simulator(D: int, N: int):
     xs = linear_gaussian(parameters, torch.zeros(D), torch.eye(D))
 
     # Check shapes.
-    assert parameters.shape == torch.Size(
-        (N, D)
-    ), f"wrong shape of parameters: {parameters.shape} != {torch.Size((N, D))}"
+    assert parameters.shape == torch.Size((
+        N,
+        D,
+    )), f"wrong shape of parameters: {parameters.shape} != {torch.Size((N, D))}"
     assert xs.shape == torch.Size([N, D])
 
     # Check mean and std.

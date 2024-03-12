@@ -2,9 +2,8 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 """Test PyTorch utility functions."""
-from __future__ import annotations
 
-from typing import Optional
+from __future__ import annotations
 
 import numpy as np
 import pytest
@@ -26,9 +25,9 @@ class TorchUtilsTest(torchtestcase.TorchTestCase):
         self.assertEqual(
             torchutils.split_leading_dim(x, [2, 3, -1]), x.view(2, 3, 4, 5)
         )
-        with self.assertRaises(Exception):
+        with self.assertRaises(RuntimeError):
             self.assertEqual(torchutils.split_leading_dim(x, []), x)
-        with self.assertRaises(Exception):
+        with self.assertRaises(RuntimeError):
             self.assertEqual(torchutils.split_leading_dim(x, [5, 5]), x)
 
     def test_merge_leading_dims(self):
@@ -37,9 +36,9 @@ class TorchUtilsTest(torchtestcase.TorchTestCase):
         self.assertEqual(torchutils.merge_leading_dims(x, 2), x.view(6, 4, 5))
         self.assertEqual(torchutils.merge_leading_dims(x, 3), x.view(24, 5))
         self.assertEqual(torchutils.merge_leading_dims(x, 4), x.view(120))
-        with self.assertRaises(Exception):
+        with self.assertRaises(TypeError):
             torchutils.merge_leading_dims(x, 0)
-        with self.assertRaises(Exception):
+        with self.assertRaises(ValueError):
             torchutils.merge_leading_dims(x, 5)
 
     def test_split_merge_leading_dims_are_consistent(self):
@@ -64,7 +63,7 @@ class TorchUtilsTest(torchtestcase.TorchTestCase):
         self.assertEqual(x[0], y[1])
         self.assertEqual(x[1], y[2])
         self.assertEqual(x[1], y[3])
-        with self.assertRaises(Exception):
+        with self.assertRaises(TypeError):
             torchutils.repeat_rows(x, 0)
 
     def test_logabsdet(self):
@@ -214,7 +213,7 @@ def test_process_device(device_input: str) -> None:
                 current_gpu_index = torch.cuda.current_device()
                 assert device_output == f"cuda:{current_gpu_index}"
             elif torch.backends.mps.is_available():
-                assert device_output == "mps"
+                assert device_output == "mps:0"
 
         if device_input == "cuda" and torch.cuda.is_available():
             assert device_output == "cuda:0"
@@ -225,7 +224,7 @@ def test_process_device(device_input: str) -> None:
 
     except RuntimeError:
         # this should not happen for cpu
-        assert not device_input == "cpu"
+        assert device_input != "cpu"
 
         # should only happen if no gpu is available
         if device_input == "gpu":

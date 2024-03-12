@@ -63,6 +63,7 @@ dev = [
     "pytest",
     "pyyaml",
     "pyright >=1.1.300,<1.1.306",
+    "ruff",
     "torchtestcase",
     "twine",
 ]
@@ -72,35 +73,33 @@ documentation = "https://sbi-dev.github.io/sbi/"
 source = "https://github.com/sbi-dev/sbi"
 tracker = "https://github.com/sbi-dev/sbi/issues"
 
-[tool.black]
+# ruff configs
+[tool.ruff]
+extend-include = ["*.ipynb"]
 line-length = 88
-target-version = ['py37', 'py38', 'py39', 'py310', 'py311']
-include = '\.pyi?$|\.ipynb$'
-extend-exclude = '''
-/(
-    \.git
-  | \.venv
-  | \.ipynb_checkpoints
-)/
-'''
 
-[tool.isort]
-line_length = 88
-include_trailing_comma = true
-use_parentheses = true
-skip_glob = [".ipynb_checkpoints", "docs/*"]
-known_first_party=["sbi", "tests", "examples", "tutorials"]
-known_third_party = ["arviz", "joblib", "matplotlib", "numpy", "pyknos", "pyro", "pytest", "scipy", "six", "sklearn", "tensorboard", "torch", "torchtestcase", "tqdm", "typing_extensions"]
-multi_line_output = 3
-
-[tool.flake8]
-max-line-length = 88
-exclude = [
-    "docs",
-    "build",
-    "dist",
-    ".ipynb_checkpoints"
+[tool.ruff.lint]
+# pycodestyle, Pyflakes, pyupgrade, flake8-bugbear, flake8-simplify, isort
+select = ["E", "F", "W", "B", "SIM", "I"]
+ignore = [
+    "E731",  # allow using lambda functions
+    "B008",  # allow function calls in default args.
 ]
+
+[tool.ruff.lint.extend-per-file-ignores]
+"__init__.py" = ["E402", "F401", "F403"]  # allow unused imports and undefined names
+"test_*.py" = ["F403", "F405"]
+
+[tool.ruff.lint.isort]
+case-sensitive = true
+lines-between-types = 0  # like isort default.
+relative-imports-order = "furthest-to-closest"  # like isort default.
+known-first-party = ["sbi", "tests", "examples", "tutorials"]
+
+[tool.ruff.format]
+exclude = ["*.ipynb"]
+preview = true
+quote-style = "preserve"
 
 # Pytest configuration
 [tool.pytest.ini_options]
@@ -113,6 +112,13 @@ markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "gpu: marks tests that require a gpu (deselect with '-m \"not gpu\"')"
 ]
+
+# Pyright configuration
+ [tool.pyright]
+ include = ["sbi", "tests"]
+ exclude = ["**/__pycache__", "**/__node_modules__", ".git", "docs", "examples", "tutorials"]
+ python_version = "3.8"
+ reportUnsupportedDunderAll = false
 
 [tool.setuptools.packages.find]
 where = ["."]  # list of folders that contain the packages (["."] by default)

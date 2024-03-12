@@ -9,7 +9,8 @@ from sbi.types import Shape
 # Mocking a neural posterior
 class BiasedPosterior:
     def __init__(self, posterior: Callable, shift: float = 5.0):
-        """give me a prior/posterior and I'll shift it by a scalar `shift`. All calls to `sample` are wrapped."""
+        """give me a prior/posterior and I'll shift it by a scalar `shift`. All
+        calls to `sample` are wrapped."""
 
         self.shift = shift
         self.posterior = posterior
@@ -19,7 +20,7 @@ class BiasedPosterior:
 
     def sample(
         self,
-        sample_shape: Shape = torch.Size(),
+        sample_shape: Shape,
         x: Optional[torch.Tensor] = None,
         show_progress_bars: bool = False,
     ):
@@ -51,7 +52,7 @@ class DispersedPosterior:
 
     def sample(
         self,
-        sample_shape: Shape = torch.Size(),
+        sample_shape: Shape,
         x: Optional[torch.Tensor] = None,
         show_progress_bars: bool = False,
     ):

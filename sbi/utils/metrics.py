@@ -20,50 +20,42 @@ def c2st(
     classifier: str = "rf",
 ) -> Tensor:
     """
-    Return accuracy of classifier trained to distinguish samples from supposedly
-    two distributions <X> and <Y>. For details on the method, see [1,2].
-    If the returned accuracy is 0.5, <X> and <Y> are considered to be from the
-    same generating PDF, i.e. they can not be differentiated.
-    If the returned accuracy is around 1., <X> and <Y> are considered to be from
-    two different generating PDFs.
+    Return accuracy of classifier trained to distinguish samples from supposedly two
+    distributions <X> and <Y>. For details on the method, see [1,2]. If the returned
+    accuracy is 0.5, <X> and <Y> are considered to be from the same generating PDF, i.e.
+    they can not be differentiated. If the returned accuracy is around 1., <X> and <Y>
+    are considered to be from two different generating PDFs.
 
-    Training of the classifier with N-fold cross-validation [3] using sklearn.
-    By default, a `RandomForestClassifier` by from `sklearn.ensemble` is used
-    (<classifier> = 'rf'). Alternatively, a multi-layer perceptron is available
-    (<classifier> = 'mlp'). For a small study on the pros and cons for this
-    choice see [4]. Before both samples are ingested, they are normalized (z scored)
-    under the assumption that each dimension in X follows a normal distribution, i.e.
-    the mean(X) is subtracted from X and this difference is divided by std(X)
-    for every dimension.
+    Training of the classifier with N-fold cross-validation [3] using sklearn. By
+    default, a `RandomForestClassifier` by from `sklearn.ensemble` is used (<classifier>
+    = 'rf'). Alternatively, a multi-layer perceptron is available (<classifier> =
+    'mlp'). For a small study on the pros and cons for this choice see [4]. Before both
+    samples are ingested, they are normalized (z scored) under the assumption that each
+    dimension in X follows a normal distribution, i.e. the mean(X) is subtracted from X
+    and this difference is divided by std(X) for every dimension.
 
-    If you need a more flexible interface which is able to take a sklearn
-    compatible classifier and more, see the `c2st_` method in this module.
+    If you need a more flexible interface which is able to take a sklearn compatible
+    classifier and more, see the `c2st_` method in this module.
 
     Args:
-        X: Samples from one distribution.
-        Y: Samples from another distribution.
-        seed: Seed for the sklearn classifier and the KFold cross-validation
-        n_folds: Number of folds to use
-        metric: sklearn compliant metric to use for the scoring parameter of cross_val_score
-        classifier: classification architecture to use, possible values: 'rf' or 'mlp'
+        X: Samples from one distribution. Y: Samples from another distribution. seed:
+        Seed for the sklearn classifier and the KFold cross-validation n_folds: Number
+        of folds to use metric: sklearn compliant metric to use for the scoring
+        parameter of cross_val_score classifier: classification architecture to use,
+        possible values: 'rf' or 'mlp'
 
     Return:
-        torch.tensor containing the mean accuracy score over the test sets
-        from cross-validation
+        torch.tensor containing the mean accuracy score over the test sets from
+        cross-validation
 
-    Example:
-    ``` py
-    > c2st(X,Y)
-    [0.51904464] #X and Y likely come from the same PDF or ensemble
-    > c2st(P,Q)
-    [0.998456] #P and Q likely come from two different PDFs or ensembles
-    ```
+    Example: ``` py > c2st(X,Y) [0.51904464] #X and Y likely come from the same PDF or
+    ensemble > c2st(P,Q) [0.998456] #P and Q likely come from two different PDFs or
+    ensembles ```
 
     References:
-        [1]: http://arxiv.org/abs/1610.06545
-        [2]: https://www.osti.gov/biblio/826696/
-        [3]: https://scikit-learn.org/stable/modules/cross_validation.html
-        [4]: https://github.com/psteinb/c2st/
+        [1]: http://arxiv.org/abs/1610.06545 [2]: https://www.osti.gov/biblio/826696/
+        [3]: https://scikit-learn.org/stable/modules/cross_validation.html [4]:
+        https://github.com/psteinb/c2st/
     """
 
     # the default configuration
@@ -115,64 +107,55 @@ def c2st_scores(
     noise_scale: Optional[float] = None,
     verbosity: int = 0,
     clf_class: Any = RandomForestClassifier,
-    clf_kwargs: Dict[str, Any] = {},
+    clf_kwargs: Optional[Dict[str, Any]] = None,
 ) -> Tensor:
     """
-    Return accuracy of classifier trained to distinguish samples from supposedly
-    two distributions <X> and <Y>. For details on the method, see [1,2].
-    If the returned accuracy is 0.5, <X> and <Y> are considered to be from the
-    same generating PDF, i.e. they can not be differentiated.
-    If the returned accuracy is around 1., <X> and <Y> are considered to be from
-    two different generating PDFs.
+    Return accuracy of classifier trained to distinguish samples from supposedly two
+    distributions <X> and <Y>. For details on the method, see [1,2]. If the returned
+    accuracy is 0.5, <X> and <Y> are considered to be from the same generating PDF, i.e.
+    they can not be differentiated. If the returned accuracy is around 1., <X> and <Y>
+    are considered to be from two different generating PDFs.
 
-    This function performs training of the classifier with N-fold cross-validation [3] using sklearn.
-    By default, a `RandomForestClassifier` by from `sklearn.ensemble` is used which
-    is recommended based on the study performed in [4].
-    This can be changed using <clf_class>. This class is used in the following
-    fashion:
+    This function performs training of the classifier with N-fold cross-validation [3]
+    using sklearn. By default, a `RandomForestClassifier` by from `sklearn.ensemble` is
+    used which is recommended based on the study performed in [4]. This can be changed
+    using <clf_class>. This class is used in the following fashion:
 
-    ``` py
-    clf = clf_class(random_state=seed, **clf_kwargs)
-    #...
-    scores = cross_val_score(
+    ``` py clf = clf_class(random_state=seed, **clf_kwargs) #... scores =
+    cross_val_score(
         clf, data, target, cv=shuffle, scoring=scoring, verbose=verbosity
     )
     ```
-    Further configuration of the classifier can be performed using <clf_kwargs>.
-    If you like to provide a custom class for training, it has to satisfy the
-    internal requirements of `sklearn.model_selection.cross_val_score`.
+    Further configuration of the classifier can be performed using <clf_kwargs>. If you
+    like to provide a custom class for training, it has to satisfy the internal
+    requirements of `sklearn.model_selection.cross_val_score`.
 
     Args:
-        X: Samples from one distribution.
-        Y: Samples from another distribution.
-        seed: Seed for the sklearn classifier and the KFold cross validation
-        n_folds: Number of folds to use for cross validation
-        metric: sklearn compliant metric to use for the scoring parameter of cross_val_score
-        z_score: Z-scoring using X, i.e. mean and std deviation of X is used to normalize Y, i.e. Y=(Y - mean)/std
-        noise_scale: If passed, will add Gaussian noise with standard deviation <noise_scale> to samples of X and of Y
-        verbosity: control the verbosity of sklearn.model_selection.cross_val_score
-        clf_class: a scikit-learn classifier class
-        clf_kwargs: key-value arguments dictionary to the class specified by clf_class, e.g. sklearn.ensemble.RandomForestClassifier
+        X: Samples from one distribution. Y: Samples from another distribution. seed:
+        Seed for the sklearn classifier and the KFold cross validation n_folds: Number
+        of folds to use for cross validation metric: sklearn compliant metric to use for
+        the scoring parameter of cross_val_score z_score: Z-scoring using X, i.e. mean
+        and std deviation of X is used to normalize Y, i.e. Y=(Y - mean)/std
+        noise_scale: If passed, will add Gaussian noise with standard deviation
+        <noise_scale> to samples of X and of Y verbosity: control the verbosity of
+        sklearn.model_selection.cross_val_score clf_class: a scikit-learn classifier
+        class clf_kwargs: key-value arguments dictionary to the class specified by
+        clf_class, e.g. sklearn.ensemble.RandomForestClassifier
 
     Return:
-        np.ndarray containing the calculated <metric> scores over the test set
-        folds from cross-validation
+        np.ndarray containing the calculated <metric> scores over the test set folds
+        from cross-validation
 
-    Example:
-    ``` py
-    > c2st_scores(X,Y)
-    [0.51904464,0.5309201,0.4959452,0.5487709,0.50682926]
-    #X and Y likely come from the same PDF or ensemble
-    > c2st_scores(P,Q)
-    [0.998456,0.9982912,0.9980476,0.9980488,0.99805826]
-    #P and Q likely come from two different PDFs or ensembles
-    ```
+    Example: ``` py > c2st_scores(X,Y)
+    [0.51904464,0.5309201,0.4959452,0.5487709,0.50682926] #X and Y likely come from the
+    same PDF or ensemble > c2st_scores(P,Q)
+    [0.998456,0.9982912,0.9980476,0.9980488,0.99805826] #P and Q likely come from two
+    different PDFs or ensembles ```
 
     References:
-        [1]: http://arxiv.org/abs/1610.06545
-        [2]: https://www.osti.gov/biblio/826696/
-        [3]: https://scikit-learn.org/stable/modules/cross_validation.html
-        [4]: https://github.com/psteinb/c2st/
+        [1]: http://arxiv.org/abs/1610.06545 [2]: https://www.osti.gov/biblio/826696/
+        [3]: https://scikit-learn.org/stable/modules/cross_validation.html [4]:
+        https://github.com/psteinb/c2st/
     """
     if z_score:
         X_mean = torch.mean(X, dim=0)
@@ -187,7 +170,7 @@ def c2st_scores(
     X = X.cpu().numpy()
     Y = Y.cpu().numpy()
 
-    clf = clf_class(random_state=seed, **clf_kwargs)
+    clf = clf_class(random_state=seed, **clf_kwargs or {})
 
     # prepare data
     data = np.concatenate((X, Y))

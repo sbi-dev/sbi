@@ -50,7 +50,7 @@ class MCMCPosterior(NeuralPosterior):
         warmup_steps: int = 10,
         num_chains: int = 1,
         init_strategy: str = "resample",
-        init_strategy_parameters: Dict[str, Any] = {},
+        init_strategy_parameters: Optional[Dict[str, Any]] = None,
         init_strategy_num_candidates: Optional[int] = None,
         num_workers: int = 1,
         device: Optional[str] = None,
@@ -107,7 +107,7 @@ class MCMCPosterior(NeuralPosterior):
         self.warmup_steps = warmup_steps
         self.num_chains = num_chains
         self.init_strategy = init_strategy
-        self.init_strategy_parameters = init_strategy_parameters
+        self.init_strategy_parameters = init_strategy_parameters or {}
         self.num_workers = num_workers
         self._posterior_sampler = None
         # Hardcode parameter name to reduce clutter kwargs.
@@ -117,7 +117,8 @@ class MCMCPosterior(NeuralPosterior):
             warn(
                 """Passing `init_strategy_num_candidates` is deprecated as of sbi
                 v0.19.0. Instead, use e.g.,
-                `init_strategy_parameters={"num_candidate_samples": 1000}`"""
+                `init_strategy_parameters={"num_candidate_samples": 1000}`""",
+                stacklevel=2,
             )
             self.init_strategy_parameters["num_candidate_samples"] = (
                 init_strategy_num_candidates
@@ -173,9 +174,11 @@ class MCMCPosterior(NeuralPosterior):
         """
         warn(
             """`.log_prob()` is deprecated for methods that can only evaluate the
-            log-probability up to a normalizing constant. Use `.potential()` instead."""
+            log-probability up to a normalizing constant. Use `.potential()`
+            instead.""",
+            stacklevel=2,
         )
-        warn("The log-probability is unnormalized!")
+        warn("The log-probability is unnormalized!", stacklevel=2)
 
         self.potential_fn.set_x(self._x_else_default_x(x))
 
@@ -195,7 +198,7 @@ class MCMCPosterior(NeuralPosterior):
         init_strategy: Optional[str] = None,
         init_strategy_parameters: Optional[Dict[str, Any]] = None,
         init_strategy_num_candidates: Optional[int] = None,
-        mcmc_parameters: Dict = {},
+        mcmc_parameters: Optional[Dict] = None,
         mcmc_method: Optional[str] = None,
         sample_with: Optional[str] = None,
         num_workers: Optional[int] = None,
@@ -239,7 +242,8 @@ class MCMCPosterior(NeuralPosterior):
             warn(
                 """Passing `init_strategy_num_candidates` is deprecated as of sbi
                 v0.19.0. Instead, use e.g.,
-                `init_strategy_parameters={"num_candidate_samples": 1000}`"""
+                `init_strategy_parameters={"num_candidate_samples": 1000}`""",
+                stacklevel=2,
             )
             self.init_strategy_parameters["num_candidate_samples"] = (
                 init_strategy_num_candidates
@@ -254,7 +258,8 @@ class MCMCPosterior(NeuralPosterior):
             warn(
                 "You passed `mcmc_method` to `.sample()`. As of sbi v0.18.0, this "
                 "is deprecated and will be removed in a future release. Use `method` "
-                "instead of `mcmc_method`."
+                "instead of `mcmc_method`.",
+                stacklevel=2,
             )
             method = mcmc_method
         if mcmc_parameters:
@@ -262,11 +267,12 @@ class MCMCPosterior(NeuralPosterior):
                 "You passed `mcmc_parameters` to `.sample()`. As of sbi v0.18.0, this "
                 "is deprecated and will be removed in a future release. Instead, pass "
                 "the variable to `.sample()` directly, e.g. "
-                "`posterior.sample((1,), num_chains=5)`."
+                "`posterior.sample((1,), num_chains=5)`.",
+                stacklevel=2,
             )
         # The following lines are only for backwards compatibility with sbi v0.17.2 or
         # older.
-        m_p = mcmc_parameters  # define to shorten the variable name
+        m_p = mcmc_parameters or {}  # define to shorten the variable name
         method = _maybe_use_dict_entry(method, "mcmc_method", m_p)
         thin = _maybe_use_dict_entry(thin, "thin", m_p)
         warmup_steps = _maybe_use_dict_entry(warmup_steps, "warmup_steps", m_p)
@@ -341,14 +347,16 @@ class MCMCPosterior(NeuralPosterior):
                 warn(
                     "You set `init_strategy=prior`. As of sbi v0.18.0, this is "
                     "deprecated and it will be removed in a future release. Use "
-                    "`init_strategy=proposal` instead."
+                    "`init_strategy=proposal` instead.",
+                    stacklevel=2,
                 )
             return lambda: proposal_init(proposal, transform=transform, **kwargs)
         elif init_strategy == "sir":
             warn(
                 "As of sbi v0.19.0, the behavior of the SIR initialization for MCMC "
                 "has changed. If you wish to restore the behavior of sbi v0.18.0, set "
-                "`init_strategy='resample'.`"
+                "`init_strategy='resample'.`",
+                stacklevel=2,
             )
             return lambda: sir_init(
                 proposal, potential_fn, transform=transform, **kwargs
@@ -534,7 +542,8 @@ class MCMCPosterior(NeuralPosterior):
         )
         sampler.run()
         samples = next(iter(sampler.get_samples().values())).reshape(
-            -1, initial_params.shape[1]  # .shape[1] = dim of theta
+            -1,
+            initial_params.shape[1],  # .shape[1] = dim of theta
         )
 
         # Save posterior sampler.
@@ -695,9 +704,9 @@ class MCMCPosterior(NeuralPosterior):
                 *samples_shape
             )
 
-            inference_data = az.convert_to_inference_data(
-                {f"{self.param_name}": samples}
-            )
+            inference_data = az.convert_to_inference_data({
+                f"{self.param_name}": samples
+            })
 
         return inference_data
 
@@ -716,5 +725,5 @@ def _maybe_use_dict_entry(default: Any, key: str, dict_to_check: Dict) -> Any:
     Returns:
         The potentially replaced value.
     """
-    attribute = default if key not in dict_to_check.keys() else dict_to_check[key]
+    attribute = dict_to_check.get(key, default)
     return attribute

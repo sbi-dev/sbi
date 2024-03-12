@@ -638,7 +638,6 @@ def test_mdn_conditional_density(num_dim: int = 3, cond_dim: int = 1):
     condition = 0.1 * ones(1, num_dim)
 
     dims = list(range(num_dim))
-    dims2sample = dims[-cond_dim:]
     dims2condition = dims[:-cond_dim]
 
     # likelihood_mean will be likelihood_shift+theta
@@ -700,10 +699,7 @@ def test_example_posterior(snpe_method: type):
     prior_cov = eye(num_dim)
     prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
 
-    if snpe_method == SNPE_A:
-        extra_kwargs = dict(final_round=True)
-    else:
-        extra_kwargs = dict()
+    extra_kwargs = dict(final_round=True) if snpe_method == SNPE_A else dict()
 
     simulator, prior = prepare_for_sbi(
         lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov),

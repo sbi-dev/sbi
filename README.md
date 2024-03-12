@@ -56,7 +56,7 @@ The following algorithms are currently available. You can find a tutorial on how
 ### Neural Posterior Estimation: amortized (NPE) and sequential (SNPE)
 
 * [`SNPE_A`](https://sbi-dev.github.io/sbi/reference/#sbi.inference.snpe.snpe_a.SNPE_A) (including amortized single-round `NPE`) from Papamakarios G and Murray I [_Fast ε-free Inference of Simulation Models with Bayesian Conditional Density Estimation_](https://proceedings.neurips.cc/paper/2016/hash/6aca97005c68f1206823815f66102863-Abstract.html) (NeurIPS 2016).
-  
+
 * [`SNPE_C`](https://sbi-dev.github.io/sbi/reference/#sbi.inference.snpe.snpe_c.SNPE_C) or `APT` from Greenberg D, Nonnenmacher M, and Macke J [_Automatic
   Posterior Transformation for likelihood-free
   inference_](https://arxiv.org/abs/1905.07488) (ICML 2019).
@@ -108,7 +108,7 @@ M. Durkan's `lfi`. `sbi` runs as a community project. See also [credits](https:/
 
 ## Citation
 
-If you use `sbi` consider citing the [sbi software paper](https://doi.org/10.21105/joss.02505), in addition to the original research articles describing the specific sbi-algorithm(s) you are using. 
+If you use `sbi` consider citing the [sbi software paper](https://doi.org/10.21105/joss.02505), in addition to the original research articles describing the specific sbi-algorithm(s) you are using.
 
 ```latex
 @article{tejero-cantero2020sbi,

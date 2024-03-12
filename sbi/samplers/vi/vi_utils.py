@@ -11,7 +11,6 @@ from typing import (
     Union,
 )
 
-import numpy as np
 import torch
 from pyro.distributions.torch_transform import TransformModule
 from torch import Tensor
@@ -189,8 +188,8 @@ def add_parameters_module_attributes(
 
 
     """
-    setattr(q, "parameters", parameters)
-    setattr(q, "modules", modules)
+    q.parameters = parameters  # type: ignore
+    q.modules = modules  # type: ignore
 
 
 def add_parameter_attributes_to_transformed_distribution(
@@ -293,7 +292,7 @@ def _base_recursor(
     """
     if isinstance(obj, Module) and check(obj):
         action(obj)
-    elif isinstance(obj, Dict) or isinstance(obj, OrderedDict):
+    elif isinstance(obj, (Dict, OrderedDict)):
         for k, o in obj.items():
             if check(o):
                 obj[k] = action(o)
@@ -305,7 +304,7 @@ def _base_recursor(
                 setattr(obj, k, action(o))
             else:
                 _base_recursor(o, parent=obj, key=k, check=check, action=action)
-    elif isinstance(obj, List) or isinstance(obj, Tuple) or isinstance(obj, Generator):
+    elif isinstance(obj, (List, Tuple, Generator)):
         new_obj = []
         for o in obj:
             if check(o):
@@ -341,7 +340,7 @@ def detach_all_non_leaf_tensors(obj: object) -> None:
 
 def move_all_tensor_to_device(obj, device):
     def check(o):
-        return isinstance(o, Tensor) or isinstance(o, Module)
+        return isinstance(o, (Tensor, Module))
 
     def action(o):
         if isinstance(o, Tensor) and o.requires_grad and o.is_leaf:
@@ -381,5 +380,5 @@ def make_object_deepcopy_compatible(obj: object):
             setattr(result, k, deepcopy(v, memo))
         return result
 
-    setattr(obj, "__deepcopy__", __deepcopy__)
+    obj.__deepcopy__ = __deepcopy__  # type: ignore
     return obj

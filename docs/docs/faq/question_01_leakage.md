@@ -11,7 +11,7 @@ collect the remaining 10000 samples. Consider interrupting (Ctrl-C) and switchin
 
 The reason for this issue is described in more detail
 [here](https://arxiv.org/abs/2002.03712) and
-[here](https://arxiv.org/abs/1905.07488). The following fixes are possible:  
+[here](https://arxiv.org/abs/1905.07488). The following fixes are possible:
 
 - sample with MCMC: `samples = posterior((num_samples,), x=x_o, sample_with_mcmc=True)`.
 This approach will make sampling slower, but samples will not "leak".
@@ -26,4 +26,4 @@ interface](https://sbi-dev.github.io/sbi/tutorial/03_flexible_interface/), set
 statement "Using SNPE-C with non-atomic loss".
 
 - use a different algorithm, e.g., SNRE and SNLE. Note, however, that these algorithms
-can have different issues and potential pitfalls.  
+can have different issues and potential pitfalls.

@@ -39,7 +39,7 @@ def check_prior(prior: Any) -> None:
 
 def process_prior(
     prior: Union[Sequence[Distribution], Distribution, rv_frozen, multi_rv_frozen],
-    custom_prior_wrapper_kwargs: Dict = {},
+    custom_prior_wrapper_kwargs: Optional[Dict] = None,
 ) -> Tuple[Distribution, int, bool]:
     """Return PyTorch distribution-like prior from user-provided prior.
 
@@ -76,7 +76,8 @@ def process_prior(
         warnings.warn(
             f"""Prior was provided as a sequence of {len(prior)} priors. They will be
             interpreted as independent of each other and matched in order to the
-            components of the parameter."""
+            components of the parameter.""",
+            stacklevel=2,
         )
         # process individual priors
         prior = [process_prior(p, custom_prior_wrapper_kwargs)[0] for p in prior]
@@ -100,7 +101,7 @@ def process_prior(
 
 
 def process_custom_prior(
-    prior, custom_prior_wrapper_kwargs: Dict = {}
+    prior, custom_prior_wrapper_kwargs: Optional[Dict] = None
 ) -> Tuple[Distribution, int, bool]:
     """Check and return corrected prior object defined by the user.
 
@@ -130,7 +131,7 @@ def process_custom_prior(
 
 
 def maybe_wrap_prior_as_pytorch(
-    prior, custom_prior_wrapper_kwargs: Dict[str, Any] = {}
+    prior, custom_prior_wrapper_kwargs: Optional[Dict[str, Any]] = None
 ) -> Tuple[Distribution, bool]:
     """Check prior return type and maybe wrap as PyTorch.
 
@@ -160,14 +161,16 @@ def maybe_wrap_prior_as_pytorch(
         prior = CustomPriorWrapper(
             custom_prior=prior,
             event_shape=torch.Size([theta.numel()]),
-            **custom_prior_wrapper_kwargs,
+            **custom_prior_wrapper_kwargs or {},
         )
         is_prior_numpy = False
     elif isinstance(theta, ndarray) and isinstance(log_probs, ndarray):
         # infer event shape from single numpy sample.
         event_shape = torch.Size([theta.size])
         prior = CustomPriorWrapper(
-            custom_prior=prior, event_shape=event_shape, **custom_prior_wrapper_kwargs
+            custom_prior=prior,
+            event_shape=event_shape,
+            **custom_prior_wrapper_kwargs or {},
         )
         is_prior_numpy = True
     else:
@@ -207,13 +210,14 @@ def process_pytorch_prior(prior: Distribution) -> Tuple[Distribution, int, bool]
     elif isinstance(prior, Uniform) and prior.batch_shape.numel() == 1:
         prior = BoxUniform(low=prior.low, high=prior.high)
         warnings.warn(
-            "Casting 1D Uniform prior to BoxUniform to match sbi batch requirements."
+            "Casting 1D Uniform prior to BoxUniform to match sbi batch requirements.",
+            stacklevel=2,
         )
 
     check_prior_batch_behavior(prior)
     check_prior_batch_dims(prior)
 
-    if not prior.sample().dtype == float32:
+    if prior.sample().dtype != float32:
         prior = PytorchReturnTypeWrapper(
             prior, return_type=float32, validate_args=False
         )
@@ -346,33 +350,33 @@ def check_prior_attributes(prior) -> None:
     num_samples = 2
     try:
         theta = prior.sample((num_samples,))
-    except AttributeError:
+    except AttributeError as err:
         raise AttributeError(
             "Prior needs method `.sample()`. Consider using a PyTorch distribution."
-        )
-    except TypeError:
+        ) from err
+    except TypeError as err:
         raise TypeError(
             f"""The `prior.sample()` method must accept Tuple arguments, e.g.,
             prior.sample(({num_samples}, )) to sample a batch of 2 parameters. Consider
             using a PyTorch distribution."""
-        )
-    except Exception:  # Catch any other error.
+        ) from err
+    except Exception as err:  # Catch any other error.
         raise ValueError(
             f"""Something went wrong when sampling a batch of parameters
             from the prior as `prior.sample(({num_samples}, ))`. Consider using a
             PyTorch distribution."""
-        )
+        ) from err
     try:
         prior.log_prob(theta)
-    except AttributeError:
+    except AttributeError as err:
         raise AttributeError(
             "Prior needs method `.log_prob()`. Consider using a PyTorch distribution."
-        )
-    except Exception:  # Catch any other error.
+        ) from err
+    except Exception as err:  # Catch any other error.
         raise ValueError(
             """Something went wrong when evaluating a batch of parameters theta
             with `prior.log_prob(theta)`. Consider using a PyTorch distribution."""
-        )
+        ) from err
 
 
 def check_prior_return_type(
@@ -420,11 +424,11 @@ def check_prior_support(prior):
 
     try:
         within_support(prior, prior.sample((1,)))
-    except NotImplementedError:
+    except NotImplementedError as err:
         raise NotImplementedError(
             """The prior must implement the support property or allow to call
             .log_prob() outside of support."""
-        )
+        ) from err
 
 
 def check_embedding_net_device(embedding_net: nn.Module, datum: torch.Tensor) -> None:
@@ -449,7 +453,8 @@ def check_embedding_net_device(embedding_net: nn.Module, datum: torch.Tensor) ->
                 f"device '{embedding_net_device}'. "
                 "Automatically switching the embedding_net's device to "
                 f"'{datum_device}', which could otherwise be done manually "
-                f"""using the line `embedding_net.to('{datum_device}')`."""
+                f"""using the line `embedding_net.to('{datum_device}')`.""",
+                stacklevel=2,
             )
             embedding_net.to(datum_device)
     else:
@@ -720,7 +725,8 @@ def validate_theta_and_x(
         warnings.warn(
             f"Data x has device '{x.device}'."
             f"Moving x to the data_device '{data_device}'."
-            f"Training will proceed on device '{training_device}'."
+            f"Training will proceed on device '{training_device}'.",
+            stacklevel=2,
         )
         x = x.to(data_device)
 
@@ -728,7 +734,8 @@ def validate_theta_and_x(
         warnings.warn(
             f"Parameters theta has device '{theta.device}'. "
             f"Moving theta to the data_device '{data_device}'."
-            f"Training will proceed on device '{training_device}'."
+            f"Training will proceed on device '{training_device}'.",
+            stacklevel=2,
         )
         theta = theta.to(data_device)
 
@@ -749,7 +756,7 @@ def test_posterior_net_for_multi_d_x(net: flows.Flow, theta: Tensor, x: Tensor) 
     except RuntimeError as rte:
         ndims = x.ndim
         if ndims > 2:
-            message = f"""Debug hint: The simulated data x has {ndims-1} dimensions.
+            message = f"""Debug hint: The simulated data x has {ndims - 1} dimensions.
             With default settings, sbi cannot deal with multidimensional simulations.
             Make sure to use an embedding net that reduces the dimensionality, e.g., a
             CNN in case of images, or change the simulator to return one-dimensional x.
@@ -757,4 +764,4 @@ def test_posterior_net_for_multi_d_x(net: flows.Flow, theta: Tensor, x: Tensor) 
         else:
             message = ""
 
-        raise RuntimeError(rte, message)
+        raise RuntimeError(message) from rte

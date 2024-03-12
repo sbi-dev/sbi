@@ -192,9 +192,11 @@ def test_average_cond_coeff_matrix():
         resolution=500,
     )
     corr_dim12 = torch.sqrt(torch.tensor(30.0**2 / 100.0 / 10.0))
-    gt_matrix = torch.tensor(
-        [[1.0, corr_dim12, 0.0], [corr_dim12, 1.0, 0.0], [0.0, 0.0, 1.0]]
-    )
+    gt_matrix = torch.tensor([
+        [1.0, corr_dim12, 0.0],
+        [corr_dim12, 1.0, 0.0],
+        [0.0, 0.0, 1.0],
+    ])
 
     assert (torch.abs(gt_matrix - cond_mat) < 1e-3).all()
 
@@ -225,9 +227,9 @@ def test_gaussian_transforms(snpe_method: str, plot_results: bool = False):
 
         def log_prob(self, theta):
             probs = zeros(theta.shape[0])
-            for m, p, l in zip(self._means, self._preds, self._logits):
+            for m, p, logit in zip(self._means, self._preds, self._logits):
                 mvn = MultivariateNormal(m, p)
-                weighted_prob = torch.exp(mvn.log_prob(theta)) * l
+                weighted_prob = torch.exp(mvn.log_prob(theta)) * logit
                 probs += weighted_prob
             return probs
 

@@ -108,7 +108,7 @@ class CNNEmbedding(nn.Module):
         self,
         input_shape: Tuple,
         in_channels: int = 1,
-        out_channels_per_layer: List = [6, 12],
+        out_channels_per_layer: Optional[List] = None,
         num_conv_layers: int = 2,
         num_linear_layers: int = 2,
         num_linear_units: int = 50,
@@ -150,6 +150,8 @@ class CNNEmbedding(nn.Module):
         conv_module = nn.Conv2d if use_2d_cnn else nn.Conv1d
         pool_module = nn.MaxPool2d if use_2d_cnn else nn.MaxPool1d
 
+        if out_channels_per_layer is None:
+            out_channels_per_layer = [6, 12]
         assert (
             len(out_channels_per_layer) == num_conv_layers
         ), "out_channels needs as many entries as num_cnn_layers."

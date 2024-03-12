@@ -138,10 +138,7 @@ class PosteriorEstimator(NeuralInference, ABC):
                 current_round = max(self._data_round_index) + 1
 
         if exclude_invalid_x is None:
-            if current_round == 0:
-                exclude_invalid_x = True
-            else:
-                exclude_invalid_x = False
+            exclude_invalid_x = current_round == 0
 
         if data_device is None:
             data_device = self._device
@@ -437,10 +434,10 @@ class PosteriorEstimator(NeuralInference, ABC):
         sample_with: str = "direct",
         mcmc_method: str = "slice_np",
         vi_method: str = "rKL",
-        direct_sampling_parameters: Dict[str, Any] = {},
-        mcmc_parameters: Dict[str, Any] = {},
-        vi_parameters: Dict[str, Any] = {},
-        rejection_sampling_parameters: Dict[str, Any] = {},
+        direct_sampling_parameters: Optional[Dict[str, Any]] = None,
+        mcmc_parameters: Optional[Dict[str, Any]] = None,
+        vi_parameters: Optional[Dict[str, Any]] = None,
+        rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
     ) -> Union[MCMCPosterior, RejectionPosterior, VIPosterior, DirectPosterior]:
         r"""Build posterior from the neural density estimator.
 
@@ -506,10 +503,11 @@ class PosteriorEstimator(NeuralInference, ABC):
                 prior=prior,
                 x_shape=self._x_shape,
                 device=device,
-                **direct_sampling_parameters,
+                **direct_sampling_parameters or {},
             )
         elif sample_with == "rejection":
-            if "proposal" not in rejection_sampling_parameters.keys():
+            rejection_sampling_parameters = rejection_sampling_parameters or {}
+            if "proposal" not in rejection_sampling_parameters:
                 raise ValueError(
                     "You passed `sample_with='rejection' but you did not specify a "
                     "`proposal` in `rejection_sampling_parameters`. Until sbi "
@@ -531,7 +529,7 @@ class PosteriorEstimator(NeuralInference, ABC):
                 method=mcmc_method,
                 device=device,
                 x_shape=self._x_shape,
-                **mcmc_parameters,
+                **mcmc_parameters or {},
             )
         elif sample_with == "vi":
             self._posterior = VIPosterior(
@@ -541,7 +539,7 @@ class PosteriorEstimator(NeuralInference, ABC):
                 vi_method=vi_method,
                 device=device,
                 x_shape=self._x_shape,
-                **vi_parameters,
+                **vi_parameters or {},
             )
         else:
             raise NotImplementedError
@@ -607,7 +605,8 @@ class PosteriorEstimator(NeuralInference, ABC):
                         "proposal distribution it uses is not the prior (it can be "
                         "accessed via `RestrictedPrior._prior`). We do not "
                         "recommend to mix the `RestrictedPrior` with multi-round "
-                        "SNPE."
+                        "SNPE.",
+                        stacklevel=2,
                     )
             elif (
                 not isinstance(proposal, NeuralPosterior)
@@ -617,7 +616,8 @@ class PosteriorEstimator(NeuralInference, ABC):
                     "The proposal you passed is neither the prior nor a "
                     "`NeuralPosterior` object. If you are an expert user and did so "
                     "for research purposes, this is fine. If not, you might be doing "
-                    "something wrong: feel free to create an issue on Github."
+                    "something wrong: feel free to create an issue on Github.",
+                    stacklevel=2,
                 )
         elif self._round > 0:
             raise ValueError(

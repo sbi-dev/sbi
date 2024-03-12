@@ -77,7 +77,7 @@ def test_sbc_rank_plot(num_parameters, num_cols, custom_figure, plot_type):
         plot_type=plot_type,
         fig=fig,
         ax=ax,
-        kwargs=dict(num_cols=num_cols, params_in_subplots=True),
+        **dict(num_cols=num_cols, params_in_subplots=True),
     )
     if not custom_figure:
         if num_parameters > num_cols:

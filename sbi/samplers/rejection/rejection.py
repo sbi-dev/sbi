@@ -81,7 +81,10 @@ def rejection_sample(
     )
 
     if m < 1.0:
-        warnings.warn("A value of m < 1.0 will lead to systematically wrong results.")
+        warnings.warn(
+            "A value of m < 1.0 will lead to systematically wrong results.",
+            stacklevel=2,
+        )
 
     class ScaledProposal:
         """
@@ -192,7 +195,7 @@ def accept_reject_sample(
     warn_acceptance: float = 0.01,
     sample_for_correction_factor: bool = False,
     max_sampling_batch_size: int = 10_000,
-    proposal_sampling_kwargs: Dict = {},
+    proposal_sampling_kwargs: Optional[Dict] = None,
     alternative_method: Optional[str] = None,
     **kwargs,
 ) -> Tuple[Tensor, Tensor]:

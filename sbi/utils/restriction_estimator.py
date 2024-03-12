@@ -10,7 +10,6 @@ from torch.distributions import Distribution
 from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.utils import data
 from torch.utils.data.sampler import SubsetRandomSampler, WeightedRandomSampler
-from tqdm.auto import tqdm
 
 from sbi.samplers.importance.sir import sampling_importance_resampling
 from sbi.samplers.rejection.rejection import accept_reject_sample
@@ -384,9 +383,10 @@ class RestrictionEstimator:
         # Factor of two such that the average learning rate remains the same.
         # Needed because the average of reweigh_factor and 1-reweigh_factor will be 0.5
         # only.
-        importance_weights = 2 * torch.tensor(
-            [importance_weights, 1 - importance_weights]
-        )
+        importance_weights = 2 * torch.tensor([
+            importance_weights,
+            1 - importance_weights,
+        ])
 
         criterion = nn.CrossEntropyLoss(importance_weights, reduction="none")
 

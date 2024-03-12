@@ -6,7 +6,7 @@ from functools import partial
 from typing import Optional, Sequence, Union
 from warnings import warn
 
-import zuko
+import torch
 from pyknos.nflows import distributions as distributions_
 from pyknos.nflows import flows, transforms
 from pyknos.nflows.nn import nets
@@ -62,7 +62,10 @@ def build_made(
     y_numel = embedding_net(batch_y[:1]).numel()
 
     if x_numel == 1:
-        warn("In one-dimensional output space, this flow is limited to Gaussians")
+        warn(
+            "In one-dimensional output space, this flow is limited to Gaussians",
+            stacklevel=2,
+        )
 
     transform = transforms.IdentityTransform()
 
@@ -142,7 +145,10 @@ def build_maf(
     y_numel = embedding_net(batch_y[:1]).numel()
 
     if x_numel == 1:
-        warn("In one-dimensional output space, this flow is limited to Gaussians")
+        warn(
+            "In one-dimensional output space, this flow is limited to Gaussians",
+            stacklevel=2,
+        )
 
     transform_list = []
     for _ in range(num_transforms):
@@ -177,7 +183,7 @@ def build_maf(
     # Combine transforms.
     transform = transforms.CompositeTransform(transform_list)
 
-    distribution = distributions_.StandardNormal((x_numel,))
+    distribution = get_base_dist(x_numel, **kwargs)
     neural_net = flows.Flow(transform, distribution, embedding_net)
     flow = NFlowsFlow(neural_net, condition_shape=batch_y[0].shape)
 
@@ -247,7 +253,10 @@ def build_maf_rqs(
     y_numel = embedding_net(batch_y[:1]).numel()
 
     if x_numel == 1:
-        warn("In one-dimensional output space, this flow is limited to Gaussians")
+        warn(
+            "In one-dimensional output space, this flow is limited to Gaussians",
+            stacklevel=2,
+        )
 
     transform_list = []
     for _ in range(num_transforms):
@@ -288,7 +297,7 @@ def build_maf_rqs(
     # Combine transforms.
     transform = transforms.CompositeTransform(transform_list)
 
-    distribution = distributions_.StandardNormal((x_numel,))
+    distribution = get_base_dist(x_numel, **kwargs)
     neural_net = flows.Flow(transform, distribution, embedding_net)
     flow = NFlowsFlow(neural_net, condition_shape=batch_y[0].shape)
 
@@ -407,7 +416,7 @@ def build_nsf(
             standardizing_net(batch_y, structured_y), embedding_net
         )
 
-    distribution = distributions_.StandardNormal((x_numel,))
+    distribution = get_base_dist(x_numel, **kwargs)
 
     # Combine transforms.
     transform = transforms.CompositeTransform(transform_list)
@@ -565,3 +574,13 @@ class ContextSplineMap(nn.Module):
             Spline parameters.
         """
         return self.spline_predictor(context)
+
+
+def get_base_dist(
+    num_dims: int, dtype: torch.dtype = torch.float32, **kwargs
+) -> distributions_.Distribution:
+    """Returns the base distribution for a flow with given float dtype."""
+
+    base = distributions_.StandardNormal((num_dims,))
+    base._log_z = base._log_z.to(dtype)
+    return base

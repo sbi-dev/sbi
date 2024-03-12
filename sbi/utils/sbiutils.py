@@ -13,9 +13,8 @@ import torch
 import torch.distributions.transforms as torch_tf
 import zuko
 from pyro.distributions import Empirical
-from torch import Tensor
+from torch import Tensor, ones, optim, zeros
 from torch import nn as nn
-from torch import ones, optim, zeros
 from torch.distributions import Distribution, Independent, biject_to, constraints
 
 from sbi import utils as utils
@@ -41,6 +40,7 @@ def warn_if_zscoring_changes_data(x: Tensor, duplicate_tolerance: float = 0.1) -
             If this is intended, make sure to set `z_score_x='none'` as z-scoring would
             result in NaNs""",
             UserWarning,
+            stacklevel=2,
         )
 
         # Skip computation.
@@ -55,13 +55,14 @@ def warn_if_zscoring_changes_data(x: Tensor, duplicate_tolerance: float = 0.1) -
         if num_unique_z < num_unique * (1 - duplicate_tolerance):
             warnings.warn(
                 """Z-scoring these simulation outputs resulted in {num_unique_z} unique
-                datapoints. Before z-scoring, it had been {num_unique}. This can occur 
-                due to numerical inaccuracies when the data covers a large range of 
-                values. Consider either setting `z_score_x=False` (but beware that this 
-                can be problematic for training the NN) or exclude outliers from your 
+                datapoints. Before z-scoring, it had been {num_unique}. This can occur
+                due to numerical inaccuracies when the data covers a large range of
+                values. Consider either setting `z_score_x=False` (but beware that this
+                can be problematic for training the NN) or exclude outliers from your
                 dataset. Note: if you have already set `z_score_x=False`, this warning
                 will still be displayed, but you can ignore it.""",
                 UserWarning,
+                stacklevel=2,
             )
 
 
@@ -107,12 +108,13 @@ def z_score_parser(z_score_flag: Optional["str"]) -> Tuple[bool, bool]:
     Returns:
         Flag for whether or not to z-score, and whether data is structured
     """
-    if type(z_score_flag) is bool:
+    if isinstance(z_score_flag, bool):
         # Raise warning if boolean was passed.
         warnings.warn(
             "Boolean flag for z-scoring is deprecated as of sbi v0.18.0. It will be "
             "removed in a future release. Use 'none', 'independent', or 'structured' "
-            "to indicate z-scoring option."
+            "to indicate z-scoring option.",
+            stacklevel=2,
         )
         z_score_bool, structured_data = z_score_flag, False
 
@@ -123,7 +125,7 @@ def z_score_parser(z_score_flag: Optional["str"]) -> Tuple[bool, bool]:
     elif (z_score_flag == "independent") or (z_score_flag == "structured"):
         # Got one of two valid z-scoring methods.
         z_score_bool = True
-        structured_data = True if z_score_flag == "structured" else False
+        structured_data = z_score_flag == "structured"
 
     else:
         # Return warning due to invalid option, defaults to not z-scoring.
@@ -254,7 +256,7 @@ def standardizing_net(
     nan_in_stats = torch.logical_or(torch.isnan(t_mean).any(), torch.isnan(t_std).any())
     assert not nan_in_stats, """Training data mean or std for standardizing net must not
                             contain NaNs. In case you are encoding missing trials with
-                            NaNs, consider setting z_score_x='none' to disable 
+                            NaNs, consider setting z_score_x='none' to disable
                             z-scoring."""
 
     return Standardize(t_mean, t_std)
@@ -359,7 +361,8 @@ def warn_on_iid_x(num_trials):
             + """It will be interpreted as a batch of independent and identically
             distributed data X={x_1, ..., x_n}, i.e., data generated based on the
             same underlying (unknown) parameter. The resulting posterior will be with
-            respect to entire batch, i.e,. p(theta | X)."""
+            respect to entire batch, i.e,. p(theta | X).""",
+            stacklevel=2,
         )
 
 
@@ -393,7 +396,7 @@ def check_warn_and_setstate(
         appended warning message.
     """
 
-    if key_name not in state_dict.keys():
+    if key_name not in state_dict:
         state_dict[key_name] = replacement_value
         warning_msg += " `self." + key_name + f" = {str(replacement_value)}`"
     return state_dict, warning_msg
@@ -413,9 +416,9 @@ def get_simulations_since_round(
         starting_round_index: From which round onwards to return the data. We start
             counting from 0.
     """
-    return torch.cat(
-        [t for t, r in zip(data, data_round_indices) if r >= starting_round_index]
-    )
+    return torch.cat([
+        t for t, r in zip(data, data_round_indices) if r >= starting_round_index
+    ])
 
 
 def mask_sims_from_prior(round_: int, num_simulations: int) -> Tensor:
@@ -611,9 +614,10 @@ def match_theta_and_x_batch_shapes(theta: Tensor, x: Tensor) -> Tuple[Tensor, Te
 
     # Double check: batch size for log prob evaluation must match.
     assert x_repeated.shape == torch.Size([theta_batch_size * x_batch_size, *x_shape])
-    assert theta_repeated.shape == torch.Size(
-        [theta_batch_size * x_batch_size, *theta_shape]
-    )
+    assert theta_repeated.shape == torch.Size([
+        theta_batch_size * x_batch_size,
+        *theta_shape,
+    ])
 
     return theta_repeated, x_repeated
 
@@ -662,7 +666,8 @@ def mcmc_transform(
             warnings.warn(
                 """The passed prior has no support property, transform will be
                 constructed from mean and std. If the passed prior is supposed to be
-                bounded consider implementing the prior.support property."""
+                bounded consider implementing the prior.support property.""",
+                stacklevel=2,
             )
             has_support = False
 
@@ -695,7 +700,9 @@ def mcmc_transform(
                 # AttributeError -> Custom distribution that has no mean/std attribute.
                 warnings.warn(
                     """The passed prior has no mean or stddev attribute, estimating
-                    them from samples to build affimed standardizing transform."""
+                    them from samples to build affimed standardizing
+                    transform.""",
+                    stacklevel=2,
                 )
                 theta = prior.sample(torch.Size((num_prior_samples_for_zscoring,)))
                 prior_mean = theta.mean(dim=0).to(device)
@@ -734,7 +741,9 @@ def check_transform(
     use a transforms when using a MultipleIndependent prior with a Dirichlet prior."""
 
     assert torch.allclose(
-        theta, transform(theta_unconstrained), atol=atol  # type: ignore
+        theta,
+        transform(theta_unconstrained),  # type: ignore
+        atol=atol,
     ), "Original and re-transformed parameters must be close to each other."
 
 
@@ -911,9 +920,9 @@ def gradient_ascent(
                 if show_progress_bars:
                     print(
                         "\r",
-                        f"Optimizing MAP estimate. Iterations: {iter_+1} / "
+                        f"Optimizing MAP estimate. Iterations: {iter_ + 1} / "
                         f"{num_iter}. Performance in iteration "
-                        f"{divmod(iter_+1, save_best_every)[0] * save_best_every}: "
+                        f"{divmod(iter_ + 1, save_best_every)[0] * save_best_every}: "
                         f"{best_log_prob_iter.item():.2f} (= unnormalized log-prob)",
                         end="",
                     )
@@ -933,11 +942,8 @@ def gradient_ascent(
 def seed_all_backends(seed: Optional[Union[int, Tensor]] = None) -> None:
     """Sets all python, numpy and pytorch seeds."""
 
-    if seed is None:
-        seed = int(torch.randint(1_000_000, size=(1,)))
-    else:
-        # Cast Tensor to int (required by math.random since Python 3.11)
-        seed = int(seed)
+    # Cast Tensor to int (required by math.random since Python 3.11)
+    seed = int(torch.randint(1000000, size=(1,))) if seed is None else int(seed)
 
     random.seed(seed)
     np.random.seed(seed)

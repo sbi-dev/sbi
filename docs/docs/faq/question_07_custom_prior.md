@@ -71,8 +71,8 @@ pass the bounds to the wrapper function such that `sbi` can pass them to torch
 from sbi.utils import process_prior
 
 custom_prior = CustomUniformPrior(torch.zeros(2), torch.ones(2))
-prior = process_prior(custom_prior, 
-                      custom_prior_wrapper_kwargs=dict(lower_bound=torch.zeros(2), 
+prior = process_prior(custom_prior,
+                      custom_prior_wrapper_kwargs=dict(lower_bound=torch.zeros(2),
                                                        upper_bound=torch.ones(2)))
 # use this wrapped prior in sbi...
 ```

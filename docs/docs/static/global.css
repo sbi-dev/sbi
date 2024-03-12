@@ -15,7 +15,7 @@ a[title="Edit this page"] {
 }
 
 .md-typeset .footnote-ref:before {
-  border-left: none !important; 
+  border-left: none !important;
   margin-left: -0.4em !important;
 }
 

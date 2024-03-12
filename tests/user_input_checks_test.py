@@ -181,9 +181,10 @@ def test_process_prior(prior):
 
     batch_size = 2
     theta = prior.sample((batch_size,))
-    assert theta.shape == torch.Size(
-        (batch_size, parameter_dim)
-    ), "Number of sampled parameters must match batch size."
+    assert theta.shape == torch.Size((
+        batch_size,
+        parameter_dim,
+    )), "Number of sampled parameters must match batch size."
     assert (
         prior.log_prob(theta).shape[0] == batch_size
     ), "Number of log probs must match number of input values."
@@ -367,9 +368,10 @@ def test_inference_with_user_sbi_problems(
         pytest.param(
             [
                 Gamma(ones(2), ones(1)),
-                MultipleIndependent(
-                    [Uniform(zeros(1), ones(1)), Uniform(zeros(1), ones(1))]
-                ),
+                MultipleIndependent([
+                    Uniform(zeros(1), ones(1)),
+                    Uniform(zeros(1), ones(1)),
+                ]),
             ],
             marks=pytest.mark.xfail,
         ),  # nested definition.
@@ -407,9 +409,10 @@ def test_independent_joint_shapes_and_samples(dists):
     log_probs = joint.log_prob(samples)
 
     # Check sample and log_prob return shapes.
-    assert samples.shape == torch.Size(
-        [num_samples, joint.ndims]
-    ) or samples.shape == torch.Size([num_samples])
+    assert samples.shape == torch.Size([
+        num_samples,
+        joint.ndims,
+    ]) or samples.shape == torch.Size([num_samples])
     assert log_probs.shape == torch.Size([num_samples])
 
     # Seed again to get same samples by hand.

@@ -20,11 +20,11 @@ class CustomPriorWrapper(Distribution):
         batch_shape=torch.Size(),
         event_shape=torch.Size(),
         validate_args=None,
-        arg_constraints: Dict[str, constraints.Constraint] = {},
+        arg_constraints: Optional[Dict[str, constraints.Constraint]] = None,
         lower_bound: Optional[Tensor] = None,
         upper_bound: Optional[Tensor] = None,
     ):
-        self.custom_arg_constraints = arg_constraints
+        self.custom_arg_constraints = arg_constraints or {}
         self.custom_prior = custom_prior
         self.return_type = return_type
 
@@ -40,7 +40,8 @@ class CustomPriorWrapper(Distribution):
 
     def log_prob(self, value) -> Tensor:
         return torch.as_tensor(
-            self.custom_prior.log_prob(value), dtype=self.return_type  # type: ignore
+            self.custom_prior.log_prob(value),
+            dtype=self.return_type,  # type: ignore
         )
 
     def sample(self, sample_shape=torch.Size()) -> Tensor:
@@ -69,6 +70,7 @@ class CustomPriorWrapper(Distribution):
             warnings.warn(
                 "Prior is lacking mean attribute, estimating prior mean from samples.",
                 UserWarning,
+                stacklevel=2,
             )
         if hasattr(self.custom_prior, "variance"):
             pass
@@ -81,6 +83,7 @@ class CustomPriorWrapper(Distribution):
                 """Prior is lacking variance attribute, estimating prior variance from
                 samples...""",
                 UserWarning,
+                stacklevel=2,
             )
 
     @property
@@ -108,11 +111,11 @@ class ScipyPytorchWrapper(Distribution):
         batch_shape=torch.Size(),
         event_shape=torch.Size(),
         validate_args=None,
-        arg_constraints: Dict[str, constraints.Constraint] = {},
+        arg_constraints: Optional[Dict[str, constraints.Constraint]] = None,
         lower_bound: Optional[Tensor] = None,
         upper_bound: Optional[Tensor] = None,
     ):
-        self.custom_arg_constraints = arg_constraints
+        self.custom_arg_constraints = arg_constraints or {}
         self.prior_scipy = prior_scipy
         self.return_type = return_type
         self.custom_support = build_support(lower_bound, upper_bound)
@@ -224,7 +227,7 @@ class MultipleIndependent(Distribution):
         self,
         dists: Sequence[Distribution],
         validate_args=None,
-        arg_constraints: Dict[str, constraints.Constraint] = {},
+        arg_constraints: Optional[Dict[str, constraints.Constraint]] = None,
     ):
         self._check_distributions(dists)
         if validate_args is not None:
@@ -236,14 +239,14 @@ class MultipleIndependent(Distribution):
         self.dims_per_dist = [d.sample().numel() for d in self.dists]
 
         self.ndims = int(torch.sum(torch.as_tensor(self.dims_per_dist)).item())
-        self.custom_arg_constraints = arg_constraints
+        self.custom_arg_constraints = arg_constraints or {}
         self.validate_args = validate_args
 
         super().__init__(
             batch_shape=torch.Size([]),  # batch size was ensured to be <= 1 above.
-            event_shape=torch.Size(
-                [self.ndims]
-            ),  # Event shape is the sum of all ndims.
+            event_shape=torch.Size([
+                self.ndims
+            ]),  # Event shape is the sum of all ndims.
             validate_args=validate_args,
         )
 
@@ -388,7 +391,8 @@ def build_support(
         support = constraints.real
         warnings.warn(
             """No prior bounds were passed, consider passing lower_bound
-            and / or upper_bound if your prior has bounded support."""
+            and / or upper_bound if your prior has bounded support.""",
+            stacklevel=2,
         )
     # Only lower bound is specified.
     elif upper_bound is None:

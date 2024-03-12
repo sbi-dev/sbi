@@ -9,15 +9,15 @@ def syn_current(duration=120, dt=0.01, t_on=10, curr_level=5e-4, seed=None):
 
     # external current
     A_soma = np.pi * ((70.0 * 1e-4) ** 2)  # cm2
-    I = np.zeros_like(t)
-    I[int(np.round(t_on / dt)) : int(np.round(t_off / dt))] = (
+    I_inj = np.zeros_like(t)
+    I_inj[int(np.round(t_on / dt)) : int(np.round(t_off / dt))] = (
         curr_level / A_soma
     )  # muA/cm2
 
-    return I, t_on, t_off, dt, t, A_soma
+    return I_inj, t_on, t_off, dt, t, A_soma
 
 
-def HHsimulator(V0, params, dt, t, I, seed=None):
+def HHsimulator(V0, params, dt, t, I_inj, seed=None):
     """Simulates the Hodgkin-Huxley model for a specified time duration and current
 
     Parameters
@@ -144,7 +144,7 @@ def HHsimulator(V0, params, dt, t, I, seed=None):
             + (n[i - 1] ** 4) * gbar_K * E_K
             + g_leak * E_leak
             + gbar_M * p[i - 1] * E_K
-            + I[i - 1]
+            + I_inj[i - 1]
             + nois_fact * rng.randn() / (tstep**0.5)
         ) / (tau_V_inv * C)
         V[i] = V_inf + (V[i - 1] - V_inf) * np.exp(-tstep * tau_V_inv)
@@ -167,7 +167,7 @@ def calculate_summary_statistics(x):
     -------
     np.array, summary statistics
     """
-    I, t_on, t_off, dt, t, A_soma = syn_current()
+    I_inj, t_on, t_off, dt, t, A_soma = syn_current()
 
     n_mom = 4
     n_summary = 7
@@ -214,15 +214,15 @@ def calculate_summary_statistics(x):
     )
 
     # concatenation of summary statistics
-    sum_stats_vec = np.concatenate(
-        (
-            np.array([spike_times_stim.shape[0]]),
-            np.array(
-                [rest_pot, rest_pot_std, np.mean(x["data"][(t > t_on) & (t < t_off)])]
-            ),
-            moments,
-        )
-    )
+    sum_stats_vec = np.concatenate((
+        np.array([spike_times_stim.shape[0]]),
+        np.array([
+            rest_pot,
+            rest_pot_std,
+            np.mean(x["data"][(t > t_on) & (t < t_off)]),
+        ]),
+        moments,
+    ))
     sum_stats_vec = sum_stats_vec[0:n_summary]
 
     return sum_stats_vec

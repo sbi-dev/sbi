@@ -69,10 +69,10 @@ def infer(
 
     try:
         method_fun: Callable = getattr(sbi.inference, method.upper())
-    except AttributeError:
+    except AttributeError as err:
         raise NameError(
             "Method not available. `method` must be one of 'SNPE', 'SNLE', 'SNRE'."
-        )
+        ) from err
 
     simulator, prior = prepare_for_sbi(simulator, prior)
 
@@ -209,13 +209,15 @@ class NeuralInference(ABC):
             theta: Parameter sets.
             x: Simulation outputs.
             exclude_invalid_x: Whether invalid simulations are discarded during
-                training. If `False`, The inference algorithm raises an error when invalid simulations are
-                found. If `True`, invalid simulations are discarded and training
-                can proceed, but this gives systematically wrong results.
+                training. If `False`, The inference algorithm raises an error when
+                invalid simulations are found. If `True`, invalid simulations are
+                discarded and training can proceed, but this gives systematically wrong
+                results.
             from_round: Which round the data stemmed from. Round 0 means from the prior.
-                With default settings, this is not used at all for the inference algorithm. Only when
-                the user later on requests `.train(discard_prior_samples=True)`, we
-                use these indices to find which training data stemmed from the prior.
+                With default settings, this is not used at all for the inference
+                algorithm. Only when the user later on requests
+                `.train(discard_prior_samples=True)`, we use these indices to find which
+                training data stemmed from the prior.
             algorithm: Which algorithm is used. This is used to give a more informative
                 warning or error message when invalid simulations are found.
             data_device: Where to store the data, default is on the same device where
@@ -412,7 +414,8 @@ class NeuralInference(ABC):
         elif max_num_epochs == epoch:
             warn(
                 "Maximum number of epochs `max_num_epochs={max_num_epochs}` reached,"
-                "but network has not yet fully converged. Consider increasing it."
+                "but network has not yet fully converged. Consider increasing it.",
+                stacklevel=2,
             )
 
     def _summarize(
@@ -502,11 +505,12 @@ class NeuralInference(ABC):
             "changes in the following two ways: "
             "1) `.train(..., retrain_from_scratch=True)` is not supported. "
             "2) When the loaded object calls the `.train()` method, it generates a new "
-            "tensorboard summary writer (instead of appending to the current one)."
+            "tensorboard summary writer (instead of appending to the current one).",
+            stacklevel=2,
         )
         dict_to_save = {}
         unpicklable_attributes = ["_summary_writer", "_build_neural_net"]
-        for key in self.__dict__.keys():
+        for key in self.__dict__:
             if key in unpicklable_attributes:
                 dict_to_save[key] = None
             else:
@@ -583,10 +587,9 @@ def check_if_proposal_has_default_x(proposal: Any):
     If the proposal is a `NeuralPosterior`, we check if the default_x is set and
     if it matches the `_x_o_training_focused_on`.
     """
-    if isinstance(proposal, NeuralPosterior):
-        if proposal.default_x is None:
-            raise ValueError(
-                "`proposal.default_x` is None, i.e. there is no "
-                "x_o for training. Set it with "
-                "`posterior.set_default_x(x_o)`."
-            )
+    if isinstance(proposal, NeuralPosterior) and proposal.default_x is None:
+        raise ValueError(
+            "`proposal.default_x` is None, i.e. there is no "
+            "x_o for training. Set it with "
+            "`posterior.set_default_x(x_o)`."
+        )

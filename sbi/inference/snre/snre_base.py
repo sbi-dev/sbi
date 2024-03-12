@@ -39,7 +39,8 @@ class RatioEstimator(NeuralInference, ABC):
         - SNRE_B / SRE can use more than two atoms, potentially boosting performance,
           but allows for posterior evaluation **only up to a normalizing constant**,
           even when training only one round.
-        - BNRE is a variation of SNRE_A aiming to produce more conservative posterior approximations.
+        - BNRE is a variation of SNRE_A aiming to produce more conservative posterior
+          approximations.
         - SNRE_C / NRE-C is a generalization of SNRE_A and SNRE_B which can use multiple
           classes (similar to atoms) but encourages an exact likelihood-to-evidence
           ratio (density evaluation) by introducing an independently drawn class.
@@ -135,7 +136,7 @@ class RatioEstimator(NeuralInference, ABC):
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
-        loss_kwargs: Dict[str, Any] = {},
+        loss_kwargs: Optional[Dict[str, Any]] = None,
     ) -> nn.Module:
         r"""Return classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
 
@@ -163,6 +164,9 @@ class RatioEstimator(NeuralInference, ABC):
         self._round = max(self._data_round_index)
         # Starting index for the training set (1 = discard round-0 samples).
         start_idx = int(discard_prior_samples and self._round > 0)
+
+        if loss_kwargs is None:
+            loss_kwargs = {}
 
         train_loader, val_loader = self.get_dataloaders(
             start_idx,
@@ -311,9 +315,9 @@ class RatioEstimator(NeuralInference, ABC):
         sample_with: str = "mcmc",
         mcmc_method: str = "slice_np",
         vi_method: str = "rKL",
-        mcmc_parameters: Dict[str, Any] = {},
-        vi_parameters: Dict[str, Any] = {},
-        rejection_sampling_parameters: Dict[str, Any] = {},
+        mcmc_parameters: Optional[Dict[str, Any]] = None,
+        vi_parameters: Optional[Dict[str, Any]] = None,
+        rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
     ) -> Union[MCMCPosterior, RejectionPosterior, VIPosterior]:
         r"""Build posterior from the neural density estimator.
 
@@ -380,7 +384,7 @@ class RatioEstimator(NeuralInference, ABC):
                 method=mcmc_method,
                 device=device,
                 x_shape=self._x_shape,
-                **mcmc_parameters,
+                **mcmc_parameters or {},
             )
         elif sample_with == "rejection":
             self._posterior = RejectionPosterior(
@@ -388,7 +392,7 @@ class RatioEstimator(NeuralInference, ABC):
                 proposal=prior,
                 device=device,
                 x_shape=self._x_shape,
-                **rejection_sampling_parameters,
+                **rejection_sampling_parameters or {},
             )
         elif sample_with == "vi":
             self._posterior = VIPosterior(
@@ -398,7 +402,7 @@ class RatioEstimator(NeuralInference, ABC):
                 vi_method=vi_method,
                 device=device,
                 x_shape=self._x_shape,
-                **vi_parameters,
+                **vi_parameters or {},
             )
         else:
             raise NotImplementedError

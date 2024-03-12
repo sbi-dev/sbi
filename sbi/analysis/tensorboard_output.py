@@ -1,11 +1,12 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 """Utils for processing tensorboard event data."""
+
 import inspect
 import logging
 from copy import deepcopy
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -27,16 +28,16 @@ _NeuralInference = Any
 
 def plot_summary(
     inference: Union[_NeuralInference, Path],
-    tags: List[str] = ["validation_log_probs"],
+    tags: Optional[List[str]] = None,
     disable_tensorboard_prompt: bool = False,
     tensorboard_scalar_limit: int = 10_000,
-    figsize: List[int] = [20, 6],
+    figsize: Sequence[int] = (20, 6),
     fontsize: float = 12,
     fig: Optional[Figure] = None,
     axes: Optional[Axes] = None,
     xlabel: str = "epochs_trained",
-    ylabel: List[str] = [],
-    plot_kwargs: Dict[str, Any] = {},
+    ylabel: Optional[List[str]] = None,
+    plot_kwargs: Optional[Dict[str, Any]] = None,
 ) -> Tuple[Figure, Axes]:
     """Plots data logged by the tensorboard summary writer of an inference object.
 
@@ -58,6 +59,9 @@ def plot_summary(
     Returns a tuple of Figure and Axes objects.
     """
     logger = logging.getLogger(__name__)
+
+    if tags is None:
+        tags = ["validation_log_probs"]
 
     size_guidance = deepcopy(DEFAULT_SIZE_GUIDANCE)
     size_guidance.update(scalars=tensorboard_scalar_limit)
@@ -111,7 +115,9 @@ def plot_summary(
     ylabel = ylabel or tags
 
     for i, ax in enumerate(axes):  # type: ignore
-        ax.plot(scalars[tags[i]]["step"], scalars[tags[i]]["value"], **plot_kwargs)
+        ax.plot(
+            scalars[tags[i]]["step"], scalars[tags[i]]["value"], **plot_kwargs or {}
+        )
 
         ax.set_ylabel(ylabel[i], fontsize=fontsize)
         ax.set_xlabel(xlabel, fontsize=fontsize)
@@ -179,7 +185,7 @@ def _get_event_data_from_log_dir(
                 # attribute.
                 _type = type(data[0])
                 for attribute in inspect.getfullargspec(_type).args:
-                    if not attribute.startswith("_") and not attribute == "self":
+                    if not attribute.startswith("_") and attribute != "self":
                         if attribute not in all_event_data[tag_type][tag]:
                             all_event_data[tag_type][tag][attribute] = []
                         for datapoint in data:

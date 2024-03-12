@@ -197,15 +197,13 @@ class SMCABC(ABCBASE):
         )
         log_weights = torch.log(1 / num_particles * torch.ones(num_particles))
 
-        self.logger.info(
-            (
-                "population=%s, eps=%s, ess=%s, num_sims=%s",
-                pop_idx,
-                epsilon,
-                1.0,
-                num_initial_pop,
-            )
-        )
+        self.logger.info((
+            "population=%s, eps=%s, ess=%s, num_sims=%s",
+            pop_idx,
+            epsilon,
+            1.0,
+            num_initial_pop,
+        ))
 
         all_particles = [particles]
         all_log_weights = [log_weights]
@@ -246,14 +244,12 @@ class SMCABC(ABCBASE):
                     particles, log_weights, ess_min, pop_idx
                 )
 
-            self.logger.info(
-                (
-                    "population=%s done: eps={epsilon:.6f}, num_sims=%s.",
-                    pop_idx,
-                    epsilon,
-                    self.simulation_counter,
-                )
-            )
+            self.logger.info((
+                "population=%s done: eps={epsilon:.6f}, num_sims=%s.",
+                pop_idx,
+                epsilon,
+                self.simulation_counter,
+            ))
 
             # collect results
             all_particles.append(particles)
@@ -282,7 +278,7 @@ class SMCABC(ABCBASE):
                 unreliable results when used with too few samples and in high
                 dimensions.""",
                 final_particles.shape[0],
-                kde_kwargs["bandwidth"] if "bandwidth" in kde_kwargs else "cv",
+                kde_kwargs.get("bandwidth", "cv"),
             )
             # Maybe get particles weights from last population for weighted KDE.
             if kde_sample_weights:
@@ -479,14 +475,12 @@ class SMCABC(ABCBASE):
         try:
             qidx = torch.where(distances_cdf >= quantile)[0][0]
         except IndexError:
-            self.logger.warning(
-                (
-                    """Accepted unique distances=%s don't match quantile=%s. Selecting
+            self.logger.warning((
+                """Accepted unique distances=%s don't match quantile=%s. Selecting
                     last distance.""",
-                    distances,
-                    quantile,
-                )
-            )
+                distances,
+                quantile,
+            ))
             qidx = -1
 
         # The new epsilon is given by that distance.

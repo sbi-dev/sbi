@@ -172,9 +172,10 @@ def test_restricted_prior_log_prob(prior):
 
     def simulator(theta):
         perturbed_theta = theta + 0.5 * torch.randn(2)
-        perturbed_theta[theta[:, 0] < 0.8] = torch.as_tensor(
-            [float("nan"), float("nan")]
-        )
+        perturbed_theta[theta[:, 0] < 0.8] = torch.as_tensor([
+            float("nan"),
+            float("nan"),
+        ])
         return perturbed_theta
 
     if prior == "uniform":

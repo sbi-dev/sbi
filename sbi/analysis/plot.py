@@ -19,7 +19,7 @@ from sbi.analysis import eval_conditional_density
 
 try:
     collectionsAbc = collections.abc  # type: ignore
-except:
+except AttributeError:
     collectionsAbc = collections
 
 
@@ -31,18 +31,18 @@ def hex2rgb(hex):
 def rgb2hex(RGB):
     # Components need to be integers for hex to make sense
     RGB = [int(x) for x in RGB]
-    return "#" + "".join(
-        ["0{0:x}".format(v) if v < 16 else "{0:x}".format(v) for v in RGB]
-    )
+    return "#" + "".join([
+        "0{0:x}".format(v) if v < 16 else "{0:x}".format(v) for v in RGB
+    ])
 
 
 def _update(d, u):
     # https://stackoverflow.com/a/3233356
     for k, v in six.iteritems(u):
         dv = d.get(k, {})
-        if not isinstance(dv, collectionsAbc.Mapping):  # tpye: ignore
+        if not isinstance(dv, collectionsAbc.Mapping):  # type: ignore
             d[k] = v
-        elif isinstance(v, collectionsAbc.Mapping):  # tpye: ignore
+        elif isinstance(v, collectionsAbc.Mapping):  # type: ignore
             d[k] = _update(dv, v)
         else:
             d[k] = v
@@ -147,11 +147,11 @@ def prepare_for_plot(samples, limits):
     """
 
     # Prepare samples
-    if type(samples) != list:
+    if not isinstance(samples, list):
         samples = ensure_numpy(samples)
         samples = [samples]
     else:
-        for i, sample_pack in enumerate(samples):
+        for i, _ in enumerate(samples):
             samples[i] = ensure_numpy(samples[i])
 
     # Dimensionality of the problem.
@@ -170,10 +170,7 @@ def prepare_for_plot(samples, limits):
                 max = max_ if max_ > max else max
             limits.append([min, max])
     else:
-        if len(limits) == 1:
-            limits = [limits[0] for _ in range(dim)]
-        else:
-            limits = limits
+        limits = [limits[0] for _ in range(dim)] if len(limits) == 1 else limits
     limits = torch.as_tensor(limits)
     return samples, dim, limits
 
@@ -230,7 +227,7 @@ def get_diag_func(samples, limits, opts, **kwargs):
                         ys,
                         color=opts["samples_colors"][n],
                     )
-                elif "offdiag" in opts.keys() and opts["offdiag"][n] == "scatter":
+                elif "offdiag" in opts and opts["offdiag"][n] == "scatter":
                     for single_sample in v:
                         plt.axvline(
                             single_sample[row],
@@ -288,7 +285,7 @@ def pairplot(
     diag: Optional[Union[List[str], str]] = "hist",
     figsize: Tuple = (10, 10),
     labels: Optional[List[str]] = None,
-    ticks: Union[List, torch.Tensor] = [],
+    ticks: Optional[Union[List, torch.Tensor]] = None,
     upper: Optional[str] = None,
     fig=None,
     axes=None,
@@ -344,13 +341,13 @@ def pairplot(
             samples
         ), "Provide at least as many labels as samples."
     if opts["upper"] is not None:
-        warn("upper is deprecated, use offdiag instead.")
+        warn("upper is deprecated, use offdiag instead.", stacklevel=2)
         opts["offdiag"] = opts["upper"]
 
     # Prepare diag/upper/lower
-    if type(opts["diag"]) is not list:
+    if not isinstance(opts["diag"], list):
         opts["diag"] = [opts["diag"] for _ in range(len(samples))]
-    if type(opts["offdiag"]) is not list:
+    if not isinstance(opts["offdiag"], list):
         opts["offdiag"] = [opts["offdiag"] for _ in range(len(samples))]
     # if type(opts['lower']) is not list:
     #    opts['lower'] = [opts['lower'] for _ in range(len(samples))]
@@ -473,7 +470,7 @@ def marginal_plot(
     diag: Optional[str] = "hist",
     figsize: Tuple = (10, 10),
     labels: Optional[List[str]] = None,
-    ticks: Union[List, torch.Tensor] = [],
+    ticks: Optional[Union[List, torch.Tensor]] = None,
     fig=None,
     axes=None,
     **kwargs,
@@ -516,7 +513,7 @@ def marginal_plot(
     samples, dim, limits = prepare_for_plot(samples, limits)
 
     # Prepare diag/upper/lower
-    if type(opts["diag"]) is not list:
+    if not isinstance(opts["diag"], list):
         opts["diag"] = [opts["diag"] for _ in range(len(samples))]
 
     diag_func = get_diag_func(samples, limits, opts, **kwargs)
@@ -537,7 +534,7 @@ def conditional_marginal_plot(
     resolution: int = 50,
     figsize: Tuple = (10, 10),
     labels: Optional[List[str]] = None,
-    ticks: Union[List, torch.Tensor] = [],
+    ticks: Optional[Union[List, torch.Tensor]] = None,
     fig=None,
     axes=None,
     **kwargs,
@@ -610,7 +607,7 @@ def conditional_pairplot(
     resolution: int = 50,
     figsize: Tuple = (10, 10),
     labels: Optional[List[str]] = None,
-    ticks: Union[List, torch.Tensor] = [],
+    ticks: Optional[Union[List, torch.Tensor]] = None,
     fig=None,
     axes=None,
     **kwargs,
@@ -734,7 +731,7 @@ def _arrange_plots(
     # Prepare points
     if points is None:
         points = []
-    if type(points) != list:
+    if not isinstance(points, list):
         points = ensure_numpy(points)  # type: ignore
         points = [points]
     points = [np.atleast_2d(p) for p in points]
@@ -763,9 +760,9 @@ def _arrange_plots(
         rows = cols = dim
         subset = [i for i in range(dim)]
     else:
-        if type(subset) == int:
+        if isinstance(subset, int):
             subset = [subset]
-        elif type(subset) == list:
+        elif isinstance(subset, list):
             pass
         else:
             raise NotImplementedError
@@ -808,9 +805,7 @@ def _arrange_plots(
             else:
                 col_idx += 1
 
-            if flat:
-                current = "diag"
-            elif row == col:
+            if flat or row == col:
                 current = "diag"
             elif row < col:
                 current = "offdiag"
@@ -872,12 +867,10 @@ def _arrange_plots(
                 else:
                     _format_axis(ax, xhide=True, yhide=True)
             if opts["tick_labels"] is not None:
-                ax.set_xticklabels(
-                    (
-                        str(opts["tick_labels"][col][0]),
-                        str(opts["tick_labels"][col][1]),
-                    )
-                )
+                ax.set_xticklabels((
+                    str(opts["tick_labels"][col][0]),
+                    str(opts["tick_labels"][col][1]),
+                ))
 
             # Diagonals
             if current == "diag":
@@ -954,6 +947,7 @@ def _get_default_opts():
         "samples_colors": plt.rcParams["axes.prop_cycle"].by_key()["color"][0::2],
         "points_colors": plt.rcParams["axes.prop_cycle"].by_key()["color"][1::2],
         # ticks
+        "ticks": [],
         "tickformatter": mpl.ticker.FormatStrFormatter("%g"),  # type: ignore
         "tick_labels": None,
         # options for hist
@@ -1012,7 +1006,7 @@ def sbc_rank_plot(
     fig: Optional[Figure] = None,
     ax: Optional[Axes] = None,
     figsize: Optional[tuple] = None,
-    kwargs: Dict = {},
+    **kwargs,
 ) -> Tuple[Figure, Axes]:
     """Plot simulation-based calibration ranks as empirical CDFs or histograms.
 
@@ -1137,9 +1131,9 @@ def _sbc_rank_plot(
         figsize = (num_parameters * 4, num_rows * 5) if params_in_subplots else (8, 5)
 
     if parameter_labels is None:
-        parameter_labels = [f"dim {i+1}" for i in range(num_parameters)]
+        parameter_labels = [f"dim {i + 1}" for i in range(num_parameters)]
     if ranks_labels is None:
-        ranks_labels = [f"rank set {i+1}" for i in range(num_ranks)]
+        ranks_labels = [f"rank set {i + 1}" for i in range(num_ranks)]
     if num_bins is None:
         # Recommendation from Talts et al.
         num_bins = num_sbc_runs // 20
@@ -1158,10 +1152,7 @@ def _sbc_rank_plot(
             assert (
                 ax.size >= num_parameters
             ), "There must be at least as many subplots as parameters."
-            if ax.ndim > 1:
-                num_rows = ax.shape[0]
-            else:
-                num_rows = 1
+            num_rows = ax.shape[0] if ax.ndim > 1 else 1
         assert ax is not None
 
         col_idx, row_idx = 0, 0
@@ -1265,7 +1256,7 @@ def _plot_ranks_as_hist(
     show_legend: bool = False,
     num_ticks: int = 3,
     xlim_offset_factor: float = 0.1,
-    legend_kwargs: dict = {},
+    legend_kwargs: Optional[Dict] = None,
 ) -> None:
     """Plot ranks as histograms on the current axis.
 
@@ -1298,7 +1289,7 @@ def _plot_ranks_as_hist(
     else:
         plt.yticks([])
     if show_legend and ranks_label:
-        plt.legend(loc=1, handlelength=0.8, **legend_kwargs)
+        plt.legend(loc=1, handlelength=0.8, **legend_kwargs or {})
 
     plt.xlim(-xlim_offset, num_posterior_samples + xlim_offset)
     plt.xticks(np.linspace(0, num_posterior_samples, num_ticks))
@@ -1316,7 +1307,7 @@ def _plot_ranks_as_cdf(
     show_ylabel: bool = True,
     show_legend: bool = False,
     num_ticks: int = 3,
-    legend_kwargs: dict = {},
+    legend_kwargs: Optional[Dict] = None,
 ) -> None:
     """Plot ranks as empirical CDFs on the current axis.
 
@@ -1355,7 +1346,7 @@ def _plot_ranks_as_cdf(
         # Plot ticks only
         plt.yticks(np.linspace(0, 1, 3), [])
     if show_legend and ranks_label:
-        plt.legend(loc=2, handlelength=0.8, **legend_kwargs)
+        plt.legend(loc=2, handlelength=0.8, **legend_kwargs or {})
 
     plt.ylim(0, 1)
     plt.xlim(0, num_bins)

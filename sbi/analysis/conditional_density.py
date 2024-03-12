@@ -146,24 +146,22 @@ def conditional_corrcoeff(
     correlation_matrices = []
     for cond in condition:
         correlation_matrices.append(
-            torch.stack(
-                [
-                    compute_corrcoeff(
-                        eval_conditional_density(
-                            density,
-                            cond.to(device),
-                            limits.to(device),
-                            dim1=dim1,
-                            dim2=dim2,
-                            resolution=resolution,
-                        ),
-                        limits[[dim1, dim2]].to(device),
-                    )
-                    for dim1 in subset_
-                    for dim2 in subset_
-                    if dim1 < dim2
-                ]
-            )
+            torch.stack([
+                compute_corrcoeff(
+                    eval_conditional_density(
+                        density,
+                        cond.to(device),
+                        limits.to(device),
+                        dim1=dim1,
+                        dim2=dim2,
+                        resolution=resolution,
+                    ),
+                    limits[[dim1, dim2]].to(device),
+                )
+                for dim1 in subset_
+                for dim2 in subset_
+                if dim1 < dim2
+            ])
         )
 
     average_correlations = torch.mean(torch.stack(correlation_matrices), dim=0)
@@ -247,7 +245,8 @@ def conditonal_potential(
     """
     warn(
         "The misspelled function `conditonal_potential` will be removed in a future "
-        "release of sbi. Please use `conditional_potential` (spelled correctly)."
+        "release of sbi. Please use `conditional_potential` (spelled correctly).",
+        stacklevel=2,
     )
     return conditional_potential(
         potential_fn, theta_transform, prior, condition, dims_to_sample
@@ -295,7 +294,9 @@ def conditional_potential(
     condition = atleast_2d_float32_tensor(condition)
 
     conditioned_potential_fn = ConditionedPotential(
-        potential_fn, condition, dims_to_sample  # type: ignore
+        potential_fn,
+        condition,
+        dims_to_sample,  # type: ignore
     )
 
     restricted_prior = RestrictedPriorForConditional(prior, dims_to_sample)
