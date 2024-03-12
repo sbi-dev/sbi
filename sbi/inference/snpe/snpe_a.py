@@ -419,7 +419,6 @@ class SNPE_A_MDN(DensityEstimator):
         self._set_state_for_mog_proposal()
 
     def log_prob(self, inputs: Tensor, condition: Tensor, **kwargs) -> Tensor:
-
         inputs, condition = inputs.to(self._device), condition.to(self._device)
 
         if not self._apply_correction:

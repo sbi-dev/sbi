@@ -263,7 +263,8 @@ def accept_reject_sample(
     while num_remaining > 0:
         # Sample and reject.
         candidates = proposal.sample(
-            (sampling_batch_size,), **proposal_sampling_kwargs  # type: ignore
+            (sampling_batch_size,),
+            **proposal_sampling_kwargs,  # type: ignore
         )  # type: ignore
 
         # SNPE-style rejection-sampling when the proposal is the neural net.

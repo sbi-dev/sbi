@@ -469,8 +469,10 @@ def build_zuko_maf(
     check_embedding_net_device(embedding_net=embedding_net, datum=batch_y)
     y_numel = embedding_net(batch_y[:1]).numel()
     if x_numel == 1:
-        warn("In one-dimensional output space, this flow is limited to Gaussians"
-             , stacklevel=1)
+        warn(
+            "In one-dimensional output space, this flow is limited to Gaussians",
+            stacklevel=1,
+        )
 
     if isinstance(hidden_features, int):
         hidden_features = [hidden_features] * num_transforms
