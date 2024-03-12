@@ -41,7 +41,7 @@ For docstrings and comments, we use [Google
 Style](http://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings).
 
 For code linting and formating, we use [`ruff`](https://docs.astral.sh/ruff/), which is
-installed alongside `sbi`. 
+installed alongside `sbi`.
 
 When you create a PR onto `main`, our CI actions on GitHub will perform the following
 checks:
