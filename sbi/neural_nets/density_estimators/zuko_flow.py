@@ -2,7 +2,7 @@ from typing import Tuple
 
 import torch
 from torch import Tensor, nn
-from zuko.flows import Flow, LazyComposedTransform
+from zuko.flows import Flow
 
 from sbi.neural_nets.density_estimators.base import DensityEstimator
 from sbi.types import Shape

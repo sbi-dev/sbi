@@ -1,10 +1,10 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
-from typing import Any, Callable, Optional, Tuple
+from typing import Callable, Optional, Tuple
 
 import torch
-from torch import Tensor, nn
+from torch import Tensor
 from torch.distributions import Distribution
 
 from sbi.inference.potentials.base_potential import BasePotential
@@ -133,7 +133,8 @@ def _log_likelihoods_over_trials(
     ), "x and theta must match in batch shape."
     assert (
         next(estimator.parameters()).device == x.device and x.device == theta.device
-    ), f"""device mismatch: estimator, x, theta: {next(estimator.parameters()).device}, {x.device},
+    ), f"""device mismatch: estimator, x, theta: \
+        {next(estimator.parameters()).device}, {x.device},
         {theta.device}."""
 
     # Calculate likelihood in one batch.
@@ -185,7 +186,8 @@ class MixedLikelihoodBasedPotential(LikelihoodBasedPotential):
         x_o: Optional[Tensor],
         device: str = "cpu",
     ):
-        # TODO Fix pyright issue by making MixedDensityEstimator a subclass of DensityEstimator
+        # TODO Fix pyright issue by making MixedDensityEstimator a subclass
+        # of DensityEstimator
         super().__init__(likelihood_estimator, prior, x_o, device)  # type: ignore
 
     def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:

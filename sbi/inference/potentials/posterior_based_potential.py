@@ -4,16 +4,14 @@
 from typing import Callable, Optional, Tuple
 
 import torch
-from pyknos.nflows import flows
-from torch import Tensor, nn
+from torch import Tensor
 from torch.distributions import Distribution
 
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.neural_nets.density_estimators import DensityEstimator
 from sbi.types import TorchTransform
 from sbi.utils import mcmc_transform
-from sbi.utils.sbiutils import match_theta_and_x_batch_shapes, within_support
-from sbi.utils.torchutils import ensure_theta_batched
+from sbi.utils.sbiutils import within_support
 
 
 def posterior_estimator_based_potential(

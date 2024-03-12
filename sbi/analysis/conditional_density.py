@@ -7,7 +7,7 @@ from warnings import warn
 import torch
 import torch.distributions.transforms as torch_tf
 from pyknos.mdn.mdn import MultivariateGaussianMDN as mdn
-from torch import Tensor, nn
+from torch import Tensor
 from torch.distributions import Distribution
 
 from sbi.neural_nets.density_estimators.base import DensityEstimator

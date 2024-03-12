@@ -7,9 +7,7 @@ from functools import partial
 from typing import Any, Callable, Dict, Optional, Union
 
 import torch
-import torch.nn as nn
 from pyknos.mdn.mdn import MultivariateGaussianMDN
-from pyknos.nflows import flows
 from pyknos.nflows.transforms import CompositeTransform
 from torch import Tensor
 from torch.distributions import Distribution, MultivariateNormal

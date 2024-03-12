@@ -1,8 +1,7 @@
 from typing import Tuple
 
 import torch
-from pyknos.nflows.flows import Flow
-from torch import Tensor
+from torch import Tensor, nn
 
 from sbi.neural_nets.density_estimators.base import DensityEstimator
 from sbi.types import Shape

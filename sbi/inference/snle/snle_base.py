@@ -7,8 +7,7 @@ from copy import deepcopy
 from typing import Any, Callable, Dict, Optional, Union
 
 import torch
-from pyknos.nflows import flows
-from torch import Tensor, nn, optim
+from torch import Tensor, optim
 from torch.distributions import Distribution
 from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.utils.tensorboard.writer import SummaryWriter
