@@ -254,7 +254,7 @@ class SNPE_C(PosteriorEstimator):
         else:
             self._maybe_z_scored_prior = self._prior
 
-    def _loss_proposal_posterior(
+    def _log_prob_proposal_posterior(
         self,
         theta: Tensor,
         x: Tensor,

@@ -198,6 +198,7 @@ class MNLE(LikelihoodEstimator):
 
     # Temporary: need to rewrite mixed likelihood estimators as DensityEstimator
     # objects.
+    # TODO: Fix and merge issue #968
     def _loss(self, theta: Tensor, x: Tensor) -> Tensor:
         r"""Return loss for SNLE, which is the likelihood of $-\log q(x_i | \theta_i)$.
 

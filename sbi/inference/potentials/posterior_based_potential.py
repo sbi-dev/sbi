@@ -12,6 +12,7 @@ from sbi.neural_nets.density_estimators import DensityEstimator
 from sbi.types import TorchTransform
 from sbi.utils import mcmc_transform
 from sbi.utils.sbiutils import within_support
+from sbi.utils.torchutils import ensure_theta_batched
 
 
 def posterior_estimator_based_potential(
@@ -91,16 +92,17 @@ class PosteriorBasedPotential(BasePotential):
             The potential.
         """
 
-        # NOTE: This is no longer necessary, as the `log_prob` will broadcast
-        # theta = ensure_theta_batched(torch.as_tensor(theta))
-        # theta, x_repeated = match_theta_and_x_batch_shapes(theta, self.x_o)
-        # theta, x_repeated = theta.to(self.device), x_repeated.to(self.device)
-        assert self._x_o is not None, "No observed data is available."
+        if self._x_o is None:
+            raise ValueError(
+                "No observed data x_o is available. Please reinitialize \
+                the potential or manually set self._x_o."
+            )
+
+        theta = ensure_theta_batched(torch.as_tensor(theta))
+        theta, x = theta.to(self.device), self.x_o.to(self.device)
 
         with torch.set_grad_enabled(track_gradients):
-            posterior_log_prob = self.posterior_estimator.log_prob(
-                theta, condition=self._x_o
-            )
+            posterior_log_prob = self.posterior_estimator.log_prob(theta, condition=x)
 
             # Force probability to be zero outside prior support.
             in_prior_support = within_support(self.prior, theta)

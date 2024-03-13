@@ -39,7 +39,7 @@ class SNPE_B(PosteriorEstimator):
         kwargs = del_entries(locals(), entries=("self", "__class__"))
         super().__init__(**kwargs)
 
-    def _loss_proposal_posterior(
+    def _log_prob_proposal_posterior(
         self, theta: Tensor, x: Tensor, masks: Tensor
     ) -> Tensor:
         """

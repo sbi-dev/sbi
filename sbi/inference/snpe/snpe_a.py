@@ -306,7 +306,7 @@ class SNPE_A(PosteriorEstimator):
         )
         return deepcopy(self._posterior)
 
-    def _loss_proposal_posterior(
+    def _log_prob_proposal_posterior(
         self,
         theta: Tensor,
         x: Tensor,
@@ -362,6 +362,9 @@ class SNPE_A(PosteriorEstimator):
 
 class SNPE_A_MDN(DensityEstimator):
     """Generates a posthoc-corrected MDN which approximates the posterior.
+
+    TODO: Adapt this class to the new `DensityEstimator` interface. Maybe even to a
+          common MDN interface. See #989.
 
     This class takes as input the density estimator (abbreviated with `_d` suffix, aka
     the proposal posterior) and the proposal prior (abbreviated with `_pp` suffix) from
@@ -419,6 +422,15 @@ class SNPE_A_MDN(DensityEstimator):
         self._set_state_for_mog_proposal()
 
     def log_prob(self, inputs: Tensor, condition: Tensor, **kwargs) -> Tensor:
+        """_summary_
+
+        Args:
+            inputs: Input values
+            condition: Condition values
+
+        Returns:
+            log_prob p(inputs|condition)
+        """
         inputs, condition = inputs.to(self._device), condition.to(self._device)
 
         if not self._apply_correction:
@@ -444,6 +456,16 @@ class SNPE_A_MDN(DensityEstimator):
             return log_prob_proposal_posterior  # \hat{p} from eq (3) in [1]
 
     def sample(self, sample_shape: torch.Size, condition: Tensor, **kwargs) -> Tensor:
+        """Sample from the approximate posterior.
+
+        Args:
+            sample_shape: Shape of the samples.
+            condition: Condition values.
+
+        Returns:
+            Samples from the approximate posterior.
+        """
+
         condition = condition.to(self._device)
 
         if not self._apply_correction:

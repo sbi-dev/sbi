@@ -14,6 +14,7 @@ from sbi.neural_nets.density_estimators.base import DensityEstimator
 from sbi.samplers.rejection.rejection import accept_reject_sample
 from sbi.types import Shape
 from sbi.utils import check_prior, within_support
+from sbi.utils.torchutils import ensure_theta_batched
 
 
 class DirectPosterior(NeuralPosterior):
@@ -100,7 +101,18 @@ class DirectPosterior(NeuralPosterior):
         """
 
         num_samples = torch.Size(sample_shape).numel()
+        condition_shape = self.posterior_estimator._condition_shape
         x = self._x_else_default_x(x)
+
+        try:
+            x = x.reshape(*condition_shape)
+        except RuntimeError as err:
+            raise ValueError(
+                f"Expected a single `x` which should broadcastable to shape \
+                  {condition_shape}, but got {x.shape}. For batched eval \
+                  see issue #990"
+            ) from err
+
         max_sampling_batch_size = (
             self.max_sampling_batch_size
             if max_sampling_batch_size is None
@@ -123,7 +135,6 @@ class DirectPosterior(NeuralPosterior):
             proposal_sampling_kwargs={"condition": x},
             alternative_method="build_posterior(..., sample_with='mcmc')",
         )[0]
-        samples = samples.view(sample_shape + (-1,))  # TODO: Why is this necessary?
 
         return samples
 
@@ -160,12 +171,20 @@ class DirectPosterior(NeuralPosterior):
             support of the prior, -∞ (corresponding to 0 probability) outside.
         """
         x = self._x_else_default_x(x)
+        condition_shape = self.posterior_estimator._condition_shape
+        try:
+            x = x.reshape(*condition_shape)
+        except RuntimeError as err:
+            raise ValueError(
+                f"Expected a single `x` which should broadcastable to shape \
+                  {condition_shape}, but got {x.shape}. For batched eval \
+                  see issue #990"
+            ) from err
 
         # TODO Train exited here, entered after sampling?
         self.posterior_estimator.eval()
 
-        # theta = ensure_theta_batched(torch.as_tensor(theta))
-        # theta_repeated, x_repeated = match_theta_and_x_batch_shapes(theta, x)
+        theta = ensure_theta_batched(torch.as_tensor(theta))
 
         with torch.set_grad_enabled(track_gradients):
             # Evaluate on device, move back to cpu for comparison with prior.
