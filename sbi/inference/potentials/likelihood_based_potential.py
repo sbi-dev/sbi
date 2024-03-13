@@ -12,7 +12,6 @@ from sbi.neural_nets.density_estimators import DensityEstimator
 from sbi.neural_nets.mnle import MixedDensityEstimator
 from sbi.types import TorchTransform
 from sbi.utils import mcmc_transform
-from sbi.utils.torchutils import ensure_x_batched
 
 
 def likelihood_estimator_based_potential(
@@ -120,17 +119,15 @@ def _log_likelihoods_over_trials(
         log_likelihood_trial_sum: log likelihood for each parameter, summed over all
             batch entries (iid trials) in `x`.
     """
-
-    x = ensure_x_batched(x)
-    theta_batch_size = theta.shape[: -len(estimator._condition_shape)]
+    # unsqueeze to ensure that the x-batch dimension is the first dimension for the
+    # broadcasting of the density estimator.
+    x = torch.as_tensor(x).reshape(-1, x.shape[-1]).unsqueeze(1)
 
     # Calculate likelihood in one batch.
     with torch.set_grad_enabled(track_gradients):
         log_likelihood_trial_batch = estimator.log_prob(x, condition=theta)
-        # Reshape to (theta_batch_size * num_trials), sum over trial-log likelihoods.
-        log_likelihood_trial_sum = log_likelihood_trial_batch.reshape(
-            theta_batch_size + (-1,)
-        ).sum(-1)
+        # Reshape to (-1, theta_batch_size), sum over trial-log likelihoods.
+        log_likelihood_trial_sum = log_likelihood_trial_batch.sum(0)
 
     return log_likelihood_trial_sum
 
