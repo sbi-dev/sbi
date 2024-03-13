@@ -12,8 +12,7 @@ from sbi.neural_nets.density_estimators import DensityEstimator
 from sbi.neural_nets.mnle import MixedDensityEstimator
 from sbi.types import TorchTransform
 from sbi.utils import mcmc_transform
-from sbi.utils.sbiutils import match_theta_and_x_batch_shapes
-from sbi.utils.torchutils import atleast_2d
+from sbi.utils.torchutils import ensure_x_batched
 
 
 def likelihood_estimator_based_potential(
@@ -122,28 +121,16 @@ def _log_likelihoods_over_trials(
             batch entries (iid trials) in `x`.
     """
 
-    # Repeat `x` in case of evaluation on multiple `theta`. This is needed below in
-    # when calling nflows in order to have matching shapes of theta and context x
-    # at neural network evaluation time.
-    theta_repeated, x_repeated = match_theta_and_x_batch_shapes(
-        theta=atleast_2d(theta), x=atleast_2d(x)
-    )
-    assert (
-        x_repeated.shape[0] == theta_repeated.shape[0]
-    ), "x and theta must match in batch shape."
-    assert (
-        next(estimator.parameters()).device == x.device and x.device == theta.device
-    ), f"""device mismatch: estimator, x, theta: \
-        {next(estimator.parameters()).device}, {x.device},
-        {theta.device}."""
+    x = ensure_x_batched(x)
+    theta_batch_size = theta.shape[: -len(estimator._condition_shape)]
 
     # Calculate likelihood in one batch.
     with torch.set_grad_enabled(track_gradients):
-        log_likelihood_trial_batch = estimator.log_prob(x_repeated, theta_repeated)
-        # Reshape to (x-trials x parameters), sum over trial-log likelihoods.
+        log_likelihood_trial_batch = estimator.log_prob(x, condition=theta)
+        # Reshape to (theta_batch_size * num_trials), sum over trial-log likelihoods.
         log_likelihood_trial_sum = log_likelihood_trial_batch.reshape(
-            x.shape[0], -1
-        ).sum(0)
+            theta_batch_size + (-1,)
+        ).sum(-1)
 
     return log_likelihood_trial_sum
 

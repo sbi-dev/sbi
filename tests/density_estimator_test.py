@@ -7,10 +7,9 @@ import pytest
 import torch
 from torch import eye, zeros
 from torch.distributions import MultivariateNormal
-from zuko.flows import NSF
 
 from sbi.neural_nets.density_estimators import NFlowsFlow, ZukoFlow
-from sbi.neural_nets.flow import build_nsf
+from sbi.neural_nets.flow import build_nsf, build_zuko_maf
 
 
 @pytest.mark.parametrize("density_estimator", (NFlowsFlow, ZukoFlow))
@@ -54,17 +53,12 @@ def test_api_density_estimator(density_estimator, input_dims, condition_shape):
             embedding_net=EmbeddingNet(),
         )
     elif density_estimator == ZukoFlow:
-        # if len(condition_shape) > 1:
-        #     pytest.skip("ZukoFlow does not support multi-dimensional contexts.")
-        net = NSF(
-            features=input_dims,
-            context=condition_shape[-1],
-            transforms=2,
-            hidden_features=(10,),
-            bins=8,
-        )
-        estimator = density_estimator(
-            net, embedding_net=EmbeddingNet(), condition_shape=condition_shape
+        estimator = build_zuko_maf(
+            batch_input,
+            batch_context,
+            hidden_features=10,
+            num_transforms=2,
+            embedding_net=EmbeddingNet(),
         )
 
     # Loss is only required to work for batched inputs and contexts

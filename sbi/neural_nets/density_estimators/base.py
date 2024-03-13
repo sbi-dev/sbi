@@ -24,8 +24,8 @@ class DensityEstimator(nn.Module):
 
         Args:
             net: Neural network.
-            condition_shape: Shape of the input. If not provided, it will assume a 1D
-                             input.
+            condition_shape: Shape of the condition. If not provided, it will assume a
+                            1D input.
         """
         super().__init__()
         self.net = net
