@@ -122,6 +122,11 @@ def _log_likelihoods_over_trials(
     # unsqueeze to ensure that the x-batch dimension is the first dimension for the
     # broadcasting of the density estimator.
     x = torch.as_tensor(x).reshape(-1, x.shape[-1]).unsqueeze(1)
+    assert (
+        next(estimator.parameters()).device == x.device and x.device == theta.device
+    ), f"""device mismatch: estimator, x, theta: \
+        {next(estimator.parameters()).device}, {x.device},
+        {theta.device}."""
 
     # Calculate likelihood in one batch.
     with torch.set_grad_enabled(track_gradients):
