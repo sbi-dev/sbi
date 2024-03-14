@@ -6,7 +6,7 @@ from warnings import warn
 
 import torch
 import torch.distributions.transforms as torch_tf
-from pyknos.mdn.mdn import MultivariateGaussianMDN as mdn
+from pyknos.mdn.mdn import MultivariateGaussianMDN
 from torch import Tensor
 from torch.distributions import Distribution
 
@@ -186,7 +186,7 @@ def conditional_corrcoeff(
 class ConditionedMDN:
     def __init__(
         self,
-        gaussianMDN: DensityEstimator,
+        mdn: DensityEstimator,
         x_o: Tensor,
         condition: Tensor,
         dims_to_sample: List[int],
@@ -206,9 +206,7 @@ class ConditionedMDN:
         """
         condition = atleast_2d_float32_tensor(condition)
 
-        logits, means, precfs, _ = extract_and_transform_mog(
-            net=gaussianMDN.net, context=x_o
-        )
+        logits, means, precfs, _ = extract_and_transform_mog(net=mdn.net, context=x_o)
         self.logits, self.means, self.precfs, self.sumlogdiag = condition_mog(
             condition, dims_to_sample, logits, means, precfs
         )
@@ -216,13 +214,15 @@ class ConditionedMDN:
 
     def sample(self, sample_shape: Shape = torch.Size()) -> Tensor:
         num_samples = torch.Size(sample_shape).numel()
-        samples = mdn.sample_mog(num_samples, self.logits, self.means, self.precfs)
+        samples = MultivariateGaussianMDN.sample_mog(
+            num_samples, self.logits, self.means, self.precfs
+        )
         return samples.detach().reshape((*sample_shape, -1))
 
     def log_prob(self, theta: Tensor) -> Tensor:
         batch_size, dim = theta.shape
 
-        log_prob = mdn.log_prob_mog(
+        log_prob = MultivariateGaussianMDN.log_prob_mog(
             theta,
             self.logits.repeat(batch_size, 1),
             self.means.repeat(batch_size, 1, 1),

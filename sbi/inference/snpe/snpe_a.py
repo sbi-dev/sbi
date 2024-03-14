@@ -422,7 +422,7 @@ class SNPE_A_MDN(DensityEstimator):
         self._set_state_for_mog_proposal()
 
     def log_prob(self, inputs: Tensor, condition: Tensor, **kwargs) -> Tensor:
-        """_summary_
+        """Compute the log-probability of the approximate posterior.
 
         Args:
             inputs: Input values
@@ -549,9 +549,9 @@ class SNPE_A_MDN(DensityEstimator):
         """
 
         # Evaluate the density estimator.
-        encoded_x = self._neural_net.net._embedding_net(x)
+        embedded_x = self._neural_net.net._embedding_net(x)
         dist = self._neural_net.net._distribution  # defined to avoid black formatting.
-        logits_d, m_d, prec_d, _, _ = dist.get_mixture_components(encoded_x)
+        logits_d, m_d, prec_d, _, _ = dist.get_mixture_components(embedded_x)
         norm_logits_d = logits_d - torch.logsumexp(logits_d, dim=-1, keepdim=True)
 
         # The following if case is needed because, in the constructor, we call

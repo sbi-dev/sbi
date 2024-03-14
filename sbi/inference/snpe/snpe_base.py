@@ -583,7 +583,9 @@ class PosteriorEstimator(NeuralInference, ABC):
             # Use posterior log prob (without proposal correction) for first round.
             loss = self._neural_net.loss(theta, x)
         else:
-            loss = self._log_prob_proposal_posterior(theta, x, masks, proposal)
+            # Currently only works for `DensityEstimator` objects.
+            # Must be extended ones other Estimators are implemented. See #966,
+            loss = -self._log_prob_proposal_posterior(theta, x, masks, proposal)
 
         return calibration_kernel(x) * loss
 
