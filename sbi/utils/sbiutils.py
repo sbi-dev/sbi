@@ -572,15 +572,7 @@ def within_support(distribution: Any, samples: Tensor) -> Tensor:
     try:
         sample_check = distribution.support.check(samples)
         return sample_check
-        # Before torch v1.7.0, `support.check()` returned bools for every element.
-        # From v1.8.0 on, it directly considers all dimensions of a sample. E.g.,
-        # for a single sample in 3D, v1.7.0 would return [[True, True, True]] and
-        # v1.8.0 would return [True].
-        # TODO Check
-        # if sample_check.ndim > 1:
-        #     return torch.all(sample_check, dim=-1)
-        # else:
-        #     return sample_check
+
     # Falling back to log prob method of either the NeuralPosterior's net, or of a
     # custom wrapper distribution's.
     except (NotImplementedError, AttributeError):

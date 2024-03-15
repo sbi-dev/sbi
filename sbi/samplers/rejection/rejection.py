@@ -276,6 +276,9 @@ def accept_reject_sample(
         accepted.append(samples)
 
         # Update.
+        # Note: For any condition of shape (*batch_shape, *condition_shape), the
+        # samples will be of shape(*batch_shape, sampling_batch_size, d) and hence work
+        # in dim = -2.
         num_sampled_total += sampling_batch_size
         num_remaining -= samples.shape[-2]
         pbar.update(samples.shape[-2])
