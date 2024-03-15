@@ -29,7 +29,7 @@ from sbi.samplers.mcmc import (
     sir_init,
 )
 from sbi.simulators.simutils import tqdm_joblib
-from sbi.types import Shape, TorchTransform
+from sbi.sbi_types import Shape, TorchTransform
 from sbi.utils import pyro_potential_wrapper, tensor2numpy, transformed_potential
 from sbi.utils.torchutils import ensure_theta_batched
 

@@ -11,7 +11,7 @@ from torch import Tensor
 from torch.distributions import Distribution
 
 from sbi.neural_nets.density_estimators.base import DensityEstimator
-from sbi.types import Shape, TorchTransform
+from sbi.sbi_types import Shape, TorchTransform
 from sbi.utils.conditional_density_utils import (
     ConditionedPotential,
     RestrictedPriorForConditional,

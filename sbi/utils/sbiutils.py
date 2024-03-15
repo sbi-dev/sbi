@@ -18,7 +18,7 @@ from torch import nn as nn
 from torch.distributions import Distribution, Independent, biject_to, constraints
 
 from sbi import utils as utils
-from sbi.types import TorchTransform
+from sbi.sbi_types import TorchTransform
 from sbi.utils.torchutils import atleast_2d
 
 

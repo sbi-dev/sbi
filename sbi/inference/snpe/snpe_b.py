@@ -10,7 +10,7 @@ from torch.distributions import Distribution
 
 import sbi.utils as utils
 from sbi.inference.snpe.snpe_base import PosteriorEstimator
-from sbi.types import TensorboardSummaryWriter
+from sbi.sbi_types import TensorboardSummaryWriter
 from sbi.utils import del_entries
 
 
