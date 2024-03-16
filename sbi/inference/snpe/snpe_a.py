@@ -7,9 +7,7 @@ from functools import partial
 from typing import Any, Callable, Dict, Optional, Union
 
 import torch
-import torch.nn as nn
 from pyknos.mdn.mdn import MultivariateGaussianMDN
-from pyknos.nflows import flows
 from pyknos.nflows.transforms import CompositeTransform
 from torch import Tensor
 from torch.distributions import Distribution, MultivariateNormal
@@ -17,6 +15,7 @@ from torch.distributions import Distribution, MultivariateNormal
 import sbi.utils as utils
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.inference.snpe.snpe_base import PosteriorEstimator
+from sbi.neural_nets.density_estimators.base import DensityEstimator
 from sbi.types import TensorboardSummaryWriter, TorchModule
 from sbi.utils import torchutils
 
@@ -110,7 +109,7 @@ class SNPE_A(PosteriorEstimator):
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
         component_perturbation: float = 5e-3,
-    ) -> nn.Module:
+    ) -> DensityEstimator:
         r"""Return density estimator that approximates the proposal posterior.
 
         [1] _Fast epsilon-free Inference of Simulation Models with Bayesian Conditional
@@ -341,10 +340,10 @@ class SNPE_A(PosteriorEstimator):
         Args:
             eps: Standard deviation for the random perturbation.
         """
-        assert isinstance(self._neural_net._distribution, MultivariateGaussianMDN)
+        assert isinstance(self._neural_net.net._distribution, MultivariateGaussianMDN)
 
         # Increase the number of components
-        self._neural_net._distribution._num_components = self._num_components
+        self._neural_net.net._distribution._num_components = self._num_components
 
         # Expand the 1-dim Gaussian.
         for name, param in self._neural_net.named_parameters():
@@ -361,8 +360,11 @@ class SNPE_A(PosteriorEstimator):
                     param.grad = None  # let autograd construct a new gradient
 
 
-class SNPE_A_MDN(nn.Module):
+class SNPE_A_MDN(DensityEstimator):
     """Generates a posthoc-corrected MDN which approximates the posterior.
+
+    TODO: Adapt this class to the new `DensityEstimator` interface. Maybe even to a
+          common MDN interface. See #989.
 
     This class takes as input the density estimator (abbreviated with `_d` suffix, aka
     the proposal posterior) and the proposal prior (abbreviated with `_pp` suffix) from
@@ -380,7 +382,7 @@ class SNPE_A_MDN(nn.Module):
 
     def __init__(
         self,
-        flow: flows.Flow,
+        flow: DensityEstimator,
         proposal: Union["utils.BoxUniform", "MultivariateNormal", "DirectPosterior"],
         prior: Distribution,
         device: str,
@@ -393,7 +395,8 @@ class SNPE_A_MDN(nn.Module):
             prior: The prior distribution.
         """
         # Call nn.Module's constructor.
-        super().__init__()
+
+        super().__init__(flow, flow._condition_shape)
 
         self._neural_net = flow
         self._prior = prior
@@ -418,18 +421,27 @@ class SNPE_A_MDN(nn.Module):
         # Take care of z-scoring, pre-compute and store prior terms.
         self._set_state_for_mog_proposal()
 
-    def log_prob(self, inputs: Tensor, context: Tensor) -> Tensor:
-        inputs, context = inputs.to(self._device), context.to(self._device)
+    def log_prob(self, inputs: Tensor, condition: Tensor, **kwargs) -> Tensor:
+        """Compute the log-probability of the approximate posterior.
+
+        Args:
+            inputs: Input values
+            condition: Condition values
+
+        Returns:
+            log_prob p(inputs|condition)
+        """
+        inputs, condition = inputs.to(self._device), condition.to(self._device)
 
         if not self._apply_correction:
-            return self._neural_net.log_prob(inputs, context)
+            return self._neural_net.log_prob(inputs, condition)
         else:
             # When we want to compute the approx. posterior, a proposal prior \tilde{p}
             # has already been observed. To analytically calculate the log-prob of the
             # Gaussian, we first need to compute the mixture components.
 
             # Compute the mixture components of the proposal posterior.
-            logits_pp, m_pp, prec_pp = self._posthoc_correction(context)
+            logits_pp, m_pp, prec_pp = self._posthoc_correction(condition)
 
             # z-score theta if it z-scoring had been requested.
             theta = self._maybe_z_score_theta(inputs)
@@ -443,16 +455,30 @@ class SNPE_A_MDN(nn.Module):
             )
             return log_prob_proposal_posterior  # \hat{p} from eq (3) in [1]
 
-    def sample(self, num_samples: int, context: Tensor, batch_size: int = 1) -> Tensor:
-        context = context.to(self._device)
+    def sample(self, sample_shape: torch.Size, condition: Tensor, **kwargs) -> Tensor:
+        """Sample from the approximate posterior.
+
+        Args:
+            sample_shape: Shape of the samples.
+            condition: Condition values.
+
+        Returns:
+            Samples from the approximate posterior.
+        """
+
+        condition = condition.to(self._device)
 
         if not self._apply_correction:
-            return self._neural_net.sample(num_samples, context, batch_size)
+            return self._neural_net.sample(sample_shape, condition=condition)
         else:
             # When we want to sample from the approx. posterior, a proposal prior
             # \tilde{p} has already been observed. To analytically calculate the
             # log-prob of the Gaussian, we first need to compute the mixture components.
-            return self._sample_approx_posterior_mog(num_samples, context, batch_size)
+            num_samples = torch.Size(sample_shape).numel()
+            condition_ndim = len(self._condition_shape)
+            batch_size = condition.shape[:-condition_ndim]
+            batch_size = torch.Size(batch_size).numel()
+            return self._sample_approx_posterior_mog(num_samples, condition, batch_size)
 
     def _sample_approx_posterior_mog(
         self, num_samples, x: Tensor, batch_size: int
@@ -491,7 +517,7 @@ class SNPE_A_MDN(nn.Module):
             num_samples, logits_p, m_p, prec_factors_p
         )
 
-        embedded_context = self._neural_net._embedding_net(x)
+        embedded_context = self._neural_net.net._embedding_net(x)
         if embedded_context is not None:
             # Merge the context dimension with sample dimension in order to
             # apply the transform.
@@ -500,7 +526,9 @@ class SNPE_A_MDN(nn.Module):
                 embedded_context, num_reps=num_samples
             )
 
-        theta, _ = self._neural_net._transform.inverse(theta, context=embedded_context)
+        theta, _ = self._neural_net.net._transform.inverse(
+            theta, context=embedded_context
+        )
 
         if embedded_context is not None:
             # Split the context dimension from sample dimension.
@@ -521,9 +549,9 @@ class SNPE_A_MDN(nn.Module):
         """
 
         # Evaluate the density estimator.
-        encoded_x = self._neural_net._embedding_net(x)
-        dist = self._neural_net._distribution  # defined to avoid black formatting.
-        logits_d, m_d, prec_d, _, _ = dist.get_mixture_components(encoded_x)
+        embedded_x = self._neural_net.net._embedding_net(x)
+        dist = self._neural_net.net._distribution  # defined to avoid black formatting.
+        logits_d, m_d, prec_d, _, _ = dist.get_mixture_components(embedded_x)
         norm_logits_d = logits_d - torch.logsumexp(logits_d, dim=-1, keepdim=True)
 
         # The following if case is needed because, in the constructor, we call
@@ -616,7 +644,9 @@ class SNPE_A_MDN(nn.Module):
             training step if the prior is Gaussian.
         """
 
-        self.z_score_theta = isinstance(self._neural_net._transform, CompositeTransform)
+        self.z_score_theta = isinstance(
+            self._neural_net.net._transform, CompositeTransform
+        )
 
         self._set_maybe_z_scored_prior()
 
@@ -648,8 +678,8 @@ class SNPE_A_MDN(nn.Module):
         prior will not be exactly have mean=0 and std=1.
         """
         if self.z_score_theta:
-            scale = self._neural_net._transform._transforms[0]._scale
-            shift = self._neural_net._transform._transforms[0]._shift
+            scale = self._neural_net.net._transform._transforms[0]._scale
+            shift = self._neural_net.net._transform._transforms[0]._shift
 
             # Following the definition of the linear transform in
             # `standardizing_transform` in `sbiutils.py`:
@@ -683,7 +713,7 @@ class SNPE_A_MDN(nn.Module):
         """Return potentially standardized theta if z-scoring was requested."""
 
         if self.z_score_theta:
-            theta, _ = self._neural_net._transform(theta)
+            theta, _ = self._neural_net.net._transform(theta)
 
         return theta
 

@@ -8,11 +8,11 @@ import torch
 from torch import eye, zeros
 from torch.distributions import MultivariateNormal
 
-from sbi.neural_nets.density_estimators.flow import NFlowsFlow
-from sbi.neural_nets.flow import build_nsf
+from sbi.neural_nets.density_estimators import NFlowsFlow, ZukoFlow
+from sbi.neural_nets.flow import build_nsf, build_zuko_maf
 
 
-@pytest.mark.parametrize("density_estimator", (NFlowsFlow,))
+@pytest.mark.parametrize("density_estimator", (NFlowsFlow, ZukoFlow))
 @pytest.mark.parametrize("input_dims", (1, 2))
 @pytest.mark.parametrize(
     "condition_shape", ((1,), (2,), (1, 1), (2, 2), (1, 1, 1), (2, 2, 2))
@@ -44,14 +44,22 @@ def test_api_density_estimator(density_estimator, input_dims, condition_shape):
                 x = torch.sum(x, dim=-1)
             return x
 
-    net = build_nsf(
-        batch_input,
-        batch_context,
-        hidden_features=10,
-        num_transforms=2,
-        embedding_net=EmbeddingNet(),
-    )
-    estimator = density_estimator(net, condition_shape)
+    if density_estimator == NFlowsFlow:
+        estimator = build_nsf(
+            batch_input,
+            batch_context,
+            hidden_features=10,
+            num_transforms=2,
+            embedding_net=EmbeddingNet(),
+        )
+    elif density_estimator == ZukoFlow:
+        estimator = build_zuko_maf(
+            batch_input,
+            batch_context,
+            hidden_features=10,
+            num_transforms=2,
+            embedding_net=EmbeddingNet(),
+        )
 
     # Loss is only required to work for batched inputs and contexts
     loss = estimator.loss(batch_input, batch_context)

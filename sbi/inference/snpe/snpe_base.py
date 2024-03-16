@@ -7,7 +7,7 @@ from typing import Any, Callable, Dict, Optional, Union
 from warnings import warn
 
 import torch
-from torch import Tensor, nn, ones, optim
+from torch import Tensor, ones, optim
 from torch.distributions import Distribution
 from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.utils.tensorboard.writer import SummaryWriter
@@ -22,6 +22,7 @@ from sbi.inference.posteriors import (
 )
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials import posterior_estimator_based_potential
+from sbi.neural_nets.density_estimators import DensityEstimator
 from sbi.utils import (
     RestrictedPrior,
     check_estimator_arg,
@@ -215,7 +216,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[dict] = None,
-    ) -> nn.Module:
+    ) -> DensityEstimator:
         r"""Return density estimator that approximates the distribution $p(\theta|x)$.
 
         Args:
@@ -428,7 +429,7 @@ class PosteriorEstimator(NeuralInference, ABC):
 
     def build_posterior(
         self,
-        density_estimator: Optional[nn.Module] = None,
+        density_estimator: Optional[DensityEstimator] = None,
         prior: Optional[Distribution] = None,
         sample_with: str = "direct",
         mcmc_method: str = "slice_np",
@@ -580,11 +581,13 @@ class PosteriorEstimator(NeuralInference, ABC):
         """
         if self._round == 0 or force_first_round_loss:
             # Use posterior log prob (without proposal correction) for first round.
-            log_prob = self._neural_net.log_prob(theta, x)
+            loss = self._neural_net.loss(theta, x)
         else:
-            log_prob = self._log_prob_proposal_posterior(theta, x, masks, proposal)
+            # Currently only works for `DensityEstimator` objects.
+            # Must be extended ones other Estimators are implemented. See #966,
+            loss = -self._log_prob_proposal_posterior(theta, x, masks, proposal)
 
-        return -(calibration_kernel(x) * log_prob)
+        return calibration_kernel(x) * loss
 
     def _check_proposal(self, proposal):
         """

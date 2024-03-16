@@ -163,8 +163,8 @@ class SNPE_C(PosteriorEstimator):
             proposal = self._proposal_roundwise[-1]
             self.use_non_atomic_loss = (
                 isinstance(proposal, DirectPosterior)
-                and isinstance(proposal.posterior_estimator._distribution, mdn)
-                and isinstance(self._neural_net._distribution, mdn)
+                and isinstance(proposal.posterior_estimator.net._distribution, mdn)
+                and isinstance(self._neural_net.net._distribution, mdn)
                 and check_dist_class(
                     self._prior, class_to_check=(Uniform, MultivariateNormal)
                 )[0]
@@ -191,7 +191,9 @@ class SNPE_C(PosteriorEstimator):
             training step if the prior is Gaussian.
         """
 
-        self.z_score_theta = isinstance(self._neural_net._transform, CompositeTransform)
+        self.z_score_theta = isinstance(
+            self._neural_net.net._transform, CompositeTransform
+        )
 
         self._set_maybe_z_scored_prior()
 
@@ -221,8 +223,8 @@ class SNPE_C(PosteriorEstimator):
         """
 
         if self.z_score_theta:
-            scale = self._neural_net._transform._transforms[0]._scale
-            shift = self._neural_net._transform._transforms[0]._shift
+            scale = self._neural_net.net._transform._transforms[0]._scale
+            shift = self._neural_net.net._transform._transforms[0]._shift
 
             # Following the definintion of the linear transform in
             # `standardizing_transform` in `sbiutils.py`:
@@ -276,8 +278,22 @@ class SNPE_C(PosteriorEstimator):
         """
 
         if self.use_non_atomic_loss:
+            if not (
+                hasattr(self._neural_net.net, "_distribution")
+                and isinstance(self._neural_net.net._distribution, mdn)
+            ):
+                raise ValueError(
+                    "The density estimator must be a MDNtext for non-atomic loss."
+                )
+
             return self._log_prob_proposal_posterior_mog(theta, x, proposal)
         else:
+            if not hasattr(self._neural_net, "log_prob"):
+                raise ValueError(
+                    "The neural estimator must have a log_prob method, for\
+                                 atomic loss. It should at best follow the \
+                                 sbi.neural_nets 'DensityEstiamtor' interface."
+                )
             return self._log_prob_proposal_posterior_atomic(theta, x, masks)
 
     def _log_prob_proposal_posterior_atomic(
@@ -388,16 +404,16 @@ class SNPE_C(PosteriorEstimator):
         # Evaluate the proposal. MDNs do not have functionality to run the embedding_net
         # and then get the mixture_components (**without** calling log_prob()). Hence,
         # we call them separately here.
-        encoded_x = proposal.posterior_estimator._embedding_net(proposal.default_x)
+        encoded_x = proposal.posterior_estimator.net._embedding_net(proposal.default_x)
         dist = (
-            proposal.posterior_estimator._distribution
+            proposal.posterior_estimator.net._distribution
         )  # defined to avoid ugly black formatting.
         logits_p, m_p, prec_p, _, _ = dist.get_mixture_components(encoded_x)
         norm_logits_p = logits_p - torch.logsumexp(logits_p, dim=-1, keepdim=True)
 
         # Evaluate the density estimator.
-        encoded_x = self._neural_net._embedding_net(x)
-        dist = self._neural_net._distribution  # defined to avoid black formatting.
+        encoded_x = self._neural_net.net._embedding_net(x)
+        dist = self._neural_net.net._distribution  # defined to avoid black formatting.
         logits_d, m_d, prec_d, _, _ = dist.get_mixture_components(encoded_x)
         norm_logits_d = logits_d - torch.logsumexp(logits_d, dim=-1, keepdim=True)
 
@@ -632,6 +648,6 @@ class SNPE_C(PosteriorEstimator):
         """Return potentially standardized theta if z-scoring was requested."""
 
         if self.z_score_theta:
-            theta, _ = self._neural_net._transform(theta)
+            theta, _ = self._neural_net.net._transform(theta)
 
         return theta

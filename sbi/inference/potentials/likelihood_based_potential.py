@@ -1,22 +1,21 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
-from typing import Any, Callable, Optional, Tuple
+from typing import Callable, Optional, Tuple
 
 import torch
-from torch import Tensor, nn
+from torch import Tensor
 from torch.distributions import Distribution
 
 from sbi.inference.potentials.base_potential import BasePotential
+from sbi.neural_nets.density_estimators import DensityEstimator
 from sbi.neural_nets.mnle import MixedDensityEstimator
 from sbi.types import TorchTransform
 from sbi.utils import mcmc_transform
-from sbi.utils.sbiutils import match_theta_and_x_batch_shapes
-from sbi.utils.torchutils import atleast_2d
 
 
 def likelihood_estimator_based_potential(
-    likelihood_estimator: nn.Module,
+    likelihood_estimator: DensityEstimator,
     prior: Distribution,
     x_o: Optional[Tensor],
     enable_transform: bool = True,
@@ -27,7 +26,7 @@ def likelihood_estimator_based_potential(
     unconstrained space.
 
     Args:
-        likelihood_estimator: The neural network modelling the likelihood.
+        likelihood_estimator: The density estimator modelling the likelihood.
         prior: The prior distribution.
         x_o: The observed data at which to evaluate the likelihood.
         enable_transform: Whether to transform parameters to unconstrained space.
@@ -55,7 +54,7 @@ class LikelihoodBasedPotential(BasePotential):
 
     def __init__(
         self,
-        likelihood_estimator: nn.Module,
+        likelihood_estimator: DensityEstimator,
         prior: Distribution,
         x_o: Optional[Tensor],
         device: str = "cpu",
@@ -63,7 +62,7 @@ class LikelihoodBasedPotential(BasePotential):
         r"""Returns the potential function for likelihood-based methods.
 
         Args:
-            likelihood_estimator: The neural network modelling the likelihood.
+            likelihood_estimator: The density estimator modelling the likelihood.
             prior: The prior distribution.
             x_o: The observed data at which to evaluate the likelihood.
             device: The device to which parameters and data are moved before evaluating
@@ -92,7 +91,7 @@ class LikelihoodBasedPotential(BasePotential):
         log_likelihood_trial_sum = _log_likelihoods_over_trials(
             x=self.x_o,
             theta=theta.to(self.device),
-            net=self.likelihood_estimator,
+            estimator=self.likelihood_estimator,
             track_gradients=track_gradients,
         )
 
@@ -100,7 +99,7 @@ class LikelihoodBasedPotential(BasePotential):
 
 
 def _log_likelihoods_over_trials(
-    x: Tensor, theta: Tensor, net: Any, track_gradients: bool = False
+    x: Tensor, theta: Tensor, estimator: DensityEstimator, track_gradients: bool = False
 ) -> Tensor:
     r"""Return log likelihoods summed over iid trials of `x`.
 
@@ -112,36 +111,28 @@ def _log_likelihoods_over_trials(
 
     Args:
         x: batch of iid data.
-        theta: batch of parameters
-        net: neural net with .log_prob()
+        theta: batch of parameters.
+        estimator: DensityEstimator.
         track_gradients: Whether to track gradients.
 
     Returns:
         log_likelihood_trial_sum: log likelihood for each parameter, summed over all
             batch entries (iid trials) in `x`.
     """
-
-    # Repeat `x` in case of evaluation on multiple `theta`. This is needed below in
-    # when calling nflows in order to have matching shapes of theta and context x
-    # at neural network evaluation time.
-    theta_repeated, x_repeated = match_theta_and_x_batch_shapes(
-        theta=atleast_2d(theta), x=atleast_2d(x)
-    )
+    # unsqueeze to ensure that the x-batch dimension is the first dimension for the
+    # broadcasting of the density estimator.
+    x = torch.as_tensor(x).reshape(-1, x.shape[-1]).unsqueeze(1)
     assert (
-        x_repeated.shape[0] == theta_repeated.shape[0]
-    ), "x and theta must match in batch shape."
-    assert (
-        next(net.parameters()).device == x.device and x.device == theta.device
-    ), f"""device mismatch: net, x, theta: {next(net.parameters()).device}, {x.device},
+        next(estimator.parameters()).device == x.device and x.device == theta.device
+    ), f"""device mismatch: estimator, x, theta: \
+        {next(estimator.parameters()).device}, {x.device},
         {theta.device}."""
 
     # Calculate likelihood in one batch.
     with torch.set_grad_enabled(track_gradients):
-        log_likelihood_trial_batch = net.log_prob(x_repeated, theta_repeated)
-        # Reshape to (x-trials x parameters), sum over trial-log likelihoods.
-        log_likelihood_trial_sum = log_likelihood_trial_batch.reshape(
-            x.shape[0], -1
-        ).sum(0)
+        log_likelihood_trial_batch = estimator.log_prob(x, condition=theta)
+        # Reshape to (-1, theta_batch_size), sum over trial-log likelihoods.
+        log_likelihood_trial_sum = log_likelihood_trial_batch.sum(0)
 
     return log_likelihood_trial_sum
 
@@ -179,12 +170,14 @@ def mixed_likelihood_estimator_based_potential(
 class MixedLikelihoodBasedPotential(LikelihoodBasedPotential):
     def __init__(
         self,
-        likelihood_estimator: MixedDensityEstimator,
+        likelihood_estimator: MixedDensityEstimator,  # type: ignore TODO fix pyright
         prior: Distribution,
         x_o: Optional[Tensor],
         device: str = "cpu",
     ):
-        super().__init__(likelihood_estimator, prior, x_o, device)
+        # TODO Fix pyright issue by making MixedDensityEstimator a subclass
+        # of DensityEstimator
+        super().__init__(likelihood_estimator, prior, x_o, device)  # type: ignore
 
     def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
         # Calculate likelihood in one batch.

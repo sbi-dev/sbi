@@ -1,22 +1,38 @@
 from typing import Tuple
 
 import torch
-from pyknos.nflows.flows import Flow
-from torch import Tensor
+from torch import Tensor, nn
+from zuko.flows import Flow
 
 from sbi.neural_nets.density_estimators.base import DensityEstimator
 from sbi.types import Shape
 
 
-class NFlowsFlow(DensityEstimator):
-    r"""`nflows`- based normalizing flow density estimator.
+class ZukoFlow(DensityEstimator):
+    r"""`zuko`- based normalizing flow density estimator.
 
     Flow type objects already have a .log_prob() and .sample() method, so here we just
     wrap them and add the .loss() method.
     """
 
-    def __init__(self, net: Flow, condition_shape: torch.Size) -> None:
-        super().__init__(net, condition_shape)
+    def __init__(
+        self, net: Flow, embedding_net: nn.Module, condition_shape: torch.Size
+    ):
+        r"""Initialize the density estimator.
+
+        Args:
+            flow: Flow object.
+            condition_shape: Shape of the condition.
+        """
+
+        # assert len(condition_shape) == 1, "Zuko Flows require 1D conditions."
+        super().__init__(net=net, condition_shape=condition_shape)
+        self._embedding_net = embedding_net
+
+    @property
+    def embedding_net(self) -> nn.Module:
+        r"""Return the embedding network."""
+        return self._embedding_net
 
     def log_prob(self, input: Tensor, condition: Tensor) -> Tensor:
         r"""Return the log probabilities of the inputs given a condition or multiple
@@ -56,13 +72,12 @@ class NFlowsFlow(DensityEstimator):
         batch_shape = torch.broadcast_shapes(batch_shape_in, batch_shape_cond)
         # Expand the input and condition to the same batch shape
         input = input.expand(batch_shape + (input.shape[-1],))
-        condition = condition.expand(batch_shape + self._condition_shape)
-        # Flatten required by nflows, but now both have the same batch shape
-        input = input.reshape(-1, input.shape[-1])
-        condition = condition.reshape(-1, *self._condition_shape)
+        emb_cond = self._embedding_net(condition)
+        emb_cond = emb_cond.expand(batch_shape + (emb_cond.shape[-1],))
 
-        log_probs = self.net.log_prob(input, context=condition)
-        log_probs = log_probs.reshape(batch_shape)
+        dists = self.net(emb_cond)
+        log_probs = dists.log_prob(input)
+
         return log_probs
 
     def loss(self, input: Tensor, condition: Tensor) -> Tensor:
@@ -97,25 +112,13 @@ class NFlowsFlow(DensityEstimator):
         """
         self._check_condition_shape(condition)
 
-        num_samples = torch.Size(sample_shape).numel()
         condition_dims = len(self._condition_shape)
+        batch_shape = condition.shape[:-condition_dims] if condition_dims > 0 else ()
 
-        if len(condition.shape) == condition_dims:
-            # nflows.sample() expects conditions to be batched.
-            condition = condition.unsqueeze(0)
-            samples = self.net.sample(num_samples, context=condition).reshape((
-                *sample_shape,
-                -1,
-            ))
-        else:
-            # For batched conditions, we need to reshape the conditions and the samples
-            batch_shape = condition.shape[:-condition_dims]
-            condition = condition.reshape(-1, *self._condition_shape)
-            samples = self.net.sample(num_samples, context=condition).reshape((
-                *batch_shape,
-                *sample_shape,
-                -1,
-            ))
+        emb_cond = self._embedding_net(condition)
+        dists = self.net(emb_cond)
+        # zuko.sample() returns (*sample_shape, *batch_shape, input_size).
+        samples = dists.sample(sample_shape).reshape(*batch_shape, *sample_shape, -1)
 
         return samples
 
@@ -133,25 +136,15 @@ class NFlowsFlow(DensityEstimator):
         """
         self._check_condition_shape(condition)
 
-        num_samples = torch.Size(sample_shape).numel()
         condition_dims = len(self._condition_shape)
+        batch_shape = condition.shape[:-condition_dims] if condition_dims > 0 else ()
 
-        if len(condition.shape) == condition_dims:
-            # nflows.sample() expects conditions to be batched.
-            condition = condition.unsqueeze(0)
-            samples, log_probs = self.net.sample_and_log_prob(
-                num_samples, context=condition
-            )
-            samples = samples.reshape((*sample_shape, -1))
-            log_probs = log_probs.reshape((*sample_shape,))
-        else:
-            # For batched conditions, we need to reshape the conditions and the samples
-            batch_shape = condition.shape[:-condition_dims]
-            condition = condition.reshape(-1, *self._condition_shape)
-            samples, log_probs = self.net.sample_and_log_prob(
-                num_samples, context=condition
-            )
-            samples = samples.reshape((*batch_shape, *sample_shape, -1))
-            log_probs = log_probs.reshape((*batch_shape, *sample_shape))
+        emb_cond = self._embedding_net(condition)
+        dists = self.net(emb_cond)
+        samples, log_probs = dists.rsample_and_log_prob(sample_shape)
+        # zuko.sample_and_log_prob() returns (*sample_shape, *batch_shape, ...).
+
+        samples = samples.reshape(*batch_shape, *sample_shape, -1)
+        log_probs = log_probs.reshape(*batch_shape, *sample_shape)
 
         return samples, log_probs

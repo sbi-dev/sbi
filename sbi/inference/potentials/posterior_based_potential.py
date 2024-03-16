@@ -4,19 +4,19 @@
 from typing import Callable, Optional, Tuple
 
 import torch
-from pyknos.nflows import flows
-from torch import Tensor, nn
+from torch import Tensor
 from torch.distributions import Distribution
 
 from sbi.inference.potentials.base_potential import BasePotential
+from sbi.neural_nets.density_estimators import DensityEstimator
 from sbi.types import TorchTransform
 from sbi.utils import mcmc_transform
-from sbi.utils.sbiutils import match_theta_and_x_batch_shapes, within_support
+from sbi.utils.sbiutils import within_support
 from sbi.utils.torchutils import ensure_theta_batched
 
 
 def posterior_estimator_based_potential(
-    posterior_estimator: nn.Module,
+    posterior_estimator: DensityEstimator,
     prior: Distribution,
     x_o: Optional[Tensor],
     enable_transform: bool = True,
@@ -59,7 +59,7 @@ class PosteriorBasedPotential(BasePotential):
 
     def __init__(
         self,
-        posterior_estimator: flows.Flow,
+        posterior_estimator: DensityEstimator,
         prior: Distribution,
         x_o: Optional[Tensor],
         device: str = "cpu",
@@ -92,14 +92,17 @@ class PosteriorBasedPotential(BasePotential):
             The potential.
         """
 
+        if self._x_o is None:
+            raise ValueError(
+                "No observed data x_o is available. Please reinitialize \
+                the potential or manually set self._x_o."
+            )
+
         theta = ensure_theta_batched(torch.as_tensor(theta))
-        theta, x_repeated = match_theta_and_x_batch_shapes(theta, self.x_o)
-        theta, x_repeated = theta.to(self.device), x_repeated.to(self.device)
+        theta, x = theta.to(self.device), self.x_o.to(self.device)
 
         with torch.set_grad_enabled(track_gradients):
-            posterior_log_prob = self.posterior_estimator.log_prob(
-                theta, context=x_repeated
-            )
+            posterior_log_prob = self.posterior_estimator.log_prob(theta, condition=x)
 
             # Force probability to be zero outside prior support.
             in_prior_support = within_support(self.prior, theta)

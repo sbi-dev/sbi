@@ -5,6 +5,7 @@
 from copy import deepcopy
 from typing import Any, Callable, Dict, Optional, Union
 
+from torch import Tensor
 from torch.distributions import Distribution
 
 from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior, VIPosterior
@@ -194,3 +195,14 @@ class MNLE(LikelihoodEstimator):
         self._model_bank.append(deepcopy(self._posterior))
 
         return deepcopy(self._posterior)
+
+    # Temporary: need to rewrite mixed likelihood estimators as DensityEstimator
+    # objects.
+    # TODO: Fix and merge issue #968
+    def _loss(self, theta: Tensor, x: Tensor) -> Tensor:
+        r"""Return loss for SNLE, which is the likelihood of $-\log q(x_i | \theta_i)$.
+
+        Returns:
+            Negative log prob.
+        """
+        return -self._neural_net.log_prob(x, context=theta)

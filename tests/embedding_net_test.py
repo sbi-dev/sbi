@@ -94,6 +94,7 @@ def test_embedding_api_with_multiple_trials(num_trials, num_dim):
     inference = SNPE(prior, density_estimator=density_estimator)
 
     _ = inference.append_simulations(theta, x).train(max_num_epochs=5)
+
     posterior = inference.build_posterior().set_default_x(x_o)
 
     s = posterior.sample((1,))

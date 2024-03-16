@@ -309,7 +309,7 @@ class MixedDensityEstimator(nn.Module):
             # Transform to log-space if needed.
             torch.log(cont_x) if self.log_transform_x else cont_x,
             # Pass parameters and discrete x as context.
-            context=torch.cat((context, disc_x), dim=1),
+            condition=torch.cat((context, disc_x), dim=1),
         )
 
         # Combine into joint lp.
@@ -382,7 +382,7 @@ class MixedDensityEstimator(nn.Module):
         # Get repeat discrete data and theta to match in batch shape for flow eval.
         log_probs_cont = self.continuous_net.log_prob(
             torch.log(x_cont_repeated) if self.log_transform_x else x_cont_repeated,
-            context=torch.cat((theta_repeated, x_disc_repeated), dim=1),
+            condition=torch.cat((theta_repeated, x_disc_repeated), dim=1),
         )
 
         # Combine into joint lp with first dim over trials.

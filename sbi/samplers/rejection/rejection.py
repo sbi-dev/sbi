@@ -257,35 +257,31 @@ def accept_reject_sample(
     num_sampled_total, num_remaining = 0, num_samples
     accepted, acceptance_rate = [], float("Nan")
     leakage_warning_raised = False
+    # Ruff suggestion
+    if proposal_sampling_kwargs is None:
+        proposal_sampling_kwargs = {}
 
     # To cover cases with few samples without leakage:
     sampling_batch_size = min(num_samples, max_sampling_batch_size)
     while num_remaining > 0:
         # Sample and reject.
-        # This if-case is annoying, but it will be gone when we move away from
-        # nflows and towards a flows-framework which takes a tuple as sample_size.
-        if isinstance(proposal, nn.Module):
-            candidates = proposal.sample(
-                sampling_batch_size,
-                **proposal_sampling_kwargs or {},  # type: ignore
-            ).reshape(sampling_batch_size, -1)
-        else:
-            candidates = proposal.sample(
-                torch.Size((sampling_batch_size,)),
-                **proposal_sampling_kwargs or {},  # type: ignore
-            )  # type: ignore
+        candidates = proposal.sample(
+            (sampling_batch_size,),  # type: ignore
+            **proposal_sampling_kwargs,
+        )
 
         # SNPE-style rejection-sampling when the proposal is the neural net.
         are_accepted = accept_reject_fn(candidates)
-
         samples = candidates[are_accepted]
-
         accepted.append(samples)
 
         # Update.
+        # Note: For any condition of shape (*batch_shape, *condition_shape), the
+        # samples will be of shape(*batch_shape, sampling_batch_size, d) and hence work
+        # in dim = -2.
         num_sampled_total += sampling_batch_size
-        num_remaining -= samples.shape[0]
-        pbar.update(samples.shape[0])
+        num_remaining -= samples.shape[-2]
+        pbar.update(samples.shape[-2])
 
         # To avoid endless sampling when leakage is high, we raise a warning if the
         # acceptance rate is too low after the first 1_000 samples.
@@ -335,9 +331,9 @@ def accept_reject_sample(
     pbar.close()
 
     # When in case of leakage a batch size was used there could be too many samples.
-    samples = torch.cat(accepted)[:num_samples]
+    samples = torch.cat(accepted, dim=-2)[..., :num_samples, :]
     assert (
-        samples.shape[0] == num_samples
+        samples.shape[-2] == num_samples
     ), "Number of accepted samples must match required samples."
 
     return samples, as_tensor(acceptance_rate)

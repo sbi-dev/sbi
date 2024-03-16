@@ -11,6 +11,7 @@ import numpy as np
 import pyknos.nflows.transforms as transforms
 import torch
 import torch.distributions.transforms as torch_tf
+import zuko
 from pyro.distributions import Empirical
 from torch import Tensor, ones, optim, zeros
 from torch import nn as nn
@@ -136,8 +137,11 @@ def z_score_parser(z_score_flag: Optional["str"]) -> Tuple[bool, bool]:
 
 
 def standardizing_transform(
-    batch_t: Tensor, structured_dims: bool = False, min_std: float = 1e-14
-) -> transforms.AffineTransform:
+    batch_t: Tensor,
+    structured_dims: bool = False,
+    min_std: float = 1e-14,
+    backend: str = "nflows",
+) -> Union[transforms.AffineTransform, zuko.transforms.MonotonicAffineTransform]:
     """Builds standardizing transform
 
     Args:
@@ -171,7 +175,18 @@ def standardizing_transform(
         t_std = torch.std(batch_t[is_valid_t], dim=0)
         t_std[t_std < min_std] = min_std
 
-    return transforms.AffineTransform(shift=-t_mean / t_std, scale=1 / t_std)
+    if backend == "nflows":
+        return transforms.AffineTransform(shift=-t_mean / t_std, scale=1 / t_std)
+    elif backend == "zuko":
+        return zuko.flows.Unconditional(
+            zuko.transforms.MonotonicAffineTransform,
+            shift=-t_mean / t_std,
+            scale=1 / t_std,
+            buffer=True,
+        )
+
+    else:
+        raise ValueError("Invalid backend. Use 'nflows' or 'zuko'.")
 
 
 class Standardize(nn.Module):
@@ -556,15 +571,8 @@ def within_support(distribution: Any, samples: Tensor) -> Tensor:
     # Try to check using the support property, use log prob method otherwise.
     try:
         sample_check = distribution.support.check(samples)
+        return sample_check
 
-        # Before torch v1.7.0, `support.check()` returned bools for every element.
-        # From v1.8.0 on, it directly considers all dimensions of a sample. E.g.,
-        # for a single sample in 3D, v1.7.0 would return [[True, True, True]] and
-        # v1.8.0 would return [True].
-        if sample_check.ndim > 1:
-            return torch.all(sample_check, dim=1)
-        else:
-            return sample_check
     # Falling back to log prob method of either the NeuralPosterior's net, or of a
     # custom wrapper distribution's.
     except (NotImplementedError, AttributeError):

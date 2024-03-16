@@ -8,6 +8,7 @@ from pyknos.nflows import flows, transforms
 from torch import Tensor, nn
 
 import sbi.utils as utils
+from sbi.neural_nets.density_estimators import NFlowsFlow
 from sbi.utils.user_input_checks import check_data_device, check_embedding_net_device
 
 
@@ -20,7 +21,7 @@ def build_mdn(
     num_components: int = 10,
     embedding_net: nn.Module = nn.Identity(),
     **kwargs,
-) -> nn.Module:
+) -> NFlowsFlow:
     """Builds MDN p(x|y).
 
     Args:
@@ -80,5 +81,6 @@ def build_mdn(
     )
 
     neural_net = flows.Flow(transform, distribution, embedding_net)
+    flow = NFlowsFlow(neural_net, condition_shape=batch_y[0].shape)
 
-    return neural_net
+    return flow

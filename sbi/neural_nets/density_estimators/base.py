@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Optional, Tuple
 
 import torch
 from torch import Tensor, nn
@@ -24,12 +24,17 @@ class DensityEstimator(nn.Module):
 
         Args:
             net: Neural network.
-            condition_shape: Shape of the input. If not provided, it will assume a 1D
-                             input.
+            condition_shape: Shape of the condition. If not provided, it will assume a
+                            1D input.
         """
         super().__init__()
         self.net = net
         self._condition_shape = condition_shape
+
+    @property
+    def embedding_net(self) -> Optional[nn.Module]:
+        r"""Return the embedding network if it exists."""
+        return None
 
     def log_prob(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
         r"""Return the log probabilities of the inputs given a condition or multiple

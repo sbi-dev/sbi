@@ -7,8 +7,7 @@ from copy import deepcopy
 from typing import Any, Callable, Dict, Optional, Union
 
 import torch
-from pyknos.nflows import flows
-from torch import Tensor, nn, optim
+from torch import Tensor, optim
 from torch.distributions import Distribution
 from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.utils.tensorboard.writer import SummaryWriter
@@ -17,6 +16,7 @@ from sbi import utils as utils
 from sbi.inference import NeuralInference
 from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior, VIPosterior
 from sbi.inference.potentials import likelihood_estimator_based_potential
+from sbi.neural_nets.density_estimators import DensityEstimator
 from sbi.utils import check_estimator_arg, check_prior, x_shape_from_simulation
 
 
@@ -126,7 +126,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
-    ) -> flows.Flow:
+    ) -> DensityEstimator:
         r"""Train the density estimator to learn the distribution $p(x|\theta)$.
 
         Args:
@@ -262,7 +262,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
 
     def build_posterior(
         self,
-        density_estimator: Optional[nn.Module] = None,
+        density_estimator: Optional[DensityEstimator] = None,
         prior: Optional[Distribution] = None,
         sample_with: str = "mcmc",
         mcmc_method: str = "slice_np",
@@ -367,4 +367,4 @@ class LikelihoodEstimator(NeuralInference, ABC):
         Returns:
             Negative log prob.
         """
-        return -self._neural_net.log_prob(x, context=theta)
+        return self._neural_net.loss(x, condition=theta)

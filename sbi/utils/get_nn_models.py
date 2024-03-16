@@ -11,7 +11,13 @@ from sbi.neural_nets.classifier import (
     build_mlp_classifier,
     build_resnet_classifier,
 )
-from sbi.neural_nets.flow import build_made, build_maf, build_maf_rqs, build_nsf
+from sbi.neural_nets.flow import (
+    build_made,
+    build_maf,
+    build_maf_rqs,
+    build_nsf,
+    build_zuko_maf,
+)
 from sbi.neural_nets.mdn import build_mdn
 from sbi.neural_nets.mnle import build_mnle
 
@@ -168,6 +174,8 @@ def likelihood_nn(
             return build_nsf(batch_x=batch_x, batch_y=batch_theta, **kwargs)
         elif model == "mnle":
             return build_mnle(batch_x=batch_x, batch_y=batch_theta, **kwargs)
+        elif model == "zuko_maf":
+            return build_zuko_maf(batch_x=batch_x, batch_y=batch_theta, **kwargs)
         else:
             raise NotImplementedError
 
@@ -267,6 +275,8 @@ def posterior_nn(
             return build_maf_rqs(batch_x=batch_theta, batch_y=batch_x, **kwargs)
         elif model == "nsf":
             return build_nsf(batch_x=batch_theta, batch_y=batch_x, **kwargs)
+        elif model == "zuko_maf":
+            return build_zuko_maf(batch_x=batch_theta, batch_y=batch_x, **kwargs)
         else:
             raise NotImplementedError
 
