@@ -31,6 +31,7 @@ every year. Additionally, we mention all contributors in the releases.
 Clone [the repo](https://github.com/sbi-dev/sbi) and install all the dependencies via
 `pyproject.toml` using `pip install -e ".[dev]"` (the `-e` flag installs the package
 editable mode, and the `dev` flag installs development and testing dependencies).
+This requires at least Python 3.8.
 
 We use [`pre-commit`](https://pre-commit.com) to ensure proper formatting and perform
 linting (see below). Please install `pre-commit` locally using `pre-commit install`.
