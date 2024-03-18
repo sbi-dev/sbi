@@ -38,6 +38,8 @@ def infer(
     method: str,
     num_simulations: int,
     num_workers: int = 1,
+    init_kwargs=None,
+    call_kwargs=None,
 ) -> NeuralPosterior:
     r"""Runs simulation-based inference and returns the posterior.
 
@@ -63,6 +65,10 @@ def infer(
         num_simulations: Number of simulation calls. More simulations means a longer
             runtime, but a better posterior estimate.
         num_workers: Number of parallel workers to use for simulations.
+        init_kwargs: Additional keyword arguments as dict for the inference method
+            which are passed to `__init__`.
+        call_kwargs: Additional keyword arguments as dict for the call to
+            the inference method which are passed to `build_posterior`.
 
     Returns: Posterior over parameters conditional on observations (amortized).
     """
@@ -74,9 +80,22 @@ def infer(
             "Method not available. `method` must be one of 'SNPE', 'SNLE', 'SNRE'."
         ) from err
 
+    if init_kwargs is not None or call_kwargs is not None:
+        warn(
+            "We discourage the use the simple interface in more complicated settings. "
+            "Have a look into the flexible interface, e.g. in our tutorial.",
+            stacklevel=2,
+        )
+    # Set both variables to empty dicts to be able to pass them
+    # to the functions later on (if necessary).
+    if call_kwargs is None:
+        call_kwargs = {}
+    if init_kwargs is None:
+        init_kwargs = {}
+
     simulator, prior = prepare_for_sbi(simulator, prior)
 
-    inference = method_fun(prior=prior)
+    inference = method_fun(prior=prior, **init_kwargs)
     theta, x = simulate_for_sbi(
         simulator=simulator,
         proposal=prior,
@@ -84,7 +103,7 @@ def infer(
         num_workers=num_workers,
     )
     _ = inference.append_simulations(theta, x).train()
-    posterior = inference.build_posterior()
+    posterior = inference.build_posterior(**call_kwargs)
 
     return posterior
 
