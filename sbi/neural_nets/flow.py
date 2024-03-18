@@ -427,6 +427,31 @@ def build_nsf(
     return flow
 
 
+#################################### Functions Nastya #############################################
+
+def build_zuko_gmm(
+    batch_x: Tensor,
+    batch_y: Tensor,
+    z_score_x: Optional[str] = "independent",
+    z_score_y: Optional[str] = "independent",
+    hidden_features: Union[Sequence[int], int] = 50,
+    num_transforms: int = 5,
+    embedding_net: nn.Module = nn.Identity(),
+    residual: bool = True,
+    randperm: bool = False,
+    **kwargs,
+) -> ZukoFlow:
+
+    pass
+
+
+
+
+
+
+####################################################################################################
+
+
 def build_zuko_maf(
     batch_x: Tensor,
     batch_y: Tensor,
