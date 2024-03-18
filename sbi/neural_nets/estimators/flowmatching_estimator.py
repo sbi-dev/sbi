@@ -11,7 +11,7 @@ from zuko.distributions import DiagNormal, NormalizingFlow
 from zuko.transforms import FreeFormJacobianTransform
 from zuko.utils import broadcast
 
-from sbi.neural_nets.density_estimators.base import ConditionalDensityEstimator
+from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
 
 
 # abstract class to ensure forward signature for flow matching networks

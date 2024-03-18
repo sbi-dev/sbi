@@ -7,7 +7,7 @@ import torch
 from torch import Tensor
 from torch.distributions import Distribution
 
-from sbi.inference.posteriors.base_posterior import NeuralPosterior
+from sbi.inference.posteriors.base_posterior import NeuralPotentialPosterior
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.inference.potentials.posterior_based_potential import PosteriorBasedPotential
 from sbi.sbi_types import Shape, TorchTransform
@@ -16,7 +16,7 @@ from sbi.utils.torchutils import ensure_theta_batched
 from sbi.utils.user_input_checks import process_x
 
 
-class EnsemblePosterior(NeuralPosterior):
+class EnsemblePosterior(NeuralPotentialPosterior):
     r"""Wrapper for bundling together different posterior instances into an ensemble.
 
     This class creates a posterior ensemble from a set of N different, already trained
@@ -243,7 +243,7 @@ class EnsemblePosterior(NeuralPosterior):
         else:
             return torch.logsumexp(log_weights.expand_as(log_probs) + log_probs, dim=0)
 
-    def set_default_x(self, x: Tensor) -> "NeuralPosterior":
+    def set_default_x(self, x: Tensor) -> "NeuralPotentialPosterior":
         r"""Set new default x for `.sample(), .log_prob()` as conditioning context.
 
         This is a pure convenience to avoid having to repeatedly specify `x` in calls to
@@ -265,7 +265,9 @@ class EnsemblePosterior(NeuralPosterior):
             `EnsemblePosterior` that will use a default `x` when not explicitly
             passed.
         """
-        self._x = process_x(x, x_event_shape=None).to(self._device)
+        self._x = process_x(
+            x, x_event_shape=None, allow_iid_x=self.potential_fn.allow_iid_x
+        ).to(self._device)
 
         for posterior in self.posteriors:
             posterior.set_default_x(x)

@@ -28,6 +28,7 @@ from sbi.simulators.linear_gaussian import (
     samples_true_posterior_linear_gaussian_uniform_prior,
     true_posterior_linear_gaussian_mvn_prior,
 )
+from sbi.utils.user_input_checks import process_prior, process_simulator
 from tests.test_utils import (
     check_c2st,
     get_dkl_gaussian_prior,
@@ -51,6 +52,9 @@ def test_api_snre_multiple_trials_and_rounds_map(
 
     simulator = diagonal_linear_gaussian
     inference = snre_method(prior=prior, classifier="mlp", show_progress_bars=False)
+
+    prior, _, prior_returns_numpy = process_prior(prior)
+    simulator = process_simulator(simulator, prior, prior_returns_numpy)
 
     proposals = [prior]
     for _ in range(num_rounds):

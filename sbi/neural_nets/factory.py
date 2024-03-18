@@ -2,7 +2,7 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Union
 
 from torch import nn
 
@@ -32,6 +32,7 @@ from sbi.neural_nets.flow_matcher import (
 )
 from sbi.neural_nets.mdn import build_mdn
 from sbi.neural_nets.mnle import build_mnle
+from sbi.neural_nets.score_nets import build_score_estimator
 from sbi.utils.nn_utils import check_net_device
 
 model_builders = {
@@ -370,3 +371,85 @@ def posterior_nn(
         kwargs.pop("num_components")
 
     return build_fn_snpe_a if model == "mdn_snpe_a" else build_fn
+
+
+def posterior_score_nn(
+    sde_type: str,
+    score_net_type: Union[str, nn.Module] = "mlp",
+    z_score_theta: Optional[str] = "independent",
+    z_score_x: Optional[str] = "independent",
+    t_embedding_dim: int = 16,
+    hidden_features: int = 50,
+    embedding_net: nn.Module = nn.Identity(),
+    **kwargs: Any,
+) -> Callable:
+    """Build util function that builds a ScoreEstimator object for score-based
+    posteriors.
+
+    Args:
+        sde_type: SDE type used, which defines the mean and std functions. One of:
+            - 'vp': Variance preserving.
+            - 'subvp': Sub-variance preserving.
+            - 've': Variance exploding.
+            Defaults to 'vp'.
+        score_net: Type of regression network. One of:
+            - 'mlp': Fully connected feed-forward network.
+            - 'resnet': Residual network (NOT IMPLEMENTED).
+            -  nn.Module: Custom network
+            Defaults to 'mlp'.
+        z_score_theta: Whether to z-score thetas passing into the network, can be one
+            of:
+            - `none`, or None: do not z-score.
+            - `independent`: z-score each dimension independently.
+            - `structured`: treat dimensions as related, therefore compute mean and std
+            over the entire batch, instead of per-dimension. Should be used when each
+            sample is, for example, a time series or an image.
+        z_score_x: Whether to z-score xs passing into the network, same options as
+            z_score_theta.
+        t_embedding_dim: Embedding dimension of diffusion time. Defaults to 16.
+        hidden_features: Number of hidden units per layer. Defaults to 50.
+        embedding_net: Embedding network for x (conditioning variable). Defaults to
+            nn.Identity().
+
+    Returns:
+        Constructor function for NSPE.
+    """
+
+    kwargs = dict(
+        zip(
+            (
+                "z_score_x",
+                "z_score_y",
+                "sde_type",
+                "score_net",
+                "t_embedding_dim",
+                "hidden_features",
+                "embedding_net_y",
+            ),
+            (
+                z_score_theta,
+                z_score_x,
+                sde_type,
+                score_net_type,
+                t_embedding_dim,
+                hidden_features,
+                embedding_net,
+            ),
+        ),
+        **kwargs,
+    )
+
+    def build_fn(batch_theta, batch_x):
+        """Build function wrapper for the build_score_estimator function that
+        is required for the score posterior class.
+
+        Args:
+            batch_theta: a batch of theta.
+            batch_x: a batch of x.
+
+        Returns:
+            Callable: a ScoreEstimator object.
+        """
+        return build_score_estimator(batch_x=batch_theta, batch_y=batch_x, **kwargs)
+
+    return build_fn

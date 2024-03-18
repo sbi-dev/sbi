@@ -50,7 +50,7 @@ def linear_gaussian(
 
     Returns: Simulated data.
     """
-
+    theta = torch.as_tensor(theta)  # Must be a tensor
     if num_discarded_dims:
         theta = theta[:, :-num_discarded_dims]
 

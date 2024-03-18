@@ -1,7 +1,6 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
 
-
 from functools import partial
 from typing import List, Optional, Sequence, Union
 
@@ -15,7 +14,7 @@ from pyknos.nflows.transforms.splines import (
 )
 from torch import Tensor, nn, relu, tanh, tensor, uint8
 
-from sbi.neural_nets.density_estimators import NFlowsFlow, ZukoFlow
+from sbi.neural_nets.estimators import NFlowsFlow, ZukoFlow
 from sbi.utils.nn_utils import get_numel
 from sbi.utils.sbiutils import (
     standardizing_net,

@@ -5,7 +5,7 @@ from typing import Optional
 
 from torch import Tensor, nn, unique
 
-from sbi.neural_nets.density_estimators import CategoricalMassEstimator, CategoricalNet
+from sbi.neural_nets.estimators import CategoricalMassEstimator, CategoricalNet
 from sbi.utils.nn_utils import get_numel
 from sbi.utils.sbiutils import (
     standardizing_net,

@@ -12,6 +12,7 @@ from torch import Tensor
 
 from sbi.inference.potentials.base_potential import (
     BasePotential,
+    BasePotentialGradient,
     CallablePotentialWrapper,
 )
 from sbi.sbi_types import Array, Shape, TorchTransform
@@ -21,6 +22,201 @@ from sbi.utils.user_input_checks import process_x
 
 
 class NeuralPosterior(ABC):
+    r"""Posterior $p(\theta|x)$ with `log_prob()` and `sample()` methods.<br/><br/>
+    All inference methods in sbi train a neural network which is then used to obtain
+    the posterior distribution. The `NeuralPosterior` class wraps the trained network
+    such that one can directly evaluate the (unnormalized) log probability and draw
+    samples from the posterior.
+    """
+
+    def __init__(
+        self,
+        device: Optional[str] = None,
+        x_shape: Optional[torch.Size] = None,
+    ):
+        """
+        Args:
+            device: Training device, e.g., "cpu", "cuda" or "cuda:0". If None,
+                `potential_fn.device` is used.
+            x_shape: Deprecated, should not be passed.
+        """
+        if x_shape is not None:
+            warn(
+                "x_shape is not None. However, passing x_shape to the `Posterior` is "
+                "deprecated and will be removed in a future release of `sbi`.",
+                stacklevel=2,
+            )
+
+        # Ensure device string.
+        self._device = device
+
+        # Initialize attributes.
+        self._map = None
+        self._purpose = ""
+        self._x = None
+
+    @abstractmethod
+    def sample(
+        self,
+        sample_shape: Shape = torch.Size(),
+        x: Optional[Tensor] = None,
+        show_progress_bars: bool = True,
+        mcmc_method: Optional[str] = None,
+        mcmc_parameters: Optional[Dict[str, Any]] = None,
+    ) -> Tensor:
+        """See child classes for docstring."""
+        pass
+
+    @abstractmethod
+    def sample_batched(
+        self,
+        sample_shape: Shape,
+        x: Tensor,
+        max_sampling_batch_size: int = 10_000,
+        show_progress_bars: bool = True,
+    ) -> Tensor:
+        """See child classes for docstring."""
+        pass
+
+    @property
+    def default_x(self) -> Optional[Tensor]:
+        """Return default x used by `.sample(), .log_prob` as conditioning context."""
+        return self._x
+
+    @default_x.setter
+    def default_x(self, x: Tensor) -> None:
+        """See `set_default_x`."""
+        self.set_default_x(x)
+
+    def set_default_x(self, x: Tensor) -> "NeuralPosterior":
+        """Set new default x for `.sample(), .log_prob` to use as conditioning context.
+
+        Reset the MAP stored for the old default x if applicable.
+
+        This is a pure convenience to avoid having to repeatedly specify `x` in calls to
+        `.sample()` and `.log_prob()` - only $\theta$ needs to be passed.
+
+        This convenience is particularly useful when the posterior is focused, i.e.
+        has been trained over multiple rounds to be accurate in the vicinity of a
+        particular `x=x_o` (you can check if your posterior object is focused by
+        printing it).
+
+        NOTE: this method is chainable, i.e. will return the NeuralPosterior object so
+        that calls like `posterior.set_default_x(my_x).sample(mytheta)` are possible.
+
+        Args:
+            x: The default observation to set for the posterior $p(\theta|x)$.
+        Returns:
+            `NeuralPosterior` that will use a default `x` when not explicitly passed.
+        """
+        self._x = x
+        self._map = None
+        return self
+
+    def _x_else_default_x(self, x: Optional[Array]) -> Tensor:
+        if x is not None:
+            # New x, reset posterior sampler.
+            self._posterior_sampler = None
+            return process_x(x, x_event_shape=None)
+        elif self.default_x is None:
+            raise ValueError(
+                "Context `x` needed when a default has not been set."
+                "If you'd like to have a default, use the `.set_default_x()` method."
+            )
+        else:
+            return self.default_x
+
+    def map(
+        self,
+        x: Optional[Tensor] = None,
+        num_iter: int = 1_000,
+        num_to_optimize: int = 100,
+        learning_rate: float = 0.01,
+        init_method: Union[str, Tensor] = "posterior",
+        num_init_samples: int = 1_000,
+        save_best_every: int = 10,
+        show_progress_bars: bool = False,
+        force_update: bool = False,
+    ) -> Tensor:
+        """Returns stored maximum-a-posterior estimate (MAP), otherwise calculates it.
+
+        See child classes for docstring.
+        """
+
+        if x is not None:
+            raise ValueError(
+                "Passing `x` directly to `.map()` has been deprecated."
+                "Use `.self_default_x()` to set `x`, and then run `.map()` "
+            )
+
+        if self.default_x is None:
+            raise ValueError(
+                "Default `x` has not been set."
+                "To set the default, use the `.set_default_x()` method."
+            )
+
+        if self._map is None or force_update:
+            self._map = self._calculate_map(
+                num_iter=num_iter,
+                num_to_optimize=num_to_optimize,
+                learning_rate=learning_rate,
+                init_method=init_method,
+                num_init_samples=num_init_samples,
+                save_best_every=save_best_every,
+                show_progress_bars=show_progress_bars,
+            )
+        return self._map
+
+    @abstractmethod
+    def _calculate_map(
+        self,
+        num_iter: int = 1_000,
+        num_to_optimize: int = 100,
+        learning_rate: float = 0.01,
+        init_method: Union[str, Tensor] = "posterior",
+        num_init_samples: int = 1_000,
+        save_best_every: int = 10,
+        show_progress_bars: bool = False,
+    ) -> Tensor:
+        """Calculates the maximum-a-posteriori estimate (MAP).
+
+        See `map()` method of child classes for docstring.
+        """
+        pass
+
+    def __repr__(self):
+        desc = f"""{self.__class__.__name__}"""
+        return desc
+
+    def __str__(self):
+        desc = (
+            f"Posterior conditional density p(θ|x) of type {self.__class__.__name__}. "
+            f"{self._purpose}"
+        )
+
+        return desc
+
+    def __getstate__(self) -> Dict:
+        """Returns the state of the object that is supposed to be pickled.
+
+        Returns:
+            Dictionary containing the state.
+        """
+        return self.__dict__
+
+    def __setstate__(self, state_dict: Dict):
+        """Sets the state when being loaded from pickle.
+
+        For developers: for any new attribute added to `NeuralPosterior`, we have to
+        add an entry here using `check_warn_and_setstate()`.
+
+        Args:
+            state_dict: State to be restored.
+        """
+        self.__dict__ = state_dict
+
+
+class NeuralPotentialPosterior(NeuralPosterior):
     r"""Posterior $p(\theta|x)$ with `log_prob()` and `sample()` methods.<br/><br/>
     All inference methods in sbi train a neural network which is then used to obtain
     the posterior distribution. The `NeuralPosterior` class wraps the trained network
@@ -52,7 +248,9 @@ class NeuralPosterior(ABC):
                 stacklevel=2,
             )
 
-        if not isinstance(potential_fn, BasePotential):
+        if not isinstance(potential_fn, BasePotential) and not isinstance(
+            potential_fn, BasePotentialGradient
+        ):
             kwargs_of_callable = list(inspect.signature(potential_fn).parameters.keys())
             for key in ["theta", "x_o"]:
                 assert key in kwargs_of_callable, (
@@ -180,6 +378,31 @@ class NeuralPosterior(ABC):
         else:
             return self.default_x
 
+    def map(
+        self,
+        x: Optional[Tensor] = None,
+        num_iter: int = 1000,
+        num_to_optimize: int = 100,
+        learning_rate: float = 0.01,
+        init_method: Union[str, Tensor] = "posterior",
+        num_init_samples: int = 1000,
+        save_best_every: int = 10,
+        show_progress_bars: bool = False,
+        force_update: bool = False,
+    ) -> Tensor:
+        self.potential_fn.set_x(self.default_x)
+        return super().map(
+            x,
+            num_iter,
+            num_to_optimize,
+            learning_rate,
+            init_method,
+            num_init_samples,
+            save_best_every,
+            show_progress_bars,
+            force_update,
+        )
+
     def _calculate_map(
         self,
         num_iter: int = 1_000,
@@ -215,78 +438,8 @@ class NeuralPosterior(ABC):
             show_progress_bars=show_progress_bars,
         )[0]
 
-    @abstractmethod
-    def map(
-        self,
-        x: Optional[Tensor] = None,
-        num_iter: int = 1_000,
-        num_to_optimize: int = 100,
-        learning_rate: float = 0.01,
-        init_method: Union[str, Tensor] = "posterior",
-        num_init_samples: int = 1_000,
-        save_best_every: int = 10,
-        show_progress_bars: bool = False,
-        force_update: bool = False,
-    ) -> Tensor:
-        """Returns stored maximum-a-posterior estimate (MAP), otherwise calculates it.
-
-        See child classes for docstring.
-        """
-
-        if x is not None:
-            raise ValueError(
-                "Passing `x` directly to `.map()` has been deprecated."
-                "Use `.self_default_x()` to set `x`, and then run `.map()` "
-            )
-
-        if self.default_x is None:
-            raise ValueError(
-                "Default `x` has not been set."
-                "To set the default, use the `.set_default_x()` method."
-            )
-
-        if self._map is None or force_update:
-            self.potential_fn.set_x(self.default_x)
-            self._map = self._calculate_map(
-                num_iter=num_iter,
-                num_to_optimize=num_to_optimize,
-                learning_rate=learning_rate,
-                init_method=init_method,
-                num_init_samples=num_init_samples,
-                save_best_every=save_best_every,
-                show_progress_bars=show_progress_bars,
-            )
-        return self._map
-
     def __repr__(self):
         desc = f"""{self.__class__.__name__} sampler for potential_fn=<{
             self.potential_fn.__class__.__name__
         }>"""
         return desc
-
-    def __str__(self):
-        desc = (
-            f"Posterior conditional density p(θ|x) of type {self.__class__.__name__}. "
-            f"{self._purpose}"
-        )
-
-        return desc
-
-    def __getstate__(self) -> Dict:
-        """Returns the state of the object that is supposed to be pickled.
-
-        Returns:
-            Dictionary containing the state.
-        """
-        return self.__dict__
-
-    def __setstate__(self, state_dict: Dict):
-        """Sets the state when being loaded from pickle.
-
-        For developers: for any new attribute added to `NeuralPosterior`, we have to
-        add an entry here using `check_warn_and_setstate()`.
-
-        Args:
-            state_dict: State to be restored.
-        """
-        self.__dict__ = state_dict

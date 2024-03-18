@@ -7,7 +7,7 @@ import torch
 from pyknos.nflows.flows import Flow
 from torch import Tensor, nn
 
-from sbi.neural_nets.density_estimators.base import ConditionalDensityEstimator
+from sbi.neural_nets.estimators.base import ConditionalDensityEstimator
 from sbi.sbi_types import Shape
 
 

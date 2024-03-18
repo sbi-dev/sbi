@@ -17,7 +17,7 @@ from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior, VIPoster
 from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
 from sbi.inference.potentials import likelihood_estimator_based_potential
 from sbi.neural_nets import ConditionalDensityEstimator, likelihood_nn
-from sbi.neural_nets.density_estimators.shape_handling import (
+from sbi.neural_nets.estimators.shape_handling import (
     reshape_to_batch_event,
 )
 from sbi.utils import check_estimator_arg, check_prior, x_shape_from_simulation
@@ -187,14 +187,14 @@ class LikelihoodEstimator(NeuralInference, ABC):
                 list(self._neural_net.parameters()),
                 lr=learning_rate,
             )
-            self.epoch, self._val_log_prob = 0, float("-Inf")
+            self.epoch, self._val_loss = 0, float("Inf")
 
         while self.epoch <= max_num_epochs and not self._converged(
             self.epoch, stop_after_epochs
         ):
             # Train for a single epoch.
             self._neural_net.train()
-            train_log_probs_sum = 0
+            train_loss_sum = 0
             for batch in train_loader:
                 self.optimizer.zero_grad()
                 theta_batch, x_batch = (
@@ -204,7 +204,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
                 # Evaluate on x with theta as context.
                 train_losses = self._loss(theta=theta_batch, x=x_batch)
                 train_loss = torch.mean(train_losses)
-                train_log_probs_sum -= train_losses.sum().item()
+                train_loss_sum += train_losses.sum().item()
 
                 train_loss.backward()
                 if clip_max_norm is not None:
@@ -216,14 +216,14 @@ class LikelihoodEstimator(NeuralInference, ABC):
 
             self.epoch += 1
 
-            train_log_prob_average = train_log_probs_sum / (
+            train_loss_average = train_loss_sum / (
                 len(train_loader) * train_loader.batch_size  # type: ignore
             )
-            self._summary["training_log_probs"].append(train_log_prob_average)
+            self._summary["training_loss"].append(train_loss_average)
 
             # Calculate validation performance.
             self._neural_net.eval()
-            val_log_prob_sum = 0
+            val_loss_sum = 0
             with torch.no_grad():
                 for batch in val_loader:
                     theta_batch, x_batch = (
@@ -232,14 +232,14 @@ class LikelihoodEstimator(NeuralInference, ABC):
                     )
                     # Evaluate on x with theta as context.
                     val_losses = self._loss(theta=theta_batch, x=x_batch)
-                    val_log_prob_sum -= val_losses.sum().item()
+                    val_loss_sum += val_losses.sum().item()
 
             # Take mean over all validation samples.
-            self._val_log_prob = val_log_prob_sum / (
+            self._val_loss = val_loss_sum / (
                 len(val_loader) * val_loader.batch_size  # type: ignore
             )
             # Log validation log prob for every epoch.
-            self._summary["validation_log_probs"].append(self._val_log_prob)
+            self._summary["validation_loss"].append(self._val_loss)
 
             self._maybe_show_progress(self._show_progress_bars, self.epoch)
 
@@ -247,7 +247,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
 
         # Update summary.
         self._summary["epochs_trained"].append(self.epoch)
-        self._summary["best_validation_log_prob"].append(self._best_val_log_prob)
+        self._summary["best_validation_loss"].append(self._best_val_loss)
 
         # Update TensorBoard and summary dict.
         self._summarize(round_=self._round)

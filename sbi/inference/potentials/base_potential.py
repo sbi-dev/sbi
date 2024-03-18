@@ -77,6 +77,24 @@ class BasePotential(metaclass=ABCMeta):
         return self._x_o
 
 
+class BasePotentialGradient(BasePotential):
+    def __init__(
+        self,
+        prior: Optional[Distribution],
+        x_o: Optional[Tensor] = None,
+        device: str = "cpu",
+    ):
+        """Conceptually the same as `BasePotential`, but does not return a scalar
+        potential value, but the gradient of a scalar potential function.
+
+        Args:
+            prior: Prior distribution.
+            x_o: Observed data.
+            device: Device on which to evaluate the potential function.
+        """
+        super().__init__(prior, x_o, device)
+
+
 class CallablePotentialWrapper(BasePotential):
     """If `potential_fn` is a callable it gets wrapped as this."""
 

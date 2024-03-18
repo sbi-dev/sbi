@@ -7,7 +7,7 @@ from pyknos.mdn.mdn import MultivariateGaussianMDN
 from pyknos.nflows import flows, transforms
 from torch import Tensor, nn
 
-from sbi.neural_nets.density_estimators import NFlowsFlow
+from sbi.neural_nets.estimators import NFlowsFlow
 from sbi.utils.nn_utils import get_numel
 from sbi.utils.sbiutils import (
     standardizing_net,
