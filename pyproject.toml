@@ -42,7 +42,7 @@ dependencies = [
     "tensorboard",
     "torch>=1.8.0",
     "tqdm",
-    "zuko>=1.0.0",
+    "zuko>=1.1.0",
 ]
 
 [project.optional-dependencies]
