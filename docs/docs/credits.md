@@ -2,7 +2,7 @@
 
 ## License
 
-`sbi` is licensed under the [Affero General Public License version 3 (AGPLv3)](https://www.gnu.org/licenses/agpl-3.0.html) and
+`sbi` is licensed under the [Apache License (Apache-2.0)](https://www.apache.org/licenses/LICENSE-2.0) and
 
 > Copyright (C) 2020 Álvaro Tejero-Cantero, Jakob H. Macke, Jan-Matthis Lückmann,
 > Michael Deistler, Jan F. Bölts.
