@@ -4,7 +4,6 @@ from sbi.utils.conditional_density_utils import extract_and_transform_mog
 from sbi.utils.get_nn_models import classifier_nn, likelihood_nn, posterior_nn
 from sbi.utils.io import get_data_root, get_log_root, get_project_root
 from sbi.utils.kde import KDEWrapper, get_kde
-from sbi.utils.posterior_ensemble import NeuralPosteriorEnsemble
 from sbi.utils.potentialutils import pyro_potential_wrapper, transformed_potential
 from sbi.utils.restriction_estimator import (
     RestrictedPrior,
