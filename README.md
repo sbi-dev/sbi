@@ -49,6 +49,10 @@ posterior = simple()
 print(posterior)
 ```
 
+## Tutorials
+
+For first time users, you can now head over to the turorials and get going with [Getting Started](https://sbi-dev.github.io/sbi/tutorial/00_getting_started/).
+
 ## Inference Algorithms
 
 The following inference algorithms are currently available. You can find instructions on how to run each of these methods [here](https://sbi-dev.github.io/sbi/tutorial/16_implemented_methods/).
