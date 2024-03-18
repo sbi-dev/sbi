@@ -18,6 +18,7 @@ from sbi.inference import (
     prepare_for_sbi,
     simulate_for_sbi,
 )
+from sbi.neural_nets import likelihood_nn
 from sbi.simulators.linear_gaussian import (
     diagonal_linear_gaussian,
     linear_gaussian,
@@ -25,7 +26,7 @@ from sbi.simulators.linear_gaussian import (
     samples_true_posterior_linear_gaussian_uniform_prior,
     true_posterior_linear_gaussian_mvn_prior,
 )
-from sbi.utils import BoxUniform, likelihood_nn, process_prior
+from sbi.utils import BoxUniform, process_prior
 
 from .test_utils import check_c2st, get_prob_outside_uniform_prior
 
@@ -239,10 +240,12 @@ def test_map_with_multiple_independent_prior(use_transform):
     """Test whether map works with multiple independent priors, see issue #841, #650."""
 
     dim = 2
-    prior, *_ = process_prior([
-        BoxUniform(low=-ones(dim), high=ones(dim)),
-        HalfNormal(scale=ones(1) * 2),
-    ])
+    prior, *_ = process_prior(
+        [
+            BoxUniform(low=-ones(dim), high=ones(dim)),
+            HalfNormal(scale=ones(1) * 2),
+        ]
+    )
 
     def simulator(theta):
         return theta[:, 2:] * torch.randn_like(theta[:, :2]) + theta[:, :2]
