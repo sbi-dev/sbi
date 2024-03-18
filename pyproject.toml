@@ -47,20 +47,22 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "jupyter",
+    # Documentation
     "mkdocs",
     "mkdocs-material",
     "markdown-include",
     "mkdocs-redirects",
     "mkdocstrings[python] >= 0.18",
+    "jupyter",
     "nbconvert",
+    # Lint
     "pre-commit",
-    "pytest",
+    "ruff",
     "pyyaml",
     "pyright >=1.1.300,<1.1.306",
-    "ruff",
+    # Test
+    "pytest",
     "torchtestcase",
-    "twine",
 ]
 
 [project.urls]
