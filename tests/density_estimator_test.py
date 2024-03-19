@@ -9,8 +9,7 @@ from torch import eye, zeros
 from torch.distributions import MultivariateNormal
 
 from sbi.neural_nets.density_estimators import NFlowsFlow, ZukoFlow
-from sbi.neural_nets.flow import build_nsf, build_zuko_maf
-
+from sbi.neural_nets.flow import build_nsf, build_zuko_nsf, build_zuko_maf, build_zuko_gmm
 
 @pytest.mark.parametrize("density_estimator", (NFlowsFlow, ZukoFlow))
 @pytest.mark.parametrize("input_dims", (1, 2))
@@ -53,13 +52,29 @@ def test_api_density_estimator(density_estimator, input_dims, condition_shape):
             embedding_net=EmbeddingNet(),
         )
     elif density_estimator == ZukoFlow:
-        estimator = build_zuko_maf(
+        # estimator = build_zuko_gmm(
+        #     batch_input,
+        #     batch_context,
+        #     hidden_features=10,
+        #     num_components=2,
+        #     embedding_net=EmbeddingNet(),
+        # )
+        estimator = build_zuko_nsf(
             batch_input,
             batch_context,
             hidden_features=10,
             num_transforms=2,
             embedding_net=EmbeddingNet(),
         )
+        # estimator = build_zuko_maf(
+        #     batch_input,
+        #     batch_context,
+        #     hidden_features=10,
+        #     num_transforms=2,
+        #     embedding_net=EmbeddingNet(),
+        # )
+        
+
 
     # Loss is only required to work for batched inputs and contexts
     loss = estimator.loss(batch_input, batch_context)
@@ -213,3 +228,5 @@ def test_api_density_estimator(density_estimator, input_dims, condition_shape):
         nsamples_test,
     ), f"log_prob shape is not correct. It is of shape {log_probs.shape}, but should \
         be {(1, batch_context.shape[0], 2, nsamples_test)}"
+
+

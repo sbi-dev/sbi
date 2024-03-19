@@ -429,27 +429,141 @@ def build_nsf(
 
 #################################### Functions Nastya #############################################
 
+# Doesn't work yet
 def build_zuko_gmm(
     batch_x: Tensor,
     batch_y: Tensor,
     z_score_x: Optional[str] = "independent",
     z_score_y: Optional[str] = "independent",
-    hidden_features: Union[Sequence[int], int] = 50,
-    num_transforms: int = 5,
+    # hidden_features: Union[Sequence[int], int] = 50,
+    num_components: int = 10,
+    # num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
-    residual: bool = True,
-    randperm: bool = False,
+    # residual: bool = True,
+    # randperm: bool = False,
     **kwargs,
 ) -> ZukoFlow:
 
-    pass
+    x_numel = batch_x[0].numel()
+    # Infer the output dimensionality of the embedding_net by making a forward pass.
+    check_data_device(batch_x, batch_y)
+    check_embedding_net_device(embedding_net=embedding_net, datum=batch_y)
+    y_numel = embedding_net(batch_y[:1]).numel()
+    if x_numel == 1:
+        warn(
+            "In one-dimensional output space, this flow is limited to Gaussians",
+            stacklevel=1,
+        )
+        
+    # if isinstance(hidden_features, int):
+    #     hidden_features = [hidden_features] * num_transforms
+
+    if x_numel == 1:
+        gmm = zuko.flows.GMM(
+            features=x_numel,
+            context=y_numel,
+            # hidden_features=hidden_features,
+            components=num_components,
+        )
+    
+    # components = gmm.transform.transforms
+    # z_score_x_bool, structured_x = z_score_parser(z_score_x)
+    # if z_score_x_bool:
+    #     # transforms = transforms
+    #     transforms = (
+    #         *transforms,
+    #         standardizing_transform(batch_x, structured_x, backend="zuko"),
+    #     )
+
+    z_score_y_bool, structured_y = z_score_parser(z_score_y)
+    if z_score_y_bool:
+        # Prepend standardizing transform to y-embedding.
+        embedding_net = nn.Sequential(
+            standardizing_net(batch_y, structured_y), embedding_net
+        )
+    
+        
+    neural_net = zuko.flows.Flow(num_components, gmm.shapes)
+    flow = ZukoFlow(neural_net, embedding_net, condition_shape=batch_y[0].shape)
+
+    return flow
 
 
 
+def build_zuko_nsf(
+    batch_x: Tensor,
+    batch_y: Tensor,
+    z_score_x: Optional[str] = "independent",
+    z_score_y: Optional[str] = "independent",
+    hidden_features: int = 50,
+    num_transforms: int = 5,
+    num_bins: int = 10,
+    embedding_net: nn.Module = nn.Identity(),
+    tail_bound: float = 3.0,
+    hidden_layers_spline_context: int = 1,
+    num_blocks: int = 2,
+    dropout_probability: float = 0.0,
+    use_batch_norm: bool = False,
+    residual: bool = True, # params for batch learning
+    randperm: bool = False, # params for batch learning
+    **kwargs,
+) -> ZukoFlow:
+    
+    x_numel = batch_x[0].numel()
+    # Infer the output dimensionality of the embedding_net by making a forward pass.
+    check_data_device(batch_x, batch_y)
+    check_embedding_net_device(embedding_net=embedding_net, datum=batch_y)
+    y_numel = embedding_net(batch_y[:1]).numel()
+    
+    
+    if isinstance(hidden_features, int):
+        hidden_features = [hidden_features] * num_transforms
+
+    if x_numel == 1:
+        nsf = zuko.flows.NSF(
+            features=x_numel,
+            context=y_numel,
+            hidden_features=hidden_features,
+            transforms=num_transforms,
+        )
+    else:
+        nsf = zuko.flows.NSF(
+            features=x_numel,
+            context=y_numel,
+            hidden_features=hidden_features,
+            transforms=num_transforms,
+            randperm=randperm,
+            residual=residual,
+        )
+    
+    
+    transforms = nsf.transform.transforms
+    
+    
+    z_score_x_bool, structured_x = z_score_parser(z_score_x)
+    if z_score_x_bool:
+        # transforms = transforms
+        transforms = (
+            *transforms,
+            standardizing_transform(batch_x, structured_x, backend="zuko"),
+        )
+
+    z_score_y_bool, structured_y = z_score_parser(z_score_y)
+    if z_score_y_bool:
+        # Prepend standardizing transform to y-embedding.
+        embedding_net = nn.Sequential(
+            standardizing_net(batch_y, structured_y), embedding_net
+        )
+    
+    neural_net = zuko.flows.Flow(transforms, nsf.base)
+    flow = ZukoFlow(neural_net, embedding_net, condition_shape=batch_y[0].shape)
+    
+    
+    return flow
 
 
 
-####################################################################################################
+# ####################################################################################################
 
 
 def build_zuko_maf(
