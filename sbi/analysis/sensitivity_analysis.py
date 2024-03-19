@@ -7,6 +7,7 @@ from typing import Any, Callable, Optional, Tuple, Union
 from warnings import warn
 
 import torch
+import numpy as np
 from pyknos.nflows.nn import nets
 from torch import Tensor, nn, optim, relu
 from torch.nn import MSELoss
