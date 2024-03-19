@@ -21,12 +21,12 @@ def classifier_nn(
     **kwargs,
 ) -> Callable:
     r"""This method is deprecated and will be removed in the next release.
-    Please use classifier_nn from sbi.neural_nets in the future.
+    Please use `from sbi.neural_nets import classifier_nn` in the future.
     """
 
     warn(
         "This method is deprecated and will be removed in the next release."
-        "Please use classifier_nn from sbi.neural_nets in the future.",
+        "Please use `from sbi.neural_nets import classifier_nn` in the future.",
         DeprecationWarning,
         stacklevel=2,
     )
@@ -54,12 +54,12 @@ def likelihood_nn(
     **kwargs,
 ) -> Callable:
     r"""This method is deprecated and will be removed in the next release.
-    Please use likelihood_nn from sbi.neural_nets in the future.
+    Please use `from sbi.neural_nets import likelihood_nn` in the future.
     """
 
     warn(
         "This method is deprecated and will be removed in the next release. "
-        "Please use likelihood_nn from sbi.neural_nets in the future.",
+        "Please use `from sbi.neural_nets import likelihood_nn` in the future.",
         DeprecationWarning,
         stacklevel=2,
     )
@@ -89,12 +89,12 @@ def posterior_nn(
     **kwargs,
 ) -> Callable:
     r"""This method is deprecated and will be removed in the next release.
-    Please use posterior_nn from sbi.neural_nets in the future.
+    Please use `from sbi.neural_nets import posterior_nn` in the future.
     """
 
     warn(
         "This method is deprecated and will be removed in the next release."
-        "Please use posterior_nn from sbi.neural_nets in the future.",
+        "Please use `from sbi.neural_nets import posterior_nn` in the future.",
         DeprecationWarning,
         stacklevel=2,
     )
