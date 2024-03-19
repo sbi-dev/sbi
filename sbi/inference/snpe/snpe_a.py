@@ -302,7 +302,7 @@ class SNPE_A(PosteriorEstimator):
             density_estimator=density_estimator
         )
         self._posterior = super().build_posterior(
-            posterior_estimator=wrapped_density_estimator,  # type: ignore
+            density_estimator=wrapped_density_estimator,  # type: ignore
             prior=prior,
             **kwargs,
         )
