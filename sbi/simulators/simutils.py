@@ -3,7 +3,7 @@
 
 
 import contextlib
-from typing import Callable, Optional
+from typing import Callable, List, Optional
 
 import joblib
 import torch
@@ -15,7 +15,7 @@ from sbi.utils.sbiutils import seed_all_backends
 
 
 def simulate_in_batches(
-    simulator: Callable,
+    simulator: Callable[[Tensor], Tensor],
     theta: Tensor,
     sim_batch_size: int = 1,
     num_workers: int = 1,
@@ -71,7 +71,7 @@ def simulate_in_batches(
                     total=len(batches),
                 )
             ) as _:
-                simulation_outputs = Parallel(n_jobs=num_workers)(
+                simulation_outputs: List[Tensor] = Parallel(n_jobs=num_workers)(  # pyright: ignore[reportAssignmentType]
                     delayed(simulator_seeded)(batch, batch_seed)
                     for batch, batch_seed in zip(batches, batch_seeds)
                 )
@@ -83,7 +83,7 @@ def simulate_in_batches(
             )
 
             with pbar:
-                simulation_outputs = []
+                simulation_outputs: List[Tensor] = []
                 for batch in batches:
                     simulation_outputs.append(simulator(batch))
                     pbar.update(sim_batch_size)
