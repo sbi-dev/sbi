@@ -24,9 +24,7 @@ def test_infer():
         train_kwargs={'max_num_epochs': 2},
         build_posterior_kwargs={'prior': prior},
     )
-    assert (
-        posterior is not None
-    ), "Using 'infer' and passing keyword arguments to `__init__` failed"
+    assert posterior is not None, "Using 'infer' with keyword arguments failed"
 
 
 @pytest.mark.parametrize("training_batch_size", (1, 10, 100))
