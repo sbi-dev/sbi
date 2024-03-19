@@ -911,14 +911,14 @@ def _arrange_plots(
             ax = axes[0, len(subset) - 1]
             x0, x1 = ax.get_xlim()
             y0, y1 = ax.get_ylim()
-            text_kwargs = {"fontsize": plt.rcParams["font.size"] * 2.0}
+            text_kwargs = {"fontsize": plt.rcParams["font.size"] * 2.0}  # pyright: ignore[reportOptionalOperand]
             ax.text(x1 + (x1 - x0) / 8.0, (y0 + y1) / 2.0, "...", **text_kwargs)
         else:
             for row in range(len(subset)):
                 ax = axes[row, len(subset) - 1]
                 x0, x1 = ax.get_xlim()
                 y0, y1 = ax.get_ylim()
-                text_kwargs = {"fontsize": plt.rcParams["font.size"] * 2.0}
+                text_kwargs = {"fontsize": plt.rcParams["font.size"] * 2.0}  # pyright: ignore[reportOptionalOperand]
                 ax.text(x1 + (x1 - x0) / 8.0, (y0 + y1) / 2.0, "...", **text_kwargs)
                 if row == len(subset) - 1:
                     ax.text(
@@ -944,8 +944,8 @@ def _get_default_opts():
         "points_labels": [f"points_{idx}" for idx in range(10)],  # for points
         "samples_labels": [f"samples_{idx}" for idx in range(10)],  # for samples
         # colors: take even colors for samples, odd colors for points
-        "samples_colors": plt.rcParams["axes.prop_cycle"].by_key()["color"][0::2],
-        "points_colors": plt.rcParams["axes.prop_cycle"].by_key()["color"][1::2],
+        "samples_colors": plt.rcParams["axes.prop_cycle"].by_key()["color"][0::2],  # pyright: ignore[reportOptionalMemberAccess]
+        "points_colors": plt.rcParams["axes.prop_cycle"].by_key()["color"][1::2],  # pyright: ignore[reportOptionalMemberAccess]
         # ticks
         "ticks": [],
         "tickformatter": mpl.ticker.FormatStrFormatter("%g"),  # type: ignore
