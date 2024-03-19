@@ -57,9 +57,9 @@ dev = [
     "nbconvert",
     # Lint
     "pre-commit",
-    "ruff",
     "pyyaml",
     "pyright >=1.1.300,<1.1.306",
+    "ruff",
     # Test
     "pytest",
     "torchtestcase",
