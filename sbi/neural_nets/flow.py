@@ -11,7 +11,9 @@ import zuko
 from pyknos.nflows import distributions as distributions_
 from pyknos.nflows import flows, transforms
 from pyknos.nflows.nn import nets
-from pyknos.nflows.transforms.splines import rational_quadratic
+from pyknos.nflows.transforms.splines import (
+    rational_quadratic,  # pyright: ignore[reportAttributeAccessIssue]
+)
 from torch import Tensor, nn, relu, tanh, tensor, uint8
 
 from sbi.neural_nets.density_estimators import NFlowsFlow, ZukoFlow
