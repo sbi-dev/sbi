@@ -141,7 +141,7 @@ def standardizing_transform(
     structured_dims: bool = False,
     min_std: float = 1e-14,
     backend: str = "nflows",
-) -> Union[transforms.AffineTransform, zuko.transforms.MonotonicAffineTransform]:
+) -> Union[transforms.AffineTransform, zuko.flows.Unconditional]:
     """Builds standardizing transform
 
     Args:
