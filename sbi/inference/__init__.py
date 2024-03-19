@@ -13,12 +13,8 @@ from typing import (
 
 from sbi.inference.abc.mcabc import MCABC
 from sbi.inference.abc.smcabc import SMCABC
-from sbi.inference.base import (
-    NeuralInference,  # noqa: F401
-    check_if_proposal_has_default_x,
-    infer,
-    simulate_for_sbi,
-)
+from sbi.inference.base import NeuralInference  # noqa: F401
+from sbi.inference.base import check_if_proposal_has_default_x, infer, simulate_for_sbi
 from sbi.inference.snle.mnle import MNLE
 from sbi.inference.snle.snle_a import SNLE_A
 from sbi.inference.snpe.snpe_a import SNPE_A
@@ -48,6 +44,7 @@ _abc_family = ["ABC", "MCABC", "SMC", "SMCABC"]
 __all__ = _snpe_family + _snre_family + _snle_family + _abc_family
 
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
+from sbi.inference.posteriors.ensemble_posterior import EnsemblePosterior
 from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
 from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
 from sbi.inference.posteriors.rejection_posterior import RejectionPosterior
