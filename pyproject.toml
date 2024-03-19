@@ -56,7 +56,7 @@ dev = [
     "jupyter",
     "nbconvert",
     # Lint
-    "pre-commit",
+    "pre-commit == 3.5.0",
     "pyyaml",
     "pyright >=1.1.300,<1.1.306",
     "ruff",
