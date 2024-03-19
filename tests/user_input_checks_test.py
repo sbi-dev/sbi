@@ -9,6 +9,7 @@ import pytest
 import torch
 from pyknos.mdn.mdn import MultivariateGaussianMDN
 from scipy.stats import beta, lognorm, multivariate_normal, uniform
+from scipy.stats._multivariate import multivariate_normal_frozen
 from torch import Tensor, eye, nn, ones, zeros
 from torch.distributions import Beta, Distribution, Gamma, MultivariateNormal, Uniform
 
@@ -509,3 +510,10 @@ def test_passing_custom_density_estimator(arg):
         density_estimator = arg
     prior = MultivariateNormal(torch.zeros(2), torch.eye(2))
     _ = SNPE_C(prior=prior, density_estimator=density_estimator)
+
+
+def test_variance():
+    cov = 1
+    prior = multivariate_normal_frozen(cov)
+    wrapped_prior = ScipyPytorchWrapper(prior)
+    assert wrapped_prior.variance() == cov
