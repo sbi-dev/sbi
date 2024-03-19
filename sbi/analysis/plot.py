@@ -1377,7 +1377,7 @@ def _plot_cdf_region_expected_under_uniformity(
     plt.fill_between(
         x=np.linspace(0, num_bins, num_repeats * num_bins),
         y1=np.repeat(lower / np.max(lower), num_repeats),
-        y2=np.repeat(upper / np.max(upper), num_repeats),
+        y2=np.repeat(upper / np.max(upper), num_repeats),  # pyright: ignore[reportArgumentType]
         color=color,
         alpha=alpha,
     )
@@ -1399,7 +1399,7 @@ def _plot_hist_region_expected_under_uniformity(
     plt.fill_between(
         x=np.linspace(0, num_posterior_samples, num_bins),
         y1=np.repeat(lower, num_bins),
-        y2=np.repeat(upper, num_bins),
+        y2=np.repeat(upper, num_bins),  # pyright: ignore[reportArgumentType]
         color=color,
         alpha=alpha,
     )
