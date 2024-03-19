@@ -456,7 +456,7 @@ class SNPE_A_MDN(DensityEstimator):
             return log_prob_proposal_posterior  # \hat{p} from eq (3) in [1]
 
     def loss(self, inputs: Tensor, condition: Tensor):
-        return - self.log_prob(inputs, condition)
+        return -self.log_prob(inputs, condition)
 
     def sample(self, sample_shape: torch.Size, condition: Tensor, **kwargs) -> Tensor:
         """Sample from the approximate posterior.
