@@ -135,9 +135,9 @@ class EnsemblePosterior(NeuralPosterior):
             weights: Assignes weight to each posterior distribution.
         """
         if weights is None:
-            self._weights = torch.tensor(
-                [1.0 / self.num_components for _ in range(self.num_components)]
-            )
+            self._weights = torch.tensor([
+                1.0 / self.num_components for _ in range(self.num_components)
+            ])
         elif type(weights) == Tensor or type(weights) == List:
             self._weights = torch.tensor(weights) / sum(weights)
         else:
@@ -210,9 +210,9 @@ class EnsemblePosterior(NeuralPosterior):
             for posterior in self.posteriors
         ), "`log_prob()` only works for ensembles of the same type of posterior."
 
-        log_probs = torch.stack(
-            [posterior.log_prob(theta, x=x, **kwargs) for posterior in self.posteriors]
-        )
+        log_probs = torch.stack([
+            posterior.log_prob(theta, x=x, **kwargs) for posterior in self.posteriors
+        ])
         log_weights = torch.log(self._weights).reshape(-1, 1)
 
         if individually:
@@ -397,10 +397,6 @@ class EnsemblePotential(BasePotential):
         """
         self._weights = weights
         self.potential_fns = potential_fns
-        warnings.warn(
-            "EnsemblePotential will be moved to sbi.inference.posteriors.ensemble_posterior in v0.24.",
-            DeprecationWarning,
-        )
         super().__init__(prior, x_o, device)
 
     def allow_iid_x(self) -> bool:
