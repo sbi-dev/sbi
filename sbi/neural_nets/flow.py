@@ -60,6 +60,7 @@ def build_made(
     # Infer the output dimensionality of the embedding_net by making a forward pass.
     check_data_device(batch_x, batch_y)
     check_embedding_net_device(embedding_net=embedding_net, datum=batch_y)
+    embedding_net.eval()
     y_numel = embedding_net(batch_y[:1]).numel()
 
     if x_numel == 1:
@@ -143,6 +144,7 @@ def build_maf(
     # Infer the output dimensionality of the embedding_net by making a forward pass.
     check_data_device(batch_x, batch_y)
     check_embedding_net_device(embedding_net=embedding_net, datum=batch_y)
+    embedding_net.eval()
     y_numel = embedding_net(batch_y[:1]).numel()
 
     if x_numel == 1:
@@ -251,6 +253,7 @@ def build_maf_rqs(
     # Infer the output dimensionality of the embedding_net by making a forward pass.
     check_data_device(batch_x, batch_y)
     check_embedding_net_device(embedding_net=embedding_net, datum=batch_y)
+    embedding_net.eval()
     y_numel = embedding_net(batch_y[:1]).numel()
 
     if x_numel == 1:
@@ -354,6 +357,7 @@ def build_nsf(
     # Infer the output dimensionality of the embedding_net by making a forward pass.
     check_data_device(batch_x, batch_y)
     check_embedding_net_device(embedding_net=embedding_net, datum=batch_y)
+    embedding_net.eval()
     y_numel = embedding_net(batch_y[:1]).numel()
 
     # Define mask function to alternate between predicted x-dimensions.
@@ -467,6 +471,7 @@ def build_zuko_maf(
     # Infer the output dimensionality of the embedding_net by making a forward pass.
     check_data_device(batch_x, batch_y)
     check_embedding_net_device(embedding_net=embedding_net, datum=batch_y)
+    embedding_net.eval()
     y_numel = embedding_net(batch_y[:1]).numel()
     if x_numel == 1:
         warn(
