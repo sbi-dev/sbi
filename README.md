@@ -32,7 +32,7 @@ installing `sbi` can be created as follows:
 
 ```commandline
 # Create an environment for sbi (indicate Python 3.8 or higher); activate it
-$ conda create -n sbi_env python=3.8 && conda activate sbi_env
+$ conda create -n sbi_env python=3.10 && conda activate sbi_env
 ```
 
 Independent of whether you are using `conda` or not, `sbi` can be installed using `pip`:
