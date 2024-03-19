@@ -3,7 +3,7 @@
 
 import os
 import sys
-from typing import Callable, Optional, Union
+from typing import Callable, Optional, Sequence, Union
 from warnings import warn
 
 import numpy as np
@@ -283,7 +283,7 @@ class SliceSamplerSerial:
                 total=self.num_chains,
             )
         ):
-            all_samples = Parallel(n_jobs=self.num_workers)(
+            all_samples: Sequence[np.ndarray] = Parallel(n_jobs=self.num_workers)(  # pyright: ignore[reportAssignmentType]
                 delayed(self.run_fun)(num_samples, initial_params_batch, seed)
                 for initial_params_batch, seed in zip(self.x, seeds)
             )
