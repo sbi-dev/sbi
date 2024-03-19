@@ -423,7 +423,7 @@ class MCMCPosterior(NeuralPosterior):
                 )
             ):
                 initial_params = torch.cat(
-                    Parallel(n_jobs=num_workers)(
+                    Parallel(n_jobs=num_workers)(  # pyright: ignore[reportArgumentType]
                         delayed(seeded_init_fn)(seed) for seed in seeds
                     )
                 )
