@@ -301,7 +301,7 @@ class SNPE_A(PosteriorEstimator):
         wrapped_density_estimator = self.correct_for_proposal(
             density_estimator=density_estimator
         )
-        self._posterior = super.build_posterior(
+        self._posterior = super().build_posterior(
             posterior_estimator=wrapped_density_estimator,  # type: ignore
             prior=prior,
             **kwargs,
