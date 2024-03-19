@@ -63,7 +63,9 @@ def test_analysis_modules(device: str) -> None:
         posterior, condition=posterior.sample((1,)), limits=[[-2, 2], [-2, 2], [-2, 2]]
     )
 
-    x_o = torch.zeros(3,)
+    x_o = torch.zeros(
+        3,
+    )
     posterior_samples = posterior.sample((10000,), x=x_o)
     post_std = posterior_samples.std(dim=0)
     post_mean = posterior_samples.mean(dim=0)
