@@ -134,7 +134,9 @@ class SliceSampler(MCMCSampler):
 
         # show trace plot
         if show_info:
-            fig, ax = plt.subplots(1, 1)
+            fig: plt.FigureBase
+            ax: plt.Axes
+            fig, ax = plt.subplots(1, 1)  # pyright: ignore[reportAssignmentType]
             ax.plot(L_trace)
             ax.set_ylabel("log probability")
             ax.set_xlabel("samples")
