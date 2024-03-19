@@ -127,4 +127,5 @@ exclude = ["**/__pycache__", "**/__node_modules__", ".git", "docs", "examples", 
 python_version = "3.8"
 reportUnsupportedDunderAll = false
 reportGeneralTypeIssues = false
+reportInvalidTypeForm = false
 typeCheckingMode = "basic"
