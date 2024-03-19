@@ -126,3 +126,4 @@ include = ["sbi", "tests"]
 exclude = ["**/__pycache__", "**/__node_modules__", ".git", "docs", "examples", "tutorials", "tests"]
 python_version = "3.8"
 reportUnsupportedDunderAll = false
+reportGeneralTypeIssues = false
