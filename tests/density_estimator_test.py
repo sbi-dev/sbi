@@ -8,19 +8,41 @@ import torch
 from torch import eye, zeros
 from torch.distributions import MultivariateNormal
 
-from sbi.neural_nets.density_estimators import NFlowsFlow, ZukoFlow
-from sbi.neural_nets.flow import build_nsf, build_zuko_nsf, build_zuko_maf, build_zuko_gmm
+from sbi.neural_nets.flow import (
+    build_nsf,
+    build_zuko_maf,
+    build_zuko_naf,
+    build_zuko_nsf,
+)
 
-@pytest.mark.parametrize("density_estimator", (NFlowsFlow, ZukoFlow))
+
+def get_batch_input(nsamples: int, input_dims: int) -> torch.Tensor:
+    input_mvn = MultivariateNormal(
+        loc=zeros(input_dims), covariance_matrix=eye(input_dims)
+    )
+    return input_mvn.sample((nsamples,))
+
+
+def get_batch_context(nsamples: int, condition_shape: tuple[int, ...]) -> torch.Tensor:
+    context_mvn = MultivariateNormal(
+        loc=zeros(*condition_shape), covariance_matrix=eye(condition_shape[-1])
+    )
+    return context_mvn.sample((nsamples,))
+
+
+@pytest.mark.parametrize(
+    "build_density_estimator",
+    (build_nsf, build_zuko_nsf, build_zuko_maf, build_zuko_naf),
+)
 @pytest.mark.parametrize("input_dims", (1, 2))
 @pytest.mark.parametrize(
     "condition_shape", ((1,), (2,), (1, 1), (2, 2), (1, 1, 1), (2, 2, 2))
 )
-def test_api_density_estimator(density_estimator, input_dims, condition_shape):
+def test_api_density_estimator(build_density_estimator, input_dims, condition_shape):
     r"""Checks whether we can evaluate and sample from density estimators correctly.
 
     Args:
-        density_estimator: DensityEstimator subclass.
+        build_density_estimator: function that creates a DensityEstimator subclass.
         input_dim: Dimensionality of the input.
         context_shape: Dimensionality of the context.
     """
@@ -28,14 +50,8 @@ def test_api_density_estimator(density_estimator, input_dims, condition_shape):
     nsamples = 10
     nsamples_test = 5
 
-    input_mvn = MultivariateNormal(
-        loc=zeros(input_dims), covariance_matrix=eye(input_dims)
-    )
-    batch_input = input_mvn.sample((nsamples,))
-    context_mvn = MultivariateNormal(
-        loc=zeros(*condition_shape), covariance_matrix=eye(condition_shape[-1])
-    )
-    batch_context = context_mvn.sample((nsamples,))
+    batch_input = get_batch_input(nsamples, input_dims)
+    batch_context = get_batch_context(nsamples, condition_shape)
 
     class EmbeddingNet(torch.nn.Module):
         def forward(self, x):
@@ -43,38 +59,13 @@ def test_api_density_estimator(density_estimator, input_dims, condition_shape):
                 x = torch.sum(x, dim=-1)
             return x
 
-    if density_estimator == NFlowsFlow:
-        estimator = build_nsf(
-            batch_input,
-            batch_context,
-            hidden_features=10,
-            num_transforms=2,
-            embedding_net=EmbeddingNet(),
-        )
-    elif density_estimator == ZukoFlow:
-        # estimator = build_zuko_gmm(
-        #     batch_input,
-        #     batch_context,
-        #     hidden_features=10,
-        #     num_components=2,
-        #     embedding_net=EmbeddingNet(),
-        # )
-        estimator = build_zuko_nsf(
-            batch_input,
-            batch_context,
-            hidden_features=10,
-            num_transforms=2,
-            embedding_net=EmbeddingNet(),
-        )
-        # estimator = build_zuko_maf(
-        #     batch_input,
-        #     batch_context,
-        #     hidden_features=10,
-        #     num_transforms=2,
-        #     embedding_net=EmbeddingNet(),
-        # )
-        
-
+    estimator = build_density_estimator(
+        batch_input,
+        batch_context,
+        hidden_features=10,
+        num_transforms=2,
+        embedding_net=EmbeddingNet(),
+    )
 
     # Loss is only required to work for batched inputs and contexts
     loss = estimator.loss(batch_input, batch_context)
@@ -228,5 +219,3 @@ def test_api_density_estimator(density_estimator, input_dims, condition_shape):
         nsamples_test,
     ), f"log_prob shape is not correct. It is of shape {log_probs.shape}, but should \
         be {(1, batch_context.shape[0], 2, nsamples_test)}"
-
-
