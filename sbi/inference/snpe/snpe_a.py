@@ -305,7 +305,7 @@ class SNPE_A(PosteriorEstimator):
             density_estimator=wrapped_density_estimator,
             prior=prior,
             **kwargs,
-        ) 
+        )
         return deepcopy(self._posterior) # type: ignore
 
     def _log_prob_proposal_posterior(
