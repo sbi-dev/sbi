@@ -6,9 +6,9 @@ from warnings import warn
 
 from torch import nn
 
-from sbi.neural_nets import classifier_nn as classifier_nn_new
-from sbi.neural_nets import likelihood_nn as likelihood_nn_new
-from sbi.neural_nets import posterior_nn as posterior_nn_new
+from sbi.neural_nets import classifier_nn as classifier_nn_moved_to_neural_nets
+from sbi.neural_nets import likelihood_nn as likelihood_nn_moved_to_neural_nets
+from sbi.neural_nets import posterior_nn as posterior_nn_moved_to_neural_nets
 
 
 def classifier_nn(
@@ -55,7 +55,7 @@ def classifier_nn(
         stacklevel=2,
     )
 
-    return classifier_nn_new(
+    return classifier_nn_moved_to_neural_nets(
         model,
         z_score_theta,
         z_score_x,
@@ -114,7 +114,7 @@ def likelihood_nn(
         stacklevel=2,
     )
 
-    return likelihood_nn_new(
+    return likelihood_nn_moved_to_neural_nets(
         model,
         z_score_theta,
         z_score_x,
@@ -177,7 +177,7 @@ def posterior_nn(
         stacklevel=2,
     )
 
-    return posterior_nn_new(
+    return posterior_nn_moved_to_neural_nets(
         model,
         z_score_theta,
         z_score_x,
