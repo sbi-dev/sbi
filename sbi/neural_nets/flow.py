@@ -3,7 +3,7 @@
 
 
 from functools import partial
-from typing import Optional, Sequence, Union
+from typing import List, Optional, Sequence, Union
 from warnings import warn
 
 import torch
@@ -391,7 +391,7 @@ def build_nsf(
     # Stack spline transforms.
     transform_list = []
     for i in range(num_transforms):
-        block = [
+        block: List[transforms.Transform] = [
             transforms.PiecewiseRationalQuadraticCouplingTransform(
                 mask=mask_in_layer(i) if x_numel > 1 else tensor([1], dtype=uint8),
                 transform_net_create_fn=conditioner,
