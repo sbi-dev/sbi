@@ -275,7 +275,7 @@ class SNPE_A(PosteriorEstimator):
         self,
         density_estimator: Optional[TorchModule] = None,
         prior: Optional[Distribution] = None,
-        **kwargs
+        **kwargs,
     ) -> "DirectPosterior":
         r"""Build posterior from the neural density estimator.
 
