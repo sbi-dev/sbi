@@ -11,7 +11,7 @@ import six
 import torch
 from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
-from matplotlib.figure import Figure
+from matplotlib.figure import Figure, FigureBase
 from scipy.stats import binom, gaussian_kde
 from torch import Tensor
 
@@ -1061,7 +1061,7 @@ def _sbc_rank_plot(
     params_in_subplots: bool = False,
     show_ylabel: bool = False,
     sharey: bool = False,
-    fig: Optional[Figure] = None,
+    fig: Optional[FigureBase] = None,
     ax=None,  # no type hint to avoid hassle with pyright. Should be `array(Axes).`
     figsize: Optional[tuple] = None,
 ) -> Tuple[Figure, Axes]:
@@ -1241,7 +1241,7 @@ def _sbc_rank_plot(
                 alpha=uniform_region_alpha,
             )
 
-    return fig, ax
+    return fig, ax  # pyright: ignore[reportReturnType]
 
 
 def _plot_ranks_as_hist(
