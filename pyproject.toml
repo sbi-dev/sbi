@@ -59,7 +59,7 @@ dev = [
     "pre-commit",
     "pyyaml",
     "pyright >=1.1.300,<1.1.306",
-    "ruff",
+    "ruff>=0.3.3",
     # Test
     "pytest",
     "torchtestcase",
