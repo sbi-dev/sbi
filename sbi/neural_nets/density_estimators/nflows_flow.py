@@ -4,11 +4,11 @@ import torch
 from pyknos.nflows.flows import Flow
 from torch import Tensor, nn
 
-from sbi.neural_nets.density_estimators.base import DensityEstimator
+from sbi.neural_nets.density_estimators.base import SBIDensityEstimator
 from sbi.types import Shape
 
 
-class NFlowsFlow(DensityEstimator):
+class NFlowsFlow(SBIDensityEstimator):
     r"""`nflows`- based normalizing flow density estimator.
 
     Flow type objects already have a .log_prob() and .sample() method, so here we just

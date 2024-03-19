@@ -86,9 +86,12 @@ plugins:
       default_handler: python
       handlers:
         python:
-          rendering:
+          options:
             show_source: true
             heading_level: 3
+            show_root_toc_entry: true
+            show_root_full_path: false
+            show_root_heading: true
 
 watch:
   - ../sbi
