@@ -38,8 +38,9 @@ def infer(
     method: str,
     num_simulations: int,
     num_workers: int = 1,
-    init_kwargs=None,
-    call_kwargs=None,
+    init_kwargs: dict = None,
+    train_kwargs: dict = None,
+    build_posterior_kwargs: dict = None,
 ) -> NeuralPosterior:
     r"""Runs simulation-based inference and returns the posterior.
 
@@ -65,10 +66,10 @@ def infer(
         num_simulations: Number of simulation calls. More simulations means a longer
             runtime, but a better posterior estimate.
         num_workers: Number of parallel workers to use for simulations.
-        init_kwargs: Additional keyword arguments as dict for the inference method
+        init_kwargs: Additional keyword arguments for the inference method
             which are passed to `__init__`.
-        call_kwargs: Additional keyword arguments as dict for the call to
-            the inference method which are passed to `build_posterior`.
+        train_kwargs: Additional keyword arguments for training the density estimator.
+        build_posterior_kwargs: Additional keyword arguments for `build_posterior`.
 
     Returns: Posterior over parameters conditional on observations (amortized).
     """
@@ -80,16 +81,23 @@ def infer(
             "Method not available. `method` must be one of 'SNPE', 'SNLE', 'SNRE'."
         ) from err
 
-    if init_kwargs is not None or call_kwargs is not None:
+    if (
+        init_kwargs is not None
+        or build_posterior_kwargs is not None
+        or train_kwargs is not None
+    ):
         warn(
             "We discourage the use the simple interface in more complicated settings. "
-            "Have a look into the flexible interface, e.g. in our tutorial.",
+            "Have a look into the flexible interface, e.g. in our tutorial "
+            "(https://sbi-dev.github.io/sbi/tutorial/02_flexible_interface/).",
             stacklevel=2,
         )
-    # Set both variables to empty dicts to be able to pass them
+    # Set variables to empty dicts to be able to pass them
     # to the functions later on (if necessary).
-    if call_kwargs is None:
-        call_kwargs = {}
+    if build_posterior_kwargs is None:
+        build_posterior_kwargs = {}
+    if train_kwargs is None:
+        train_kwargs = {}
     if init_kwargs is None:
         init_kwargs = {}
 
@@ -102,8 +110,8 @@ def infer(
         num_simulations=num_simulations,
         num_workers=num_workers,
     )
-    _ = inference.append_simulations(theta, x).train()
-    posterior = inference.build_posterior(**call_kwargs)
+    _ = inference.append_simulations(theta, x).train(**train_kwargs)
+    posterior = inference.build_posterior(**build_posterior_kwargs)
 
     return posterior
 
