@@ -239,6 +239,107 @@ def get_diag_func(samples, limits, opts, **kwargs):
 
     return diag_func
 
+def get_off_diag_func(samples, limits, opts, **kwargs):
+    def offdiag_func(row, col, **kwargs):
+            if len(samples) > 0:
+                for n, v in enumerate(samples):
+                    if opts["offdiag"][n] == "hist" or opts["offdiag"][n] == "hist2d":
+                        hist, xedges, yedges = np.histogram2d(
+                            v[:, col],
+                            v[:, row],
+                            range=[
+                                [limits[col][0], limits[col][1]],
+                                [limits[row][0], limits[row][1]],
+                            ],
+                            **opts["hist_offdiag"],
+                        )
+                        plt.imshow(
+                            hist.T,
+                            origin="lower",
+                            extent=(
+                                xedges[0],
+                                xedges[-1],
+                                yedges[0],
+                                yedges[-1],
+                            ),
+                            aspect="auto",
+                        )
+
+                    elif opts["offdiag"][n] in [
+                        "kde",
+                        "kde2d",
+                        "contour",
+                        "contourf",
+                    ]:
+                        density = gaussian_kde(
+                            v[:, [col, row]].T,
+                            bw_method=opts["kde_offdiag"]["bw_method"],
+                        )
+                        X, Y = np.meshgrid(
+                            np.linspace(
+                                limits[col][0],
+                                limits[col][1],
+                                opts["kde_offdiag"]["bins"],
+                            ),
+                            np.linspace(
+                                limits[row][0],
+                                limits[row][1],
+                                opts["kde_offdiag"]["bins"],
+                            ),
+                        )
+                        positions = np.vstack([X.ravel(), Y.ravel()])
+                        Z = np.reshape(density(positions).T, X.shape)
+
+                        if opts["offdiag"][n] == "kde" or opts["offdiag"][n] == "kde2d":
+                            plt.imshow(
+                                Z,
+                                extent=(
+                                    limits[col][0],
+                                    limits[col][1],
+                                    limits[row][0],
+                                    limits[row][1],
+                                ),
+                                origin="lower",
+                                aspect="auto",
+                            )
+                        elif opts["offdiag"][n] == "contour":
+                            if opts["contour_offdiag"]["percentile"]:
+                                Z = probs2contours(Z, opts["contour_offdiag"]["levels"])
+                            else:
+                                Z = (Z - Z.min()) / (Z.max() - Z.min())
+                            plt.contour(
+                                X,
+                                Y,
+                                Z,
+                                origin="lower",
+                                extent=[
+                                    limits[col][0],
+                                    limits[col][1],
+                                    limits[row][0],
+                                    limits[row][1],
+                                ],
+                                colors=opts["samples_colors"][n],
+                                levels=opts["contour_offdiag"]["levels"],
+                            )
+                        else:
+                            pass
+                    elif opts["offdiag"][n] == "scatter":
+                        plt.scatter(
+                            v[:, col],
+                            v[:, row],
+                            color=opts["samples_colors"][n],
+                            **opts["scatter_offdiag"],
+                        )
+                    elif opts["offdiag"][n] == "plot":
+                        plt.plot(
+                            v[:, col],
+                            v[:, row],
+                            color=opts["samples_colors"][n],
+                            **opts["plot_offdiag"],
+                        )
+                    else:
+                        pass
+    return offdiag_func
 
 def get_conditional_diag_func(opts, limits, eps_margins, resolution):
     """
@@ -281,15 +382,19 @@ def pairplot(
     ] = None,
     limits: Optional[Union[List, torch.Tensor]] = None,
     subset: Optional[List[int]] = None,
-    offdiag: Optional[Union[List[str], str]] = "hist",
+    upper: Optional[Union[List[str], str]] = "hist",
+    lower: Optional[Union[List[str], str]] = None,
     diag: Optional[Union[List[str], str]] = "hist",
     figsize: Tuple = (10, 10),
     labels: Optional[List[str]] = None,
     ticks: Optional[Union[List, torch.Tensor]] = None,
-    upper: Optional[str] = None,
+    offdiag: Optional[str] = None,
     fig=None,
     axes=None,
-    **kwargs,
+    diag_kwargs = {},
+    upper_kwargs = {},
+    lower_kwargs = {},
+    fig_kwargs = {}
 ):
     """
     Plot samples in a 2D grid showing marginals and pairwise marginals.
@@ -306,9 +411,11 @@ def pairplot(
         subset: List containing the dimensions to plot. E.g. subset=[1,3] will plot
             plot only the 1st and 3rd dimension but will discard the 0th and 2nd (and,
             if they exist, the 4th, 5th and so on).
-        offdiag: Plotting style for upper diagonal, {hist, scatter, contour, cond,
+        offdiag: deprecated, use upper instead.
+        upper: Plotting style for upper diagonal, {hist, scatter, contour, cond,
             None}.
-        upper: deprecated, use offdiag instead.
+        lower: Plotting style for upper diagonal, {hist, scatter, contour, cond,
+            None}.
         diag: Plotting style for diagonal, {hist, cond, None}.
         figsize: Size of the entire figure.
         labels: List of strings specifying the names of the parameters.
@@ -330,11 +437,12 @@ def pairplot(
     # update the defaults dictionary by the current values of the variables (passed by
     # the user)
 
-    opts = _update(opts, locals())
-    opts = _update(opts, kwargs)
+    #opts = _update(opts, locals())
+    #opts = _update(opts, kwargs)
 
     samples, dim, limits = prepare_for_plot(samples, limits)
 
+    
     # checks.
     if opts["legend"]:
         assert len(opts["samples_labels"]) >= len(
@@ -349,115 +457,19 @@ def pairplot(
         opts["diag"] = [opts["diag"] for _ in range(len(samples))]
     if not isinstance(opts["offdiag"], list):
         opts["offdiag"] = [opts["offdiag"] for _ in range(len(samples))]
-    # if type(opts['lower']) is not list:
-    #    opts['lower'] = [opts['lower'] for _ in range(len(samples))]
     opts["lower"] = None
 
-    diag_func = get_diag_func(samples, limits, opts, **kwargs)
+    upper_kwargs, lower_kwargs, diag_kwargs, fig_kwargs = _opts_to_kwargs(opts,upper='kde',lower='kde',diag='kde')
 
-    def offdiag_func(row, col, limits, **kwargs):
-        if len(samples) > 0:
-            for n, v in enumerate(samples):
-                if opts["offdiag"][n] == "hist" or opts["offdiag"][n] == "hist2d":
-                    hist, xedges, yedges = np.histogram2d(
-                        v[:, col],
-                        v[:, row],
-                        range=[
-                            [limits[col][0], limits[col][1]],
-                            [limits[row][0], limits[row][1]],
-                        ],
-                        **opts["hist_offdiag"],
-                    )
-                    plt.imshow(
-                        hist.T,
-                        origin="lower",
-                        extent=(
-                            xedges[0],
-                            xedges[-1],
-                            yedges[0],
-                            yedges[-1],
-                        ),
-                        aspect="auto",
-                    )
-
-                elif opts["offdiag"][n] in [
-                    "kde",
-                    "kde2d",
-                    "contour",
-                    "contourf",
-                ]:
-                    density = gaussian_kde(
-                        v[:, [col, row]].T,
-                        bw_method=opts["kde_offdiag"]["bw_method"],
-                    )
-                    X, Y = np.meshgrid(
-                        np.linspace(
-                            limits[col][0],
-                            limits[col][1],
-                            opts["kde_offdiag"]["bins"],
-                        ),
-                        np.linspace(
-                            limits[row][0],
-                            limits[row][1],
-                            opts["kde_offdiag"]["bins"],
-                        ),
-                    )
-                    positions = np.vstack([X.ravel(), Y.ravel()])
-                    Z = np.reshape(density(positions).T, X.shape)
-
-                    if opts["offdiag"][n] == "kde" or opts["offdiag"][n] == "kde2d":
-                        plt.imshow(
-                            Z,
-                            extent=(
-                                limits[col][0],
-                                limits[col][1],
-                                limits[row][0],
-                                limits[row][1],
-                            ),
-                            origin="lower",
-                            aspect="auto",
-                        )
-                    elif opts["offdiag"][n] == "contour":
-                        if opts["contour_offdiag"]["percentile"]:
-                            Z = probs2contours(Z, opts["contour_offdiag"]["levels"])
-                        else:
-                            Z = (Z - Z.min()) / (Z.max() - Z.min())
-                        plt.contour(
-                            X,
-                            Y,
-                            Z,
-                            origin="lower",
-                            extent=[
-                                limits[col][0],
-                                limits[col][1],
-                                limits[row][0],
-                                limits[row][1],
-                            ],
-                            colors=opts["samples_colors"][n],
-                            levels=opts["contour_offdiag"]["levels"],
-                        )
-                    else:
-                        pass
-                elif opts["offdiag"][n] == "scatter":
-                    plt.scatter(
-                        v[:, col],
-                        v[:, row],
-                        color=opts["samples_colors"][n],
-                        **opts["scatter_offdiag"],
-                    )
-                elif opts["offdiag"][n] == "plot":
-                    plt.plot(
-                        v[:, col],
-                        v[:, row],
-                        color=opts["samples_colors"][n],
-                        **opts["plot_offdiag"],
-                    )
-                else:
-                    pass
-
+    diag_func = get_diag_func(samples, limits, diag, diag_kwargs)
+    upper_func = get_off_diag_func(samples, limits, upper, upper_kwargs)  
+    lower_func = get_off_diag_func(samples, limits, lower, lower_kwargs)
+    
     return _arrange_plots(
-        diag_func, offdiag_func, dim, limits, points, opts, fig=fig, axes=axes
+        diag_func, upper_func, lower_func, dim, limits, points, opts, fig=fig, axes=axes, subset=subset, 
+        figsize=figsize, labels=labels, ticks=ticks, fig_kwargs=fig_kwargs
     )
+
 
 
 def marginal_plot(
@@ -518,7 +530,7 @@ def marginal_plot(
 
     diag_func = get_diag_func(samples, limits, opts, **kwargs)
 
-    return _arrange_plots(
+    return _arrange_plots_old(
         diag_func, None, dim, limits, points, opts, fig=fig, axes=axes
     )
 
@@ -591,7 +603,7 @@ def conditional_marginal_plot(
 
     diag_func = get_conditional_diag_func(opts, limits, eps_margins, resolution)
 
-    return _arrange_plots(
+    return _arrange_plots_old(
         diag_func, None, dim, limits, points, opts, fig=fig, axes=axes
     )
 
@@ -695,14 +707,13 @@ def conditional_pairplot(
             aspect="auto",
         )
 
-    return _arrange_plots(
+    return _arrange_plots_old(
         diag_func, offdiag_func, dim, limits, points, opts, fig=fig, axes=axes
     )
 
-
 def _arrange_plots(
-    diag_func, offdiag_func, dim, limits, points, opts, fig=None, axes=None
-):
+        diag_func, upper_func, lower_func, dim, limits, points, subset, figsize, labels, ticks, fig, axes, opts
+    ):
     """
     Arranges the plots for any function that plots parameters either in a row of 1D
     marginals or a pairplot setting.
@@ -831,7 +842,8 @@ def _arrange_plots(
             ax.set_xlim((limits[col][0], limits[col][1]))
             if current != "diag":
                 ax.set_ylim((limits[row][0], limits[row][1]))
-
+            else:
+                ax.set_ylim(0)
             # Ticks
             if ticks is not None:
                 ax.set_xticks((ticks[col][0], ticks[col][1]))
@@ -935,7 +947,6 @@ def _arrange_plots(
 def _get_default_opts():
     """Return default values for plotting specs."""
     return {
-        # 'lower': None,     # hist/scatter/None  # TODO: implement
         # title and legend
         "title": None,
         "legend": False,
@@ -1403,3 +1414,284 @@ def _plot_hist_region_expected_under_uniformity(
         color=color,
         alpha=alpha,
     )
+
+# TO BE DEPRECATED
+def _arrange_plots_old(
+    diag_func, offdiag_func, dim, limits, points, opts, fig=None, axes=None
+):
+    """
+    Arranges the plots for any function that plots parameters either in a row of 1D
+    marginals or a pairplot setting.
+
+    Args:
+        diag_func: Plotting function that will be executed for the diagonal elements of
+            the plot (or the columns of a row of 1D marginals). It will be passed the
+            current `row` (i.e. which parameter that is to be plotted) and the `limits`
+            for all dimensions.
+        offdiag_func: Plotting function that will be executed for the upper-diagonal
+            elements of the plot. It will be passed the current `row` and `col` (i.e.
+            which parameters are to be plotted and the `limits` for all dimensions. None
+            if we are in a 1D setting.
+        dim: The dimensionality of the density.
+        limits: Limits for each parameter.
+        points: Additional points to be scatter-plotted.
+        opts: Dictionary built by the functions that call `_arrange_plots`. Must
+            contain at least `labels`, `subset`, `figsize`, `subplots`,
+            `fig_subplots_adjust`, `title`, `title_format`, ..
+        fig: matplotlib figure to plot on.
+        axes: matplotlib axes corresponding to fig.
+
+    Returns: figure and axis
+    """
+
+    # Prepare points
+    if points is None:
+        points = []
+    if not isinstance(points, list):
+        points = ensure_numpy(points)  # type: ignore
+        points = [points]
+    points = [np.atleast_2d(p) for p in points]
+    points = [np.atleast_2d(ensure_numpy(p)) for p in points]
+
+    # TODO: add asserts checking compatibility of dimensions
+
+    # Prepare labels
+    if opts["labels"] == [] or opts["labels"] is None:
+        labels_dim = ["dim {}".format(i + 1) for i in range(dim)]
+    else:
+        labels_dim = opts["labels"]
+
+    # Prepare ticks
+    if opts["ticks"] == [] or opts["ticks"] is None:
+        ticks = None
+    else:
+        if len(opts["ticks"]) == 1:
+            ticks = [opts["ticks"][0] for _ in range(dim)]
+        else:
+            ticks = opts["ticks"]
+
+    # Figure out if we subset the plot
+    subset = opts["subset"]
+    if subset is None:
+        rows = cols = dim
+        subset = [i for i in range(dim)]
+    else:
+        if isinstance(subset, int):
+            subset = [subset]
+        elif isinstance(subset, list):
+            pass
+        else:
+            raise NotImplementedError
+        rows = cols = len(subset)
+    flat = offdiag_func is None
+    if flat:
+        rows = 1
+        opts["lower"] = None
+
+    # Create fig and axes if they were not passed.
+    if fig is None or axes is None:
+        fig, axes = plt.subplots(
+            rows, cols, figsize=opts["figsize"], **opts["subplots"]
+        )
+    else:
+        assert axes.shape == (
+            rows,
+            cols,
+        ), f"Passed axes must match subplot shape: {rows, cols}."
+    # Cast to ndarray in case of 1D subplots.
+    axes = np.array(axes).reshape(rows, cols)
+
+    # Style figure
+    fig.subplots_adjust(**opts["fig_subplots_adjust"])
+    fig.suptitle(opts["title"], **opts["title_format"])
+
+    # Style axes
+    row_idx = -1
+    for row in range(dim):
+        if row not in subset:
+            continue
+
+        if not flat:
+            row_idx += 1
+
+        col_idx = -1
+        for col in range(dim):
+            if col not in subset:
+                continue
+            else:
+                col_idx += 1
+
+            if flat or row == col:
+                current = "diag"
+            elif row < col:
+                current = "offdiag"
+            else:
+                current = "lower"
+
+            ax = axes[row_idx, col_idx]
+            plt.sca(ax)
+
+            # Background color
+            if (
+                current in opts["fig_bg_colors"]
+                and opts["fig_bg_colors"][current] is not None
+            ):
+                ax.set_facecolor(opts["fig_bg_colors"][current])
+
+            # Axes
+            if opts[current] is None:
+                ax.axis("off")
+                continue
+
+            # Limits
+            ax.set_xlim((limits[col][0], limits[col][1]))
+            if current != "diag":
+                ax.set_ylim((limits[row][0], limits[row][1]))
+
+            # Ticks
+            if ticks is not None:
+                ax.set_xticks((ticks[col][0], ticks[col][1]))
+                if current != "diag":
+                    ax.set_yticks((ticks[row][0], ticks[row][1]))
+
+            # Despine
+            ax.spines["right"].set_visible(False)
+            ax.spines["top"].set_visible(False)
+            ax.spines["bottom"].set_position(("outward", opts["despine"]["offset"]))
+
+            # Formatting axes
+            if current == "diag":  # off-diagnoals
+                if opts["lower"] is None or col == dim - 1 or flat:
+                    _format_axis(
+                        ax,
+                        xhide=False,
+                        xlabel=labels_dim[col],
+                        yhide=True,
+                        tickformatter=opts["tickformatter"],
+                    )
+                else:
+                    _format_axis(ax, xhide=True, yhide=True)
+            else:  # off-diagnoals
+                if row == dim - 1:
+                    _format_axis(
+                        ax,
+                        xhide=False,
+                        xlabel=labels_dim[col],
+                        yhide=True,
+                        tickformatter=opts["tickformatter"],
+                    )
+                else:
+                    _format_axis(ax, xhide=True, yhide=True)
+            if opts["tick_labels"] is not None:
+                ax.set_xticklabels((
+                    str(opts["tick_labels"][col][0]),
+                    str(opts["tick_labels"][col][1]),
+                ))
+
+            # Diagonals
+            if current == "diag":
+                diag_func(row=col, limits=limits)
+
+                if len(points) > 0:
+                    extent = ax.get_ylim()
+                    for n, v in enumerate(points):
+                        plt.plot(
+                            [v[:, col], v[:, col]],
+                            extent,
+                            color=opts["points_colors"][n],
+                            **opts["points_diag"],
+                            label=opts["points_labels"][n],
+                        )
+                if opts["legend"] and col == 0:
+                    plt.legend(**opts["legend_kwargs"])
+
+            # Off-diagonals
+            else:
+                offdiag_func(
+                    row=row,
+                    col=col,
+                    limits=limits,
+                )
+
+                if len(points) > 0:
+                    for n, v in enumerate(points):
+                        plt.plot(
+                            v[:, col],
+                            v[:, row],
+                            color=opts["points_colors"][n],
+                            **opts["points_offdiag"],
+                        )
+
+    if len(subset) < dim:
+        if flat:
+            ax = axes[0, len(subset) - 1]
+            x0, x1 = ax.get_xlim()
+            y0, y1 = ax.get_ylim()
+            text_kwargs = {"fontsize": plt.rcParams["font.size"] * 2.0}
+            ax.text(x1 + (x1 - x0) / 8.0, (y0 + y1) / 2.0, "...", **text_kwargs)
+        else:
+            for row in range(len(subset)):
+                ax = axes[row, len(subset) - 1]
+                x0, x1 = ax.get_xlim()
+                y0, y1 = ax.get_ylim()
+                text_kwargs = {"fontsize": plt.rcParams["font.size"] * 2.0}
+                ax.text(x1 + (x1 - x0) / 8.0, (y0 + y1) / 2.0, "...", **text_kwargs)
+                if row == len(subset) - 1:
+                    ax.text(
+                        x1 + (x1 - x0) / 12.0,
+                        y0 - (y1 - y0) / 1.5,
+                        "...",
+                        rotation=-45,
+                        **text_kwargs,
+                    )
+
+    return fig, axes
+
+
+def _opts_to_kwargs(opts,upper=None,lower=None,diag=None,upper_kwargs={},lower_kwargs={},diag_kwargs={}, fig_kwargs={}):
+    upper_kwargs ={"mpl_kwargs": {}}  # upper triangle
+    lower_kwargs = {"mpl_kwargs": {}}  # lower triangle
+    diag_kwargs = {"mpl_kwargs": {}}  # diagonal
+    
+    opts_to_fig_kwargs = ['title', 'legend', 'legend_kwargs', 'points_labels', 'samples_labels', 'samples_colors', 
+                         'points_colors', 'ticks', 'tickformatter', 'tick_labels', 'plot_offdiag','points_diag',
+                         'points_offdiag', 'fig_bg_colors', 'fig_subplots_adjust', 'subplots', 'despine', 'title_format']
+
+    for opt in opts_to_fig_kwargs:
+        if opt in opts.keys():
+            fig_kwargs[opt] = opts[opt]
+
+    if diag == 'hist':
+        if 'hist_diag' in opts.keys():
+            diag_kwargs['mpl_kwargs']['alpha'] = opts['hist_diag']['alpha']
+            diag_kwargs['mpl_kwargs']['bins'] = opts['hist_diag']['bins']
+            diag_kwargs['mpl_kwargs']['density'] = opts['hist_diag']['density']
+            diag_kwargs['mpl_kwargs']['histtype'] = opts['hist_diag']['histtype']
+    elif diag == 'kde':
+        if 'kde_diag' in opts.keys():
+            diag_kwargs['bw_method'] = opts['kde_diag']['bw_method']
+            diag_kwargs['mpl_kwargs']['bins'] = opts['kde_diag']['bins']
+            diag_kwargs['mpl_kwargs']['color'] = opts['kde_diag']['color']
+    elif diag == 'scatter':
+        if 'scatter_diag' in opts.keys():
+            diag_kwargs['mpl_kwargs']['alpha'] = opts['scatter_diag']['alpha']
+            diag_kwargs['mpl_kwargs']['edgecolor'] = opts['scatter_diag']['edgecolor']
+            diag_kwargs['mpl_kwargs']['rasterized'] = opts['scatter_diag']['rasterized']
+    if upper == 'hist':
+        if "hist_offdiag" in opts.keys():
+            upper_kwargs['mpl_kwargs']['bins'] = opts['hist_offdiag']['bins']
+    elif upper == 'kde':
+        if "kde_offdiag" in opts.keys():
+            upper_kwargs['bw_method'] = opts['kde_offdiag']['bw_method']
+            upper_kwargs['mpl_kwargs']['bins'] = opts['kde_offdiag']['bins']
+    elif upper == 'contour':
+        if "contour_offdiag" in opts.keys():
+            upper_kwargs['levels'] = opts['contour_offdiag']['levels']
+            upper_kwargs['percentile'] = opts['contour_offdiag']['percentile']
+    elif upper == 'scatter':
+        if "scatter_offdiag" in opts.keys():
+            upper_kwargs['mpl_kwargs']['alpha'] = opts['scatter_offdiag']['alpha']
+            upper_kwargs['mpl_kwargs']['edgecolor'] = opts['scatter_offdiag']['edgecolor']
+            upper_kwargs['mpl_kwargs']['rasterized'] = opts['scatter_offdiag']['rasterized']
+        
+    return upper_kwargs, lower_kwargs, diag_kwargs, fig_kwargs
