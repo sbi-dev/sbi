@@ -8,11 +8,11 @@ from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
 from sbi.inference import SNLE_A, SNPE_C, SNRE_A, prepare_for_sbi
+from sbi.inference.posteriors import EnsemblePosterior
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     true_posterior_linear_gaussian_mvn_prior,
 )
-from sbi.utils.posterior_ensemble import NeuralPosteriorEnsemble
 from tests.test_utils import check_c2st, get_dkl_gaussian_prior
 
 
@@ -29,7 +29,7 @@ from tests.test_utils import check_c2st, get_dkl_gaussian_prior
     ),
 )
 def test_c2st_posterior_ensemble_on_linearGaussian(inference_method, num_trials):
-    """Test whether NeuralPosteriorEnsemble infers well a simple example with available
+    """Test whether EnsemblePosterior infers well a simple example with available
     ground truth.
     """
 
@@ -68,7 +68,7 @@ def test_c2st_posterior_ensemble_on_linearGaussian(inference_method, num_trials)
         posteriors.append(inferer.build_posterior())
 
     # create ensemble
-    posterior = NeuralPosteriorEnsemble(posteriors)
+    posterior = EnsemblePosterior(posteriors)
     posterior.set_default_x(x_o)
 
     # test sampling and evaluation.
