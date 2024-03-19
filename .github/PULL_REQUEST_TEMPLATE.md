@@ -23,6 +23,7 @@ your code.
 
 - [ ] I have read and understood the [contribution
   guidelines](https://github.com/sbi-dev/sbi/blob/main/CONTRIBUTING.md)
+- [ ] I agree with re-licensing my contribution from AGPLv3 to Apache-2.0.
 - [ ] I have commented my code, particularly in hard-to-understand areas
 - [ ] I have added tests that prove my fix is effective or that my feature works
 - [ ] I have reported how long the new tests run and potentially marked them
