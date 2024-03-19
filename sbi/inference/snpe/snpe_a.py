@@ -306,7 +306,7 @@ class SNPE_A(PosteriorEstimator):
             prior=prior,
             **kwargs,
         )
-        return deepcopy(self._posterior) # type: ignore
+        return deepcopy(self._posterior)  # type: ignore
 
     def _log_prob_proposal_posterior(
         self,
