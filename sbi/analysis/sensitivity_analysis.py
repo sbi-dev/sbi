@@ -6,8 +6,8 @@ from copy import deepcopy
 from typing import Any, Callable, Optional, Tuple, Union
 from warnings import warn
 
-import torch
 import numpy as np
+import torch
 from pyknos.nflows.nn import nets
 from torch import Tensor, nn, optim, relu
 from torch.nn import MSELoss
@@ -503,33 +503,35 @@ class ActiveSubspace:
 
         return projected_theta
 
+
 def posterior_shrinkage(prior_std, post_std):
-    '''
-    Calculate the posterior shrinkage. The posterior shrinkage 
-    quantifies how much the posterior distribution contracts 
+    """
+    Calculate the posterior shrinkage. The posterior shrinkage
+    quantifies how much the posterior distribution contracts
     from the initial prior distribution.
-    
+
     Parameters
     ----------
     prior_std : float, array-like
-        The standard deviation of the prior distribution.   
+        The standard deviation of the prior distribution.
     post_std : float, array-like
         The standard deviation of the posterior distribution.
-    
-    returns 
+
+    returns
     -------
     shrinkage : float, array-like
         The posterior shrinkage.
-    
-    '''
-    return 1-(post_std/prior_std)**2
-     
+
+    """
+    return 1 - (post_std / prior_std) ** 2
+
 
 def posterior_zscore(true_mean, post_mean, post_std):
-    '''
+    """
     Calculate the posterior z-score.
-    The posterior z-score quantifies how much the posterior distribution of a parameter encompasses its true value.
-    
+    The posterior z-score quantifies how much the posterior
+    distribution of a parameter encompasses its true value.
+
     Parameters
     ----------
     true_mean : float, array-like
@@ -538,14 +540,14 @@ def posterior_zscore(true_mean, post_mean, post_std):
         The mean of the posterior distribution.
     post_std : float, array-like
         The standard deviation of the posterior distribution.
-    
+
     returns
     -------
     z : float, array-like
         The z-score of the posterior distribution.
-    
+
     References:
     https://arxiv.org/abs/1803.08393
 
-    '''
+    """
     return np.abs((post_mean - true_mean) / post_std)
