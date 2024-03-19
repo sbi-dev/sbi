@@ -550,4 +550,5 @@ def posterior_zscore(true_mean, post_mean, post_std):
     https://arxiv.org/abs/1803.08393
 
     """
+
     return np.abs((post_mean - true_mean) / post_std)

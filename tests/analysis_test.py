@@ -5,6 +5,7 @@ from sbi.analysis import ActiveSubspace, conditional_corrcoeff, conditional_pair
 from sbi.inference import SNPE
 from sbi.utils import BoxUniform, get_1d_marginal_peaks_from_kde
 from sbi.utils.torchutils import process_device
+from sbi.analysis.sensitivity_analysis import posterior_shrinkage, posterior_zscore
 
 
 @pytest.mark.slow
@@ -18,6 +19,8 @@ def test_analysis_modules(device: str) -> None:
     Args:
         device: Which device to run the inference on.
     """
+
+    torch.manual_seed(42)
     num_dim = 3
     device = process_device(device)
     prior = BoxUniform(
@@ -59,6 +62,17 @@ def test_analysis_modules(device: str) -> None:
     _ = conditional_pairplot(
         posterior, condition=posterior.sample((1,)), limits=[[-2, 2], [-2, 2], [-2, 2]]
     )
+
+    x_o = torch.zeros(3,)
+    posterior_samples = posterior.sample((10000,), x=x_o)
+    post_std = posterior_samples.std(dim=0)
+    post_mean = posterior_samples.mean(dim=0)
+    prior_std = theta.std(dim=0)
+    s = posterior_shrinkage(prior_std, post_std)
+    z = posterior_zscore(x_o, post_mean, post_std)
+
+    assert torch.allclose(s, torch.tensor([0.0178, 0.4495, 0.7248]), atol=1e-3)
+    assert torch.allclose(z, torch.tensor([0.0994, 0.2292, 1.4467]), atol=1e-3)
 
 
 @pytest.mark.parametrize("num_candidates", (1_000,))
