@@ -38,9 +38,9 @@ def infer(
     method: str,
     num_simulations: int,
     num_workers: int = 1,
-    init_kwargs: dict = None,
-    train_kwargs: dict = None,
-    build_posterior_kwargs: dict = None,
+    init_kwargs: Optional[Dict] = None,
+    train_kwargs: Optional[Dict] = None,
+    build_posterior_kwargs: Optional[Dict] = None,
 ) -> NeuralPosterior:
     r"""Runs simulation-based inference and returns the posterior.
 
