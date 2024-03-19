@@ -275,6 +275,7 @@ class SNPE_A(PosteriorEstimator):
         self,
         density_estimator: Optional[TorchModule] = None,
         prior: Optional[Distribution] = None,
+        **kwargs
     ) -> "DirectPosterior":
         r"""Build posterior from the neural density estimator.
 
@@ -300,9 +301,10 @@ class SNPE_A(PosteriorEstimator):
         wrapped_density_estimator = self.correct_for_proposal(
             density_estimator=density_estimator
         )
-        self._posterior = DirectPosterior(
+        self._posterior = super.build_posterior(
             posterior_estimator=wrapped_density_estimator,  # type: ignore
             prior=prior,
+            **kwargs,
         )
         return deepcopy(self._posterior)
 
