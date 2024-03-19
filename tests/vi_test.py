@@ -259,8 +259,9 @@ def test_pickle_support(q: str):
     )
     posterior.set_default_x(torch.tensor(np.zeros((num_dim,)).astype(np.float32)))
 
-    torch.save(posterior, "posterior.pt")
-    posterior_loaded = torch.load("posterior.pt")
+    filename = f"posterior_{q}.pt"
+    torch.save(posterior, filename)
+    posterior_loaded = torch.load(filename)
     assert (
         posterior._x == posterior_loaded._x
     ).all(), "Mhh, something with the pickled is strange"
@@ -271,7 +272,7 @@ def test_pickle_support(q: str):
     torch.manual_seed(0)
     s2 = posterior_loaded._q.rsample()
 
-    os.remove("posterior.pt")
+    os.remove(filename)
 
     assert torch.allclose(s1, s2), "Mhh, something with the pickled is strange"
 
