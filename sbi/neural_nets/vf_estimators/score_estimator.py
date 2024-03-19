@@ -5,7 +5,6 @@ from torch import Tensor, nn
 
 from sbi.neural_nets.vf_estimators import VectorFieldEstimator
 from sbi.types import Shape
-from 
 
 class ScoreEstimator(VectorFieldEstimator):
     r"""Score estimator for score-based generative models (e.g., denoising diffusion).
@@ -13,7 +12,7 @@ class ScoreEstimator(VectorFieldEstimator):
 
     def __init__(
             self, 
-            net: Optional[nn.Module]=None,
+            net: nn.Module,
             condition_shape: torch.Size,
             sde_type: str='VP',
             noise_minmax: Tuple[float, float]=(0.1, 20.),
@@ -25,8 +24,12 @@ class ScoreEstimator(VectorFieldEstimator):
         """
         super().__init__(net, condition_shape)
         if net is None:
-            # Define a simple network if not provided.
-            return nn.Sequential()
+            # Define a simple torch MLP network if not provided.
+            nn.MLP()
+
+
+
+            
 
         elif isinstance(net, nn.Module):
             self.net = net
@@ -39,6 +42,7 @@ class ScoreEstimator(VectorFieldEstimator):
 
     def forward(self, input: Tensor, condition: Tensor, times: Tensor) -> Tensor:
         score = self.net(input, condition, times)
+        # TO DO: divide by std here also
         return score
     
     def loss(self, input: Tensor, condition: Tensor) -> Tensor:
