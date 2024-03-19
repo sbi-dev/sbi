@@ -26,16 +26,18 @@ class FlowMachtingEstimator(VectorFieldEstimator):
         self.std_fn = std_fn
         if mean_fn_grad is None:
             def mean_fn_grad(xs_source, xs_target, times):
-                times = times.clone().requires_grad_(True)
-                m_t = self.mean_fn(xs_source, xs_target, times)
-                grad = torch.autograd.grad(m_t, times, grad_outputs=torch.ones_like(m_t), create_graph=True)[0]
+                with torch.enable_grad():
+                    times = times.clone().requires_grad_(True)
+                    m_t = self.mean_fn(xs_source, xs_target, times)
+                    grad = torch.autograd.grad(m_t, times, grad_outputs=torch.ones_like(m_t), create_graph=True)[0]
                 return grad
 
         if std_fn_grad is None:
             def std_fn_grad(xs_source, xs_target, times):
-                times = times.clone().requires_grad_(True)
-                s_t = self.std_fn(xs_source, xs_target, times)
-                grad = torch.autograd.grad(s_t, times, grad_outputs=torch.ones_like(s_t), create_graph=True)[0]
+                with torch.enable_grad():
+                    times = times.clone().requires_grad_(True)
+                    s_t = self.std_fn(xs_source, xs_target, times)
+                    grad = torch.autograd.grad(s_t, times, grad_outputs=torch.ones_like(s_t), create_graph=True)[0]
                 return grad
 
         self.mean_fn_grad = mean_fn_grad
@@ -43,7 +45,7 @@ class FlowMachtingEstimator(VectorFieldEstimator):
 
 
     def forward(self, input, condition, time):
-        return self.net(input, condition)
+        return self.net(input, condition, time)
 
     def loss(self, input, condition):
         times = torch.rand((input.shape[0],) + (1,)*(len(input.shape)-1))
@@ -55,11 +57,11 @@ class FlowMachtingEstimator(VectorFieldEstimator):
         s_t = self.std_fn(xs_source, xs_target, times)
         xs_t = m_t + s_t * eps
 
-
         u_t = self.std_fn_grad(xs_source, xs_target, times) * eps + self.mean_fn_grad(xs_source, xs_target, times)
         v_t = self.net(xs_t, condition, times)
 
-        loss = torch.mean(self.weight_fn(times)*(u_t - v_t).pow(2), dim=-1)
+
+        loss = torch.sum(self.weight_fn(times)*(u_t - v_t).pow(2), dim=-1)
 
         return loss
     
