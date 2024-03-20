@@ -36,7 +36,7 @@ class DensityEstimator(nn.Module):
         r"""Return the embedding network if it exists."""
         return None
 
-    def log_prob(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
+    def log_prob(self, input: Tensor, condition: Tensor) -> Tensor:
         r"""Return the log probabilities of the inputs given a condition or multiple
         i.e. batched conditions.
 
@@ -68,7 +68,7 @@ class DensityEstimator(nn.Module):
 
         raise NotImplementedError
 
-    def loss(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
+    def loss(self, input: Tensor, condition: Tensor) -> Tensor:
         r"""Return the loss for training the density estimator.
 
         Args:
@@ -81,7 +81,7 @@ class DensityEstimator(nn.Module):
 
         raise NotImplementedError
 
-    def sample(self, sample_shape: torch.Size, condition: Tensor, **kwargs) -> Tensor:
+    def sample(self, sample_shape: torch.Size, condition: Tensor) -> Tensor:
         r"""Return samples from the density estimator.
 
         Args:
