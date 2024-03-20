@@ -20,12 +20,12 @@ def classifier_nn(
     embedding_net_x: nn.Module = nn.Identity(),
     **kwargs,
 ) -> Callable:
-    r"""This method is deprecated and will be removed in the next release.
+    r"""This method is deprecated and will be removed in a future release.
     Please use `from sbi.neural_nets import classifier_nn` in the future.
     """
 
     warn(
-        "This method is deprecated and will be removed in the next release."
+        "This method is deprecated and will be removed in a future release."
         "Please use `from sbi.neural_nets import classifier_nn` in the future.",
         DeprecationWarning,
         stacklevel=2,
@@ -53,12 +53,12 @@ def likelihood_nn(
     num_components: int = 10,
     **kwargs,
 ) -> Callable:
-    r"""This method is deprecated and will be removed in the next release.
+    r"""This method is deprecated and will be removed in a future release.
     Please use `from sbi.neural_nets import likelihood_nn` in the future.
     """
 
     warn(
-        "This method is deprecated and will be removed in the next release. "
+        "This method is deprecated and will be removed in a future release. "
         "Please use `from sbi.neural_nets import likelihood_nn` in the future.",
         DeprecationWarning,
         stacklevel=2,
@@ -88,12 +88,12 @@ def posterior_nn(
     num_components: int = 10,
     **kwargs,
 ) -> Callable:
-    r"""This method is deprecated and will be removed in the next release.
+    r"""This method is deprecated and will be removed in a future release.
     Please use `from sbi.neural_nets import posterior_nn` in the future.
     """
 
     warn(
-        "This method is deprecated and will be removed in the next release."
+        "This method is deprecated and will be removed in a future release."
         "Please use `from sbi.neural_nets import posterior_nn` in the future.",
         DeprecationWarning,
         stacklevel=2,
