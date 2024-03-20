@@ -35,7 +35,7 @@ nav:
     - Potentials: reference/potentials.md
     - Analysis: reference/analysis.md
   - Contributing:
-    - Guide: contribute.md
+    - How to contribute: contribute.md
     - Code of Conduct: code_of_conduct.md
   - FAQ: faq.md
   - Credits: credits.md
@@ -44,12 +44,17 @@ repo_name: 'sbi-dev/sbi'
 repo_url: http://github.com/sbi-dev/sbi
 
 theme:
-  name: 'material'
+  name: material
+  features:
+    - content.code.copy
   palette:
     primary: 'indigo'
     accent: 'indigo'
   logo: 'static/logo.svg'
   collapse_navigation: False
+  icon:
+    admonition:
+      note: octicons/tag-16
 
 extra:
   social:
