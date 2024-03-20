@@ -19,7 +19,9 @@ class DensityEstimator(nn.Module):
 
     """
 
-    def __init__(self, net: nn.Module, condition_shape: torch.Size) -> None:
+    def __init__(
+        self,  # net: nn.Module, #condition_shape: torch.Size
+    ) -> None:
         r"""Base class for density estimators.
 
         Args:
@@ -28,8 +30,8 @@ class DensityEstimator(nn.Module):
                             1D input.
         """
         super().__init__()
-        self.net = net
-        self._condition_shape = condition_shape
+        # self.net = net
+        # self._condition_shape = condition_shape
 
     @property
     def embedding_net(self) -> Optional[nn.Module]:
