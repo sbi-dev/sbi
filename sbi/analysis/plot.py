@@ -48,8 +48,63 @@ def _update(d, u):
             d[k] = v
     return d
 
+def _format_subplot(ax, current, limits, ticks, labels_dim, fig_kwargs, row, col, dim, flat,incl_lower=False):
+          # Background color
+    if (
+        current in fig_kwargs["fig_bg_colors"]
+        and fig_kwargs["fig_bg_colors"][current] is not None
+    ):
+        ax.set_facecolor(fig_kwargs["fig_bg_colors"][current])
 
-def _format_axis(ax, xhide=True, yhide=True, xlabel="", ylabel="", tickformatter=None):
+
+    # Limits
+    ax.set_xlim((limits[col][0], limits[col][1]))
+    if current != "diag":
+        ax.set_ylim((limits[row][0], limits[row][1]))
+    #else:
+        #ax.set_ylim(0,20)
+    # Ticks
+    if ticks is not None:
+        ax.set_xticks((ticks[col][0], ticks[col][1]))
+        if current != "diag":
+            ax.set_yticks((ticks[row][0], ticks[row][1]))
+
+    # Despine
+    ax.spines["right"].set_visible(False)
+    ax.spines["top"].set_visible(False)
+    ax.spines["bottom"].set_position(("outward", fig_kwargs["despine"]["offset"]))
+
+     # Formatting axes
+    if current == "diag":  # off-diagnoals
+        if incl_lower==False or col == dim - 1 or flat:
+            _format_axis(
+                ax,
+                xhide=False,
+                xlabel=labels_dim[col],
+                yhide=True,
+                tickformatter=fig_kwargs["tickformatter"],
+            )
+        else:
+            _format_axis(ax, xhide=True, yhide=True)
+    else:  # off-diagnoals
+        if row == dim - 1:
+            _format_axis(
+                ax,
+                xhide=False,
+                xlabel=labels_dim[col],
+                yhide=True,
+                tickformatter=fig_kwargs["tickformatter"],
+            )
+        else:
+            _format_axis(ax, xhide=True, yhide=True)
+    if fig_kwargs["tick_labels"] is not None:
+        ax.set_xticklabels((
+            str(fig_kwargs["tick_labels"][col][0]),
+            str(fig_kwargs["tick_labels"][col][1]),
+        ))
+
+def _format_axis(ax,xhide=True, yhide=True, xlabel="", ylabel="", tickformatter=None):
+  
     for loc in ["right", "top", "left", "bottom"]:
         ax.spines[loc].set_visible(False)
     if xhide:
@@ -539,6 +594,7 @@ def marginal_plot(
     ticks: Optional[Union[List, torch.Tensor]] = None,
     fig=None,
     axes=None,
+    fig_kwargs = {},
     **kwargs,
 ):
     """
@@ -568,30 +624,34 @@ def marginal_plot(
 
     Returns: figure and axis of posterior distribution plot
     """
+    if kwargs is not None:
+        print("DEPRECATION WARNING: TODO describe")
 
-    opts = _get_default_opts()
+   #opts = _get_default_opts()
     # update the defaults dictionary by the current values of the variables (passed by
     # the user)
 
-    opts = _update(opts, locals())
-    opts = _update(opts, kwargs)
-    print(len(samples)) #n_samples
-    print(samples[0].shape) #dims 
+    #opts = _update(opts, locals())
+    #opts = _update(opts, kwargs)
+    #print(len(samples)) #n_samples
+    #print(samples[0].shape) #dims 
     samples, dim, limits = prepare_for_plot(samples, limits)
     #print(len(samples)) 1
     #print(samples[0].shape) 110,3
     #print(dim) 3
     # Prepare diag/upper/lower
-    if not isinstance(opts["diag"], list):
-        opts["diag"] = [opts["diag"] for _ in range(len(samples))]
-    diag = opts["diag"]
+    if not isinstance(diag, list):
+       diag = [diag for _ in range(len(samples))]
     #diag = ['hist','hist']
     diag_func = get_diag_funcs(diag)#, opts, diag_kwargs={},**kwargs)
     #print(diag_func)
     #print(diag_kwargs)
     #print(samples)
+
     return _arrange_grid(
-        diag_func, None, None, diag_kwargs, None,None,samples,  limits, points, subset, figsize, labels, ticks, fig, axes, opts
+        diag_func, None, None, diag_kwargs, None,None,
+        samples, points, limits, subset, figsize, labels, ticks, fig, axes, fig_kwargs
+
 
     )
 
@@ -773,7 +833,8 @@ def conditional_pairplot(
     )
 
 def _arrange_grid(
-        diag_funcs, upper_funcs, lower_funcs, diag_kwargs,upper_kwargs,lower_kwargs,samples, limits, points, subset, figsize, labels, ticks, fig, axes, opts
+        diag_funcs, upper_funcs, lower_funcs, diag_kwargs,upper_kwargs,lower_kwargs,
+        samples, points, limits, subset, figsize, labels, ticks, fig, axes, fig_kwargs
     ):
     """
     Arranges the plots for any function that plots parameters either in a row of 1D
@@ -799,7 +860,6 @@ def _arrange_grid(
 
     Returns: figure and axis
     """
-    offdiag_funcs = upper_funcs
     dim = samples[0].shape[1]
     # Prepare points
     if points is None:
@@ -809,26 +869,19 @@ def _arrange_grid(
         points = [points]
     points = [np.atleast_2d(p) for p in points]
     points = [np.atleast_2d(ensure_numpy(p)) for p in points]
-
     # TODO: add asserts checking compatibility of dimensions
 
     # Prepare labels
-    if opts["labels"] == [] or opts["labels"] is None:
-        labels_dim = ["dim {}".format(i + 1) for i in range(dim)]
-    else:
-        labels_dim = opts["labels"]
-
+    if labels == [] or labels is None:
+        labels = ["dim {}".format(i + 1) for i in range(dim)]
+    
     # Prepare ticks
-    if opts["ticks"] == [] or opts["ticks"] is None:
-        ticks = None
-    else:
-        if len(opts["ticks"]) == 1:
-            ticks = [opts["ticks"][0] for _ in range(dim)]
-        else:
-            ticks = opts["ticks"]
-
+    if ticks is not None:
+        if len(ticks) == 1:
+            ticks = [ticks[0] for _ in range(dim)]
+        elif ticks == []:
+            ticks = None
     # Figure out if we subset the plot
-    subset = opts["subset"]
     if subset is None:
         rows = cols = dim
         subset = [i for i in range(dim)]
@@ -840,15 +893,15 @@ def _arrange_grid(
         else:
             raise NotImplementedError
         rows = cols = len(subset)
-    flat = offdiag_funcs is None
+    
+    flat = upper_funcs is None and lower_funcs is None
     if flat:
         rows = 1
-        opts["lower"] = None
 
     # Create fig and axes if they were not passed.
     if fig is None or axes is None:
         fig, axes = plt.subplots(
-            rows, cols, figsize=opts["figsize"], **opts["subplots"]
+            rows, cols, figsize=figsize, **fig_kwargs["subplots"]
         )
     else:
         assert axes.shape == (
@@ -859,99 +912,42 @@ def _arrange_grid(
     axes = np.array(axes).reshape(rows, cols)
 
     # Style figure
-    fig.subplots_adjust(**opts["fig_subplots_adjust"])
-    fig.suptitle(opts["title"], **opts["title_format"])
+    fig.subplots_adjust(**fig_kwargs["fig_subplots_adjust"])
+    fig.suptitle(fig_kwargs["title"], **fig_kwargs["title_format"])
 
-    # Style axes
     row_idx = -1
+    
+    
+    # Main Loop through all subplots, style and create the figures
+    
     for row in range(rows):
         if row not in subset:
             continue
-
         if not flat:
             row_idx += 1
-
         col_idx = -1
         for col in range(dim):
             if col not in subset:
                 continue
             else:
                 col_idx += 1
-
             if flat or row == col:
                 current = "diag"
             elif row < col:
-                current = "offdiag"
+                current = "upper"
             else:
                 current = "lower"
 
             ax = axes[row_idx, col_idx]
-            plt.sca(ax)
-
-            # Background color
-            if (
-                current in opts["fig_bg_colors"]
-                and opts["fig_bg_colors"][current] is not None
-            ):
-                ax.set_facecolor(opts["fig_bg_colors"][current])
-
-            # Axes
-            if opts[current] is None:
-                ax.axis("off")
-                continue
-
-            # Limits
-            ax.set_xlim((limits[col][0], limits[col][1]))
-            if current != "diag":
-                ax.set_ylim((limits[row][0], limits[row][1]))
-            #else:
-                #ax.set_ylim(0,20)
-            # Ticks
-            if ticks is not None:
-                ax.set_xticks((ticks[col][0], ticks[col][1]))
-                if current != "diag":
-                    ax.set_yticks((ticks[row][0], ticks[row][1]))
-
-            # Despine
-            ax.spines["right"].set_visible(False)
-            ax.spines["top"].set_visible(False)
-            ax.spines["bottom"].set_position(("outward", opts["despine"]["offset"]))
-
-            # Formatting axes
-            if current == "diag":  # off-diagnoals
-                if opts["lower"] is None or col == dim - 1 or flat:
-                    _format_axis(
-                        ax,
-                        xhide=False,
-                        xlabel=labels_dim[col],
-                        yhide=True,
-                        tickformatter=opts["tickformatter"],
-                    )
-                else:
-                    _format_axis(ax, xhide=True, yhide=True)
-            else:  # off-diagnoals
-                if row == dim - 1:
-                    _format_axis(
-                        ax,
-                        xhide=False,
-                        xlabel=labels_dim[col],
-                        yhide=True,
-                        tickformatter=opts["tickformatter"],
-                    )
-                else:
-                    _format_axis(ax, xhide=True, yhide=True)
-            if opts["tick_labels"] is not None:
-                ax.set_xticklabels((
-                    str(opts["tick_labels"][col][0]),
-                    str(opts["tick_labels"][col][1]),
-                ))
-
+            #plt.sca(ax)
             # Diagonals
+            _format_subplot(ax, current, limits, ticks, labels, fig_kwargs, row, col, dim, flat)
             if current == "diag":
-                #print(row,col)
-                #print("making diag plot")
                 for sample_ind, sample in enumerate(samples):
-                    diag_funcs[sample_ind](ax,sample[:,row],limits[row],diag_kwargs)#(row=col, limits=limits)
+                    if diag_funcs is None:
+                        ax.axis("off")
+                    else:
+                        diag_funcs[sample_ind](ax,sample[:,row],limits[row],diag_kwargs)#(row=col, limits=limits)
                     #print(ax.get_ylim())
 
                 if len(points) > 0:
@@ -960,16 +956,17 @@ def _arrange_grid(
                         plt.plot(
                             [v[:, col], v[:, col]],
                             extent,
-                            color=opts["points_colors"][n],
-                            **opts["points_diag"],
-                            label=opts["points_labels"][n],
+                            color=fig_kwargs["points_colors"][n],
+                            **fig_kwargs["points_diag"],
+                            label=fig_kwargs["points_labels"][n],
                         )
-                if opts["legend"] and col == 0:
-                    plt.legend(**opts["legend_kwargs"])
+                if fig_kwargs["legend"] and col == 0:
+                    plt.legend(**fig_kwargs["legend_kwargs"])
 
             # Off-diagonals
+            """
             else:
-                offdiag_func(
+                offdiag_funcs(
                     row=row,
                     col=col,
                     limits=limits,
@@ -983,7 +980,7 @@ def _arrange_grid(
                             color=opts["points_colors"][n],
                             **opts["points_offdiag"],
                         )
-
+            """
     if len(subset) < dim:
         if flat:
             ax = axes[0, len(subset) - 1]
