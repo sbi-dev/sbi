@@ -22,7 +22,7 @@ def get_transforms(model: Callable, *model_args: Any, **model_kwargs: Any):
     """
     transforms = {}
 
-    model_trace = poutine.trace(model).get_trace(*model_args, **model_kwargs)
+    model_trace = poutine.trace(model).get_trace(*model_args, **model_kwargs)  # pyright: ignore[reportFunctionMemberAccess]
 
     for name, node in model_trace.iter_stochastic_nodes():
         fn = node["fn"]
