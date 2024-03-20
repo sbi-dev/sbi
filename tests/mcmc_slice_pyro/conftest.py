@@ -118,20 +118,19 @@ class LogisticRegressionModelPyro:
     Simple logistic regression model in Pyro, intended to be only used during testing.
     """
 
-    def __init__(self, labels: torch.Tensor, data: torch.Tensor):
+    def __init__(self, dim: int,  labels: torch.Tensor):
         """
         Args:
+            dim: Number of data dimensions.
             labels: Samples from a Bernoulli distribution.
-            data: Samples from a normal distribution.
         """
-        self.data = data
-        self.dim = data.size(-1)
+        self.dim = dim
         self.labels = labels
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self, data: torch.Tensor) -> torch.Tensor:
         coefs_mean = torch.zeros(self.dim)
         coefs = pyro.sample("beta", dist.Normal(coefs_mean, torch.ones(self.dim)))
         y = pyro.sample(
-            "y", dist.Bernoulli(logits=(coefs * self.data).sum(-1)), obs=self.labels
+            "y", dist.Bernoulli(logits=(coefs * data).sum(-1)), obs=self.labels
         )
         return y

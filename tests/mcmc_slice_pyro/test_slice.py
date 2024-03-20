@@ -189,7 +189,7 @@ def test_logistic_regression(jit, num_chains):
     data = torch.randn(2000, dim)
     true_coefs = torch.arange(1.0, dim + 1.0)
     labels = dist.Bernoulli(logits=(true_coefs * data).sum(-1)).sample()
-    model = LogisticRegressionModelPyro(data, labels)
+    model = LogisticRegressionModelPyro(dim, labels)
 
     slice_kernel = Slice(model, jit_compile=jit, ignore_jit_warnings=True)
     mcmc = MCMC(
