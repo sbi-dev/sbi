@@ -1,49 +1,27 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
+from __future__ import annotations
+
 from typing import Optional
 
-import torch
 from pyknos.nflows.nn import nets
 from torch import Tensor, nn, relu
 
+from sbi.neural_nets.ratio_estimators import TensorRatioEstimator
 from sbi.utils.sbiutils import standardizing_net, z_score_parser
 from sbi.utils.user_input_checks import check_data_device, check_embedding_net_device
 
 
-class StandardizeInputs(nn.Module):
-    def __init__(self, embedding_net_x, embedding_net_y, dim_x, dim_y):
-        super().__init__()
-        self.embedding_net_x = embedding_net_x
-        self.embedding_net_y = embedding_net_y
-        self.dim_x = dim_x
-        self.dim_y = dim_y
-
-    def forward(self, inputs: list) -> Tensor:
-        assert (
-            isinstance(inputs, list) and len(inputs) == 2
-        ), """Inputs to (s)nre classifier must be a list containing raw theta and x."""
-        out = torch.cat(
-            [
-                self.embedding_net_x(inputs[0]),
-                self.embedding_net_y(inputs[1]),
-            ],
-            dim=1,
-        )
-        return out
-
-
-def build_input_layer(
+def build_z_scored_embedding_nets(
     batch_x: Tensor,
     batch_y: Tensor,
     z_score_x: Optional[str] = "independent",
     z_score_y: Optional[str] = "independent",
     embedding_net_x: nn.Module = nn.Identity(),
     embedding_net_y: nn.Module = nn.Identity(),
-) -> nn.Module:
+) -> tuple[nn.Module, nn.Module]:
     """Builds input layer for classifiers that optionally z-scores.
-
-    In SNRE, the classifier will receive batches of thetas and xs.
 
     Args:
         batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
@@ -56,7 +34,6 @@ def build_input_layer(
             sample is, for example, a time series or an image.
         z_score_y: Whether to z-score ys passing into the network, same options as
             z_score_x.
-        hidden_features: Number of hidden features.
         embedding_net_x: Optional embedding network for x.
         embedding_net_y: Optional embedding network for y.
 
@@ -75,11 +52,7 @@ def build_input_layer(
             standardizing_net(batch_y, structured_y), embedding_net_y
         )
 
-    input_layer = StandardizeInputs(
-        embedding_net_x, embedding_net_y, dim_x=batch_x.shape[1], dim_y=batch_y.shape[1]
-    )
-
-    return input_layer
+    return embedding_net_x, embedding_net_y
 
 
 def build_linear_classifier(
@@ -90,7 +63,7 @@ def build_linear_classifier(
     embedding_net_x: nn.Module = nn.Identity(),
     embedding_net_y: nn.Module = nn.Identity(),
     **kwargs,
-) -> nn.Module:
+) -> TensorRatioEstimator:
     """Builds linear classifier.
 
     In SNRE, the classifier will receive batches of thetas and xs.
@@ -119,18 +92,20 @@ def build_linear_classifier(
     check_embedding_net_device(embedding_net=embedding_net_y, datum=batch_y)
 
     # Infer the output dimensionalities of the embedding_net by making a forward pass.
-    x_numel = embedding_net_x(batch_x[:1]).numel()
-    y_numel = embedding_net_y(batch_y[:1]).numel()
+    x_numel = embedding_net_x(batch_x[:1]).size(-1)
+    y_numel = embedding_net_y(batch_y[:1]).size(-1)
 
     neural_net = nn.Linear(x_numel + y_numel, 1)
 
-    input_layer = build_input_layer(
+    embedding_net_x, embedding_net_y = build_z_scored_embedding_nets(
         batch_x, batch_y, z_score_x, z_score_y, embedding_net_x, embedding_net_y
     )
 
-    neural_net = nn.Sequential(input_layer, neural_net)
-
-    return neural_net
+    return TensorRatioEstimator(
+        net=neural_net,
+        embedding_net_theta=embedding_net_x,
+        embedding_net_x=embedding_net_y,
+    )
 
 
 def build_mlp_classifier(
@@ -141,10 +116,8 @@ def build_mlp_classifier(
     hidden_features: int = 50,
     embedding_net_x: nn.Module = nn.Identity(),
     embedding_net_y: nn.Module = nn.Identity(),
-) -> nn.Module:
+) -> TensorRatioEstimator:
     """Builds MLP classifier.
-
-    In SNRE, the classifier will receive batches of thetas and xs.
 
     Args:
         batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
@@ -157,7 +130,6 @@ def build_mlp_classifier(
             sample is, for example, a time series or an image.
         z_score_y: Whether to z-score ys passing into the network, same options as
             z_score_x.
-        hidden_features: Number of hidden features.
         embedding_net_x: Optional embedding network for x.
         embedding_net_y: Optional embedding network for y.
 
@@ -169,8 +141,8 @@ def build_mlp_classifier(
     check_embedding_net_device(embedding_net=embedding_net_y, datum=batch_y)
 
     # Infer the output dimensionalities of the embedding_net by making a forward pass.
-    x_numel = embedding_net_x(batch_x[:1]).numel()
-    y_numel = embedding_net_y(batch_y[:1]).numel()
+    x_numel = embedding_net_x(batch_x[:1]).size(-1)
+    y_numel = embedding_net_y(batch_y[:1]).size(-1)
 
     neural_net = nn.Sequential(
         nn.Linear(x_numel + y_numel, hidden_features),
@@ -182,13 +154,15 @@ def build_mlp_classifier(
         nn.Linear(hidden_features, 1),
     )
 
-    input_layer = build_input_layer(
+    embedding_net_x, embedding_net_y = build_z_scored_embedding_nets(
         batch_x, batch_y, z_score_x, z_score_y, embedding_net_x, embedding_net_y
     )
 
-    neural_net = nn.Sequential(input_layer, neural_net)
-
-    return neural_net
+    return TensorRatioEstimator(
+        net=neural_net,
+        embedding_net_theta=embedding_net_x,
+        embedding_net_x=embedding_net_y,
+    )
 
 
 def build_resnet_classifier(
@@ -202,7 +176,7 @@ def build_resnet_classifier(
     num_blocks: int = 2,
     dropout_probability: float = 0.0,
     use_batch_norm: bool = False,
-) -> nn.Module:
+) -> TensorRatioEstimator:
     """Builds ResNet classifier.
 
     In SNRE, the classifier will receive batches of thetas and xs.
@@ -218,7 +192,6 @@ def build_resnet_classifier(
             sample is, for example, a time series or an image.
         z_score_y: Whether to z-score ys passing into the network, same options as
             z_score_x.
-        hidden_features: Number of hidden features.
         embedding_net_x: Optional embedding network for x.
         embedding_net_y: Optional embedding network for y.
 
@@ -230,8 +203,8 @@ def build_resnet_classifier(
     check_embedding_net_device(embedding_net=embedding_net_y, datum=batch_y)
 
     # Infer the output dimensionalities of the embedding_net by making a forward pass.
-    x_numel = embedding_net_x(batch_x[:1]).numel()
-    y_numel = embedding_net_y(batch_y[:1]).numel()
+    x_numel = embedding_net_x(batch_x[:1]).size(-1)
+    y_numel = embedding_net_y(batch_y[:1]).size(-1)
 
     neural_net = nets.ResidualNet(
         in_features=x_numel + y_numel,
@@ -244,10 +217,12 @@ def build_resnet_classifier(
         use_batch_norm=use_batch_norm,
     )
 
-    input_layer = build_input_layer(
+    embedding_net_x, embedding_net_y = build_z_scored_embedding_nets(
         batch_x, batch_y, z_score_x, z_score_y, embedding_net_x, embedding_net_y
     )
 
-    neural_net = nn.Sequential(input_layer, neural_net)
-
-    return neural_net
+    return TensorRatioEstimator(
+        net=neural_net,
+        embedding_net_theta=embedding_net_x,
+        embedding_net_x=embedding_net_y,
+    )
