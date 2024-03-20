@@ -3,16 +3,15 @@ from typing import Callable, Dict, List, Sequence, Tuple, Union
 
 import torch
 from joblib import Parallel, delayed
-from scipy.stats import kstest, uniform
-from torch import Tensor, ones, zeros
-from torch.distributions import Uniform
-from tqdm.auto import tqdm
-
 from sbi.inference import DirectPosterior
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.posteriors.vi_posterior import VIPosterior
 from sbi.simulators.simutils import tqdm_joblib
 from sbi.utils.metrics import c2st
+from scipy.stats import kstest, uniform
+from torch import Tensor, ones, zeros
+from torch.distributions import Uniform
+from tqdm.auto import tqdm
 
 
 def run_sbc(
@@ -298,10 +297,12 @@ def check_prior_vs_dap(prior_samples: Tensor, dap_samples: Tensor) -> Tensor:
 
     assert prior_samples.shape == dap_samples.shape
 
-    return torch.tensor([
-        c2st(s1.unsqueeze(1), s2.unsqueeze(1))
-        for s1, s2 in zip(prior_samples.T, dap_samples.T)
-    ])
+    return torch.tensor(
+        [
+            c2st(s1.unsqueeze(1), s2.unsqueeze(1))
+            for s1, s2 in zip(prior_samples.T, dap_samples.T)
+        ]
+    )
 
 
 def check_uniformity_frequentist(ranks, num_posterior_samples) -> Tensor:
@@ -347,21 +348,24 @@ def check_uniformity_c2st(
             one for each dim_parameters.
     """
 
-    c2st_scores = torch.tensor([
+    c2st_scores = torch.tensor(
         [
-            c2st(
-                rks.unsqueeze(1),
-                Uniform(zeros(1), num_posterior_samples * ones(1)).sample(
-                    torch.Size((ranks.shape[0],))
-                ),
-            )
-            for rks in ranks.T
+            [
+                c2st(
+                    rks.unsqueeze(1),
+                    Uniform(zeros(1), num_posterior_samples * ones(1)).sample(
+                        torch.Size((ranks.shape[0],))
+                    ),
+                )
+                for rks in ranks.T
+            ]
+            for _ in range(num_repetitions)
         ]
-        for _ in range(num_repetitions)
-    ])
+    )
 
     # Use variance over repetitions to estimate robustness of c2st.
-    if (c2st_scores.std(0) > 0.05).any():
+    c2st_std = c2st_scores.std(0, correction=0 if num_repetitions == 1 else 1)
+    if (c2st_std > 0.05).any():
         warnings.warn(
             f"""C2ST score variability is larger than {0.05}: std={c2st_scores.std(0)},
             result may be unreliable. Consider increasing the number of samples.
