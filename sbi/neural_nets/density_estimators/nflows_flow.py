@@ -43,6 +43,7 @@ class NFlowsFlow(DensityEstimator):
         input_iid_dim = input.shape[0]
         input_batch_dim = input.shape[1]
         condition_batch_dim = condition.shape[1]
+        input_event_dims = len(input.shape[2:])
         
         assert condition_batch_dim == input_batch_dim, (
             f"Batch shape of condition {condition_batch_dim} and input "
@@ -53,7 +54,8 @@ class NFlowsFlow(DensityEstimator):
         input = input.reshape((input_batch_dim * input_iid_dim, -1))
         
         # Repeat the condition to match `input_batch_dim * input_iid_dim`.
-        condition = torch.repeat_interleave(condition, input_iid_dim, dim=1)
+        ones_for_event_dims = (1,) * input_event_dims  # Tuple of 1s, e.g. (1, 1, 1)
+        condition = condition.repeat(1, input_iid_dim, *ones_for_event_dims)
         # The `.net` expects `batch, iid, event`, not `iid, batch, event`.
         condition = condition.transpose(1, 0)
         # If no iid samples then squeeze the iid dimension.
