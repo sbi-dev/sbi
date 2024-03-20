@@ -298,12 +298,10 @@ def check_prior_vs_dap(prior_samples: Tensor, dap_samples: Tensor) -> Tensor:
 
     assert prior_samples.shape == dap_samples.shape
 
-    return torch.tensor(
-        [
-            c2st(s1.unsqueeze(1), s2.unsqueeze(1))
-            for s1, s2 in zip(prior_samples.T, dap_samples.T)
-        ]
-    )
+    return torch.tensor([
+        c2st(s1.unsqueeze(1), s2.unsqueeze(1))
+        for s1, s2 in zip(prior_samples.T, dap_samples.T)
+    ])
 
 
 def check_uniformity_frequentist(ranks, num_posterior_samples) -> Tensor:
@@ -349,20 +347,18 @@ def check_uniformity_c2st(
             one for each dim_parameters.
     """
 
-    c2st_scores = torch.tensor(
+    c2st_scores = torch.tensor([
         [
-            [
-                c2st(
-                    rks.unsqueeze(1),
-                    Uniform(zeros(1), num_posterior_samples * ones(1)).sample(
-                        torch.Size((ranks.shape[0],))
-                    ),
-                )
-                for rks in ranks.T
-            ]
-            for _ in range(num_repetitions)
+            c2st(
+                rks.unsqueeze(1),
+                Uniform(zeros(1), num_posterior_samples * ones(1)).sample(
+                    torch.Size((ranks.shape[0],))
+                ),
+            )
+            for rks in ranks.T
         ]
-    )
+        for _ in range(num_repetitions)
+    ])
 
     # Use variance over repetitions to estimate robustness of c2st.
     c2st_std = c2st_scores.std(0, correction=0 if num_repetitions == 1 else 1)
