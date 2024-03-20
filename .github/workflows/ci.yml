@@ -1,0 +1,71 @@
+name: Continuous Integration
+
+on: [push, pull_request, workflow_dispatch]
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+#  pre-commit:
+#    name: Run pre-commit hooks including ruff
+#    runs-on: ubuntu-latest
+#    steps:
+#    - uses: actions/checkout@v4
+#    - uses: actions/setup-python@v5
+#      with:
+#        python-version: '3.8'
+#    - uses: pre-commit/action@v3.0.1
+#      with:
+#        extra_args: --all-files
+
+  ci:
+    name: CI
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.8']
+        torch-version: ['1.11', '2.2']
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        lfs: true
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Cache dependency
+      id: cache-dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install torch==${{ matrix.torch-version }} --extra-index-url https://download.pytorch.org/whl/cpu
+        pip install -e .[dev]
+
+    - name: Install and run pre-commit hooks
+      run: |
+        pre-commit install
+        pre-commit run --all-files --show-diff-on-failure --color=always
+
+    - name: Check types with pyright
+      run: |
+        pyright sbi
+
+    - name: Run the fast tests
+      run: |
+        pytest -m "not slow and not gpu" --exitfirst
