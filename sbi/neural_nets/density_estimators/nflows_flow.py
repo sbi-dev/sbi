@@ -94,6 +94,7 @@ class NFlowsFlow(DensityEstimator):
 
         # The `.net` expects `batch, iid, event`, not `iid, batch, event`.
         condition = condition.transpose(1, 0)
+        condition = torch.squeeze(condition, dim=1)
         samples = self.net.sample(num_samples, context=condition)
 
         return samples.reshape((

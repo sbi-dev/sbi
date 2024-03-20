@@ -755,10 +755,9 @@ def test_posterior_net_for_multi_d_x(net: flows.Flow, theta: Tensor, x: Tensor) 
     embedding net. If not, it usually fails with a RuntimeError. Here we catch the
     error, append a debug hint and raise it again.
     """
-
     try:
         # torch.nn.functional needs at least two inputs here.
-        net.log_prob(theta[:2], x[:2])
+        net.log_prob(theta[:, :2], condition=x[:, :2])
     except RuntimeError as rte:
         ndims = x.ndim
         if ndims > 2:

@@ -11,6 +11,7 @@ from sbi.inference.potentials.posterior_based_potential import (
     posterior_estimator_based_potential,
 )
 from sbi.neural_nets.density_estimators.base import DensityEstimator
+from sbi.neural_nets.density_estimators.shape_handling import reshape_to_iid_batch_event
 from sbi.samplers.rejection.rejection import accept_reject_sample
 from sbi.sbi_types import Shape
 from sbi.utils import check_prior, within_support
@@ -112,6 +113,9 @@ class DirectPosterior(NeuralPosterior):
                   {condition_shape}, but got {x.shape}. For batched eval \
                   see issue #990"
             ) from err
+        
+        # TODO: leading could be IID.
+        x = reshape_to_iid_batch_event(x, event_shape=self._x_shape[1:], leading_is_iid=False)
 
         max_sampling_batch_size = (
             self.max_sampling_batch_size
