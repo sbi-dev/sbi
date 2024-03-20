@@ -45,7 +45,8 @@ For code linting and formating, we use [`ruff`](https://docs.astral.sh/ruff/), w
 installed alongside `sbi`.
 
 You can exclude slow tests and those which require a GPU with `pytest -m "not slow and not gpu"`.
-Additionally, we recommend to run tests with `pytest -n auto` in parallel.
+Additionally, we recommend to run tests with `pytest -n auto -m "not slow and not gpu"` in parallel.
+GPU tests should probably not be run this way.
 
 When you create a PR onto `main`, our Continuous Integration (CI) actions on GitHub will perform the following
 checks:
