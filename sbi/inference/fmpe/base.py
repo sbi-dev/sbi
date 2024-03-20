@@ -11,23 +11,22 @@ from torch import optim
 from torch.distributions import Distribution
 from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.utils.tensorboard.writer import SummaryWriter
-from zuko.distributions import DiagNormal, NormalizingFlow
-from zuko.transforms import FreeFormJacobianTransform
 
-from sbi.inference.posteriors.vf_posterior import VectorFieldPosterior
-from sbi.neural_nets.vf_estimators.base import VectorFieldEstimator
-from sbi.neural_nets.vf_estimators.zuko_flow_estimator import ZukoFlowMatchingEstimator
+from sbi.inference.base import NeuralInference
+from sbi.inference.posteriors.direct_posterior import DirectPosterior
+from sbi.neural_nets.density_estimators.zuko_flow_estimator import ZukoFlowMatchingEstimator
+
 from sbi.types import Shape
 
 
-class FMPE(VectorFieldPosterior):
+class FMPE(NeuralInference):
     def __init__(
         self,
         x_shape: torch.Size,
         prior: Optional[Distribution] = None,
         max_sampling_batch_size: int = 10_000,
         enable_transform: bool = True,
-        vf_estimator: VectorFieldEstimator = None,
+        density_estimator: ZukoFlowMatchingEstimator = None,
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
@@ -35,23 +34,23 @@ class FMPE(VectorFieldPosterior):
     ) -> None:
         # obtain the shape of the prior samples
         self.theta_dim = prior.sample((1,)).shape[-1]
-        if not vf_estimator:
+        if not density_estimator:
             # init default Flow Matching Estimator using a MLP as regressor network
-            vf_estimator = ZukoFlowMatchingEstimator(
+            density_estimator = ZukoFlowMatchingEstimator(
                 theta_shape=self.theta_dim,
                 condition_shape=x_shape,
                 device=device,
             )
         else:
-            vf_estimator = vf_estimator
+            density_estimator = density_estimator
 
         super().__init__(
             prior=prior,
-            vf_estimator=vf_estimator,
-            # device=device,
-            # logging_level=logging_level,
-            # summary_writer=summary_writer,
-            # show_progress_bars=show_progress_bars,
+            density_estimator=density_estimator,
+            device=device,
+            logging_level=logging_level,
+            summary_writer=summary_writer,
+            show_progress_bars=show_progress_bars,
         )
 
     def train(
@@ -167,46 +166,5 @@ class FMPE(VectorFieldPosterior):
 
         return deepcopy(self.vf_estimator.net)
 
-    def flow(self, x_o: torch.Tensor) -> Distribution:
-        return NormalizingFlow(
-            transform=FreeFormJacobianTransform(
-                f=lambda t, theta: self.vf_estimator(theta, x_o, t),
-                t0=x_o.new_tensor(0.0),
-                t1=x_o.new_tensor(1.0),
-                phi=(x_o, *self.vf_estimator.net.parameters()),
-            ),
-            base=DiagNormal(
-                torch.zeros(self.theta_dim), torch.ones(self.theta_dim)
-            ).expand(x_o.shape[:-1]),
-        )
-
-    def sample(self, sample_shape: Shape, condition: torch.Tensor) -> torch.Tensor:
-
-        # check for possible batch dimension in the condition
-        if len(condition.shape) > len(self.x_shape):
-            raise ValueError(
-                "The condition has a batch dimension, which is currently not supported."
-            )
-
-        dist = self.flow(x_o=condition)
-        samples = dist.sample(sample_shape)
-        return samples
-
-    def log_prob(self, input: torch.Tensor, condition: torch.Tensor) -> torch.Tensor:
-
-        # check for possible batch dimension in the condition
-        if len(condition.shape) > len(self.x_shape):
-            raise ValueError(
-                "The condition has a batch dimension, which is currently not supported."
-            )
-
-        dist = self.flow(x_o=condition)
-        log_prob = dist.log_prob(input)
-
-        return log_prob
-
-    def build_posterior(self) -> VectorFieldPosterior:
-        raise NotImplementedError
-
-    def map(self, condition: torch.Tensor) -> torch.Tensor:
+    def build_posterior(self) -> DirectPosterior:
         raise NotImplementedError
