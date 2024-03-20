@@ -62,7 +62,7 @@ def build_mdn(
         embedding_net = nn.Sequential(
             utils.standardizing_net(batch_y, structured_y), embedding_net
         )
-
+    # Replace ZUKO
     distribution = MultivariateGaussianMDN(
         features=x_numel,
         context_features=y_numel,
@@ -82,5 +82,6 @@ def build_mdn(
 
     neural_net = flows.Flow(transform, distribution, embedding_net)
     flow = NFlowsFlow(neural_net, condition_shape=batch_y[0].shape)
+    # ZukoFlow(zuko.GMM, nn.Identity(), )
 
     return flow
