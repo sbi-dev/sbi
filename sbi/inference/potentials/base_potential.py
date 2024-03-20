@@ -1,5 +1,5 @@
 from abc import ABCMeta, abstractmethod
-from typing import Optional
+from typing import Callable, Optional
 
 import torch
 from torch import Tensor
@@ -74,7 +74,7 @@ class CallablePotentialWrapper(BasePotential):
 
     def __init__(
         self,
-        callable_potential,
+        callable_potential: Callable,
         prior: Optional[Distribution],
         x_o: Optional[Tensor] = None,
         device: str = "cpu",

@@ -291,7 +291,7 @@ class ConditionedPotential:
         self.potential_fn = potential_fn
         self.condition = condition
         self.dims_to_sample = dims_to_sample
-        self.device = self.potential_fn.device
+        self.device = self.potential_fn.device  # pyright: ignore[reportFunctionMemberAccess]
         self.allow_iid_x = allow_iid_x
 
     def __call__(
@@ -327,13 +327,13 @@ class ConditionedPotential:
         """Check the shape of the observed data and, if valid, set it."""
         if x_o is not None:
             x_o = process_x(x_o, allow_iid_x=self.allow_iid_x).to(self.device)
-        self.potential_fn.set_x(x_o)
+        self.potential_fn.set_x(x_o)  # pyright: ignore[reportFunctionMemberAccess]
 
     @property
     def x_o(self) -> Tensor:
         """Return the observed data at which the potential is evaluated."""
-        if self.potential_fn._x_o is not None:
-            return self.potential_fn._x_o
+        if self.potential_fn._x_o is not None:  # pyright: ignore[reportFunctionMemberAccess]
+            return self.potential_fn._x_o  # pyright: ignore[reportFunctionMemberAccess]
         else:
             raise ValueError("No observed data is available.")
 
@@ -348,7 +348,7 @@ class ConditionedPotential:
         Difference to the `x_o` property is that it will not raise an error if
         `self._x_o` is `None`.
         """
-        return self.potential_fn._x_o
+        return self.potential_fn._x_o  # pyright: ignore[reportFunctionMemberAccess]
 
 
 class RestrictedPriorForConditional:
