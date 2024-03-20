@@ -107,10 +107,11 @@ def _log_ratios_over_trials(
     Repeats `x` and $\theta$ to cover all their combinations of batch entries.
 
     Args:
-        x: batch of iid data.
-        theta: batch of parameters
+        x: Batch of iid data of shape `(iid_dim, *event_shape)`.
+        theta: Batch of parameters of shape `(batch_dim, *event_shape)`.
         net: neural net representing the classifier to approximate the ratio.
         track_gradients: Whether to track gradients.
+
     Returns:
         log_ratio_trial_sum: log ratio for each parameter, summed over all
             batch entries (iid trials) in `x`.

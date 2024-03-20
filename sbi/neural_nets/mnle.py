@@ -2,41 +2,17 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 import warnings
-from typing import Optional, Tuple
+from typing import Optional
 
 import torch
-from torch import Tensor, nn, unique
+from torch import Tensor
 
-from sbi.neural_nets.density_estimators import (
-    CategoricalMassEstimator,
-    CategoricalNet,
-    MixedDensityEstimator,
-)
+from sbi.neural_nets.categorial import build_categoricalmassestimator
+from sbi.neural_nets.density_estimators import MixedDensityEstimator
+from sbi.neural_nets.density_estimators.mixed_density_estimator import _separate_input
 from sbi.neural_nets.flow import build_nsf
 from sbi.utils.sbiutils import standardizing_net
 from sbi.utils.user_input_checks import check_data_device
-
-
-def build_categoricalmassestimator(
-    num_input: int = 4,
-    num_categories: int = 2,
-    num_hidden: int = 20,
-    num_layers: int = 2,
-    embedding: Optional[nn.Module] = None,
-):
-    """Returns a density estimator for a categorical random variable."""
-
-    categorical_net = CategoricalNet(
-        num_input=num_input,
-        num_categories=num_categories,
-        num_hidden=num_hidden,
-        num_layers=num_layers,
-        embedding=embedding,
-    )
-
-    categorical_mass_estimator = CategoricalMassEstimator(categorical_net)
-
-    return categorical_mass_estimator
 
 
 def build_mnle(
@@ -75,7 +51,7 @@ def build_mnle(
     """
 
     check_data_device(batch_x, batch_y)
-    embedding = standardizing_net(batch_y) if z_score_y == "independent" else None
+    embedding_net = standardizing_net(batch_y) if z_score_y == "independent" else None
 
     warnings.warn(
         """The mixed neural likelihood estimator assumes that x contains
@@ -85,19 +61,15 @@ def build_mnle(
         stacklevel=2,
     )
     # Separate continuous and discrete data.
-    cont_x, disc_x = _separate_x(batch_x)
-
-    # Infer input and output dims.
-    dim_parameters = batch_y[0].numel()
-    num_categories = unique(disc_x).numel()
+    cont_x, disc_x = _separate_input(batch_x)
 
     # Set up a categorical RV neural net for modelling the discrete data.
     disc_nle = build_categoricalmassestimator(
-        num_input=dim_parameters,
-        num_categories=num_categories,
+        disc_x,
+        batch_y,
         num_hidden=hidden_features,
         num_layers=hidden_layers,
-        embedding=embedding,
+        embedding_net=embedding_net,
     )
 
     # Set up a NSF for modelling the continuous data, conditioned on the discrete data.
@@ -117,17 +89,6 @@ def build_mnle(
     return MixedDensityEstimator(
         discrete_net=disc_nle,
         continuous_net=cont_nle,
-        log_transform_x=log_transform_x,
+        log_transform_input=log_transform_x,
         condition_shape=torch.Size([]),
     )
-
-
-def _separate_x(x: Tensor, num_discrete_columns: int = 1) -> Tuple[Tensor, Tensor]:
-    """Returns the continuous and discrete part of the given x.
-
-    Assumes the discrete data to live in the last columns of x.
-    """
-
-    assert x.ndim == 2, f"x must have two dimensions but has {x.ndim}."
-
-    return x[:, :-num_discrete_columns], x[:, -num_discrete_columns:]

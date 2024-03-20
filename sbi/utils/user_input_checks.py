@@ -7,7 +7,6 @@ from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union, cast
 
 import torch
 from numpy import ndarray
-from pyknos.nflows import flows
 from scipy.stats._distn_infrastructure import rv_frozen
 from scipy.stats._multivariate import multi_rv_frozen
 from torch import Tensor, float32, nn
@@ -749,17 +748,19 @@ def validate_theta_and_x(
     return theta, x
 
 
-def test_posterior_net_for_multi_d_x(net: flows.Flow, theta: Tensor, x: Tensor) -> None:
+def test_posterior_net_for_multi_d_x(net, theta: Tensor, x: Tensor) -> None:
     """Test log prob method of the net.
 
     This is done to make sure the net can handle multidimensional inputs via an
     embedding net. If not, it usually fails with a RuntimeError. Here we catch the
     error, append a debug hint and raise it again.
-    """
 
+    Args:
+        net: A `DensityEstimator`.
+    """
     try:
         # torch.nn.functional needs at least two inputs here.
-        net.log_prob(theta[:2], x[:2])
+        net.log_prob(theta[:, :2], condition=x[:2])
     except RuntimeError as rte:
         ndims = x.ndim
         if ndims > 2:
