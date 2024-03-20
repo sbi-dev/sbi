@@ -55,7 +55,8 @@ For first time users, you can now head over to the turorials and get going with
 
 The tutorials are easily accessible by opening a codespace on this repo. To do
 so, click on the green "Code" button and select "Open with Codespaces". This
-provides you with a fully functional environment to run the tutorials as jupyter notebooks.
+provides you with a fully functional environment to run the tutorials as jupyter
+notebooks.
 
 ## Inference Algorithms
 
