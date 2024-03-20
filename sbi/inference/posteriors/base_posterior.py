@@ -3,7 +3,7 @@
 
 import inspect
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Callable, Dict, Optional, Union
 
 import torch
 import torch.distributions.transforms as torch_tf
@@ -108,8 +108,6 @@ class NeuralPosterior(ABC):
         sample_shape: Shape = torch.Size(),
         x: Optional[Tensor] = None,
         show_progress_bars: bool = True,
-        mcmc_method: Optional[str] = None,
-        mcmc_parameters: Optional[Dict[str, Any]] = None,
     ) -> Tensor:
         """See child classes for docstring."""
         pass
