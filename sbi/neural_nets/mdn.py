@@ -48,6 +48,7 @@ def build_mdn(
     # Infer the output dimensionality of the embedding_net by making a forward pass.
     check_data_device(batch_x, batch_y)
     check_embedding_net_device(embedding_net=embedding_net, datum=batch_y)
+    embedding_net.eval()
     y_numel = embedding_net(batch_y[:1]).numel()
 
     transform = transforms.IdentityTransform()

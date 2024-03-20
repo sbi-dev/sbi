@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.axes import Axes
-from matplotlib.figure import Figure
+from matplotlib.figure import Figure, FigureBase
 from tensorboard.backend.event_processing.event_accumulator import (
     DEFAULT_SIZE_GUIDANCE,
     EventAccumulator,
@@ -33,7 +33,7 @@ def plot_summary(
     tensorboard_scalar_limit: int = 10_000,
     figsize: Sequence[int] = (20, 6),
     fontsize: float = 12,
-    fig: Optional[Figure] = None,
+    fig: Optional[FigureBase] = None,
     axes: Optional[Axes] = None,
     xlabel: str = "epochs_trained",
     ylabel: Optional[List[str]] = None,
@@ -104,7 +104,7 @@ def plot_summary(
 
     plot_options.update(figsize=figsize, fontsize=fontsize)
     if fig is None or axes is None:
-        fig, axes = plt.subplots(
+        fig, axes = plt.subplots(  # pyright: ignore[reportAssignmentType]
             1,
             len(tags),
             figsize=plot_options["figsize"],
