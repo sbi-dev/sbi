@@ -197,8 +197,52 @@ def prepare_for_conditional_plot(condition, opts):
 
     return dim, limits, eps_margins
 
+def plt_hist_1d(ax,samples,limits,kwargs):
+    print(samples.shape)
+    ax.hist(
+        samples,
+        **kwargs['mpl_kwargs'])
 
-def get_diag_func(samples, limits, opts, **kwargs):
+def plt_kde_1d(ax,samples,limits, kwargs):
+    density = gaussian_kde(
+        samples, bw_method=kwargs["bw_method"]
+    )
+    xs = np.linspace(
+        limits[0], limits[1],kwargs["bins"]
+    )
+    ys = density(xs)
+
+    ax.plot(
+        xs,
+        ys,
+        **kwargs['mpl_kwargs']
+    )
+def plt_scatter_1d(ax,samples,limits, kwargs):
+    for single_sample in samples:
+        ax.axvline(
+            single_sample,
+            **kwargs['mpl_kwargs']
+        )
+    
+def get_diag_funcs(diag_list):
+    diag_funcs = []
+  
+    for diag in diag_list:
+        if diag=='hist':
+            diag_funcs.append(plt_hist_1d)
+        elif diag=='kde':
+            diag_funcs.append(plt_kde_1d)
+        elif diag=='scatter':
+            diag_funcs.append(plt_scatter_1d)
+        else:
+            diag_funcs.append(None)
+
+            
+    return diag_funcs
+        
+            
+
+def get_diag_func(samples, limits, opts, diag_kwargs,**kwargs):
     """
     Returns the diag_func which returns the 1D marginal plot for the parameter
     indexed by row.
@@ -207,6 +251,9 @@ def get_diag_func(samples, limits, opts, **kwargs):
     def diag_func(row, **kwargs):
         if len(samples) > 0:
             for n, v in enumerate(samples):
+                print(n)
+                #print(v)
+                print(opts["diag"])
                 if opts["diag"][n] == "hist":
                     plt.hist(
                         v[:, row],
@@ -239,7 +286,7 @@ def get_diag_func(samples, limits, opts, **kwargs):
 
     return diag_func
 
-def get_off_diag_func(samples, limits, opts, **kwargs):
+def get_off_diag_func(samples, limits, opts, off_diag_kwargs,**kwargs):
     def offdiag_func(row, col, **kwargs):
             if len(samples) > 0:
                 for n, v in enumerate(samples):
@@ -374,7 +421,7 @@ def get_conditional_diag_func(opts, limits, eps_margins, resolution):
 
     return diag_func
 
-
+#TO DO pass two arrays, lower and upper
 def pairplot(
     samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
     points: Optional[
@@ -394,7 +441,8 @@ def pairplot(
     diag_kwargs = {},
     upper_kwargs = {},
     lower_kwargs = {},
-    fig_kwargs = {}
+    fig_kwargs = {},
+    **kwargs
 ):
     """
     Plot samples in a 2D grid showing marginals and pairwise marginals.
@@ -428,7 +476,8 @@ def pairplot(
 
     Returns: figure and axis of posterior distribution plot
     """
-
+    if kwargs:
+        print("kwargs used")
     # TODO: add color map support
     # TODO: automatically determine good bin sizes for histograms
     # TODO: add legend (if legend is True)
@@ -437,8 +486,8 @@ def pairplot(
     # update the defaults dictionary by the current values of the variables (passed by
     # the user)
 
-    #opts = _update(opts, locals())
-    #opts = _update(opts, kwargs)
+    opts = _update(opts, locals())
+    opts = _update(opts, kwargs)
 
     samples, dim, limits = prepare_for_plot(samples, limits)
 
@@ -448,6 +497,7 @@ def pairplot(
         assert len(opts["samples_labels"]) >= len(
             samples
         ), "Provide at least as many labels as samples."
+    opts["upper"]=None
     if opts["upper"] is not None:
         warn("upper is deprecated, use offdiag instead.", stacklevel=2)
         opts["offdiag"] = opts["upper"]
@@ -465,12 +515,15 @@ def pairplot(
     upper_func = get_off_diag_func(samples, limits, upper, upper_kwargs)  
     lower_func = get_off_diag_func(samples, limits, lower, lower_kwargs)
     
+    return _arrange_plots(diag_func, upper_func, lower_func, dim, limits, 
+                          points, subset, figsize, labels, ticks, fig, axes, opts
+    )
     return _arrange_plots(
         diag_func, upper_func, lower_func, dim, limits, points, opts, fig=fig, axes=axes, subset=subset, 
         figsize=figsize, labels=labels, ticks=ticks, fig_kwargs=fig_kwargs
     )
 
-
+#diag_func, None, None, diag_kwargs, None,None
 
 def marginal_plot(
     samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
@@ -480,6 +533,7 @@ def marginal_plot(
     limits: Optional[Union[List, torch.Tensor]] = None,
     subset: Optional[List[int]] = None,
     diag: Optional[str] = "hist",
+    diag_kwargs = {},
     figsize: Tuple = (10, 10),
     labels: Optional[List[str]] = None,
     ticks: Optional[Union[List, torch.Tensor]] = None,
@@ -521,17 +575,24 @@ def marginal_plot(
 
     opts = _update(opts, locals())
     opts = _update(opts, kwargs)
-
+    print(len(samples)) #n_samples
+    print(samples[0].shape) #dims 
     samples, dim, limits = prepare_for_plot(samples, limits)
-
+    #print(len(samples)) 1
+    #print(samples[0].shape) 110,3
+    #print(dim) 3
     # Prepare diag/upper/lower
     if not isinstance(opts["diag"], list):
         opts["diag"] = [opts["diag"] for _ in range(len(samples))]
+    diag = opts["diag"]
+    #diag = ['hist','hist']
+    diag_func = get_diag_funcs(diag)#, opts, diag_kwargs={},**kwargs)
+    #print(diag_func)
+    #print(diag_kwargs)
+    #print(samples)
+    return _arrange_grid(
+        diag_func, None, None, diag_kwargs, None,None,samples,  limits, points, subset, figsize, labels, ticks, fig, axes, opts
 
-    diag_func = get_diag_func(samples, limits, opts, **kwargs)
-
-    return _arrange_plots_old(
-        diag_func, None, dim, limits, points, opts, fig=fig, axes=axes
     )
 
 
@@ -711,8 +772,8 @@ def conditional_pairplot(
         diag_func, offdiag_func, dim, limits, points, opts, fig=fig, axes=axes
     )
 
-def _arrange_plots(
-        diag_func, upper_func, lower_func, dim, limits, points, subset, figsize, labels, ticks, fig, axes, opts
+def _arrange_grid(
+        diag_funcs, upper_funcs, lower_funcs, diag_kwargs,upper_kwargs,lower_kwargs,samples, limits, points, subset, figsize, labels, ticks, fig, axes, opts
     ):
     """
     Arranges the plots for any function that plots parameters either in a row of 1D
@@ -738,7 +799,8 @@ def _arrange_plots(
 
     Returns: figure and axis
     """
-
+    offdiag_funcs = upper_funcs
+    dim = samples[0].shape[1]
     # Prepare points
     if points is None:
         points = []
@@ -778,7 +840,7 @@ def _arrange_plots(
         else:
             raise NotImplementedError
         rows = cols = len(subset)
-    flat = offdiag_func is None
+    flat = offdiag_funcs is None
     if flat:
         rows = 1
         opts["lower"] = None
@@ -802,7 +864,7 @@ def _arrange_plots(
 
     # Style axes
     row_idx = -1
-    for row in range(dim):
+    for row in range(rows):
         if row not in subset:
             continue
 
@@ -842,8 +904,8 @@ def _arrange_plots(
             ax.set_xlim((limits[col][0], limits[col][1]))
             if current != "diag":
                 ax.set_ylim((limits[row][0], limits[row][1]))
-            else:
-                ax.set_ylim(0)
+            #else:
+                #ax.set_ylim(0,20)
             # Ticks
             if ticks is not None:
                 ax.set_xticks((ticks[col][0], ticks[col][1]))
@@ -886,7 +948,11 @@ def _arrange_plots(
 
             # Diagonals
             if current == "diag":
-                diag_func(row=col, limits=limits)
+                #print(row,col)
+                #print("making diag plot")
+                for sample_ind, sample in enumerate(samples):
+                    diag_funcs[sample_ind](ax,sample[:,row],limits[row],diag_kwargs)#(row=col, limits=limits)
+                    #print(ax.get_ylim())
 
                 if len(points) > 0:
                     extent = ax.get_ylim()
