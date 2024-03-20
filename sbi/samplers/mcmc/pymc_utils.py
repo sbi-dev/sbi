@@ -107,13 +107,16 @@ class PyMCSampler:
         self._progressbar = progressbar
         self._device = device
 
+        # create PyMC model object
         track_gradients = True if step in (pymc.NUTS, pymc.HamiltonianMC) else False
         self._model = pymc.Model()
         potential = PyMCPotential(
             potential_fn, track_gradients=track_gradients, device=device
         )
         with self._model:
-            params = pymc.Normal(self.param_name, mu=initvals.mean(axis=0))
+            params = pymc.Normal(
+                self.param_name, mu=initvals.mean(axis=0)
+            )  # dummy prior
             pymc.Potential("likelihood", potential(params))
 
     def run(self) -> np.ndarray:
