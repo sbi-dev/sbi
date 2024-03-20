@@ -11,7 +11,7 @@ from sbi.inference.posteriors.ensemble_posterior import EnsemblePosterior
 from sbi.inference.posteriors.ensemble_posterior import (
     EnsemblePotential as EnsemblePotentialMoved,
 )
-from sbi.types import TorchTransform
+from sbi.sbi_types import TorchTransform
 
 warnings.filterwarnings("default", category=DeprecationWarning, module=__name__)
 

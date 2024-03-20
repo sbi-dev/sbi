@@ -1,5 +1,5 @@
 import warnings
-from typing import Callable, Dict, List, Tuple, Union
+from typing import Callable, Dict, List, Sequence, Tuple, Union
 
 import torch
 from joblib import Parallel, delayed
@@ -86,7 +86,8 @@ def run_sbc(
                 total=len(thetas_batches),
             )
         ) as _:
-            sbc_outputs = Parallel(n_jobs=num_workers)(
+            sbc_outputs: Sequence[Tuple[Tensor, Tensor]]
+            sbc_outputs = Parallel(n_jobs=num_workers)(  # pyright: ignore[reportAssignmentType]
                 delayed(sbc_on_batch)(
                     thetas_batch, xs_batch, posterior, num_posterior_samples
                 )

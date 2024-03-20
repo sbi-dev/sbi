@@ -63,7 +63,10 @@ If any of these fail, try reproducing and solving the error locally:
  using `pre-commit run --all-files`. `ruff` tends to give informative error
   messages that help you fix the problem.
 - **`pyright`**: Run it locally using `pyright sbi/` and ensure you are using the same
-  `pyright` version as used in the CI.
+  `pyright` version as used in the CI (which is the case if you have installed it with `pip install -e ".[dev]"`
+  but note that you have to rerun it once someone updates the version in the `pyproject.toml`).
+  - Known issues and fixes:
+    - If using `**kwargs`, you either have to specify all possible types of `kwargs`, e.g. `**kwargs: Union[int, boolean]` or use `**kwargs: Any`
 - **`pytest`**: On GitHub Actions you can see which test failed. Reproduce it locally, e.g., using `pytest -n auto tests/linearGaussian_snpe_test.py`. Note that this will run for a few minutes and should result in passes and expected fails (xfailed).
 - commit and push again until CI tests pass. Don't hesitate to ask for help by
   commenting on the PR.
