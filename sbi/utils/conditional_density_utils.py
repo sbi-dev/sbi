@@ -383,6 +383,7 @@ class RestrictedPriorForConditional:
         return self.full_prior.log_prob(*args, **kwargs)
 
 
+# This class doesn't follow the interface of torch.Transform. This causes pyright's `IncompatibleMethodOverride`.
 class RestrictedTransformForConditional(torch_tf.Transform):
     """
     Class to restrict the transform to fewer dimensions for conditional sampling.
@@ -421,7 +422,7 @@ class RestrictedTransformForConditional(torch_tf.Transform):
         tf_full_theta = self.transform(full_theta)
         return tf_full_theta[:, self.dims_to_sample]  # type: ignore
 
-    def inv(self, theta: Tensor) -> Tensor:
+    def inv(self, theta: Tensor) -> Tensor:  # pyright: ignore[reportIncompatibleMethodOverride]
         r"""
         Inverse transform restricted $\theta$.
         """
@@ -430,7 +431,7 @@ class RestrictedTransformForConditional(torch_tf.Transform):
         tf_full_theta = self.transform.inv(full_theta)
         return tf_full_theta[:, self.dims_to_sample]  # type: ignore
 
-    def log_abs_det_jacobian(self, theta1: Tensor, theta2: Tensor) -> Tensor:
+    def log_abs_det_jacobian(self, theta1: Tensor, theta2: Tensor) -> Tensor:  # pyright: ignore[reportIncompatibleMethodOverride]
         """
         Return the `log_abs_det_jacobian` of |dtheta1 / dtheta2|.
 
