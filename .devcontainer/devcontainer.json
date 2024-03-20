@@ -1,34 +1,20 @@
 {
-    "name": "Demo Environment for the SBI Toolkit.",
+    "name": "Simple Codespace for the SBI Toolkit.",
     "build": {
-        "dockerfile": "Dockerfile",
-        "context": ".",
-        "args": { "VARIANT": "3.10" }
+        "dockerfile": "Dockerfile"
     },
-    "runArgs": [
-        "-u", "vscode",
-        "-e", "TERM=xterm-256color"
-    ],
     "customizations": {
         "vscode": {
-            "settings": {
-                "python.linting.enabled": true,
-                "python.linting.pylintEnabled": true
-            },
             "terminal": {
                 "integrated.shell.linux": "/bin/bash"
             },
             "extensions": [
-                "ms-azuretools.vscode-docker",
                 "GitHub.copilot",
-                "GitHub.copilot-chat",
                 "ms-python.python",
                 "ms-toolsai.jupyter",
                 "stkb.rewrap",
                 "streetsidesoftware.code-spell-checker"
             ]
         }
-    },
-    // "postCreateCommand": "sh -c \"$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)\"",
-    "remoteUser": "vscode"
+    }
 }
