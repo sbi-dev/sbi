@@ -19,9 +19,9 @@ from pyro.contrib.conjugate.infer import (
 )
 from pyro.infer import SVI, TraceEnum_ELBO
 from pyro.infer.autoguide import AutoDelta
+from pyro.infer.mcmc.api import MCMC
 from pyro.util import ignore_jit_warnings
 
-from sbi.samplers.mcmc.mcmc import MCMC
 from sbi.samplers.mcmc.slice import Slice
 
 from .common import assert_equal
@@ -201,8 +201,7 @@ def test_logistic_regression(jit, num_chains):
         num_samples=500,
         warmup_steps=100,
         num_chains=num_chains,
-        mp_context="fork",
-        available_cpu=1,
+        mp_context="spawn",
     )
     mcmc.run(data)
     samples = mcmc.get_samples()
