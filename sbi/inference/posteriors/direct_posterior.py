@@ -85,9 +85,9 @@ class DirectPosterior(NeuralPosterior):
         self,
         sample_shape: Shape = torch.Size(),
         x: Optional[Tensor] = None,
+        show_progress_bars: bool = True,
         max_sampling_batch_size: int = 10_000,
         sample_with: Optional[str] = None,
-        show_progress_bars: bool = True,
     ) -> Tensor:
         r"""Return samples from posterior distribution $p(\theta|x)$.
 
@@ -95,9 +95,11 @@ class DirectPosterior(NeuralPosterior):
             sample_shape: Desired shape of samples that are drawn from posterior. If
                 sample_shape is multidimensional we simply draw `sample_shape.numel()`
                 samples and then reshape into the desired shape.
+            x:
+            show_progress_bars: Whether to show sampling progress monitor.
             sample_with: This argument only exists to keep backward-compatibility with
                 `sbi` v0.17.2 or older. If it is set, we instantly raise an error.
-            show_progress_bars: Whether to show sampling progress monitor.
+            max_sampling_batch_size:
         """
 
         num_samples = torch.Size(sample_shape).numel()
