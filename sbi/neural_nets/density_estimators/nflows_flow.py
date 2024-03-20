@@ -35,7 +35,7 @@ class NFlowsFlow(DensityEstimator):
             condition: Conditions of shape `(iid_dim, batch_dim, *event_shape)`.
 
         Raises:
-            AssertionError if `input_batch_dim != condition_batch_dim`.
+            AssertionError: If `input_batch_dim != condition_batch_dim`.
 
         Returns:
             Sample-wise log probabilities, shape `(input_iid_dim, input_batch_dim)`.
@@ -50,14 +50,12 @@ class NFlowsFlow(DensityEstimator):
         )
 
         # Nflows needs to have a single batch dimension for condition and input. 
-        # Therefore, we repeat the condition and to match 
-        # `input_batch_dim * input_iid_dim` and we "flatten" the input.
         input = input.reshape((input_batch_dim * input_iid_dim, -1))
-        condition = torch.repeat_interleave(condition, input_iid_dim, dim=1)
         
+        # Repeat the condition to match `input_batch_dim * input_iid_dim`.
+        condition = torch.repeat_interleave(condition, input_iid_dim, dim=1)
         # The `.net` expects `batch, iid, event`, not `iid, batch, event`.
         condition = condition.transpose(1, 0)
-
         # If no iid samples then squeeze the iid dimension.
         condition = torch.squeeze(condition, dim=1)
 
