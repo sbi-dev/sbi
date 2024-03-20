@@ -24,8 +24,8 @@ from pyro.util import ignore_jit_warnings
 
 from sbi.samplers.mcmc.slice import Slice
 
-from ..conftest import LogisticRegressionModelPyro
 from .common import assert_equal
+from .conftest import LogisticRegressionModelPyro
 
 # NOTE: Use below imports if this moves upstream
 # from tests.common import assert_equal

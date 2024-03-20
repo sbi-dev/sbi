@@ -7,6 +7,7 @@ import warnings
 import pyro
 import pytest
 import torch
+from pyro import distributions as dist
 
 torch.set_default_tensor_type(os.environ.get("PYRO_TENSOR_TYPE", "torch.DoubleTensor"))
 
@@ -110,3 +111,27 @@ def pytest_collection_modifyitems(config, items):
             selected_items.append(item)
     config.hook.pytest_deselected(items=deselected_items)
     items[:] = selected_items
+
+
+class LogisticRegressionModelPyro:
+    """
+    Simple logistic regression model in Pyro, intended to be only used during testing.
+    """
+
+    def __init__(self, labels: torch.Tensor, data: torch.Tensor):
+        """
+        Args:
+            labels: Samples from a Bernoulli distribution.
+            data: Samples from a normal distribution.
+        """
+        self.data = data
+        self.dim = data.size(-1)
+        self.labels = labels
+
+    def __call__(self, *args, **kwargs):
+        coefs_mean = torch.zeros(self.dim)
+        coefs = pyro.sample("beta", dist.Normal(coefs_mean, torch.ones(self.dim)))
+        y = pyro.sample(
+            "y", dist.Bernoulli(logits=(coefs * self.data).sum(-1)), obs=self.labels
+        )
+        return y
