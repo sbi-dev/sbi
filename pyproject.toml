@@ -58,7 +58,7 @@ dev = [
     # Lint
     "pre-commit == 3.5.0",
     "pyyaml",
-    "pyright == 1.1.354",
+    "pyright == 1.1.355",
     "ruff>=0.3.3",
     # Test
     "pytest",
