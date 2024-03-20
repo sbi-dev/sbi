@@ -142,7 +142,7 @@ class DivergenceOptimizer(ABC):
         self.HYPER_PARAMETERS = ["n_particles", "clip_value", "eps"]
 
     @abstractmethod
-    def _loss(self, *args, **kwargs) -> Tuple[Tensor, Tensor]:
+    def _loss(self, xo: Tensor) -> Tuple[Tensor, Tensor]:
         """This should be overwritten based on the `_generate_loss_function`. And is
         the function that is evaluate to compute the loss."""
         raise NotImplementedError("Child classes implement the loss.")
