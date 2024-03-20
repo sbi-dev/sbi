@@ -13,7 +13,7 @@ from scipy.stats._multivariate import multi_rv_frozen
 from torch import Tensor, float32, nn
 from torch.distributions import Distribution, Uniform
 
-from sbi.types import Array
+from sbi.sbi_types import Array
 from sbi.utils.sbiutils import warn_on_iid_x, within_support
 from sbi.utils.torchutils import BoxUniform, atleast_2d
 from sbi.utils.user_input_checks_utils import (

@@ -17,6 +17,7 @@ from sbi.inference import (
     prepare_for_sbi,
     simulate_for_sbi,
 )
+from sbi.neural_nets import likelihood_nn
 from sbi.samplers.mcmc.slice_numpy import (
     SliceSampler,
     SliceSamplerSerial,
@@ -26,7 +27,6 @@ from sbi.simulators.linear_gaussian import (
     diagonal_linear_gaussian,
     true_posterior_linear_gaussian_mvn_prior,
 )
-from sbi.utils import likelihood_nn
 from tests.test_utils import check_c2st
 
 
@@ -130,9 +130,11 @@ def test_c2st_slice_np_vectorized_parallelized_on_Gaussian(
 @pytest.mark.parametrize(
     "method",
     (
-        "nuts",
-        "hmc",
-        "slice",
+        "nuts_pyro",
+        "hmc_pyro",
+        "nuts_pymc",
+        "hmc_pymc",
+        "slice_pymc",
         "slice_np",
         "slice_np_vectorized",
     ),

@@ -5,7 +5,6 @@ from sbi.samplers.mcmc.init_strategy import (
     sir_init,
 )
 from sbi.samplers.mcmc.pymc_utils import PyMCSampler
-from sbi.samplers.mcmc.slice import Slice
 from sbi.samplers.mcmc.slice_numpy import (
     SliceSampler,
     SliceSamplerSerial,

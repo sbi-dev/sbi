@@ -6,7 +6,6 @@ from typing import Any, Callable, Dict, Optional, Union
 from warnings import warn
 
 import arviz as az
-import pymc
 import torch
 import torch.distributions.transforms as torch_tf
 from arviz.data import InferenceData
@@ -29,8 +28,8 @@ from sbi.samplers.mcmc import (
     resample_given_potential_fn,
     sir_init,
 )
+from sbi.sbi_types import Shape, TorchTransform
 from sbi.simulators.simutils import tqdm_joblib
-from sbi.types import Shape, TorchTransform
 from sbi.utils import pyro_potential_wrapper, tensor2numpy, transformed_potential
 from sbi.utils.torchutils import ensure_theta_batched
 
@@ -605,9 +604,7 @@ class MCMCPosterior(NeuralPosterior):
         """
         num_chains = mp.cpu_count() - 1 if num_chains is None else num_chains
 
-        steps = dict(
-            slice_pymc=pymc.Slice, hmc_pymc=pymc.HamiltonianMC, nuts_pymc=pymc.NUTS
-        )
+        steps = dict(slice_pymc="slice", hmc_pymc="hmc", nuts_pymc="nuts")
 
         sampler = PyMCSampler(
             potential_fn=potential_function,
@@ -624,6 +621,9 @@ class MCMCPosterior(NeuralPosterior):
         samples = sampler.run()
         samples = torch.from_numpy(samples)
         samples = samples.reshape(-1, initial_params.shape[1])
+
+        # Save posterior sampler.
+        self._posterior_sampler = sampler
 
         samples = samples[::thin][:num_samples]
         assert samples.shape[0] == num_samples

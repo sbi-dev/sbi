@@ -73,8 +73,8 @@ class PyMCSampler:
     def __init__(
         self,
         potential_fn: Callable,
-        step: pymc.step_methods.compound.BlockedStep,
         initvals: np.ndarray,
+        step: str = "nuts",
         draws: int = 1000,
         tune: int = 1000,
         chains: Optional[int] = None,
@@ -83,7 +83,20 @@ class PyMCSampler:
         param_name: str = "theta",
         device: str = "cpu",
     ):
-        super().__init__()
+        """Interface for PyMC samplers
+
+        Args:
+            potential_fn: Potential function from density estimator.
+            initvals: Initial parameters.
+            step: One of `"slice"`, `"hmc"`, or `"nuts"`.
+            draws: Number of total samples to draw.
+            tune: Number of tuning steps to take.
+            chains: Number of MCMC chains to run in parallel.
+            mp_ctx: Multiprocessing context for parallel sampling.
+            progressbar: Whether to show/hide progress bars.
+            param_name: Name for parameter variable, for PyMC and ArviZ structures
+            device: The device to which to move the parameters for potential_fn.
+        """
         self.param_name = param_name
         self._step = step
         self._draws = draws
@@ -103,10 +116,16 @@ class PyMCSampler:
             params = pymc.Normal(self.param_name, mu=initvals.mean(axis=0))
             pymc.Potential("likelihood", potential(params))
 
-    def run(self):
+    def run(self) -> np.ndarray:
+        """Run MCMC with PyMC
+
+        Returns:
+            MCMC samples
+        """
+        step_class = dict(slice=pymc.Slice, hmc=pymc.HamiltonianMC, nuts=pymc.NUTS)
         with self._model:
             inference_data = pymc.sample(
-                step=self._step(),
+                step=step_class[self._step](),
                 tune=self._tune,
                 draws=self._draws,
                 initvals=self._initvals,
