@@ -1,0 +1,17 @@
+name: Docker Image for SBI toolkit
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build_and_publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code base 
+        uses: actions/checkout@v3
+      - name: Build and push image to ghcr
+        run: |
+          docker login --username <USER> --password ${{ secrets.GH_TOKEN }} ghcr.io
+          docker build . -t ghcr.io/sbi-dev/sbi-toolkit:latest
+          docker push ghcr.io/sbi-dev/sbi-toolkit:latest
