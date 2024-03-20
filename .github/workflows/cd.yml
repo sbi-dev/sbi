@@ -60,7 +60,7 @@ jobs:
       uses: codecov/codecov-action@v4-beta
       with:
         file: ./coverage.xml
-        flags: unittests
+        flags: unittests-all-cpu
         env_vars: OS,PYTHON
         name: codecov-umbrella
         fail_ci_if_error: false

@@ -57,6 +57,18 @@ jobs:
       run: |
         pyright sbi
 
-    - name: Run the fast tests
+    - name:  Run the fast tests with coverage
       run: |
-        pytest -m "not slow and not gpu" --exitfirst
+        pip install pytest-cov
+        pytest -m "not slow and not gpu" tests/ --cov=sbi --cov-report=xml --exitfirst
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4-beta
+      with:
+        file: ./coverage.xml
+        flags: unittests-fast-cpu
+        env_vars: OS,PYTHON
+        name: codecov-umbrella
+        fail_ci_if_error: false
+      env:
+        token: ${{ secrets.CODECOV_TOKEN }}
