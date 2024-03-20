@@ -1,4 +1,4 @@
-# Models
+# Neural networks
 
 ::: sbi.utils.get_nn_models.posterior_nn
       show_object_full_path: true
