@@ -20,7 +20,6 @@ from sbi.utils.user_input_checks_utils import (
     CustomPriorWrapper,
     MultipleIndependent,
     PytorchReturnTypeWrapper,
-    ScipyPytorchWrapper,
 )
 
 
@@ -88,12 +87,10 @@ def process_prior(
 
     # If prior is given as `scipy.stats` object, wrap as PyTorch.
     elif isinstance(prior, (rv_frozen, multi_rv_frozen)):
-        event_shape = torch.Size([prior.rvs().size])
-        # batch_shape is passed as default
-        prior = ScipyPytorchWrapper(
-            prior, batch_shape=torch.Size([]), event_shape=event_shape
+        raise NotImplementedError(
+            "Passing a prior as scipy.stats object is deprecated. "
+            "Please pass it as a PyTorch Distribution."
         )
-        return process_pytorch_prior(prior)
 
     # Otherwise it is a custom prior - check for `.sample()` and `.log_prob()`.
     else:
