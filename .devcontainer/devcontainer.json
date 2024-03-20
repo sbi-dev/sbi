@@ -1,0 +1,20 @@
+{
+    "name": "Simple Codespace for the SBI Toolkit.",
+    "build": {
+        "dockerfile": "Dockerfile"
+    },
+    "customizations": {
+        "vscode": {
+            "terminal": {
+                "integrated.shell.linux": "/bin/bash"
+            },
+            "extensions": [
+                "GitHub.copilot",
+                "ms-python.python",
+                "ms-toolsai.jupyter",
+                "stkb.rewrap",
+                "streetsidesoftware.code-spell-checker"
+            ]
+        }
+    }
+}
