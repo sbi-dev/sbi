@@ -51,10 +51,10 @@ jobs:
       run: |
         pyright sbi
 
-    - name:  Run the fast and slow tests with coverage
+    - name:  Run the fast and the slow tests with coverage
       run: |
         pip install pytest-cov
-        pytest -m "not slow and not gpu" tests/ --cov=sbi --cov-report=xml --exitfirst
+        pytest -m "not gpu" tests/ --cov=sbi --cov-report=xml --exitfirst
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4-beta
