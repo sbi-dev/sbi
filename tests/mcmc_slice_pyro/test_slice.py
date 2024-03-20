@@ -24,6 +24,7 @@ from pyro.util import ignore_jit_warnings
 
 from sbi.samplers.mcmc.slice import Slice
 
+from ..conftest import LogisticRegressionModelPyro
 from .common import assert_equal
 
 # NOTE: Use below imports if this moves upstream
@@ -188,12 +189,7 @@ def test_logistic_regression(jit, num_chains):
     data = torch.randn(2000, dim)
     true_coefs = torch.arange(1.0, dim + 1.0)
     labels = dist.Bernoulli(logits=(true_coefs * data).sum(-1)).sample()
-
-    def model(data):
-        coefs_mean = torch.zeros(dim)
-        coefs = pyro.sample("beta", dist.Normal(coefs_mean, torch.ones(dim)))
-        y = pyro.sample("y", dist.Bernoulli(logits=(coefs * data).sum(-1)), obs=labels)
-        return y
+    model = LogisticRegressionModelPyro(data, labels)
 
     slice_kernel = Slice(model, jit_compile=jit, ignore_jit_warnings=True)
     mcmc = MCMC(
