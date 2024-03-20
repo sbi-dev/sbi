@@ -430,11 +430,13 @@ def test_embedding_nets_integration_training_device(
 
         posterior = inference.build_posterior(
             density_estimator_train,
-            **{}
-            if inference_method == SNPE_A
-            else dict(
-                mcmc_method="slice_np_vectorized",
-                mcmc_parameters=dict(thin=10, num_chains=20, warmup_steps=10),
+            **(
+                {}
+                if inference_method == SNPE_A
+                else dict(
+                    mcmc_method="slice_np_vectorized",
+                    mcmc_parameters=dict(thin=10, num_chains=20, warmup_steps=10),
+                )
             ),
         )
         proposal = posterior.set_default_x(x_o)
