@@ -10,7 +10,7 @@ from torch.distributions import Distribution
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.neural_nets.density_estimators import DensityEstimator
 from sbi.neural_nets.mnle import MixedDensityEstimator
-from sbi.types import TorchTransform
+from sbi.sbi_types import TorchTransform
 from sbi.utils import mcmc_transform
 
 

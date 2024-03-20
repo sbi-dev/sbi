@@ -116,17 +116,17 @@
 
 ## Models
 
-::: sbi.utils.get_nn_models.posterior_nn
+::: sbi.neural_nets.factory.posterior_nn
     rendering:
       show_root_heading: true
       show_object_full_path: true
 
-::: sbi.utils.get_nn_models.likelihood_nn
+::: sbi.neural_nets.factory.likelihood_nn
     rendering:
       show_root_heading: true
       show_object_full_path: true
 
-::: sbi.utils.get_nn_models.classifier_nn
+::: sbi.neural_nets.factory.classifier_nn
     rendering:
       show_root_heading: true
       show_object_full_path: true

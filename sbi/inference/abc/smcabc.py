@@ -9,7 +9,7 @@ from torch import Tensor
 from torch.distributions import Distribution, Multinomial, MultivariateNormal
 
 from sbi.inference.abc.abc_base import ABCBASE
-from sbi.types import Array
+from sbi.sbi_types import Array
 from sbi.utils import BoxUniform, KDEWrapper, get_kde, process_x, within_support
 
 

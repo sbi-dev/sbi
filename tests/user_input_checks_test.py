@@ -8,8 +8,6 @@ from typing import Callable, Tuple
 import pytest
 import torch
 from pyknos.mdn.mdn import MultivariateGaussianMDN
-from scipy.stats import beta, lognorm, multivariate_normal, uniform
-from scipy.stats._multivariate import multivariate_normal_frozen
 from torch import Tensor, eye, nn, ones, zeros
 from torch.distributions import Beta, Distribution, Gamma, MultivariateNormal, Uniform
 
@@ -28,7 +26,6 @@ from sbi.utils.user_input_checks_utils import (
     CustomPriorWrapper,
     MultipleIndependent,
     PytorchReturnTypeWrapper,
-    ScipyPytorchWrapper,
 )
 
 
@@ -89,14 +86,6 @@ torch.set_default_tensor_type(torch.FloatTensor)
             UserNumpyUniform(zeros(3), ones(3), return_numpy=True),
             dict(lower_bound=zeros(3), upper_bound=ones(3)),
         ),
-        (ScipyPytorchWrapper, multivariate_normal(), dict()),
-        (ScipyPytorchWrapper, lognorm(s=1.0), dict()),
-        (
-            ScipyPytorchWrapper,
-            uniform(),
-            dict(lower_bound=zeros(1), upper_bound=ones(1)),
-        ),
-        (ScipyPytorchWrapper, beta(a=1, b=1), dict()),
         (
             PytorchReturnTypeWrapper,
             BoxUniform(zeros(3, dtype=torch.float64), ones(3, dtype=torch.float64)),
@@ -510,10 +499,3 @@ def test_passing_custom_density_estimator(arg):
         density_estimator = arg
     prior = MultivariateNormal(torch.zeros(2), torch.eye(2))
     _ = SNPE_C(prior=prior, density_estimator=density_estimator)
-
-
-def test_variance():
-    cov = 1
-    prior = multivariate_normal_frozen(cov)
-    wrapped_prior = ScipyPytorchWrapper(prior)
-    assert wrapped_prior.variance() == cov

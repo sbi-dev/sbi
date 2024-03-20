@@ -12,7 +12,7 @@ from sbi.inference.potentials.posterior_based_potential import (
 )
 from sbi.neural_nets.density_estimators.base import DensityEstimator
 from sbi.samplers.rejection.rejection import accept_reject_sample
-from sbi.types import Shape
+from sbi.sbi_types import Shape
 from sbi.utils import check_prior, within_support
 from sbi.utils.torchutils import ensure_theta_batched
 
