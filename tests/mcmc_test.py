@@ -132,7 +132,6 @@ def test_c2st_slice_np_vectorized_parallelized_on_Gaussian(
     (
         "nuts",
         "hmc",
-        "slice",
         "slice_np",
         "slice_np_vectorized",
     ),

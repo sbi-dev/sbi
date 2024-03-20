@@ -21,7 +21,6 @@ from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.samplers.mcmc import (
     IterateParameters,
-    Slice,
     SliceSamplerSerial,
     SliceSamplerVectorized,
     proposal_init,
@@ -93,6 +92,14 @@ class MCMCPosterior(NeuralPosterior):
             x_shape: Shape of a single simulator output. If passed, it is used to check
                 the shape of the observed data and give a descriptive error.
         """
+        if method == "slice":
+            warn(
+                "The Pyro-based slice sampler is deprecated, and the method `slice` "
+                "has been changed to `slice_np`, i.e., the custom numpy-based slice sampler.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            method = "slice_np"
 
         super().__init__(
             potential_fn,
@@ -302,7 +309,7 @@ class MCMCPosterior(NeuralPosterior):
                     num_workers=num_workers,
                     show_progress_bars=show_progress_bars,
                 )
-            elif method in ("hmc", "nuts", "slice"):
+            elif method in ("hmc", "nuts"):
                 transformed_samples = self._pyro_mcmc(
                     num_samples=num_samples,
                     potential_function=self.potential_,
@@ -454,7 +461,7 @@ class MCMCPosterior(NeuralPosterior):
             initial_params: Initial parameters for MCMC chain.
             thin: Thinning (subsampling) factor.
             warmup_steps: Initial number of samples to discard.
-            vectorized: Whether to use a vectorized implementation of the Slice sampler.
+            vectorized: Whether to use a vectorized implementation of the `SliceSampler`.
             num_workers: Number of CPU cores to use.
             init_width: Inital width of brackets.
             show_progress_bars: Whether to show a progressbar during sampling;
@@ -504,20 +511,20 @@ class MCMCPosterior(NeuralPosterior):
         num_samples: int,
         potential_function: Callable,
         initial_params: Tensor,
-        mcmc_method: str = "slice",
+        mcmc_method: str = "hmc",
         thin: int = 10,
         warmup_steps: int = 200,
         num_chains: Optional[int] = 1,
         show_progress_bars: bool = True,
     ) -> Tensor:
-        r"""Return samples obtained using Pyro HMC, NUTS for slice kernels.
+        r"""Return samples obtained using Pyro's HMC or NUTS sampler.
 
         Args:
             num_samples: Desired number of samples.
             potential_function: A callable **class**. A class, but not a function,
                 is picklable for Pyro MCMC to use it across chains in parallel,
                 even when the potential function requires evaluating a neural network.
-            mcmc_method: One of `hmc`, `nuts` or `slice`.
+            mcmc_method: Either `"hmc"` or `"nuts"`.
             thin: Thinning (subsampling) factor.
             warmup_steps: Initial number of samples to discard.
             num_chains: Whether to sample in parallel. If None, use all but one CPU.
@@ -528,7 +535,7 @@ class MCMCPosterior(NeuralPosterior):
         """
         num_chains = mp.cpu_count() - 1 if num_chains is None else num_chains
 
-        kernels = dict(slice=Slice, hmc=HMC, nuts=NUTS)
+        kernels = dict(hmc=HMC, nuts=NUTS)
 
         sampler = MCMC(
             kernel=kernels[mcmc_method](potential_fn=potential_function),
@@ -563,10 +570,7 @@ class MCMCPosterior(NeuralPosterior):
         Returns:
             A potential function that is ready to be used in MCMC.
         """
-        if method == "slice":
-            track_gradients = False
-            pyro = True
-        elif method in ("hmc", "nuts"):
+        if method in ("hmc", "nuts"):
             track_gradients = True
             pyro = True
         elif "slice_np" in method:
@@ -662,8 +666,8 @@ class MCMCPosterior(NeuralPosterior):
         Note: the InferenceData is constructed using the posterior samples generated in
         most recent call to `.sample(...)`.
 
-        For Pyro HMC and NUTS kernels InferenceData will contain diagnostics, for Pyro
-        Slice or sbi slice sampling samples, only the samples are added.
+        For Pyro HMC and NUTS kernels InferenceData will contain diagnostics, for
+        sbi slice sampling samples, only the samples are added.
 
         Returns:
             inference_data: Arviz InferenceData object.
@@ -704,9 +708,9 @@ class MCMCPosterior(NeuralPosterior):
                 *samples_shape
             )
 
-            inference_data = az.convert_to_inference_data({
-                f"{self.param_name}": samples
-            })
+            inference_data = az.convert_to_inference_data(
+                {f"{self.param_name}": samples}
+            )
 
         return inference_data
 
