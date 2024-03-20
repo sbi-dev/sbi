@@ -2,7 +2,7 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 from torch import nn
 
@@ -29,7 +29,7 @@ def classifier_nn(
     hidden_features: int = 50,
     embedding_net_theta: nn.Module = nn.Identity(),
     embedding_net_x: nn.Module = nn.Identity(),
-    **kwargs,
+    **kwargs: Any,
 ) -> Callable:
     r"""
     Returns a function that builds a classifier for learning density ratios.
@@ -105,7 +105,7 @@ def likelihood_nn(
     num_bins: int = 10,
     embedding_net: nn.Module = nn.Identity(),
     num_components: int = 10,
-    **kwargs,
+    **kwargs: Any,
 ) -> Callable:
     r"""
     Returns a function that builds a density estimator for learning the likelihood.
@@ -191,7 +191,7 @@ def posterior_nn(
     num_bins: int = 10,
     embedding_net: nn.Module = nn.Identity(),
     num_components: int = 10,
-    **kwargs,
+    **kwargs: Any,
 ) -> Callable:
     r"""
     Returns a function that builds a density estimator for learning the posterior.

@@ -17,6 +17,8 @@ class NFlowsFlow(DensityEstimator):
 
     def __init__(self, net: Flow, condition_shape: torch.Size) -> None:
         super().__init__(net, condition_shape)
+        # TODO: Remove as soon as DensityEstimator becomes abstract
+        self.net: Flow
 
     @property
     def embedding_net(self) -> nn.Module:

@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 from warnings import warn
 
 from torch import nn
@@ -18,7 +18,7 @@ def classifier_nn(
     hidden_features: int = 50,
     embedding_net_theta: nn.Module = nn.Identity(),
     embedding_net_x: nn.Module = nn.Identity(),
-    **kwargs,
+    **kwargs: Any,
 ) -> Callable:
     r"""This method is deprecated and will be removed in a future release.
     Please use `from sbi.neural_nets import classifier_nn` in the future.
@@ -51,7 +51,7 @@ def likelihood_nn(
     num_bins: int = 10,
     embedding_net: nn.Module = nn.Identity(),
     num_components: int = 10,
-    **kwargs,
+    **kwargs: Any,
 ) -> Callable:
     r"""This method is deprecated and will be removed in a future release.
     Please use `from sbi.neural_nets import likelihood_nn` in the future.
@@ -86,7 +86,7 @@ def posterior_nn(
     num_bins: int = 10,
     embedding_net: nn.Module = nn.Identity(),
     num_components: int = 10,
-    **kwargs,
+    **kwargs: Any,
 ) -> Callable:
     r"""This method is deprecated and will be removed in a future release.
     Please use `from sbi.neural_nets import posterior_nn` in the future.
