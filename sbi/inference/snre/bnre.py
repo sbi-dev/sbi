@@ -50,7 +50,7 @@ class BNRE(SNRE_A):
         kwargs = del_entries(locals(), entries=("self", "__class__"))
         super().__init__(**kwargs)
 
-    def train(
+    def train(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
         regularization_strength: float = 100.0,
         training_batch_size: int = 50,
@@ -104,7 +104,7 @@ class BNRE(SNRE_A):
         }
         return super().train(**kwargs)
 
-    def _loss(
+    def _loss(  # pyright: ignore[reportIncompatibleMethodOverride]
         self, theta: Tensor, x: Tensor, num_atoms: int, regularization_strength: float
     ) -> Tensor:
         """Returns the binary cross-entropy loss for the trained classifier.

@@ -47,7 +47,7 @@ class SNRE_B(RatioEstimator):
         kwargs = del_entries(locals(), entries=("self", "__class__"))
         super().__init__(**kwargs)
 
-    def train(
+    def train(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
         num_atoms: int = 10,
         training_batch_size: int = 50,

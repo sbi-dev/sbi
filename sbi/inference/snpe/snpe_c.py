@@ -83,7 +83,7 @@ class SNPE_C(PosteriorEstimator):
         kwargs = del_entries(locals(), entries=("self", "__class__"))
         super().__init__(**kwargs)
 
-    def train(
+    def train(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
         num_atoms: int = 10,
         training_batch_size: int = 50,
@@ -286,7 +286,7 @@ class SNPE_C(PosteriorEstimator):
                     "The density estimator must be a MDNtext for non-atomic loss."
                 )
 
-            return self._log_prob_proposal_posterior_mog(theta, x, proposal)
+            return self._log_prob_proposal_posterior_mog(theta, x, proposal)  # pyright: ignore[reportIncompatibleMethodOverride]
         else:
             if not hasattr(self._neural_net, "log_prob"):
                 raise ValueError(

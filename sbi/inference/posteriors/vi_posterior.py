@@ -274,7 +274,7 @@ class VIPosterior(NeuralPosterior):
         self._optimizer_builder = get_VI_method(method)
         return self
 
-    def sample(
+    def sample(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
         sample_shape: Shape = torch.Size(),
         x: Optional[Tensor] = None,

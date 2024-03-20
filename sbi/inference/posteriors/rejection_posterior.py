@@ -99,7 +99,7 @@ class RejectionPosterior(NeuralPosterior):
             theta.to(self._device), track_gradients=track_gradients
         )
 
-    def sample(
+    def sample(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
         sample_shape: Shape = torch.Size(),
         x: Optional[Tensor] = None,

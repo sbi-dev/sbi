@@ -153,7 +153,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
 
         return self._normalization_constant.to(self._device)  # type: ignore
 
-    def sample(
+    def sample(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
         sample_shape: Shape = torch.Size(),
         x: Optional[Tensor] = None,

@@ -84,7 +84,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         self._proposal_roundwise = []
         self.use_non_atomic_loss = False
 
-    def append_simulations(
+    def append_simulations(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
         theta: Tensor,
         x: Tensor,
@@ -201,7 +201,7 @@ class PosteriorEstimator(NeuralInference, ABC):
 
         return self
 
-    def train(
+    def train(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
         training_batch_size: int = 50,
         learning_rate: float = 5e-4,

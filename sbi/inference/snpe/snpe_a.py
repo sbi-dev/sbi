@@ -94,7 +94,7 @@ class SNPE_A(PosteriorEstimator):
         )
         super().__init__(**kwargs)
 
-    def train(
+    def train(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
         final_round: bool = False,
         training_batch_size: int = 50,
@@ -271,7 +271,7 @@ class SNPE_A(PosteriorEstimator):
         )
         return wrapped_density_estimator
 
-    def build_posterior(
+    def build_posterior(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
         density_estimator: Optional[TorchModule] = None,
         prior: Optional[Distribution] = None,
@@ -423,7 +423,7 @@ class SNPE_A_MDN(DensityEstimator):
         # Take care of z-scoring, pre-compute and store prior terms.
         self._set_state_for_mog_proposal()
 
-    def log_prob(self, inputs: Tensor, condition: Tensor, **kwargs) -> Tensor:
+    def log_prob(self, inputs: Tensor, condition: Tensor, **kwargs) -> Tensor:  # pyright: ignore[reportIncompatibleMethodOverride]
         """Compute the log-probability of the approximate posterior.
 
         Args:

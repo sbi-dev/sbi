@@ -79,7 +79,7 @@ class RatioEstimator(NeuralInference, ABC):
         else:
             self._build_neural_net = classifier
 
-    def append_simulations(
+    def append_simulations(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
         theta: Tensor,
         x: Tensor,
@@ -123,7 +123,7 @@ class RatioEstimator(NeuralInference, ABC):
             data_device=data_device,
         )
 
-    def train(
+    def train(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
         num_atoms: int = 10,
         training_batch_size: int = 50,

@@ -67,7 +67,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         else:
             self._build_neural_net = density_estimator
 
-    def append_simulations(
+    def append_simulations(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
         theta: Tensor,
         x: Tensor,
@@ -112,7 +112,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
             data_device=data_device,
         )
 
-    def train(
+    def train(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
         training_batch_size: int = 50,
         learning_rate: float = 5e-4,

@@ -61,7 +61,7 @@ class SNRE_C(RatioEstimator):
         kwargs = del_entries(locals(), entries=("self", "__class__"))
         super().__init__(**kwargs)
 
-    def train(
+    def train(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
         num_classes: int = 5,
         gamma: float = 1.0,
@@ -123,7 +123,7 @@ class SNRE_C(RatioEstimator):
         kwargs["loss_kwargs"] = {"gamma": kwargs.pop("gamma")}
         return super().train(**kwargs)
 
-    def _loss(
+    def _loss(  # pyright: ignore[reportIncompatibleMethodOverride]
         self, theta: Tensor, x: Tensor, num_atoms: int, gamma: float
     ) -> torch.Tensor:
         r"""Return cross-entropy loss (via ''multi-class sigmoid'' activation) for

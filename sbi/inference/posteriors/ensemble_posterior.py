@@ -143,7 +143,7 @@ class EnsemblePosterior(NeuralPosterior):
         else:
             raise TypeError
 
-    def sample(
+    def sample(  # pyright: ignore[reportIncompatibleMethodOverride]
         self, sample_shape: Shape = torch.Size(), x: Optional[Tensor] = None, **kwargs
     ) -> Tensor:
         r"""Return samples from posterior ensemble.
@@ -271,7 +271,7 @@ class EnsemblePosterior(NeuralPosterior):
             theta.to(self._device), track_gradients=track_gradients
         )
 
-    def map(
+    def map(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
         x: Optional[Tensor] = None,
         num_iter: int = 1_000,
@@ -399,7 +399,7 @@ class EnsemblePotential(BasePotential):
         self.potential_fns = potential_fns
         super().__init__(prior, x_o, device)
 
-    def allow_iid_x(self) -> bool:
+    def allow_iid_x(self) -> bool:  # pyright: ignore[reportIncompatibleMethodOverride]
         # in case there is different kinds of posteriors, this will produce an error
         # in `set_x()`
         return any(

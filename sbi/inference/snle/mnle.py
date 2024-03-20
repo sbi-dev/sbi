@@ -65,7 +65,7 @@ class MNLE(LikelihoodEstimator):
         kwargs = del_entries(locals(), entries=("self", "__class__"))
         super().__init__(**kwargs)
 
-    def train(
+    def train(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
         training_batch_size: int = 50,
         learning_rate: float = 5e-4,
