@@ -199,25 +199,21 @@ def extract_and_transform_mog(
 
 def condition_mog(
     condition: Tensor,
-    dims: List[int],
     logits: Tensor,
     means: Tensor,
-    precfs: Tensor,
+    precs: Tensor,
 ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
     """Finds the conditional distribution p(X|Y) for a MoG.
 
     Args:
         prior: Prior Distribution. Used to check if condition within support.
-        condition: Parameter set that all dimensions not specified in
-            `dims_to_sample` will be fixed to. Should contain dim_theta elements,
+        condition: Parameters used to condition the MoG. All NaN dims are conditioned
+            on all non NaN dims. Should contain dim_theta elements,
             i.e. it could e.g. be a sample from the posterior distribution.
             The entries at all `dims_to_sample` will be ignored.
-        dims_to_sample: Which dimensions to sample from. The dimensions not
-            specified in `dims_to_sample` will be fixed to values given in
-            `condition`.
         logits: Log weights of the MoG. (batch_size, n_mixtures)
         means: Means of the MoG. (batch_size, n_mixtures, n_dims)
-        precfs: Precision factors of the MoG.
+        precs: Precision matrices of the MoG.
             (batch_size, n_mixtures, n_dims, n_dims)
 
     Raises:
@@ -234,28 +230,22 @@ def condition_mog(
 
     n_mixtures, n_dims = means.shape[1:]
 
-    mask = torch.zeros(n_dims, dtype=torch.bool)
-    mask[dims] = True
+    mask = torch.where(torch.isnan(condition.view(-1)), True, False)
 
     y = condition[:, ~mask]
     mu_x = means[:, :, mask]
     mu_y = means[:, :, ~mask]
 
-    precfs_xx = precfs[:, :, mask]
-    precfs_xx = precfs_xx[:, :, :, mask]
-    precs_xx = precfs_xx.transpose(3, 2) @ precfs_xx
-
-    precfs_yy = precfs[:, :, ~mask]
-    precfs_yy = precfs_yy[:, :, :, ~mask]
-    precs_yy = precfs_yy.transpose(3, 2) @ precfs_yy
-
-    precs = precfs.transpose(3, 2) @ precfs
-    precs_xy = precs[:, :, mask]
-    precs_xy = precs_xy[:, :, :, ~mask]
+    precs_xx = precs[:, :, mask][:, :, :, mask]
+    precs_yy = precs[:, :, ~mask][:, :, :, ~mask]
+    precs_xy = precs[:, :, mask][:, :, :, ~mask]
 
     means = mu_x - (
         torch.inverse(precs_xx) @ precs_xy @ (y - mu_y).view(1, n_mixtures, -1, 1)
     ).view(1, n_mixtures, -1)
+
+    precfs_yy = torch.linalg.cholesky(precs_yy, upper=True)
+    precfs_xx = torch.linalg.cholesky(precs_xx, upper=True)
 
     diags = torch.diagonal(precfs_yy, dim1=2, dim2=3)
     sumlogdiag_yy = torch.sum(torch.log(diags), dim=2)
@@ -267,7 +257,7 @@ def condition_mog(
     logits = torch.log(new_mcs)
 
     sumlogdiag = torch.sum(torch.log(torch.diagonal(precfs_xx, dim1=2, dim2=3)), dim=2)
-    return logits, means, precfs_xx, sumlogdiag
+    return logits, means, precs_xx, sumlogdiag
 
 
 class ConditionedPotential:

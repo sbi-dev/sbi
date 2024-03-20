@@ -17,11 +17,16 @@ from sbi.utils.sbiutils import batched_mixture_mv, batched_mixture_vmv
 
 class MoG:
     def __init__(
-        self, logits: Tensor = None, means: Tensor = None, precisions: Tensor = None
+        self,
+        logits: Optional[Tensor] = None,
+        means: Optional[Tensor] = None,
+        precisions: Optional[Tensor] = None,
     ):
-        self._logits = logits
-        self._means = means
-        self._precisions = precisions
+        self._logits = logits  # (batch_size, num_components)
+        self._means = means  # (batch_size, num_components, input_size)
+        self._precisions = (
+            precisions  # (batch_size, num_components, input_size, input_size)
+        )
 
     @property
     def parameters(self):
@@ -32,60 +37,73 @@ class MoG:
     def parameters(self, parameters: Tuple[Tensor, Tensor, Tensor]):
         r"""Set the parameters of the mixture of Gaussians."""
         self._logits, self._means, self._precisions = parameters
+        self._logits -= self.logsumexplogits
 
     @property
     def logsumexplogits(self):
         return torch.logsumexp(self._logits, dim=-1, keepdim=True)
 
+    @property
+    def batchdim(self):
+        return self._logits.shape[0]
+
     def reset_parameters(self):
         r"""Reset the parameters of the mixture of Gaussians."""
         self.parameters = (None, None, None)
 
-    def condition(
-        self, condition: Tensor, mask: List[bool] = None, inplace: bool = True
-    ) -> Optional[MoG]:
+    def condition(self, condition: Tensor, inplace: bool = True) -> Optional[MoG]:
         # return copy of the MDN with conditioned parameters
-        dims_to_sample = torch.where(torch.tensor(mask))[0]
-        cond_logits, cond_means, cond_precfs, cond_sumlogdiag = condition_mog(
-            condition, dims_to_sample, *self.parameters
+        cond_logits, cond_means, cond_precs, _ = condition_mog(
+            condition, *self.parameters
         )
-        cond_precs = cond_precfs.transpose(3, 2) @ cond_precfs
         # TODO: CHECK IF THIS IS CORRECT OR cond_logits need to be normalized
-
         if not inplace:
-            conditioned_mog = deepcopy(self)
-            conditioned_mog.parameters = (cond_logits, cond_means, cond_precs)
-            return conditioned_mog
+            return MoG(cond_logits, cond_means, cond_precs)
         self.parameters = (cond_logits, cond_means, cond_precs)
 
-    def marginalize(self, inplace: bool = True):
+    def marginalize(self, mask: List[bool], inplace: bool = True):
         # return copy of the MDN with marginalized parameters
-        raise NotImplementedError
+        logits, means, precs = self.parameters
+        marg_logits = logits[:, mask]
+        marg_means = means[:, mask]
+        marg_precs = precs[:, mask][:, :, mask]
+        if not inplace:
+            return MoG(marg_logits, marg_means, marg_precs)
+        self.parameters = (marg_logits, marg_means, marg_precs)
 
-    def sample(self, sample_shape) -> Tensor:
+    def sample(self, sample_shape, batch_size=None) -> Tensor:
         logits_p, m_p, prec_p = self.parameters
         prec_factors_p = torch.linalg.cholesky(prec_p, upper=True)
 
         num_samples = torch.Size(sample_shape).numel()
-        batch_size = 1 if len(sample_shape) == 1 else sample_shape[0]
-        # Replicate to use batched sampling from pyknos.
-        if batch_size is not None and batch_size > 1:
-            logits_p = logits_p.repeat(batch_size, 1)
-            m_p = m_p.repeat(batch_size, 1, 1)
-            prec_factors_p = prec_factors_p.repeat(batch_size, 1, 1, 1)
+        if batch_size is None:
+            batch_size = 1 if len(sample_shape) == 1 else sample_shape[0]
+        logits_p, m_p, prec_factors_p = self.expand_to(
+            (logits_p, m_p, prec_factors_p), batch_size
+        )
 
-        # Get (optionally z-scored) MoG samples.
         theta = mdn.sample_mog(num_samples, logits_p, m_p, prec_factors_p)
         return theta.reshape(*sample_shape, -1)
 
+    @staticmethod
+    def expand_to(parameters, batch_dim):
+        logits, means, precisions = parameters
+        logits = logits.repeat(batch_dim, 1)
+        means = means.repeat(batch_dim, 1, 1)
+        precisions = precisions.repeat(batch_dim, 1, 1, 1)
+        return (logits, means, precisions)
+
     def log_prob(self, input: Tensor) -> Tensor:
         r"""Return the log probability of the input under the mixture of Gaussians."""
-        log_probs = mog_log_prob(input, *self.parameters)
+        input_batch_dim = 1 if input.ndim == 1 else input.shape[0]
+        if input_batch_dim != self.batchdim:
+            mog_parameters = self.expand_to(self.parameters, input_batch_dim)
+        log_probs = mog_log_prob(input, *mog_parameters)
         assert_all_finite(log_probs, "proposal posterior eval")
         return log_probs
 
 
-class MDNDensityEstimator(DensityEstimator):
+class MDNDensity(DensityEstimator):
     def __init__(self, mdn: Any, condition_shape=torch.Size) -> None:
         super().__init__(mdn, condition_shape)
         self.mog = MoG()
@@ -95,23 +113,22 @@ class MDNDensityEstimator(DensityEstimator):
     @property
     def embedding_net(self) -> nn.Module:
         r"""Return the embedding network."""
-        return self.net.net._embedding_net
+        return self.net._embedding_net
 
     @property
     def distribution(self):
         r"""Return the distribution of the density estimator."""
-        return self.net.net._distribution
+        return self.net._distribution
 
     @property
     def transform(self):
         r"""Return the distribution of the density estimator."""
-        return self.net.net._transform
+        return self.net._transform
 
     def get_mixture_components(self, condition: Optional[Tensor] = None):
         embedded_x = self.embedding_net(condition)
         logits_d, m_d, prec_d, *_ = self.distribution.get_mixture_components(embedded_x)
-        norm_logits_d = logits_d - torch.logsumexp(logits_d, dim=-1, keepdim=True)
-        return norm_logits_d, m_d, prec_d
+        return logits_d, m_d, prec_d
 
     def set_mixture_context(self, context: Tensor, inplace: bool = True):
         mog_parameters = self.get_mixture_components(context)
@@ -132,7 +149,10 @@ class MDNDensityEstimator(DensityEstimator):
         self._is_proposal_corrected = True
 
     def sample(
-        self, sample_shape, condition: Tensor = None, proposal: Optional[MoG] = None
+        self,
+        sample_shape,
+        condition: Optional[Tensor] = None,
+        proposal: Optional[MoG] = None,
     ) -> Tensor:
         # mdn sample
         # TODO: add support for sampling the MDN
@@ -145,10 +165,19 @@ class MDNDensityEstimator(DensityEstimator):
         return self.mog.sample(sample_shape)
 
     def log_prob(
-        self, input: Tensor, condition: Tensor = None, proposal: Optional[MoG] = None
+        self,
+        input: Tensor,
+        condition: Optional[Tensor] = None,
+        proposal: Optional[MoG] = None,
     ) -> Tensor:
         # mdn log_prob
         # TODO: add support for evaluating the MDN
+
+        # TODO: CHECK THAT BOTH RETURN THE SAME LOG PROBS
+        # mdn = posterior_nn("mdn")(theta, x)
+        # mdn_est = MDNDensity(mdn.net, mdn._condition_shape)
+        # mdn_flow = NFlowsFlow(mdn.net, mdn._condition_shape)
+        # assert all(mdn_est.log_prob(theta) == mdn_flow.log_prob(theta, xo))
 
         # mog log_prob
         if condition is not None:
@@ -209,8 +238,6 @@ class MDNDensityEstimator(DensityEstimator):
         precisions_d_rep = precisions_d.repeat(1, num_comps_p, 1, 1)
 
         precisions_p = precisions_d_rep - precisions_pp_rep
-        if isinstance(self._maybe_z_scored_prior, MultivariateNormal):
-            precisions_p += self._maybe_z_scored_prior.precision_matrix
 
         # Check if precision matrix is positive definite.
         for _, batches in enumerate(precisions_p):
