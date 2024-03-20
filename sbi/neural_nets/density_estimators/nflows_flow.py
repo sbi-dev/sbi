@@ -127,7 +127,7 @@ class NFlowsFlow(DensityEstimator):
         return samples
 
     def sample_and_log_prob(
-        self, sample_shape: torch.Size, condition: Tensor, **kwargs
+        self, sample_shape: torch.Size, condition: Tensor
     ) -> Tuple[Tensor, Tensor]:
         r"""Return samples and their density from the density estimator.
 

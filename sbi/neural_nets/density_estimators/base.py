@@ -102,7 +102,7 @@ class DensityEstimator(nn.Module):
         raise NotImplementedError
 
     def sample_and_log_prob(
-        self, sample_shape: torch.Size, condition: Tensor, **kwargs
+        self, sample_shape: torch.Size, condition: Tensor
     ) -> Tuple[Tensor, Tensor]:
         r"""Return samples and their density from the density estimator.
 
@@ -120,8 +120,8 @@ class DensityEstimator(nn.Module):
             then be overwritten to provide a more efficient implementation.
         """
 
-        samples = self.sample(sample_shape, condition, **kwargs)
-        log_probs = self.log_prob(samples, condition, **kwargs)
+        samples = self.sample(sample_shape, condition)
+        log_probs = self.log_prob(samples, condition)
         return samples, log_probs
 
     def _check_condition_shape(self, condition: Tensor):
