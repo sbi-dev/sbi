@@ -3,15 +3,16 @@ from typing import Callable, Dict, List, Sequence, Tuple, Union
 
 import torch
 from joblib import Parallel, delayed
+from scipy.stats import kstest, uniform
+from torch import Tensor, ones, zeros
+from torch.distributions import Uniform
+from tqdm.auto import tqdm
+
 from sbi.inference import DirectPosterior
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.posteriors.vi_posterior import VIPosterior
 from sbi.simulators.simutils import tqdm_joblib
 from sbi.utils.metrics import c2st
-from scipy.stats import kstest, uniform
-from torch import Tensor, ones, zeros
-from torch.distributions import Uniform
-from tqdm.auto import tqdm
 
 
 def run_sbc(
