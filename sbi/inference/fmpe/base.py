@@ -15,6 +15,7 @@ from torch.utils.tensorboard.writer import SummaryWriter
 from sbi.inference.base import NeuralInference
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.neural_nets.density_estimators.zuko_flow_estimator import ZukoFlowMatchingEstimator
+from sbi.neural_nets.density_estimators import DensityEstimator
 
 from sbi.types import Shape
 
@@ -53,6 +54,8 @@ class FMPE(NeuralInference):
             show_progress_bars=show_progress_bars,
         )
 
+    # todo: this is not correct, the method should return a vector field
+    # estimator and not a density est. 
     def train(
         self,
         training_batch_size: int = 50,
@@ -65,7 +68,7 @@ class FMPE(NeuralInference):
         resume_training: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[dict] = None,
-    ) -> VectorFieldEstimator:
+    ) -> DensityEstimator:
 
         if resume_training:
             raise NotImplementedError("Resume training is not yet implemented.")
@@ -85,26 +88,25 @@ class FMPE(NeuralInference):
         # initialize optimizer and training parameters
         if not resume_training:
             self.optimizer = optim.Adam(
-                list(self.vf_estimator.net.parameters()), lr=learning_rate
+                list(self.density_estimator.net.parameters()), lr=learning_rate
             )
             self.epoch, self._val_log_prob = 0, float("-Inf")
 
         while self.epoch <= max_num_epochs and not self._converged(
             self.epoch, stop_after_epochs
         ):
-            self.vf_estimator.net.train()
+            self.density_estimator.net.train()
             train_log_probs_sum = 0
             epoch_start_time = time.time()
             for batch in train_loader:
                 self.optimizer.zero_grad()
                 # get batches on current device.
-                # todo: clarify what masks_batch does here ... currently skipped
                 theta_batch, x_batch = (
                     batch[0].to(self._device),
                     batch[1].to(self._device),
                 )
 
-                train_losses = self.vf_estimator.loss(theta_batch, x_batch)
+                train_losses = self.density_estimator.loss(theta_batch, x_batch)
                 train_loss = torch.mean(train_losses)
                 train_log_probs_sum -= train_losses.sum().item()
 
@@ -128,13 +130,12 @@ class FMPE(NeuralInference):
 
             with torch.no_grad():
                 for batch in val_loader:
-                    # todo: clarify what masks_batch does here ... currently skipped
                     theta_batch, x_batch = (
                         batch[0].to(self._device),
                         batch[1].to(self._device),
                     )
                     # Take negative loss here to get validation log_prob.
-                    val_losses = self.vf_estimator.loss(theta_batch, x_batch)
+                    val_losses = self.density_estimator.loss(theta_batch, x_batch)
                     val_log_prob_sum -= val_losses.sum().item()
 
             # Take mean over all validation samples.
@@ -164,7 +165,7 @@ class FMPE(NeuralInference):
         # cause memory leakage when benchmarking.
         self._neural_net.zero_grad(set_to_none=True)
 
-        return deepcopy(self.vf_estimator.net)
+        return deepcopy(self.density_estimator)
 
     def build_posterior(self) -> DirectPosterior:
         raise NotImplementedError
