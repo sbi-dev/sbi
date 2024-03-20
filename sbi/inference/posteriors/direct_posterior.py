@@ -113,9 +113,11 @@ class DirectPosterior(NeuralPosterior):
                   {condition_shape}, but got {x.shape}. For batched eval \
                   see issue #990"
             ) from err
-        
+
         # TODO: leading could be IID.
-        x = reshape_to_iid_batch_event(x, event_shape=self._x_shape[1:], leading_is_iid=False)
+        x = reshape_to_iid_batch_event(
+            x, event_shape=self._x_shape[1:], leading_is_iid=False
+        )
 
         max_sampling_batch_size = (
             self.max_sampling_batch_size

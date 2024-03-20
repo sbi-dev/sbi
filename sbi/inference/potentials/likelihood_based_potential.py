@@ -12,6 +12,7 @@ from sbi.neural_nets.density_estimators import DensityEstimator
 from sbi.neural_nets.mnle import MixedDensityEstimator
 from sbi.sbi_types import TorchTransform
 from sbi.utils import mcmc_transform
+from sbi.neural_nets.density_estimators.shape_handling import reshape_to_iid_batch_event
 
 
 def likelihood_estimator_based_potential(
@@ -119,19 +120,29 @@ def _log_likelihoods_over_trials(
         log_likelihood_trial_sum: log likelihood for each parameter, summed over all
             batch entries (iid trials) in `x`.
     """
-    # unsqueeze to ensure that the x-batch dimension is the first dimension for the
-    # broadcasting of the density estimator.
-    x = torch.as_tensor(x).reshape(-1, x.shape[-1]).unsqueeze(1)
+    # Shape of `x` is (iid_dim, *event_shape)
+    x = reshape_to_iid_batch_event(x, event_shape=x.shape[1:], leading_is_iid=True)
+    x = x.transpose(1, 0)
+
+    # Match the number of `x` to the number of conditions (`theta`).
+    theta_batch_size = theta.shape[1]
+    x = x.expand(-1, theta_batch_size, -1)
+
     assert (
         next(estimator.parameters()).device == x.device and x.device == theta.device
     ), f"""device mismatch: estimator, x, theta: \
         {next(estimator.parameters()).device}, {x.device},
         {theta.device}."""
 
+    # Shape of `theta` is (batch_dim, *event_shape).
+    theta = reshape_to_iid_batch_event(
+        theta, event_shape=theta.shape[1:], leading_is_iid=False
+    )
+
     # Calculate likelihood in one batch.
     with torch.set_grad_enabled(track_gradients):
         log_likelihood_trial_batch = estimator.log_prob(x, condition=theta)
-        # Reshape to (-1, theta_batch_size), sum over trial-log likelihoods.
+        # Sum over trial-log likelihoods.
         log_likelihood_trial_sum = log_likelihood_trial_batch.sum(0)
 
     return log_likelihood_trial_sum

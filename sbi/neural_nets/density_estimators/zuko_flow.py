@@ -39,7 +39,7 @@ class ZukoFlow(DensityEstimator):
         i.e. batched conditions.
 
         Args:
-            input: Inputs to evaluate the log probability on. Of shape 
+            input: Inputs to evaluate the log probability on. Of shape
                 `(iid_dim, batch_dim, *event_shape)`.
             condition: Conditions of shape `(iid_dim, batch_dim, *event_shape)`.
 
@@ -51,12 +51,12 @@ class ZukoFlow(DensityEstimator):
         """
         input_batch_dim = input.shape[1]
         condition_batch_dim = condition.shape[1]
-        
+
         assert condition_batch_dim == input_batch_dim, (
             f"Batch shape of condition {condition_batch_dim} and input "
             f"{input_batch_dim} do not match."
         )
-        
+
         condition = condition.transpose(1, 0)
         condition = torch.squeeze(condition, dim=1)
         emb_cond = self._embedding_net(condition)
@@ -70,7 +70,7 @@ class ZukoFlow(DensityEstimator):
         r"""Return the loss for training the density estimator.
 
         Args:
-            input: Inputs to evaluate the loss on of shape 
+            input: Inputs to evaluate the loss on of shape
                 `(iid_dim, batch_dim, *event_shape)`.
             condition: Conditions of shape `(iid_dim, batch_dim, *event_dim)`.
 

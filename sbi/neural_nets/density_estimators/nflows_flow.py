@@ -30,7 +30,7 @@ class NFlowsFlow(DensityEstimator):
         i.e. batched conditions.
 
         Args:
-            input: Inputs to evaluate the log probability on. Of shape 
+            input: Inputs to evaluate the log probability on. Of shape
                 `(iid_dim, batch_dim, *event_shape)`.
             condition: Conditions of shape `(iid_dim, batch_dim, *event_shape)`.
 
@@ -44,15 +44,15 @@ class NFlowsFlow(DensityEstimator):
         input_batch_dim = input.shape[1]
         condition_batch_dim = condition.shape[1]
         input_event_dims = len(input.shape[2:])
-        
+
         assert condition_batch_dim == input_batch_dim, (
             f"Batch shape of condition {condition_batch_dim} and input "
             f"{input_batch_dim} do not match."
         )
 
-        # Nflows needs to have a single batch dimension for condition and input. 
+        # Nflows needs to have a single batch dimension for condition and input.
         input = input.reshape((input_batch_dim * input_iid_dim, -1))
-        
+
         # Repeat the condition to match `input_batch_dim * input_iid_dim`.
         ones_for_event_dims = (1,) * input_event_dims  # Tuple of 1s, e.g. (1, 1, 1)
         condition = condition.repeat(1, input_iid_dim, *ones_for_event_dims)
@@ -64,12 +64,11 @@ class NFlowsFlow(DensityEstimator):
         log_probs = self.net.log_prob(input, context=condition)
         return log_probs.reshape((input_iid_dim, input_batch_dim))
 
-
     def loss(self, input: Tensor, condition: Tensor) -> Tensor:
         r"""Return the loss for training the density estimator.
 
         Args:
-            input: Inputs to evaluate the loss on of shape 
+            input: Inputs to evaluate the loss on of shape
                 `(iid_dim, batch_dim, *event_shape)`.
             condition: Conditions of shape `(iid_dim, batch_dim, *event_dim)`.
 
