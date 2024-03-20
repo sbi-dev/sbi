@@ -13,7 +13,7 @@ from torch.distributions import Distribution, MultivariateNormal, Uniform
 from sbi import utils as utils
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.inference.snpe.snpe_base import PosteriorEstimator
-from sbi.types import TensorboardSummaryWriter
+from sbi.sbi_types import TensorboardSummaryWriter
 from sbi.utils import (
     batched_mixture_mv,
     batched_mixture_vmv,
