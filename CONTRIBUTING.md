@@ -47,6 +47,8 @@ installed alongside `sbi`.
 You can exclude slow tests and those which require a GPU with `pytest -m "not slow and not gpu"`.
 Additionally, we recommend to run tests with `pytest -n auto -m "not slow and not gpu"` in parallel.
 GPU tests should probably not be run this way.
+If you see unexpected behavior (tests fail if they shouldn't), try to run them without `-n auto` and see if it persists.
+When writing new tests and debugging things, it may make sense to also run them without `-n auto`.
 
 When you create a PR onto `main`, our Continuous Integration (CI) actions on GitHub will perform the following
 checks:
