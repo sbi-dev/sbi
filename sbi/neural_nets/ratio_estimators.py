@@ -23,8 +23,6 @@ class RatioEstimator(nn.Module, ABC):
     def __init__(
         self,
         net: nn.Module,
-        theta_shape: torch.Size,
-        x_shape: torch.Size,
         embedding_net_theta: nn.Module,
         embedding_net_x: nn.Module,
     ) -> None:
@@ -32,22 +30,23 @@ class RatioEstimator(nn.Module, ABC):
 
         Args:
             net: neural network taking in combined (embedded) `theta` and `x`
-            theta_shape
-            x_shape
             embedding_net_theta
             embedding_net_x
         """
         super().__init__()
         self.net = net
-        self._theta_shape = theta_shape
-        self._x_shape = x_shape
         self.embedding_net_theta = embedding_net_theta
         self.embedding_net_x = embedding_net_x
 
     @abstractmethod
     def combine_embedded_theta_and_x(
-        embedded_theta: Tensor, embedded_x: Tensor
+        self, embedded_theta: Tensor, embedded_x: Tensor
     ) -> Tensor:
+        """combine embedded theta and embedded x"""
+        return None
+
+    @abstractmethod
+    def embed_and_combine_theta_and_x(self, theta: Tensor, x: Tensor) -> Tensor:
         return None
 
     @abstractmethod
@@ -65,16 +64,39 @@ class RatioEstimator(nn.Module, ABC):
 
         raise NotImplementedError
 
-    @abstractmethod
-    def loss(self, theta: Tensor, x: Tensor, **kwargs) -> Tensor:
-        r"""Return the loss for training the ratio estimator.
+
+class TensorRatioEstimator(RatioEstimator):
+    def __init__(
+        self,
+        net: nn.Module,
+        embedding_net_theta: nn.Module = nn.Identity,
+        embedding_net_x: nn.Module = nn.Identity,
+    ) -> None:
+        r"""Base class for ratio estimators.
 
         Args:
-            theta: parameters of shape (sample, batch, theta_shape).
-            x: data of shape (sample, batch, x_shape).
-
-        Returns:
-            Loss of shape (batch_size,)
+            net: neural network taking in combined (embedded) `theta` and `x`
+            embedding_net_theta
+            embedding_net_x
         """
+        super().__init__(
+            net=net,
+            embedding_net_theta=embedding_net_theta,
+            embedding_net_x=embedding_net_x,
+        )
 
-        raise NotImplementedError
+    @staticmethod
+    def combine_embedded_theta_and_x(
+        embedded_theta: Tensor, embedded_x: Tensor
+    ) -> Tensor:
+        """concatenate embedded theta and embedded x"""
+        return torch.cat([embedded_theta, embedded_x], dim=-1)
+
+    def embed_and_combine_theta_and_x(self, theta: Tensor, x: Tensor) -> Tensor:
+        return self.combine_embedded_theta_and_x(
+            self.embedding_net_theta(theta), self.embedding_net_x(x)
+        )
+
+    def unnormalized_log_ratio(self, theta: Tensor, x: Tensor) -> Tensor:
+        z = self.embed_and_combine_theta_and_x(theta, x)
+        return self.net(z)
