@@ -88,45 +88,27 @@ class ZukoFlow(DensityEstimator):
         i.e. batched conditions.
 
         Args:
-            input: Inputs to evaluate the log probability on of shape
-                    (*batch_shape1, input_size).
-            condition: Conditions of shape (*batch_shape2, *condition_shape).
+            input: Inputs to evaluate the log probability on. Of shape
+                `(sample_dim, batch_dim, *event_shape)`.
+            condition: Conditions of shape `(sample_dim, batch_dim, *event_shape)`.
 
         Raises:
-            RuntimeError: If batch_shape1 and batch_shape2 are not broadcastable.
+            AssertionError: If `input_batch_dim != condition_batch_dim`.
 
         Returns:
-            Sample-wise log probabilities.
-
-        Note:
-            This function should support PyTorch's automatic broadcasting. This means
-            the function should behave as follows for different input and condition
-            shapes:
-            - (input_size,) + (batch_size,*condition_shape) -> (batch_size,)
-            - (batch_size, input_size) + (*condition_shape) -> (batch_size,)
-            - (batch_size, input_size) + (batch_size, *condition_shape) -> (batch_size,)
-            - (batch_size1, input_size) + (batch_size2, *condition_shape)
-                                                  -> RuntimeError i.e. not broadcastable
-            - (batch_size1,1, input_size) + (batch_size2, *condition_shape)
-                                                  -> (batch_size1,batch_size2)
-            - (batch_size1, input_size) + (batch_size2,1, *condition_shape)
-                                                  -> (batch_size2,batch_size1)
+            Sample-wise log probabilities, shape `(input_sample_dim, input_batch_dim)`.
         """
-        self._check_condition_shape(condition)
-        condition_dims = len(self._condition_shape)
+        input_batch_dim = input.shape[1]
+        condition_batch_dim = condition.shape[0]
 
-        # PyTorch's automatic broadcasting
-        batch_shape_in = input.shape[:-1]
-        batch_shape_cond = condition.shape[:-condition_dims]
-        batch_shape = torch.broadcast_shapes(batch_shape_in, batch_shape_cond)
-        # Expand the input and condition to the same batch shape
-        input = input.expand(batch_shape + (input.shape[-1],))
+        assert condition_batch_dim == input_batch_dim, (
+            f"Batch shape of condition {condition_batch_dim} and input "
+            f"{input_batch_dim} do not match."
+        )
+
         emb_cond = self._embedding_net(condition)
-        emb_cond = emb_cond.expand(batch_shape + (emb_cond.shape[-1],))
-
-        dists = self.net(emb_cond)
-
-        log_probs = dists.log_prob(input)
+        distributions = self.net(emb_cond)
+        log_probs = distributions.log_prob(input)
 
         return log_probs
 
@@ -134,11 +116,12 @@ class ZukoFlow(DensityEstimator):
         r"""Return the loss for training the density estimator.
 
         Args:
-            input: Inputs to evaluate the loss on of shape (batch_size, input_size).
-            condition: Conditions of shape (batch_size, *condition_shape).
+            input: Inputs to evaluate the loss on of shape
+                `(sample_dim, batch_dim, *event_shape)`.
+            condition: Conditions of shape `(sample_dim, batch_dim, *event_dim)`.
 
         Returns:
-            Negative log_probability (batch_size,)
+            Negative log_probability of shape `(input_sample_dim, condition_batch_dim)`.
         """
 
         return -self.log_prob(input, condition)
@@ -148,27 +131,15 @@ class ZukoFlow(DensityEstimator):
 
         Args:
             sample_shape: Shape of the samples to return.
-            condition: Conditions of shape (*batch_shape, *condition_shape).
+            condition: Conditions of shape `(sample_dim, batch_dim, *event_shape)`.
 
         Returns:
-            Samples of shape (*batch_shape, *sample_shape, input_size).
-
-        Note:
-            This function should support batched conditions and should admit the
-            following behavior for different condition shapes:
-            - (*condition_shape) -> (*sample_shape, input_size)
-            - (*batch_shape, *condition_shape)
-                                        -> (*batch_shape, *sample_shape, input_size)
+            Samples of shape `(*sample_shape, condition_batch_dim)`.
         """
-        self._check_condition_shape(condition)
-
-        condition_dims = len(self._condition_shape)
-        batch_shape = condition.shape[:-condition_dims] if condition_dims > 0 else ()
-
         emb_cond = self._embedding_net(condition)
         dists = self.net(emb_cond)
 
-        samples = dists.sample(sample_shape).reshape(*batch_shape, *sample_shape, -1)
+        samples = dists.sample(sample_shape)
 
         return samples
 
@@ -179,21 +150,14 @@ class ZukoFlow(DensityEstimator):
 
         Args:
             sample_shape: Shape of the samples to return.
-            condition: Conditions of shape (*batch_shape, *condition_shape).
+            condition: Conditions of shape (sample_dim, batch_dim, *event_shape).
 
         Returns:
-            Samples and associated log probabilities.
+            Samples of shape `(*sample_shape, condition_batch_dim, *input_event_shape)`
+            and associated log probs of shape `(*sample_shape, condition_batch_dim)`.
         """
-        self._check_condition_shape(condition)
-
-        condition_dims = len(self._condition_shape)
-        batch_shape = condition.shape[:-condition_dims] if condition_dims > 0 else ()
-
         emb_cond = self._embedding_net(condition)
         dists = self.net(emb_cond)
 
         samples, log_probs = dists.rsample_and_log_prob(sample_shape)
-        samples = samples.reshape(*batch_shape, *sample_shape, -1)
-        log_probs = log_probs.reshape(*batch_shape, *sample_shape)
-
         return samples, log_probs

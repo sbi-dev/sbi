@@ -27,16 +27,16 @@ class MixedDensityEstimator(DensityEstimator):
         discrete_net: CategoricalMassEstimator,
         continuous_net: NFlowsFlow,
         condition_shape: torch.Size,
-        log_transform_x: bool = False,
+        log_transform_input: bool = False,
     ):
         """Initialize class for combining density estimators for MNLE.
 
         Args:
             discrete_net: neural net to model discrete part of the data.
             continuous_net: neural net to model the continuous data.
-            log_transform_x: whether to transform the continous part of the data into
-                logarithmic domain before training. This is helpful for bounded data, e.
-                g.,for reaction times.
+            log_transform_input: whether to transform the continous part of the data
+                into logarithmic domain before training. This is helpful for bounded
+                data, e.g.,for reaction times.
         """
         super(MixedDensityEstimator, self).__init__(
             net=continuous_net, condition_shape=condition_shape
@@ -44,169 +44,191 @@ class MixedDensityEstimator(DensityEstimator):
 
         self.discrete_net = discrete_net
         self.continuous_net = continuous_net
-        self.log_transform_x = log_transform_x
+        self.log_transform_input = log_transform_input
 
-    def forward(self, x: Tensor):
+    def forward(self, input: Tensor):
         raise NotImplementedError(
             """The forward method is not implemented for MNLE, use '.sample(...)' to
             generate samples though a forward pass."""
         )
 
     def sample(
-        self, context: Tensor, sample_shape: torch.Size, track_gradients: bool = False
+        self, sample_shape: torch.Size, condition: Tensor, track_gradients: bool = False
     ) -> Tensor:
         """Return sample from mixed data distribution.
 
         Args:
-            context: parameters for which to generate samples.
-            sample_shape number of samples to generate.
+            sample_shape: Shape of samples to generate.
+            condition: Condition of shape `(batch_dim, *event_shape_condition)`
 
         Returns:
-            Tensor: samples with shape (num_samples, num_data_dimensions)
+            Samples of shape `(*sample_shape, batch_dim, event_dim_input)`
         """
-        assert (
-            context.shape[0] == 1
-        ), "Samples can be generated for a single context only."
+        num_samples = torch.Size(sample_shape).numel()
+        batch_dim = condition.shape[0]
+        condition_event_dim = condition.dim() - 1
 
         with torch.set_grad_enabled(track_gradients):
             # Sample discrete data given parameters.
-            discrete_x = self.discrete_net.sample(
+            discrete_input = self.discrete_net.sample(
                 sample_shape=sample_shape,
-                context=context,
-            ).reshape(sample_shape[0], -1)
+                condition=condition,
+            )
+            # Trailing `1` because `Categorical` has event_shape `()`.
+            discrete_input = discrete_input.reshape(num_samples * batch_dim, 1)
+
+            ones_for_event_dims = (1,) * condition_event_dim
+            repeated_condition = condition.repeat(num_samples, *ones_for_event_dims)
 
             # Sample continuous data condition on parameters and discrete data.
-            # Pass num_samples=1 because the choices in the context contains
+            # Pass num_samples=1 because the choices in the condition contains
             # num_samples elements already.
-            continuous_x = self.continuous_net.sample(
-                # repeat the single context to match number of sampled choices.
-                # sample_shape[0] is the iid dimension.
-                condition=torch.cat(
-                    (context.repeat(sample_shape[0], 1), discrete_x), dim=1
-                ),
-                sample_shape=sample_shape,
-            ).reshape(sample_shape[0], -1)
+            continuous_input = self.continuous_net.sample(
+                sample_shape=(),
+                # repeat the single condition to match number of sampled choices.
+                # sample_shape[0] is the sample dimension.
+                condition=torch.cat((repeated_condition, discrete_input), dim=1),
+            )
 
-            # In case x was log-transformed, move them to linear space.
-            if self.log_transform_x:
-                continuous_x = continuous_x.exp()
+            # In case input was log-transformed, move them to linear space.
+            if self.log_transform_input:
+                continuous_input = continuous_input.exp()
 
-        return torch.cat((continuous_x, discrete_x), dim=1)
+            joined_input = torch.cat((continuous_input, discrete_input), dim=1)
 
-    def log_prob(self, x: Tensor, context: Tensor) -> Tensor:
+            # `continuous_input` is of shape `(batch_dim * numel(sample_shape))`.
+            return joined_input.reshape(*sample_shape, batch_dim, -1)
+
+    def log_prob(self, input: Tensor, condition: Tensor) -> Tensor:
         """Return log-probability of samples under the learned MNLE.
 
-        For a fixed data point x this returns the value of the likelihood function
-        evaluated at context, L(context, x=x).
+        For a fixed data point input this returns the value of the likelihood function
+        evaluated at condition, L(condition, input=input).
 
         Alternatively, it can be interpreted as the log-prob of the density
-        p(x | context).
+        p(input | condition).
 
         It evaluates the separate density estimator for the discrete and continous part
         of the data and then combines them into one evaluation.
 
         Args:
-            x: data (containing continuous and discrete data).
-            context: parameters for which to evaluate the likelihod function, or for
-                which to condition p(x | context).
+            input: data (containing continuous and discrete data).
+            condition: parameters for which to evaluate the likelihod function, or for
+                which to condition p(input | condition).
 
         Returns:
-            Tensor: log_prob of p(x | context).
+            Tensor: log_prob of p(input | condition).
         """
-        assert (
-            x.shape[0] == context.shape[0]
-        ), "x and context must have same batch size."
-
-        cont_x, disc_x = _separate_x(x)
-        dim_context = context.shape[0]
+        cont_input, disc_input = _separate_input(input)
 
         disc_log_prob = self.discrete_net.log_prob(
-            input=disc_x, context=context
-        ).reshape(dim_context)
-
-        cont_log_prob = self.continuous_net.log_prob(
-            # Transform to log-space if needed.
-            torch.log(cont_x) if self.log_transform_x else cont_x,
-            # Pass parameters and discrete x as context.
-            condition=torch.cat((context, disc_x), dim=1),
+            input=disc_input, condition=condition
         )
 
+        # Pass parameters and discrete input as condition.
+        repeats = disc_input.shape[0]
+        disc_input_repeated = disc_input.reshape((repeats * disc_input.shape[1], -1))
+        condition_repeated = condition.repeat((repeats, 1))
+        condition_reshaped = torch.cat((condition_repeated, disc_input_repeated), dim=1)
+
+        cont_input_reshaped = cont_input.reshape((
+            1,
+            cont_input.shape[0] * cont_input.shape[1],
+            -1,
+        ))
+        cont_log_prob = self.continuous_net.log_prob(
+            # Transform to log-space if needed.
+            (
+                torch.log(cont_input_reshaped)
+                if self.log_transform_input
+                else cont_input_reshaped
+            ),
+            condition=condition_reshaped,
+        )
+        cont_log_prob = cont_log_prob.reshape(disc_log_prob.shape)
+
         # Combine into joint lp.
-        log_probs_combined = (disc_log_prob + cont_log_prob).reshape(dim_context)
+        log_probs_combined = disc_log_prob + cont_log_prob
 
         # Maybe add log abs det jacobian of RTs: log(1/x) = - log(x)
-        if self.log_transform_x:
-            log_probs_combined -= torch.log(cont_x).squeeze()
+        if self.log_transform_input:
+            log_probs_combined -= torch.log(cont_input).sum(-1)
 
         return log_probs_combined
 
-    def loss(self, x: Tensor, context: Tensor, **kwargs) -> Tensor:
-        return self.log_prob(x, context)
+    def loss(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
+        return self.log_prob(input, condition)
 
-    def log_prob_iid(self, x: Tensor, context: Tensor) -> Tensor:
-        """Return log prob given a batch of iid x and a different batch of context.
+    def log_prob_iid(self, input: Tensor, condition: Tensor) -> Tensor:
+        """Return logprob given a batch of iid input and a different batch of condition.
 
         This is different from `.log_prob()` to enable speed ups in evaluation during
         inference. The speed up is achieved by exploiting the fact that there are only
-        finite number of possible categories in the discrete part of the dat: one can
+        finite number of possible categories in the discrete part of the data: one can
         just calculate the log probs for each possible category (given the current batch
         of context) and then copy those log probs into the entire batch of iid
         categories.
         For example, for the drift-diffusion model, there are only two choices, but
         often 100s or 1000 trials. With this method a evaluation over trials then passes
-        a batch of `2 (one per choice) * num_contexts` into the NN, whereas the normal
-        `.log_prob()` would pass `1000 * num_contexts`.
+        a batch of `2 (one per choice) * num_conditions` into the NN, whereas the normal
+        `.log_prob()` would pass `1000 * num_conditions`.
 
         Args:
-            x: batch of iid data, data observed given the same underlying parameters or
-                experimental conditions.
-            context: batch of parameters to be evaluated, i.e., each batch entry will be
-                evaluated for the entire batch of iid x.
+            input: batch of iid data, data observed given the same underlying parameters
+                or experimental conditions.
+            condition: batch of parameters to be evaluated, i.e., each batch entry will
+                be evaluated for the entire batch of iid input.
 
         Returns:
             log probs with shape (num_trials, num_parameters), i.e., the log prob for
             each context for each trial.
         """
 
-        context = atleast_2d(context)
-        x = atleast_2d(x)
-        batch_size = context.shape[0]
-        num_trials = x.shape[0]
-        context_repeated, x_repeated = match_theta_and_x_batch_shapes(context, x)
+        condition = atleast_2d(condition)
+        input = atleast_2d(input)
+        batch_size = condition.shape[0]
+        num_trials = input.shape[0]
+        condition_repeated, input_repeated = match_theta_and_x_batch_shapes(
+            condition, input
+        )
         net_device = next(self.discrete_net.parameters()).device
-        assert (
-            net_device == x.device and x.device == context.device
-        ), f"device mismatch: net, x, context: \
-            {net_device}, {x.device}, {context.device}."
+        assert net_device == input.device and input.device == condition.device, (
+            f"device mismatch: net, x, condition: "
+            f"{net_device}, {input.device}, {condition.device}."
+        )
 
-        x_cont_repeated, x_disc_repeated = _separate_x(x_repeated)
-        x_cont, x_disc = _separate_x(x)
+        input_cont_repeated, input_disc_repeated = _separate_input(input_repeated)
+        input_cont, input_disc = _separate_input(input)
 
         # repeat categories for parameters
         repeated_categories = torch.repeat_interleave(
             torch.arange(self.discrete_net.num_categories - 1), batch_size, dim=0
         )
         # repeat parameters for categories
-        repeated_context = context.repeat(self.discrete_net.num_categories - 1, 1)
+        repeated_condition = condition.repeat(self.discrete_net.num_categories - 1, 1)
         log_prob_per_cat = torch.zeros(self.discrete_net.num_categories, batch_size).to(
             net_device
         )
         log_prob_per_cat[:-1, :] = self.discrete_net.log_prob(
             repeated_categories.to(net_device),
-            repeated_context.to(net_device),
+            repeated_condition.to(net_device),
         ).reshape(-1, batch_size)
         # infer the last category logprob from sum to one.
         log_prob_per_cat[-1, :] = torch.log(1 - log_prob_per_cat[:-1, :].exp().sum(0))
 
         # fill in lps for each occurred category
         log_probs_discrete = log_prob_per_cat[
-            x_disc.type_as(torch.zeros(1, dtype=torch.long)).squeeze()
+            input_disc.type_as(torch.zeros(1, dtype=torch.long)).squeeze()
         ].reshape(-1)
 
-        # Get repeat discrete data and context to match in batch shape for flow eval.
+        # Get repeat discrete data and condition to match in batch shape for flow eval.
         log_probs_cont = self.continuous_net.log_prob(
-            torch.log(x_cont_repeated) if self.log_transform_x else x_cont_repeated,
-            condition=torch.cat((context_repeated, x_disc_repeated), dim=1),
+            (
+                torch.log(input_cont_repeated)
+                if self.log_transform_input
+                else input_cont_repeated
+            ),
+            condition=torch.cat((condition_repeated, input_disc_repeated), dim=1),
         )
 
         # Combine into joint lp with first dim over trials.
@@ -215,19 +237,18 @@ class MixedDensityEstimator(DensityEstimator):
         )
 
         # Maybe add log abs det jacobian of RTs: log(1/rt) = - log(rt)
-        if self.log_transform_x:
-            log_probs_combined -= torch.log(x_cont)
+        if self.log_transform_input:
+            log_probs_combined -= torch.log(input_cont)
 
         # Return batch over trials as required by SBI potentials.
         return log_probs_combined
 
 
-def _separate_x(x: Tensor, num_discrete_columns: int = 1) -> Tuple[Tensor, Tensor]:
-    """Returns the continuous and discrete part of the given x.
+def _separate_input(
+    input: Tensor, num_discrete_columns: int = 1
+) -> Tuple[Tensor, Tensor]:
+    """Returns the continuous and discrete part of the given input.
 
-    Assumes the discrete data to live in the last columns of x.
+    Assumes the discrete data to live in the last columns of input.
     """
-
-    assert x.ndim == 2, f"x must have two dimensions but has {x.ndim}."
-
-    return x[:, :-num_discrete_columns], x[:, -num_discrete_columns:]
+    return input[..., :-num_discrete_columns], input[..., -num_discrete_columns:]

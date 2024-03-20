@@ -79,59 +79,47 @@ class NFlowsFlow(DensityEstimator):
         i.e. batched conditions.
 
         Args:
-            input: Inputs to evaluate the log probability on of shape
-                    (*batch_shape1, input_size).
-            condition: Conditions of shape (*batch_shape2, *condition_shape).
+            input: Inputs to evaluate the log probability on. Of shape
+                `(sample_dim, batch_dim, *event_shape)`.
+            condition: Conditions of shape `(sample_dim, batch_dim, *event_shape)`.
 
         Raises:
-            RuntimeError: If batch_shape1 and batch_shape2 are not broadcastable.
+            AssertionError: If `input_batch_dim != condition_batch_dim`.
 
         Returns:
-            Sample-wise log probabilities.
-
-        Note:
-            This function should support PyTorch's automatic broadcasting. This means
-            the function should behave as follows for different input and condition
-            shapes:
-            - (input_size,) + (batch_size,*condition_shape) -> (batch_size,)
-            - (batch_size, input_size) + (*condition_shape) -> (batch_size,)
-            - (batch_size, input_size) + (batch_size, *condition_shape) -> (batch_size,)
-            - (batch_size1, input_size) + (batch_size2, *condition_shape)
-                                                  -> RuntimeError i.e. not broadcastable
-            - (batch_size1,1, input_size) + (batch_size2, *condition_shape)
-                                                  -> (batch_size1,batch_size2)
-            - (batch_size1, input_size) + (batch_size2,1, *condition_shape)
-                                                  -> (batch_size2,batch_size1)
+            Sample-wise log probabilities, shape `(input_sample_dim, input_batch_dim)`.
         """
-        self._check_condition_shape(condition)
-        condition_dims = len(self._condition_shape)
+        input_sample_dim = input.shape[0]
+        input_batch_dim = input.shape[1]
+        condition_batch_dim = condition.shape[0]
+        condition_event_dims = len(condition.shape[1:])
 
-        # PyTorch's automatic broadcasting
-        batch_shape_in = input.shape[:-1]
-        batch_shape_cond = condition.shape[:-condition_dims]
-        batch_shape = torch.broadcast_shapes(batch_shape_in, batch_shape_cond)
-        # Expand the input and condition to the same batch shape
-        input = input.expand(batch_shape + (input.shape[-1],))
-        condition = condition.expand(batch_shape + self._condition_shape)
-        # Flatten required by nflows, but now both have the same batch shape
-        input = input.reshape(-1, input.shape[-1])
-        condition = condition.reshape(-1, *self._condition_shape)
+        assert condition_batch_dim == input_batch_dim, (
+            f"Batch shape of condition {condition_batch_dim} and input "
+            f"{input_batch_dim} do not match."
+        )
+
+        # Nflows needs to have a single batch dimension for condition and input.
+        input = input.reshape((input_batch_dim * input_sample_dim, -1))
+
+        # Repeat the condition to match `input_batch_dim * input_sample_dim`.
+        ones_for_event_dims = (1,) * condition_event_dims  # Tuple of 1s, e.g. (1, 1, 1)
+        condition = condition.repeat(input_sample_dim, *ones_for_event_dims)
 
         log_probs = self.net.log_prob(input, context=condition)
-        log_probs = log_probs.reshape(batch_shape)
-        return log_probs
+        return log_probs.reshape((input_sample_dim, input_batch_dim))
 
     def loss(self, input: Tensor, condition: Tensor) -> Tensor:
         r"""Return the loss for training the density estimator.
 
         Args:
-            input: Inputs to evaluate the loss on of shape (batch_size, input_size).
-            condition: Conditions of shape (batch_size, *condition_shape).
+            input: Inputs to evaluate the loss on of shape
+                `(sample_dim, batch_dim, *event_shape)`.
+            condition: Conditions of shape `(sample_dim, batch_dim, *event_dim)`.
 
         Returns:
-            Negative log_probability (batch_size,)
+            Negative log_probability of shape `(input_sample_dim, condition_batch_dim)`.
         """
-
         return -self.log_prob(input, condition)
 
     def sample(self, sample_shape: Shape, condition: Tensor) -> Tensor:
@@ -139,41 +127,21 @@ class NFlowsFlow(DensityEstimator):
 
         Args:
             sample_shape: Shape of the samples to return.
-            condition: Conditions of shape (*batch_shape, *condition_shape).
+            condition: Conditions of shape `(sample_dim, batch_dim, *event_shape)`.
 
         Returns:
-            Samples of shape (*batch_shape, *sample_shape, input_size).
-
-        Note:
-            This function should support batched conditions and should admit the
-            following behavior for different condition shapes:
-            - (*condition_shape) -> (*sample_shape, input_size)
-            - (*batch_shape, *condition_shape)
-                                        -> (*batch_shape, *sample_shape, input_size)
+            Samples of shape `(*sample_shape, condition_batch_dim)`.
         """
-        self._check_condition_shape(condition)
-
+        condition_batch_dim = condition.shape[0]
         num_samples = torch.Size(sample_shape).numel()
-        condition_dims = len(self._condition_shape)
 
-        if len(condition.shape) == condition_dims:
-            # nflows.sample() expects conditions to be batched.
-            condition = condition.unsqueeze(0)
-            samples = self.net.sample(num_samples, context=condition).reshape((
-                *sample_shape,
-                -1,
-            ))
-        else:
-            # For batched conditions, we need to reshape the conditions and the samples
-            batch_shape = condition.shape[:-condition_dims]
-            condition = condition.reshape(-1, *self._condition_shape)
-            samples = self.net.sample(num_samples, context=condition).reshape((
-                *batch_shape,
-                *sample_shape,
-                -1,
-            ))
+        samples = self.net.sample(num_samples, context=condition)
 
-        return samples
+        return samples.reshape((
+            *sample_shape,
+            condition_batch_dim,
+            -1,
+        ))
 
     def sample_and_log_prob(
         self, sample_shape: torch.Size, condition: Tensor, **kwargs
@@ -182,32 +150,18 @@ class NFlowsFlow(DensityEstimator):
 
         Args:
             sample_shape: Shape of the samples to return.
-            condition: Conditions of shape (*batch_shape, *condition_shape).
+            condition: Conditions of shape (sample_dim, batch_dim, *event_shape).
 
         Returns:
-            Samples and associated log probabilities.
+            Samples of shape `(*sample_shape, condition_batch_dim, *input_event_shape)`
+            and associated log probs of shape `(*sample_shape, condition_batch_dim)`.
         """
-        self._check_condition_shape(condition)
-
+        condition_batch_dim = condition.shape[0]
         num_samples = torch.Size(sample_shape).numel()
-        condition_dims = len(self._condition_shape)
 
-        if len(condition.shape) == condition_dims:
-            # nflows.sample() expects conditions to be batched.
-            condition = condition.unsqueeze(0)
-            samples, log_probs = self.net.sample_and_log_prob(
-                num_samples, context=condition
-            )
-            samples = samples.reshape((*sample_shape, -1))
-            log_probs = log_probs.reshape((*sample_shape,))
-        else:
-            # For batched conditions, we need to reshape the conditions and the samples
-            batch_shape = condition.shape[:-condition_dims]
-            condition = condition.reshape(-1, *self._condition_shape)
-            samples, log_probs = self.net.sample_and_log_prob(
-                num_samples, context=condition
-            )
-            samples = samples.reshape((*batch_shape, *sample_shape, -1))
-            log_probs = log_probs.reshape((*batch_shape, *sample_shape))
-
+        samples, log_probs = self.net.sample_and_log_prob(
+            num_samples, context=condition
+        )
+        samples = samples.reshape((*sample_shape, condition_batch_dim, -1))
+        log_probs = log_probs.reshape((*sample_shape, -1))
         return samples, log_probs
