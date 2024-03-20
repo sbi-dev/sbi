@@ -259,7 +259,7 @@ class SNPE_C(PosteriorEstimator):
         theta: Tensor,
         x: Tensor,
         masks: Tensor,
-        proposal: DirectPosterior,
+        proposal: Optional[DirectPosterior],
     ) -> Tensor:
         """Return the log-probability of the proposal posterior.
 
@@ -292,7 +292,7 @@ class SNPE_C(PosteriorEstimator):
                 raise ValueError(
                     "The neural estimator must have a log_prob method, for\
                                  atomic loss. It should at best follow the \
-                                 sbi.neural_nets 'DensityEstiamtor' interface."
+                                 sbi.neural_nets 'DensityEstimator' interface."
                 )
             return self._log_prob_proposal_posterior_atomic(theta, x, masks)
 
