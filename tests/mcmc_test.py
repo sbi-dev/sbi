@@ -139,10 +139,12 @@ def test_c2st_slice_np_vectorized_parallelized_on_Gaussian(
         "slice_np_vectorized",
     ),
 )
-def test_getting_inference_diagnostics(method):
-    num_simulations = 100
-    num_samples = 10
-    num_dim = 2
+def test_getting_inference_diagnostics(
+    method: str,
+    num_simulations: int = 100,
+    num_samples: int = 10,
+    num_dim: int = 2,
+):
 
     # Use composed prior to test MultipleIndependent case.
     prior = [

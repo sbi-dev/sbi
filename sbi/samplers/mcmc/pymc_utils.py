@@ -35,7 +35,7 @@ class PyMCPotential(pt.Op):
         self.device = device
         self.track_gradients = track_gradients
 
-    def perform(self, node, inputs, outputs):
+    def perform(self, node, inputs, outputs) -> None:
         """Compute potential and possibly gradients from input parameters"""
         # unpack and handle inputs
         params = inputs[0]
@@ -48,9 +48,9 @@ class PyMCPotential(pt.Op):
 
         # call the potential function
         energy = self.potential_fn(params, track_gradients=self.track_gradients)
-        outputs[0][0] = tensor2numpy(energy).astype(
-            np.float64
-        )  # output the log-likelihood
+
+        # output the log-likelihood
+        outputs[0][0] = tensor2numpy(energy).astype(np.float64)
 
         # compute and record gradients if desired
         if self.track_gradients:
