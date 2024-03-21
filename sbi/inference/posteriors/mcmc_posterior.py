@@ -753,11 +753,15 @@ class MCMCPosterior(NeuralPosterior):
         ] = self._posterior_sampler
 
         # If Pyro sampler and samples not transformed, use arviz' from_pyro.
-        # Exclude 'slice' kernel as it lacks the 'divergence' diagnostics key.
-        if isinstance(self._posterior_sampler, (HMC, NUTS)) and isinstance(
+        if isinstance(sampler, (HMC, NUTS)) and isinstance(
             self.theta_transform, torch_tf.IndependentTransform
         ):
             inference_data = az.from_pyro(sampler)
+        # If PyMC sampler and samples not transformed, get cached InferenceData.
+        elif isinstance(sampler, PyMCSampler) and isinstance(
+            self.theta_transform, torch_tf.IndependentTransform
+        ):
+            inference_data = sampler.get_inference_data()
 
         # otherwise get samples from sampler and transform to original space.
         else:

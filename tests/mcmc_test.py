@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import arviz as az
 import numpy as np
 import pytest
 import torch
@@ -139,7 +138,7 @@ def test_c2st_slice_np_vectorized_parallelized_on_Gaussian(
         "slice_np_vectorized",
     ),
 )
-def test_getting_inference_diagnostics(
+def test_mcmc_methods_and_inference_diagnostics(
     method: str,
     num_simulations: int = 100,
     num_samples: int = 10,
@@ -180,4 +179,11 @@ def test_getting_inference_diagnostics(
     )
     idata = posterior.get_arviz_inference_data()
 
-    az.plot_trace(idata)
+    assert hasattr(
+        idata, "posterior"
+    ), f"`MCMCPosterior.get_arviz_inference_data()` for method {method} returned invalid InferenceData. Must contain key 'posterior', but found only {list(idata.keys())}"
+    samples = getattr(idata.posterior, posterior.param_name).data
+    samples = samples.reshape(-1, samples.shape[-1])[::2][:num_samples]
+    assert (
+        samples.shape == (num_samples, num_dim)
+    ), f"MCMC samples for method {method} have incorrect shape (n_samples, n_dims). Expected {(num_samples, num_dim)}, got {samples.shape}"

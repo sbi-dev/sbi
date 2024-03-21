@@ -1,9 +1,10 @@
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 import numpy as np
 import pymc
 import pytensor.tensor as pt
 import torch
+from arviz.data import InferenceData
 
 from sbi.utils import tensor2numpy
 
@@ -36,16 +37,16 @@ class PyMCPotential(pt.Op):  # type: ignore
         self.device = device
         self.track_gradients = track_gradients
 
-    def perform(self, node, inputs, outputs) -> None:
+    def perform(self, node: Any, inputs: Any, outputs: Any) -> None:
         """Compute potential and possibly gradients from input parameters
 
         Args:
             node: A "node" that represents the computation, handled internally
                 by PyTensor.
-            inputs: A list of inputs to the operation of type `itypes`. In this
-                case, the list will contain one array containing the simulator parameters.
-            outputs: A list allocated for storing operation outputs. In this
-                case, the list will contain one scalar for the computed potential
+            inputs: A sequence of inputs to the operation of type `itypes`. In this
+                case, the sequence will contain one array containing the simulator parameters.
+            outputs: A sequence allocated for storing operation outputs. In this
+                case, the sequence will contain one scalar for the computed potential
                 and an array containing the gradient of the potential with respect to the
                 simulator parameters.
         """
@@ -71,13 +72,13 @@ class PyMCPotential(pt.Op):  # type: ignore
         else:
             outputs[1][0] = np.zeros(params.shape, dtype=np.float64)
 
-    def grad(self, inputs, output_grads) -> list:
+    def grad(self, inputs: Any, output_grads: Any) -> list:
         """Get gradients computed from `perform` and return Jacobian-Vector product
 
         Args:
-            inputs: A list of inputs to the operation of type `itypes`. In this
-                case, the list will contain one array containing the simulator parameters.
-            output_grads: A list of the gradients of the output variables. The first
+            inputs: A sequence of inputs to the operation of type `itypes`. In this
+                case, the sequence will contain one array containing the simulator parameters.
+            output_grads: A sequence of the gradients of the output variables. The first
                 element will be the gradient of the output of the whole computational
                 graph with respect to the output of this specific operation, i.e., the potential.
 
@@ -133,7 +134,7 @@ class PyMCSampler:
         self._device = device
 
         # create PyMC model object
-        track_gradients = True if step in (pymc.NUTS, pymc.HamiltonianMC) else False
+        track_gradients = step in (pymc.NUTS, pymc.HamiltonianMC)
         self._model = pymc.Model()
         potential = PyMCPotential(
             potential_fn, track_gradients=track_gradients, device=device
@@ -198,3 +199,16 @@ class PyMCSampler:
             return samples[:, -num_samples:, :]
         else:
             return samples[-num_samples:, :]
+
+    def get_inference_data(self) -> InferenceData:
+        """Returns InferenceData from last call to self.run,
+        which contains diagnostic information in addition to samples
+
+        Raises ValueError if no samples have been generated yet.
+
+        Returns:
+            InferenceData containing samples and sampling run information
+        """
+        if self._inference_data is None:
+            raise ValueError("No samples found from MCMC run.")
+        return self._inference_data
