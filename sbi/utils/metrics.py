@@ -261,6 +261,78 @@ def unbiased_mmd_squared_hypothesis_test(x, y, alpha=0.05):
 
     return mmd_square_unbiased, threshold
 
+def posterior_shrinkage(prior_samples, post_samples):
+    """
+    Calculate the posterior shrinkage, quantifying how much
+    the posterior distribution contracts from the initial
+    prior distribution.
+
+    Parameters
+    ----------
+    prior_samples : array-like or torch.Tensor
+        Samples from the prior distribution.
+    post_samples : array-like or torch.Tensor
+        Samples from the posterior distribution.
+
+    Returns
+    -------
+    shrinkage : float or array-like
+        The posterior shrinkage.
+    """
+    # check if input are not empty
+    if len(prior_samples) == 0 or len(post_samples) == 0:
+        raise ValueError("Input samples are empty")
+
+    if isinstance(prior_samples, torch.Tensor):
+        prior_samples = prior_samples.cpu().numpy()
+    if isinstance(post_samples, torch.Tensor):
+        post_samples = post_samples.cpu().numpy()
+
+    prior_samples = np.atleast_2d(prior_samples)
+    post_samples = np.atleast_2d(post_samples)
+
+    prior_std = np.std(prior_samples, axis=0)
+    post_std = np.std(post_samples, axis=0)
+
+    return 1 - (post_std / prior_std) ** 2
+
+def posterior_zscore(true_theta, post_samples):
+    """
+    Calculate the posterior z-score, quantifying how much the posterior
+    distribution of a parameter encompasses its true value.
+
+    Parameters
+    ----------
+    true_theta : array-like or torch.Tensor
+        The true value of the parameters.
+    post_samples : array-like or torch.Tensor
+        Samples from the posterior distributions.
+
+    Returns
+    -------
+    z : array-like
+        The z-score of the posterior distributions.
+
+    References:
+    https://arxiv.org/abs/1803.08393
+    """
+
+    if len(post_samples) == 0:
+        raise ValueError("Input samples are empty")
+
+    if isinstance(true_theta, torch.Tensor):
+        true_theta = true_theta.cpu().numpy()
+    if isinstance(post_samples, torch.Tensor):
+        post_samples = post_samples.cpu().numpy()
+
+    true_theta = np.atleast_1d(true_theta)
+    post_samples = np.atleast_2d(post_samples)
+
+    post_mean = np.mean(post_samples, axis=0)
+    post_std = np.std(post_samples, axis=0)
+
+    return np.abs((post_mean - true_theta) / post_std)
+
 
 def _test():
     n = 2500
