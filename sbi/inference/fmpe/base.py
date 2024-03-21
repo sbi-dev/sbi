@@ -23,6 +23,18 @@ from sbi.neural_nets.density_estimators.zuko_flow_estimator import (
 from sbi.neural_nets.density_estimators import DensityEstimator
 from sbi.utils.sbiutils import mask_sims_from_prior
 
+from sbi.utils import (
+    RestrictedPrior,
+    check_estimator_arg,
+    handle_invalid_x,
+    nle_nre_apt_msg_on_invalid_x,
+    npe_msg_on_invalid_x,
+    test_posterior_net_for_multi_d_x,
+    validate_theta_and_x,
+    warn_if_zscoring_changes_data,
+    x_shape_from_simulation,
+)
+
 
 class FMPE(NeuralInference):
     def __init__(
@@ -66,6 +78,8 @@ class FMPE(NeuralInference):
             raise NotImplementedError("Resume training is not yet implemented.")
 
         start_idx = 0  # as there is no multi-round FMPE yet
+        current_round = 1  # as there is no multi-round FMPE yet
+        self._data_round_index.append(current_round)
 
         train_loader, val_loader = self.get_dataloaders(
             start_idx,
@@ -269,8 +283,6 @@ class FMPE(NeuralInference):
         warn_if_zscoring_changes_data(x)
         # todo: check what this does exactly
         npe_msg_on_invalid_x(num_nans, num_infs, exclude_invalid_x, "Single-round FMPE")
-
-        self._check_proposal(proposal)
 
         prior_masks = mask_sims_from_prior(int(current_round > 0), theta.size(0))
 
