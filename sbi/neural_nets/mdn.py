@@ -63,7 +63,7 @@ def build_mdn(
         embedding_net = nn.Sequential(
             utils.standardizing_net(batch_y, structured_y), embedding_net
         )
-    # Replace ZUKO
+
     distribution = MultivariateGaussianMDN(
         features=x_numel,
         context_features=y_numel,

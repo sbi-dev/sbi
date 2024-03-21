@@ -409,6 +409,35 @@ def build_nsf(
     return flow
 
 
+def build_zuko_gmm(
+    batch_x: Tensor,
+    batch_y: Tensor,
+    z_score_x: Optional[str] = "independent",
+    z_score_y: Optional[str] = "independent",
+    hidden_features: Union[Sequence[int], int] = 50,
+    num_transforms: int = 1,
+    embedding_net: nn.Module = nn.Identity(),
+    components: int = 2,
+    **kwargs,
+) -> ZukoFlow:
+    x_numel, y_numel = get_numel(batch_x, batch_y, embedding_net)
+
+    if isinstance(hidden_features, int):
+        hidden_features = [hidden_features]
+
+    flow_built = zuko.flows.GMM(
+        features=x_numel,
+        context=y_numel,
+        hidden_features=hidden_features,
+        components=components,
+        **kwargs,
+    )
+
+    flow = ZukoFlow(flow_built, embedding_net, condition_shape=batch_y[0].shape)
+
+    return flow
+
+
 def build_zuko_nice(
     batch_x: Tensor,
     batch_y: Tensor,
@@ -765,6 +794,8 @@ def build_zuko_flow(
             **kwargs,
         )
 
+    # Continuous normalizing flows (CNF) only have one transform,
+    # so we need to handle them slightly differently.
     if which_nf == "CNF":
         transform = flow_built.transform
 
@@ -807,9 +838,6 @@ def build_zuko_flow(
     flow = ZukoFlow(neural_net, embedding_net, condition_shape=batch_y[0].shape)
 
     return flow
-
-
-########################################################
 
 
 class ContextSplineMap(nn.Module):

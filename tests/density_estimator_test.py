@@ -12,14 +12,16 @@ from torch.distributions import MultivariateNormal
 
 from sbi.neural_nets.density_estimators.shape_handling import reshape_to_iid_batch_event
 from sbi.neural_nets.flow import (
+    build_maf,
+    build_maf_rqs,
     build_nsf,
+    # build_zuko_gmm,
     build_zuko_bpf,
     build_zuko_cnf,
     build_zuko_gf,
     build_zuko_maf,
     build_zuko_naf,
     build_zuko_ncsf,
-    # build_zuko_gmm,
     build_zuko_nice,
     build_zuko_nsf,
     build_zuko_sospf,
@@ -44,6 +46,8 @@ def get_batch_context(nsamples: int, condition_shape: tuple[int, ...]) -> torch.
 @pytest.mark.parametrize(
     "build_density_estimator",
     (
+        build_maf,
+        build_maf_rqs,
         build_nsf,
         # build_zuko_gmm,
         build_zuko_nice,
