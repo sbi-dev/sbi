@@ -155,7 +155,7 @@ class LC2ST:
             P_eval: Samples from P conditioned on the observation `x_eval`.
                 Shape (n_samples, dim_theta)
             x_eval: Observation.
-                Shape (n_samples, dim_x)
+                Shape (,dim_x)
             return_probas: Whether to return the predicted probabilities of being in P.
                 Defaults to False.
 
@@ -195,7 +195,7 @@ class LC2ST:
             P_eval: Samples from P (class 0) conditioned on the observation `x_eval`.
                 Shape (n_samples, dim_theta)
             x_eval: Observation.
-                Shape (n_samples, dim_x)
+                Shape (, dim_x)
 
         Returns:
             L-C2ST statistic at `x_eval`
@@ -214,7 +214,7 @@ class LC2ST:
             P_eval: Samples from P (class 0) conditioned on the observation `x_eval`.
                 Shape (n_samples, dim_theta)
             x_eval: Observation.
-                Shape (n_samples, dim_x)
+                Shape (, dim_x)
             kwargs: Additional arguments for `compute_stats_null` (n_trials, etc.)
 
         Returns:
@@ -222,7 +222,7 @@ class LC2ST:
         """
         stat_data = self.statistic(P_eval, x_eval)
         stats_null = self.compute_stats_null(
-            P_eval, x_eval, return_probas=False, **kwargs
+            P_eval, x_eval, return_probas=False, verbosity=0, **kwargs
         )
         return (stat_data < stats_null).mean()
 
@@ -239,7 +239,7 @@ class LC2ST:
             P_eval: Samples from P (class 0) conditioned on the observation `x_eval`.
                 Shape (n_samples, dim_theta)
             x_eval: Observation.
-                Shape (n_samples, dim_x)
+                Shape (, dim_x)
             alpha: Significance level.
                 Defaults to 0.05.
             kwargs: Additional arguments for `compute_stats_null` (n_trials, etc.)
@@ -249,10 +249,8 @@ class LC2ST:
         """
         return self.p_value(P_eval, x_eval, **kwargs) < alpha
 
-    def compute_stats_null(
+    def train_null(
         self,
-        P_eval: Tensor,
-        x_eval: Tensor,
         n_trials: int = 100,
         permutation: bool = True,
         return_probas: bool = False,
@@ -265,7 +263,7 @@ class LC2ST:
             P_eval: Samples from P (class 0) conditioned on the observation `x_eval`.
                 Shape (n_samples, dim_theta)
             x_eval: Observation.
-                Shape (n_samples, dim_x)
+                Shape (, dim_x)
             n_trials: Number of trials for the permutation test.
                 Defaults to 100.
             permutation: Whether to use the permutation method for (H0).
@@ -282,16 +280,10 @@ class LC2ST:
         # initialize classifier
         clf = self.clf_class(**self.clf_kwargs)
 
-        if self.trained_clfs_null is not None:
-            assert (
-                len(self.trained_clfs_null) == n_trials
-            ), " You need one classifier per trial"
-
         trained_clfs_null = []
-        probas_null, stats_null = [], []
         for t in tqdm(
             range(n_trials),
-            desc=f"Computing T under (H0) - permutation = {permutation}",
+            desc=f"Training the classifiers under (H0) - permutation = {permutation}",
             disable=verbosity < 1,
         ):
             # prepare data
@@ -309,17 +301,6 @@ class LC2ST:
                     joint_Q_perm[:, : self.Q.shape[-1]],
                     joint_Q_perm[:, self.Q.shape[1] :],
                 )
-
-                P_eval_t = P_eval
-
-                if self.z_score:
-                    P_t = (P_t - self.P_mean) / self.P_std
-                    Q_t = (Q_t - self.P_mean) / self.P_std
-                    x_P_t = (x_P_t - self.x_P_mean) / self.x_P_std
-                    x_Q_t = (x_Q_t - self.x_P_mean) / self.x_P_std
-
-                    P_eval_t = (P_eval - self.P_mean) / self.P_std
-                    x_eval = (x_eval - self.x_P_mean) / self.x_P_std
             else:
                 assert (
                     self.null_distribution is not None
@@ -328,28 +309,82 @@ class LC2ST:
                 Q_t = self.null_distribution.sample((self.P.shape[0],))
                 x_P_t, x_Q_t = self.x_P, self.x_Q
 
-                P_eval_t = self.null_distribution.sample((P_eval.shape[0],))
+            if self.z_score:
+                P_t = (P_t - self.P_mean) / self.P_std
+                Q_t = (Q_t - self.P_mean) / self.P_std
+                x_P_t = (x_P_t - self.x_P_mean) / self.x_P_std
+                x_Q_t = (x_Q_t - self.x_P_mean) / self.x_P_std
 
-                if self.z_score:
-                    P_mean, P_std = torch.mean(P_t, dim=0), torch.std(P_t, dim=0)
-                    P_t = (P_t - P_mean) / P_std
-                    Q_t = (Q_t - P_mean) / P_std
-                    x_P_t = (x_P_t - self.x_P_mean) / self.x_P_std
-                    x_Q_t = (x_Q_t - self.x_P_mean) / self.x_P_std
-
-                    P_eval_t = (P_eval_t - P_mean) / P_std
-
-            # train and evaluate
-            if self.trained_clfs_null is not None:
-                clf_t = self.trained_clfs_null[t]
-            else:
-                clf_t = train_lc2st(P_t, Q_t, x_P_t, x_Q_t, clf)
-            proba, score = eval_lc2st(P_eval_t, x_eval, clf_t, return_proba=True)
-            probas_null.append(proba)
-            stats_null.append(score.mean())
+            # train
+            clf_t = train_lc2st(P_t, Q_t, x_P_t, x_Q_t, clf)
             trained_clfs_null.append(clf_t)
 
         self.trained_clfs_null = trained_clfs_null
+
+        return trained_clfs_null
+
+    def compute_stats_null(
+        self,
+        P_eval: Tensor,
+        x_eval: Tensor,
+        n_trials: int = 100,
+        permutation: bool = True,
+        return_probas: bool = False,
+        verbosity: int = 0,
+    ):
+        """Compute the L-C2ST scores under the null hypothesis (H0).
+        Saves the trained classifiers for the null distribution.
+
+        Args:
+            P_eval: Samples from P (class 0) conditioned on the observation `x_eval`.
+                Shape (n_samples, dim_theta)
+            x_eval: Observation.
+                Shape (, dim_x)
+            n_trials: Number of trials for the permutation test.
+                Defaults to 100.
+            permutation: Whether to use the permutation method for (H0).
+                Defaults to True.
+            return_probas: Whether to return the predicted probabilities of being in P.
+                Defaults to False.
+            verbosity: Verbosity level, defaults to 1.
+
+        Returns: one of
+            scores: L-C2ST scores under (H0).
+            (probas, scores): Predicted probabilities and L-C2ST scores under (H0).
+        """
+
+        if self.trained_clfs_null is None:
+            raise ValueError("You need to train the classifiers under (H0) first")
+        else:
+            assert (
+                len(self.trained_clfs_null) == n_trials
+            ), " You need one classifier per trial"
+
+        probas_null, stats_null = [], []
+        for t in tqdm(
+            range(n_trials),
+            desc=f"Computing T under (H0) - permutation = {permutation}",
+            disable=verbosity < 1,
+        ):
+            # prepare data
+            if permutation:
+                P_eval_t = P_eval
+            else:
+                assert (
+                    self.null_distribution is not None
+                ), "You need to provide a null distribution"
+
+                P_eval_t = self.null_distribution.sample((P_eval.shape[0],))
+
+            if self.z_score:
+                P_eval_t = (P_eval_t - self.P_mean) / self.P_std
+                x_eval = (x_eval - self.x_P_mean) / self.x_P_std
+
+            # evaluate
+            clf_t = self.trained_clfs_null[t]
+            proba, score = eval_lc2st(P_eval_t, x_eval, clf_t, return_proba=True)
+            probas_null.append(proba)
+            stats_null.append(score.mean())
 
         probas_null, stats_null = np.array(probas_null), np.array(stats_null)
 
@@ -388,12 +423,10 @@ def train_lc2st(P: Tensor, Q: Tensor, x_P: Tensor, x_Q: Tensor, clf: Any) -> Any
 def eval_lc2st(
     P: Tensor, observation: Tensor, clf: Any, return_proba: bool = False
 ) -> Tensor:
-    # cpu and numpy
-    P = P.cpu().numpy()
-    observation = observation.cpu().numpy()
-
     # concatenate to get joint data
-    joint_P = np.concatenate([P, observation.repeat(len(P), 1)], axis=1)
+    joint_P = np.concatenate(
+        [P.cpu().numpy(), observation.repeat(len(P), 1).cpu().numpy()], axis=1
+    )
 
     # evaluate classifier
     # probability of being in P (class 0)
