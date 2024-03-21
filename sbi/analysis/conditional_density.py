@@ -10,8 +10,8 @@ from pyknos.mdn.mdn import MultivariateGaussianMDN
 from torch import Tensor
 from torch.distributions import Distribution
 
-from sbi.neural_nets.density_estimators.base import DensityEstimator
-from sbi.types import Shape, TorchTransform
+from sbi.neural_nets.density_estimators.nflows_flow import NFlowsFlow
+from sbi.sbi_types import Shape, TorchTransform
 from sbi.utils.conditional_density_utils import (
     ConditionedPotential,
     RestrictedPriorForConditional,
@@ -186,7 +186,7 @@ def conditional_corrcoeff(
 class ConditionedMDN:
     def __init__(
         self,
-        mdn: DensityEstimator,
+        mdn: NFlowsFlow,
         x_o: Tensor,
         condition: Tensor,
         dims_to_sample: List[int],
@@ -194,7 +194,8 @@ class ConditionedMDN:
         r"""Class that can sample and evaluate a conditional mixture-of-gaussians.
 
         Args:
-            net: Mixture density network that models $p(\theta|x).
+            mdn: Mixture density network that models $p(\theta|x). We use the normflows
+                implementation of MDNs.
             x_o: The datapoint at which the `net` is evaluated.
             condition: Parameter set that all dimensions not specified in
                 `dims_to_sample` will be fixed to. Should contain dim_theta elements,

@@ -11,8 +11,9 @@ import six
 import torch
 from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
-from matplotlib.figure import Figure
+from matplotlib.figure import Figure, FigureBase
 from scipy.stats import binom, gaussian_kde, iqr
+
 from torch import Tensor
 
 from sbi.analysis import eval_conditional_density
@@ -627,7 +628,7 @@ def marginal_plot(
     limits: Optional[Union[List, torch.Tensor]] = None,
     subset: Optional[List[int]] = None,
     diag: Optional[str] = "hist",
-    figsize: Tuple = (10, 10),
+    figsize: Tuple = (10, 2),
     labels: Optional[List[str]] = None,
     ticks: Optional[Union[List, torch.Tensor]] = None,
     diag_kwargs: Optional[Dict]= {},
@@ -1142,14 +1143,14 @@ def _arrange_grid(
             ax = axes[0, len(subset) - 1]
             x0, x1 = ax.get_xlim()
             y0, y1 = ax.get_ylim()
-            text_kwargs = {"fontsize": plt.rcParams["font.size"] * 2.0}
+            text_kwargs = {"fontsize": plt.rcParams["font.size"] * 2.0}  # pyright: ignore[reportOptionalOperand]
             ax.text(x1 + (x1 - x0) / 8.0, (y0 + y1) / 2.0, "...", **text_kwargs)
         else:
             for row in range(len(subset)):
                 ax = axes[row, len(subset) - 1]
                 x0, x1 = ax.get_xlim()
                 y0, y1 = ax.get_ylim()
-                text_kwargs = {"fontsize": plt.rcParams["font.size"] * 2.0}
+                text_kwargs = {"fontsize": plt.rcParams["font.size"] * 2.0}  # pyright: ignore[reportOptionalOperand]
                 ax.text(x1 + (x1 - x0) / 8.0, (y0 + y1) / 2.0, "...", **text_kwargs)
                 if row == len(subset) - 1:
                     ax.text(
@@ -1163,6 +1164,67 @@ def _arrange_grid(
     return fig, axes
 
 
+def _get_default_opts():
+    """Return default values for plotting specs."""
+    return {
+        # 'lower': None,     # hist/scatter/None  # TODO: implement
+        # title and legend
+        "title": None,
+        "legend": False,
+        "legend_kwargs": {},
+        # labels
+        "points_labels": [f"points_{idx}" for idx in range(10)],  # for points
+        "samples_labels": [f"samples_{idx}" for idx in range(10)],  # for samples
+        # colors: take even colors for samples, odd colors for points
+        "samples_colors": plt.rcParams["axes.prop_cycle"].by_key()["color"][0::2],
+        "points_colors": plt.rcParams["axes.prop_cycle"].by_key()["color"][1::2],
+        # ticks
+        "ticks": [],
+        "tickformatter": mpl.ticker.FormatStrFormatter("%g"),  # type: ignore
+        "tick_labels": None,
+        # options for hist
+        "hist_diag": {
+            "alpha": 1.0,
+            "bins": 50,
+            "density": False,
+            "histtype": "step",
+        },
+        "hist_offdiag": {
+            # 'edgecolor': 'none',
+            # 'linewidth': 0.0,
+            "bins": 50,
+        },
+        # options for kde
+        "kde_diag": {"bw_method": "scott", "bins": 50, "color": "black"},
+        "kde_offdiag": {"bw_method": "scott", "bins": 50},
+        # options for contour
+        "contour_offdiag": {"levels": [0.68], "percentile": True},
+        # options for scatter
+        "scatter_offdiag": {
+            "alpha": 0.5,
+            "edgecolor": "none",
+            "rasterized": False,
+        },
+        "scatter_diag": {},
+        # options for plot
+        "plot_offdiag": {},
+        # formatting points (scale, markers)
+        "points_diag": {},
+        "points_offdiag": {
+            "marker": ".",
+            "markersize": 10,
+        },
+        # other options
+        "fig_bg_colors": {"offdiag": None, "diag": None, "lower": None},
+        "fig_subplots_adjust": {
+            "top": 0.9,
+        },
+        "subplots": {},
+        "despine": {
+            "offset": 5,
+        },
+        "title_format": {"fontsize": 16},
+    }
 
 
 def sbc_rank_plot(
@@ -1231,7 +1293,7 @@ def _sbc_rank_plot(
     params_in_subplots: bool = False,
     show_ylabel: bool = False,
     sharey: bool = False,
-    fig: Optional[Figure] = None,
+    fig: Optional[FigureBase] = None,
     ax=None,  # no type hint to avoid hassle with pyright. Should be `array(Axes).`
     figsize: Optional[tuple] = None,
 ) -> Tuple[Figure, Axes]:
@@ -1411,7 +1473,7 @@ def _sbc_rank_plot(
                 alpha=uniform_region_alpha,
             )
 
-    return fig, ax
+    return fig, ax  # pyright: ignore[reportReturnType]
 
 
 def _plot_ranks_as_hist(
@@ -1547,7 +1609,7 @@ def _plot_cdf_region_expected_under_uniformity(
     plt.fill_between(
         x=np.linspace(0, num_bins, num_repeats * num_bins),
         y1=np.repeat(lower / np.max(lower), num_repeats),
-        y2=np.repeat(upper / np.max(upper), num_repeats),
+        y2=np.repeat(upper / np.max(upper), num_repeats),  # pyright: ignore[reportArgumentType]
         color=color,
         alpha=alpha,
     )
@@ -1569,7 +1631,7 @@ def _plot_hist_region_expected_under_uniformity(
     plt.fill_between(
         x=np.linspace(0, num_posterior_samples, num_bins),
         y1=np.repeat(lower, num_bins),
-        y2=np.repeat(upper, num_bins),
+        y2=np.repeat(upper, num_bins),  # pyright: ignore[reportArgumentType]
         color=color,
         alpha=alpha,
     )

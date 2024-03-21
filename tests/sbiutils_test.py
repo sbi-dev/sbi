@@ -15,7 +15,8 @@ from sbi.analysis import (
 )
 from sbi.inference import SNPE, SNPE_A
 from sbi.inference.snpe.snpe_a import SNPE_A_MDN
-from sbi.utils import BoxUniform, classifier_nn, get_kde, likelihood_nn, posterior_nn
+from sbi.neural_nets import classifier_nn, likelihood_nn, posterior_nn
+from sbi.utils import BoxUniform, get_kde
 
 
 def test_conditional_density_1d():

@@ -22,7 +22,7 @@ from sbi.inference.posteriors import (
 )
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials import posterior_estimator_based_potential
-from sbi.neural_nets.density_estimators import DensityEstimator
+from sbi.neural_nets import DensityEstimator, posterior_nn
 from sbi.utils import (
     RestrictedPrior,
     check_estimator_arg,
@@ -77,7 +77,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         # potentially for z-scoring.
         check_estimator_arg(density_estimator)
         if isinstance(density_estimator, str):
-            self._build_neural_net = utils.posterior_nn(model=density_estimator)
+            self._build_neural_net = posterior_nn(model=density_estimator)
         else:
             self._build_neural_net = density_estimator
 

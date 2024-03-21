@@ -29,8 +29,8 @@ from sbi.inference import (
 )
 from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
 from sbi.inference.potentials.base_potential import BasePotential
+from sbi.neural_nets import classifier_nn, likelihood_nn, posterior_nn
 from sbi.simulators import diagonal_linear_gaussian, linear_gaussian
-from sbi.utils.get_nn_models import classifier_nn, likelihood_nn, posterior_nn
 from sbi.utils.torchutils import BoxUniform, gpu_available, process_device
 from sbi.utils.user_input_checks import (
     check_embedding_net_device,
@@ -110,20 +110,20 @@ def test_training_and_mcmc_on_device(
 
     if method in [SNPE_A, SNPE_C]:
         kwargs = dict(
-            density_estimator=utils.posterior_nn(
+            density_estimator=posterior_nn(
                 model=model, num_transforms=2, dtype=torch.float32
             )
         )
         train_kwargs = dict(force_first_round_loss=True)
     elif method == SNLE:
         kwargs = dict(
-            density_estimator=utils.likelihood_nn(
+            density_estimator=likelihood_nn(
                 model=model, num_transforms=2, dtype=torch.float32
             )
         )
         train_kwargs = dict()
     elif method in (SNRE_A, SNRE_B, SNRE_C):
-        kwargs = dict(classifier=utils.classifier_nn(model=model))
+        kwargs = dict(classifier=classifier_nn(model=model))
         train_kwargs = dict()
     else:
         raise ValueError()
@@ -430,11 +430,13 @@ def test_embedding_nets_integration_training_device(
 
         posterior = inference.build_posterior(
             density_estimator_train,
-            **{}
-            if inference_method == SNPE_A
-            else dict(
-                mcmc_method="slice_np_vectorized",
-                mcmc_parameters=dict(thin=10, num_chains=20, warmup_steps=10),
+            **(
+                {}
+                if inference_method == SNPE_A
+                else dict(
+                    mcmc_method="slice_np_vectorized",
+                    mcmc_parameters=dict(thin=10, num_chains=20, warmup_steps=10),
+                )
             ),
         )
         proposal = posterior.set_default_x(x_o)
