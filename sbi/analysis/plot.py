@@ -61,7 +61,8 @@ def plt_hist_1d(ax,samples,limits,kwargs):
         binsize = 2*iqr(samples)*len(samples)**(-1/3)
         kwargs['mpl_kwargs']["bins"] = np.arange(limits[0],limits[1]+binsize,binsize)
     elif isinstance(kwargs['mpl_kwargs']["bins"],int):
-        kwargs['mpl_kwargs']["bins"] = np.linspace(limits[0],limits[1],kwargs['mpl_kwargs']["bins"])
+        kwargs['mpl_kwargs']["bins"] = np.linspace(limits[0],limits[1],
+                                                   kwargs['mpl_kwargs']["bins"])
     ax.hist(
         samples,
         **kwargs['mpl_kwargs'])
@@ -240,7 +241,8 @@ def get_offdiag_funcs(off_diag_list):
             offdiag_funcs.append(None)
     return offdiag_funcs
 
-def _format_subplot(ax, current, limits, ticks, labels_dim, fig_kwargs, row, col, dim, flat,excl_lower):
+def _format_subplot(ax, current, limits, ticks, labels_dim, fig_kwargs, row, col, dim,
+                    flat, excl_lower):
     """
     Format subplot according to fig_kwargs and other arguments
     Args:
@@ -351,12 +353,12 @@ def probs2contours(probs, levels):
     percentile levels.
     Args:
         probs : array
-            Probability array. doesn't have to sum to 1, but it is assumed it contains all
-            the mass
+            Probability array. doesn't have to sum to 1, but it is assumed it contains
+            all the mass
         levels : list
             Percentile levels, have to be in [0.0, 1.0]. Specifies contour levels that
-            include a given proportion of samples, i.e., 0.1 specifies where the top 10% of
-            the density is.
+            include a given proportion of samples, i.e., 0.1 specifies where the top
+            10% of the density is.
     Returns:
         contors: array
             Array of same shape as probs with percentile labels. Values in output array
@@ -514,10 +516,10 @@ def pairplot(
     labels: Optional[List[str]] = None,
     ticks: Optional[Union[List, torch.Tensor]] = None,
     offdiag: Optional[str] = None,
-    diag_kwargs :Optional[Dict]={},
-    upper_kwargs : Optional[Dict]={},
-    lower_kwargs : Optional[Dict]={},
-    fig_kwargs : Optional[Dict]={},
+    diag_kwargs :Optional[Dict]=None,
+    upper_kwargs : Optional[Dict]=None,
+    lower_kwargs : Optional[Dict]=None,
+    fig_kwargs : Optional[Dict]=None,
     fig=None,
     axes=None,
     **kwargs
@@ -562,8 +564,17 @@ def pairplot(
     """
 
     #Backwards compatibility
+    if fig_kwargs is None:
+        fig_kwargs = {}
+    if lower_kwargs is None:
+        lower_kwargs = {}
+    if upper_kwargs is None:
+        upper_kwargs = {}
+    if diag_kwargs is None:
+        diag_kwargs = {}
     if len(kwargs)>0:
-        warn("**kwargs are deprecated, use fig_kwargs instead. \n Calling the to be deprecated pairplot function", stacklevel=2)
+        warn("**kwargs are deprecated, use fig_kwargs instead. \n \
+              Calling the to be deprecated pairplot function", stacklevel=2)
         fig,axes = pairplot_dep(samples,points,limits,subset,offdiag,diag,figsize,
                               labels,ticks,upper,fig,axes,**kwargs)
         return fig,axes
@@ -618,8 +629,9 @@ def pairplot(
         lower_kwargs_filled.append(lower_kwarg_filled_i)
 
     return _arrange_grid(
-        diag_func, upper_func, lower_func, diag_kwargs_filled, upper_kwargs_filled,lower_kwargs_filled,
-        samples, points, limits, subset, figsize, labels, ticks, fig, axes, fig_kwargs_filled
+        diag_func, upper_func, lower_func, diag_kwargs_filled, upper_kwargs_filled,
+        lower_kwargs_filled, samples, points, limits, subset, figsize, labels, ticks,
+        fig, axes, fig_kwargs_filled
 
 
     )
@@ -634,8 +646,8 @@ def marginal_plot(
     figsize: Tuple = (10, 2),
     labels: Optional[List[str]] = None,
     ticks: Optional[Union[List, torch.Tensor]] = None,
-    diag_kwargs: Optional[Dict]= {},
-    fig_kwargs: Optional[Dict]= {},
+    diag_kwargs: Optional[Dict]= None,
+    fig_kwargs: Optional[Dict]= None,
     fig=None,
     axes=None,
     **kwargs,
@@ -669,8 +681,13 @@ def marginal_plot(
     """
 
     #backwards compatibility
+    if fig_kwargs is None:
+        fig_kwargs = {}
+    if diag_kwargs is None:
+        diag_kwargs = {}
     if len(kwargs)>0:
-        warn("**kwargs are deprecated, use fig_kwargs instead.\n calling the to be deprecated marginal_plot funcion", stacklevel=2)
+        warn("**kwargs are deprecated, use fig_kwargs instead.\n\
+              calling the to be deprecated marginal_plot funcion", stacklevel=2)
         fig,axes = marginal_plot_dep(samples,points,limits,subset,diag,figsize,
                               labels,ticks,fig,axes,**kwargs)
         return fig,axes
@@ -694,7 +711,8 @@ def marginal_plot(
     # generate plot
     return _arrange_grid(
         diag_func, [None], [None], diag_kwargs_filled, [None],[None],
-        samples, points, limits, subset, figsize, labels, ticks, fig, axes, fig_kwargs_filled
+        samples, points, limits, subset, figsize, labels, ticks, fig, axes,
+        fig_kwargs_filled
     )
 
 
@@ -712,30 +730,33 @@ def _get_default_offdiag_kwargs(offdiag, i=0):
     elif offdiag == "hist" or offdiag == "hist2d":
         offdiag_kwargs = {
             "bin_heuristic": None,#"Freedman-Diaconis",
-            "mpl_kwargs": {
-                           "cmap": "viridis",
+            "mpl_kwargs": {"cmap": "viridis",
                            "origin":"lower"},
             "np_hist_kwargs":{"bins":50,
                               "density": False}
         }
 
     elif offdiag == "scatter":
-        offdiag_kwargs = {"mpl_kwargs": {"color": plt.rcParams["axes.prop_cycle"].by_key()["color"][i*2],
-                                      "edgecolor": "white",
-                                      "alpha":.5,
-                                      "rasterized": False}
-        }
+        offdiag_kwargs = {
+            "mpl_kwargs":
+                {"color": plt.rcParams["axes.prop_cycle"].by_key()["color"][i*2],
+                "edgecolor": "white",
+                "alpha":.5,
+                "rasterized": False}
+    }
     elif offdiag == "contour" or offdiag == "contourf":
         offdiag_kwargs = {
             "bw_method": "scott",
             "bins":50,
             "levels": [0.68,.95,.99],
             "percentile": True,
-            "mpl_kwargs": {"colors": plt.rcParams["axes.prop_cycle"].by_key()["color"][i*2]}
+            "mpl_kwargs":
+                {"colors": plt.rcParams["axes.prop_cycle"].by_key()["color"][i*2]}
         }
     elif offdiag == "plot":
         offdiag_kwargs = {
-            "mpl_kwargs": {"color": plt.rcParams["axes.prop_cycle"].by_key()["color"][i*2]}
+            "mpl_kwargs":
+                {"color": plt.rcParams["axes.prop_cycle"].by_key()["color"][i*2]}
         }
     else:
         offdiag_kwargs = {}
@@ -747,18 +768,22 @@ def _get_default_diag_kwargs(diag,i=0):
         diag_kwargs = {
             "bw_method": "scott",
             "bins": 50,
-            "mpl_kwargs": {"color": plt.rcParams["axes.prop_cycle"].by_key()["color"][i*2]}
+            "mpl_kwargs":
+                {"color": plt.rcParams["axes.prop_cycle"].by_key()["color"][i*2]}
         }
 
     elif diag =="hist":
         diag_kwargs = {
             "bin_heuristic": "Freedman-Diaconis",
-            "mpl_kwargs": {"color": plt.rcParams["axes.prop_cycle"].by_key()["color"][i*2],
-                        "density": False,
-                        "histtype": "step"}
+            "mpl_kwargs":
+                {"color": plt.rcParams["axes.prop_cycle"].by_key()["color"][i*2],
+                "density": False,
+                "histtype": "step"}
         }
     elif diag =="scatter":
-        diag_kwargs = {"mpl_kwargs": {"color": plt.rcParams["axes.prop_cycle"].by_key()["color"][i*2]}
+        diag_kwargs = {
+            "mpl_kwargs":
+                {"color": plt.rcParams["axes.prop_cycle"].by_key()["color"][i*2]}
         }
     else:
         diag_kwargs = {}
@@ -1086,14 +1111,16 @@ def _arrange_grid(
 
             ax = axes[row_idx, col_idx]
             # Diagonals
-            _format_subplot(ax, current, limits, ticks, labels, fig_kwargs, row, col, dim, flat,excl_lower)
+            _format_subplot(ax, current, limits, ticks, labels, fig_kwargs, row,
+                            col, dim, flat,excl_lower)
             if current == "diag":
                 if excl_diag:
                     ax.axis("off")
                 else:
                     for sample_ind, sample in enumerate(samples):
                         if diag_funcs[sample_ind] is not None:
-                            diag_funcs[sample_ind](ax,sample[:,row],limits[row],diag_kwargs[sample_ind])#(row=col, limits=limits)
+                            diag_funcs[sample_ind](ax,sample[:,row],
+                                                    limits[row],diag_kwargs[sample_ind])
 
                 if len(points) > 0:
                     extent = ax.get_ylim()
@@ -2097,7 +2124,8 @@ def _arrange_plots(
 
 def _get_default_opts():
     warn(
-        "_get_default_opts will be deprecated, use _get_default_fig_kwargs, get_default_diag_kwargs, get_default_offdiag_kwargs instead",
+        "_get_default_opts will be deprecated, use _get_default_fig_kwargs,\
+              get_default_diag_kwargs, get_default_offdiag_kwargs instead",
         stacklevel=2,
     )
     return {
