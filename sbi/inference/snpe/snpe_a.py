@@ -400,7 +400,7 @@ class SNPE_A_MDN(DensityEstimator):
         super().__init__()
 
         self.net = flow
-        self._condition_shape = condition_shape
+        self._condition_shape = flow._condition_shape
 
         self._neural_net = flow
         self._prior = prior
