@@ -176,7 +176,7 @@ def standardizing_transform(
         t_std[t_std < min_std] = min_std
 
     if backend == "nflows":
-        return transforms.AffineTransform(shift=-t_mean / t_std, scale=1 / t_std)
+        return transforms.PointwiseAffineTransform(shift=-t_mean / t_std, scale=1 / t_std)
     elif backend == "zuko":
         return zuko.flows.Unconditional(
             zuko.transforms.MonotonicAffineTransform,

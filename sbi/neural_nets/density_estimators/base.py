@@ -1,14 +1,15 @@
+from abc import ABC, abstractmethod
 from typing import Optional, Tuple
 
 import torch
 from torch import Tensor, nn
 
 
-class DensityEstimator(nn.Module):
+class DensityEstimator(nn.Module, ABC):
     r"""Base class for density estimators.
 
     The density estimator class is a wrapper around neural networks that
-    allows to evaluate the `log_prob`, `sample`, and provide the `loss` of $\theta,x$
+    allows to evaluate the `log_prob`, `sample`, and provide the `loss` of $\theta, x$
     pairs. Here $\theta$ would be the `input` and $x$ would be the `condition`.
 
     Note:
@@ -19,23 +20,12 @@ class DensityEstimator(nn.Module):
 
     """
 
-    def __init__(self, net: nn.Module, condition_shape: torch.Size) -> None:
-        r"""Base class for density estimators.
-
-        Args:
-            net: Neural network.
-            condition_shape: Shape of the condition. If not provided, it will assume a
-                            1D input.
-        """
-        super().__init__()
-        self.net = net
-        self._condition_shape = condition_shape
-
     @property
     def embedding_net(self) -> Optional[nn.Module]:
         r"""Return the embedding network if it exists."""
         return None
 
+    @abstractmethod
     def log_prob(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
         r"""Return the log probabilities of the inputs given a condition or multiple
         i.e. batched conditions.
@@ -65,9 +55,9 @@ class DensityEstimator(nn.Module):
             - (batch_size1, input_size) + (batch_size2,1, *condition_shape)
                                                   -> (batch_size2,batch_size1)
         """
+        ...
 
-        raise NotImplementedError
-
+    @abstractmethod
     def loss(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
         r"""Return the loss for training the density estimator.
 
@@ -78,9 +68,9 @@ class DensityEstimator(nn.Module):
         Returns:
             Loss of shape (batch_size,)
         """
+        ...
 
-        raise NotImplementedError
-
+    @abstractmethod
     def sample(self, sample_shape: torch.Size, condition: Tensor, **kwargs) -> Tensor:
         r"""Return samples from the density estimator.
 
@@ -123,6 +113,20 @@ class DensityEstimator(nn.Module):
         samples = self.sample(sample_shape, condition, **kwargs)
         log_probs = self.log_prob(samples, condition, **kwargs)
         return samples, log_probs
+
+
+class SBIDensityEstimator(DensityEstimator):
+    def __init__(self, net: nn.Module, condition_shape: torch.Size) -> None:
+        r"""Base class for density estimators.
+
+        Args:
+            net: Neural network.
+            condition_shape: Shape of the condition. If not provided, it will assume a
+                            1D input.
+        """
+        super().__init__()
+        self.net = net
+        self._condition_shape = condition_shape
 
     def _check_condition_shape(self, condition: Tensor):
         r"""This method checks whether the condition has the correct shape.
