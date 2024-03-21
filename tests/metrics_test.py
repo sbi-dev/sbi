@@ -156,7 +156,6 @@ def test_posterior_shrinkage():
 
 
 def test_posterior_zscore():
-
     true_theta = np.array([2, 3])
     post_samples = np.array([[1, 2], [2, 3], [3, 4]])
     expected_zscore = np.array([0.0, 0.0])
