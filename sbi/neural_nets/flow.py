@@ -1152,7 +1152,13 @@ def build_zuko_flow_matching(
     )
 
     z_score_x_bool, structured_x = z_score_parser(z_score_x)
-    z_score_theta = standardizing_transform(batch_x, structured_x, backend="zuko")    
+    if z_score_x_bool:
+        z_score_theta = standardizing_transform(batch_x, structured_x, backend="zuko") 
+    
+    z_score_y_bool, structured_y = z_score_parser(z_score_y)
+    if z_score_y_bool:
+        # Prepend standardizing transform to y-embedding.
+        z_score_x = standardizing_net(batch_y, structured_y)
 
     flow_matching_estimator = ZukoFlowMatchingEstimator(
         theta_shape=x_numel,
