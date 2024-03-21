@@ -6,9 +6,21 @@ from warnings import warn
 
 from torch import nn
 
-from sbi.neural_nets.factory import classifier_nn as classifier_nn_moved_to_neural_nets
-from sbi.neural_nets.factory import likelihood_nn as likelihood_nn_moved_to_neural_nets
-from sbi.neural_nets.factory import posterior_nn as posterior_nn_moved_to_neural_nets
+from sbi.neural_nets.classifier import (
+    build_linear_classifier,
+    build_mlp_classifier,
+    build_resnet_classifier,
+)
+from sbi.neural_nets.flow import (
+    build_made,
+    build_maf,
+    build_maf_rqs,
+    build_nsf,
+    build_zuko_maf,
+    build_zuko_flow_matching
+)
+from sbi.neural_nets.mdn import build_mdn
+from sbi.neural_nets.mnle import build_mnle
 
 
 def classifier_nn(
@@ -110,3 +122,47 @@ def posterior_nn(
         num_components,
         **kwargs,
     )
+
+    def build_fn_snpe_a(batch_theta, batch_x, num_components):
+        """Build function for SNPE-A
+
+        Extract the number of components from the kwargs, such that they are exposed as
+        a kwargs, offering the possibility to later override this kwarg with
+        `functools.partial`. This is necessary in order to make sure that the MDN in
+        SNPE-A only has one component when running the Algorithm 1 part.
+        """
+        return build_mdn(
+            batch_x=batch_theta,
+            batch_y=batch_x,
+            num_components=num_components,
+            **kwargs,
+        )
+
+    def build_fn(batch_theta, batch_x):
+        if model == "mdn":
+            return build_mdn(batch_x=batch_theta, batch_y=batch_x, **kwargs)
+        elif model == "made":
+            return build_made(batch_x=batch_theta, batch_y=batch_x, **kwargs)
+        elif model == "maf":
+            return build_maf(batch_x=batch_theta, batch_y=batch_x, **kwargs)
+        elif model == "maf_rqs":
+            return build_maf_rqs(batch_x=batch_theta, batch_y=batch_x, **kwargs)
+        elif model == "nsf":
+            return build_nsf(batch_x=batch_theta, batch_y=batch_x, **kwargs)
+        elif model == "zuko_maf":
+            return build_zuko_maf(batch_x=batch_theta, batch_y=batch_x, **kwargs)
+        elif model == "zuko_fm":
+            return build_zuko_flow_matching(batch_x=batch_theta, batch_y=batch_x, **kwargs)
+        else:
+            raise NotImplementedError
+
+    if model == "mdn_snpe_a":
+        if num_components != 10:
+            raise ValueError(
+                "You set `num_components`. For SNPE-A, this has to be done at "
+                "instantiation of the inference object, i.e. "
+                "`inference = SNPE_A(..., num_components=20)`"
+            )
+        kwargs.pop("num_components")
+
+    return build_fn_snpe_a if model == "mdn_snpe_a" else build_fn
