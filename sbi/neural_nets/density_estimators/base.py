@@ -57,7 +57,6 @@ class DensityEstimator(nn.Module, ABC):
         """
         ...
 
-    @abstractmethod
     def loss(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
         r"""Return the loss for training the density estimator.
 
@@ -68,7 +67,7 @@ class DensityEstimator(nn.Module, ABC):
         Returns:
             Loss of shape (batch_size,)
         """
-        ...
+        return - self.log_prob(input, condition, **kwargs)
 
     @abstractmethod
     def sample(self, sample_shape: torch.Size, condition: Tensor, **kwargs) -> Tensor:
