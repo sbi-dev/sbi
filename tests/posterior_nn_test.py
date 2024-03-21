@@ -11,10 +11,14 @@ from sbi.inference import (
     SNPE_A,
     SNPE_C,
     DirectPosterior,
-    prepare_for_sbi,
     simulate_for_sbi,
 )
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
+from sbi.utils.user_input_checks import (
+    check_sbi_inputs,
+    process_prior,
+    process_simulator,
+)
 
 
 @pytest.mark.parametrize("snpe_method", [SNPE_A, SNPE_C])
@@ -30,7 +34,10 @@ def test_log_prob_with_different_x(snpe_method: type, x_o_batch_dim: bool):
     num_dim = 2
 
     prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
-    simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior)
+    prior, _, prior_returns_numpy = process_prior(prior)
+    simulator = process_simulator(diagonal_linear_gaussian, prior, prior_returns_numpy)
+    check_sbi_inputs(simulator, prior)
+
     inference = snpe_method(prior=prior)
     theta, x = simulate_for_sbi(simulator, prior, 1000)
     posterior_estimator = inference.append_simulations(theta, x).train(max_num_epochs=3)

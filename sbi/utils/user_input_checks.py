@@ -610,7 +610,9 @@ def process_x(
 def prepare_for_sbi(simulator: Callable, prior) -> Tuple[Callable, Distribution]:
     """Prepare simulator and prior for usage in sbi.
 
-    NOTE: This is a wrapper around `process_prior` and `process_simulator` which can be
+    NOTE: This method is deprecated as of sbi version v0.23.0. and will be removed in a future release.
+    Please use `process_prior` and `process_simulator` in the future.
+    This is a wrapper around `process_prior` and `process_simulator` which can be
     used in isolation as well.
 
     Attempts to meet the following requirements by reshaping and type-casting:
@@ -629,6 +631,13 @@ def prepare_for_sbi(simulator: Callable, prior) -> Tuple[Callable, Distribution]
     Returns:
         Tuple (simulator, prior) checked and matching the requirements of sbi.
     """
+
+    warnings.warn(
+        "This method is deprecated as of sbi version v0.23.0. and will be removed in a future release."
+        "Please use `process_prior` and `process_simulator` in the future.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
 
     # Check prior, return PyTorch prior.
     prior, _, prior_returns_numpy = process_prior(prior)
