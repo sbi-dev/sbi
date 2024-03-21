@@ -72,7 +72,6 @@ jobs:
       uses: codecov/codecov-action@v4
       with:
         env_vars: OS,PYTHON
-        fail_ci_if_error: false
         file: ./coverage.xml
         flags: unittests
         name: codecov-sbi-fast-cpu

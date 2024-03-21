@@ -1,0 +1,28 @@
+# The official docs
+# https://docs.codecov.io/docs/codecov-yaml
+# https://docs.codecov.com/docs/common-recipe-list
+
+# Check if this file is valid
+# cd PATH_TO/sbi/.github
+# curl -X POST --data-binary @codecov.yml https://codecov.io/validate
+
+ignore:
+  - "sbi/examples"
+
+coverage:
+  status:
+    project:
+      default:
+        target: 70% # the required coverage value
+        threshold: 2% # allow the coverage to drop by X%, and posting a success status
+        if_ci_failed: error # will set the status to success only if the CI is successful, alternative: success
+    patch: # about the individual commit
+      default:
+        target: 50% # minimum coverage ratio that the commit must meet to be considered a success
+        threshold: 2% # allow the coverage to drop by X%, and posting a success status
+        if_ci_failed: error # will set the status to success only if the CI is successful, alternative: success
+
+comment:
+  layout: "diff, flags, files"
+  behavior: default # update if exists, otherwise post new
+  require_changes: false # if true, only post the comment if coverage changes
