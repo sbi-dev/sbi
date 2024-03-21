@@ -69,5 +69,4 @@ jobs:
         file: ./coverage.xml
         flags: unittests
         name: codecov-sbi-all-cpu
-      env:
         token: ${{ secrets.CODECOV_TOKEN }}
