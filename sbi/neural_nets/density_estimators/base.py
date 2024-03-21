@@ -67,7 +67,7 @@ class DensityEstimator(nn.Module, ABC):
         Returns:
             Loss of shape (batch_size,)
         """
-        return - self.log_prob(input, condition, **kwargs)
+        return -self.log_prob(input, condition, **kwargs)
 
     @abstractmethod
     def sample(self, sample_shape: torch.Size, condition: Tensor, **kwargs) -> Tensor:
