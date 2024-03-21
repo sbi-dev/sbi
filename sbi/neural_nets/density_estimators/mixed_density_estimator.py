@@ -4,12 +4,12 @@
 from typing import Tuple
 
 import torch
-from pyknos.nflows import flows
 from torch import Tensor
 
 from sbi.neural_nets.density_estimators import (
     CategoricalMassEstimator,
     DensityEstimator,
+    NFlowsFlow,
 )
 from sbi.utils.sbiutils import match_theta_and_x_batch_shapes
 from sbi.utils.torchutils import atleast_2d
@@ -25,9 +25,9 @@ class MixedDensityEstimator(DensityEstimator):
     def __init__(
         self,
         discrete_net: CategoricalMassEstimator,
-        continuous_net: flows.Flow,
+        continuous_net: NFlowsFlow,
         log_transform_x: bool = False,
-        # condition_shape: torch.Size = None,
+        condition_shape: torch.Size = None,
     ):
         """Initialize class for combining density estimators for MNLE.
 
@@ -38,7 +38,9 @@ class MixedDensityEstimator(DensityEstimator):
                 logarithmic domain before training. This is helpful for bounded data, e.
                 g.,for reaction times.
         """
-        super(MixedDensityEstimator, self).__init__()
+        super(MixedDensityEstimator, self).__init__(
+            net=None, condition_shape=condition_shape
+        )
 
         self.discrete_net = discrete_net
         self.continuous_net = continuous_net
@@ -51,13 +53,13 @@ class MixedDensityEstimator(DensityEstimator):
         )
 
     def sample(
-        self, theta: Tensor, num_samples: int = 1, track_gradients: bool = False
+        self, theta: Tensor, sample_shape: torch.Size, track_gradients: bool = False
     ) -> Tensor:
         """Return sample from mixed data distribution.
 
         Args:
             theta: parameters for which to generate samples.
-            num_samples: number of samples to generate.
+            sample_shape number of samples to generate.
 
         Returns:
             Tensor: samples with shape (num_samples, num_data_dimensions)
@@ -67,19 +69,22 @@ class MixedDensityEstimator(DensityEstimator):
         with torch.set_grad_enabled(track_gradients):
             # Sample discrete data given parameters.
             discrete_x = self.discrete_net.sample(
-                sample_shape=torch.Size((num_samples,)),
+                sample_shape=sample_shape,
                 context=theta,
                 # num_samples=num_samples,
-            ).reshape(num_samples, 1)
+            )  # .reshape(num_samples, 1)
 
             # Sample continuous data condition on parameters and discrete data.
             # Pass num_samples=1 because the choices in the context contains
             # num_samples elements already.
             continuous_x = self.continuous_net.sample(
                 # repeat the single theta to match number of sampled choices.
-                context=torch.cat((theta.repeat(num_samples, 1), discrete_x), dim=1),
-                num_samples=1,
-            ).reshape(num_samples, 1)
+                # sample_shape[0] is the iid dimension.
+                condition=torch.cat(
+                    (theta.repeat(sample_shape[0], 1), discrete_x), dim=1
+                ),
+                sample_shape=sample_shape,
+            )  # .reshape(num_samples, 1)
 
             # In case x was log-transformed, move them to linear space.
             if self.log_transform_x:
@@ -122,7 +127,7 @@ class MixedDensityEstimator(DensityEstimator):
             # Transform to log-space if needed.
             torch.log(cont_x) if self.log_transform_x else cont_x,
             # Pass parameters and discrete x as context.
-            context=torch.cat((context, disc_x), dim=1),
+            condition=torch.cat((context, disc_x), dim=1),
         )
 
         # Combine into joint lp.
@@ -198,7 +203,7 @@ class MixedDensityEstimator(DensityEstimator):
         # Get repeat discrete data and theta to match in batch shape for flow eval.
         log_probs_cont = self.continuous_net.log_prob(
             torch.log(x_cont_repeated) if self.log_transform_x else x_cont_repeated,
-            context=torch.cat((theta_repeated, x_disc_repeated), dim=1),
+            condition=torch.cat((theta_repeated, x_disc_repeated), dim=1),
         )
 
         # Combine into joint lp with first dim over trials.

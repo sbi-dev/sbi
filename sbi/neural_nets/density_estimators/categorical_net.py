@@ -93,13 +93,13 @@ class CategoricalNet(nn.Module):
         ps = self.forward(context)
         return Categorical(probs=ps).log_prob(input.squeeze())
 
-    def sample(self, num_samples: int, context: Tensor) -> Tensor:
+    def sample(self, sample_shape: torch.Size, context: Tensor) -> Tensor:
         """Returns samples from categorical random variable with probs predicted from
         the neural net.
 
         Args:
+            sample_shape: number of samples to obtain.
             context: batch of parameters for prediction.
-            num_samples: number of samples to obtain.
 
         Returns:
             Tensor: Samples with shape (num_samples, 1)
@@ -108,9 +108,8 @@ class CategoricalNet(nn.Module):
         # Predict Categorical ps and sample.
         ps = self.forward(context)
         return (
-            Categorical(probs=ps)
-            .sample(torch.Size((num_samples,)))
-            .reshape(num_samples, -1)
+            Categorical(probs=ps).sample(sample_shape=sample_shape)
+            # .reshape(num_samples, -1)
         )
 
 
@@ -120,7 +119,7 @@ class CategoricalMassEstimator(DensityEstimator):
     """
 
     def __init__(self, net: CategoricalNet) -> None:
-        super().__init__()
+        super().__init__(net=net, condition_shape=None)
         self.net = net
 
     def log_prob(self, input: Tensor, context: Tensor, **kwargs) -> Tensor:
