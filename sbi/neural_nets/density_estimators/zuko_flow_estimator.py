@@ -38,7 +38,9 @@ class ZukoFlowMatchingEstimator(DensityEstimator):
         # instantiate the regression network
         if not net:
             net = MLP(
-                in_features=theta_shape.numel() + condition_shape.numel() + 2 * frequency,
+                in_features=theta_shape.numel()
+                + condition_shape.numel()
+                + 2 * frequency,
                 out_features=theta_shape,
                 hidden_features=[64] * 5,
                 activation=nn.ELU,
@@ -52,8 +54,8 @@ class ZukoFlowMatchingEstimator(DensityEstimator):
         self.device = device
         self.theta_shape = theta_shape
         self.frequency = torch.arange(1, frequency + 1, device=self.device) * math.pi
-        self.eta = eta,
-        self.z_score_theta = z_score_theta,
+        self.eta = eta
+        self.z_score_theta = z_score_theta
         self.z_score_x = z_score_x
 
     def embedding_net(self):
@@ -68,8 +70,8 @@ class ZukoFlowMatchingEstimator(DensityEstimator):
         # check for possible batch dimension in the condition
         if len(condition.shape) > len(self._condition_shape):
             raise ValueError(
-                "The condition has a batch dimension, which is currently not supported.", \
-                f"{condition.shape} vs. {self._condition_shape}"
+                "The condition has a batch dimension, which is currently not supported.",
+                f"{condition.shape} vs. {self._condition_shape}",
             )
 
         dist = self.flow(x_o=condition)
@@ -104,7 +106,9 @@ class ZukoFlowMatchingEstimator(DensityEstimator):
         return x
 
     def loss(self, theta: torch.Tensor, x: torch.Tensor, **kwargs) -> torch.Tensor:
+        theta_ = theta
         theta, x = self.maybe_z_score(theta, x)
+
         # randomly sample the time steps to compare the vector field at different time steps
         t = torch.rand(theta.shape[:-1], device=theta.device, dtype=theta.dtype)
         t_ = t[..., None]
@@ -150,15 +154,13 @@ class ZukoFlowMatchingEstimator(DensityEstimator):
         x_o = self.maybe_z_score_x(x_o)
 
         transform = zuko.transforms.ComposedTransform(
-            transforms=[
-                self.z_score_theta,
-                FreeFormJacobianTransform(
-                    f=lambda t, theta: self.forward(theta, x_o, t),
-                    t0=x_o.new_tensor(0.0),
-                    t1=x_o.new_tensor(1.0),
-                    phi=(x_o, *self.net.parameters()),
-                ),
-            ]
+            self.z_score_theta,
+            FreeFormJacobianTransform(
+                f=lambda t, theta: self.forward(theta, x_o, t),
+                t0=x_o.new_tensor(0.0),
+                t1=x_o.new_tensor(1.0),
+                phi=(x_o, *self.net.parameters()),
+            ),
         )
         return NormalizingFlow(
             transform=transform,
