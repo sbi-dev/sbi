@@ -16,12 +16,15 @@ The package implements a variety of inference algorithms, including _amortized_ 
 Amortized methods return a posterior that can be applied to many different observations without retraining; sequential methods focus the inference on one particular observation to be more simulation-efficient.
 See below for an overview of implemented methods.
 
-`sbi` offers a simple interface for one-line posterior inference:
+`sbi` offers a simple interface for posterior inference in a few lines of code
 
 ```python
-from sbi.inference import infer
+from sbi.inference import SNPE
 # import your simulator, define your prior over the parameters
-parameter_posterior = infer(simulator, prior, method='SNPE', num_simulations=100)
+# sample parameters theta and observations x
+inference = SNPE(prior=prior)
+_ = inference.append_simulations(theta, x).train()
+posterior = inference.build_posterior()
 ```
 
 ## Installation
