@@ -73,19 +73,6 @@ class NFlowsFlow(DensityEstimator):
         log_probs = log_probs.reshape(batch_shape)
         return log_probs
 
-    def loss(self, input: Tensor, condition: Tensor) -> Tensor:
-        r"""Return the loss for training the density estimator.
-
-        Args:
-            input: Inputs to evaluate the loss on of shape (batch_size, input_size).
-            condition: Conditions of shape (batch_size, *condition_shape).
-
-        Returns:
-            Negative log_probability (batch_size,)
-        """
-
-        return -self.log_prob(input, condition)
-
     def sample(self, sample_shape: Shape, condition: Tensor) -> Tensor:
         r"""Return samples from the density estimator.
 
