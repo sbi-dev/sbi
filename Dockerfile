@@ -1,4 +1,3 @@
-# FROM graphcore/pytorch-jupyter:latest
 FROM deepnote/python:3.9-conda
 RUN pip install --upgrade pip 
 RUN pip install jupyterlab
