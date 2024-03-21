@@ -1165,7 +1165,7 @@ def build_zuko_flow_matching(
         condition_shape=batch_y[0].shape,
         net=vector_field_regression_net,
         frequency=frequency,
-        z_score_theta=z_score_theta,
+        z_score_theta=z_score_theta(),
         z_score_x=z_score_x
     )
 

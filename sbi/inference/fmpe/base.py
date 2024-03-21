@@ -100,11 +100,11 @@ class FMPE(NeuralInference):
             )
             self._x_shape = x_shape_from_simulation(x.to("cpu"))
 
-            test_posterior_net_for_multi_d_x(
-                self._neural_net,
-                theta.to("cpu"),
-                x.to("cpu"),
-            )
+            # test_posterior_net_for_multi_d_x(
+            #     self._neural_net,
+            #     theta.to("cpu"),
+            #     x.to("cpu"),
+            # )
 
             del theta, x
 
@@ -114,7 +114,7 @@ class FMPE(NeuralInference):
         # initialize optimizer and training parameters
         if not resume_training:
             self.optimizer = optim.Adam(
-                list(self.density_estimator.net.parameters()), lr=learning_rate
+                list(self._neural_net.net.parameters()), lr=learning_rate
             )
             self.epoch, self._val_log_prob = 0, float("-Inf")
 
@@ -122,7 +122,7 @@ class FMPE(NeuralInference):
         #     self.epoch, stop_after_epochs
         # ):
         while self.epoch <= max_num_epochs:
-            self.density_estimator.net.train()
+            self._neural_net.net.train()
             train_log_probs_sum = 0
             epoch_start_time = time.time()
             for batch in train_loader:
@@ -133,14 +133,14 @@ class FMPE(NeuralInference):
                     batch[1].to(self._device),
                 )
 
-                train_losses = self.density_estimator.loss(theta_batch, x_batch)
+                train_losses = self._neural_net.loss(theta_batch, x_batch)
                 train_loss = torch.mean(train_losses)
                 train_log_probs_sum -= train_losses.sum().item()
 
                 train_loss.backward()
                 if clip_max_norm is not None:
                     clip_grad_norm_(
-                        self.density_estimator.net.parameters(), max_norm=clip_max_norm
+                        self._neural_net.net.parameters(), max_norm=clip_max_norm
                     )
                 self.optimizer.step()
 
@@ -162,7 +162,7 @@ class FMPE(NeuralInference):
                         batch[1].to(self._device),
                     )
                     # Take negative loss here to get validation log_prob.
-                    val_losses = self.density_estimator.loss(theta_batch, x_batch)
+                    val_losses = self._neural_net.loss(theta_batch, x_batch)
                     val_log_prob_sum -= val_losses.sum().item()
 
             # Take mean over all validation samples.
@@ -192,7 +192,7 @@ class FMPE(NeuralInference):
         # cause memory leakage when benchmarking.
         # self._neural_net.zero_grad(set_to_none=True)
 
-        return deepcopy(self.density_estimator)
+        return deepcopy(self._neural_net)
 
     def build_posterior(
         self,
