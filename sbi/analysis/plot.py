@@ -24,24 +24,25 @@ except AttributeError:
 
 
 def hex2rgb(hex):
-    # Pass 16 to the integer function for change of base
+    """Pass 16 to the integer function for change of base"""
     return [int(hex[i : i + 2], 16) for i in range(1, 6, 2)]
 
 
 def rgb2hex(RGB):
-    # Components need to be integers for hex to make sense
+    """Components need to be integers for hex to make sense"""
     RGB = [int(x) for x in RGB]
     return "#" + "".join([
         "0{0:x}".format(v) if v < 16 else "{0:x}".format(v) for v in RGB
     ])
 
 def to_list(x,len):
+    """If x is not a list, make it a list of length `len`."""
     if not isinstance(x, list):
         x = [x for _ in range(len)]
     return x
 
 def _update(d, u):
-    # https://stackoverflow.com/a/3233356
+    """update dictionary with user input, see: https://stackoverflow.com/a/3233356"""
     for k, v in six.iteritems(u):
         dv = d.get(k, {})
         if not isinstance(dv, collectionsAbc.Mapping):  # type: ignore
@@ -51,14 +52,16 @@ def _update(d, u):
         else:
             d[k] = v
     return d
+
+# Plotting functions
 def plt_hist_1d(ax,samples,limits,kwargs):
-    print(samples.shape)
+    """Plot 1D histogram."""
     ax.hist(
         samples,
         **kwargs['mpl_kwargs'])
     
 def plt_hist_2d(ax,samples_col, samples_row,limits_col,limits_row,kwargs):
-    print(kwargs)
+    """Plot 2D histogram."""
     hist, xedges, yedges = np.histogram2d(
                             samples_col,
                             samples_row,
@@ -68,7 +71,6 @@ def plt_hist_2d(ax,samples_col, samples_row,limits_col,limits_row,kwargs):
                             ],
                             **kwargs['hist_kwargs'],
                         )
-
     ax.imshow(
         hist.T,
         extent=(
@@ -81,6 +83,7 @@ def plt_hist_2d(ax,samples_col, samples_row,limits_col,limits_row,kwargs):
     )
 
 def plt_kde_1d(ax,samples,limits, kwargs):
+    """"1D Kernel Density Estimation."""
     density = gaussian_kde(
         samples, bw_method=kwargs["bw_method"]
     )
@@ -96,6 +99,7 @@ def plt_kde_1d(ax,samples,limits, kwargs):
     )
 
 def plt_kde_2d(ax,samples_col, samples_row,limits_col,limits_row,kwargs):
+    """2D Kernel Density Estimation."""
     density = gaussian_kde(
         np.array([samples_col,samples_row]),
         bw_method=kwargs["bw_method"],
@@ -114,9 +118,6 @@ def plt_kde_2d(ax,samples_col, samples_row,limits_col,limits_row,kwargs):
     )
     positions = np.vstack([X.ravel(), Y.ravel()])
     Z = np.reshape(density(positions).T, X.shape)
-    print(kwargs['mpl_kwargs'])
-    print(Z)
-    print(limits_col,limits_row)
 
     ax.imshow(
         Z,
@@ -130,6 +131,7 @@ def plt_kde_2d(ax,samples_col, samples_row,limits_col,limits_row,kwargs):
     )
     
 def plt_contour_2d(ax,samples_col, samples_row,limits_col,limits_row,kwargs):
+    """2D Contour based on Kernel Density Estimation."""
     density = gaussian_kde(
         np.array([samples_col,samples_row]),
         bw_method=kwargs["bw_method"],
@@ -169,6 +171,7 @@ def plt_contour_2d(ax,samples_col, samples_row,limits_col,limits_row,kwargs):
     )
                         
 def plt_scatter_1d(ax,samples,limits, kwargs):
+    """Scatter plot 1D."""
     for single_sample in samples:
         ax.axvline(
             single_sample,
@@ -176,11 +179,13 @@ def plt_scatter_1d(ax,samples,limits, kwargs):
         )
 
 def plt_scatter_2d(ax,samples_col, samples_row,limits_col,limits_row,kwargs):
+    """Scatter plot 2D."""
     ax.scatter(samples_col,
                 samples_row,
                 **kwargs['mpl_kwargs'],
             )
 def plt_plot_2d(ax,samples_col, samples_row,limits_col,limits_row,kwargs):
+    """Plot 2D trajectory"""
     ax.plot(samples_col,
                 samples_row,
                 **kwargs['mpl_kwargs'],
@@ -188,6 +193,7 @@ def plt_plot_2d(ax,samples_col, samples_row,limits_col,limits_row,kwargs):
 
     
 def get_diag_funcs(diag_list):
+    """make a list of the functions for the diagonal plots."""
     diag_funcs = []
     for diag in diag_list:
         if diag=='hist':
@@ -203,6 +209,7 @@ def get_diag_funcs(diag_list):
         
             
 def get_offdiag_funcs(off_diag_list):
+    """make a list of the functions for the off-diagonal plots."""
     offdiag_funcs = []
     for offdiag in off_diag_list:
         if offdiag=='hist' or offdiag=='hist2d':
@@ -578,47 +585,6 @@ def pairplot(
 
 
     )
-
-def _get_default_offdiag_kwargs(offdiag, i=0):
-    if offdiag =="kde" or offdiag == "kde2d":
-        offdiag_kwargs = {
-            "bw_method": "scott", 
-            "bins": 50, 
-            "mpl_kwargs": {"cmap": "viridis",
-                           "origin":"lower"},
-        }  
-
-    elif offdiag == "hist" or offdiag == "hist2d":
-        offdiag_kwargs = {
-            "mpl_kwargs": {"cmap": "viridis",
-                           "origin":"lower"},
-            "hist_kwargs":{
-                        "bins": 50,
-                        "density": False}
-        }
-
-    elif offdiag == "scatter":
-        offdiag_kwargs = {"mpl_kwargs": {"color": plt.rcParams["axes.prop_cycle"].by_key()["color"][i*2],
-                                      "edgecolor": "white",
-                                      "alpha":.5,
-                                      "rasterized": False}
-        }
-    elif offdiag == "contour" or offdiag == "contourf":
-        offdiag_kwargs = {
-            "bw_method": "scott",
-            "bins":50,
-            "levels": [0.68,.95,.99],
-            "percentile": True,
-            "mpl_kwargs": {"colors": plt.rcParams["axes.prop_cycle"].by_key()["color"][i*2]}
-        }
-    elif offdiag == "plot":
-        offdiag_kwargs = {
-            "mpl_kwargs": {"color": plt.rcParams["axes.prop_cycle"].by_key()["color"][i*2]}
-        }
-    else:
-        offdiag_kwargs = {}
-    return offdiag_kwargs
-
 def marginal_plot(
     samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
     points: Optional[
@@ -691,7 +657,47 @@ def marginal_plot(
 
     )
 
-#diag_func, None, None, diag_kwargs, None,None
+
+def _get_default_offdiag_kwargs(offdiag, i=0):
+    if offdiag =="kde" or offdiag == "kde2d":
+        offdiag_kwargs = {
+            "bw_method": "scott", 
+            "bins": 50, 
+            "mpl_kwargs": {"cmap": "viridis",
+                           "origin":"lower"},
+        }  
+
+    elif offdiag == "hist" or offdiag == "hist2d":
+        offdiag_kwargs = {
+            "mpl_kwargs": {"cmap": "viridis",
+                           "origin":"lower"},
+            "hist_kwargs":{
+                        "bins": 50,
+                        "density": False}
+        }
+
+    elif offdiag == "scatter":
+        offdiag_kwargs = {"mpl_kwargs": {"color": plt.rcParams["axes.prop_cycle"].by_key()["color"][i*2],
+                                      "edgecolor": "white",
+                                      "alpha":.5,
+                                      "rasterized": False}
+        }
+    elif offdiag == "contour" or offdiag == "contourf":
+        offdiag_kwargs = {
+            "bw_method": "scott",
+            "bins":50,
+            "levels": [0.68,.95,.99],
+            "percentile": True,
+            "mpl_kwargs": {"colors": plt.rcParams["axes.prop_cycle"].by_key()["color"][i*2]}
+        }
+    elif offdiag == "plot":
+        offdiag_kwargs = {
+            "mpl_kwargs": {"color": plt.rcParams["axes.prop_cycle"].by_key()["color"][i*2]}
+        }
+    else:
+        offdiag_kwargs = {}
+    return offdiag_kwargs
+
 def _get_default_diag_kwargs(diag,i=0):
     if diag == "kde":
         diag_kwargs = {
@@ -1043,12 +1049,11 @@ def _arrange_grid(
                     for sample_ind, sample in enumerate(samples):
                         if diag_funcs[sample_ind] is not None:
                             diag_funcs[sample_ind](ax,sample[:,row],limits[row],diag_kwargs[sample_ind])#(row=col, limits=limits)
-                    #print(ax.get_ylim())
 
                 if len(points) > 0:
                     extent = ax.get_ylim()
                     for n, v in enumerate(points):
-                        plt.plot(
+                        ax.plot(
                             [v[:, col], v[:, col]],
                             extent,
                             color=fig_kwargs["points_colors"][n],
@@ -1056,7 +1061,7 @@ def _arrange_grid(
                             label=fig_kwargs["points_labels"][n],
                         )
                 if fig_kwargs["legend"] and col == 0:
-                    plt.legend(**fig_kwargs["legend_kwargs"])
+                    ax.legend(**fig_kwargs["legend_kwargs"])
 
             # Off-diagonals
             
@@ -1067,16 +1072,14 @@ def _arrange_grid(
                     for sample_ind, sample in enumerate(samples):
                         if upper_funcs[sample_ind] is not None:
                             upper_funcs[sample_ind](ax,sample[:,row],sample[:,col],limits[row],limits[col],upper_kwargs[sample_ind])
-                    """
                     if len(points) > 0:
                         for n, v in enumerate(points):
-                            plt.plot(
+                            ax.plot(
                                 v[:, col],
                                 v[:, row],
-                                color=opts["points_colors"][n],
-                                **opts["points_offdiag"],
+                                color=fig_kwargs["points_colors"][n],
+                                **fig_kwargs["points_offdiag"],
                             )
-                    """
             elif current == "lower":
                 if excl_lower:
                     ax.axis("off")
@@ -1084,7 +1087,15 @@ def _arrange_grid(
                     for sample_ind, sample in enumerate(samples):
                         if lower_funcs[sample_ind] is not None:
                             lower_funcs[sample_ind](ax,sample[:,row],sample[:,col],limits[row],limits[col],lower_kwargs[sample_ind])
-
+                    if len(points) > 0:
+                        for n, v in enumerate(points):
+                            ax.plot(
+                                v[:, col],
+                                v[:, row],
+                                color=fig_kwargs["points_colors"][n],
+                                **fig_kwargs["points_offdiag"],
+                            )
+ 
 
     if len(subset) < dim:
         if flat:
