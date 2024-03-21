@@ -13,7 +13,6 @@ from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure, FigureBase
 from scipy.stats import binom, gaussian_kde, iqr
-
 from torch import Tensor
 
 from sbi.analysis import eval_conditional_density
@@ -1170,69 +1169,6 @@ def _arrange_grid(
     return fig, axes
 
 
-def _get_default_opts():
-    """Return default values for plotting specs."""
-    return {
-        # 'lower': None,     # hist/scatter/None  # TODO: implement
-        # title and legend
-        "title": None,
-        "legend": False,
-        "legend_kwargs": {},
-        # labels
-        "points_labels": [f"points_{idx}" for idx in range(10)],  # for points
-        "samples_labels": [f"samples_{idx}" for idx in range(10)],  # for samples
-        # colors: take even colors for samples, odd colors for points
-        "samples_colors": plt.rcParams["axes.prop_cycle"].by_key()["color"][0::2],
-        "points_colors": plt.rcParams["axes.prop_cycle"].by_key()["color"][1::2],
-        # ticks
-        "ticks": [],
-        "tickformatter": mpl.ticker.FormatStrFormatter("%g"),  # type: ignore
-        "tick_labels": None,
-        # options for hist
-        "hist_diag": {
-            "alpha": 1.0,
-            "bins": 50,
-            "density": False,
-            "histtype": "step",
-        },
-        "hist_offdiag": {
-            # 'edgecolor': 'none',
-            # 'linewidth': 0.0,
-            "bins": 50,
-        },
-        # options for kde
-        "kde_diag": {"bw_method": "scott", "bins": 50, "color": "black"},
-        "kde_offdiag": {"bw_method": "scott", "bins": 50},
-        # options for contour
-        "contour_offdiag": {"levels": [0.68], "percentile": True},
-        # options for scatter
-        "scatter_offdiag": {
-            "alpha": 0.5,
-            "edgecolor": "none",
-            "rasterized": False,
-        },
-        "scatter_diag": {},
-        # options for plot
-        "plot_offdiag": {},
-        # formatting points (scale, markers)
-        "points_diag": {},
-        "points_offdiag": {
-            "marker": ".",
-            "markersize": 10,
-        },
-        # other options
-        "fig_bg_colors": {"offdiag": None, "diag": None, "lower": None},
-        "fig_subplots_adjust": {
-            "top": 0.9,
-        },
-        "subplots": {},
-        "despine": {
-            "offset": 5,
-        },
-        "title_format": {"fontsize": 16},
-    }
-
-
 def sbc_rank_plot(
     ranks: Union[Tensor, np.ndarray, List[Tensor], List[np.ndarray]],
     num_posterior_samples: int,
@@ -2160,8 +2096,10 @@ def _arrange_plots(
 
 
 def _get_default_opts():
-    warn("_get_default_opts will be deprecated, use _get_default_fig_kwargs, get_default_diag_kwargs, get_default_offdiag_kwargs instead", stacklevel=2)
-    """Return default values for plotting specs."""
+    warn(
+        "_get_default_opts will be deprecated, use _get_default_fig_kwargs, get_default_diag_kwargs, get_default_offdiag_kwargs instead",
+        stacklevel=2,
+    )
     return {
         # title and legend
         "title": None,
