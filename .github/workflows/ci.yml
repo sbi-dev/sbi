@@ -59,15 +59,15 @@ jobs:
 
     - name:  Run the fast tests with coverage
       run: |
-        pytest -n auto -m "not slow and not gpu" tests/ --cov=sbi --cov-report=xml --exitfirst
+        pytest -n auto -v -m "not slow and not gpu" --cov=sbi --cov-report=xml --exitfirst  tests/
 
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v4-beta
+      uses: codecov/codecov-action@v4
       with:
-        file: ./coverage.xml
-        flags: unittests-fast-cpu
         env_vars: OS,PYTHON
-        name: codecov-umbrella
         fail_ci_if_error: false
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-sbi-fast-cpu
       env:
         token: ${{ secrets.CODECOV_TOKEN }}
