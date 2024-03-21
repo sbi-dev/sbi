@@ -320,16 +320,8 @@ class PosteriorEstimator(NeuralInference, ABC):
             self._x_shape = x_shape_from_simulation(x.to("cpu"))
             self._theta_shape = theta[0].unsqueeze(0).shape
 
-            theta = reshape_to_iid_batch_event(
-                theta.to("cpu"), self._theta_shape[1:], leading_is_iid=False
-            )
-            print("before", x.shape)
-            print("x_shape", self._x_shape)
-            x = reshape_to_iid_batch_event(
-                x.to("cpu"), self._x_shape[1:], leading_is_iid=False
-            )
-            print("theta here", theta.shape)
-            print("x here", x.shape)
+            theta = reshape_to_iid_batch_event(theta.to("cpu"), self._theta_shape[1:])
+            x = reshape_to_iid_batch_event(x.to("cpu"), self._x_shape[1:])
             test_posterior_net_for_multi_d_x(self._neural_net, theta, x)
 
             del theta, x
@@ -587,12 +579,8 @@ class PosteriorEstimator(NeuralInference, ABC):
                 i.e., potentially ignoring the correction for using a proposal
                 distribution different from the prior.
         """
-        theta = reshape_to_iid_batch_event(
-            theta, event_shape=self._theta_shape[1:], leading_is_iid=False
-        )
-        x = reshape_to_iid_batch_event(
-            x, event_shape=self._x_shape[1:], leading_is_iid=False
-        )
+        theta = reshape_to_iid_batch_event(theta, event_shape=self._theta_shape[1:])
+        x = reshape_to_iid_batch_event(x, event_shape=self._x_shape[1:])
         if self._round == 0 or force_first_round_loss:
             # Use posterior log prob (without proposal correction) for first round.
             loss = self._neural_net.loss(theta, x)

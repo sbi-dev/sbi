@@ -756,8 +756,6 @@ def test_posterior_net_for_multi_d_x(net: flows.Flow, theta: Tensor, x: Tensor) 
     error, append a debug hint and raise it again.
     """
     try:
-        print("theta", theta.shape)
-        print("x", x.shape)
         # torch.nn.functional needs at least two inputs here.
         net.log_prob(theta[:, :2], condition=x[:, :2])
     except RuntimeError as rte:

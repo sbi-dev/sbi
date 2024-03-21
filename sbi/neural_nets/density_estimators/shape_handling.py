@@ -3,7 +3,7 @@ from torch import Tensor
 
 
 def reshape_to_iid_batch_event(
-    theta_or_x: Tensor, event_shape: torch.Size, leading_is_iid: bool
+    theta_or_x: Tensor, event_shape: torch.Size, leading_is_iid: bool = False
 ) -> Tensor:
     """Return theta or x s.t. its shape is `(iid_shape, batch_shape, event_shape)`.
 
@@ -42,7 +42,7 @@ def reshape_to_iid_batch_event(
         return theta_or_x.unsqueeze(1) if leading_is_iid else theta_or_x.unsqueeze(0)
     elif len(leading_theta_or_x_shape) == 2:
         # Batch dimension and iid dimension were passed.
-        return theta_or_x
+        return theta_or_x if leading_is_iid else theta_or_x.transpose(1, 0)
     else:
         raise ValueError(
             f"`len(leading_theta_or_x_shape) = {leading_theta_or_x_shape} > 2`. "

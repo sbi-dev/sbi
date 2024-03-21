@@ -97,11 +97,12 @@ class PosteriorBasedPotential(BasePotential):
                 "No observed data x_o is available. Please reinitialize \
                 the potential or manually set self._x_o."
             )
+        
+        print("x_o", self.x_o.shape)
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
-        print("x_o", self.x_o.shape)
-        theta = reshape_to_iid_batch_event(theta, event_shape=theta.shape[1:], leading_is_iid=False)
-        x = reshape_to_iid_batch_event(self.x_o, event_shape=self.x_o.shape[1:], leading_is_iid=True)
+        theta = reshape_to_iid_batch_event(theta, event_shape=theta.shape[1:], leading_is_iid=True)
+        x = reshape_to_iid_batch_event(self.x_o, event_shape=self.x_o.shape[1:])
 
         theta, x = theta.to(self.device), x.to(self.device)
 

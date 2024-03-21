@@ -43,7 +43,7 @@ class NFlowsFlow(DensityEstimator):
         input_iid_dim = input.shape[0]
         input_batch_dim = input.shape[1]
         condition_batch_dim = condition.shape[1]
-        input_event_dims = len(input.shape[2:])
+        condition_event_dims = len(condition.shape[2:])
 
         assert condition_batch_dim == input_batch_dim, (
             f"Batch shape of condition {condition_batch_dim} and input "
@@ -54,13 +54,11 @@ class NFlowsFlow(DensityEstimator):
         input = input.reshape((input_batch_dim * input_iid_dim, -1))
 
         # Repeat the condition to match `input_batch_dim * input_iid_dim`.
-        ones_for_event_dims = (1,) * input_event_dims  # Tuple of 1s, e.g. (1, 1, 1)
-        print("ones_for_event_dims", ones_for_event_dims)
+        ones_for_event_dims = (1,) * condition_event_dims  # Tuple of 1s, e.g. (1, 1, 1)
         condition = condition.repeat(1, input_iid_dim, *ones_for_event_dims)
-        # The `.net` expects `batch, iid, event`, not `iid, batch, event`.
-        condition = condition.transpose(1, 0)
+
         # If no iid samples then squeeze the iid dimension.
-        condition = torch.squeeze(condition, dim=1)
+        condition = torch.squeeze(condition, dim=0)
 
         log_probs = self.net.log_prob(input, context=condition)
         return log_probs.reshape((input_iid_dim, input_batch_dim))
@@ -92,9 +90,7 @@ class NFlowsFlow(DensityEstimator):
         condition_batch_dim = condition.shape[1]
         num_samples = torch.Size(sample_shape).numel()
 
-        # The `.net` expects `batch, iid, event`, not `iid, batch, event`.
-        condition = condition.transpose(1, 0)
-        condition = torch.squeeze(condition, dim=1)
+        condition = torch.squeeze(condition, dim=0)
         samples = self.net.sample(num_samples, context=condition)
 
         return samples.reshape((
@@ -119,9 +115,7 @@ class NFlowsFlow(DensityEstimator):
         condition_batch_dim = condition.shape[1]
         num_samples = torch.Size(sample_shape).numel()
 
-        # The `.net` expects `batch, iid, event`, not `iid, batch, event`.
-        condition = condition.transpose(1, 0)
-
+        condition = condition.squeeze(dim=0)
         samples, log_probs = self.net.sample_and_log_prob(
             num_samples, context=condition
         )
