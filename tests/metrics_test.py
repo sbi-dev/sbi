@@ -139,16 +139,14 @@ def test_posterior_shrinkage():
     post_samples = np.array([[2, 3], [3, 4]])
     expected_shrinkage = np.array([0.0, 0.0])
     assert np.allclose(
-        posterior_shrinkage(prior_samples, post_samples),
-        expected_shrinkage
+        posterior_shrinkage(prior_samples, post_samples), expected_shrinkage
     )
 
     prior_samples = torch.tensor([[1, 2], [2, 3]])
     post_samples = torch.tensor([[2, 3], [3, 4]])
     expected_shrinkage = np.array([0.0, 0.0])
     assert np.allclose(
-        posterior_shrinkage(prior_samples, post_samples),
-        expected_shrinkage
+        posterior_shrinkage(prior_samples, post_samples), expected_shrinkage
     )
 
     prior_samples = np.array([])
@@ -161,20 +159,17 @@ def test_posterior_zscore():
     true_theta = 3
     post_samples = np.array([2, 3, 4])
     expected_zscore = np.array([np.inf, np.nan, np.inf])
-    assert np.allclose(posterior_zscore(true_theta, post_samples),
-                       expected_zscore)
+    assert np.allclose(posterior_zscore(true_theta, post_samples), expected_zscore)
 
     true_theta = np.array([2, 3])
     post_samples = np.array([[1, 2], [2, 3], [3, 4]])
     expected_zscore = np.array([0.0, 0.0])
-    assert np.allclose(posterior_zscore(true_theta, post_samples),
-                       expected_zscore)
+    assert np.allclose(posterior_zscore(true_theta, post_samples), expected_zscore)
 
     true_theta = torch.tensor([2, 3])
     post_samples = torch.tensor([[1, 2], [2, 3], [3, 4]])
     expected_zscore = np.array([0.0, 0.0])
-    assert np.allclose(posterior_zscore(true_theta, post_samples),
-                       expected_zscore)
+    assert np.allclose(posterior_zscore(true_theta, post_samples), expected_zscore)
 
     true_theta = np.array([])
     post_samples = np.array([])
