@@ -13,14 +13,13 @@ from scipy.stats._multivariate import multi_rv_frozen
 from torch import Tensor, float32, nn
 from torch.distributions import Distribution, Uniform
 
-from sbi.types import Array
+from sbi.sbi_types import Array
 from sbi.utils.sbiutils import warn_on_iid_x, within_support
 from sbi.utils.torchutils import BoxUniform, atleast_2d
 from sbi.utils.user_input_checks_utils import (
     CustomPriorWrapper,
     MultipleIndependent,
     PytorchReturnTypeWrapper,
-    ScipyPytorchWrapper,
 )
 
 
@@ -88,12 +87,10 @@ def process_prior(
 
     # If prior is given as `scipy.stats` object, wrap as PyTorch.
     elif isinstance(prior, (rv_frozen, multi_rv_frozen)):
-        event_shape = torch.Size([prior.rvs().size])
-        # batch_shape is passed as default
-        prior = ScipyPytorchWrapper(
-            prior, batch_shape=torch.Size([]), event_shape=event_shape
+        raise NotImplementedError(
+            "Passing a prior as scipy.stats object is deprecated. "
+            "Please pass it as a PyTorch Distribution."
         )
-        return process_pytorch_prior(prior)
 
     # Otherwise it is a custom prior - check for `.sample()` and `.log_prob()`.
     else:

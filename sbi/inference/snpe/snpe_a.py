@@ -16,7 +16,7 @@ import sbi.utils as utils
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.inference.snpe.snpe_base import PosteriorEstimator
 from sbi.neural_nets.density_estimators.base import DensityEstimator
-from sbi.types import TensorboardSummaryWriter, TorchModule
+from sbi.sbi_types import TensorboardSummaryWriter, TorchModule
 from sbi.utils import torchutils
 
 

@@ -7,7 +7,7 @@ from sklearn.neighbors import KernelDensity
 from torch import Tensor
 from torch.distributions.transforms import IndependentTransform, identity_transform
 
-from sbi.types import transform_types
+from sbi.sbi_types import transform_types
 
 
 class KDEWrapper:

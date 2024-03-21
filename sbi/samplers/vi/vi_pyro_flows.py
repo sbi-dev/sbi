@@ -9,7 +9,7 @@ from torch import nn
 from torch.distributions import Distribution, Independent, Normal
 
 from sbi.samplers.vi.vi_utils import filter_kwrags_for_func, get_modules, get_parameters
-from sbi.types import TorchTransform
+from sbi.sbi_types import TorchTransform
 
 # Supported transforms and flows are registered here i.e. associated with a name
 
