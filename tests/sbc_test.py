@@ -5,13 +5,13 @@ from __future__ import annotations
 
 import pytest
 import torch
-from torch import eye, ones, zeros
-from torch.distributions import MultivariateNormal, Uniform
-
 from sbi.diagnostics import check_sbc, get_nltp, run_sbc
 from sbi.inference import SNLE, SNPE, simulate_for_sbi
 from sbi.simulators import linear_gaussian
 from sbi.utils import BoxUniform, MultipleIndependent
+from torch import eye, ones, zeros
+from torch.distributions import MultivariateNormal, Uniform
+
 from tests.test_utils import PosteriorPotential, TractablePosterior
 
 
@@ -27,9 +27,9 @@ def test_running_sbc(method, prior, reduce_fn_str, sampler, model="mdn"):
     if prior == "boxuniform":
         prior = BoxUniform(-torch.ones(num_dim), torch.ones(num_dim))
     else:
-        prior = MultipleIndependent([
-            Uniform(-torch.ones(1), torch.ones(1)) for _ in range(num_dim)
-        ])
+        prior = MultipleIndependent(
+            [Uniform(-torch.ones(1), torch.ones(1)) for _ in range(num_dim)]
+        )
 
     num_simulations = 100
     max_num_epochs = 1
@@ -74,6 +74,80 @@ def test_running_sbc(method, prior, reduce_fn_str, sampler, model="mdn"):
 
     # Check nltp
     get_nltp(thetas, xs, posterior)
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("prior", ("boxuniform", "independent"))
+@pytest.mark.parametrize("method, sampler", [(SNLE, "vi")])
+def test_consistent_sbc_results(method, prior, sampler, model="mdn"):
+    """Tests running inference and then SBC and obtaining nltp."""
+
+    num_dim = 2
+    if prior == "boxuniform":
+        prior = BoxUniform(-torch.ones(num_dim), torch.ones(num_dim))
+    else:
+        prior = MultipleIndependent(
+            [Uniform(-torch.ones(1), torch.ones(1)) for _ in range(num_dim)]
+        )
+
+    num_simulations = 200
+    max_num_epochs = 20
+    num_sbc_runs = 4
+
+    likelihood_shift = -1.0 * ones(num_dim)
+    likelihood_cov = 0.3 * eye(num_dim)
+
+    def simulator(theta):
+        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
+
+    inferer = method(prior, show_progress_bars=False, density_estimator=model)
+
+    theta, x = simulate_for_sbi(simulator, prior, num_simulations)
+
+    _ = inferer.append_simulations(theta, x).train(
+        training_batch_size=100, max_num_epochs=max_num_epochs
+    )
+    if method == SNLE:
+        posterior_kwargs = {
+            "sample_with": "mcmc" if sampler == "mcmc" else "vi",
+            "mcmc_method": "slice_np_vectorized",
+            "mcmc_parameters": {"num_chains": 10, "thin": 5, "warmup_steps": 10},
+        }
+    else:
+        posterior_kwargs = {}
+
+    posterior = inferer.build_posterior(**posterior_kwargs)
+    num_posterior_samples = 250
+    thetas = prior.sample((num_sbc_runs,))
+    xs = simulator(thetas)
+
+    mranks, mdaps = run_sbc(
+        thetas,
+        xs,
+        posterior,
+        num_workers=1,
+        num_posterior_samples=num_posterior_samples,
+    )
+    mstats = check_sbc(
+        mranks, thetas, mdaps, num_posterior_samples=num_posterior_samples
+    )
+    lranks, ldaps = run_sbc(
+        thetas,
+        xs,
+        posterior,
+        num_workers=1,
+        num_posterior_samples=num_posterior_samples,
+        reduce_fns=posterior.log_prob,
+    )
+    lstats = check_sbc(
+        lranks, thetas, ldaps, num_posterior_samples=num_posterior_samples
+    )
+
+    assert lstats["ks_pvals"] > 0.05
+    assert (mstats["ks_pvals"] > 0.05).all()
+
+    assert lstats["c2st_ranks"] < 0.75
+    assert (mstats["c2st_ranks"] < 0.75).all()
 
 
 def test_sbc_accuracy():
