@@ -4,11 +4,11 @@ import torch
 from torch import Tensor, nn
 from zuko.flows import Flow
 
-from sbi.neural_nets.density_estimators.base import SBIDensityEstimator
+from sbi.neural_nets.density_estimators.base import DensityEstimator
 from sbi.types import Shape
 
 
-class ZukoFlow(SBIDensityEstimator):
+class ZukoFlow(DensityEstimator):
     r"""`zuko`- based normalizing flow density estimator.
 
     Flow type objects already have a .log_prob() and .sample() method, so here we just
@@ -24,9 +24,9 @@ class ZukoFlow(SBIDensityEstimator):
             flow: Flow object.
             condition_shape: Shape of the condition.
         """
-
-        # assert len(condition_shape) == 1, "Zuko Flows require 1D conditions."
-        super().__init__(net=net, condition_shape=condition_shape)
+        super().__init__()
+        self.net = net
+        self._condition_shape = condition_shape
         self._embedding_net = embedding_net
 
     @property
@@ -63,7 +63,7 @@ class ZukoFlow(SBIDensityEstimator):
             - (batch_size1, input_size) + (batch_size2,1, *condition_shape)
                                                   -> (batch_size2,batch_size1)
         """
-        self._check_condition_shape(condition)
+        check_condition_shape(condition, self._condition_shape)
         condition_dims = len(self._condition_shape)
 
         # PyTorch's automatic broadcasting
@@ -110,7 +110,7 @@ class ZukoFlow(SBIDensityEstimator):
             - (*batch_shape, *condition_shape)
                                         -> (*batch_shape, *sample_shape, input_size)
         """
-        self._check_condition_shape(condition)
+        check_condition_shape(condition, self._condition_shape)
 
         condition_dims = len(self._condition_shape)
         batch_shape = condition.shape[:-condition_dims] if condition_dims > 0 else ()
@@ -134,7 +134,7 @@ class ZukoFlow(SBIDensityEstimator):
         Returns:
             Samples and associated log probabilities.
         """
-        self._check_condition_shape(condition)
+        check_condition_shape(condition, self._condition_shape)
 
         condition_dims = len(self._condition_shape)
         batch_shape = condition.shape[:-condition_dims] if condition_dims > 0 else ()
