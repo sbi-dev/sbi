@@ -1112,7 +1112,7 @@ def _arrange_grid(
                 else:
                     for sample_ind, sample in enumerate(samples):
                         if upper_funcs[sample_ind] is not None:
-                            upper_funcs[sample_ind](ax,sample[:,row],sample[:,col],limits[row],limits[col],upper_kwargs[sample_ind])
+                            upper_funcs[sample_ind](ax,sample[:,col],sample[:,row],limits[col],limits[row],upper_kwargs[sample_ind])
                     if len(points) > 0:
                         for n, v in enumerate(points):
                             ax.plot(
