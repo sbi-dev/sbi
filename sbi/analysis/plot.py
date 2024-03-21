@@ -56,24 +56,26 @@ def _update(d, u):
 # Plotting functions
 def plt_hist_1d(ax,samples,limits,kwargs):
     """Plot 1D histogram."""
-    if "bins" not in kwargs['mpl_kwargs'].keys() or kwargs['mpl_kwargs']["bins"] is None:
+    if kwargs["bin_heuristic"]=="Freedman-Diaconis":
         #The Freedman-Diaconis heuristic
         binsize = 2*iqr(samples)*len(samples)**(-1/3)
         kwargs['mpl_kwargs']["bins"] = np.arange(limits[0],limits[1]+binsize,binsize)
+    elif isinstance(kwargs['mpl_kwargs']["bins"],int):
+        kwargs['mpl_kwargs']["bins"] = np.linspace(limits[0],limits[1],kwargs['mpl_kwargs']["bins"])
     ax.hist(
         samples,
         **kwargs['mpl_kwargs'])
-    
+
 def plt_hist_2d(ax,samples_col, samples_row,limits_col,limits_row,kwargs):
     """Plot 2D histogram."""
-    if "bins" not in kwargs['mpl_kwargs'].keys() or kwargs['mpl_kwargs']["bins"] is None:
-        if kwargs["bin_heuristic"]=="Freedman-Diaconis":
-            #The Freedman-Diaconis heuristic applied to each direction
-            binsize_col = 2*iqr(samples_col)*len(samples_col)**(-1/3)
-            n_bins_col = int((limits_col[1]-limits_col[0])/binsize_col)
-            binsize_row = 2*iqr(samples_row)*len(samples_row)**(-1/3)
-            n_bins_row = int((limits_row[1]-limits_row[0])/binsize_row)
-            kwargs['np_hist_kwargs']["bins"] = [n_bins_col,n_bins_row]
+    if kwargs["bin_heuristic"]=="Freedman-Diaconis":
+        #The Freedman-Diaconis heuristic applied to each direction
+        binsize_col = 2*iqr(samples_col)*len(samples_col)**(-1/3)
+        n_bins_col = int((limits_col[1]-limits_col[0])/binsize_col)
+        binsize_row = 2*iqr(samples_row)*len(samples_row)**(-1/3)
+        n_bins_row = int((limits_row[1]-limits_row[0])/binsize_row)
+        kwargs['np_hist_kwargs']["bins"] = [n_bins_col,n_bins_row]
+
     hist, xedges, yedges = np.histogram2d(
                             samples_col,
                             samples_row,
@@ -141,7 +143,7 @@ def plt_kde_2d(ax,samples_col, samples_row,limits_col,limits_row,kwargs):
         ),
         **kwargs['mpl_kwargs']
     )
-    
+
 def plt_contour_2d(ax,samples_col, samples_row,limits_col,limits_row,kwargs):
     """2D Contour based on Kernel Density Estimation."""
     density = gaussian_kde(
@@ -181,7 +183,7 @@ def plt_contour_2d(ax,samples_col, samples_row,limits_col,limits_row,kwargs):
         **kwargs['mpl_kwargs']
 
     )
-                        
+
 def plt_scatter_1d(ax,samples,limits, kwargs):
     """Scatter plot 1D."""
     for single_sample in samples:
@@ -203,7 +205,7 @@ def plt_plot_2d(ax,samples_col, samples_row,limits_col,limits_row,kwargs):
                 **kwargs['mpl_kwargs'],
             )
 
-    
+
 def get_diag_funcs(diag_list):
     """make a list of the functions for the diagonal plots."""
     diag_funcs = []
@@ -216,10 +218,10 @@ def get_diag_funcs(diag_list):
             diag_funcs.append(plt_scatter_1d)
         else:
             diag_funcs.append(None)
-            
+
     return diag_funcs
-        
-            
+
+
 def get_offdiag_funcs(off_diag_list):
     """make a list of the functions for the off-diagonal plots."""
     offdiag_funcs = []
@@ -238,21 +240,39 @@ def get_offdiag_funcs(off_diag_list):
             offdiag_funcs.append(None)
     return offdiag_funcs
 
-def _format_subplot(ax, current, limits, ticks, labels_dim, fig_kwargs, row, col, dim, flat,excl_lower):
-          # Background color
+def _format_subplot(ax, current, limits, ticks, labels_dim, fig_kwargs, row, col, dim, flat,excl_lower,eps=1e-5):
+    """
+    Format subplot according to fig_kwargs and other arguments
+    Args:
+        ax: matplotlib axis
+        current: str, 'diag','upper' or 'lower'
+        limits: list of lists, limits for each dimension
+        ticks: list of lists, ticks for each dimension
+        labels_dim: list of strings, labels for each dimension
+        fig_kwargs: dict, figure kwargs
+        row: int, row index
+        col: int, column index
+        dim: int, number of dimensions
+        flat: bool, whether the plot is flat (1 row)
+        excl_lower: bool, whether lower triangle is empty
+
+    """
+
+    # Background color
     if (
         current in fig_kwargs["fig_bg_colors"]
         and fig_kwargs["fig_bg_colors"][current] is not None
     ):
         ax.set_facecolor(fig_kwargs["fig_bg_colors"][current])
-
-
     # Limits
-    ax.set_xlim((limits[col][0], limits[col][1]))
+    if current == "diag":
+        ax.set_xlim((limits[col][0]-eps, limits[col][1]+eps))
+    else:
+        ax.set_xlim((limits[col][0], limits[col][1]))
+
     if current != "diag":
         ax.set_ylim((limits[row][0], limits[row][1]))
-    #else:
-        #ax.set_ylim(0,20)
+
     # Ticks
     if ticks is not None:
         ax.set_xticks((ticks[col][0], ticks[col][1]))
@@ -265,7 +285,7 @@ def _format_subplot(ax, current, limits, ticks, labels_dim, fig_kwargs, row, col
     ax.spines["bottom"].set_position(("outward", fig_kwargs["despine"]["offset"]))
 
      # Formatting axes
-    if current == "diag":  # off-diagnoals
+    if current == "diag":  # diagonals
         if excl_lower or col == dim - 1 or flat:
             _format_axis(
                 ax,
@@ -276,7 +296,7 @@ def _format_subplot(ax, current, limits, ticks, labels_dim, fig_kwargs, row, col
             )
         else:
             _format_axis(ax, xhide=True, yhide=True)
-    else:  # off-diagnoals
+    else:  # off-diagonals
         if row == dim - 1:
             _format_axis(
                 ax,
@@ -294,7 +314,7 @@ def _format_subplot(ax, current, limits, ticks, labels_dim, fig_kwargs, row, col
         ))
 
 def _format_axis(ax,xhide=True, yhide=True, xlabel="", ylabel="", tickformatter=None):
-  
+    """Format axis spines and ticks."""
     for loc in ["right", "top", "left", "bottom"]:
         ax.spines[loc].set_visible(False)
     if xhide:
@@ -325,19 +345,18 @@ def _format_axis(ax,xhide=True, yhide=True, xlabel="", ylabel="", tickformatter=
 def probs2contours(probs, levels):
     """Takes an array of probabilities and produces an array of contours at specified
     percentile levels.
-    Parameters
-    ----------
-    probs : array
-        Probability array. doesn't have to sum to 1, but it is assumed it contains all
-        the mass
-    levels : list
-        Percentile levels, have to be in [0.0, 1.0]. Specifies contour levels that
-        include a given proportion of samples, i.e., 0.1 specifies where the top 10% of
-        the density is.
-    Return
-    ------
-    Array of same shape as probs with percentile labels. Values in output array
-    denote labels which percentile bin the probability mass belongs to.
+    Args:
+        probs : array
+            Probability array. doesn't have to sum to 1, but it is assumed it contains all
+            the mass
+        levels : list
+            Percentile levels, have to be in [0.0, 1.0]. Specifies contour levels that
+            include a given proportion of samples, i.e., 0.1 specifies where the top 10% of
+            the density is.
+    Returns:
+        contors: array
+            Array of same shape as probs with percentile labels. Values in output array
+            denote labels which percentile bin the probability mass belongs to.
 
     Example: for levels = [0.1, 0.5], output array will take on values [1.0, 0.5, 0.1],
     where elements labeled "0.1" correspond to the top 10% of the density, "0.5"
@@ -491,12 +510,12 @@ def pairplot(
     labels: Optional[List[str]] = None,
     ticks: Optional[Union[List, torch.Tensor]] = None,
     offdiag: Optional[str] = None,
+    diag_kwargs :Optional[Dict]={},
+    upper_kwargs : Optional[Dict]={},
+    lower_kwargs : Optional[Dict]={},
+    fig_kwargs : Optional[Dict]={},
     fig=None,
     axes=None,
-    diag_kwargs = {},
-    upper_kwargs = {},
-    lower_kwargs = {},
-    fig_kwargs = {},
     **kwargs
 ):
     """
@@ -514,38 +533,44 @@ def pairplot(
         subset: List containing the dimensions to plot. E.g. subset=[1,3] will plot
             plot only the 1st and 3rd dimension but will discard the 0th and 2nd (and,
             if they exist, the 4th, 5th and so on).
-        offdiag: deprecated, use upper instead.
-        upper: Plotting style for upper diagonal, {hist, scatter, contour, cond,
+        upper: Plotting style for upper diagonal, {hist, scatter, contour, kde,
             None}.
-        lower: Plotting style for upper diagonal, {hist, scatter, contour, cond,
+        lower: Plotting style for upper diagonal, {hist, scatter, contour, kde,
             None}.
-        diag: Plotting style for diagonal, {hist, cond, None}.
+        diag: Plotting style for diagonal, {hist, scatter, kde}.
         figsize: Size of the entire figure.
         labels: List of strings specifying the names of the parameters.
         ticks: Position of the ticks.
+        offdiag: deprecated, use upper instead.
+        diag_kwargs: Additional arguments to adjust the diagonal plot,
+            see the source code in `_get_default_diag_kwarg()`
+        upper_kwargs: Additional arguments to adjust the upper diagonal plot,
+            see the source code in `_get_default_offdiag_kwarg()`
+        lower_kwargs: Additional arguments to adjust the lower diagonal plot,
+            see the source code in `_get_default_offdiag_kwarg()`
+        fig_kwargs: Additional arguments to adjust the overall figure,
+            see the source code in `_get_default_fig_kwargs()`
         fig: matplotlib figure to plot on.
         axes: matplotlib axes corresponding to fig.
-        **kwargs: Additional arguments to adjust the plot, e.g., `samples_colors`,
-            `points_colors` and many more, see the source code in `_get_default_opts()`
-            in `sbi.analysis.plot` for details.
+        **kwargs: Additional arguments to adjust the plot (deprecated).
 
     Returns: figure and axis of posterior distribution plot
     """
-    
+
     #Backwards compatibility
     if len(kwargs)>0:
         warn("**kwargs are deprecated, use fig_kwargs instead. \n Calling the to be deprecated pairplot function", stacklevel=2)
         fig,axes = pairplot_dep(samples,points,limits,subset,offdiag,diag,figsize,
                               labels,ticks,upper,fig,axes,**kwargs)
         return fig,axes
-    
+
     samples, dim, limits = prepare_for_plot(samples, limits)
-    
+
     #prepate figure kwargs
     fig_kwargs_filled = _get_default_fig_kwargs()
     # update the defaults dictionary with user provided values
     fig_kwargs_filled = _update(fig_kwargs_filled, fig_kwargs)
-    
+
     # checks.
     if fig_kwargs_filled["legend"]:
         assert len(fig_kwargs_filled["samples_labels"]) >= len(
@@ -567,7 +592,7 @@ def pairplot(
         diag_kwargs_filled.append(diag_kwarg_filled_i)
 
     # Prepare upper
-    upper = to_list(upper, len(samples))    
+    upper = to_list(upper, len(samples))
     upper_kwargs = to_list(upper_kwargs, len(samples))
     upper_func = get_offdiag_funcs(upper)
     upper_kwargs_filled = []
@@ -576,7 +601,7 @@ def pairplot(
         # update the defaults dictionary with user provided values
         upper_kwarg_filled_i = _update(upper_kwarg_filled_i, upper_kwargs_i)
         upper_kwargs_filled.append(upper_kwarg_filled_i)
-  
+
     # Prepare lower
     lower = to_list(lower, len(samples))
     lower_kwargs = to_list(lower_kwargs, len(samples))
@@ -602,10 +627,10 @@ def marginal_plot(
     limits: Optional[Union[List, torch.Tensor]] = None,
     subset: Optional[List[int]] = None,
     diag: Optional[str] = "hist",
-    diag_kwargs = {},
     figsize: Tuple = (10, 10),
     labels: Optional[List[str]] = None,
     ticks: Optional[Union[List, torch.Tensor]] = None,
+    diag_kwargs: Optional[Dict]= {},
     fig_kwargs: Optional[Dict]= {},
     fig=None,
     axes=None,
@@ -629,25 +654,26 @@ def marginal_plot(
         figsize: Size of the entire figure.
         labels: List of strings specifying the names of the parameters.
         ticks: Position of the ticks.
-        points_colors: Colors of the `points`.
+        diag_kwargs: Additional arguments to adjust the diagonal plot,
+            see the source code in `_get_default_diag_kwarg()`
+        fig_kwargs: Additional arguments to adjust the overall figure,
+            see the source code in `_get_default_fig_kwargs()`
         fig: matplotlib figure to plot on.
         axes: matplotlib axes corresponding to fig.
-        **kwargs: Additional arguments to adjust the plot, e.g., `samples_colors`,
-            `points_colors` and many more, see the source code in `_get_default_opts()`
-            in `sbi.analysis.plot` for details.
-
+        **kwargs: Additional arguments to adjust the plot (deprecated)
     Returns: figure and axis of posterior distribution plot
     """
-    
+
     #backwards compatibility
     if len(kwargs)>0:
         warn("**kwargs are deprecated, use fig_kwargs instead.\n calling the to be deprecated marginal_plot funcion", stacklevel=2)
         fig,axes = marginal_plot_dep(samples,points,limits,subset,diag,figsize,
                               labels,ticks,fig,axes,**kwargs)
         return fig,axes
-    
+
     samples, dim, limits = prepare_for_plot(samples, limits)
 
+    # prepare kwargs and functions of the subplots
     diag = to_list(diag, len(samples))
     diag_kwargs = to_list(diag_kwargs, len(samples))
     diag_func = get_diag_funcs(diag)
@@ -656,33 +682,37 @@ def marginal_plot(
         diag_kwarg_filled_i = _get_default_diag_kwargs(diag_i,i)
         diag_kwarg_filled_i = _update(diag_kwarg_filled_i, diag_kwargs_i)
         diag_kwargs_filled.append(diag_kwarg_filled_i)
-    
+
+    # prepare fig_kwargs
     fig_kwargs_filled = _get_default_fig_kwargs()
     fig_kwargs_filled = _update(fig_kwargs_filled, fig_kwargs)
-    
+
+    # generate plot
     return _arrange_grid(
         diag_func, [None], [None], diag_kwargs_filled, [None],[None],
         samples, points, limits, subset, figsize, labels, ticks, fig, axes, fig_kwargs_filled
-
-
     )
 
 
 def _get_default_offdiag_kwargs(offdiag, i=0):
+    """Get default offdiag kwargs."""
+
     if offdiag =="kde" or offdiag == "kde2d":
         offdiag_kwargs = {
-            "bw_method": "scott", 
-            "bins": 50, 
+            "bw_method": "scott",
+            "bins": 50,
             "mpl_kwargs": {"cmap": "viridis",
                            "origin":"lower"},
-        }  
+        }
 
     elif offdiag == "hist" or offdiag == "hist2d":
         offdiag_kwargs = {
-            "bin_heuristic": "Freedman-Diaconis",
-            "mpl_kwargs": {"cmap": "viridis",
+            "bin_heuristic": None,#"Freedman-Diaconis",
+            "mpl_kwargs": {
+                           "cmap": "viridis",
                            "origin":"lower"},
-            "np_hist_kwargs":{"density": False}
+            "np_hist_kwargs":{"bins":50,
+                              "density": False}
         }
 
     elif offdiag == "scatter":
@@ -708,12 +738,13 @@ def _get_default_offdiag_kwargs(offdiag, i=0):
     return offdiag_kwargs
 
 def _get_default_diag_kwargs(diag,i=0):
+    """Get default diag kwargs."""
     if diag == "kde":
         diag_kwargs = {
-            "bw_method": "scott", 
-            "bins": 50, 
+            "bw_method": "scott",
+            "bins": 50,
             "mpl_kwargs": {"color": plt.rcParams["axes.prop_cycle"].by_key()["color"][i*2]}
-        }  
+        }
 
     elif diag =="hist":
         diag_kwargs = {
@@ -730,6 +761,7 @@ def _get_default_diag_kwargs(diag,i=0):
     return diag_kwargs
 
 def _get_default_fig_kwargs():
+    """Get default figure kwargs."""
     return {
         "legend":None,
         "legend_kwargs": {},
@@ -980,7 +1012,7 @@ def _arrange_grid(
     # Prepare labels
     if labels == [] or labels is None:
         labels = ["dim {}".format(i + 1) for i in range(dim)]
-    
+
     # Prepare ticks
     if ticks is not None:
         if len(ticks) == 1:
@@ -1026,7 +1058,7 @@ def _arrange_grid(
             rows,
             cols,
         ), f"Passed axes must match subplot shape: {rows, cols}."
-    
+
     # Cast to ndarray in case of 1D subplots.
     axes = np.array(axes).reshape(rows, cols)
 
@@ -1034,7 +1066,7 @@ def _arrange_grid(
     fig.subplots_adjust(**fig_kwargs["fig_subplots_adjust"])
     fig.suptitle(fig_kwargs["title"], **fig_kwargs["title_format"])
 
-    
+
     # Main Loop through all subplots, style and create the figures
     for row_idx, row in enumerate(subset_rows):
 
@@ -1071,7 +1103,7 @@ def _arrange_grid(
                     ax.legend(**fig_kwargs["legend_kwargs"])
 
             # Off-diagonals
-            
+
             # upper
             elif current == "upper":
                 if excl_upper:
