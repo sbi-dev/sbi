@@ -12,7 +12,7 @@ import torch
 from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
-from scipy.stats import binom, gaussian_kde
+from scipy.stats import binom, gaussian_kde, iqr
 from torch import Tensor
 
 from sbi.analysis import eval_conditional_density
@@ -56,12 +56,24 @@ def _update(d, u):
 # Plotting functions
 def plt_hist_1d(ax,samples,limits,kwargs):
     """Plot 1D histogram."""
+    if "bins" not in kwargs['mpl_kwargs'].keys() or kwargs['mpl_kwargs']["bins"] is None:
+        #The Freedman-Diaconis heuristic
+        binsize = 2*iqr(samples)*len(samples)**(-1/3)
+        kwargs['mpl_kwargs']["bins"] = np.arange(limits[0],limits[1]+binsize,binsize)
     ax.hist(
         samples,
         **kwargs['mpl_kwargs'])
     
 def plt_hist_2d(ax,samples_col, samples_row,limits_col,limits_row,kwargs):
     """Plot 2D histogram."""
+    if "bins" not in kwargs['mpl_kwargs'].keys() or kwargs['mpl_kwargs']["bins"] is None:
+        if kwargs["bin_heuristic"]=="Freedman-Diaconis":
+            #The Freedman-Diaconis heuristic applied to each direction
+            binsize_col = 2*iqr(samples_col)*len(samples_col)**(-1/3)
+            n_bins_col = int((limits_col[1]-limits_col[0])/binsize_col)
+            binsize_row = 2*iqr(samples_row)*len(samples_row)**(-1/3)
+            n_bins_row = int((limits_row[1]-limits_row[0])/binsize_row)
+            kwargs['np_hist_kwargs']["bins"] = [n_bins_col,n_bins_row]
     hist, xedges, yedges = np.histogram2d(
                             samples_col,
                             samples_row,
@@ -69,7 +81,7 @@ def plt_hist_2d(ax,samples_col, samples_row,limits_col,limits_row,kwargs):
                                 [limits_col[0], limits_col[1]],
                                 [limits_row[0], limits_row[1]],
                             ],
-                            **kwargs['hist_kwargs'],
+                            **kwargs['np_hist_kwargs'],
                         )
     ax.imshow(
         hist.T,
@@ -527,9 +539,6 @@ def pairplot(
                               labels,ticks,upper,fig,axes,**kwargs)
         return fig,axes
     
-    # TODO: automatically determine good bin sizes for histograms
-    # TODO: add legend (if legend is True)
-
     samples, dim, limits = prepare_for_plot(samples, limits)
     
     #prepate figure kwargs
@@ -650,6 +659,7 @@ def marginal_plot(
     
     fig_kwargs_filled = _get_default_fig_kwargs()
     fig_kwargs_filled = _update(fig_kwargs_filled, fig_kwargs)
+    
     return _arrange_grid(
         diag_func, [None], [None], diag_kwargs_filled, [None],[None],
         samples, points, limits, subset, figsize, labels, ticks, fig, axes, fig_kwargs_filled
@@ -669,11 +679,10 @@ def _get_default_offdiag_kwargs(offdiag, i=0):
 
     elif offdiag == "hist" or offdiag == "hist2d":
         offdiag_kwargs = {
+            "bin_heuristic": "Freedman-Diaconis",
             "mpl_kwargs": {"cmap": "viridis",
                            "origin":"lower"},
-            "hist_kwargs":{
-                        "bins": 50,
-                        "density": False}
+            "np_hist_kwargs":{"density": False}
         }
 
     elif offdiag == "scatter":
@@ -708,8 +717,8 @@ def _get_default_diag_kwargs(diag,i=0):
 
     elif diag =="hist":
         diag_kwargs = {
+            "bin_heuristic": "Freedman-Diaconis",
             "mpl_kwargs": {"color": plt.rcParams["axes.prop_cycle"].by_key()["color"][i*2],
-                        "bins": 50,
                         "density": False,
                         "histtype": "step"}
         }
@@ -978,6 +987,7 @@ def _arrange_grid(
             ticks = [ticks[0] for _ in range(dim)]
         elif ticks == []:
             ticks = None
+
     # Figure out if we subset the plot
     if subset is None:
         rows = cols = dim
@@ -990,12 +1000,20 @@ def _arrange_grid(
         else:
             raise NotImplementedError
         rows = cols = len(subset)
+
+    #check which subplots are empty
     excl_lower=all(v is None for v in lower_funcs)
     excl_upper=all(v is None for v in upper_funcs)
     excl_diag=all(v is None for v in diag_funcs)
     flat = excl_lower and excl_upper
+
+    #select the subset of rows and cols to be plotted
     if flat:
         rows = 1
+        subset_rows =[1]
+    else:
+        subset_rows = subset
+    subset_cols = subset
 
 
     # Create fig and axes if they were not passed.
@@ -1008,6 +1026,7 @@ def _arrange_grid(
             rows,
             cols,
         ), f"Passed axes must match subplot shape: {rows, cols}."
+    
     # Cast to ndarray in case of 1D subplots.
     axes = np.array(axes).reshape(rows, cols)
 
@@ -1015,22 +1034,11 @@ def _arrange_grid(
     fig.subplots_adjust(**fig_kwargs["fig_subplots_adjust"])
     fig.suptitle(fig_kwargs["title"], **fig_kwargs["title_format"])
 
-    row_idx = -1
-    
     
     # Main Loop through all subplots, style and create the figures
-    
-    for row in range(rows):
-        if row not in subset:
-            continue
-        if not flat:
-            row_idx += 1
-        col_idx = -1
-        for col in range(dim):
-            if col not in subset:
-                continue
-            else:
-                col_idx += 1
+    for row_idx, row in enumerate(subset_rows):
+
+        for col_idx, col in enumerate(subset_cols):
             if flat or row == col:
                 current = "diag"
             elif row < col:
@@ -1039,7 +1047,6 @@ def _arrange_grid(
                 current = "lower"
 
             ax = axes[row_idx, col_idx]
-            #plt.sca(ax)
             # Diagonals
             _format_subplot(ax, current, limits, ticks, labels, fig_kwargs, row, col, dim, flat,excl_lower)
             if current == "diag":
@@ -1065,6 +1072,7 @@ def _arrange_grid(
 
             # Off-diagonals
             
+            # upper
             elif current == "upper":
                 if excl_upper:
                     ax.axis("off")
@@ -1080,6 +1088,7 @@ def _arrange_grid(
                                 color=fig_kwargs["points_colors"][n],
                                 **fig_kwargs["points_offdiag"],
                             )
+            # lower
             elif current == "lower":
                 if excl_lower:
                     ax.axis("off")
@@ -1095,8 +1104,7 @@ def _arrange_grid(
                                 color=fig_kwargs["points_colors"][n],
                                 **fig_kwargs["points_offdiag"],
                             )
- 
-
+    # Add dots if we subset
     if len(subset) < dim:
         if flat:
             ax = axes[0, len(subset) - 1]
