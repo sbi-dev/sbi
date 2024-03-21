@@ -52,8 +52,8 @@ class ZukoFlowMatchingEstimator(DensityEstimator):
         self.device = device
         self.theta_shape = theta_shape
         self.frequency = torch.arange(1, frequency + 1, device=self.device) * math.pi
-        self.eta = eta,
-        self.z_score_theta = z_score_theta,
+        self.eta = eta
+        self.z_score_theta = z_score_theta
         self.z_score_x = z_score_x
 
     def embedding_net(self):
@@ -120,6 +120,7 @@ class ZukoFlowMatchingEstimator(DensityEstimator):
         # compute the mean squared error between the vector fields
         return (self.forward(theta_prime, x, t) - vector_field).pow(2).mean()
 
+    # TODO: rename? apply z_scores
     def forward(
         self, theta: torch.Tensor, x: torch.Tensor, t: torch.Tensor
     ) -> torch.Tensor:

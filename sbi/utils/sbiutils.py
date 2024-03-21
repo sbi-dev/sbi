@@ -184,6 +184,11 @@ def standardizing_transform(
             scale=1 / t_std,
             buffer=True,
         )
+    elif backend == "zuko_transform":
+        return zuko.transforms.MonotonicAffineTransform(
+            -t_mean / t_std,
+            scale=1 / t_std
+        )
 
     else:
         raise ValueError("Invalid backend. Use 'nflows' or 'zuko'.")
