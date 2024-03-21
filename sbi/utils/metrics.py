@@ -261,6 +261,7 @@ def unbiased_mmd_squared_hypothesis_test(x, y, alpha=0.05):
 
     return mmd_square_unbiased, threshold
 
+
 def posterior_shrinkage(prior_samples, post_samples):
     """
     Calculate the posterior shrinkage, quantifying how much
@@ -279,7 +280,7 @@ def posterior_shrinkage(prior_samples, post_samples):
     shrinkage : float or array-like
         The posterior shrinkage.
     """
-    # check if input are not empty
+
     if len(prior_samples) == 0 or len(post_samples) == 0:
         raise ValueError("Input samples are empty")
 
@@ -295,6 +296,7 @@ def posterior_shrinkage(prior_samples, post_samples):
     post_std = np.std(post_samples, axis=0)
 
     return 1 - (post_std / prior_std) ** 2
+
 
 def posterior_zscore(true_theta, post_samples):
     """
