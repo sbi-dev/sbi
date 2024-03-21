@@ -525,7 +525,7 @@ class MCMCPosterior(NeuralPosterior):
         num_samples: int,
         potential_function: Callable,
         initial_params: Tensor,
-        mcmc_method: str = "hmc_pyro",
+        mcmc_method: str = "nuts_pyro",
         thin: int = 10,
         warmup_steps: int = 200,
         num_chains: Optional[int] = 1,
@@ -580,7 +580,7 @@ class MCMCPosterior(NeuralPosterior):
         num_samples: int,
         potential_function: Callable,
         initial_params: Tensor,
-        mcmc_method: str = "slice_pymc",
+        mcmc_method: str = "nuts_pymc",
         thin: int = 10,
         warmup_steps: int = 200,
         num_chains: Optional[int] = 1,
@@ -738,8 +738,8 @@ class MCMCPosterior(NeuralPosterior):
         Note: the InferenceData is constructed using the posterior samples generated in
         most recent call to `.sample(...)`.
 
-        For Pyro HMC and NUTS kernels InferenceData will contain diagnostics, for
-        sbi slice sampling samples, only the samples are added.
+        For Pyro and PyMC samplers, InferenceData will contain diagnostics, but for
+        sbi slice samplers, only the samples are added.
 
         Returns:
             inference_data: Arviz InferenceData object.
@@ -748,9 +748,9 @@ class MCMCPosterior(NeuralPosterior):
             self._posterior_sampler is not None
         ), """No samples have been generated, call .sample() first."""
 
-        sampler: Union[MCMC, SliceSamplerSerial, SliceSamplerVectorized] = (
-            self._posterior_sampler
-        )
+        sampler: Union[
+            MCMC, SliceSamplerSerial, SliceSamplerVectorized, PyMCSampler
+        ] = self._posterior_sampler
 
         # If Pyro sampler and samples not transformed, use arviz' from_pyro.
         # Exclude 'slice' kernel as it lacks the 'divergence' diagnostics key.

@@ -5,11 +5,12 @@ import pymc
 import pytensor.tensor as pt
 import torch
 
-from sbi.inference.potentials.base_potential import BasePotential
 from sbi.utils import tensor2numpy
 
 
-class PyMCPotential(pt.Op):
+class PyMCPotential(pt.Op):  # type: ignore
+    """PyTensor Op wrapping a callable potential function"""
+
     itypes = [pt.dvector]  # expects a vector of parameter values when called
     otypes = [
         pt.dscalar,
@@ -19,11 +20,11 @@ class PyMCPotential(pt.Op):
 
     def __init__(
         self,
-        potential_fn: BasePotential,
+        potential_fn: Callable,
         device: str,
         track_gradients: bool = True,
     ):
-        """PyTensor operation wrapping a `BasePotential` callable for use
+        """PyTensor Op wrapping a callable potential function for use
         with PyMC samplers.
 
         Args:
@@ -36,13 +37,23 @@ class PyMCPotential(pt.Op):
         self.track_gradients = track_gradients
 
     def perform(self, node, inputs, outputs) -> None:
-        """Compute potential and possibly gradients from input parameters"""
+        """Compute potential and possibly gradients from input parameters
+
+        Args:
+            node: A "node" that represents the computation, handled internally
+                by PyTensor.
+            inputs: A list of inputs to the operation of type `itypes`. In this
+                case, the list will contain one array containing the simulator parameters.
+            outputs: A list allocated for storing operation outputs. In this
+                case, the list will contain one scalar for the computed potential
+                and an array containing the gradient of the potential with respect to the
+                simulator parameters.
+        """
         # unpack and handle inputs
         params = inputs[0]
         params = (
             torch.tensor(params)
-            .to(torch.float32)
-            .to(self.device)
+            .to(device=self.device, dtype=torch.float32)
             .requires_grad_(self.track_gradients)
         )
 
@@ -60,16 +71,30 @@ class PyMCPotential(pt.Op):
         else:
             outputs[1][0] = np.zeros(params.shape, dtype=np.float64)
 
-    def grad(self, inputs, g):
-        """Get gradients computed from `perform` and return Jacobian-Vector product"""
+    def grad(self, inputs, output_grads) -> list:
+        """Get gradients computed from `perform` and return Jacobian-Vector product
+
+        Args:
+            inputs: A list of inputs to the operation of type `itypes`. In this
+                case, the list will contain one array containing the simulator parameters.
+            output_grads: A list of the gradients of the output variables. The first
+                element will be the gradient of the output of the whole computational
+                graph with respect to the output of this specific operation, i.e., the potential.
+
+        Returns:
+            A list containing the gradient of the output of the whole computational
+                graph with respect to the input of this operation, i.e., the simulator parameters.
+        """
         # get outputs from forward pass (but doesn't re-compute it, I think...)
         value = self(*inputs)
         gradients = value.owner.outputs[1:]
         # compute and return JVP
-        return [(g[0] * grad) for grad in gradients]
+        return [(output_grads[0] * grad) for grad in gradients]
 
 
 class PyMCSampler:
+    """Interface for PyMC samplers"""
+
     def __init__(
         self,
         potential_fn: Callable,
@@ -117,7 +142,7 @@ class PyMCSampler:
             params = pymc.Normal(
                 self.param_name, mu=initvals.mean(axis=0)
             )  # dummy prior
-            pymc.Potential("likelihood", potential(params))
+            pymc.Potential("likelihood", potential(params))  # type: ignore
 
     def run(self) -> np.ndarray:
         """Run MCMC with PyMC
@@ -131,13 +156,14 @@ class PyMCSampler:
                 step=step_class[self._step](),
                 tune=self._tune,
                 draws=self._draws,
-                initvals=self._initvals,
+                initvals=self._initvals,  # type: ignore
                 chains=self._chains,
                 progressbar=self._progressbar,
                 mp_ctx=self._mp_ctx,
             )
         self._inference_data = inference_data
-        samples = getattr(inference_data.posterior, self.param_name).data
+        traces = inference_data.posterior
+        samples = getattr(traces, self.param_name).data
         return samples
 
     def get_samples(
@@ -159,7 +185,8 @@ class PyMCSampler:
         if self._inference_data is None:
             raise ValueError("No samples found from MCMC run.")
         # if not grouped by chain, flatten samples into (all_samples, dim_params)
-        samples = getattr(self._inference_data.posterior, self.param_name).data
+        traces = self._inference_data.posterior
+        samples = getattr(traces, self.param_name).data
         if not group_by_chain:
             samples = samples.reshape(-1, samples.shape[-1])
 

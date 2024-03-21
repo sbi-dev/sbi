@@ -145,7 +145,6 @@ def test_getting_inference_diagnostics(
     num_samples: int = 10,
     num_dim: int = 2,
 ):
-
     # Use composed prior to test MultipleIndependent case.
     prior = [
         Uniform(low=-ones(1), high=ones(1)),
