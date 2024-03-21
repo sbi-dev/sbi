@@ -1,6 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
+from logging import warning
 from typing import Any, Dict, Optional
 
 import numpy as np
@@ -185,8 +186,10 @@ def c2st_scores(
     return scores
 
 
-def unbiased_mmd_squared(x, y):
+def unbiased_mmd_squared(x, y, scale: float = None):
     nx, ny = x.shape[0], y.shape[0]
+    assert nx != 1 and ny != 1, "The unbiased MMD estimator is not defined "
+    "for empirical distributions of size 1."
 
     def f(a, b, diag=False):
         if diag:
@@ -202,7 +205,8 @@ def unbiased_mmd_squared(x, y):
     xy = f(x, y, diag=True)
     yy = f(y, y)
 
-    scale = torch.median(torch.sqrt(torch.cat((xx, xy, yy))))
+    if scale is None:
+        scale = torch.median(torch.sqrt(torch.cat((xx, xy, yy))))
     c = -0.5 / (scale**2)
 
     k = lambda a: torch.sum(torch.exp(c * a))
@@ -260,6 +264,126 @@ def unbiased_mmd_squared_hypothesis_test(x, y, alpha=0.05):
     threshold = (4 / np.sqrt(x.shape[0])) * np.sqrt(-np.log(alpha))
 
     return mmd_square_unbiased, threshold
+
+
+def wasserstein_2_squared(x, y, epsilon=1e-3, max_iter=1000, tol=1e-9):
+    """Approximate the squared 2-Wasserstein distance
+    using entropic regularized optimal transport. In the limit,
+    'epsilon' to 0, we recover the squared Wasserstein-2 distance is recovered.
+
+    Args:
+        x: Data of shape (B, m, d) or (m, d)
+        y: Data of shape (B, n, d) or (n, d)
+        epsilon: Entropic regularization term
+        max_iter: Maximum number of iteration for which the Sinkhorn iterations run
+        tol: Tolerance required for Sinkhorn to converge
+    Return:
+        A single scalar for the squared 2-Wasserstein distance
+    """
+    assert (
+        x.ndim == y.ndim
+    ), "Please make sure that 'x' and 'y' are both either batched or not."
+    if x.ndim == 2:
+        nx, ny = x.shape[0], y.shape[0]
+        a = torch.ones(nx) / nx
+        b = torch.ones(ny) / ny
+    elif x.ndim == 3:
+        batch_size = x.shape[0]
+        nx, ny = x.shape[1], y.shape[1]
+        a = torch.ones((batch_size, nx)) / nx
+        b = torch.ones((batch_size, ny)) / ny
+    else:
+        raise ValueError(
+            "This implementation of Wasserstein is only implemented, "
+            "if x.ndim=2 or x.ndim=3."
+        )
+
+    # Evaluate the cost matrix based on the default l2 cost
+    cost_matrix = torch.cdist(x, y, 2)
+
+    coupling = regularized_ot_dual(
+        a, b, cost_matrix, epsilon, max_iter=max_iter, tol=tol
+    )
+    if a.ndim == 1:
+        return torch.sum(coupling * cost_matrix)
+    else:
+        return torch.sum(coupling * cost_matrix, dim=(1, 2))
+
+
+def regularized_ot_dual(
+    a, b, cost, epsilon: float = 1e-3, max_iter: int = 1000, tol=1e-9
+):
+    """Implementation of regularized optimal transport based on
+    the dual formulation of the regularized optimal transport problem.
+
+    Args:
+        a: Probability vector of the empirical distribution x,
+        either in batched form (B, m) or as a single vector (m,).
+        b: Probability vector of the empirical distribution y,
+        either in batched form (B, n) or as a single vector (n,).
+        cost: Cost-matrix between the empirical samples of x and y.
+        Either in batched form (B, m, n) or as a matrix (m, n).
+        epsilon: The entropic regularization term
+        max_iter: Maximum number of iterations
+        tol: Tolerance required for Sinkhorn to converge
+
+    Return:
+        Optimal transport coupling of shape (B, m, n) or (m, n)
+    """
+
+    assert (
+        a.ndim == b.ndim
+    ), "Please make sure that 'a' and 'b' are both either batched or not."
+    f"currently a.ndim={a.ndim} and b.ndim={b.ndim}"
+
+    batched = True
+    if a.ndim == 1 and b.ndim == 1:
+        batched = False
+        na, nb = a.shape[0], b.shape[0]
+        a = torch.atleast_2d(a)
+        b = torch.atleast_2d(b)
+        cost = cost.unsqueeze(0)
+    na, nb = a.shape[1], b.shape[1]
+
+    # Define potentials
+    f, g = torch.zeros_like(a), torch.zeros_like(b)
+
+    def s(f, g):
+        return cost - f.unsqueeze(2) - g.unsqueeze(1)
+
+    err = torch.inf
+    iters = torch.zeros(a.shape[0])
+    terminated = torch.zeros(a.shape[0], dtype=bool)
+    for _ in range(max_iter):
+        f_prev, g_prev = f, g
+        f_tmp = f + epsilon * (
+            torch.log(a) - torch.logsumexp(-s(f, g) / epsilon, dim=2)
+        )
+        g_tmp = g + epsilon * (
+            torch.log(b) - torch.logsumexp(-s(f_tmp, g) / epsilon, dim=1)
+        )
+        f = torch.where(terminated.unsqueeze(-1).repeat((1, na)), f, f_tmp)
+        g = torch.where(terminated.unsqueeze(-1).repeat((1, nb)), g, g_tmp)
+
+        err = torch.max((f_prev - f).abs().sum(dim=1), (g_prev - g).abs().sum(dim=1))
+        terminated = torch.logical_or(terminated, err < tol)
+        if torch.all(terminated):
+            break
+        if iters.max() == max_iter:
+            warning(
+                f"Sinkhorn iterations did not converge within {max_iter} iterations. "
+                f"Consider a bigger regularization parameter 'epsilon' "
+                "or increasing 'max_iter'."
+            )
+            break
+        iters = torch.where(terminated, iters, iters + 1)
+
+    coupling = torch.exp(-s(f, g) / epsilon)
+
+    if not batched:
+        coupling = coupling.squeeze(0)
+
+    return coupling
 
 
 def _test():

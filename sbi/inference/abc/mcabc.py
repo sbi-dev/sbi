@@ -21,6 +21,7 @@ class MCABC(ABCBASE):
         num_workers: int = 1,
         simulation_batch_size: int = 1,
         show_progress_bars: bool = True,
+        distance_kwargs: Optional[Dict] = None,
     ):
         r"""Monte-Carlo Approximate Bayesian Computation (Rejection ABC) [1].
 
@@ -55,6 +56,7 @@ class MCABC(ABCBASE):
             num_workers=num_workers,
             simulation_batch_size=simulation_batch_size,
             show_progress_bars=show_progress_bars,
+            distance_kwargs=distance_kwargs,
         )
 
     def __call__(
@@ -70,6 +72,7 @@ class MCABC(ABCBASE):
         kde: bool = False,
         kde_kwargs: Optional[Dict[str, Any]] = None,
         return_summary: bool = False,
+        num_iid_samples: int = 1,
     ) -> Union[Tuple[Tensor, dict], Tuple[KDEWrapper, dict], Tensor, KDEWrapper]:
         r"""Run MCABC and return accepted parameters or KDE object fitted on them.
 
@@ -139,11 +142,23 @@ class MCABC(ABCBASE):
 
         # Simulate and calculate distances.
         theta = self.prior.sample((num_simulations,))
-        x = simulator(theta)
+        # theta_repeat = theta.repeat((num_iid_samples, 1))
+        theta_repeat = theta.repeat_interleave(num_iid_samples, dim=0)
+        x = simulator(theta_repeat)
+        x = x.reshape((
+            num_simulations,
+            num_iid_samples,
+            -1,
+        ))  # Dim(num_initial_pop, num_iid_samples, -1)
 
-        # Infer shape of x to test and set x_o.
-        self.x_shape = x[0].unsqueeze(0).shape
-        self.x_o = process_x(x_o, self.x_shape)
+        # Infer x shape to test and set x_o.
+        if not self.allow_iid:
+            x = x.squeeze(1)
+            self.x_shape = x[0].unsqueeze(0).shape
+            self.x_o = process_x(x_o, self.x_shape)
+        else:
+            self.x_shape = x[0].shape
+            self.x_o = process_x(x_o, self.x_shape, allow_iid_x=True)
 
         distances = self.distance(self.x_o, x)
 

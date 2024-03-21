@@ -9,7 +9,7 @@ import torch
 from sklearn.neural_network import MLPClassifier
 from torch.distributions import MultivariateNormal as tmvn
 
-from sbi.utils.metrics import c2st, c2st_scores
+from sbi.utils.metrics import c2st, c2st_scores, wasserstein_2_squared
 
 ## c2st related:
 ## for a study about c2st see https://github.com/psteinb/c2st/
@@ -128,3 +128,23 @@ def test_c2st_scores(dist_sigma, c2st_lowerbound, c2st_upperbound):
     assert obs2_c2st.mean() <= c2st_upperbound
 
     assert np.allclose(obs2_c2st, obs_c2st, atol=0.05)
+
+
+def test_wasserstein_2_distance():
+    ndim = 10
+    nsamples = 1024
+    refdist = tmvn(loc=torch.zeros(ndim), covariance_matrix=torch.eye(ndim))
+    X = refdist.sample((nsamples,))
+
+    dist_sigmas = [0.0, 1.0, 20.0]
+    w2_prev = 0.0
+    for dist_sigma in dist_sigmas:
+        otherdist = tmvn(
+            loc=dist_sigma + torch.zeros(ndim), covariance_matrix=torch.eye(ndim)
+        )
+        Y = otherdist.sample((nsamples - 1,))
+
+        w2 = wasserstein_2_squared(X, Y)
+
+        assert w2 > w2_prev
+        w2_prev = w2

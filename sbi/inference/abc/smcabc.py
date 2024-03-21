@@ -26,6 +26,7 @@ class SMCABC(ABCBASE):
         show_progress_bars: bool = True,
         kernel: Optional[str] = "gaussian",
         algorithm_variant: str = "C",
+        distance_kwargs: Dict = None,
     ):
         r"""Sequential Monte Carlo Approximate Bayesian Computation.
 
@@ -71,6 +72,7 @@ class SMCABC(ABCBASE):
             num_workers=num_workers,
             simulation_batch_size=simulation_batch_size,
             show_progress_bars=show_progress_bars,
+            distance_kwargs=distance_kwargs,
         )
 
         kernels = ("gaussian", "uniform")
@@ -117,6 +119,7 @@ class SMCABC(ABCBASE):
         sass: bool = False,
         sass_fraction: float = 0.25,
         sass_expansion_degree: int = 1,
+        num_iid_samples: int = 1,
     ) -> Union[Tensor, KDEWrapper, Tuple[Tensor, dict], Tuple[KDEWrapper, dict]]:
         r"""Run SMCABC and return accepted parameters or KDE object fitted on them.
 
@@ -168,19 +171,25 @@ class SMCABC(ABCBASE):
         """
 
         pop_idx = 0
-        self.num_simulations = num_simulations
+        self.num_simulations = num_simulations * num_iid_samples
         if kde_kwargs is None:
             kde_kwargs = {}
         assert isinstance(epsilon_decay, float) and epsilon_decay > 0.0
 
         # Pilot run for SASS.
         if sass:
+            # TODO: how should we deal with sass
             num_pilot_simulations = int(sass_fraction * num_simulations)
             self.logger.info(
                 "Running SASS with %s pilot samples.", num_pilot_simulations
             )
             sass_transform = self.run_sass_set_xo(
-                num_particles, num_pilot_simulations, x_o, lra, sass_expansion_degree
+                num_particles,
+                num_pilot_simulations,
+                x_o,
+                num_iid_samples,
+                lra,
+                sass_expansion_degree,
             )
             # Udpate simulator and xo
             x_o = sass_transform(self.x_o)
@@ -193,7 +202,7 @@ class SMCABC(ABCBASE):
 
         # run initial population
         particles, epsilon, distances, x = self._set_xo_and_sample_initial_population(
-            x_o, num_particles, num_initial_pop
+            x_o, num_particles, num_initial_pop, num_iid_samples
         )
         log_weights = torch.log(1 / num_particles * torch.ones(num_particles))
 
@@ -235,6 +244,7 @@ class SMCABC(ABCBASE):
                 distances=all_distances[pop_idx - 1],
                 epsilon=epsilon,
                 x=all_x[pop_idx - 1],
+                num_iid_samples=num_iid_samples,
                 use_last_pop_samples=use_last_pop_samples,
             )
 
@@ -260,6 +270,7 @@ class SMCABC(ABCBASE):
 
         # Maybe run LRA and adjust weights.
         if lra:
+            # TODO: how should we deal with sass
             self.logger.info("Running Linear regression adjustment.")
             adjusted_particles, _ = self.run_lra_update_weights(
                 particles=all_particles[-1],
@@ -319,6 +330,7 @@ class SMCABC(ABCBASE):
         x_o: Array,
         num_particles: int,
         num_initial_pop: int,
+        num_iid_samples: int,
     ) -> Tuple[Tensor, float, Tensor, Tensor]:
         """Return particles, epsilon and distances of initial population."""
 
@@ -326,12 +338,36 @@ class SMCABC(ABCBASE):
             num_particles <= num_initial_pop
         ), "number of initial round simulations must be greater than population size"
 
+        # if (num_iid_samples > 1) and not self.allow_iid:
+
+        assert (
+            num_iid_samples == 1 and x_o.shape[0] == 1
+        ) or self.allow_iid, "You choose num_iid_samples > 1, "
+        "but the choice of your distance does not allow iid simulations."
+        assert (
+            x_o.shape[0] == 1
+        ) or self.allow_iid, "Your data contains more than one data-point, "
+        "but the choice of your distance does not allow multiple conditioning "
+        "observations."
+
         theta = self.prior.sample((num_initial_pop,))
-        x = self._simulate_with_budget(theta)
+
+        theta_repeat = theta.repeat_interleave(num_iid_samples, dim=0)
+        # theta_repeat = theta.repeat((num_iid_samples, 1))
+        x = self._simulate_with_budget(theta_repeat)
+        x = x.reshape((
+            num_initial_pop,
+            num_iid_samples,
+            -1,
+        ))  # Dim(num_initial_pop, num_iid_samples, -1)
 
         # Infer x shape to test and set x_o.
-        self.x_shape = x[0].unsqueeze(0).shape
-        self.x_o = process_x(x_o, self.x_shape)
+        if not self.allow_iid:
+            x = x.squeeze(1)
+            self.x_shape = x[0].unsqueeze(0).shape
+        else:
+            self.x_shape = x[0].shape
+        self.x_o = process_x(x_o, self.x_shape, allow_iid_x=self.allow_iid)
 
         distances = self.distance(self.x_o, x)
         sortidx = torch.argsort(distances)
@@ -356,6 +392,7 @@ class SMCABC(ABCBASE):
         distances: Tensor,
         epsilon: float,
         x: Tensor,
+        num_iid_samples: int,
         use_last_pop_samples: bool = True,
     ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
         """Return particles, weights and distances of new population."""
@@ -380,7 +417,19 @@ class SMCABC(ABCBASE):
                 particles, torch.exp(log_weights), num_samples=num_batch
             )
             # Simulate and select based on distance.
-            x_candidates = self._simulate_with_budget(particle_candidates)
+            candidates_repeated = particle_candidates.repeat_interleave(
+                num_iid_samples, dim=0
+            )
+
+            x_candidates = self._simulate_with_budget(candidates_repeated)
+            x_candidates = x_candidates.reshape((
+                num_batch,
+                num_iid_samples,
+                -1,
+            ))  # Dim(num_initial_pop, num_iid_samples, -1)
+            if not self.allow_iid:
+                x_candidates = x_candidates.squeeze(1)
+
             dists = self.distance(self.x_o, x_candidates)
             is_accepted = dists <= epsilon
             num_accepted_batch = is_accepted.sum().item()
@@ -678,6 +727,7 @@ class SMCABC(ABCBASE):
         num_particles: int,
         num_pilot_simulations: int,
         x_o,
+        num_iid_samples: int,
         lra: bool = False,
         sass_expansion_degree: int = 1,
     ) -> Callable:
@@ -694,7 +744,7 @@ class SMCABC(ABCBASE):
             _,
             pilot_xs,
         ) = self._set_xo_and_sample_initial_population(
-            x_o, num_particles, num_pilot_simulations
+            x_o, num_particles, num_pilot_simulations, num_iid_samples
         )
         assert self.x_o is not None, "x_o not set yet."
 
