@@ -153,16 +153,16 @@ class ZukoFlowMatchingEstimator(DensityEstimator):
             transforms=[
                 self.z_score_theta,
                 FreeFormJacobianTransform(
-                    f=lambda t, theta: self.vf_estimator(theta, x_o, t),
+                    f=lambda t, theta: self.forward(theta, x_o, t),
                     t0=x_o.new_tensor(0.0),
                     t1=x_o.new_tensor(1.0),
-                    phi=(x_o, *self.vf_estimator.net.parameters()),
+                    phi=(x_o, *self.net.parameters()),
                 ),
             ]
         )
         return NormalizingFlow(
             transform=transform,
             base=DiagNormal(
-                torch.zeros(self.theta_dim), torch.ones(self.theta_dim)
+                torch.zeros(self.theta_shape), torch.ones(self.theta_shape)
             ).expand(x_o.shape[:-1]),
         )
