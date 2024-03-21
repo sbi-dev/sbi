@@ -6,6 +6,7 @@ from zuko.flows import Flow
 
 from sbi.neural_nets.density_estimators.base import DensityEstimator
 from sbi.sbi_types import Shape
+from sbi.utils.user_input_checks import check_condition_shape
 
 
 class ZukoFlow(DensityEstimator):
