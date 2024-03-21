@@ -13,8 +13,10 @@ from pyknos.nflows import flows, transforms
 from pyknos.nflows.nn import nets
 from pyknos.nflows.transforms.splines import rational_quadratic
 from torch import Tensor, nn, relu, tanh, tensor, uint8
+from zuko.nn import MLP
 
 from sbi.neural_nets.density_estimators import NFlowsFlow, ZukoFlow
+from sbi.neural_nets.density_estimators.zuko_flow_estimator import ZukoFlowMatchingEstimator
 from sbi.utils.sbiutils import (
     standardizing_net,
     standardizing_transform,
@@ -517,6 +519,47 @@ def build_zuko_maf(
 
     return flow
 
+
+def build_zuko_flow_matching(
+    batch_x: Tensor,
+    batch_y: Tensor,
+    z_score_x: Optional[str] = "independent",
+    z_score_y: Optional[str] = "independent",
+    hidden_features: Union[Sequence[int], int] = 50,
+    num_transforms: int = 5,
+    frequency: int = 3,
+    **kwargs,
+) -> ZukoFlowMatchingEstimator:
+    x_numel = batch_x[0].numel()
+    y_numel = batch_y[0].numel()
+
+    # Infer the output dimensionality of the embedding_net by making a forward pass.
+    check_data_device(batch_x, batch_y)
+
+    # create a list of layers for the regression network; the vector field
+    # regressor is a MLP consisting of num_transforms of layers with
+    # hidden_features neurons each
+    if isinstance(hidden_features, int):
+        hidden_features = [hidden_features] * num_transforms
+
+    vector_field_regression_net = MLP(
+                in_features=x_numel + y_numel + 2 * frequency,
+                out_features=x_numel,
+                hidden_features=[64] * 5,
+                activation=nn.ELU,
+    )
+
+    z_score_x_bool, structured_x = z_score_parser(z_score_x)
+    z_score_theta = standardizing_transform(batch_x, structured_x, backend="zuko")    
+
+    flow_matching_estimator = ZukoFlowMatchingEstimator(
+        theta_shape=x_numel,
+        condition_shape=y_numel,
+        net=vector_field_regression_net,
+        frequency=frequency,
+    )
+
+    pass
 
 class ContextSplineMap(nn.Module):
     """
