@@ -163,6 +163,6 @@ class ZukoFlowMatchingEstimator(DensityEstimator):
         return NormalizingFlow(
             transform=transform,
             base=DiagNormal(
-                torch.zeros(self.theta_dim), torch.ones(self.theta_dim)
+                torch.zeros(self.theta_shape), torch.ones(self.theta_shape)
             ).expand(x_o.shape[:-1]),
         )
