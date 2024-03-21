@@ -60,7 +60,7 @@ jobs:
     - name:  Run the fast tests with coverage
       run: |
         pip install pytest-cov
-        pytest -m "not slow and not gpu" tests/ --cov=sbi --cov-report=xml --exitfirst
+        pytest -n auto -m "not slow and not gpu" tests/ --cov=sbi --cov-report=xml --exitfirst
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4-beta
