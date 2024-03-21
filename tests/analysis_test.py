@@ -2,7 +2,6 @@ import pytest
 import torch
 
 from sbi.analysis import ActiveSubspace, conditional_corrcoeff, conditional_pairplot
-from sbi.analysis.sensitivity_analysis import posterior_shrinkage, posterior_zscore
 from sbi.inference import SNPE
 from sbi.utils import BoxUniform, get_1d_marginal_peaks_from_kde
 from sbi.utils.torchutils import process_device

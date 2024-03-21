@@ -9,9 +9,7 @@ import torch
 from sklearn.neural_network import MLPClassifier
 from torch.distributions import MultivariateNormal as tmvn
 
-from sbi.utils.metrics import c2st, c2st_scores
-from sbi.utils.metrics import posterior_shrinkage
-from sbi.utils.metrics import posterior_zscore
+from sbi.utils.metrics import c2st, c2st_scores, posterior_shrinkage, posterior_zscore
 
 ## c2st related:
 ## for a study about c2st see https://github.com/psteinb/c2st/
@@ -171,4 +169,3 @@ def test_posterior_zscore():
     post_samples = np.array([])
     with pytest.raises(ValueError):
         posterior_zscore(true_theta, post_samples)
-
