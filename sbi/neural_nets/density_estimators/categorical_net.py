@@ -33,7 +33,7 @@ class CategoricalNet(nn.Module):
             num_layers: number of hidden layers.
             embedding: emebedding net for parameters, e.g., a z-scoring transform.
         """
-        super(CategoricalNet, self).__init__()
+        super().__init__()
 
         self.num_hidden = num_hidden
         self.num_input = num_input
@@ -108,8 +108,9 @@ class CategoricalNet(nn.Module):
         # Predict Categorical ps and sample.
         ps = self.forward(context)
         return (
-            Categorical(probs=ps).sample(sample_shape=sample_shape)
-            # .reshape(num_samples, -1)
+            Categorical(probs=ps)
+            .sample(sample_shape=sample_shape)
+            .reshape(sample_shape[0], -1)
         )
 
 
@@ -119,14 +120,15 @@ class CategoricalMassEstimator(DensityEstimator):
     """
 
     def __init__(self, net: CategoricalNet) -> None:
-        super().__init__(net=net, condition_shape=None)
+        super().__init__(net=net, condition_shape=torch.Size([]))
         self.net = net
+        self.num_categories = net.num_categories
 
     def log_prob(self, input: Tensor, context: Tensor, **kwargs) -> Tensor:
-        return super().log_prob(input, context, **kwargs)
+        return self.net.log_prob(input, context, **kwargs)
 
     def sample(self, sample_shape: torch.Size, context: Tensor, **kwargs) -> Tensor:
-        return super().sample(sample_shape, context, **kwargs)
+        return self.net.sample(sample_shape, context, **kwargs)
 
     def loss(self, input: Tensor, context: Tensor, **kwargs) -> Tensor:
         r"""Return the loss for training the density estimator.

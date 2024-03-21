@@ -53,38 +53,39 @@ class MixedDensityEstimator(DensityEstimator):
         )
 
     def sample(
-        self, theta: Tensor, sample_shape: torch.Size, track_gradients: bool = False
+        self, context: Tensor, sample_shape: torch.Size, track_gradients: bool = False
     ) -> Tensor:
         """Return sample from mixed data distribution.
 
         Args:
-            theta: parameters for which to generate samples.
+            context: parameters for which to generate samples.
             sample_shape number of samples to generate.
 
         Returns:
             Tensor: samples with shape (num_samples, num_data_dimensions)
         """
-        assert theta.shape[0] == 1, "Samples can be generated for a single theta only."
+        assert (
+            context.shape[0] == 1
+        ), "Samples can be generated for a single context only."
 
         with torch.set_grad_enabled(track_gradients):
             # Sample discrete data given parameters.
             discrete_x = self.discrete_net.sample(
                 sample_shape=sample_shape,
-                context=theta,
-                # num_samples=num_samples,
-            )  # .reshape(num_samples, 1)
+                context=context,
+            ).reshape(sample_shape[0], -1)
 
             # Sample continuous data condition on parameters and discrete data.
             # Pass num_samples=1 because the choices in the context contains
             # num_samples elements already.
             continuous_x = self.continuous_net.sample(
-                # repeat the single theta to match number of sampled choices.
+                # repeat the single context to match number of sampled choices.
                 # sample_shape[0] is the iid dimension.
                 condition=torch.cat(
-                    (theta.repeat(sample_shape[0], 1), discrete_x), dim=1
+                    (context.repeat(sample_shape[0], 1), discrete_x), dim=1
                 ),
                 sample_shape=sample_shape,
-            )  # .reshape(num_samples, 1)
+            ).reshape(sample_shape[0], -1)
 
             # In case x was log-transformed, move them to linear space.
             if self.log_transform_x:
@@ -96,10 +97,10 @@ class MixedDensityEstimator(DensityEstimator):
         """Return log-probability of samples under the learned MNLE.
 
         For a fixed data point x this returns the value of the likelihood function
-        evaluated at theta, L(theta, x=x).
+        evaluated at context, L(context, x=x).
 
         Alternatively, it can be interpreted as the log-prob of the density
-        p(x | theta).
+        p(x | context).
 
         It evaluates the separate density estimator for the discrete and continous part
         of the data and then combines them into one evaluation.
@@ -107,21 +108,21 @@ class MixedDensityEstimator(DensityEstimator):
         Args:
             x: data (containing continuous and discrete data).
             context: parameters for which to evaluate the likelihod function, or for
-                which to condition p(x | theta).
+                which to condition p(x | context).
 
         Returns:
-            Tensor: log_prob of p(x | theta).
+            Tensor: log_prob of p(x | context).
         """
         assert (
             x.shape[0] == context.shape[0]
         ), "x and context must have same batch size."
 
         cont_x, disc_x = _separate_x(x)
-        num_parameters = context.shape[0]
+        dim_context = context.shape[0]
 
         disc_log_prob = self.discrete_net.log_prob(
             input=disc_x, context=context
-        ).reshape(num_parameters)
+        ).reshape(dim_context)
 
         cont_log_prob = self.continuous_net.log_prob(
             # Transform to log-space if needed.
@@ -131,7 +132,7 @@ class MixedDensityEstimator(DensityEstimator):
         )
 
         # Combine into joint lp.
-        log_probs_combined = (disc_log_prob + cont_log_prob).reshape(num_parameters)
+        log_probs_combined = (disc_log_prob + cont_log_prob).reshape(dim_context)
 
         # Maybe add log abs det jacobian of RTs: log(1/x) = - log(x)
         if self.log_transform_x:
@@ -139,42 +140,42 @@ class MixedDensityEstimator(DensityEstimator):
 
         return log_probs_combined
 
-    def loss(self, x: Tensor, theta: Tensor, **kwargs) -> Tensor:
-        return self.log_prob(x, theta)
+    def loss(self, x: Tensor, context: Tensor, **kwargs) -> Tensor:
+        return self.log_prob(x, context)
 
-    def log_prob_iid(self, x: Tensor, theta: Tensor) -> Tensor:
-        """Return log prob given a batch of iid x and a different batch of theta.
+    def log_prob_iid(self, x: Tensor, context: Tensor) -> Tensor:
+        """Return log prob given a batch of iid x and a different batch of context.
 
         This is different from `.log_prob()` to enable speed ups in evaluation during
         inference. The speed up is achieved by exploiting the fact that there are only
         finite number of possible categories in the discrete part of the dat: one can
         just calculate the log probs for each possible category (given the current batch
-        of theta) and then copy those log probs into the entire batch of iid categories.
+        of context) and then copy those log probs into the entire batch of iid categories.
         For example, for the drift-diffusion model, there are only two choices, but
         often 100s or 1000 trials. With this method a evaluation over trials then passes
-        a batch of `2 (one per choice) * num_thetas` into the NN, whereas the normal
-        `.log_prob()` would pass `1000 * num_thetas`.
+        a batch of `2 (one per choice) * num_contexts` into the NN, whereas the normal
+        `.log_prob()` would pass `1000 * num_contexts`.
 
         Args:
             x: batch of iid data, data observed given the same underlying parameters or
                 experimental conditions.
-            theta: batch of parameters to be evaluated, i.e., each batch entry will be
+            context: batch of parameters to be evaluated, i.e., each batch entry will be
                 evaluated for the entire batch of iid x.
 
         Returns:
             Tensor: log probs with shape (num_trials, num_parameters), i.e., the log
-                prob for each theta for each trial.
+                prob for each context for each trial.
         """
 
-        theta = atleast_2d(theta)
+        context = atleast_2d(context)
         x = atleast_2d(x)
-        batch_size = theta.shape[0]
+        batch_size = context.shape[0]
         num_trials = x.shape[0]
-        theta_repeated, x_repeated = match_theta_and_x_batch_shapes(theta, x)
+        context_repeated, x_repeated = match_theta_and_x_batch_shapes(context, x)
         net_device = next(self.discrete_net.parameters()).device
         assert (
-            net_device == x.device and x.device == theta.device
-        ), f"device mismatch: net, x, theta: {net_device}, {x.device}, {theta.device}."
+            net_device == x.device and x.device == context.device
+        ), f"device mismatch: net, x, context: {net_device}, {x.device}, {context.device}."
 
         x_cont_repeated, x_disc_repeated = _separate_x(x_repeated)
         x_cont, x_disc = _separate_x(x)
@@ -184,13 +185,13 @@ class MixedDensityEstimator(DensityEstimator):
             torch.arange(self.discrete_net.num_categories - 1), batch_size, dim=0
         )
         # repeat parameters for categories
-        repeated_theta = theta.repeat(self.discrete_net.num_categories - 1, 1)
+        repeated_context = context.repeat(self.discrete_net.num_categories - 1, 1)
         log_prob_per_cat = torch.zeros(self.discrete_net.num_categories, batch_size).to(
             net_device
         )
         log_prob_per_cat[:-1, :] = self.discrete_net.log_prob(
             repeated_categories.to(net_device),
-            repeated_theta.to(net_device),
+            repeated_context.to(net_device),
         ).reshape(-1, batch_size)
         # infer the last category logprob from sum to one.
         log_prob_per_cat[-1, :] = torch.log(1 - log_prob_per_cat[:-1, :].exp().sum(0))
@@ -200,10 +201,10 @@ class MixedDensityEstimator(DensityEstimator):
             x_disc.type_as(torch.zeros(1, dtype=torch.long)).squeeze()
         ].reshape(-1)
 
-        # Get repeat discrete data and theta to match in batch shape for flow eval.
+        # Get repeat discrete data and context to match in batch shape for flow eval.
         log_probs_cont = self.continuous_net.log_prob(
             torch.log(x_cont_repeated) if self.log_transform_x else x_cont_repeated,
-            condition=torch.cat((theta_repeated, x_disc_repeated), dim=1),
+            condition=torch.cat((context_repeated, x_disc_repeated), dim=1),
         )
 
         # Combine into joint lp with first dim over trials.
