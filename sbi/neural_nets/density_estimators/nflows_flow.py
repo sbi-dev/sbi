@@ -5,7 +5,7 @@ from pyknos.nflows.flows import Flow
 from torch import Tensor, nn
 
 from sbi.neural_nets.density_estimators.base import DensityEstimator
-from sbi.types import Shape
+from sbi.sbi_types import Shape
 from sbi.utils.user_input_checks import check_condition_shape
 
 
@@ -18,7 +18,7 @@ class NFlowsFlow(DensityEstimator):
 
     def __init__(self, net: Flow, condition_shape: torch.Size) -> None:
         super().__init__()
-        self._net = net
+        self.net = net
         self._condition_shape = condition_shape
 
     @property

@@ -3,12 +3,15 @@
 
 from __future__ import annotations
 
+from typing import Tuple
+
 import pytest
 import torch
 from torch import eye, zeros
 from torch.distributions import MultivariateNormal
 
 from sbi.neural_nets.density_estimators import NFlowsFlow, ZukoFlow
+from sbi.neural_nets.density_estimators.shape_handling import reshape_to_iid_batch_event
 from sbi.neural_nets.flow import build_nsf, build_zuko_maf
 
 
@@ -125,9 +128,11 @@ def test_api_density_estimator(density_estimator, input_dims, condition_shape):
         # Shapes (10,) and (5,) are not broadcastable, so we expect a ValueError
         pass
     except Exception as err:
-        raise AssertionError(f"Expected RuntimeError as shapes {batch_context.shape} \
+        raise AssertionError(
+            f"Expected RuntimeError as shapes {batch_context.shape} \
                              and {samples.shape} are not broadcastable, but got a \
-                             different/no error.") from err
+                             different/no error."
+        ) from err
 
     samples = estimator.sample((nsamples_test,), batch_context[0].unsqueeze(0))
     assert samples.shape == (
@@ -159,9 +164,11 @@ def test_api_density_estimator(density_estimator, input_dims, condition_shape):
         # Shapes (10,) and (5,) are not broadcastable, so we expect a ValueError
         pass
     except Exception as err:
-        raise AssertionError(f"Expected RuntimeError as shapes {batch_context.shape} \
+        raise AssertionError(
+            f"Expected RuntimeError as shapes {batch_context.shape} \
                             and {samples.shape} are not broadcastable, but got a \
-                            different/no error.") from err
+                            different/no error."
+        ) from err
 
     # Sample and log_prob work for batched and unbatched contexts
     samples, log_probs = estimator.sample_and_log_prob(
@@ -213,3 +220,47 @@ def test_api_density_estimator(density_estimator, input_dims, condition_shape):
         nsamples_test,
     ), f"log_prob shape is not correct. It is of shape {log_probs.shape}, but should \
         be {(1, batch_context.shape[0], 2, nsamples_test)}"
+
+
+@pytest.mark.parametrize(
+    "theta_or_x_shape, target_shape, event_shape, leading_is_iid",
+    (
+        ((3,), (1, 1, 3), (3,), False),
+        ((3,), (1, 1, 3), (3,), True),
+        ((1, 3), (1, 1, 3), (3,), False),
+        ((1, 3), (1, 1, 3), (3,), True),
+        ((2, 3), (1, 2, 3), (3,), False),
+        ((2, 3), (2, 1, 3), (3,), True),
+        ((1, 2, 3), (1, 2, 3), (3,), True),
+        ((1, 2, 3), (1, 2, 3), (3,), False),
+        ((3, 5), (1, 1, 3, 5), (3, 5), False),
+        ((3, 5), (1, 1, 3, 5), (3, 5), True),
+        ((1, 3, 5), (1, 1, 3, 5), (3, 5), False),
+        ((1, 3, 5), (1, 1, 3, 5), (3, 5), True),
+        ((2, 3, 5), (1, 2, 3, 5), (3, 5), False),
+        ((2, 3, 5), (2, 1, 3, 5), (3, 5), True),
+        ((1, 2, 3, 5), (1, 2, 3, 5), (3, 5), True),
+        ((1, 2, 3, 5), (1, 2, 3, 5), (3, 5), False),
+        pytest.param((1, 2, 3, 5), (1, 2, 3, 5), (5), False, marks=pytest.mark.xfail),
+        pytest.param((1, 2, 3, 5), (1, 2, 3, 5), (3), False, marks=pytest.mark.xfail),
+        pytest.param((1, 2, 3), (1, 2, 3), (1, 5), False, marks=pytest.mark.xfail),
+        pytest.param((1, 2, 3), (1, 2, 3), (1, 3), False, marks=pytest.mark.xfail),
+        pytest.param((1, 2, 3), (2, 1, 3), (3), False, marks=pytest.mark.xfail),
+        pytest.param((1, 2, 3), (2, 1, 3), (3), True, marks=pytest.mark.xfail),
+    ),
+)
+def test_shape_handling_utility_for_density_estimator(
+    theta_or_x_shape: Tuple,
+    target_shape: Tuple,
+    event_shape: Tuple,
+    leading_is_iid: bool,
+):
+    """Test whether `reshape_to_batch_iid_event` results in expected outputs."""
+    input = torch.randn(theta_or_x_shape)
+    output = reshape_to_iid_batch_event(
+        input, event_shape=event_shape, leading_is_iid=leading_is_iid
+    )
+    assert output.shape == target_shape, (
+        f"Shapes of Output ({output.shape}) and target shape ({target_shape}) do not "
+        f"match."
+    )

@@ -38,6 +38,9 @@ def infer(
     method: str,
     num_simulations: int,
     num_workers: int = 1,
+    init_kwargs: Optional[Dict] = None,
+    train_kwargs: Optional[Dict] = None,
+    build_posterior_kwargs: Optional[Dict] = None,
 ) -> NeuralPosterior:
     r"""Runs simulation-based inference and returns the posterior.
 
@@ -63,6 +66,10 @@ def infer(
         num_simulations: Number of simulation calls. More simulations means a longer
             runtime, but a better posterior estimate.
         num_workers: Number of parallel workers to use for simulations.
+        init_kwargs: Additional keyword arguments for the inference method
+            which are passed to `__init__`.
+        train_kwargs: Additional keyword arguments for training the density estimator.
+        build_posterior_kwargs: Additional keyword arguments for `build_posterior`.
 
     Returns: Posterior over parameters conditional on observations (amortized).
     """
@@ -74,17 +81,37 @@ def infer(
             "Method not available. `method` must be one of 'SNPE', 'SNLE', 'SNRE'."
         ) from err
 
+    if (
+        init_kwargs is not None
+        or build_posterior_kwargs is not None
+        or train_kwargs is not None
+    ):
+        warn(
+            "We discourage the use the simple interface in more complicated settings. "
+            "Have a look into the flexible interface, e.g. in our tutorial "
+            "(https://sbi-dev.github.io/sbi/tutorial/02_flexible_interface/).",
+            stacklevel=2,
+        )
+    # Set variables to empty dicts to be able to pass them
+    # to the functions later on (if necessary).
+    if build_posterior_kwargs is None:
+        build_posterior_kwargs = {}
+    if train_kwargs is None:
+        train_kwargs = {}
+    if init_kwargs is None:
+        init_kwargs = {}
+
     simulator, prior = prepare_for_sbi(simulator, prior)
 
-    inference = method_fun(prior=prior)
+    inference = method_fun(prior=prior, **init_kwargs)
     theta, x = simulate_for_sbi(
         simulator=simulator,
         proposal=prior,
         num_simulations=num_simulations,
         num_workers=num_workers,
     )
-    _ = inference.append_simulations(theta, x).train()
-    posterior = inference.build_posterior()
+    _ = inference.append_simulations(theta, x).train(**train_kwargs)
+    posterior = inference.build_posterior(**build_posterior_kwargs)
 
     return posterior
 

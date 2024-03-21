@@ -91,6 +91,7 @@ target/
 .env
 *.code-workspace
 .vscode/
+.idea
 
 # Class diagram
 *.pyns
