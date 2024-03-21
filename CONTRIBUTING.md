@@ -44,6 +44,12 @@ Style](http://google.github.io/styleguide/pyguide.html#38-comments-and-docstring
 For code linting and formating, we use [`ruff`](https://docs.astral.sh/ruff/), which is
 installed alongside `sbi`.
 
+You can exclude slow tests and those which require a GPU with `pytest -m "not slow and not gpu"`.
+Additionally, we recommend to run tests with `pytest -n auto -m "not slow and not gpu"` in parallel.
+GPU tests should probably not be run this way.
+If you see unexpected behavior (tests fail if they shouldn't), try to run them without `-n auto` and see if it persists.
+When writing new tests and debugging things, it may make sense to also run them without `-n auto`.
+
 When you create a PR onto `main`, our Continuous Integration (CI) actions on GitHub will perform the following
 checks:
 
@@ -57,8 +63,11 @@ If any of these fail, try reproducing and solving the error locally:
  using `pre-commit run --all-files`. `ruff` tends to give informative error
   messages that help you fix the problem.
 - **`pyright`**: Run it locally using `pyright sbi/` and ensure you are using the same
-  `pyright` version as used in the CI.
-- **`pytest`**: On GitHub Actions you can see which test failed. Reproduce it locally, e.g., using `pytest tests/linearGaussian_snpe_test.py`. Note that this will run for a few minutes and should result in passes and expected fails (xfailed).
+  `pyright` version as used in the CI (which is the case if you have installed it with `pip install -e ".[dev]"`
+  but note that you have to rerun it once someone updates the version in the `pyproject.toml`).
+  - Known issues and fixes:
+    - If using `**kwargs`, you either have to specify all possible types of `kwargs`, e.g. `**kwargs: Union[int, boolean]` or use `**kwargs: Any`
+- **`pytest`**: On GitHub Actions you can see which test failed. Reproduce it locally, e.g., using `pytest -n auto tests/linearGaussian_snpe_test.py`. Note that this will run for a few minutes and should result in passes and expected fails (xfailed).
 - commit and push again until CI tests pass. Don't hesitate to ask for help by
   commenting on the PR.
 

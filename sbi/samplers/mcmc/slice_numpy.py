@@ -3,7 +3,7 @@
 
 import os
 import sys
-from typing import Callable, Optional, Union
+from typing import Callable, Optional, Sequence, Union
 from warnings import warn
 
 import numpy as np
@@ -134,7 +134,9 @@ class SliceSampler(MCMCSampler):
 
         # show trace plot
         if show_info:
-            fig, ax = plt.subplots(1, 1)
+            fig: plt.FigureBase
+            ax: plt.Axes
+            fig, ax = plt.subplots(1, 1)  # pyright: ignore[reportAssignmentType]
             ax.plot(L_trace)
             ax.set_ylabel("log probability")
             ax.set_xlabel("samples")
@@ -283,7 +285,7 @@ class SliceSamplerSerial:
                 total=self.num_chains,
             )
         ):
-            all_samples = Parallel(n_jobs=self.num_workers)(
+            all_samples: Sequence[np.ndarray] = Parallel(n_jobs=self.num_workers)(  # pyright: ignore[reportAssignmentType]
                 delayed(self.run_fun)(num_samples, initial_params_batch, seed)
                 for initial_params_batch, seed in zip(self.x, seeds)
             )

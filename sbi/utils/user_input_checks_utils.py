@@ -3,11 +3,9 @@
 
 
 import warnings
-from typing import Dict, Optional, Sequence, Union
+from typing import Dict, Optional, Sequence
 
 import torch
-from scipy.stats._distn_infrastructure import rv_frozen
-from scipy.stats._multivariate import multi_rv_frozen
 from torch import Tensor, float32
 from torch.distributions import Distribution, constraints
 
@@ -99,60 +97,6 @@ class CustomPriorWrapper(Distribution):
             self.custom_prior.variance,
             dtype=self.return_type,  # type: ignore
         )
-
-
-class ScipyPytorchWrapper(Distribution):
-    """Wrap scipy.stats prior as a PyTorch Distribution object."""
-
-    def __init__(
-        self,
-        prior_scipy: Union[rv_frozen, multi_rv_frozen],
-        return_type: Optional[torch.dtype] = float32,
-        batch_shape=torch.Size(),
-        event_shape=torch.Size(),
-        validate_args=None,
-        arg_constraints: Optional[Dict[str, constraints.Constraint]] = None,
-        lower_bound: Optional[Tensor] = None,
-        upper_bound: Optional[Tensor] = None,
-    ):
-        self.custom_arg_constraints = arg_constraints or {}
-        self.prior_scipy = prior_scipy
-        self.return_type = return_type
-        self.custom_support = build_support(lower_bound, upper_bound)
-
-        super().__init__(
-            batch_shape=batch_shape,
-            event_shape=event_shape,
-            validate_args=validate_args,
-        )
-
-    def log_prob(self, value) -> Tensor:
-        return torch.as_tensor(
-            self.prior_scipy.logpdf(x=value),
-            dtype=self.return_type,  # type: ignore
-        )
-
-    def sample(self, sample_shape=torch.Size()) -> Tensor:
-        return torch.as_tensor(
-            self.prior_scipy.rvs(size=sample_shape),
-            dtype=self.return_type,  # type: ignore
-        )
-
-    @property
-    def support(self) -> Optional[constraints.Constraint]:
-        return self.custom_support
-
-    @property
-    def mean(self):
-        return self.prior_scipy.mean
-
-    @property
-    def variance(self):
-        return self.prior_scipy.var
-
-    @property
-    def arg_constraints(self) -> Dict[str, constraints.Constraint]:
-        return self.custom_arg_constraints
 
 
 class PytorchReturnTypeWrapper(Distribution):

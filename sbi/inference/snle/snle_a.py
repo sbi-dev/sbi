@@ -7,7 +7,7 @@ from typing import Callable, Optional, Union
 from torch.distributions import Distribution
 
 from sbi.inference.snle.snle_base import LikelihoodEstimator
-from sbi.types import TensorboardSummaryWriter
+from sbi.sbi_types import TensorboardSummaryWriter
 from sbi.utils import del_entries
 
 
