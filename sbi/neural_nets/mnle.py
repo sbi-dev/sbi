@@ -5,11 +5,11 @@ import warnings
 from typing import Optional, Tuple
 
 import torch
-from pyknos.nflows import flows
 from torch import Tensor, nn, unique
 from torch.distributions import Categorical
 from torch.nn import Sigmoid, Softmax
 
+from sbi.neural_nets.density_estimators.base import DensityEstimator
 from sbi.neural_nets.flow import build_nsf
 from sbi.utils.sbiutils import match_theta_and_x_batch_shapes, standardizing_net
 from sbi.utils.torchutils import atleast_2d
@@ -214,7 +214,7 @@ class MixedDensityEstimator(nn.Module):
     def __init__(
         self,
         discrete_net: CategoricalNet,
-        continuous_net: flows.Flow,
+        continuous_net: DensityEstimator,
         log_transform_x: bool = False,
     ):
         """Initialize class for combining density estimators for MNLE.
@@ -263,9 +263,9 @@ class MixedDensityEstimator(nn.Module):
             # Pass num_samples=1 because the choices in the context contains
             # num_samples elements already.
             continuous_x = self.continuous_net.sample(
+                sample_shape=torch.Size((1,)),
                 # repeat the single theta to match number of sampled choices.
-                context=torch.cat((theta.repeat(num_samples, 1), discrete_x), dim=1),
-                num_samples=1,
+                condition=torch.cat((theta.repeat(num_samples, 1), discrete_x), dim=1),
             ).reshape(num_samples, 1)
 
             # In case x was log-transformed, move them to linear space.

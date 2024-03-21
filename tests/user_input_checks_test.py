@@ -8,7 +8,6 @@ from typing import Callable, Tuple
 import pytest
 import torch
 from pyknos.mdn.mdn import MultivariateGaussianMDN
-from scipy.stats import beta, lognorm, multivariate_normal, uniform
 from torch import Tensor, eye, nn, ones, zeros
 from torch.distributions import Beta, Distribution, Gamma, MultivariateNormal, Uniform
 
@@ -27,7 +26,6 @@ from sbi.utils.user_input_checks_utils import (
     CustomPriorWrapper,
     MultipleIndependent,
     PytorchReturnTypeWrapper,
-    ScipyPytorchWrapper,
 )
 
 
@@ -88,14 +86,6 @@ torch.set_default_tensor_type(torch.FloatTensor)
             UserNumpyUniform(zeros(3), ones(3), return_numpy=True),
             dict(lower_bound=zeros(3), upper_bound=ones(3)),
         ),
-        (ScipyPytorchWrapper, multivariate_normal(), dict()),
-        (ScipyPytorchWrapper, lognorm(s=1.0), dict()),
-        (
-            ScipyPytorchWrapper,
-            uniform(),
-            dict(lower_bound=zeros(1), upper_bound=ones(1)),
-        ),
-        (ScipyPytorchWrapper, beta(a=1, b=1), dict()),
         (
             PytorchReturnTypeWrapper,
             BoxUniform(zeros(3, dtype=torch.float64), ones(3, dtype=torch.float64)),

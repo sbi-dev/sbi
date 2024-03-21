@@ -100,7 +100,7 @@ def get_new_cnn_output_size(
         )
         for i in range(len(input_shape))
     ]
-    return tuple(out_after_pool)
+    return tuple(out_after_pool)  # pyright: ignore[reportReturnType]
 
 
 class CNNEmbedding(nn.Module):

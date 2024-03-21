@@ -25,7 +25,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Development Status :: 3 - Alpha",
 ]
-requires-python = ">=3.6"
+requires-python = ">=3.8"
 dynamic = ["version"]
 readme = "README.md"
 keywords = ["Bayesian inference", "simulation-based inference", "PyTorch"]
@@ -47,31 +47,39 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "autoflake",
-    "black",
-    "deepdiff",
-    "flake8",
-    "isort",
-    "jupyter",
+    # Documentation
     "mkdocs",
     "mkdocs-material",
     "markdown-include",
     "mkdocs-redirects",
     "mkdocstrings[python] >= 0.18",
+    "jupyter",
     "nbconvert",
-    "pre-commit",
-    "pytest",
+    # Lint
+    "pre-commit == 3.5.0",
     "pyyaml",
-    "pyright >=1.1.300,<1.1.306",
-    "ruff",
+    "pyright == 1.1.355",
+    "ruff>=0.3.3",
+    # Test
+    "pytest",
+    "pytest-xdist",
     "torchtestcase",
-    "twine",
 ]
 
 [project.urls]
 documentation = "https://sbi-dev.github.io/sbi/"
 source = "https://github.com/sbi-dev/sbi"
 tracker = "https://github.com/sbi-dev/sbi/issues"
+
+# Package installation configuration
+[tool.setuptools.packages.find]
+where = ["."]  # list of folders that contain the packages (["."] by default)
+include = ["sbi*"]  # package names should match these glob patterns (["*"] by default)
+exclude = ["sbi-logs*"]  # exclude packages matching these glob patterns (empty by default)
+namespaces = false  # to disable scanning PEP 420 namespaces (true by default)
+
+[tool.setuptools.dynamic]
+version = {attr = "sbi.__version__"}
 
 # ruff configs
 [tool.ruff]
@@ -82,7 +90,7 @@ line-length = 88
 # pycodestyle, Pyflakes, pyupgrade, flake8-bugbear, flake8-simplify, isort
 select = ["E", "F", "W", "B", "SIM", "I"]
 ignore = [
-    "E731",  # allow using lambda functions
+    "E731",  # allow naming lambda functions.
     "B008",  # allow function calls in default args.
 ]
 
@@ -114,17 +122,11 @@ markers = [
 ]
 
 # Pyright configuration
- [tool.pyright]
- include = ["sbi", "tests"]
- exclude = ["**/__pycache__", "**/__node_modules__", ".git", "docs", "examples", "tutorials"]
- python_version = "3.8"
- reportUnsupportedDunderAll = false
-
-[tool.setuptools.packages.find]
-where = ["."]  # list of folders that contain the packages (["."] by default)
-include = ["sbi*"]  # package names should match these glob patterns (["*"] by default)
-exclude = ["sbi-logs*"]  # exclude packages matching these glob patterns (empty by default)
-namespaces = false  # to disable scanning PEP 420 namespaces (true by default)
-
-[tool.setuptools.dynamic]
-version = {attr = "sbi.__version__"}
+[tool.pyright]
+include = ["sbi", "tests"]
+exclude = ["**/__pycache__", "**/__node_modules__", ".git", "docs", "examples", "tutorials", "tests"]
+python_version = "3.8"
+reportUnsupportedDunderAll = false
+reportGeneralTypeIssues = false
+reportInvalidTypeForm = false
+typeCheckingMode = "basic"
