@@ -55,6 +55,7 @@ class NFlowsFlow(DensityEstimator):
 
         # Repeat the condition to match `input_batch_dim * input_iid_dim`.
         ones_for_event_dims = (1,) * input_event_dims  # Tuple of 1s, e.g. (1, 1, 1)
+        print("ones_for_event_dims", ones_for_event_dims)
         condition = condition.repeat(1, input_iid_dim, *ones_for_event_dims)
         # The `.net` expects `batch, iid, event`, not `iid, batch, event`.
         condition = condition.transpose(1, 0)

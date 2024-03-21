@@ -13,7 +13,7 @@ from sbi.sbi_types import TorchTransform
 from sbi.utils import mcmc_transform
 from sbi.utils.sbiutils import within_support
 from sbi.utils.torchutils import ensure_theta_batched
-
+from sbi.neural_nets.density_estimators.shape_handling import reshape_to_iid_batch_event
 
 def posterior_estimator_based_potential(
     posterior_estimator: DensityEstimator,
@@ -99,7 +99,11 @@ class PosteriorBasedPotential(BasePotential):
             )
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
-        theta, x = theta.to(self.device), self.x_o.to(self.device)
+        print("x_o", self.x_o.shape)
+        theta = reshape_to_iid_batch_event(theta, event_shape=theta.shape[1:], leading_is_iid=False)
+        x = reshape_to_iid_batch_event(self.x_o, event_shape=self.x_o.shape[1:], leading_is_iid=True)
+
+        theta, x = theta.to(self.device), x.to(self.device)
 
         with torch.set_grad_enabled(track_gradients):
             posterior_log_prob = self.posterior_estimator.log_prob(theta, condition=x)

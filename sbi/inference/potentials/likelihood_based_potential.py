@@ -120,12 +120,14 @@ def _log_likelihoods_over_trials(
         log_likelihood_trial_sum: log likelihood for each parameter, summed over all
             batch entries (iid trials) in `x`.
     """
+    # print("x", x.shape)
+    # print("theta", theta.shape)
+
     # Shape of `x` is (iid_dim, *event_shape)
     x = reshape_to_iid_batch_event(x, event_shape=x.shape[1:], leading_is_iid=True)
-    x = x.transpose(1, 0)
 
     # Match the number of `x` to the number of conditions (`theta`).
-    theta_batch_size = theta.shape[1]
+    theta_batch_size = theta.shape[0]
     x = x.expand(-1, theta_batch_size, -1)
 
     assert (
@@ -138,6 +140,9 @@ def _log_likelihoods_over_trials(
     theta = reshape_to_iid_batch_event(
         theta, event_shape=theta.shape[1:], leading_is_iid=False
     )
+
+    # print("final_x", x.shape)
+    # print("final_theta", theta.shape)
 
     # Calculate likelihood in one batch.
     with torch.set_grad_enabled(track_gradients):

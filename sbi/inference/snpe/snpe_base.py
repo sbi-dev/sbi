@@ -323,9 +323,13 @@ class PosteriorEstimator(NeuralInference, ABC):
             theta = reshape_to_iid_batch_event(
                 theta.to("cpu"), self._theta_shape[1:], leading_is_iid=False
             )
+            print("before", x.shape)
+            print("x_shape", self._x_shape)
             x = reshape_to_iid_batch_event(
                 x.to("cpu"), self._x_shape[1:], leading_is_iid=False
             )
+            print("theta here", theta.shape)
+            print("x here", x.shape)
             test_posterior_net_for_multi_d_x(self._neural_net, theta, x)
 
             del theta, x
