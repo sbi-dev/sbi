@@ -738,6 +738,7 @@ def validate_theta_and_x(
 
     return theta, x
 
+
 def check_condition_shape(condition, condition_shape=None):
     r"""This method checks whether the condition has the correct shape.
 
