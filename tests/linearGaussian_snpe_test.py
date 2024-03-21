@@ -24,6 +24,7 @@ from sbi.inference import (
     prepare_for_sbi,
     simulate_for_sbi,
 )
+from sbi.neural_nets import posterior_nn
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     samples_true_posterior_linear_gaussian_mvn_prior_different_dims,
@@ -302,7 +303,7 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
 
     if method_str == "snpe_c_non_atomic":
         # Test whether SNPE works properly with structured z-scoring.
-        density_estimator = utils.posterior_nn(
+        density_estimator = posterior_nn(
             "mdn", z_score_x="structured", num_components=5
         )
         method_str = "snpe_c"
@@ -534,7 +535,7 @@ def test_sample_conditional():
             return linear_gaussian(theta, -likelihood_shift, likelihood_cov)
 
     # Test whether SNPE works properly with structured z-scoring.
-    net = utils.posterior_nn("maf", z_score_x="structured", hidden_features=20)
+    net = posterior_nn("maf", z_score_x="structured", hidden_features=20)
 
     simulator, prior = prepare_for_sbi(simulator, prior)
 

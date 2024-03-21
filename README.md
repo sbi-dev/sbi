@@ -26,13 +26,12 @@ parameter_posterior = infer(simulator, prior, method='SNPE', num_simulations=100
 
 ## Installation
 
-`sbi` requires Python 3.6 or higher. We recommend to use a [`conda`](https://docs.conda.io/en/latest/miniconda.html) virtual
-environment ([Miniconda installation instructions](https://docs.conda.io/en/latest/miniconda.html])). If `conda` is installed on the system, an environment for
-installing `sbi` can be created as follows:
+`sbi` requires Python 3.8 or higher. A GPU is not required, but can lead to speed-up in some cases. We recommend to use a [`conda`](https://docs.conda.io/en/latest/miniconda.html) virtual
+environment ([Miniconda installation instructions](https://docs.conda.io/en/latest/miniconda.html)). If `conda` is installed on the system, an environment for installing `sbi` can be created as follows:
 
 ```commandline
-# Create an environment for sbi (indicate Python 3.6 or higher); activate it
-$ conda create -n sbi_env python=3.7 && conda activate sbi_env
+# Create an environment for sbi (indicate Python 3.8 or higher); activate it
+$ conda create -n sbi_env python=3.10 && conda activate sbi_env
 ```
 
 Independent of whether you are using `conda` or not, `sbi` can be installed using `pip`:
@@ -49,9 +48,13 @@ posterior = simple()
 print(posterior)
 ```
 
+## Tutorials
+
+For first time users, you can now head over to the turorials and get going with [Getting Started](https://sbi-dev.github.io/sbi/tutorial/00_getting_started/).
+
 ## Inference Algorithms
 
-The following algorithms are currently available. You can find a tutorial on how to run each of these methods [here](https://sbi-dev.github.io/sbi/tutorial/16_implemented_methods/).
+The following inference algorithms are currently available. You can find instructions on how to run each of these methods [here](https://sbi-dev.github.io/sbi/tutorial/16_implemented_methods/).
 
 ### Neural Posterior Estimation: amortized (NPE) and sequential (SNPE)
 

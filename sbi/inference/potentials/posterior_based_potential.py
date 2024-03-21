@@ -9,7 +9,7 @@ from torch.distributions import Distribution
 
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.neural_nets.density_estimators import DensityEstimator
-from sbi.types import TorchTransform
+from sbi.sbi_types import TorchTransform
 from sbi.utils import mcmc_transform
 from sbi.utils.sbiutils import within_support
 from sbi.utils.torchutils import ensure_theta_batched

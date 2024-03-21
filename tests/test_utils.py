@@ -12,8 +12,8 @@ from torch.distributions import Distribution
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
 from sbi.inference.potentials.base_potential import BasePotential
+from sbi.sbi_types import Shape, TorchTransform
 from sbi.simulators.linear_gaussian import true_posterior_linear_gaussian_mvn_prior
-from sbi.types import Shape, TorchTransform
 from sbi.utils import BoxUniform, within_support
 from sbi.utils.metrics import c2st
 from sbi.utils.torchutils import ensure_theta_batched
