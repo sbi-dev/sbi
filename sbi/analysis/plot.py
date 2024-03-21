@@ -7,8 +7,10 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import matplotlib as mpl
 import numpy as np
+import pandas as pd
 import six
 import torch
+from matplotlib import cm
 from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure, FigureBase
@@ -16,6 +18,7 @@ from scipy.stats import binom, gaussian_kde
 from torch import Tensor
 
 from sbi.analysis import eval_conditional_density
+from sbi.analysis.test_utils import PP_vals
 
 try:
     collectionsAbc = collections.abc  # type: ignore
@@ -1403,3 +1406,159 @@ def _plot_hist_region_expected_under_uniformity(
         color=color,
         alpha=alpha,
     )
+
+
+# ==== Diagnostics for L-C2ST ====
+
+
+def pp_plot_lc2st(
+    probas, probas_null, labels, colors, pp_vals_null=None, ax=None, **kwargs
+):
+    """Probability - Probability (P-P) plot for the classifier predicted
+    class probabilities in (L)C2ST to assess the validity of a (or several)
+    density estimator(s).
+
+    Args:
+        probas (list of np.arrays): list of predicted class probabilities for each case
+            (i.e. associated to each density estimator).
+        probas_null (list of ): list of predicted class probabilities in each trial
+            under the null hypothesis.
+        labels (list): list of labels for every density estimator.
+        colors (list): list of colors for every density estimator.
+        pp_vals_null (dict): dictionary of PP-values for each trial under the null
+            hypothesis.
+        ax (matplotlib.axes.Axes): axes to plot on.
+        **kwargs: keyword arguments for matplotlib.pyplot.plot.
+
+    Returns:
+        ax (matplotlib.axes.Axes): axes with the P-P plot.
+    """
+    if ax is None:
+        ax = plt.gca()
+    alphas = np.linspace(0, 1, 100)
+    pp_vals_dirac = PP_vals([0.5] * len(probas), alphas)
+    ax.plot(alphas, pp_vals_dirac, "--", color="black", label="True probability (H0)")
+
+    if pp_vals_null is None:
+        pp_vals_null = {}
+        for t in range(len(probas_null)):
+            pp_vals_null[t] = pd.Series(PP_vals(probas_null[t], alphas))
+
+    low_null = pd.DataFrame(pp_vals_null).quantile(0.05 / 2, axis=1)
+    up_null = pd.DataFrame(pp_vals_null).quantile(1 - 0.05 / 2, axis=1)
+    ax.fill_between(
+        alphas,
+        low_null,
+        up_null,
+        color="grey",
+        alpha=0.2,
+        label="95% confidence region",
+    )
+
+    for p, l_, c in zip(probas, labels, colors):
+        pp_vals = pd.Series(PP_vals(p, alphas))
+        ax.plot(alphas, pp_vals, label=l_, color=c, **kwargs)
+    return ax
+
+
+def pairplot_with_proba_intensity(
+    df_probas,
+    dim=1,
+    z_space=True,
+    n_bins=20,
+    vmin=0,
+    vmax=1,
+    cmap=cm.get_cmap("Spectral_r"),
+    show_colorbar=True,
+    ax=None,
+):
+    """Plot 1d or 2d marginal histogram of samples of the density estimator
+    with probabilities as color intensity.
+
+    Args:
+        df_probas (pd.DataFrame): dataframe with predicted class probabilities
+            as obtained from `compute_dfs_with_probas_marginals`.
+        dim (int): dimension of the marginal histogram to plot.
+        z_space (bool): whether to plot the histogram in latent space
+            of the base distribution of a normalizing flow. If False, plot
+            in the original space of the estimated density.
+        n_bins (int): number of bins for the histogram.
+        vmin (float): minimum value for the color intensity.
+        vmax (float): maximum value for the color intensity.
+        cmap (matplotlib.colors.Colormap): colormap for the color intensity.
+        show_colorbar (bool): whether to show the colorbar.
+        ax (matplotlib.axes.Axes): axes to plot on.
+
+    Returns:
+        ax (matplotlib.axes.Axes): axes with the plot.
+    """
+    if ax is None:
+        ax = plt.gca()
+
+    if dim == 1:
+        _, bins, patches = ax.hist(df_probas.z, n_bins, density=True, color="green")
+        df_probas["bins"] = np.select(
+            [df_probas.z <= i for i in bins[1:]], list(range(n_bins))
+        )
+        # get mean predicted proba for each bin
+        weights = df_probas.groupby(["bins"]).mean().probas
+
+        id = list(set(range(n_bins)) - set(df_probas.bins))
+        patches = np.delete(patches, id)
+        bins = np.delete(bins, id)
+
+        norm = Normalize(vmin=vmin, vmax=vmax)
+
+        for w, p in zip(weights, patches):
+            p.set_facecolor(cmap(w))  # color is mean predicted proba
+
+        if show_colorbar:
+            plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax)
+
+    elif dim == 2:
+        if z_space:
+            legend = r"$\hat{p}(Z\sim\mathcal{N}(0,1)\mid x_0)$"
+        else:
+            legend = r"$\hat{p}(\Theta\sim q_{\phi}(\theta \mid x_0) \mid x_0)$"
+
+        _, x, y = np.histogram2d(df_probas.z_1, df_probas.z_2, bins=n_bins)
+        df_probas["bins_x"] = np.select(
+            [df_probas.z_1 <= i for i in x[1:]], list(range(n_bins))
+        )
+        df_probas["bins_y"] = np.select(
+            [df_probas.z_2 <= i for i in y[1:]], list(range(n_bins))
+        )
+        # get mean predicted proba for each bin
+        prob_mean = df_probas.groupby(["bins_x", "bins_y"]).mean().probas
+
+        weights = np.zeros((n_bins, n_bins))
+        for i in range(n_bins):
+            for j in range(n_bins):
+                try:
+                    weights[i, j] = prob_mean.loc[i].loc[j]
+                except KeyError:
+                    # if no sample in bin, set color to white
+                    weights[i, j] = np.nan
+
+        norm = Normalize(vmin=vmin, vmax=vmax)
+        for i in range(len(x) - 1):
+            for j in range(len(y) - 1):
+                facecolor = cmap(norm(weights.T[j, i]))
+                # if no sample in bin, set color to white
+                if weights.T[j, i] == np.nan:
+                    facecolor = "white"
+                rect = Rectangle(
+                    (x[i], y[j]),
+                    x[i + 1] - x[i],
+                    y[j + 1] - y[j],
+                    facecolor=facecolor,  # color is mean predicted proba
+                    edgecolor="none",
+                )
+                ax.add_patch(rect)
+        if show_colorbar:
+            plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax, label=legend)
+
+    else:
+        print("Not implemented.")
+
+    return ax
