@@ -241,7 +241,7 @@ def get_offdiag_funcs(off_diag_list):
             offdiag_funcs.append(None)
     return offdiag_funcs
 
-def _format_subplot(ax, current, limits, ticks, labels_dim, fig_kwargs, row, col, dim, flat,excl_lower,eps=1e-5):
+def _format_subplot(ax, current, limits, ticks, labels_dim, fig_kwargs, row, col, dim, flat,excl_lower):
     """
     Format subplot according to fig_kwargs and other arguments
     Args:
@@ -267,6 +267,7 @@ def _format_subplot(ax, current, limits, ticks, labels_dim, fig_kwargs, row, col
         ax.set_facecolor(fig_kwargs["fig_bg_colors"][current])
     # Limits
     if current == "diag":
+        eps = fig_kwargs["x_lim_add_eps"]
         ax.set_xlim((limits[col][0]-eps, limits[col][1]+eps))
     else:
         ax.set_xlim((limits[col][0], limits[col][1]))
@@ -280,6 +281,9 @@ def _format_subplot(ax, current, limits, ticks, labels_dim, fig_kwargs, row, col
         if current != "diag":
             ax.set_yticks((ticks[row][0], ticks[row][1]))
 
+    #make square
+    if fig_kwargs["square_subplots"]:
+        ax.set_box_aspect(1)
     # Despine
     ax.spines["right"].set_visible(False)
     ax.spines["top"].set_visible(False)
@@ -792,6 +796,8 @@ def _get_default_fig_kwargs():
         },
         "title":None,
         "title_format": {"fontsize": 16},
+        "x_lim_add_eps": 1e-5,
+        "square_subplots": True,
 }
 
 
