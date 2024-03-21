@@ -69,8 +69,8 @@ class TensorRatioEstimator(RatioEstimator):
     def __init__(
         self,
         net: nn.Module,
-        embedding_net_theta: nn.Module = nn.Identity,
-        embedding_net_x: nn.Module = nn.Identity,
+        embedding_net_theta: nn.Module = nn.Identity(),
+        embedding_net_x: nn.Module = nn.Identity(),
     ) -> None:
         r"""Base class for ratio estimators.
 
