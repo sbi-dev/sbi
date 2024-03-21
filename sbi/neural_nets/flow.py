@@ -565,7 +565,7 @@ def build_zuko_flow_matching(
         frequency=frequency,
     )
 
-    pass
+    return flow_matching_estimator
 
 class ContextSplineMap(nn.Module):
     """
