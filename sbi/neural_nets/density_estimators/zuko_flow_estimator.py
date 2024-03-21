@@ -15,8 +15,8 @@ from zuko.utils import broadcast
 class ZukoFlowMatchingEstimator(DensityEstimator):
     def __init__(
         self,
-        theta_shape: int,
-        condition_shape: int,
+        theta_shape: torch.Size,
+        condition_shape: torch.Size,
         net: nn.Module = None,
         frequency: int = 3,
         eta: float = 1e-3,
@@ -38,7 +38,7 @@ class ZukoFlowMatchingEstimator(DensityEstimator):
         # instantiate the regression network
         if not net:
             net = MLP(
-                in_features=theta_shape + condition_shape + 2 * frequency,
+                in_features=theta_shape.numel() + condition_shape.numel() + 2 * frequency,
                 out_features=theta_shape,
                 hidden_features=[64] * 5,
                 activation=nn.ELU,
