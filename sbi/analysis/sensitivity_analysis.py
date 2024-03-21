@@ -6,7 +6,6 @@ from copy import deepcopy
 from typing import Any, Callable, Optional, Tuple, Union
 from warnings import warn
 
-import numpy as np
 import torch
 from pyknos.nflows.nn import nets
 from torch import Tensor, nn, optim, relu
