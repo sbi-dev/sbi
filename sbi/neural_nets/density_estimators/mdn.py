@@ -103,7 +103,7 @@ class MoG:
         return log_probs
 
 
-class MDNDensity(DensityEstimator):
+class MixedDensityEstimator(DensityEstimator):
     def __init__(self, mdn: Any, condition_shape=torch.Size) -> None:
         super().__init__(mdn, condition_shape)
         self.mog = MoG()
@@ -127,7 +127,7 @@ class MDNDensity(DensityEstimator):
 
     def get_mixture_components(self, condition: Optional[Tensor] = None):
         embedded_x = self.embedding_net(condition)
-        logits_d, m_d, prec_d, *_ = self.distribution.get_mixture_components(embedded_x)
+        logits_d, m_d, prec_d = self.distribution.get_mixture_components(embedded_x)[:3]
         return logits_d, m_d, prec_d
 
     def set_mixture_context(self, context: Tensor, inplace: bool = True):
@@ -162,7 +162,8 @@ class MDNDensity(DensityEstimator):
             self.set_mixture_context(condition, inplace=True)
         if proposal is not None:
             self.correct_mixture(proposal)
-        return self.mog.sample(sample_shape)
+        theta = self.mog.sample(sample_shape)
+        return self.transform.inverse(theta)[0]
 
     def log_prob(
         self,
@@ -173,18 +174,13 @@ class MDNDensity(DensityEstimator):
         # mdn log_prob
         # TODO: add support for evaluating the MDN
 
-        # TODO: CHECK THAT BOTH RETURN THE SAME LOG PROBS
-        # mdn = posterior_nn("mdn")(theta, x)
-        # mdn_est = MDNDensity(mdn.net, mdn._condition_shape)
-        # mdn_flow = NFlowsFlow(mdn.net, mdn._condition_shape)
-        # assert all(mdn_est.log_prob(theta) == mdn_flow.log_prob(theta, xo))
-
         # mog log_prob
         if condition is not None:
             self.set_mixture_context(condition, inplace=True)
         if proposal is not None:
             self.correct_mixture(proposal)
-        return self.mog.log_prob(input)
+        input, logsumdiag = self.transform(input)
+        return self.mog.log_prob(input) + logsumdiag
 
     def loss(self, input: Tensor, condition: Tensor) -> Tensor:
         r"""Return the loss for training the density estimator.
