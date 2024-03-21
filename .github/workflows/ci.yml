@@ -28,7 +28,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
-        lfs: true
+        lfs: false
 
     - name: Set up Python
       uses: actions/setup-python@v5
