@@ -1,6 +1,7 @@
 import math
 import torch
 import torch.nn as nn
+from typing import Tuple
 
 from sbi.neural_nets.density_estimators.base import DensityEstimator
 from torch.distributions import Distribution
