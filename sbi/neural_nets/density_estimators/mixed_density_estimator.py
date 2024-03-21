@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
-from typing import Tuple
+from typing import Optional, Tuple
 
 import torch
 from torch import Tensor
@@ -9,8 +9,8 @@ from torch import Tensor
 from sbi.neural_nets.density_estimators import (
     CategoricalMassEstimator,
     DensityEstimator,
-    NFlowsFlow,
 )
+from sbi.neural_nets.density_estimators.nflows_flow import NFlowsFlow
 from sbi.utils.sbiutils import match_theta_and_x_batch_shapes
 from sbi.utils.torchutils import atleast_2d
 
@@ -27,7 +27,7 @@ class MixedDensityEstimator(DensityEstimator):
         discrete_net: CategoricalMassEstimator,
         continuous_net: NFlowsFlow,
         log_transform_x: bool = False,
-        condition_shape: torch.Size = None,
+        condition_shape: Optional[torch.Size] = None,
     ):
         """Initialize class for combining density estimators for MNLE.
 
