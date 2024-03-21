@@ -232,8 +232,23 @@ def z_standardization(
         t_std = torch.std(batch_t[is_valid_t], dim=0)
         t_std[t_std < min_std] = min_std
 
-    # Return mean and std for z-scoring.
-    return t_mean, t_std
+    if backend == "nflows":
+        return transforms.AffineTransform(shift=-t_mean / t_std, scale=1 / t_std)
+    elif backend == "zuko":
+        return zuko.flows.Unconditional(
+            zuko.transforms.MonotonicAffineTransform,
+            shift=-t_mean / t_std,
+            scale=1 / t_std,
+            buffer=True,
+        )
+    elif backend == "zuko_transform":
+        return zuko.transforms.MonotonicAffineTransform(
+            -t_mean / t_std,
+            scale=1 / t_std
+        )
+
+    else:
+        raise ValueError("Invalid backend. Use 'nflows' or 'zuko'.")
 
 
 class Standardize(nn.Module):
