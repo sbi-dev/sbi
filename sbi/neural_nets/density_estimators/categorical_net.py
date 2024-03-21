@@ -79,26 +79,26 @@ class CategoricalNet(nn.Module):
 
         return self.softmax(self.output_layer(context))
 
-    def log_prob(self, input: Tensor, condition: Tensor) -> Tensor:
-        """Return categorical log probability of categories input, given condition.
+    def log_prob(self, input: Tensor, context: Tensor) -> Tensor:
+        """Return categorical log probability of categories input, given context.
 
         Args:
             input: categories to evaluate.
-            condition: parameters.
+            context: parameters.
 
         Returns:
             Tensor: log probs with shape (input.shape[0],)
         """
         # Predict categorical ps and evaluate.
-        ps = self.forward(condition)
+        ps = self.forward(context)
         return Categorical(probs=ps).log_prob(input.squeeze())
 
-    def sample(self, num_samples: int, condition: Tensor) -> Tensor:
+    def sample(self, num_samples: int, context: Tensor) -> Tensor:
         """Returns samples from categorical random variable with probs predicted from
         the neural net.
 
         Args:
-            condition: batch of parameters for prediction.
+            context: batch of parameters for prediction.
             num_samples: number of samples to obtain.
 
         Returns:
@@ -106,7 +106,7 @@ class CategoricalNet(nn.Module):
         """
 
         # Predict Categorical ps and sample.
-        ps = self.forward(condition)
+        ps = self.forward(context)
         return (
             Categorical(probs=ps)
             .sample(torch.Size((num_samples,)))
@@ -119,25 +119,25 @@ class CategoricalMassEstimator(DensityEstimator):
     for a categorical RV.
     """
 
-    def __init__(self, net: CategoricalNet, condition_shape: torch.Size) -> None:
+    def __init__(self, net: CategoricalNet) -> None:
         super().__init__()
         self.net = net
 
-    def log_prob(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
-        return super().log_prob(input, condition, **kwargs)
+    def log_prob(self, input: Tensor, context: Tensor, **kwargs) -> Tensor:
+        return super().log_prob(input, context, **kwargs)
 
-    def sample(self, sample_shape: torch.Size, condition: Tensor, **kwargs) -> Tensor:
-        return super().sample(sample_shape, condition, **kwargs)
+    def sample(self, sample_shape: torch.Size, context: Tensor, **kwargs) -> Tensor:
+        return super().sample(sample_shape, context, **kwargs)
 
-    def loss(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
+    def loss(self, input: Tensor, context: Tensor, **kwargs) -> Tensor:
         r"""Return the loss for training the density estimator.
 
         Args:
             input: Inputs to evaluate the loss on of shape (batch_size, input_size).
-            condition: Conditions of shape (batch_size, *condition_shape).
+            context: Conditions of shape (batch_size, *condition_shape).
 
         Returns:
             Loss of shape (batch_size,)
         """
 
-        return -self.log_prob(input, condition)
+        return -self.log_prob(input, context)

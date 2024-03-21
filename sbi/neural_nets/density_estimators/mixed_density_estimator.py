@@ -8,7 +8,7 @@ from pyknos.nflows import flows
 from torch import Tensor
 
 from sbi.neural_nets.density_estimators import (
-    CategoricalNet,
+    CategoricalMassEstimator,
     DensityEstimator,
 )
 from sbi.utils.sbiutils import match_theta_and_x_batch_shapes
@@ -24,7 +24,7 @@ class MixedDensityEstimator(DensityEstimator):
 
     def __init__(
         self,
-        discrete_net: CategoricalNet,
+        discrete_net: CategoricalMassEstimator,
         continuous_net: flows.Flow,
         log_transform_x: bool = False,
         # condition_shape: torch.Size = None,
@@ -67,8 +67,9 @@ class MixedDensityEstimator(DensityEstimator):
         with torch.set_grad_enabled(track_gradients):
             # Sample discrete data given parameters.
             discrete_x = self.discrete_net.sample(
-                theta=theta,
-                num_samples=num_samples,
+                sample_shape=torch.Size((num_samples,)),
+                context=theta,
+                # num_samples=num_samples,
             ).reshape(num_samples, 1)
 
             # Sample continuous data condition on parameters and discrete data.
@@ -113,15 +114,15 @@ class MixedDensityEstimator(DensityEstimator):
         cont_x, disc_x = _separate_x(x)
         num_parameters = context.shape[0]
 
-        disc_log_prob = self.discrete_net.log_prob(x=disc_x, theta=context).reshape(
-            num_parameters
-        )
+        disc_log_prob = self.discrete_net.log_prob(
+            input=disc_x, context=context
+        ).reshape(num_parameters)
 
         cont_log_prob = self.continuous_net.log_prob(
             # Transform to log-space if needed.
             torch.log(cont_x) if self.log_transform_x else cont_x,
             # Pass parameters and discrete x as context.
-            condition=torch.cat((context, disc_x), dim=1),
+            context=torch.cat((context, disc_x), dim=1),
         )
 
         # Combine into joint lp.
@@ -197,7 +198,7 @@ class MixedDensityEstimator(DensityEstimator):
         # Get repeat discrete data and theta to match in batch shape for flow eval.
         log_probs_cont = self.continuous_net.log_prob(
             torch.log(x_cont_repeated) if self.log_transform_x else x_cont_repeated,
-            condition=torch.cat((theta_repeated, x_disc_repeated), dim=1),
+            context=torch.cat((theta_repeated, x_disc_repeated), dim=1),
         )
 
         # Combine into joint lp with first dim over trials.
