@@ -17,7 +17,7 @@ class LC2ST:
         xs: Tensor,
         posterior_samples: Tensor,
         seed: int = 1,
-        n_folds: int = 5,
+        n_folds: int = 1,
         classifier: str = "mlp",
         z_score: bool = False,
         clf_class: BaseEstimator = None,
@@ -42,7 +42,7 @@ class LC2ST:
             seed: Seed for the sklearn classifier and the KFold cross validation.
                 Defaults to 1.
             n_folds: Number of folds for the cross-validation.
-                Defaults to 5.
+                Defaults to 1 (no cross-validation).
             z_score: Whether to z-score to normalize the data.
                 Defaults to False.
             classifier: Classification architecture to use.
@@ -105,15 +105,16 @@ class LC2ST:
         # TODO: case of normalizing flows
         self.null_distribution = None
 
-    def train(self, verbosity: int = 0) -> List[Any]:
+    def _train(self, P, Q, x_P, x_Q, verbosity: int = 0) -> List[Any]:
         """Returns the classifiers trained on observed data."""
 
         # prepare data
+
         if self.z_score:
-            self.P = (self.P - self.P_mean) / self.P_std
-            self.Q = (self.Q - self.P_mean) / self.P_std
-            self.x_P = (self.x_P - self.x_P_mean) / self.x_P_std
-            self.x_Q = (self.x_Q - self.x_P_mean) / self.x_P_std
+            P = (P - self.P_mean) / self.P_std
+            Q = (Q - self.P_mean) / self.P_std
+            x_P = (x_P - self.x_P_mean) / self.x_P_std
+            x_Q = (x_Q - self.x_P_mean) / self.x_P_std
 
         # initialize classifier
         clf = self.clf_class(**self.clf_kwargs)
@@ -127,8 +128,8 @@ class LC2ST:
                 cv_splits, desc="Cross-validation", disable=verbosity < 1
             ):
                 # get train split
-                P_train, Q_train = self.P[train_idx], self.Q[train_idx]
-                x_P_train, x_Q_train = self.x_P[train_idx], self.x_Q[train_idx]
+                P_train, Q_train = P[train_idx], Q[train_idx]
+                x_P_train, x_Q_train = x_P[train_idx], x_Q[train_idx]
 
                 # train classifier
                 clf_n = train_lc2st(P_train, Q_train, x_P_train, x_Q_train, clf)
@@ -136,17 +137,16 @@ class LC2ST:
                 trained_clfs.append(clf_n)
         else:
             # train single classifier
-            clf = train_lc2st(self.P, self.Q, self.x_P, self.x_Q, clf)
+            clf = train_lc2st(P, Q, x_P, x_Q, clf)
             trained_clfs = [clf]
 
-        # set trained classifiers
-        self.trained_clfs = trained_clfs
         return trained_clfs
 
-    def scores(
+    def _scores(
         self,
         P_eval: Tensor,
         x_eval: Tensor,
+        trained_clfs: List[Any],
         return_probas: bool = False,
     ) -> np.ndarray:
         """Compute the L-C2ST scores for the observed data.
@@ -156,6 +156,7 @@ class LC2ST:
                 Shape (n_samples, dim_theta)
             x_eval: Observation.
                 Shape (,dim_x)
+            trained_clfs: Trained classifiers.
             return_probas: Whether to return the predicted probabilities of being in P.
                 Defaults to False.
 
@@ -163,8 +164,6 @@ class LC2ST:
             scores: L-C2ST scores at `x_eval`.
             (probas, scores): Predicted probabilities and L-C2ST scores at `x_eval`.
         """
-        assert self.trained_clfs is not None, "You need to train the classifiers first"
-
         # prepare data
         if self.z_score:
             P_eval = (P_eval - self.P_mean) / self.P_std
@@ -173,7 +172,7 @@ class LC2ST:
         probas, scores = [], []
 
         # evaluate classifiers
-        for clf in self.trained_clfs:
+        for clf in trained_clfs:
             proba, score = eval_lc2st(P_eval, x_eval, clf, return_proba=True)
             probas.append(proba)
             scores.append(score)
@@ -184,7 +183,19 @@ class LC2ST:
         else:
             return scores
 
-    def statistic(
+    def train_data(self):
+        trained_clfs = self._train(self.P, self.Q, self.x_P, self.x_Q)
+        self.trained_clfs = trained_clfs
+
+    def scores_data(self, P_eval: Tensor, x_eval: Tensor, return_probas: bool = False):
+        assert (
+            self.trained_clfs is not None
+        ), "No trained classifiers found. Run `train_data` first."
+        return self._scores(
+            P_eval, x_eval, self.trained_clfs, return_probas=return_probas
+        )
+
+    def statistic_data(
         self,
         P_eval: Tensor,
         x_eval: Tensor,
@@ -200,7 +211,7 @@ class LC2ST:
         Returns:
             L-C2ST statistic at `x_eval`
         """
-        return self.scores(P_eval, x_eval).mean()
+        return self.scores_data(P_eval, x_eval).mean()
 
     def p_value(
         self,
@@ -220,8 +231,8 @@ class LC2ST:
         Returns:
             p-value for L-C2ST at `x_eval`
         """
-        stat_data = self.statistic(P_eval, x_eval)
-        stats_null = self.compute_stats_null(
+        stat_data = self.statistic_data(P_eval, x_eval)
+        stats_null = self.statistics_null(
             P_eval, x_eval, return_probas=False, verbosity=0, **kwargs
         )
         return (stat_data < stats_null).mean()
@@ -253,7 +264,6 @@ class LC2ST:
         self,
         n_trials: int = 100,
         permutation: bool = True,
-        return_probas: bool = False,
         verbosity: int = 1,
     ):
         """Compute the L-C2ST scores under the null hypothesis (H0).
@@ -277,10 +287,7 @@ class LC2ST:
             (probas, scores): Predicted probabilities and L-C2ST scores under (H0).
         """
 
-        # initialize classifier
-        clf = self.clf_class(**self.clf_kwargs)
-
-        trained_clfs_null = []
+        trained_clfs_null = {}
         for t in tqdm(
             range(n_trials),
             desc=f"Training the classifiers under (H0) - permutation = {permutation}",
@@ -316,14 +323,12 @@ class LC2ST:
                 x_Q_t = (x_Q_t - self.x_P_mean) / self.x_P_std
 
             # train
-            clf_t = train_lc2st(P_t, Q_t, x_P_t, x_Q_t, clf)
-            trained_clfs_null.append(clf_t)
+            clf_t = self._train(P_t, Q_t, x_P_t, x_Q_t, verbosity=0)
+            trained_clfs_null[t] = clf_t
 
         self.trained_clfs_null = trained_clfs_null
 
-        return trained_clfs_null
-
-    def compute_stats_null(
+    def statistics_null(
         self,
         P_eval: Tensor,
         x_eval: Tensor,
@@ -354,11 +359,13 @@ class LC2ST:
         """
 
         if self.trained_clfs_null is None:
-            raise ValueError("You need to train the classifiers under (H0) first")
+            raise ValueError(
+                "You need to train the classifiers under (H0). Run `train_null`."
+            )
         else:
             assert (
                 len(self.trained_clfs_null) == n_trials
-            ), " You need one classifier per trial"
+            ), " You need one classifier per trial."
 
         probas_null, stats_null = [], []
         for t in tqdm(
@@ -382,7 +389,7 @@ class LC2ST:
 
             # evaluate
             clf_t = self.trained_clfs_null[t]
-            proba, score = eval_lc2st(P_eval_t, x_eval, clf_t, return_proba=True)
+            proba, score = self._scores(P_eval_t, x_eval, clf_t, return_probas=True)
             probas_null.append(proba)
             stats_null.append(score.mean())
 
