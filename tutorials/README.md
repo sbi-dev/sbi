@@ -1,7 +1,7 @@
 # Tutorials for using the `sbi` toolbox
 
 These `sbi` tutorials are aimed at two sepatate groups
-1.  _users,_ e.g., domain scientists that aim to get an introduction to the method to then apply it to their (mechanistic) models
+1.  _users_, e.g., domain scientists that aim to get an introduction to the method to then apply it to their (mechanistic) models
 2. _contributers_ who develop methods and/or plan to contribute to the `sbi` toolbox
 
 Before running the notebooks, follow our instructions to [install sbi](../README.md).
