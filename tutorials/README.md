@@ -11,7 +11,7 @@ The numbers of the notebooks are not informative of the order, please follow thi
 Before going through the tutorial notebooks, make sure to read through the **Overview, Motivation and Approach** below.
 
 - [Getting started](00_getting_started_flexible.ipynb) introduces the `sbi` package and its core functionality.
-- [Inferring parameters for multiple observations ](01_gaussian_amortized.ipynb)introduces the concept of amortization, i.e., that we do not need to retrain our inference procedure for different observations.
+- [Inferring parameters for multiple observations](01_gaussian_amortized.ipynb) introduces the concept of amortization, i.e., that we do not need to retrain our inference procedure for different observations.
 - [The example for a scientific simulator from neuroscience (Hodgkin-Huxley)](../examples/00_HH_simulator.ipynb), show cases `sbi` applied to a scientific use cases building on the previous two examples.
 - [Inferring parameters for a single observation ](03_multiround_inference.ipynb) introduces the concept of multi round inference for a single observation to be more sampling efficient.
 
@@ -76,8 +76,7 @@ Many areas of science and engineering make extensive use of complex, stochastic,
 numerical simulations to describe the structure and dynamics of the processes being
 investigated.
 
-A key challenge in simulation-based science is constraining these simulation models'
-parameters, which are intepretable quantities, with observational data. Bayesian
+A key challenge in simulation models for science, is constraining the parameters of these models, which are intepretable quantities, with observational data. Bayesian
 inference provides a general and powerful framework to invert the simulators, i.e.
 describe the parameters which are consistent both with empirical data and prior
 knowledge.
