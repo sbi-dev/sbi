@@ -559,8 +559,8 @@ def build_zuko_flow_matching(
         z_score_x = standardizing_net(batch_y, structured_y)
 
     flow_matching_estimator = ZukoFlowMatchingEstimator(
-        theta_shape=x_numel,
-        condition_shape=y_numel,
+        theta_shape=batch_x[0].shape,
+        condition_shape=batch_y[0].shape,
         net=vector_field_regression_net,
         frequency=frequency,
     )

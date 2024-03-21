@@ -68,7 +68,8 @@ class ZukoFlowMatchingEstimator(DensityEstimator):
         # check for possible batch dimension in the condition
         if len(condition.shape) > len(self._condition_shape):
             raise ValueError(
-                "The condition has a batch dimension, which is currently not supported."
+                "The condition has a batch dimension, which is currently not supported.", \
+                f"{condition.shape} vs. {self._condition_shape}"
             )
 
         dist = self.flow(x_o=condition)
