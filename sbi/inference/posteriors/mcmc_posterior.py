@@ -553,7 +553,7 @@ class MCMCPosterior(NeuralPosterior):
 
         sampler = MCMC(
             kernel=kernels[mcmc_method](potential_fn=potential_function),
-            num_samples=(thin * num_samples) // num_chains + num_chains,
+            num_samples=ceil((thin * num_samples) / num_chains),
             warmup_steps=warmup_steps,
             initial_params={self.param_name: initial_params},
             num_chains=num_chains,
@@ -610,7 +610,7 @@ class MCMCPosterior(NeuralPosterior):
             potential_fn=potential_function,
             step=steps[mcmc_method],
             initvals=tensor2numpy(initial_params),
-            draws=(thin * num_samples) // num_chains + num_chains,
+            draws=ceil((thin * num_samples) / num_chains),
             tune=warmup_steps,
             chains=num_chains,
             mp_ctx="spawn",

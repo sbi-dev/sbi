@@ -88,7 +88,7 @@ class PyMCPotential(pt.Op):  # type: ignore
         """
         # get outputs from forward pass (but doesn't re-compute it, I think...)
         value = self(*inputs)
-        gradients = value.owner.outputs[1:]
+        gradients = value.owner.outputs[1:]  # type: ignore
         # compute and return JVP
         return [(output_grads[0] * grad) for grad in gradients]
 

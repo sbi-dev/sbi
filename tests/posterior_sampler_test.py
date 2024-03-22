@@ -16,7 +16,7 @@ from sbi.inference import (
     prepare_for_sbi,
     simulate_for_sbi,
 )
-from sbi.samplers.mcmc import SliceSamplerSerial, SliceSamplerVectorized
+from sbi.samplers.mcmc import PyMCSampler, SliceSamplerSerial, SliceSamplerVectorized
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
 
 
@@ -25,9 +25,11 @@ from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
     (
         "slice_np",
         "slice_np_vectorized",
-        "slice",
-        "nuts",
-        "hmc",
+        "nuts_pyro",
+        "hmc_pyro",
+        "nuts_pymc",
+        "hmc_pymc",
+        "slice_pymc",
     ),
 )
 def test_api_posterior_sampler_set(sampling_method: str, set_seed):
@@ -73,8 +75,10 @@ def test_api_posterior_sampler_set(sampling_method: str, set_seed):
         },
     )
 
-    if sampling_method in ["slice", "hmc", "nuts"]:
+    if "pyro" in sampling_method:
         assert type(posterior.posterior_sampler) is MCMC
+    elif "pymc" in sampling_method:
+        assert type(posterior.posterior_sampler) is PyMCSampler
     elif sampling_method == "slice_np":
         assert type(posterior.posterior_sampler) is SliceSamplerSerial
     else:  # sampling_method == "slice_np_vectorized"

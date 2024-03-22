@@ -17,6 +17,7 @@ from sbi.inference import (
     simulate_for_sbi,
 )
 from sbi.neural_nets import likelihood_nn
+from sbi.samplers.mcmc.pymc_wrapper import PyMCSampler
 from sbi.samplers.mcmc.slice_numpy import (
     SliceSampler,
     SliceSamplerSerial,
@@ -122,6 +123,56 @@ def test_c2st_slice_np_vectorized_parallelized_on_Gaussian(
         SliceSamplerVectorized: "slice_np_vectorized",
         SliceSamplerSerial: "slice_np",
     }[slice_sampler]
+
+    check_c2st(samples, target_samples, alg=alg)
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("num_dim", (1, 2))
+@pytest.mark.parametrize("step", ("nuts",))  # , "hmc", "slice"))
+@pytest.mark.parametrize("num_chains", (1, 2))
+def test_c2st_pymc_sampler_on_Gaussian(num_dim: int, step: str, num_chains: int):
+    """Test PyMC on Gaussian, comparing to ground truth target via c2st.
+
+    Args:
+        num_dim: parameter dimension of the gaussian model
+
+    """
+    num_samples = 500
+    warmup = 50
+
+    likelihood_shift = -1.0 * ones(num_dim)
+    likelihood_cov = 0.3 * eye(num_dim)
+    prior_mean = zeros(num_dim)
+    prior_cov = eye(num_dim)
+    x_o = zeros((1, num_dim))
+    target_distribution = true_posterior_linear_gaussian_mvn_prior(
+        x_o[0], likelihood_shift, likelihood_cov, prior_mean, prior_cov
+    )
+    target_samples = target_distribution.sample((num_samples,))
+
+    def lp_f(x, track_gradients=True):
+        with torch.set_grad_enabled(track_gradients):
+            return target_distribution.log_prob(x)
+
+    sampler = PyMCSampler(
+        potential_fn=lp_f,
+        initvals=np.zeros((num_chains, num_dim)).astype(np.float32),
+        step=step,
+        draws=(int(num_samples / num_chains)),  # PyMC does not use thinning
+        tune=warmup,
+        chains=num_chains,
+    )
+    samples = sampler.run()
+    assert samples.shape == (
+        num_chains,
+        int(num_samples / num_chains),
+        num_dim,
+    )
+    samples = samples.reshape(-1, num_dim)
+
+    samples = torch.as_tensor(samples, dtype=torch.float32)
+    alg = f"pymc_{step}"
 
     check_c2st(samples, target_samples, alg=alg)
 
