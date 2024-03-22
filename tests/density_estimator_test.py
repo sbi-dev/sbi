@@ -87,11 +87,10 @@ def test_density_estimator_loss_shapes(
     embedding_net = FCEmbedding(
         input_dim=condition_event_shape[0], output_dim=output_dim
     )
-    if condition_iid_dim > 1:
-        embedding_net = PermutationInvariantEmbedding(
-            embedding_net,
-            trial_net_output_dim=output_dim,
-        )
+    embedding_net = PermutationInvariantEmbedding(
+        embedding_net,
+        trial_net_output_dim=output_dim,
+    )
 
     density_estimator = posterior_nn(
         density_estimator_name, embedding_net=embedding_net
@@ -101,7 +100,7 @@ def test_density_estimator_loss_shapes(
     density_estimator = density_estimator(building_thetas, building_xs)
 
     inputs = torch.randn((input_iid_dim, batch_dim, *input_event_shape))
-    condition = torch.randn((condition_iid_dim, batch_dim, *condition_event_shape))
+    condition = torch.randn((1, batch_dim, condition_iid_dim, *condition_event_shape))
     losses = density_estimator.loss(inputs, condition=condition)
     assert losses.shape == (input_iid_dim, batch_dim)
 
@@ -194,4 +193,4 @@ def test_correctness_of_density_estimator_loss(
     inputs = inputs.expand(input_iid_dim, -1, -1)
     condition = building_xs.unsqueeze(0)
     losses = density_estimator.loss(inputs, condition=condition)
-    # assert torch.allclose(losses[0, :], losses[1, :])
+    assert torch.allclose(losses[0, :], losses[1, :])
