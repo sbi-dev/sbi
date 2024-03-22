@@ -289,8 +289,10 @@ def posterior_shrinkage(prior_samples, post_samples):
     if isinstance(post_samples, torch.Tensor):
         post_samples = post_samples.cpu().numpy()
 
-    prior_samples = np.atleast_2d(prior_samples)
-    post_samples = np.atleast_2d(post_samples)
+    if prior_samples.ndim == 1:
+        prior_samples = prior_samples[:, None]
+    if post_samples.ndim == 1:
+        post_samples = post_samples[:, None]
 
     prior_std = np.std(prior_samples, axis=0)
     post_std = np.std(post_samples, axis=0)
@@ -328,8 +330,10 @@ def posterior_zscore(true_theta, post_samples):
         post_samples = post_samples.cpu().numpy()
 
     true_theta = np.atleast_1d(true_theta)
-    post_samples = np.atleast_2d(post_samples)
+    if post_samples.ndim == 1:
+        post_samples = post_samples[:, None]
 
+    assert len(true_theta) == post_samples.shape[1]
     post_mean = np.mean(post_samples, axis=0)
     post_std = np.std(post_samples, axis=0)
 
