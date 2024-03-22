@@ -78,7 +78,7 @@ def test_running_sbc(method, prior, reduce_fn_str, sampler, model="mdn"):
 
 @pytest.mark.slow
 @pytest.mark.parametrize("prior", ("boxuniform", "independent"))
-@pytest.mark.parametrize("method, sampler", [(SNLE, "vi")])
+@pytest.mark.parametrize("method, sampler", [(SNPE, "mdn")])
 def test_consistent_sbc_results(method, prior, sampler, model="mdn"):
     """Tests running inference and then SBC and obtaining nltp."""
 
@@ -90,7 +90,7 @@ def test_consistent_sbc_results(method, prior, sampler, model="mdn"):
             [Uniform(-torch.ones(1), torch.ones(1)) for _ in range(num_dim)]
         )
 
-    num_simulations = 200
+    num_simulations = 1000
     max_num_epochs = 20
     num_sbc_runs = 4
 
@@ -108,14 +108,8 @@ def test_consistent_sbc_results(method, prior, sampler, model="mdn"):
         training_batch_size=100, max_num_epochs=max_num_epochs
     )
 
-    posterior_kwargs = {
-        "sample_with": "mcmc" if sampler == "mcmc" else "vi",
-        "mcmc_method": "slice_np_vectorized",
-        "mcmc_parameters": {"num_chains": 10, "thin": 5, "warmup_steps": 10},
-    }
-
-    posterior = inferer.build_posterior(**posterior_kwargs)
-    num_posterior_samples = 250
+    posterior = inferer.build_posterior()
+    num_posterior_samples = 1000
     thetas = prior.sample((num_sbc_runs,))
     xs = simulator(thetas)
 
