@@ -56,7 +56,7 @@ def _update(d, u):
 # Plotting functions
 def plt_hist_1d(ax, samples, limits, kwargs):
     """Plot 1D histogram."""
-    if ["bins"] not in kwargs['mpl_kwargs'].keys() or kwargs['mpl_kwargs']["bins"] is None:
+    if "bins" not in kwargs['mpl_kwargs'].keys() or kwargs['mpl_kwargs']["bins"] is None:
         if kwargs["bin_heuristic"] == "Freedman-Diaconis":
             # The Freedman-Diaconis heuristic
             binsize = 2 * iqr(samples) * len(samples) ** (-1 / 3)
@@ -83,7 +83,7 @@ def plt_scatter_1d(ax, samples, limits, kwargs):
 
 def plt_hist_2d(ax, samples_col, samples_row, limits_col, limits_row, kwargs):
     """Plot 2D histogram."""
-    if ["bins"] not in kwargs['np_hist_kwargs'].keys() or kwargs['np_hist_kwargs']["bins"] is None:
+    if "bins" not in kwargs['np_hist_kwargs'].keys() or kwargs['np_hist_kwargs']["bins"] is None:
         if kwargs["bin_heuristic"] == "Freedman-Diaconis":
             # The Freedman-Diaconis heuristic applied to each direction
             binsize_col = 2 * iqr(samples_col) * len(samples_col) ** (-1 / 3)
