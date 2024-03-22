@@ -51,7 +51,7 @@ def test_api_snre_multiple_trials_and_rounds_map(
     prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
 
     simulator = diagonal_linear_gaussian
-    inference = snre_method(prior=prior, classifier="mlp", show_progress_bars=False)
+    inference = snre_method(prior=prior, critic="mlp", show_progress_bars=False)
 
     proposals = [prior]
     for _ in range(num_rounds):
@@ -107,7 +107,7 @@ def test_c2st_sre_on_linearGaussian(
             theta, likelihood_shift, likelihood_cov, num_discarded_dims=discard_dims
         )
 
-    inference = snre_method(classifier="resnet", show_progress_bars=False)
+    inference = snre_method(critic="resnet", show_progress_bars=False)
 
     theta, x = simulate_for_sbi(
         simulator, prior, num_simulations, simulation_batch_size=100
@@ -183,7 +183,7 @@ def test_c2st_snre_variants_on_linearGaussian_with_multiple_trials(
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     kwargs = dict(
-        classifier="resnet",
+        critic="resnet",
         show_progress_bars=False,
     )
 
@@ -229,7 +229,7 @@ def test_c2st_snre_variants_on_linearGaussian_with_multiple_trials(
     # Checks for log_prob()
     if prior_str == "gaussian" and isinstance(snre_method, (AALR, BNRE)):
         # For the Gaussian prior, we compute the KLd between ground truth and
-        # posterior. We can do this only if the classifier_loss was as described in
+        # posterior. We can do this only if the critic_loss was as described in
         # Hermans et al. 2020 ('aalr') since Durkan et al. 2020 version only allows
         # evaluation up to a constant.
         # For the Gaussian prior, we compute the KLd between ground truth and posterior
@@ -380,7 +380,7 @@ def test_api_sre_sampling_methods(
 
     simulator = diagonal_linear_gaussian
 
-    inference = SNRE_B(classifier="resnet", show_progress_bars=False)
+    inference = SNRE_B(critic="resnet", show_progress_bars=False)
 
     theta, x = simulate_for_sbi(
         simulator, prior, num_simulations, simulation_batch_size=num_simulations

@@ -13,7 +13,7 @@ class SNRE_C(RatioEstimator):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        classifier: Union[str, Callable] = "resnet",
+        critic: Union[str, Callable] = "resnet",
         device: str = "cpu",
         logging_level: Union[int, str] = "warning",
         summary_writer: Optional[TensorboardSummaryWriter] = None,
@@ -42,13 +42,13 @@ class SNRE_C(RatioEstimator):
             prior: A probability distribution that expresses prior knowledge about the
                 parameters, e.g. which ranges are meaningful for them. If `None`, the
                 prior must be passed to `.build_posterior()`.
-            classifier: Classifier trained to approximate likelihood ratios. If it is
+            critic: Critic trained to approximate likelihood ratios. If it is
                 a string, use a pre-configured network of the provided type (one of
                 linear, mlp, resnet). Alternatively, a function that builds a custom
                 neural network can be provided. The function will be called with the
                 first batch of simulations (theta, x), which can thus be used for shape
                 inference and potentially for z-scoring. It needs to return a PyTorch
-                `nn.Module` implementing the classifier.
+                `nn.Module` implementing the critic.
             device: Training device, e.g., "cpu", "cuda" or "cuda:{0, 1, ...}".
             logging_level: Minimum severity of messages to log. One of the strings
                 INFO, WARNING, DEBUG, ERROR and CRITICAL.
@@ -77,7 +77,7 @@ class SNRE_C(RatioEstimator):
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[Dict] = None,
     ) -> nn.Module:
-        r"""Return classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
+        r"""Return critic that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
 
         Args:
             num_classes: Number of theta to classify against, corresponds to $K$ in
@@ -116,7 +116,7 @@ class SNRE_C(RatioEstimator):
                 and validation dataloaders (like, e.g., a collate_fn)
 
         Returns:
-            Classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
+            Critic that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
         """
         kwargs = del_entries(locals(), entries=("self", "__class__"))
         kwargs["num_atoms"] = kwargs.pop("num_classes") + 1

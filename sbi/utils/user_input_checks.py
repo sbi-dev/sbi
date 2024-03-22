@@ -685,7 +685,7 @@ def check_estimator_arg(estimator: Union[str, Callable]) -> None:
     assert isinstance(estimator, str) or (
         isinstance(estimator, Callable) and not isinstance(estimator, nn.Module)
     ), (
-        "The passed density estimator / classifier must be a string or a function "
+        "The passed density estimator / critic must be a string or a function "
         f"returning a nn.Module, but is {type(estimator)}"
     )
 

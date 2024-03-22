@@ -12,7 +12,7 @@ from sbi import utils as utils
 from sbi.inference.base import NeuralInference
 from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior, VIPosterior
 from sbi.inference.potentials import ratio_estimator_based_potential
-from sbi.neural_nets import classifier_nn
+from sbi.neural_nets import critic_nn
 from sbi.utils import (
     check_estimator_arg,
     check_prior,
@@ -25,7 +25,7 @@ class RatioEstimator(NeuralInference, ABC):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        classifier: Union[str, Callable] = "resnet",
+        critic: Union[str, Callable] = "resnet",
         device: str = "cpu",
         logging_level: Union[int, str] = "warning",
         summary_writer: Optional[SummaryWriter] = None,
@@ -49,13 +49,13 @@ class RatioEstimator(NeuralInference, ABC):
           (normalizing constant) of the data $x$.
 
         Args:
-            classifier: Classifier trained to approximate likelihood ratios. If it is
+            critic: Critic trained to approximate likelihood ratios. If it is
                 a string, use a pre-configured network of the provided type (one of
                 linear, mlp, resnet). Alternatively, a function that builds a custom
                 neural network can be provided. The function will be called with the
                 first batch of simulations (theta, x), which can thus be used for shape
                 inference and potentially for z-scoring. It needs to return a PyTorch
-                `nn.Module` implementing the classifier.
+                `nn.Module` implementing the critic.
 
         See docstring of `NeuralInference` class for all other arguments.
         """
@@ -73,11 +73,11 @@ class RatioEstimator(NeuralInference, ABC):
         # `_build_neural_net`. It will be called in the first round and receive
         # thetas and xs as inputs, so that they can be used for shape inference and
         # potentially for z-scoring.
-        check_estimator_arg(classifier)
-        if isinstance(classifier, str):
-            self._build_neural_net = classifier_nn(model=classifier)
+        check_estimator_arg(critic)
+        if isinstance(critic, str):
+            self._build_neural_net = critic_nn(model=critic)
         else:
-            self._build_neural_net = classifier
+            self._build_neural_net = critic
 
     def append_simulations(
         self,
@@ -139,7 +139,7 @@ class RatioEstimator(NeuralInference, ABC):
         dataloader_kwargs: Optional[Dict] = None,
         loss_kwargs: Optional[Dict[str, Any]] = None,
     ) -> nn.Module:
-        r"""Return classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
+        r"""Return critic that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
 
         Args:
             num_atoms: Number of atoms to use for classification.
@@ -159,7 +159,7 @@ class RatioEstimator(NeuralInference, ABC):
             loss_kwargs: Additional or updated kwargs to be passed to the self._loss fn.
 
         Returns:
-            Classifier that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
+            Critic that approximates the ratio $p(\theta,x)/p(\theta)p(x)$.
         """
         # Load data from most recent round.
         self._round = max(self._data_round_index)
@@ -285,7 +285,8 @@ class RatioEstimator(NeuralInference, ABC):
         return deepcopy(self._neural_net)
 
     def _classifier_logits(self, theta: Tensor, x: Tensor, num_atoms: int) -> Tensor:
-        """Return logits obtained through classifier forward pass.
+        """Return logits obtained through classifier (defined by the critic's)
+        forward pass.
 
         The logits are obtained from atomic sets of (theta,x) pairs.
         """

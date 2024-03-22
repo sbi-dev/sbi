@@ -15,7 +15,7 @@ from sbi.analysis import (
 )
 from sbi.inference import SNPE, SNPE_A
 from sbi.inference.snpe.snpe_a import SNPE_A_MDN
-from sbi.neural_nets import classifier_nn, likelihood_nn, posterior_nn
+from sbi.neural_nets import critic_nn, likelihood_nn, posterior_nn
 from sbi.utils import BoxUniform, get_kde
 
 
@@ -406,7 +406,7 @@ def test_kde(bandwidth, transform, sample_weights):
 @pytest.mark.parametrize(
     "z_theta", [True, False, None, "none", "independent", "structured"]
 )
-@pytest.mark.parametrize("builder", [likelihood_nn, posterior_nn, classifier_nn])
+@pytest.mark.parametrize("builder", [likelihood_nn, posterior_nn, critic_nn])
 def test_z_scoring_structured(z_x, z_theta, builder):
     """
     Test that z-scoring string args don't break API.

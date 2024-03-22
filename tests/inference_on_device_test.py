@@ -29,7 +29,7 @@ from sbi.inference import (
 )
 from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
 from sbi.inference.potentials.base_potential import BasePotential
-from sbi.neural_nets import classifier_nn, likelihood_nn, posterior_nn
+from sbi.neural_nets import critic_nn, likelihood_nn, posterior_nn
 from sbi.simulators import diagonal_linear_gaussian, linear_gaussian
 from sbi.utils.torchutils import BoxUniform, gpu_available, process_device
 from sbi.utils.user_input_checks import (
@@ -130,7 +130,7 @@ def test_training_and_mcmc_on_device(
         )
         train_kwargs = dict()
     elif method in (SNRE_A, SNRE_B, SNRE_C):
-        kwargs = dict(classifier=classifier_nn(model=model))
+        kwargs = dict(critic=critic_nn(model=model))
         train_kwargs = dict()
     else:
         raise ValueError()
@@ -293,7 +293,7 @@ def test_train_with_different_data_and_training_device(
     inference = inference_method(
         prior,
         **(
-            dict(classifier="resnet")
+            dict(critic="resnet")
             if inference_method in [SNRE_A, SNRE_B, SNRE_C]
             else dict(
                 density_estimator=(
@@ -368,7 +368,7 @@ def test_embedding_nets_integration_training_device(
             embedding_net_device
         )
         nn_kwargs = dict(
-            classifier=classifier_nn(
+            critic=critic_nn(
                 model="resnet",
                 embedding_net_x=embedding_net_x,
                 embedding_net_theta=embedding_net_theta,
@@ -461,7 +461,7 @@ def test_nograd_after_inference_train(inference_method) -> None:
     inference = inference_method(
         prior,
         **(
-            dict(classifier="resnet")
+            dict(critic="resnet")
             if inference_method in [SNRE_A, SNRE_B, SNRE_C]
             else dict(
                 density_estimator=(

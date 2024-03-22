@@ -7,7 +7,7 @@ from torch.distributions import MultivariateNormal
 
 from sbi import utils
 from sbi.inference import SNLE, SNPE, SNRE
-from sbi.neural_nets import classifier_nn, likelihood_nn, posterior_nn
+from sbi.neural_nets import critic_nn, likelihood_nn, posterior_nn
 from sbi.neural_nets.embedding_nets import (
     CNNEmbedding,
     FCEmbedding,
@@ -57,8 +57,8 @@ def test_embedding_net_api(
             prior, density_estimator=density_estimator, show_progress_bars=False
         )
     elif method == "SNRE":
-        classifier = classifier_nn("resnet", embedding_net_x=embedding)
-        inference = SNRE(prior, classifier=classifier, show_progress_bars=False)
+        critic = critic_nn("resnet", embedding_net_x=embedding)
+        inference = SNRE(prior, critic=critic, show_progress_bars=False)
     else:
         raise NameError
 

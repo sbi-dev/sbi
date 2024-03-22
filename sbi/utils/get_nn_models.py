@@ -6,12 +6,12 @@ from warnings import warn
 
 from torch import nn
 
-from sbi.neural_nets import classifier_nn as classifier_nn_moved_to_neural_nets
+from sbi.neural_nets import critic_nn as critic_nn_moved_to_neural_nets
 from sbi.neural_nets import likelihood_nn as likelihood_nn_moved_to_neural_nets
 from sbi.neural_nets import posterior_nn as posterior_nn_moved_to_neural_nets
 
 
-def classifier_nn(
+def critic_nn(
     model: str,
     z_score_theta: Optional[str] = "independent",
     z_score_x: Optional[str] = "independent",
@@ -21,17 +21,17 @@ def classifier_nn(
     **kwargs: Any,
 ) -> Callable:
     r"""This method is deprecated and will be removed in a future release.
-    Please use `from sbi.neural_nets import classifier_nn` in the future.
+    Please use `from sbi.neural_nets import critic_nn` in the future.
     """
 
     warn(
         "This method is deprecated and will be removed in a future release."
-        "Please use `from sbi.neural_nets import classifier_nn` in the future.",
+        "Please use `from sbi.neural_nets import critic_nn` in the future.",
         DeprecationWarning,
         stacklevel=2,
     )
 
-    return classifier_nn_moved_to_neural_nets(
+    return critic_nn_moved_to_neural_nets(
         model,
         z_score_theta,
         z_score_x,
