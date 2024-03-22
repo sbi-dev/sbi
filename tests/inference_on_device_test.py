@@ -34,9 +34,6 @@ from sbi.simulators import diagonal_linear_gaussian, linear_gaussian
 from sbi.utils.torchutils import BoxUniform, gpu_available, process_device
 from sbi.utils.user_input_checks import (
     check_embedding_net_device,
-    check_sbi_inputs,
-    process_prior,
-    process_simulator,
     validate_theta_and_x,
 )
 
@@ -282,13 +279,11 @@ def test_train_with_different_data_and_training_device(
     training_device = process_device(training_device)
 
     num_dim = 2
-    prior_ = BoxUniform(
+    num_simulations = 32
+    prior = BoxUniform(
         -torch.ones(num_dim), torch.ones(num_dim), device=training_device
     )
-
-    prior, _, prior_returns_numpy = process_prior(prior_)
-    simulator = process_simulator(diagonal_linear_gaussian, prior, prior_returns_numpy)
-    check_sbi_inputs(simulator, prior)
+    simulator = diagonal_linear_gaussian
 
     inference = inference_method(
         prior,
@@ -305,8 +300,9 @@ def test_train_with_different_data_and_training_device(
         device=training_device,
     )
 
-    theta, x = simulate_for_sbi(simulator, prior, 32)
-    theta, x = theta.to(data_device), x.to(data_device)
+    theta = prior.sample((num_simulations,))
+    x = simulator(theta).to(data_device)
+    theta = theta.to(data_device)
     x_o = torch.zeros(x.shape[1])
     inference = inference.append_simulations(theta, x, data_device=data_device)
 
@@ -453,10 +449,8 @@ def test_embedding_nets_integration_training_device(
 def test_nograd_after_inference_train(inference_method) -> None:
     """Test that no gradients are present after training."""
     num_dim = 2
-    prior_ = BoxUniform(-torch.ones(num_dim), torch.ones(num_dim))
-    prior, _, prior_returns_numpy = process_prior(prior_)
-    simulator = process_simulator(diagonal_linear_gaussian, prior, prior_returns_numpy)
-    check_sbi_inputs(simulator, prior)
+    prior = BoxUniform(-torch.ones(num_dim), torch.ones(num_dim))
+    simulator = diagonal_linear_gaussian
 
     inference = inference_method(
         prior,

@@ -27,9 +27,7 @@ from sbi.simulators.linear_gaussian import (
 )
 from sbi.utils import BoxUniform
 from sbi.utils.user_input_checks import (
-    check_sbi_inputs,
     process_prior,
-    process_simulator,
 )
 
 from .test_utils import check_c2st, get_prob_outside_uniform_prior
@@ -58,9 +56,7 @@ def test_api_snle_multiple_trials_and_rounds_map(num_dim: int, prior_str: str):
     else:
         prior = BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
 
-    prior, _, prior_returns_numpy = process_prior(prior)
-    simulator = process_simulator(diagonal_linear_gaussian, prior, prior_returns_numpy)
-    check_sbi_inputs(simulator, prior)
+    simulator = diagonal_linear_gaussian
     inference = SNLE(prior=prior, density_estimator="mdn", show_progress_bars=False)
 
     proposals = [prior]
@@ -112,18 +108,14 @@ def test_c2st_snl_on_linear_gaussian_different_dims(model_str="maf"):
         num_discarded_dims=discard_dims,
         num_samples=num_samples,
     )
-    prior, _, prior_returns_numpy = process_prior(prior)
-    simulator = process_simulator(
-        lambda theta: linear_gaussian(
+
+    def simulator(theta):
+        return linear_gaussian(
             theta,
             likelihood_shift,
             likelihood_cov,
             num_discarded_dims=discard_dims,
-        ),
-        prior,
-        prior_returns_numpy,
-    )
-    check_sbi_inputs(simulator, prior)
+        )
 
     density_estimator = likelihood_nn(model=model_str, num_transforms=3)
     inference = SNLE(density_estimator=density_estimator, show_progress_bars=False)
@@ -177,13 +169,8 @@ def test_c2st_and_map_snl_on_linearGaussian_different(
     else:
         prior = BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
 
-    prior, _, prior_returns_numpy = process_prior(prior)
-    simulator = process_simulator(
-        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov),
-        prior,
-        prior_returns_numpy,
-    )
-    check_sbi_inputs(simulator, prior)
+    def simulator(theta):
+        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     density_estimator = likelihood_nn(model_str, num_transforms=3)
     inference = SNLE(density_estimator=density_estimator, show_progress_bars=False)
@@ -306,13 +293,8 @@ def test_c2st_multi_round_snl_on_linearGaussian(num_trials: int):
     )
     target_samples = gt_posterior.sample((num_samples,))
 
-    prior, _, prior_returns_numpy = process_prior(prior)
-    simulator = process_simulator(
-        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov),
-        prior,
-        prior_returns_numpy,
-    )
-    check_sbi_inputs(simulator, prior)
+    def simulator(theta):
+        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     inference = SNLE(show_progress_bars=False)
 
@@ -375,13 +357,8 @@ def test_c2st_multi_round_snl_on_linearGaussian_vi(num_trials: int):
     )
     target_samples = gt_posterior.sample((num_samples,))
 
-    prior, _, prior_returns_numpy = process_prior(prior)
-    simulator = process_simulator(
-        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov),
-        prior,
-        prior_returns_numpy,
-    )
-    check_sbi_inputs(simulator, prior)
+    def simulator(theta):
+        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     inference = SNLE(show_progress_bars=False)
 
@@ -487,11 +464,7 @@ def test_api_snl_sampling_methods(
     # Thus, we would not like to run, e.g., VI with all init_strategies, but only once
     # (namely with `init_strategy=proposal`).
     if sample_with == "mcmc" or init_strategy == "proposal":
-        prior, _, prior_returns_numpy = process_prior(prior)
-        simulator = process_simulator(
-            diagonal_linear_gaussian, prior, prior_returns_numpy
-        )
-        check_sbi_inputs(simulator, prior)
+        simulator = diagonal_linear_gaussian
 
         inference = SNLE(show_progress_bars=False)
 

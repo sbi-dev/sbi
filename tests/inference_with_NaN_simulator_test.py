@@ -23,7 +23,6 @@ from sbi.utils import RestrictionEstimator
 from sbi.utils.sbiutils import handle_invalid_x
 from sbi.utils.user_input_checks import (
     check_sbi_inputs,
-    process_prior,
     process_simulator,
 )
 
@@ -100,8 +99,7 @@ def test_inference_with_nan_simulator(method: type, percent_nans: float):
         prior=prior,
     )
 
-    prior, _, prior_returns_numpy = process_prior(prior)
-    simulator = process_simulator(linear_gaussian_nan, prior, prior_returns_numpy)
+    simulator = process_simulator(linear_gaussian_nan, prior, False)
     check_sbi_inputs(simulator, prior)
     inference = method(prior=prior)
 
@@ -143,8 +141,7 @@ def test_inference_with_restriction_estimator():
         prior=prior,
     )
 
-    prior, _, prior_returns_numpy = process_prior(prior)
-    simulator = process_simulator(linear_gaussian_nan, prior, prior_returns_numpy)
+    simulator = process_simulator(linear_gaussian_nan, prior, False)
     check_sbi_inputs(simulator, prior)
     restriction_estimator = RestrictionEstimator(prior=prior)
     proposal = prior
