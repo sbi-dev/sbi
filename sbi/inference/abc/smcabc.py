@@ -26,7 +26,7 @@ class SMCABC(ABCBASE):
         show_progress_bars: bool = True,
         kernel: Optional[str] = "gaussian",
         algorithm_variant: str = "C",
-        distance_kwargs: Dict = None,
+        distance_kwargs: Optional[Dict] = None,
     ):
         r"""Sequential Monte Carlo Approximate Bayesian Computation.
 
@@ -175,10 +175,17 @@ class SMCABC(ABCBASE):
         if kde_kwargs is None:
             kde_kwargs = {}
         assert isinstance(epsilon_decay, float) and epsilon_decay > 0.0
+        assert not (
+            self.allow_iid and lra
+        ), "Currently there is no support to run inference "
+        "on multiple observations together with lra."
+        assert not (
+            self.allow_iid and sass
+        ), "Currently there is no support to run inference "
+        "on multiple observations together with sass."
 
         # Pilot run for SASS.
         if sass:
-            # TODO: how should we deal with sass
             num_pilot_simulations = int(sass_fraction * num_simulations)
             self.logger.info(
                 "Running SASS with %s pilot samples.", num_pilot_simulations
@@ -270,7 +277,6 @@ class SMCABC(ABCBASE):
 
         # Maybe run LRA and adjust weights.
         if lra:
-            # TODO: how should we deal with sass
             self.logger.info("Running Linear regression adjustment.")
             adjusted_particles, _ = self.run_lra_update_weights(
                 particles=all_particles[-1],
@@ -338,12 +344,6 @@ class SMCABC(ABCBASE):
             num_particles <= num_initial_pop
         ), "number of initial round simulations must be greater than population size"
 
-        # if (num_iid_samples > 1) and not self.allow_iid:
-
-        assert (
-            num_iid_samples == 1 and x_o.shape[0] == 1
-        ) or self.allow_iid, "You choose num_iid_samples > 1, "
-        "but the choice of your distance does not allow iid simulations."
         assert (
             x_o.shape[0] == 1
         ) or self.allow_iid, "Your data contains more than one data-point, "
@@ -353,7 +353,6 @@ class SMCABC(ABCBASE):
         theta = self.prior.sample((num_initial_pop,))
 
         theta_repeat = theta.repeat_interleave(num_iid_samples, dim=0)
-        # theta_repeat = theta.repeat((num_iid_samples, 1))
         x = self._simulate_with_budget(theta_repeat)
         x = x.reshape((
             num_initial_pop,
@@ -420,7 +419,6 @@ class SMCABC(ABCBASE):
             candidates_repeated = particle_candidates.repeat_interleave(
                 num_iid_samples, dim=0
             )
-
             x_candidates = self._simulate_with_budget(candidates_repeated)
             x_candidates = x_candidates.reshape((
                 num_batch,

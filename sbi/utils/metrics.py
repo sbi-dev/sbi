@@ -186,7 +186,7 @@ def c2st_scores(
     return scores
 
 
-def unbiased_mmd_squared(x, y, scale: float = None):
+def unbiased_mmd_squared(x, y, scale: Optional[float] = None):
     nx, ny = x.shape[0], y.shape[0]
     assert nx != 1 and ny != 1, "The unbiased MMD estimator is not defined "
     "for empirical distributions of size 1."
@@ -299,7 +299,7 @@ def wasserstein_2_squared(x, y, epsilon=1e-3, max_iter=1000, tol=1e-9):
         )
 
     # Evaluate the cost matrix based on the default l2 cost
-    cost_matrix = torch.cdist(x, y, 2)
+    cost_matrix = torch.cdist(x, y, 2) ** 2
 
     coupling = regularized_ot_dual(
         a, b, cost_matrix, epsilon, max_iter=max_iter, tol=tol
@@ -353,7 +353,7 @@ def regularized_ot_dual(
 
     err = torch.inf
     iters = torch.zeros(a.shape[0])
-    terminated = torch.zeros(a.shape[0], dtype=bool)
+    terminated = torch.zeros(a.shape[0], dtype=torch.bool)
     for _ in range(max_iter):
         f_prev, g_prev = f, g
         f_tmp = f + epsilon * (

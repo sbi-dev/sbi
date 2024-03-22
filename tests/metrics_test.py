@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import math
+
 import numpy as np
 import pytest
 import torch
@@ -130,21 +132,33 @@ def test_c2st_scores(dist_sigma, c2st_lowerbound, c2st_upperbound):
     assert np.allclose(obs2_c2st, obs_c2st, atol=0.05)
 
 
-def test_wasserstein_2_distance():
+@pytest.mark.slow
+@pytest.mark.parametrize(
+    "sigma",
+    (0.0, 5, 20.0),
+)
+def test_wasserstein_2_distance(sigma):
     ndim = 10
     nsamples = 1024
     refdist = tmvn(loc=torch.zeros(ndim), covariance_matrix=torch.eye(ndim))
     X = refdist.sample((nsamples,))
 
-    dist_sigmas = [0.0, 1.0, 20.0]
-    w2_prev = 0.0
-    for dist_sigma in dist_sigmas:
-        otherdist = tmvn(
-            loc=dist_sigma + torch.zeros(ndim), covariance_matrix=torch.eye(ndim)
-        )
-        Y = otherdist.sample((nsamples - 1,))
+    # As we are only dealing with a diagonal covariance,
+    #  the residual terms coming from the covariance cancel out.
+    analytical_wasserstein_2_squared = (
+        torch.norm(sigma * torch.ones(ndim)) ** 2
+    ).item()
 
-        w2 = wasserstein_2_squared(X, Y)
+    otherdist = tmvn(loc=sigma + torch.zeros(ndim), covariance_matrix=torch.eye(ndim))
+    Y = otherdist.sample((nsamples - 1,))
+    estimate = wasserstein_2_squared(X, Y, epsilon=5e-4).item()
 
-        assert w2 > w2_prev
-        w2_prev = w2
+    # Check if the wasserstein estimate is of the same order
+    # as the analytically derived squared Wasserstein-2 distance
+    exponent1 = (
+        0
+        if analytical_wasserstein_2_squared == 0
+        else int(math.floor(math.log10(abs(analytical_wasserstein_2_squared))))
+    )
+    exponent2 = 0 if estimate == 0 else int(math.floor(math.log10(abs(estimate))))
+    assert exponent1 == exponent2

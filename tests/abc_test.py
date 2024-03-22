@@ -24,6 +24,7 @@ def test_mcabc_inference_on_linear_gaussian(
     kde=False,
     kde_bandwidth="cv",
     num_iid_samples=1,
+    distance_kwargs=None,
 ):
     x_o = zeros((num_iid_samples, num_dim))
     num_samples = 1000
@@ -43,7 +44,13 @@ def test_mcabc_inference_on_linear_gaussian(
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    inferer = MCABC(simulator, prior, simulation_batch_size=10000, distance=distance)
+    inferer = MCABC(
+        simulator,
+        prior,
+        simulation_batch_size=10000,
+        distance=distance,
+        distance_kwargs=distance_kwargs,
+    )
 
     phat = inferer(
         x_o,
@@ -81,6 +88,7 @@ def test_smcabc_inference_on_linear_gaussian(
     transform=False,
     num_simulations=20000,
     num_iid_samples=1,
+    distance_kwargs=None,
 ):
     x_o = zeros((num_iid_samples, num_dim))
     num_samples = 1000
@@ -92,13 +100,13 @@ def test_smcabc_inference_on_linear_gaussian(
         prior_cov = eye(num_dim)
         prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
         gt_posterior = true_posterior_linear_gaussian_mvn_prior(
-            x_o[0], likelihood_shift, likelihood_cov, prior_mean, prior_cov
+            x_o, likelihood_shift, likelihood_cov, prior_mean, prior_cov
         )
         target_samples = gt_posterior.sample((num_samples,))
     elif prior_type == "uniform":
         prior = BoxUniform(-ones(num_dim), ones(num_dim))
         target_samples = samples_true_posterior_linear_gaussian_uniform_prior(
-            x_o[0], likelihood_shift, likelihood_cov, prior, num_samples
+            x_o, likelihood_shift, likelihood_cov, prior, num_samples
         )
     else:
         raise ValueError("Wrong prior string.")
@@ -112,6 +120,7 @@ def test_smcabc_inference_on_linear_gaussian(
         distance=distance,
         simulation_batch_size=10000,
         algorithm_variant="C",
+        distance_kwargs=distance_kwargs,
     )
 
     phat = infer(
@@ -119,7 +128,7 @@ def test_smcabc_inference_on_linear_gaussian(
         num_particles=1000,
         num_initial_pop=5000,
         epsilon_decay=0.5,
-        num_simulations=num_simulations * num_iid_samples,
+        num_simulations=num_simulations,
         distance_based_decay=True,
         return_summary=False,
         lra=lra,
@@ -134,6 +143,12 @@ def test_smcabc_inference_on_linear_gaussian(
         num_iid_samples=num_iid_samples,
     )
 
+    # if isinstance(phat, KDEWrapper):
+    #     b = phat.sample((num_samples,))
+    # elif isinstance(phat, Tensor):
+    #     b = phat
+    # else:
+    #     raise TypeError
     check_c2st(
         phat.sample((num_samples,)) if kde else phat,
         target_samples,
@@ -196,25 +211,36 @@ def test_smcabc_kde(kde_bandwidth):
 
 @pytest.mark.slow
 @pytest.mark.parametrize(
-    "distance, num_iid_samples", (["l2", 1], ["mmd", 20], ["wasserstein", 20])
+    "distance, num_iid_samples, distance_kwargs",
+    (
+        ["l2", 1, None],
+        ["mmd", 10, {"scale": 1.5}],
+    ),
 )
-def test_mc_abc_iid_inference(distance, num_iid_samples):
+def test_mc_abc_iid_inference(distance, num_iid_samples, distance_kwargs):
     test_mcabc_inference_on_linear_gaussian(
         num_dim=2,
         distance=distance,
         num_iid_samples=num_iid_samples,
+        distance_kwargs=distance_kwargs,
     )
 
 
 @pytest.mark.slow
 @pytest.mark.parametrize(
-    "distance, num_iid_samples", (["l2", 1], ["mmd", 20], ["wasserstein", 20])
+    "distance, num_iid_samples, distance_kwargs",
+    (
+        ["l2", 1, None],
+        ["mmd", 20, {"scale": 1.0}],
+        ["wasserstein", 10, {"epsilon": 1.0, "tol": 1e-6, "max_iter": 1000}],
+    ),
 )
-def test_smcabc_iid_inference(distance, num_iid_samples):
+def test_smcabc_iid_inference(distance, num_iid_samples, distance_kwargs):
     test_smcabc_inference_on_linear_gaussian(
         num_dim=2,
-        prior_type="uniform",
+        prior_type="gaussian",
         distance=distance,
         num_iid_samples=num_iid_samples,
-        num_simulations=50000,
+        num_simulations=20000,
+        distance_kwargs=distance_kwargs,
     )

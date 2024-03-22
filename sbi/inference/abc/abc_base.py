@@ -1,6 +1,7 @@
 """Base class for Approximate Bayesian Computation methods."""
 
 import logging
+from functools import partial
 from typing import Callable, Dict, Optional, Union
 
 import numpy as np
@@ -81,7 +82,7 @@ class ABCBASE:
         distance_type: Union[str, Callable] = "l2",
         allow_iid: Optional[bool] = None,
         distance_kwargs: Optional[Dict] = None,
-    ) -> Callable:
+    ) -> [Callable, bool]:
         """Return distance function for given distance type.
 
         Args:
@@ -122,23 +123,26 @@ class ABCBASE:
 
         def mmd_squared(xo, x):
             assert len(x.shape) >= 3 and len(xo.shape) == len(x.shape) - 1
-
-            distances = torch.vmap(unbiased_mmd_squared, in_dims=(None, 0))(xo, x)
+            dist_fn = partial(unbiased_mmd_squared, **distance_kwargs)
+            distances = torch.vmap(dist_fn, in_dims=(None, 0))(xo, x)
             return distances
 
         def wasserstein(xo, x):
             assert len(x.shape) >= 3 and len(xo.shape) == len(x.shape) - 1
 
-            batch_size = 10000
-            num_batches = x.shape[0] // batch_size
+            batch_size = 1000
+            num_batches = x.shape[0] // batch_size - 1
             remaining = x.shape[0] % batch_size
+            if remaining == 0:
+                remaining = batch_size
 
             distances = torch.empty(x.shape[0])
+            batched_xo = xo.repeat((batch_size, 1, 1))
             for i in tqdm(range(num_batches)):
-                distances[num_batches * i : num_batches * i + batch_size] = (
+                distances[batch_size * i : (i + 1) * batch_size] = (
                     wasserstein_2_squared(
-                        xo.repeat((batch_size, 1, 1)),
-                        x[num_batches * i : num_batches * i + batch_size],
+                        batched_xo,
+                        x[batch_size * i : (i + 1) * batch_size],
                         **distance_kwargs,
                     )
                 )
@@ -149,7 +153,7 @@ class ABCBASE:
                     **distance_kwargs,
                 )
 
-            return torch.stack(distances)
+            return distances
 
         distance_functions = {
             "mse": mse_distance,
