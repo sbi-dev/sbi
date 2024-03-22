@@ -1412,7 +1412,14 @@ def _plot_hist_region_expected_under_uniformity(
 
 
 def pp_plot_lc2st(
-    probas, probas_null, labels, colors, pp_vals_null=None, ax=None, **kwargs
+    probas,
+    probas_null,
+    labels,
+    colors,
+    conf_alpha=0.05,
+    pp_vals_null=None,
+    ax=None,
+    **kwargs,
 ):
     """Probability - Probability (P-P) plot for the classifier predicted
     class probabilities in (L)C2ST to assess the validity of a (or several)
@@ -1444,15 +1451,15 @@ def pp_plot_lc2st(
         for t in range(len(probas_null)):
             pp_vals_null[t] = pd.Series(PP_vals(probas_null[t], alphas))
 
-    low_null = pd.DataFrame(pp_vals_null).quantile(0.05 / 2, axis=1)
-    up_null = pd.DataFrame(pp_vals_null).quantile(1 - 0.05 / 2, axis=1)
+    low_null = pd.DataFrame(pp_vals_null).quantile(conf_alpha / 2, axis=1)
+    up_null = pd.DataFrame(pp_vals_null).quantile(1 - conf_alpha / 2, axis=1)
     ax.fill_between(
         alphas,
         low_null,
         up_null,
         color="grey",
         alpha=0.2,
-        label="95% confidence region",
+        label=f"{(1 - conf_alpha) * 100}% confidence region",
     )
 
     for p, l_, c in zip(probas, labels, colors):
