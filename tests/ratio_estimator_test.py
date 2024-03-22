@@ -8,7 +8,7 @@ import torch
 from torch import eye, zeros
 from torch.distributions import MultivariateNormal
 
-from sbi.neural_nets.classifier import build_linear_classifier
+from sbi.neural_nets.critic import build_linear_critic
 from sbi.neural_nets.ratio_estimators import TensorRatioEstimator
 
 
@@ -46,7 +46,7 @@ def test_api_ratio_estimator(ratio_estimator, theta_shape, x_shape):
     batch_x = x_mvn.sample((nsamples,))
 
     if ratio_estimator == TensorRatioEstimator:
-        estimator = build_linear_classifier(
+        estimator = build_linear_critic(
             batch_x=batch_theta,
             batch_y=batch_x,
             embedding_net_x=EmbeddingNet(theta_shape),

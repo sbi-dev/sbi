@@ -6,10 +6,10 @@ from typing import Any, Callable, Optional
 
 from torch import nn
 
-from sbi.neural_nets.classifier import (
-    build_linear_classifier,
-    build_mlp_classifier,
-    build_resnet_classifier,
+from sbi.neural_nets.critic import (
+    build_linear_critic,
+    build_mlp_critic,
+    build_resnet_critic,
 )
 from sbi.neural_nets.flow import (
     build_made,
@@ -48,7 +48,7 @@ model_builders = {
 }
 
 
-def classifier_nn(
+def critic_nn(
     model: str,
     z_score_theta: Optional[str] = "independent",
     z_score_x: Optional[str] = "independent",
@@ -58,15 +58,15 @@ def classifier_nn(
     **kwargs: Any,
 ) -> Callable:
     r"""
-    Returns a function that builds a classifier for learning density ratios.
+    Returns a function that builds a critic for learning density ratios.
 
     This function will usually be used for SNRE. The returned function is to be passed
     to the inference class when using the flexible interface.
 
-    Note that in the view of the SNRE classifier we build below, x=theta and y=x.
+    Note that in the view of the SNRE critic we build below, x=theta and y=x.
 
     Args:
-        model: The type of classifier that will be created. One of [`linear`, `mlp`,
+        model: The type of critic that will be created. One of [`linear`, `mlp`,
             `resnet`].
         z_score_theta: Whether to z-score parameters $\theta$ before passing them into
             the network, can take one of the following:
@@ -107,15 +107,11 @@ def classifier_nn(
 
     def build_fn(batch_theta, batch_x):
         if model == "linear":
-            return build_linear_classifier(
-                batch_x=batch_theta, batch_y=batch_x, **kwargs
-            )
+            return build_linear_critic(batch_x=batch_theta, batch_y=batch_x, **kwargs)
         if model == "mlp":
-            return build_mlp_classifier(batch_x=batch_theta, batch_y=batch_x, **kwargs)
+            return build_mlp_critic(batch_x=batch_theta, batch_y=batch_x, **kwargs)
         if model == "resnet":
-            return build_resnet_classifier(
-                batch_x=batch_theta, batch_y=batch_x, **kwargs
-            )
+            return build_resnet_critic(batch_x=batch_theta, batch_y=batch_x, **kwargs)
         else:
             raise NotImplementedError
 

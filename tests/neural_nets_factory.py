@@ -1,6 +1,6 @@
 import pytest
 
-from sbi.utils.get_nn_models import classifier_nn, likelihood_nn, posterior_nn
+from sbi.utils.get_nn_models import critic_nn, likelihood_nn, posterior_nn
 
 models_to_test = [
     "mdn",
@@ -24,9 +24,9 @@ models_to_test = [
 @pytest.mark.parametrize(
     "model", ["linear", "mlp", "resnet"], ids=["linear", "mlp", "resnet"]
 )
-def test_deprecated_import_classifier_nn(model: str):
+def test_deprecated_import_critic_nn(model: str):
     with pytest.warns(DeprecationWarning):
-        build_fcn = classifier_nn(model)
+        build_fcn = critic_nn(model)
         assert callable(build_fcn)
 
 
