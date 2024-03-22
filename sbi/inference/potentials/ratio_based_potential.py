@@ -128,7 +128,7 @@ def _log_ratios_over_trials(
 
     # Calculate ratios in one batch.
     with torch.set_grad_enabled(track_gradients):
-        log_ratio_trial_batch = net([theta_repeated, x_repeated])
+        log_ratio_trial_batch = net(theta_repeated, x_repeated)
         # Reshape to (x-trials x parameters), sum over trial-log likelihoods.
         log_ratio_trial_sum = log_ratio_trial_batch.reshape(x.shape[0], -1).sum(0)
 
