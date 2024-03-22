@@ -11,8 +11,7 @@ import torch
 from torch import eye, zeros
 from torch.distributions import MultivariateNormal
 
-from sbi.neural_nets.density_estimators.zuko_flow import ZukoFlow
-from sbi.neural_nets.density_estimators.zuko_flow_estimator import ZukoFlowMatchingEstimator
+from sbi.neural_nets.density_estimators import NFlowsFlow, ZukoFlow, ZukoFlowMatchingEstimator
 from sbi.neural_nets.flow import build_nsf, build_zuko_maf, build_zuko_flow_matching
 
 
@@ -77,10 +76,8 @@ def get_batch_context(nsamples: int, condition_shape: tuple[int, ...]) -> torch.
         )
     elif density_estimator == ZukoFlowMatchingEstimator:
         estimator = build_zuko_flow_matching(
-            batch_input,
-            batch_context,
-            hidden_features=10,
-            num_transforms=2
+            batch_x=batch_input,
+            batch_y=batch_context
         )
 
     # Loss is only required to work for batched inputs and contexts
