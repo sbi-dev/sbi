@@ -13,7 +13,7 @@ from torch.utils.data.sampler import SubsetRandomSampler, WeightedRandomSampler
 
 from sbi.samplers.importance.sir import sampling_importance_resampling
 from sbi.samplers.rejection.rejection import accept_reject_sample
-from sbi.types import Shape
+from sbi.sbi_types import Shape
 from sbi.utils.sbiutils import (
     get_simulations_since_round,
     handle_invalid_x,

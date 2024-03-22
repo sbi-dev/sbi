@@ -22,7 +22,7 @@ from sbi.samplers.vi import (
     make_object_deepcopy_compatible,
     move_all_tensor_to_device,
 )
-from sbi.types import (
+from sbi.sbi_types import (
     PyroTransformedDistribution,
     Shape,
     TorchDistribution,

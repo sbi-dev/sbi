@@ -1,9 +1,8 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
-
 from functools import partial
-from typing import Optional, Sequence, Union
+from typing import List, Optional, Sequence, Union
 from warnings import warn
 
 import torch
@@ -11,8 +10,11 @@ import zuko
 from pyknos.nflows import distributions as distributions_
 from pyknos.nflows import flows, transforms
 from pyknos.nflows.nn import nets
-from pyknos.nflows.transforms.splines import rational_quadratic
+from pyknos.nflows.transforms.splines import (
+    rational_quadratic,  # pyright: ignore[reportAttributeAccessIssue]
+)
 from torch import Tensor, nn, relu, tanh, tensor, uint8
+from zuko.flows import LazyTransform
 
 from sbi.neural_nets.density_estimators import NFlowsFlow, ZukoFlow
 from sbi.utils.sbiutils import (
@@ -60,6 +62,7 @@ def build_made(
     # Infer the output dimensionality of the embedding_net by making a forward pass.
     check_data_device(batch_x, batch_y)
     check_embedding_net_device(embedding_net=embedding_net, datum=batch_y)
+    embedding_net.eval()
     y_numel = embedding_net(batch_y[:1]).numel()
 
     if x_numel == 1:
@@ -143,6 +146,7 @@ def build_maf(
     # Infer the output dimensionality of the embedding_net by making a forward pass.
     check_data_device(batch_x, batch_y)
     check_embedding_net_device(embedding_net=embedding_net, datum=batch_y)
+    embedding_net.eval()
     y_numel = embedding_net(batch_y[:1]).numel()
 
     if x_numel == 1:
@@ -251,6 +255,7 @@ def build_maf_rqs(
     # Infer the output dimensionality of the embedding_net by making a forward pass.
     check_data_device(batch_x, batch_y)
     check_embedding_net_device(embedding_net=embedding_net, datum=batch_y)
+    embedding_net.eval()
     y_numel = embedding_net(batch_y[:1]).numel()
 
     if x_numel == 1:
@@ -354,6 +359,7 @@ def build_nsf(
     # Infer the output dimensionality of the embedding_net by making a forward pass.
     check_data_device(batch_x, batch_y)
     check_embedding_net_device(embedding_net=embedding_net, datum=batch_y)
+    embedding_net.eval()
     y_numel = embedding_net(batch_y[:1]).numel()
 
     # Define mask function to alternate between predicted x-dimensions.
@@ -385,7 +391,7 @@ def build_nsf(
     # Stack spline transforms.
     transform_list = []
     for i in range(num_transforms):
-        block = [
+        block: List[transforms.Transform] = [
             transforms.PiecewiseRationalQuadraticCouplingTransform(
                 mask=mask_in_layer(i) if x_numel > 1 else tensor([1], dtype=uint8),
                 transform_net_create_fn=conditioner,
@@ -467,6 +473,7 @@ def build_zuko_maf(
     # Infer the output dimensionality of the embedding_net by making a forward pass.
     check_data_device(batch_x, batch_y)
     check_embedding_net_device(embedding_net=embedding_net, datum=batch_y)
+    embedding_net.eval()
     y_numel = embedding_net(batch_y[:1]).numel()
     if x_numel == 1:
         warn(
@@ -494,13 +501,15 @@ def build_zuko_maf(
             residual=residual,
         )
 
-    transforms = maf.transform.transforms
+    transforms: Union[Sequence[LazyTransform], LazyTransform]
+    transforms = maf.transform.transforms  # pyright: ignore[reportAssignmentType]
     z_score_x_bool, structured_x = z_score_parser(z_score_x)
     if z_score_x_bool:
         # transforms = transforms
         transforms = (
             *transforms,
-            standardizing_transform(batch_x, structured_x, backend="zuko"),
+            # Ideally `standardizing_transform` would return a `LazyTransform` instead of ` AffineTransform | Unconditional`, maybe all three are compatible
+            standardizing_transform(batch_x, structured_x, backend="zuko"),  # pyright: ignore[reportAssignmentType]
         )
 
     z_score_y_bool, structured_y = z_score_parser(z_score_y)

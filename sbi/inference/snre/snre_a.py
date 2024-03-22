@@ -5,7 +5,7 @@ from torch import Tensor, nn, ones
 from torch.distributions import Distribution
 
 from sbi.inference.snre.snre_base import RatioEstimator
-from sbi.types import TensorboardSummaryWriter
+from sbi.sbi_types import TensorboardSummaryWriter
 from sbi.utils import del_entries
 
 

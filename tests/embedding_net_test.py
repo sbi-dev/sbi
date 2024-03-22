@@ -7,6 +7,7 @@ from torch.distributions import MultivariateNormal
 
 from sbi import utils
 from sbi.inference import SNLE, SNPE, SNRE
+from sbi.neural_nets import classifier_nn, likelihood_nn, posterior_nn
 from sbi.neural_nets.embedding_nets import (
     CNNEmbedding,
     FCEmbedding,
@@ -16,7 +17,6 @@ from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     true_posterior_linear_gaussian_mvn_prior,
 )
-from sbi.utils import classifier_nn, likelihood_nn, posterior_nn
 
 from .test_utils import check_c2st
 

@@ -13,7 +13,7 @@ from torch import Tensor, float32
 from torch.distributions import Independent, Uniform
 
 from sbi import utils as utils
-from sbi.types import Array, OneOrMore
+from sbi.sbi_types import Array, OneOrMore
 
 
 def process_device(device: str) -> str:

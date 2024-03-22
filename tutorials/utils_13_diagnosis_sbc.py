@@ -3,7 +3,7 @@ from typing import Callable, Optional
 
 import torch
 
-from sbi.types import Shape
+from sbi.sbi_types import Shape
 
 
 # Mocking a neural posterior

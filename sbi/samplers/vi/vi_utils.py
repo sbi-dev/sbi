@@ -18,7 +18,7 @@ from torch.distributions import Distribution, TransformedDistribution
 from torch.distributions.transforms import ComposeTransform, IndependentTransform
 from torch.nn import Module
 
-from sbi.types import PyroTransformedDistribution, TorchTransform
+from sbi.sbi_types import PyroTransformedDistribution, TorchTransform
 
 
 def filter_kwrags_for_func(f: Callable, kwargs: Dict) -> Dict:

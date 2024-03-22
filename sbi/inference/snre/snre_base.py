@@ -12,6 +12,7 @@ from sbi import utils as utils
 from sbi.inference.base import NeuralInference
 from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior, VIPosterior
 from sbi.inference.potentials import ratio_estimator_based_potential
+from sbi.neural_nets import classifier_nn
 from sbi.utils import (
     check_estimator_arg,
     check_prior,
@@ -74,7 +75,7 @@ class RatioEstimator(NeuralInference, ABC):
         # potentially for z-scoring.
         check_estimator_arg(classifier)
         if isinstance(classifier, str):
-            self._build_neural_net = utils.classifier_nn(model=classifier)
+            self._build_neural_net = classifier_nn(model=classifier)
         else:
             self._build_neural_net = classifier
 

@@ -25,7 +25,6 @@ from sbi.inference.snpe.snpe_a import SNPE_A
 from sbi.inference.snpe.snpe_b import SNPE_B
 from sbi.inference.snpe.snpe_c import SNPE_C  # noqa: F401
 from sbi.inference.snre import BNRE, SNRE, SNRE_A, SNRE_B, SNRE_C  # noqa: F401
-from sbi.utils.user_input_checks import prepare_for_sbi
 
 SNL = SNLE = SNLE_A
 _snle_family = ["SNL"]
@@ -48,6 +47,7 @@ _abc_family = ["ABC", "MCABC", "SMC", "SMCABC"]
 __all__ = _snpe_family + _snre_family + _snle_family + _abc_family
 
 from sbi.inference.posteriors.direct_posterior import DirectPosterior
+from sbi.inference.posteriors.ensemble_posterior import EnsemblePosterior
 from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
 from sbi.inference.posteriors.mcmc_posterior import MCMCPosterior
 from sbi.inference.posteriors.rejection_posterior import RejectionPosterior

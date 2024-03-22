@@ -28,8 +28,8 @@ from sbi.samplers.mcmc import (
     resample_given_potential_fn,
     sir_init,
 )
+from sbi.sbi_types import Shape, TorchTransform
 from sbi.simulators.simutils import tqdm_joblib
-from sbi.types import Shape, TorchTransform
 from sbi.utils import pyro_potential_wrapper, tensor2numpy, transformed_potential
 from sbi.utils.torchutils import ensure_theta_batched
 
@@ -423,7 +423,7 @@ class MCMCPosterior(NeuralPosterior):
                 )
             ):
                 initial_params = torch.cat(
-                    Parallel(n_jobs=num_workers)(
+                    Parallel(n_jobs=num_workers)(  # pyright: ignore[reportArgumentType]
                         delayed(seeded_init_fn)(seed) for seed in seeds
                     )
                 )

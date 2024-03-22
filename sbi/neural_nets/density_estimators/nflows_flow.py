@@ -5,7 +5,7 @@ from pyknos.nflows.flows import Flow
 from torch import Tensor, nn
 
 from sbi.neural_nets.density_estimators.base import DensityEstimator
-from sbi.types import Shape
+from sbi.sbi_types import Shape
 
 
 class NFlowsFlow(DensityEstimator):
@@ -17,6 +17,8 @@ class NFlowsFlow(DensityEstimator):
 
     def __init__(self, net: Flow, condition_shape: torch.Size) -> None:
         super().__init__(net, condition_shape)
+        # TODO: Remove as soon as DensityEstimator becomes abstract
+        self.net: Flow
 
     @property
     def embedding_net(self) -> nn.Module:

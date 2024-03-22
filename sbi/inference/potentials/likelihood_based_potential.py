@@ -10,7 +10,7 @@ from torch.distributions import Distribution
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.neural_nets.density_estimators import DensityEstimator
 from sbi.neural_nets.mnle import MixedDensityEstimator
-from sbi.types import TorchTransform
+from sbi.sbi_types import TorchTransform
 from sbi.utils import mcmc_transform
 
 
@@ -187,7 +187,7 @@ class MixedLikelihoodBasedPotential(LikelihoodBasedPotential):
             # TODO: how to fix pyright issues?
             log_likelihood_trial_batch = self.likelihood_estimator.log_prob_iid(
                 x=self.x_o,
-                theta=theta.to(self.device),
+                context=theta.to(self.device),
             )  # type: ignore
             # Reshape to (x-trials x parameters), sum over trial-log likelihoods.
             log_likelihood_trial_sum = log_likelihood_trial_batch.reshape(

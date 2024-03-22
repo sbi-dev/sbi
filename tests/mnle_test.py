@@ -13,7 +13,8 @@ from sbi.inference.potentials.base_potential import BasePotential
 from sbi.inference.potentials.likelihood_based_potential import (
     MixedLikelihoodBasedPotential,
 )
-from sbi.utils import BoxUniform, likelihood_nn, mcmc_transform
+from sbi.neural_nets import likelihood_nn
+from sbi.utils import BoxUniform, mcmc_transform
 from sbi.utils.conditional_density_utils import ConditionedPotential
 from sbi.utils.torchutils import atleast_2d, process_device
 from sbi.utils.user_input_checks_utils import MultipleIndependent

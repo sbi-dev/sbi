@@ -24,7 +24,7 @@ from sbi.samplers.vi.vi_utils import (
     make_object_deepcopy_compatible,
     move_all_tensor_to_device,
 )
-from sbi.types import Array, PyroTransformedDistribution
+from sbi.sbi_types import Array, PyroTransformedDistribution
 from sbi.utils import check_prior
 
 _VI_method = {}

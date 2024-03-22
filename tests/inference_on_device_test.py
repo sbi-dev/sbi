@@ -29,12 +29,14 @@ from sbi.inference import (
 )
 from sbi.inference.posteriors.importance_posterior import ImportanceSamplingPosterior
 from sbi.inference.potentials.base_potential import BasePotential
+from sbi.neural_nets import classifier_nn, likelihood_nn, posterior_nn
 from sbi.simulators import diagonal_linear_gaussian, linear_gaussian
-from sbi.utils.get_nn_models import classifier_nn, likelihood_nn, posterior_nn
 from sbi.utils.torchutils import BoxUniform, gpu_available, process_device
 from sbi.utils.user_input_checks import (
     check_embedding_net_device,
-    prepare_for_sbi,
+    check_sbi_inputs,
+    process_prior,
+    process_simulator,
     validate_theta_and_x,
 )
 
@@ -110,20 +112,20 @@ def test_training_and_mcmc_on_device(
 
     if method in [SNPE_A, SNPE_C]:
         kwargs = dict(
-            density_estimator=utils.posterior_nn(
+            density_estimator=posterior_nn(
                 model=model, num_transforms=2, dtype=torch.float32
             )
         )
         train_kwargs = dict(force_first_round_loss=True)
     elif method == SNLE:
         kwargs = dict(
-            density_estimator=utils.likelihood_nn(
+            density_estimator=likelihood_nn(
                 model=model, num_transforms=2, dtype=torch.float32
             )
         )
         train_kwargs = dict()
     elif method in (SNRE_A, SNRE_B, SNRE_C):
-        kwargs = dict(classifier=utils.classifier_nn(model=model))
+        kwargs = dict(classifier=classifier_nn(model=model))
         train_kwargs = dict()
     else:
         raise ValueError()
@@ -283,7 +285,10 @@ def test_train_with_different_data_and_training_device(
     prior_ = BoxUniform(
         -torch.ones(num_dim), torch.ones(num_dim), device=training_device
     )
-    simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior_)
+
+    prior, _, prior_returns_numpy = process_prior(prior_)
+    simulator = process_simulator(diagonal_linear_gaussian, prior, prior_returns_numpy)
+    check_sbi_inputs(simulator, prior)
 
     inference = inference_method(
         prior,
@@ -430,11 +435,13 @@ def test_embedding_nets_integration_training_device(
 
         posterior = inference.build_posterior(
             density_estimator_train,
-            **{}
-            if inference_method == SNPE_A
-            else dict(
-                mcmc_method="slice_np_vectorized",
-                mcmc_parameters=dict(thin=10, num_chains=20, warmup_steps=10),
+            **(
+                {}
+                if inference_method == SNPE_A
+                else dict(
+                    mcmc_method="slice_np_vectorized",
+                    mcmc_parameters=dict(thin=10, num_chains=20, warmup_steps=10),
+                )
             ),
         )
         proposal = posterior.set_default_x(x_o)
@@ -447,7 +454,9 @@ def test_nograd_after_inference_train(inference_method) -> None:
     """Test that no gradients are present after training."""
     num_dim = 2
     prior_ = BoxUniform(-torch.ones(num_dim), torch.ones(num_dim))
-    simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior_)
+    prior, _, prior_returns_numpy = process_prior(prior_)
+    simulator = process_simulator(diagonal_linear_gaussian, prior, prior_returns_numpy)
+    check_sbi_inputs(simulator, prior)
 
     inference = inference_method(
         prior,

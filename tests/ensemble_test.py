@@ -7,13 +7,49 @@ import pytest
 from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
-from sbi.inference import SNLE_A, SNPE_C, SNRE_A, prepare_for_sbi
+from sbi.inference import SNLE_A, SNPE_C, SNRE_A
+from sbi.inference.posteriors import EnsemblePosterior
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     true_posterior_linear_gaussian_mvn_prior,
 )
-from sbi.utils.posterior_ensemble import NeuralPosteriorEnsemble
+from sbi.utils.user_input_checks import (
+    check_sbi_inputs,
+    process_prior,
+    process_simulator,
+)
 from tests.test_utils import check_c2st, get_dkl_gaussian_prior
+
+
+def test_import_before_deprecation():
+    with pytest.warns(DeprecationWarning):
+        from sbi.utils.posterior_ensemble import NeuralPosteriorEnsemble
+
+        num_simulations = 100
+
+        likelihood_shift = -1.0 * ones(2)
+        likelihood_cov = 0.3 * eye(2)
+
+        prior_mean = zeros(2)
+        prior_cov = eye(2)
+        prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
+
+        prior, _, prior_returns_numpy = process_prior(prior)
+        simulator = process_simulator(
+            lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov),
+            prior,
+            prior_returns_numpy,
+        )
+        check_sbi_inputs(simulator, prior)
+
+        theta = prior.sample((num_simulations,))
+        x = simulator(theta)
+        inferer = SNPE_C(prior)
+        inferer.append_simulations(theta, x).train(max_num_epochs=1)
+        posterior = inferer.build_posterior()
+
+        # create ensemble
+        posterior = NeuralPosteriorEnsemble([posterior])
 
 
 @pytest.mark.slow
@@ -29,7 +65,7 @@ from tests.test_utils import check_c2st, get_dkl_gaussian_prior
     ),
 )
 def test_c2st_posterior_ensemble_on_linearGaussian(inference_method, num_trials):
-    """Test whether NeuralPosteriorEnsemble infers well a simple example with available
+    """Test whether EnsemblePosterior infers well a simple example with available
     ground truth.
     """
 
@@ -51,9 +87,13 @@ def test_c2st_posterior_ensemble_on_linearGaussian(inference_method, num_trials)
     )
     target_samples = gt_posterior.sample((num_samples,))
 
-    simulator, prior = prepare_for_sbi(
-        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov), prior
+    prior, _, prior_returns_numpy = process_prior(prior)
+    simulator = process_simulator(
+        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov),
+        prior,
+        prior_returns_numpy,
     )
+    check_sbi_inputs(simulator, prior)
 
     # train ensemble components
     posteriors = []
@@ -68,7 +108,7 @@ def test_c2st_posterior_ensemble_on_linearGaussian(inference_method, num_trials)
         posteriors.append(inferer.build_posterior())
 
     # create ensemble
-    posterior = NeuralPosteriorEnsemble(posteriors)
+    posterior = EnsemblePosterior(posteriors)
     posterior.set_default_x(x_o)
 
     # test sampling and evaluation.

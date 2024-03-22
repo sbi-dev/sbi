@@ -14,8 +14,8 @@ from matplotlib import cm
 from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.colors import Normalize
-from matplotlib.figure import Figure
 from matplotlib.patches import Rectangle
+from matplotlib.figure import Figure, FigureBase
 from scipy.stats import binom, gaussian_kde
 from torch import Tensor
 
@@ -916,14 +916,14 @@ def _arrange_plots(
             ax = axes[0, len(subset) - 1]
             x0, x1 = ax.get_xlim()
             y0, y1 = ax.get_ylim()
-            text_kwargs = {"fontsize": plt.rcParams["font.size"] * 2.0}
+            text_kwargs = {"fontsize": plt.rcParams["font.size"] * 2.0}  # pyright: ignore[reportOptionalOperand]
             ax.text(x1 + (x1 - x0) / 8.0, (y0 + y1) / 2.0, "...", **text_kwargs)
         else:
             for row in range(len(subset)):
                 ax = axes[row, len(subset) - 1]
                 x0, x1 = ax.get_xlim()
                 y0, y1 = ax.get_ylim()
-                text_kwargs = {"fontsize": plt.rcParams["font.size"] * 2.0}
+                text_kwargs = {"fontsize": plt.rcParams["font.size"] * 2.0}  # pyright: ignore[reportOptionalOperand]
                 ax.text(x1 + (x1 - x0) / 8.0, (y0 + y1) / 2.0, "...", **text_kwargs)
                 if row == len(subset) - 1:
                     ax.text(
@@ -949,8 +949,8 @@ def _get_default_opts():
         "points_labels": [f"points_{idx}" for idx in range(10)],  # for points
         "samples_labels": [f"samples_{idx}" for idx in range(10)],  # for samples
         # colors: take even colors for samples, odd colors for points
-        "samples_colors": plt.rcParams["axes.prop_cycle"].by_key()["color"][0::2],
-        "points_colors": plt.rcParams["axes.prop_cycle"].by_key()["color"][1::2],
+        "samples_colors": plt.rcParams["axes.prop_cycle"].by_key()["color"][0::2],  # pyright: ignore[reportOptionalMemberAccess]
+        "points_colors": plt.rcParams["axes.prop_cycle"].by_key()["color"][1::2],  # pyright: ignore[reportOptionalMemberAccess]
         # ticks
         "ticks": [],
         "tickformatter": mpl.ticker.FormatStrFormatter("%g"),  # type: ignore
@@ -1066,7 +1066,7 @@ def _sbc_rank_plot(
     params_in_subplots: bool = False,
     show_ylabel: bool = False,
     sharey: bool = False,
-    fig: Optional[Figure] = None,
+    fig: Optional[FigureBase] = None,
     ax=None,  # no type hint to avoid hassle with pyright. Should be `array(Axes).`
     figsize: Optional[tuple] = None,
 ) -> Tuple[Figure, Axes]:
@@ -1246,7 +1246,7 @@ def _sbc_rank_plot(
                 alpha=uniform_region_alpha,
             )
 
-    return fig, ax
+    return fig, ax  # pyright: ignore[reportReturnType]
 
 
 def _plot_ranks_as_hist(
@@ -1382,7 +1382,7 @@ def _plot_cdf_region_expected_under_uniformity(
     plt.fill_between(
         x=np.linspace(0, num_bins, num_repeats * num_bins),
         y1=np.repeat(lower / np.max(lower), num_repeats),
-        y2=np.repeat(upper / np.max(upper), num_repeats),
+        y2=np.repeat(upper / np.max(upper), num_repeats),  # pyright: ignore[reportArgumentType]
         color=color,
         alpha=alpha,
     )
@@ -1404,7 +1404,7 @@ def _plot_hist_region_expected_under_uniformity(
     plt.fill_between(
         x=np.linspace(0, num_posterior_samples, num_bins),
         y1=np.repeat(lower, num_bins),
-        y2=np.repeat(upper, num_bins),
+        y2=np.repeat(upper, num_bins),  # pyright: ignore[reportArgumentType]
         color=color,
         alpha=alpha,
     )

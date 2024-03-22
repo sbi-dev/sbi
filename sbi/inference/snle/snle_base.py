@@ -12,11 +12,10 @@ from torch.distributions import Distribution
 from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.utils.tensorboard.writer import SummaryWriter
 
-from sbi import utils as utils
 from sbi.inference import NeuralInference
 from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior, VIPosterior
 from sbi.inference.potentials import likelihood_estimator_based_potential
-from sbi.neural_nets.density_estimators import DensityEstimator
+from sbi.neural_nets import DensityEstimator, likelihood_nn
 from sbi.utils import check_estimator_arg, check_prior, x_shape_from_simulation
 
 
@@ -64,7 +63,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
         # potentially for z-scoring.
         check_estimator_arg(density_estimator)
         if isinstance(density_estimator, str):
-            self._build_neural_net = utils.likelihood_nn(model=density_estimator)
+            self._build_neural_net = likelihood_nn(model=density_estimator)
         else:
             self._build_neural_net = density_estimator
 

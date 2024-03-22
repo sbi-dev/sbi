@@ -18,7 +18,7 @@ from torch import nn as nn
 from torch.distributions import Distribution, Independent, biject_to, constraints
 
 from sbi import utils as utils
-from sbi.types import TorchTransform
+from sbi.sbi_types import TorchTransform
 from sbi.utils.torchutils import atleast_2d
 
 
@@ -141,7 +141,7 @@ def standardizing_transform(
     structured_dims: bool = False,
     min_std: float = 1e-14,
     backend: str = "nflows",
-) -> Union[transforms.AffineTransform, zuko.transforms.MonotonicAffineTransform]:
+) -> Union[transforms.AffineTransform, zuko.flows.Unconditional]:
     """Builds standardizing transform
 
     Args:
@@ -511,7 +511,7 @@ def logit(theta: Tensor, lower_bound: Tensor, upper_bound: Tensor) -> Tensor:
 
 
 def check_dist_class(
-    dist, class_to_check: Union[Type, Tuple[Type]]
+    dist, class_to_check: Union[Type[Distribution], Tuple[Type[Distribution], ...]]
 ) -> Tuple[bool, Optional[Distribution]]:
     """Returns whether the `dist` is instance of `class_to_check`.
 
@@ -521,9 +521,10 @@ def check_dist_class(
 
     Args:
         dist: Distribution to be checked.
+        class_to_check: Class or tuple of classes to check against.
 
     Returns:
-        Whether the `dist` is `Uniform` and the `Uniform` itself.
+        Whether the `dist` is `class_to_check` and the `dist` itself.
     """
 
     # Direct check.
@@ -569,8 +570,16 @@ def within_support(distribution: Any, samples: Tensor) -> Tensor:
         Tensor of bools indicating whether each sample was within the support.
     """
     # Try to check using the support property, use log prob method otherwise.
+    # Before torch v1.7.0, `support.check()` returned bools for every element.
+    # From v1.8.0 on, it directly considers all dimensions of a sample. E.g.,
+    # for a single sample in 3D, v1.7.0 would return [[True, True, True]] and
+    # v1.8.0 would return [True]. However, Pyro distributions would still
+    # return [[True, True, True]]. This is relevant for `ImproperEmpirical`
+    # distributions in SBI, which are used in SNPE.
     try:
         sample_check = distribution.support.check(samples)
+        if sample_check.shape == samples.shape:
+            sample_check = torch.all(sample_check, dim=-1)
         return sample_check
 
     # Falling back to log prob method of either the NeuralPosterior's net, or of a

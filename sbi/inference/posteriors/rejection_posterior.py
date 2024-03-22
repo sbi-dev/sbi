@@ -11,7 +11,7 @@ from sbi import utils as utils
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
 from sbi.inference.potentials.base_potential import BasePotential
 from sbi.samplers.rejection.rejection import rejection_sample
-from sbi.types import Shape, TorchTransform
+from sbi.sbi_types import Shape, TorchTransform
 from sbi.utils.torchutils import ensure_theta_batched
 
 
