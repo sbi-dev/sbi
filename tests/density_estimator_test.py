@@ -12,8 +12,9 @@ from torch.distributions import MultivariateNormal
 
 from sbi.neural_nets.density_estimators import NFlowsFlow, ZukoFlow
 from sbi.neural_nets.density_estimators.shape_handling import reshape_to_iid_batch_event
-from sbi.neural_nets.flow import build_nsf, build_zuko_maf
-from sbi.neural_nets import posterior_nn, PermutationInvariantEmbedding, FCEmbedding
+from sbi.neural_nets.flow import build_nsf, build_zuko_maf, build_maf
+from sbi.neural_nets import posterior_nn, PermutationInvariantEmbedding, FCEmbedding, build_mnle, likelihood_nn
+from sbi.neural_nets.mnle import MixedDensityEstimator
 
 
 @pytest.mark.parametrize(
@@ -135,7 +136,7 @@ def test_density_estimator_sample_shapes(
     assert losses.shape == (input_iid_dim, batch_dim)
 
 
-@pytest.mark.parametrize("density_estimator_name", ("maf", "zuko_maf"))
+@pytest.mark.parametrize("density_estimator_name", ("maf", "zuko_maf", "mnle"))
 @pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
 @pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
 @pytest.mark.parametrize("batch_dim", (1, 10))
@@ -146,10 +147,16 @@ def test_correctness_of_density_estimator_loss(
     batch_dim,
 ):
     """Test whether identical inputs lead to identical loss values."""
-    density_estimator = posterior_nn(density_estimator_name)
     building_thetas = torch.randn((100, *input_event_shape))
     building_xs = torch.randn((100, *condition_event_shape))
-    density_estimator = density_estimator(building_thetas, building_xs)
+    if density_estimator_name == "maf":
+        density_estimator = build_maf(building_thetas, building_xs)
+    elif density_estimator_name == "zuko_maf":
+        density_estimator = build_zuko_maf(building_thetas, building_xs)
+    elif density_estimator_name == "mnle":
+        density_estimator = build_mnle(building_thetas, building_xs)
+    else:
+        raise ValueError
 
     condition_iid_dim = 1
     input_iid_dim = 2
