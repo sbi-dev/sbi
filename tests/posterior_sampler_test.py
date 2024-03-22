@@ -71,7 +71,7 @@ def test_api_posterior_sampler_set(
         },
     )
     assert isinstance(samples, Tensor)
-    assert samples.shape == (num_samples, 1, num_dim)  # TODO check the 2nd dim =? 1
+    assert samples.shape == (num_samples, num_chains, num_dim)
 
     if "pyro" in sampling_method:
         assert type(posterior.posterior_sampler) is MCMC
