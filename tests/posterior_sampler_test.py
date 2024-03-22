@@ -5,10 +5,9 @@ from __future__ import annotations
 
 import pytest
 from pyro.infer.mcmc import MCMC
-from torch import eye, zeros
+from torch import eye, zeros, Tensor
 from torch.distributions import MultivariateNormal
 
-from sbi import utils as utils
 from sbi.inference import (
     SNL,
     MCMCPosterior,
@@ -32,18 +31,15 @@ from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
         "slice_pymc",
     ),
 )
-def test_api_posterior_sampler_set(sampling_method: str, set_seed):
-    """Runs SNL and checks that posterior_sampler is correctly set.
-
-    Args:
-        mcmc_method: which mcmc method to use for sampling
-        set_seed: fixture for manual seeding
-    """
-
-    num_dim = 2
-    num_samples = 10
-    num_trials = 2
-    num_simulations = 10
+def test_api_posterior_sampler_set(
+    sampling_method: str,
+    set_seed,
+    num_dim: int = 2,
+    num_samples: int = 42,
+    num_trials: int = 2,
+    num_simulations: int = 10,
+):
+    """Runs SNL and checks that posterior_sampler is correctly set."""
     x_o = zeros((num_trials, num_dim))
     # Test for multiple chains is cheap when vectorized.
     num_chains = 3 if sampling_method in "slice_np_vectorized" else 1
@@ -64,7 +60,7 @@ def test_api_posterior_sampler_set(sampling_method: str, set_seed):
     )
 
     assert posterior.posterior_sampler is None
-    posterior.sample(
+    samples = posterior.sample(
         sample_shape=(num_samples, num_chains),
         x=x_o,
         mcmc_parameters={
@@ -74,6 +70,8 @@ def test_api_posterior_sampler_set(sampling_method: str, set_seed):
             "warmup_steps": 10,
         },
     )
+    assert isinstance(samples, Tensor)
+    assert samples.shape == (num_samples, 1, num_dim)  # TODO check the 2nd dim =? 1
 
     if "pyro" in sampling_method:
         assert type(posterior.posterior_sampler) is MCMC

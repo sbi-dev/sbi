@@ -619,13 +619,13 @@ class MCMCPosterior(NeuralPosterior):
             device=self._device,
         )
         samples = sampler.run()
-        samples = torch.from_numpy(samples)
+        samples = torch.from_numpy(samples).to(dtype=torch.get_default_dtype())
         samples = samples.reshape(-1, initial_params.shape[1])
 
         # Save posterior sampler.
         self._posterior_sampler = sampler
 
-        samples = samples[::thin][:num_samples]
+        samples = samples[::thin][:num_samples]  # TODO do we really need :num_samples ?
         assert samples.shape[0] == num_samples
 
         return samples
