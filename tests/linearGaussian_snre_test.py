@@ -52,13 +52,16 @@ mcmc_parameters = {
 @pytest.mark.parametrize("num_dim", (1,))  # dim 3 is tested below.
 @pytest.mark.parametrize("snre_method", (SNRE_B, SNRE_C))
 def test_api_snre_multiple_trials_and_rounds_map(
-    num_dim: int, snre_method: RatioEstimator
+    num_dim: int,
+    snre_method: RatioEstimator,
+    num_rounds: int = 2,
+    num_samples: int = 12,
+    num_simulations: int = 100,
+    num_chains: int = 4,
+    thin: int = 2,
+    warmup_steps: int = 100,
 ):
     """Test SNRE API with 2 rounds, different priors num trials and MAP."""
-
-    num_rounds = 2
-    num_samples = 1
-    num_simulations = 100
     prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
 
     prior, _, prior_returns_numpy = process_prior(prior)
@@ -81,7 +84,9 @@ def test_api_snre_multiple_trials_and_rounds_map(
             x_o = zeros((num_trials, num_dim))
             posterior = inference.build_posterior(
                 mcmc_method="slice_np_vectorized",
-                mcmc_parameters=dict(num_chains=10, thin=5, warmup_steps=10),
+                mcmc_parameters=dict(
+                    num_chains=num_chains, thin=thin, warmup_steps=warmup_steps
+                ),
             ).set_default_x(x_o)
             posterior.sample(sample_shape=(num_samples,))
         proposals.append(posterior)
