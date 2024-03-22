@@ -20,20 +20,20 @@ class MCMCSampler:
     Superclass for MCMC samplers.
     """
 
-    def __init__(self, x, lp_f: Callable, thin: Optional[int], verbose: bool = False):
+    def __init__(self, x, lp_f: Callable, thin: int, verbose: bool = False):
         """
 
         Args:
             x: initial state
             lp_f: Function that returns the log prob.
-            thin: amount of thinning; if None, no thinning.
+            thin: Thinning (subsampling) factor, setting 1 disables thinning.
             verbose: Whether to show progress bars (False).
         """
 
         self.x = np.array(x, dtype=float)
         self.lp_f = lp_f
         self.L = lp_f(self.x)
-        self.thin = 1 if thin is None else thin
+        self.thin = thin
         self.n_dims = self.x.size if self.x.ndim == 1 else self.x.shape[1]
         self.verbose = verbose
 
@@ -59,7 +59,7 @@ class SliceSampler(MCMCSampler):
         lp_f,
         max_width=float("inf"),
         init_width: Union[float, np.ndarray] = 0.01,
-        thin=None,
+        thin=1,
         tuning: int = 50,
         verbose: bool = False,
     ):
@@ -235,7 +235,7 @@ class SliceSamplerSerial:
             log_prob_fn: Log prob function.
             init_params: Initial parameters.
             num_chains: Number of MCMC chains to run in parallel
-            thin: amount of thinning; if None, no thinning.
+            thin: Thinning (subsampling) factor, setting 1 disables thinning.
             tuning: Number of tuning steps for brackets.
             verbose: Show/hide additional info such as progress bars.
             init_width: Inital width of brackets.
@@ -285,7 +285,9 @@ class SliceSamplerSerial:
                 total=self.num_chains,
             )
         ):
-            all_samples: Sequence[np.ndarray] = Parallel(n_jobs=self.num_workers)(  # pyright: ignore[reportAssignmentType]
+            all_samples: Sequence[np.ndarray] = Parallel(
+                n_jobs=self.num_workers
+            )(  # pyright: ignore[reportAssignmentType]
                 delayed(self.run_fun)(num_samples, initial_params_batch, seed)
                 for initial_params_batch, seed in zip(self.x, seeds)
             )
@@ -367,7 +369,7 @@ class SliceSamplerVectorized:
             log_prob_fn: Log prob function.
             init_params: Initial parameters.
             num_chains: Number of MCMC chains to run in parallel
-            thin: amount of thinning; if None, no thinning.
+            thin: Thinning (subsampling) factor, setting 1 disables thinning.
             tuning: Number of tuning steps for brackets.
             verbose: Show/hide additional info such as progress bars.
             init_width: Inital width of brackets.
@@ -448,11 +450,13 @@ class SliceSamplerVectorized:
                 if sc["state"] == "BEGIN":
                     sc["cxi"] = sc["x"][sc["order"][sc["i"]]]
                     sc["wi"] = sc["width"][sc["order"][sc["i"]]]
-                    sc["next_param"] = np.concatenate([
-                        sc["x"][: sc["order"][sc["i"]]],
-                        [sc["cxi"]],
-                        sc["x"][sc["order"][sc["i"]] + 1 :],
-                    ])
+                    sc["next_param"] = np.concatenate(
+                        [
+                            sc["x"][: sc["order"][sc["i"]]],
+                            [sc["cxi"]],
+                            sc["x"][sc["order"][sc["i"]] + 1 :],
+                        ]
+                    )
 
             params = np.stack([sc["next_param"] for sc in self.state.values()])
             log_probs = self._log_prob_fn(params)
@@ -465,11 +469,13 @@ class SliceSamplerVectorized:
                     sc["logu"] = log_probs[c] + np.log(1.0 - self.rng.rand())
                     sc["lx"] = sc["cxi"] - sc["wi"] * self.rng.rand()
                     sc["ux"] = sc["lx"] + sc["wi"]
-                    sc["next_param"] = np.concatenate([
-                        sc["x"][: sc["order"][sc["i"]]],
-                        [sc["lx"]],
-                        sc["x"][sc["order"][sc["i"]] + 1 :],
-                    ])
+                    sc["next_param"] = np.concatenate(
+                        [
+                            sc["x"][: sc["order"][sc["i"]]],
+                            [sc["lx"]],
+                            sc["x"][sc["order"][sc["i"]] + 1 :],
+                        ]
+                    )
                     sc["state"] = "LOWER"
 
                 elif sc["state"] == "LOWER":
@@ -480,18 +486,22 @@ class SliceSamplerVectorized:
 
                     if outside_lower:
                         sc["lx"] -= sc["wi"]
-                        sc["next_param"] = np.concatenate([
-                            sc["x"][: sc["order"][sc["i"]]],
-                            [sc["lx"]],
-                            sc["x"][sc["order"][sc["i"]] + 1 :],
-                        ])
+                        sc["next_param"] = np.concatenate(
+                            [
+                                sc["x"][: sc["order"][sc["i"]]],
+                                [sc["lx"]],
+                                sc["x"][sc["order"][sc["i"]] + 1 :],
+                            ]
+                        )
 
                     else:
-                        sc["next_param"] = np.concatenate([
-                            sc["x"][: sc["order"][sc["i"]]],
-                            [sc["ux"]],
-                            sc["x"][sc["order"][sc["i"]] + 1 :],
-                        ])
+                        sc["next_param"] = np.concatenate(
+                            [
+                                sc["x"][: sc["order"][sc["i"]]],
+                                [sc["ux"]],
+                                sc["x"][sc["order"][sc["i"]] + 1 :],
+                            ]
+                        )
                         sc["state"] = "UPPER"
 
                 elif sc["state"] == "UPPER":
@@ -502,19 +512,23 @@ class SliceSamplerVectorized:
 
                     if outside_upper:
                         sc["ux"] += sc["wi"]
-                        sc["next_param"] = np.concatenate([
-                            sc["x"][: sc["order"][sc["i"]]],
-                            [sc["ux"]],
-                            sc["x"][sc["order"][sc["i"]] + 1 :],
-                        ])
+                        sc["next_param"] = np.concatenate(
+                            [
+                                sc["x"][: sc["order"][sc["i"]]],
+                                [sc["ux"]],
+                                sc["x"][sc["order"][sc["i"]] + 1 :],
+                            ]
+                        )
                     else:
                         # sample uniformly from bracket
                         sc["xi"] = (sc["ux"] - sc["lx"]) * self.rng.rand() + sc["lx"]
-                        sc["next_param"] = np.concatenate([
-                            sc["x"][: sc["order"][sc["i"]]],
-                            [sc["xi"]],
-                            sc["x"][sc["order"][sc["i"]] + 1 :],
-                        ])
+                        sc["next_param"] = np.concatenate(
+                            [
+                                sc["x"][: sc["order"][sc["i"]]],
+                                [sc["xi"]],
+                                sc["x"][sc["order"][sc["i"]] + 1 :],
+                            ]
+                        )
                         sc["state"] = "SAMPLE_SLICE"
 
                 elif sc["state"] == "SAMPLE_SLICE":
@@ -527,11 +541,13 @@ class SliceSamplerVectorized:
                         else:
                             sc["ux"] = sc["xi"]
                         sc["xi"] = (sc["ux"] - sc["lx"]) * self.rng.rand() + sc["lx"]
-                        sc["next_param"] = np.concatenate([
-                            sc["x"][: sc["order"][sc["i"]]],
-                            [sc["xi"]],
-                            sc["x"][sc["order"][sc["i"]] + 1 :],
-                        ])
+                        sc["next_param"] = np.concatenate(
+                            [
+                                sc["x"][: sc["order"][sc["i"]]],
+                                [sc["xi"]],
+                                sc["x"][sc["order"][sc["i"]] + 1 :],
+                            ]
+                        )
 
                     else:
                         if sc["t"] < num_samples:

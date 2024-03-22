@@ -46,7 +46,7 @@ class MCMCPosterior(NeuralPosterior):
         proposal: Any,
         theta_transform: Optional[TorchTransform] = None,
         method: str = "slice_np",
-        thin: int = 1,
+        thin: int = -1,
         warmup_steps: int = 200,
         num_chains: int = 1,
         init_strategy: str = "resample",
@@ -103,6 +103,8 @@ class MCMCPosterior(NeuralPosterior):
                 stacklevel=2,
             )
             method = "slice_np"
+
+        thin = _process_thin_default(thin)
 
         super().__init__(
             potential_fn,
@@ -473,7 +475,7 @@ class MCMCPosterior(NeuralPosterior):
             num_samples: Desired number of samples.
             potential_function: A callable **class**.
             initial_params: Initial parameters for MCMC chain.
-            thin: Thinning (subsampling) factor.
+            thin: Thinning (subsampling) factor, setting 1 disables thinning.
             warmup_steps: Initial number of samples to discard.
             vectorized: Whether to use a vectorized implementation of the `SliceSampler`.
             num_workers: Number of CPU cores to use.
@@ -525,7 +527,7 @@ class MCMCPosterior(NeuralPosterior):
         potential_function: Callable,
         initial_params: Tensor,
         mcmc_method: str = "nuts_pyro",
-        thin: int = 1,
+        thin: int = -1,
         warmup_steps: int = 200,
         num_chains: Optional[int] = 1,
         show_progress_bars: bool = True,
@@ -538,7 +540,7 @@ class MCMCPosterior(NeuralPosterior):
                 is picklable for Pyro MCMC to use it across chains in parallel,
                 even when the potential function requires evaluating a neural network.
             mcmc_method: Either `"hmc_pyro"` or `"nuts_pyro"`.
-            thin: Thinning (subsampling) factor.
+            thin: Thinning (subsampling) factor, setting 1 disables thinning.
             warmup_steps: Initial number of samples to discard.
             num_chains: Whether to sample in parallel. If None, use all but one CPU.
             show_progress_bars: Whether to show a progressbar during sampling.
@@ -546,8 +548,8 @@ class MCMCPosterior(NeuralPosterior):
         Returns:
             Tensor of shape (num_samples, shape_of_single_theta).
         """
+        thin = _process_thin_default(thin)
         num_chains = mp.cpu_count() - 1 if num_chains is None else num_chains
-
         kernels = dict(hmc_pyro=HMC, nuts_pyro=NUTS)
 
         sampler = MCMC(
@@ -579,7 +581,7 @@ class MCMCPosterior(NeuralPosterior):
         potential_function: Callable,
         initial_params: Tensor,
         mcmc_method: str = "nuts_pymc",
-        thin: int = 1,
+        thin: int = -1,
         warmup_steps: int = 200,
         num_chains: Optional[int] = 1,
         show_progress_bars: bool = True,
@@ -592,7 +594,7 @@ class MCMCPosterior(NeuralPosterior):
                 is picklable for PyMC MCMC to use it across chains in parallel,
                 even when the potential function requires evaluating a neural network.
             mcmc_method: One of `"hmc_pymc"`, `"nuts_pymc"` or `"slice_pymc"`.
-            thin: Thinning (subsampling) factor.
+            thin: Thinning (subsampling) factor, setting 1 disables thinning.
             warmup_steps: Initial number of samples to discard.
             num_chains: Whether to sample in parallel. If None, use all but one CPU.
             show_progress_bars: Whether to show a progressbar during sampling.
@@ -600,8 +602,8 @@ class MCMCPosterior(NeuralPosterior):
         Returns:
             Tensor of shape (num_samples, shape_of_single_theta).
         """
+        thin = _process_thin_default(thin)
         num_chains = mp.cpu_count() - 1 if num_chains is None else num_chains
-
         steps = dict(slice_pymc="slice", hmc_pymc="hmc", nuts_pymc="nuts")
 
         sampler = PyMCSampler(
@@ -786,6 +788,28 @@ class MCMCPosterior(NeuralPosterior):
             })
 
         return inference_data
+
+
+def _process_thin_default(thin: int) -> int:
+    """
+    Check if the user did use the default thinning value and raise a warning if so.
+
+    Args:
+        thin: Thinning (subsampling) factor, setting 1 disables thinning.
+
+    Returns:
+        The corrected thinning factor.
+    """
+    if thin == -1:
+        thin = 1
+        warn(
+            "The default value for thinning in MCMC sampling has been changed from "
+            "10 to 1. This might cause the results differ from the last benchmark.",
+            UserWarning,
+            stacklevel=2,
+        )
+
+    return thin
 
 
 def _maybe_use_dict_entry(default: Any, key: str, dict_to_check: Dict) -> Any:
