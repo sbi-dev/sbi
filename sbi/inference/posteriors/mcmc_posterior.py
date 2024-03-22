@@ -570,7 +570,7 @@ class MCMCPosterior(NeuralPosterior):
         # Save posterior sampler.
         self._posterior_sampler = sampler
 
-        samples = samples[::thin][:num_samples]
+        samples = samples[::thin]
         assert samples.shape[0] == num_samples
 
         return samples.detach()
@@ -625,7 +625,7 @@ class MCMCPosterior(NeuralPosterior):
         # Save posterior sampler.
         self._posterior_sampler = sampler
 
-        samples = samples[::thin][:num_samples]  # TODO do we really need :num_samples ?
+        samples = samples[::thin]
         assert samples.shape[0] == num_samples
 
         return samples
