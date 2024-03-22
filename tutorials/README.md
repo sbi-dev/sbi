@@ -43,7 +43,8 @@ Once you have familiarised yourself with the methods and identified how to apply
 
 ### Analysis:
 - [Conditional distributions](07_conditional_distributions.ipynb)
-- [Posterior sensitivity analysis](09_sensitivity_analysis.ipynb)
+- [Posterior sensitivity analysis](09_sensitivity_analysis.ipynb) shows how to perform a sensitivity analysis of a model.
+
 ### Examples:
 - [Hodgkin-Huxley example](../examples/00_HH_simulator.ipynb)
 - [Decision making model](../examples/01_decision_making_model.ipynb)
