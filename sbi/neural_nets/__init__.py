@@ -1,7 +1,7 @@
 from sbi.neural_nets.classifier import (
-    build_linear_classifier,
-    build_mlp_classifier,
-    build_resnet_classifier,
+    build_linear_critic,
+    build_mlp_critic,
+    build_resnet_critic,
 )
 from sbi.neural_nets.density_estimators import DensityEstimator, NFlowsFlow
 from sbi.neural_nets.embedding_nets import (
@@ -9,7 +9,7 @@ from sbi.neural_nets.embedding_nets import (
     FCEmbedding,
     PermutationInvariantEmbedding,
 )
-from sbi.neural_nets.factory import classifier_nn, likelihood_nn, posterior_nn
+from sbi.neural_nets.factory import critic_nn, likelihood_nn, posterior_nn
 from sbi.neural_nets.flow import (
     build_made,
     build_maf,

@@ -126,7 +126,7 @@
       show_root_heading: true
       show_object_full_path: true
 
-::: sbi.neural_nets.factory.classifier_nn
+::: sbi.neural_nets.factory.critic_nn
     rendering:
       show_root_heading: true
       show_object_full_path: true

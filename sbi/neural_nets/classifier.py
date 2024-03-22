@@ -21,7 +21,7 @@ def build_z_scored_embedding_nets(
     embedding_net_x: nn.Module = nn.Identity(),
     embedding_net_y: nn.Module = nn.Identity(),
 ) -> tuple[nn.Module, nn.Module]:
-    """Builds input layer for classifiers that optionally z-scores.
+    """Builds input layer for critics that optionally z-scores.
 
     Args:
         batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
@@ -55,7 +55,7 @@ def build_z_scored_embedding_nets(
     return embedding_net_x, embedding_net_y
 
 
-def build_linear_classifier(
+def build_linear_critic(
     batch_x: Tensor,
     batch_y: Tensor,
     z_score_x: Optional[str] = "independent",
@@ -64,9 +64,9 @@ def build_linear_classifier(
     embedding_net_y: nn.Module = nn.Identity(),
     **kwargs,
 ) -> TensorRatioEstimator:
-    """Builds linear classifier.
+    """Builds linear critic.
 
-    In SNRE, the classifier will receive batches of thetas and xs.
+    In SNRE, the critic will receive batches of thetas and xs.
 
     Args:
         batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
@@ -82,7 +82,7 @@ def build_linear_classifier(
         embedding_net_x: Optional embedding network for x.
         embedding_net_y: Optional embedding network for y.
         kwargs: Additional arguments that are passed by the build function but are not
-            relevant for linear classifiers and are therefore ignored.
+            relevant for linear critics and are therefore ignored.
 
     Returns:
         Neural network.
@@ -108,7 +108,7 @@ def build_linear_classifier(
     )
 
 
-def build_mlp_classifier(
+def build_mlp_critic(
     batch_x: Tensor,
     batch_y: Tensor,
     z_score_x: Optional[str] = "independent",
@@ -117,7 +117,7 @@ def build_mlp_classifier(
     embedding_net_x: nn.Module = nn.Identity(),
     embedding_net_y: nn.Module = nn.Identity(),
 ) -> TensorRatioEstimator:
-    """Builds MLP classifier.
+    """Builds MLP critic.
 
     Args:
         batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
@@ -165,7 +165,7 @@ def build_mlp_classifier(
     )
 
 
-def build_resnet_classifier(
+def build_resnet_critic(
     batch_x: Tensor,
     batch_y: Tensor,
     z_score_x: Optional[str] = "independent",
@@ -177,9 +177,9 @@ def build_resnet_classifier(
     dropout_probability: float = 0.0,
     use_batch_norm: bool = False,
 ) -> TensorRatioEstimator:
-    """Builds ResNet classifier.
+    """Builds ResNet critic.
 
-    In SNRE, the classifier will receive batches of thetas and xs.
+    In SNRE, the critic will receive batches of thetas and xs.
 
     Args:
         batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.

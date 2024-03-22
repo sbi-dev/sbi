@@ -109,7 +109,7 @@ def _log_ratios_over_trials(
     Args:
         x: batch of iid data.
         theta: batch of parameters
-        net: neural net representing the classifier to approximate the ratio.
+        net: neural net representing the critic to approximate the ratio.
         track_gradients: Whether to track gradients.
     Returns:
         log_ratio_trial_sum: log ratio for each parameter, summed over all

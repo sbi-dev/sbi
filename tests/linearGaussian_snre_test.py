@@ -64,7 +64,7 @@ def test_api_snre_multiple_trials_and_rounds_map(
     prior, _, prior_returns_numpy = process_prior(prior)
     simulator = process_simulator(diagonal_linear_gaussian, prior, prior_returns_numpy)
     check_sbi_inputs(simulator, prior)
-    inference = snre_method(prior=prior, classifier="mlp", show_progress_bars=False)
+    inference = snre_method(prior=prior, critic="mlp", show_progress_bars=False)
 
     proposals = [prior]
     for _ in range(num_rounds):
@@ -121,7 +121,7 @@ def test_c2st_sre_on_linearGaussian(snre_method: RatioEstimator):
         prior_returns_numpy,
     )
     check_sbi_inputs(simulator, prior)
-    inference = snre_method(classifier="resnet", show_progress_bars=False)
+    inference = snre_method(critic="resnet", show_progress_bars=False)
 
     theta, x = simulate_for_sbi(
         simulator, prior, num_simulations, simulation_batch_size=100
@@ -195,7 +195,7 @@ def test_c2st_snre_variants_on_linearGaussian_with_multiple_trials(
     simulator = process_simulator(simulator, prior, prior_returns_numpy)
     check_sbi_inputs(simulator, prior)
     kwargs = dict(
-        classifier="resnet",
+        critic="resnet",
         show_progress_bars=False,
     )
 
@@ -240,7 +240,7 @@ def test_c2st_snre_variants_on_linearGaussian_with_multiple_trials(
     # Checks for log_prob()
     if prior_str == "gaussian" and isinstance(snre_method, (AALR, BNRE)):
         # For the Gaussian prior, we compute the KLd between ground truth and
-        # posterior. We can do this only if the classifier_loss was as described in
+        # posterior. We can do this only if the critic_loss was as described in
         # Hermans et al. 2020 ('aalr') since Durkan et al. 2020 version only allows
         # evaluation up to a constant.
         # For the Gaussian prior, we compute the KLd between ground truth and posterior
@@ -396,7 +396,7 @@ def test_api_sre_sampling_methods(sampling_method: str, prior_str: str):
     prior, _, prior_returns_numpy = process_prior(prior)
     simulator = process_simulator(diagonal_linear_gaussian, prior, prior_returns_numpy)
     check_sbi_inputs(simulator, prior)
-    inference = SNRE_B(classifier="resnet", show_progress_bars=False)
+    inference = SNRE_B(critic="resnet", show_progress_bars=False)
 
     theta, x = simulate_for_sbi(
         simulator, prior, num_simulations, simulation_batch_size=num_simulations
