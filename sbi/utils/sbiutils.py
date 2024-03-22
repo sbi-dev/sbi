@@ -20,6 +20,7 @@ from torch.distributions import Distribution, Independent, biject_to, constraint
 from sbi import utils as utils
 from sbi.sbi_types import TorchTransform
 from sbi.utils.torchutils import atleast_2d
+from sbi.utils.zukoutils import UnconditionalLazyTransform
 
 
 def warn_if_zscoring_changes_data(x: Tensor, duplicate_tolerance: float = 0.1) -> None:
@@ -141,7 +142,7 @@ def standardizing_transform(
     structured_dims: bool = False,
     min_std: float = 1e-14,
     backend: str = "nflows",
-) -> Union[transforms.AffineTransform, zuko.flows.Unconditional]:
+) -> Union[transforms.AffineTransform, zuko.flows.LazyTransform]:
     """Builds standardizing transform
 
     Args:
@@ -178,11 +179,13 @@ def standardizing_transform(
     if backend == "nflows":
         return transforms.AffineTransform(shift=-t_mean / t_std, scale=1 / t_std)
     elif backend == "zuko":
-        return zuko.flows.Unconditional(
-            zuko.transforms.MonotonicAffineTransform,
-            shift=-t_mean / t_std,
-            scale=1 / t_std,
-            buffer=True,
+        return UnconditionalLazyTransform(
+            zuko.flows.Unconditional(
+                zuko.transforms.MonotonicAffineTransform,
+                shift=-t_mean / t_std,
+                scale=1 / t_std,
+                buffer=True,
+            )
         )
 
     else:
