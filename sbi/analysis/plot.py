@@ -35,13 +35,11 @@ def rgb2hex(RGB):
         "0{0:x}".format(v) if v < 16 else "{0:x}".format(v) for v in RGB
     ])
 
-
 def to_list(x, len):
     """If x is not a list, make it a list of length `len`."""
     if not isinstance(x, list):
         x = [x for _ in range(len)]
     return x
-
 
 def _update(d, u):
     """update dictionary with user input, see: https://stackoverflow.com/a/3233356"""
@@ -55,32 +53,44 @@ def _update(d, u):
             d[k] = v
     return d
 
-
 # Plotting functions
 def plt_hist_1d(ax, samples, limits, kwargs):
     """Plot 1D histogram."""
-    if kwargs["bin_heuristic"] == "Freedman-Diaconis":
-        # The Freedman-Diaconis heuristic
-        binsize = 2 * iqr(samples) * len(samples) ** (-1 / 3)
-        kwargs['mpl_kwargs']["bins"] = np.arange(
-            limits[0], limits[1] + binsize, binsize
-        )
-    elif isinstance(kwargs['mpl_kwargs']["bins"], int):
+    if ["bins"] not in kwargs['mpl_kwargs'].keys() or kwargs['mpl_kwargs']["bins"] is None:
+        if kwargs["bin_heuristic"] == "Freedman-Diaconis":
+            # The Freedman-Diaconis heuristic
+            binsize = 2 * iqr(samples) * len(samples) ** (-1 / 3)
+            kwargs['mpl_kwargs']["bins"] = np.arange(
+                limits[0], limits[1] + binsize, binsize
+            )
+    if isinstance(kwargs['mpl_kwargs']["bins"], int):
         kwargs['mpl_kwargs']["bins"] = np.linspace(
             limits[0], limits[1], kwargs['mpl_kwargs']["bins"]
         )
     ax.hist(samples, **kwargs['mpl_kwargs'])
 
+def plt_kde_1d(ax, samples, limits, kwargs):
+    """ "1D Kernel Density Estimation."""
+    density = gaussian_kde(samples, bw_method=kwargs["bw_method"])
+    xs = np.linspace(limits[0], limits[1], kwargs["bins"])
+    ys = density(xs)
+    ax.plot(xs, ys, **kwargs['mpl_kwargs'])
+
+def plt_scatter_1d(ax, samples, limits, kwargs):
+    """Scatter plot 1D."""
+    for single_sample in samples:
+        ax.axvline(single_sample, **kwargs['mpl_kwargs'])
 
 def plt_hist_2d(ax, samples_col, samples_row, limits_col, limits_row, kwargs):
     """Plot 2D histogram."""
-    if kwargs["bin_heuristic"] == "Freedman-Diaconis":
-        # The Freedman-Diaconis heuristic applied to each direction
-        binsize_col = 2 * iqr(samples_col) * len(samples_col) ** (-1 / 3)
-        n_bins_col = int((limits_col[1] - limits_col[0]) / binsize_col)
-        binsize_row = 2 * iqr(samples_row) * len(samples_row) ** (-1 / 3)
-        n_bins_row = int((limits_row[1] - limits_row[0]) / binsize_row)
-        kwargs['np_hist_kwargs']["bins"] = [n_bins_col, n_bins_row]
+    if ["bins"] not in kwargs['np_hist_kwargs'].keys() or kwargs['np_hist_kwargs']["bins"] is None:
+        if kwargs["bin_heuristic"] == "Freedman-Diaconis":
+            # The Freedman-Diaconis heuristic applied to each direction
+            binsize_col = 2 * iqr(samples_col) * len(samples_col) ** (-1 / 3)
+            n_bins_col = int((limits_col[1] - limits_col[0]) / binsize_col)
+            binsize_row = 2 * iqr(samples_row) * len(samples_row) ** (-1 / 3)
+            n_bins_row = int((limits_row[1] - limits_row[0]) / binsize_row)
+            kwargs['np_hist_kwargs']["bins"] = [n_bins_col, n_bins_row]
 
     hist, xedges, yedges = np.histogram2d(
         samples_col,
@@ -101,16 +111,6 @@ def plt_hist_2d(ax, samples_col, samples_row, limits_col, limits_row, kwargs):
         ),
         **kwargs['mpl_kwargs'],
     )
-
-
-def plt_kde_1d(ax, samples, limits, kwargs):
-    """ "1D Kernel Density Estimation."""
-    density = gaussian_kde(samples, bw_method=kwargs["bw_method"])
-    xs = np.linspace(limits[0], limits[1], kwargs["bins"])
-    ys = density(xs)
-
-    ax.plot(xs, ys, **kwargs['mpl_kwargs'])
-
 
 def plt_kde_2d(ax, samples_col, samples_row, limits_col, limits_row, kwargs):
     """2D Kernel Density Estimation."""
@@ -184,13 +184,6 @@ def plt_contour_2d(ax, samples_col, samples_row, limits_col, limits_row, kwargs)
         **kwargs['mpl_kwargs'],
     )
 
-
-def plt_scatter_1d(ax, samples, limits, kwargs):
-    """Scatter plot 1D."""
-    for single_sample in samples:
-        ax.axvline(single_sample, **kwargs['mpl_kwargs'])
-
-
 def plt_scatter_2d(ax, samples_col, samples_row, limits_col, limits_row, kwargs):
     """Scatter plot 2D."""
     ax.scatter(
@@ -199,7 +192,6 @@ def plt_scatter_2d(ax, samples_col, samples_row, limits_col, limits_row, kwargs)
         **kwargs['mpl_kwargs'],
     )
 
-
 def plt_plot_2d(ax, samples_col, samples_row, limits_col, limits_row, kwargs):
     """Plot 2D trajectory"""
     ax.plot(
@@ -207,7 +199,6 @@ def plt_plot_2d(ax, samples_col, samples_row, limits_col, limits_row, kwargs):
         samples_row,
         **kwargs['mpl_kwargs'],
     )
-
 
 def get_diag_funcs(diag_list):
     """make a list of the functions for the diagonal plots."""
@@ -520,7 +511,7 @@ def pairplot(
     figsize: Tuple = (10, 10),
     labels: Optional[List[str]] = None,
     ticks: Optional[Union[List, torch.Tensor]] = None,
-    offdiag: Optional[str] = None,
+    offdiag: Optional[Union[List[str], str]] = None,
     diag_kwargs: Optional[Dict] = None,
     upper_kwargs: Optional[Dict] = None,
     lower_kwargs: Optional[Dict] = None,
@@ -676,7 +667,7 @@ def marginal_plot(
     ] = None,
     limits: Optional[Union[List, torch.Tensor]] = None,
     subset: Optional[List[int]] = None,
-    diag: Optional[str] = "hist",
+    diag: Optional[Union[List[str], str]] = "hist",
     figsize: Tuple = (10, 2),
     labels: Optional[List[str]] = None,
     ticks: Optional[Union[List, torch.Tensor]] = None,
@@ -1722,7 +1713,7 @@ def pairplot_dep(
     figsize: Tuple = (10, 10),
     labels: Optional[List[str]] = None,
     ticks: Optional[Union[List, torch.Tensor]] = None,
-    upper: Optional[str] = None,
+    upper: Optional[Union[List[str], str]] = None,
     fig=None,
     axes=None,
     **kwargs,
