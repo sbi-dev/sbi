@@ -778,7 +778,8 @@ def build_zuko_flow(
 
         # Combine transforms.
         neural_net = zuko.flows.Flow(
-            transform, flow_built.base
+            transform,
+            flow_built.base,  # ignore[reportArgumentType]
         )  # # pyright: ignore[reportAssignmentType]
     else:
         transforms = flow_built.transform.transforms
@@ -798,7 +799,7 @@ def build_zuko_flow(
             )
 
         # Combine transforms.
-        neural_net = zuko.flows.Flow(transforms, flow_built.base)  # pyright: ignore[reportAssignmentType]
+        neural_net = zuko.flows.Flow(transforms, flow_built.base)  # pyright: ignore[reportArgumentType]
 
     flow = ZukoFlow(neural_net, embedding_net, condition_shape=batch_y[0].shape)
 
