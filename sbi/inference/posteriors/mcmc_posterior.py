@@ -335,7 +335,7 @@ class MCMCPosterior(NeuralPosterior):
                     show_progress_bars=show_progress_bars,
                 )
             else:
-                raise NameError
+                raise NameError(f"The sampling method {method} is not implemented!")
 
         samples = self.theta_transform.inv(transformed_samples)
 
@@ -784,9 +784,9 @@ class MCMCPosterior(NeuralPosterior):
                 *samples_shape
             )
 
-            inference_data = az.convert_to_inference_data({
-                f"{self.param_name}": samples
-            })
+            inference_data = az.convert_to_inference_data(
+                {f"{self.param_name}": samples}
+            )
 
         return inference_data
 
