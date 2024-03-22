@@ -162,7 +162,7 @@ def test_c2st_snre_variants_on_linearGaussian_with_multiple_trials(
     snre_method: RatioEstimator,
     prior_str: str,
     num_trials: int,
-    mcmc_testing_params: dict,
+    mcmc_params_testing: dict,
 ):
     """Test C2ST and MAP accuracy of SNRE variants on linear gaussian.
 
@@ -218,7 +218,7 @@ def test_c2st_snre_variants_on_linearGaussian_with_multiple_trials(
         theta_transform=theta_transform,
         proposal=prior,
         method="slice_np_vectorized",
-        **mcmc_testing_params,
+        **mcmc_params_testing,
     )
     samples = posterior.sample(sample_shape=(num_samples,))
 
