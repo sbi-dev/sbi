@@ -26,6 +26,7 @@ class SMCABC(ABCBASE):
         show_progress_bars: bool = True,
         kernel: Optional[str] = "gaussian",
         algorithm_variant: str = "C",
+        allow_iid: Optional[None] = None,
         distance_kwargs: Optional[Dict] = None,
     ):
         r"""Sequential Monte Carlo Approximate Bayesian Computation.
@@ -62,7 +63,11 @@ class SMCABC(ABCBASE):
                 sampling.
             kernel: Perturbation kernel.
             algorithm_variant: Indicating the choice of algorithm variant, A, B, or C.
-
+            allow_iid: Whether to allow conditioning on iid sampled data or not. Typically,
+                this information is inferred by the choice of the distance, but in case a
+                custom distance is used, this information is pivotal.
+            distance_kwargs: Configurations parameters for the distances. In particular
+                useful for the MMD and Wasserstein distance.
         """
 
         super().__init__(
@@ -72,6 +77,7 @@ class SMCABC(ABCBASE):
             num_workers=num_workers,
             simulation_batch_size=simulation_batch_size,
             show_progress_bars=show_progress_bars,
+            allow_iid=allow_iid,
             distance_kwargs=distance_kwargs,
         )
 

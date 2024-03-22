@@ -26,7 +26,7 @@ class ABCBASE:
         num_workers: int = 1,
         simulation_batch_size: int = 1,
         show_progress_bars: bool = True,
-        allow_iid: bool = None,
+        allow_iid: Optional[bool] = None,
         distance_kwargs: Optional[Dict] = None,
     ) -> None:
         r"""Base class for Approximate Bayesian Computation methods.
@@ -41,7 +41,7 @@ class ABCBASE:
                 object with `.log_prob()`and `.sample()` (for example, a PyTorch
                 distribution) can be used.
             distance: Distance function to compare observed and simulated data. Can be
-                a custom callable function or one of `l1`, `l2`, `mse`.
+                a custom callable function or one of `l1`, `l2`, `mse`, `mmd`, `wasserstein`.
             num_workers: Number of parallel workers to use for simulations.
             simulation_batch_size: Number of parameter sets that the simulator
                 maps to data x at once. If None, we simulate all parameter sets at the
@@ -49,6 +49,11 @@ class ABCBASE:
                 (simulation_batch_size, parameter_dimension).
             show_progress_bars: Whether to show a progressbar during simulation and
                 sampling.
+            allow_iid: Whether to allow conditioning on iid sampled data or not. Typically,
+                this information is inferred by the choice of the distance, but in case a
+                custom distance is used, this information is pivotal.
+            distance_kwargs: Configurations parameters for the distances. In particular
+                useful for the MMD and Wasserstein distance.
         """
 
         self.prior = prior
@@ -63,7 +68,6 @@ class ABCBASE:
             distance, allow_iid, distance_kwargs
         )
 
-        self.allow_iid = allow_iid
         if not isinstance(distance, Callable) and distance in ["mmd", "wasserstein"]:
             self.allow_iid = True
 
@@ -89,6 +93,11 @@ class ABCBASE:
             distance_type: string indicating the distance type, e.g., 'l2', 'l1',
                 'mse'. Note that the returned distance function averages over the last
                 dimension, e.g., over the summary statistics.
+            allow_iid: Whether to allow conditioning on iid sampled data or not. Typically,
+                this information is inferred by the choice of the distance, but in case a
+                custom distance is used, this information is pivotal.
+            distance_kwargs: Configurations parameters for the distances. In particular
+                useful for the MMD and Wasserstein distance.
 
         Returns:
             distance_fun: distance functions built from passe string. Returns
@@ -117,9 +126,6 @@ class ABCBASE:
 
         def l1_distance(xo, x):
             return torch.mean(abs(xo - x), dim=-1)
-
-        def build_statistical_distance(distance_type):
-            pass
 
         def mmd_squared(xo, x):
             assert len(x.shape) >= 3 and len(xo.shape) == len(x.shape) - 1

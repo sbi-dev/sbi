@@ -21,6 +21,7 @@ class MCABC(ABCBASE):
         num_workers: int = 1,
         simulation_batch_size: int = 1,
         show_progress_bars: bool = True,
+        allow_iid: Optional[None] = None,
         distance_kwargs: Optional[Dict] = None,
     ):
         r"""Monte-Carlo Approximate Bayesian Computation (Rejection ABC) [1].
@@ -47,6 +48,11 @@ class MCABC(ABCBASE):
                 (simulation_batch_size, parameter_dimension).
             show_progress_bars: Whether to show a progressbar during simulation and
                 sampling.
+            allow_iid: Whether to allow conditioning on iid sampled data or not. Typically,
+                this information is inferred by the choice of the distance, but in case a
+                custom distance is used, this information is pivotal.
+            distance_kwargs: Configurations parameters for the distances. In particular
+                useful for the MMD and Wasserstein distance.
         """
 
         super().__init__(
@@ -56,6 +62,7 @@ class MCABC(ABCBASE):
             num_workers=num_workers,
             simulation_batch_size=simulation_batch_size,
             show_progress_bars=show_progress_bars,
+            allow_iid=allow_iid,
             distance_kwargs=distance_kwargs,
         )
 

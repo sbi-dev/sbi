@@ -205,9 +205,8 @@ def unbiased_mmd_squared(x, y, scale: Optional[float] = None):
     xy = f(x, y, diag=True)
     yy = f(y, y)
 
-    if scale is None:
-        scale = torch.median(torch.sqrt(torch.cat((xx, xy, yy))))
-    c = -0.5 / (scale**2)
+    s = torch.median(torch.sqrt(torch.cat((xx, xy, yy)))) if scale is None else scale
+    c = -0.5 / (s**2)
 
     k = lambda a: torch.sum(torch.exp(c * a))
 
