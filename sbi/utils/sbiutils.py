@@ -180,12 +180,10 @@ def standardizing_transform(
         return transforms.AffineTransform(shift=-t_mean / t_std, scale=1 / t_std)
     elif backend == "zuko":
         return UnconditionalLazyTransform(
-            zuko.flows.Unconditional(
-                zuko.transforms.MonotonicAffineTransform,
-                shift=-t_mean / t_std,
-                scale=1 / t_std,
-                buffer=True,
-            )
+            zuko.transforms.MonotonicAffineTransform,
+            shift=-t_mean / t_std,
+            scale=1 / t_std,
+            buffer=True,
         )
 
     else:
