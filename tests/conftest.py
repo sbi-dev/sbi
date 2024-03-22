@@ -16,3 +16,8 @@ def set_seed():
 @pytest.fixture(scope="session", autouse=True)
 def set_default_tensor_type():
     torch.set_default_tensor_type("torch.FloatTensor")
+
+
+@pytest.fixture(scope="function")
+def mcmc_params_testing() -> dict:
+    return dict(num_chains=4, thin=2, warmup_steps=100)

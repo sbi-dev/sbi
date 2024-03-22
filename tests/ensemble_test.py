@@ -58,13 +58,15 @@ def test_import_before_deprecation():
     (
         (SNPE_C, 1),
         pytest.param(SNPE_C, 5, marks=pytest.mark.xfail),
-        (SNLE_A, 1),
-        (SNLE_A, 5),
-        (SNRE_A, 1),
-        (SNRE_A, 5),
+        pytest.param(SNLE_A, 1, marks=pytest.mark.mcmc),
+        pytest.param(SNLE_A, 5, marks=pytest.mark.mcmc),
+        pytest.param(SNRE_A, 1, marks=pytest.mark.mcmc),
+        pytest.param(SNRE_A, 5, marks=pytest.mark.mcmc),
     ),
 )
-def test_c2st_posterior_ensemble_on_linearGaussian(inference_method, num_trials):
+def test_c2st_posterior_ensemble_on_linearGaussian(
+    inference_method, num_trials, mcmc_params_testing: dict
+):
     """Test whether EnsemblePosterior infers well a simple example with available
     ground truth.
     """
@@ -115,10 +117,8 @@ def test_c2st_posterior_ensemble_on_linearGaussian(inference_method, num_trials)
     if isinstance(inferer, (SNLE_A, SNRE_A)):
         samples = posterior.sample(
             (num_samples,),
-            num_chains=20,
             method="slice_np_vectorized",
-            thin=5,
-            warmup_steps=50,
+            **mcmc_params_testing,
         )
     else:
         samples = posterior.sample((num_samples,))

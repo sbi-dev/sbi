@@ -36,25 +36,20 @@ def mixed_simulator(theta, stimulus_condition=2.0):
     return torch.cat((rts, choices), dim=1)
 
 
-# MCMC kwargs for faster testing
-mcmc_kwargs = dict(
-    num_chains=20,
-    warmup_steps=50,
-    method="slice_np_vectorized",
-    init_strategy="proposal",
-    thin=5,
-)
-
-
+@pytest.mark.mcmc
 @pytest.mark.gpu
 @pytest.mark.parametrize("device", ("cpu", "gpu"))
-def test_mnle_on_device(device):
+def test_mnle_on_device(
+    device,
+    mcmc_params_testing: dict,
+    num_simulations: int = 100,
+    mcmc_method: str = "slice",
+):
     """Test MNLE API on device."""
 
     device = process_device(device)
     # Generate mixed data.
-    num_simulations = 100
-    mcmc_method = "slice"
+
     theta = torch.rand(num_simulations, 2)
     x = torch.cat(
         (
@@ -76,13 +71,14 @@ def test_mnle_on_device(device):
         x=x[0],
         show_progress_bars=False,
         mcmc_method=mcmc_method,
-        thin=1,
-        warmup_steps=1,
+        **mcmc_params_testing,
     )
 
 
-@pytest.mark.parametrize("sampler", ("mcmc", "rejection", "vi"))
-def test_mnle_api(sampler):
+@pytest.mark.parametrize(
+    "sampler", (pytest.param("mcmc", marks=pytest.mark.mcmc), "rejection", "vi")
+)
+def test_mnle_api(sampler, mcmc_params_testing: dict):
     """Test MNLE API."""
     # Generate mixed data.
     num_simulations = 100
@@ -113,18 +109,20 @@ def test_mnle_api(sampler):
     else:
         posterior.sample(
             (1,),
-            num_chains=2,
-            warmup_steps=1,
-            method="slice_np_vectorized",
             init_strategy="proposal",
-            thin=1,
+            method="slice_np_vectorized",
+            **mcmc_params_testing,
         )
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("sampler", ("mcmc", "rejection", "vi"))
+@pytest.mark.parametrize(
+    "sampler", (pytest.param("mcmc", marks=pytest.mark.mcmc), "rejection", "vi")
+)
 @pytest.mark.parametrize("num_trials", [5, 10])
-def test_mnle_accuracy_with_different_samplers_and_trials(sampler, num_trials: int):
+def test_mnle_accuracy_with_different_samplers_and_trials(
+    sampler, num_trials: int, mcmc_params_testing: dict
+):
     """Test MNLE c2st accuracy for different samplers and number of trials."""
 
     num_simulations = 2000
@@ -148,6 +146,10 @@ def test_mnle_accuracy_with_different_samplers_and_trials(sampler, num_trials: i
 
     theta_o = prior.sample((1,))
     x_o = mixed_simulator(theta_o.repeat(num_trials, 1))
+
+    mcmc_kwargs = dict(
+        method="slice_np_vectorized", init_strategy="proposal", **mcmc_params_testing
+    )
 
     # True posterior samples
     transform = mcmc_transform(prior)
@@ -224,7 +226,8 @@ class PotentialFunctionProvider(BasePotential):
 
 
 @pytest.mark.slow
-def test_mnle_with_experimental_conditions():
+@pytest.mark.mcmc
+def test_mnle_with_experimental_conditions(mcmc_params_testing: dict):
     """Test MNLE c2st accuracy when conditioned on a subset of the parameters, e.g.,
     experimental conditions.
 
@@ -256,6 +259,10 @@ def test_mnle_with_experimental_conditions():
     theta_o = proposal.sample((1,))
     theta_o[0, 2] = 2.0  # set condition to 2 as in original simulator.
     x_o = sim_wrapper(theta_o.repeat(num_trials, 1))
+
+    mcmc_kwargs = dict(
+        method="slice_np_vectorized", init_strategy="proposal", **mcmc_params_testing
+    )
 
     # MNLE
     trainer = MNLE(proposal)

@@ -24,6 +24,7 @@ from sbi.utils.user_input_checks import (
 )
 
 
+@pytest.mark.mcmc
 @pytest.mark.parametrize(
     "sampling_method",
     (
@@ -34,7 +35,9 @@ from sbi.utils.user_input_checks import (
         "hmc",
     ),
 )
-def test_api_posterior_sampler_set(sampling_method: str, set_seed):
+def test_api_posterior_sampler_set(
+    sampling_method: str, set_seed, mcmc_params_testing: dict
+):
     """Runs SNL and checks that posterior_sampler is correctly set.
 
     Args:
@@ -48,7 +51,6 @@ def test_api_posterior_sampler_set(sampling_method: str, set_seed):
     num_simulations = 10
     x_o = zeros((num_trials, num_dim))
     # Test for multiple chains is cheap when vectorized.
-    num_chains = 3 if sampling_method in "slice_np_vectorized" else 1
 
     prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
     prior, _, prior_returns_numpy = process_prior(prior)
@@ -69,13 +71,11 @@ def test_api_posterior_sampler_set(sampling_method: str, set_seed):
 
     assert posterior.posterior_sampler is None
     posterior.sample(
-        sample_shape=(num_samples, num_chains),
+        sample_shape=(num_samples, mcmc_params_testing["num_chains"]),
         x=x_o,
         mcmc_parameters={
-            "thin": 2,
-            "num_chains": num_chains,
             "init_strategy": "prior",
-            "warmup_steps": 10,
+            **mcmc_params_testing,
         },
     )
 

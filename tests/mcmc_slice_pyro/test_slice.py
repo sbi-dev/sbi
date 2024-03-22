@@ -137,6 +137,7 @@ def jit_idfn(param):
     return "JIT={}".format(param)
 
 
+@pytest.mark.mcmc
 @pytest.mark.parametrize(
     T._fields,
     TEST_CASES,
@@ -181,6 +182,7 @@ def test_slice_conjugate_gaussian(
         assert_equal(rmse(latent_std, expected_std).item(), 0.0, prec=std_tol)
 
 
+@pytest.mark.mcmc
 @pytest.mark.parametrize("jit", [False, mark_jit(True)], ids=jit_idfn)
 @pytest.mark.parametrize("num_chains", [1, 2])
 def test_logistic_regression(jit, num_chains):
@@ -209,6 +211,7 @@ def test_logistic_regression(jit, num_chains):
     assert_equal(rmse(true_coefs, samples["beta"].mean(0)).item(), 0.0, prec=0.1)
 
 
+@pytest.mark.mcmc
 def test_beta_bernoulli():
     def model(data):
         alpha = torch.tensor([1.1, 1.1])
@@ -226,6 +229,7 @@ def test_beta_bernoulli():
     assert_equal(samples["p_latent"].mean(0), true_probs, prec=0.02)
 
 
+@pytest.mark.mcmc
 @pytest.mark.parametrize("jit", [False, mark_jit(True)], ids=jit_idfn)
 def test_gamma_normal(jit):
     def model(data):
@@ -244,6 +248,7 @@ def test_gamma_normal(jit):
     assert_equal(samples["p_latent"].mean(0), true_std, prec=0.05)
 
 
+@pytest.mark.mcmc
 @pytest.mark.parametrize("jit", [False, mark_jit(True)], ids=jit_idfn)
 def test_dirichlet_categorical(jit):
     def model(data):
@@ -262,6 +267,7 @@ def test_dirichlet_categorical(jit):
     assert_equal(posterior.mean(0), true_probs, prec=0.02)
 
 
+@pytest.mark.mcmc
 @pytest.mark.parametrize("jit", [False, mark_jit(True)], ids=jit_idfn)
 @pytest.mark.skip(reason="Slice sampling not implemented for multiple sites yet.")
 def test_gamma_beta(jit):
@@ -287,6 +293,7 @@ def test_gamma_beta(jit):
     assert_equal(samples["beta"].mean(0), true_beta, prec=0.05)
 
 
+@pytest.mark.mcmc
 @pytest.mark.parametrize("jit", [False, mark_jit(True)], ids=jit_idfn)
 @pytest.mark.skip(reason="Slice sampling not implemented for multiple sites yet.")
 def test_gaussian_mixture_model(jit):
@@ -321,6 +328,7 @@ def test_gaussian_mixture_model(jit):
     )
 
 
+@pytest.mark.mcmc
 @pytest.mark.parametrize("jit", [False, mark_jit(True)], ids=jit_idfn)
 @pytest.mark.skip(reason="Slice sampling not implemented for multiple sites yet.")
 def test_bernoulli_latent_model(jit):
@@ -346,6 +354,7 @@ def test_bernoulli_latent_model(jit):
     assert_equal(samples["y_prob"].mean(0), y_prob, prec=0.05)
 
 
+@pytest.mark.mcmc
 @pytest.mark.parametrize("num_steps", [2, 3, 30])
 @pytest.mark.skip(reason="Slice sampling not implemented for multiple sites yet.")
 def test_gaussian_hmm(num_steps):
@@ -410,6 +419,7 @@ def test_gaussian_hmm(num_steps):
     mcmc.run(data)
 
 
+@pytest.mark.mcmc
 @pytest.mark.parametrize("hyperpriors", [False, True])
 @pytest.mark.skip(reason="Slice sampling not implemented for multiple sites yet.")
 def test_beta_binomial(hyperpriors):
@@ -451,6 +461,7 @@ def test_beta_binomial(hyperpriors):
     assert_equal(posterior["probs"].mean(0), true_probs, prec=0.05)
 
 
+@pytest.mark.mcmc
 @pytest.mark.parametrize("hyperpriors", [False, True])
 @pytest.mark.skip(reason="Slice sampling not implemented for multiple sites yet.")
 def test_gamma_poisson(hyperpriors):

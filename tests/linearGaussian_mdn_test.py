@@ -37,7 +37,7 @@ def test_mdn_with_snle():
     mdn_inference_with_different_methods(SNLE)
 
 
-def mdn_inference_with_different_methods(method):
+def mdn_inference_with_different_methods(method, mcmc_params_testing: dict):
     num_dim = 2
     x_o = torch.tensor([[1.0, 0.0]])
     num_samples = 500
@@ -76,9 +76,7 @@ def mdn_inference_with_different_methods(method):
             theta_transform=theta_transform,
             proposal=prior,
             method="slice_np_vectorized",
-            num_chains=20,
-            warmup_steps=50,
-            thin=5,
+            **mcmc_params_testing,
         )
 
     samples = posterior.sample((num_samples,), x=x_o)

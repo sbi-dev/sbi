@@ -18,9 +18,16 @@ from tests.test_utils import PosteriorPotential, TractablePosterior
 @pytest.mark.parametrize("reduce_fn_str", ("marginals", "posterior_log_prob"))
 @pytest.mark.parametrize("prior", ("boxuniform", "independent"))
 @pytest.mark.parametrize(
-    "method, sampler", ((SNPE, None), (SNLE, "mcmc"), (SNLE, "vi"))
+    "method, sampler",
+    (
+        (SNPE, None),
+        pytest.param(SNLE, "mcmc", marks=pytest.mark.mcmc),
+        pytest.param(SNLE, "vi", marks=pytest.mark.mcmc),
+    ),
 )
-def test_running_sbc(method, prior, reduce_fn_str, sampler, model="mdn"):
+def test_running_sbc(
+    method, prior, reduce_fn_str, sampler, mcmc_params_testing: dict, model="mdn"
+):
     """Tests running inference and then SBC and obtaining nltp."""
 
     num_dim = 2
@@ -52,7 +59,7 @@ def test_running_sbc(method, prior, reduce_fn_str, sampler, model="mdn"):
         posterior_kwargs = {
             "sample_with": "mcmc" if sampler == "mcmc" else "vi",
             "mcmc_method": "slice_np_vectorized",
-            "mcmc_parameters": {"num_chains": 10, "thin": 5, "warmup_steps": 10},
+            "mcmc_parameters": mcmc_params_testing,
         }
     else:
         posterior_kwargs = {}

@@ -34,18 +34,12 @@ from sbi.utils.user_input_checks import (
 
 from .test_utils import check_c2st, get_prob_outside_uniform_prior
 
-# mcmc params for fast testing.
-mcmc_parameters = {
-    "method": "slice_np_vectorized",
-    "num_chains": 20,
-    "thin": 5,
-    "warmup_steps": 50,
-}
-
 
 @pytest.mark.parametrize("num_dim", (1,))  # dim 3 is tested below.
 @pytest.mark.parametrize("prior_str", ("uniform", "gaussian"))
-def test_api_snle_multiple_trials_and_rounds_map(num_dim: int, prior_str: str):
+def test_api_snle_multiple_trials_and_rounds_map(
+    num_dim: int, prior_str: str, mcmc_params_testing: dict
+):
     """Test SNLE API with 2 rounds, different priors num trials and MAP."""
     num_rounds = 2
     num_samples = 1
@@ -78,14 +72,16 @@ def test_api_snle_multiple_trials_and_rounds_map(num_dim: int, prior_str: str):
             x_o = zeros((num_trials, num_dim))
             posterior = inference.build_posterior(
                 mcmc_method="slice_np_vectorized",
-                mcmc_parameters=dict(num_chains=10, thin=10, warmup_steps=10),
+                mcmc_parameters=mcmc_params_testing,
             ).set_default_x(x_o)
             posterior.sample(sample_shape=(num_samples,))
         proposals.append(posterior)
         posterior.map(num_iter=1)
 
 
-def test_c2st_snl_on_linear_gaussian_different_dims(model_str="maf"):
+def test_c2st_snl_on_linear_gaussian_different_dims(
+    mcmc_params_testing: dict, model_str="maf"
+):
     """Test SNLE on linear Gaussian task with different theta and x dims."""
 
     theta_dim = 3
@@ -139,7 +135,8 @@ def test_c2st_snl_on_linear_gaussian_different_dims(model_str="maf"):
         proposal=prior,
         potential_fn=potential_fn,
         theta_transform=theta_transform,
-        **mcmc_parameters,
+        method="slice_np_vectorized",
+        **mcmc_params_testing,
     )
     samples = posterior.sample((num_samples,))
 
@@ -152,7 +149,7 @@ def test_c2st_snl_on_linear_gaussian_different_dims(model_str="maf"):
 @pytest.mark.parametrize("prior_str", ("uniform", "gaussian"))
 @pytest.mark.parametrize("model_str", ("maf", "zuko_maf"))
 def test_c2st_and_map_snl_on_linearGaussian_different(
-    num_dim: int, prior_str: str, model_str: str
+    num_dim: int, prior_str: str, model_str: str, mcmc_params_testing: dict
 ):
     """Test SNL on linear Gaussian, comparing to ground truth posterior via c2st.
 
@@ -219,7 +216,8 @@ def test_c2st_and_map_snl_on_linearGaussian_different(
             proposal=prior,
             potential_fn=potential_fn,
             theta_transform=theta_transform,
-            **mcmc_parameters,
+            method="slice_np_vectorized",
+            **mcmc_params_testing,
         )
 
         samples = posterior.sample(sample_shape=(num_samples,))
@@ -286,7 +284,9 @@ def test_map_with_multiple_independent_prior(use_transform):
 
 @pytest.mark.slow
 @pytest.mark.parametrize("num_trials", (1, 3))
-def test_c2st_multi_round_snl_on_linearGaussian(num_trials: int):
+def test_c2st_multi_round_snl_on_linearGaussian(
+    num_trials: int, mcmc_params_testing: dict
+):
     """Test SNL on linear Gaussian, comparing to ground truth posterior via c2st."""
 
     num_dim = 2
@@ -327,7 +327,8 @@ def test_c2st_multi_round_snl_on_linearGaussian(num_trials: int):
         proposal=prior,
         potential_fn=potential_fn,
         theta_transform=theta_transform,
-        **mcmc_parameters,
+        method="slice_np_vectorized",
+        **mcmc_params_testing,
     )
 
     theta, x = simulate_for_sbi(
@@ -344,7 +345,8 @@ def test_c2st_multi_round_snl_on_linearGaussian(num_trials: int):
         proposal=prior,
         potential_fn=potential_fn,
         theta_transform=theta_transform,
-        **mcmc_parameters,
+        method="slice_np_vectorized",
+        **mcmc_params_testing,
     )
 
     samples = posterior.sample(sample_shape=(num_samples,))
@@ -423,15 +425,15 @@ def test_c2st_multi_round_snl_on_linearGaussian_vi(num_trials: int):
 @pytest.mark.parametrize(
     "sampling_method, prior_str",
     (
-        ("slice_np", "gaussian"),
-        ("slice_np", "uniform"),
-        ("slice_np_vectorized", "gaussian"),
-        ("slice_np_vectorized", "uniform"),
-        ("slice", "gaussian"),
-        ("slice", "uniform"),
-        ("nuts", "gaussian"),
-        ("nuts", "uniform"),
-        ("hmc", "gaussian"),
+        pytest.param("slice_np", "gaussian", marks=pytest.mark.mcmc),
+        pytest.param("slice_np", "uniform", marks=pytest.mark.mcmc),
+        pytest.param("slice_np_vectorized", "gaussian", marks=pytest.mark.mcmc),
+        pytest.param("slice_np_vectorized", "uniform", marks=pytest.mark.mcmc),
+        pytest.param("slice", "gaussian", marks=pytest.mark.mcmc),
+        pytest.param("slice", "uniform", marks=pytest.mark.mcmc),
+        pytest.param("nuts", "gaussian", marks=pytest.mark.mcmc),
+        pytest.param("nuts", "uniform", marks=pytest.mark.mcmc),
+        pytest.param("hmc", "gaussian", marks=pytest.mark.mcmc),
         ("rejection", "uniform"),
         ("rejection", "gaussian"),
         ("rKL", "uniform"),
@@ -448,7 +450,7 @@ def test_c2st_multi_round_snl_on_linearGaussian_vi(num_trials: int):
 )
 @pytest.mark.parametrize("init_strategy", ("proposal", "resample", "sir"))
 def test_api_snl_sampling_methods(
-    sampling_method: str, prior_str: str, init_strategy: str
+    sampling_method: str, prior_str: str, init_strategy: str, mcmc_params_testing: dict
 ):
     """Runs SNL on linear Gaussian and tests sampling from posterior via mcmc.
 
@@ -516,9 +518,8 @@ def test_api_snl_sampling_methods(
                 proposal=prior,
                 theta_transform=theta_transform,
                 method=sampling_method,
-                thin=5,
-                num_chains=num_chains,
                 init_strategy=init_strategy,
+                **mcmc_params_testing,
             )
         elif sample_with == "importance":
             posterior = ImportanceSamplingPosterior(

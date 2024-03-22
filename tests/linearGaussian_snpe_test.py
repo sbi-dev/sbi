@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
+
 import numpy as np
 import pytest
 import torch
@@ -413,13 +415,15 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
 @pytest.mark.parametrize(
     "sample_with, mcmc_method, prior_str",
     (
-        ("mcmc", "slice_np", "gaussian"),
-        ("mcmc", "slice", "gaussian"),
-        ("mcmc", "slice_np_vectorized", "gaussian"),
+        pytest.param("mcmc", "slice_np", "gaussian", marks=pytest.mark.mcmc),
+        pytest.param("mcmc", "slice", "gaussian", marks=pytest.mark.mcmc),
+        pytest.param("mcmc", "slice_np_vectorized", "gaussian", marks=pytest.mark.mcmc),
         ("rejection", "rejection", "uniform"),
     ),
 )
-def test_api_snpe_c_posterior_correction(sample_with, mcmc_method, prior_str):
+def test_api_snpe_c_posterior_correction(
+    sample_with, mcmc_method, prior_str, mcmc_params_testing: dict
+):
     """Test that leakage correction applied to sampling works, with both MCMC and
     rejection.
 
@@ -427,6 +431,10 @@ def test_api_snpe_c_posterior_correction(sample_with, mcmc_method, prior_str):
 
     num_dim = 2
     x_o = zeros(1, num_dim)
+
+    mcmc_params = deepcopy(mcmc_params_testing)
+    if mcmc_method != "slice_np_vectorized":
+        mcmc_params["num_chains"] = 1
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(num_dim)
@@ -460,9 +468,7 @@ def test_api_snpe_c_posterior_correction(sample_with, mcmc_method, prior_str):
             theta_transform=theta_transform,
             proposal=prior,
             method=mcmc_method,
-            num_chains=10 if mcmc_method == "slice_np_vectorized" else 1,
-            warmup_steps=10,
-            thin=1,
+            **mcmc_params,
         )
     elif sample_with == "rejection":
         posterior = RejectionPosterior(
@@ -526,7 +532,8 @@ def test_api_force_first_round_loss(
 
 
 @pytest.mark.slow
-def test_sample_conditional():
+@pytest.mark.mcmc
+def test_sample_conditional(mcmc_params_testing: dict):
     """
     Test whether sampling from the conditional gives the same results as evaluating.
 
@@ -542,10 +549,6 @@ def test_sample_conditional():
     dim_to_sample_2 = 2
     num_simulations = 6000
     num_conditional_samples = 500
-
-    mcmc_parameters = dict(
-        method="slice_np_vectorized", num_chains=20, warmup_steps=50, thin=5
-    )
 
     x_o = zeros(1, num_dim)
 
@@ -602,7 +605,8 @@ def test_sample_conditional():
         potential_fn=conditioned_potential_fn,
         theta_transform=restricted_tf,
         proposal=restricted_prior,
-        **mcmc_parameters,
+        method="slice_np_vectorized",
+        **mcmc_params_testing,
     )
     mcmc_posterior.set_default_x(x_o)  # TODO: This test has a bug? Needed to add this
     cond_samples = mcmc_posterior.sample((num_conditional_samples,))

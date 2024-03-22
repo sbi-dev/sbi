@@ -48,20 +48,20 @@ from sbi.utils.user_input_checks import (
     [
         (SNPE_C, "maf", "direct"),
         (SNPE_C, "mdn", "rejection"),
-        (SNPE_C, "maf", "slice_np_vectorized"),
-        (SNPE_C, "mdn", "slice"),
-        (SNLE, "nsf", "slice_np_vectorized"),
-        (SNLE, "mdn", "slice"),
+        pytest.param(SNPE_C, "maf", "slice_np_vectorized", marks=pytest.mark.mcmc),
+        pytest.param(SNPE_C, "mdn", "slice", marks=pytest.mark.mcmc),
+        pytest.param(SNLE, "nsf", "slice_np_vectorized", marks=pytest.mark.mcmc),
+        pytest.param(SNLE, "mdn", "slice", marks=pytest.mark.mcmc),
         (SNLE, "nsf", "rejection"),
         (SNLE, "maf", "importance"),
-        (SNRE_A, "mlp", "slice_np_vectorized"),
-        (SNRE_A, "mlp", "slice"),
+        pytest.param(SNRE_A, "mlp", "slice_np_vectorized", marks=pytest.mark.mcmc),
+        pytest.param(SNRE_A, "mlp", "slice", marks=pytest.mark.mcmc),
         (SNRE_B, "resnet", "rejection"),
         (SNRE_B, "resnet", "importance"),
-        (SNRE_B, "resnet", "slice"),
+        pytest.param(SNRE_B, "resnet", "slice", marks=pytest.mark.mcmc),
         (SNRE_C, "resnet", "rejection"),
         (SNRE_C, "resnet", "importance"),
-        (SNRE_C, "resnet", "nuts"),
+        pytest.param(SNRE_C, "resnet", "nuts", marks=pytest.mark.mcmc),
     ],
 )
 @pytest.mark.parametrize(
@@ -74,7 +74,13 @@ from sbi.utils.user_input_checks import (
 )
 @pytest.mark.parametrize("prior_type", ["gaussian", "uniform"])
 def test_training_and_mcmc_on_device(
-    method, model, sampling_method, training_device, prior_device, prior_type
+    method,
+    model,
+    sampling_method,
+    training_device,
+    prior_device,
+    prior_type,
+    mcmc_params_testing: dict,
 ):
     """Test training on devices.
 
@@ -151,8 +157,12 @@ def test_training_and_mcmc_on_device(
                 sample_with="mcmc",
                 mcmc_method=sampling_method,
                 mcmc_parameters=dict(
-                    thin=10 if sampling_method == "slice_np_vectorized" else 1,
-                    num_chains=10 if sampling_method == "slice_np_vectorized" else 1,
+                    thin=mcmc_params_testing["thin"]
+                    if sampling_method == "slice_np_vectorized"
+                    else 1,
+                    num_chains=mcmc_params_testing["num_chains"]
+                    if sampling_method == "slice_np_vectorized"
+                    else 1,
                 ),
             )
         elif sampling_method in ["rejection", "direct"]:
@@ -335,6 +345,7 @@ def test_embedding_nets_integration_training_device(
     embedding_net_device: str,
     data_device: str,
     training_device: str,
+    mcmc_params_testing: dict,
 ) -> None:
     """Test embedding nets integration with different devices, priors and methods."""
     # add other methods
@@ -440,7 +451,7 @@ def test_embedding_nets_integration_training_device(
                 if inference_method == SNPE_A
                 else dict(
                     mcmc_method="slice_np_vectorized",
-                    mcmc_parameters=dict(thin=10, num_chains=20, warmup_steps=10),
+                    mcmc_parameters=mcmc_params_testing,
                 )
             ),
         )
