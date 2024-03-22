@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
-from typing import Optional, Tuple
+from typing import Tuple
 
 import torch
 from torch import Tensor
@@ -26,8 +26,8 @@ class MixedDensityEstimator(DensityEstimator):
         self,
         discrete_net: CategoricalMassEstimator,
         continuous_net: NFlowsFlow,
+        condition_shape: torch.Size,
         log_transform_x: bool = False,
-        condition_shape: Optional[torch.Size] = torch.Size([]),
     ):
         """Initialize class for combining density estimators for MNLE.
 
