@@ -8,7 +8,6 @@ from typing import Callable, Tuple
 import pytest
 import torch
 from pyknos.mdn.mdn import MultivariateGaussianMDN
-from scipy.stats import beta, lognorm, multivariate_normal, uniform
 from torch import Tensor, eye, nn, ones, zeros
 from torch.distributions import Beta, Distribution, Gamma, MultivariateNormal, Uniform
 
@@ -18,7 +17,7 @@ from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
 from sbi.utils import mcmc_transform, within_support
 from sbi.utils.torchutils import BoxUniform
 from sbi.utils.user_input_checks import (
-    prepare_for_sbi,
+    check_sbi_inputs,
     process_prior,
     process_simulator,
     process_x,
@@ -27,7 +26,6 @@ from sbi.utils.user_input_checks_utils import (
     CustomPriorWrapper,
     MultipleIndependent,
     PytorchReturnTypeWrapper,
-    ScipyPytorchWrapper,
 )
 
 
@@ -88,14 +86,6 @@ torch.set_default_tensor_type(torch.FloatTensor)
             UserNumpyUniform(zeros(3), ones(3), return_numpy=True),
             dict(lower_bound=zeros(3), upper_bound=ones(3)),
         ),
-        (ScipyPytorchWrapper, multivariate_normal(), dict()),
-        (ScipyPytorchWrapper, lognorm(s=1.0), dict()),
-        (
-            ScipyPytorchWrapper,
-            uniform(),
-            dict(lower_bound=zeros(1), upper_bound=ones(1)),
-        ),
-        (ScipyPytorchWrapper, beta(a=1, b=1), dict()),
         (
             PytorchReturnTypeWrapper,
             BoxUniform(zeros(3, dtype=torch.float64), ones(3, dtype=torch.float64)),
@@ -279,7 +269,9 @@ def test_prepare_sbi_problem(simulator: Callable, prior):
         x_shape: shape of data as defined by the user.
     """
 
-    simulator, prior = prepare_for_sbi(simulator, prior)
+    prior, _, prior_returns_numpy = process_prior(prior)
+    simulator = process_simulator(simulator, prior, prior_returns_numpy)
+    check_sbi_inputs(simulator, prior)
 
     # check batch sims and type
     n_batch = 5
@@ -325,7 +317,9 @@ def test_inference_with_user_sbi_problems(
     Test inference with combinations of user defined simulators, priors and x_os.
     """
 
-    simulator, prior = prepare_for_sbi(user_simulator, user_prior)
+    prior, _, prior_returns_numpy = process_prior(user_prior)
+    simulator = process_simulator(user_simulator, prior, prior_returns_numpy)
+    check_sbi_inputs(simulator, prior)
     inference = snpe_method(
         prior=prior,
         density_estimator="mdn_snpe_a" if snpe_method == SNPE_A else "maf",
