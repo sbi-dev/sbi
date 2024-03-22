@@ -7,15 +7,14 @@ from typing import Any, Callable, Optional
 import torch
 from torch import nn
 
-from sbi.neural_nets.density_estimators.hierarchical_estimator import (
-    HierarchicalDensityEstimator,
-    split_hierarchical
-)
-
 from sbi.neural_nets.classifier import (
     build_linear_classifier,
     build_mlp_classifier,
     build_resnet_classifier,
+)
+from sbi.neural_nets.density_estimators.hierarchical_estimator import (
+    HierarchicalDensityEstimator,
+    split_hierarchical,
 )
 from sbi.neural_nets.flow import (
     build_made,
@@ -320,8 +319,10 @@ def hierarchical_nn(
     def build_hierarchical(batch_theta, batch_condition):
         assert batch_theta.ndim == 2, "Only working with 1D theta for now."
         local_theta, global_theta = split_hierarchical(batch_theta, dim_local)
-        local_condition, global_condition = HierarchicalDensityEstimator.embed_condition(
-            embedding_net, batch_condition, batch_condition.shape[1:]
+        local_condition, global_condition = (
+            HierarchicalDensityEstimator.embed_condition(
+                embedding_net, batch_condition, batch_condition.shape[1:]
+            )
         )
 
         global_flow = build_global_flow(

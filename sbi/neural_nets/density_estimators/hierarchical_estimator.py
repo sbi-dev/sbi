@@ -1,6 +1,6 @@
-import torch
 import functools
 
+import torch
 
 from sbi.neural_nets.density_estimators import DensityEstimator
 
@@ -18,7 +18,11 @@ def hierachical_simulator(n_extra, dim_local, p_local, simulator=None):
 
 
     def h_simulator(theta):
-        assert theta.ndim == 2, "Hierarchical simulator only work with vector parameters"
+        msg = (
+            "Hierarchical simulator only work with vector parameters, with "
+            f"of shape (n_batch, theta_dim). Got {theta.shape}."
+        )
+        assert theta.ndim == 2, msg
         n_batch, theta_dim = theta.shape
         local_theta, global_theta = split_hierarchical(theta, dim_local)
         extra_local = p_local.sample((n_batch, n_extra))
@@ -26,7 +30,8 @@ def hierachical_simulator(n_extra, dim_local, p_local, simulator=None):
             (local_theta[:, None], extra_local), dim=1
         )
         all_theta = torch.concatenate(
-            (all_theta_local, global_theta.repeat([n_extra+1, 1]).view(n_batch, n_extra+1, -1)), dim=2
+            (all_theta_local, global_theta.repeat([n_extra+1, 1])
+            .view(n_batch, n_extra+1, -1)), dim=2
         )
         observation = simulator(all_theta.view(n_batch * (n_extra+1), -1))
         return observation.view((n_batch,  n_extra + 1, *observation.shape[1:]))

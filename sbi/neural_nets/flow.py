@@ -508,7 +508,8 @@ def build_zuko_maf(
         # transforms = transforms
         transforms = (
             *transforms,
-            # Ideally `standardizing_transform` would return a `LazyTransform` instead of ` AffineTransform | Unconditional`, maybe all three are compatible
+            # Ideally `standardizing_transform` would return a `LazyTransform` instead
+            # of `AffineTransform | Unconditional`, maybe all three are compatible
             standardizing_transform(batch_x, structured_x, backend="zuko"),  # pyright: ignore[reportAssignmentType]
         )
 
