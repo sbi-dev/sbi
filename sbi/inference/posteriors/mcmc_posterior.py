@@ -98,7 +98,8 @@ class MCMCPosterior(NeuralPosterior):
         if method == "slice":
             warn(
                 "The Pyro-based slice sampler is deprecated, and the method `slice` "
-                "has been changed to `slice_np`, i.e., the custom numpy-based slice sampler.",
+                "has been changed to `slice_np`, i.e., the custom "
+                "numpy-based slice sampler.",
                 DeprecationWarning,
                 stacklevel=2,
             )
@@ -477,7 +478,8 @@ class MCMCPosterior(NeuralPosterior):
             initial_params: Initial parameters for MCMC chain.
             thin: Thinning (subsampling) factor, setting 1 disables thinning.
             warmup_steps: Initial number of samples to discard.
-            vectorized: Whether to use a vectorized implementation of the `SliceSampler`.
+            vectorized: Whether to use a vectorized implementation of the
+                `SliceSampler`.
             num_workers: Number of CPU cores to use.
             init_width: Inital width of brackets.
             show_progress_bars: Whether to show a progressbar during sampling;
@@ -783,9 +785,9 @@ class MCMCPosterior(NeuralPosterior):
                 *samples_shape
             )
 
-            inference_data = az.convert_to_inference_data({
-                f"{self.param_name}": samples
-            })
+            inference_data = az.convert_to_inference_data(
+                {f"{self.param_name}": samples}
+            )
 
         return inference_data
 

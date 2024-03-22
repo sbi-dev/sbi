@@ -44,7 +44,8 @@ class PyMCPotential(pt.Op):  # type: ignore
             node: A "node" that represents the computation, handled internally
                 by PyTensor.
             inputs: A sequence of inputs to the operation of type `itypes`. In this
-                case, the sequence will contain one array containing the simulator parameters.
+                case, the sequence will contain one array containing the
+                simulator parameters.
             outputs: A sequence allocated for storing operation outputs. In this
                 case, the sequence will contain one scalar for the computed potential
                 and an array containing the gradient of the potential with respect to the
@@ -77,10 +78,12 @@ class PyMCPotential(pt.Op):  # type: ignore
 
         Args:
             inputs: A sequence of inputs to the operation of type `itypes`. In this
-                case, the sequence will contain one array containing the simulator parameters.
+                case, the sequence will contain one array containing the
+                simulator parameters.
             output_grads: A sequence of the gradients of the output variables. The first
                 element will be the gradient of the output of the whole computational
-                graph with respect to the output of this specific operation, i.e., the potential.
+                graph with respect to the output of this specific operation, i.e.,
+                the potential.
 
         Returns:
             A list containing the gradient of the output of the whole computational
