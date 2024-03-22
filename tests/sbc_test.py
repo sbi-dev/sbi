@@ -78,8 +78,8 @@ def test_running_sbc(method, prior, reduce_fn_str, sampler, model="mdn"):
 
 @pytest.mark.slow
 @pytest.mark.parametrize("prior", ("boxuniform", "independent"))
-@pytest.mark.parametrize("method, sampler", [(SNPE, "mdn")])
-def test_consistent_sbc_results(method, prior, sampler, model="mdn"):
+@pytest.mark.parametrize("method", [SNPE])
+def test_consistent_sbc_results(method, prior, model="mdn"):
     """Tests running inference and then SBC and obtaining nltp."""
 
     num_dim = 2
