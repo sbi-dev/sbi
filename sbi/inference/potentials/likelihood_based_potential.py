@@ -187,7 +187,7 @@ class MixedLikelihoodBasedPotential(LikelihoodBasedPotential):
             # TODO: how to fix pyright issues?
             log_likelihood_trial_batch = self.likelihood_estimator.log_prob_iid(
                 x=self.x_o,
-                theta=theta.to(self.device),
+                context=theta.to(self.device),
             )  # type: ignore
             # Reshape to (x-trials x parameters), sum over trial-log likelihoods.
             log_likelihood_trial_sum = log_likelihood_trial_batch.reshape(
