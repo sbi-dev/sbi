@@ -4,9 +4,11 @@
 
 ::: sbi.inference.base.infer
 
-::: sbi.utils.user_input_checks.prepare_for_sbi
-
 ::: sbi.inference.base.simulate_for_sbi
+
+::: sbi.utils.user_input_checks.process_prior
+
+::: sbi.utils.user_input_checks.process_simulator
 
 
 ## Algorithms
