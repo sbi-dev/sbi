@@ -24,7 +24,11 @@ from sbi.utils import BoxUniform
 def test_pairplot(
     samples, labels, legend, offdiag, samples_labels, points_labels, points
 ):
-    pairplot(**{k: v for k, v in locals().items() if v is not None})
+    fig, axs = pairplot(**{k: v for k, v in locals().items() if v is not None})
+
+    assert isinstance(fig, Figure)
+    assert isinstance(axs, np.ndarray)
+    assert isinstance(axs[0, 0], Axes)
 
 
 @pytest.mark.parametrize("method", (SNPE, SNLE, SNRE))
