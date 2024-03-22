@@ -31,16 +31,14 @@ from tests.test_utils import check_c2st
 
 
 @pytest.mark.parametrize("num_dim", (1, 2))
-def test_c2st_slice_np_on_Gaussian(num_dim: int):
+def test_c2st_slice_np_on_Gaussian(
+    num_dim: int, warmup: int = 100, num_samples: int = 500
+):
     """Test MCMC on Gaussian, comparing to ground truth target via c2st.
 
     Args:
         num_dim: parameter dimension of the gaussian model
-
     """
-    warmup = 100
-    num_samples = 500
-
     likelihood_shift = -1.0 * ones(num_dim)
     likelihood_cov = 0.3 * eye(num_dim)
     prior_mean = zeros(num_dim)
@@ -74,18 +72,19 @@ def test_c2st_slice_np_on_Gaussian(num_dim: int):
 @pytest.mark.parametrize("slice_sampler", (SliceSamplerVectorized, SliceSamplerSerial))
 @pytest.mark.parametrize("num_workers", (1, 2))
 def test_c2st_slice_np_vectorized_parallelized_on_Gaussian(
-    num_dim: int, slice_sampler, num_workers: int
+    num_dim: int,
+    slice_sampler,
+    num_workers: int,
+    num_samples: int = 500,
+    warmup: int = 50,
+    thin: int = 2,
 ):
     """Test MCMC on Gaussian, comparing to ground truth target via c2st.
 
     Args:
         num_dim: parameter dimension of the gaussian model
-
     """
-    num_samples = 500
-    warmup = 50
     num_chains = 10 if slice_sampler is SliceSamplerVectorized else 1
-    thin = 2
 
     likelihood_shift = -1.0 * ones(num_dim)
     likelihood_cov = 0.3 * eye(num_dim)
@@ -131,16 +130,10 @@ def test_c2st_slice_np_vectorized_parallelized_on_Gaussian(
 @pytest.mark.parametrize("num_dim", (1, 2))
 @pytest.mark.parametrize("step", ("nuts",))  # , "hmc", "slice"))
 @pytest.mark.parametrize("num_chains", (1, 2))
-def test_c2st_pymc_sampler_on_Gaussian(num_dim: int, step: str, num_chains: int):
-    """Test PyMC on Gaussian, comparing to ground truth target via c2st.
-
-    Args:
-        num_dim: parameter dimension of the gaussian model
-
-    """
-    num_samples = 500
-    warmup = 50
-
+def test_c2st_pymc_sampler_on_Gaussian(
+    num_dim: int, step: str, num_chains: int, num_samples: int = 500, warmup: int = 50
+):
+    """Test PyMC on Gaussian, comparing to ground truth target via c2st."""
     likelihood_shift = -1.0 * ones(num_dim)
     likelihood_cov = 0.3 * eye(num_dim)
     prior_mean = zeros(num_dim)
@@ -235,6 +228,7 @@ def test_mcmc_methods_and_inference_diagnostics(
     ), f"`MCMCPosterior.get_arviz_inference_data()` for method {method} returned invalid InferenceData. Must contain key 'posterior', but found only {list(idata.keys())}"
     samples = getattr(idata.posterior, posterior.param_name).data
     samples = samples.reshape(-1, samples.shape[-1])[::2][:num_samples]
-    assert (
-        samples.shape == (num_samples, num_dim)
+    assert samples.shape == (
+        num_samples,
+        num_dim,
     ), f"MCMC samples for method {method} have incorrect shape (n_samples, n_dims). Expected {(num_samples, num_dim)}, got {samples.shape}"
