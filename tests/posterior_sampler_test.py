@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 from pyro.infer.mcmc import MCMC
-from torch import eye, zeros, Tensor
+from torch import Tensor, eye, zeros
 from torch.distributions import MultivariateNormal
 
 from sbi.inference import (

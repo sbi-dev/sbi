@@ -515,8 +515,7 @@ class MCMCPosterior(NeuralPosterior):
         self._mcmc_init_params = samples[:, -1, :].reshape(num_chains, dim_samples)
 
         # Collect samples from all chains.
-        samples = samples.reshape(-1, dim_samples)[:num_samples, :]
-        assert samples.shape[0] == num_samples
+        samples = samples.reshape(-1, dim_samples)
 
         return samples.type(torch.float32).to(self._device)
 
@@ -571,7 +570,6 @@ class MCMCPosterior(NeuralPosterior):
         self._posterior_sampler = sampler
 
         samples = samples[::thin]
-        assert samples.shape[0] == num_samples
 
         return samples.detach()
 
@@ -619,14 +617,13 @@ class MCMCPosterior(NeuralPosterior):
             device=self._device,
         )
         samples = sampler.run()
-        samples = torch.from_numpy(samples).to(dtype=torch.get_default_dtype())
+        samples = torch.from_numpy(samples).to(dtype=torch.float32, device=self._device)
         samples = samples.reshape(-1, initial_params.shape[1])
 
         # Save posterior sampler.
         self._posterior_sampler = sampler
 
         samples = samples[::thin]
-        assert samples.shape[0] == num_samples
 
         return samples
 
@@ -784,9 +781,9 @@ class MCMCPosterior(NeuralPosterior):
                 *samples_shape
             )
 
-            inference_data = az.convert_to_inference_data(
-                {f"{self.param_name}": samples}
-            )
+            inference_data = az.convert_to_inference_data({
+                f"{self.param_name}": samples
+            })
 
         return inference_data
 
