@@ -5,13 +5,13 @@ from __future__ import annotations
 
 import pytest
 import torch
-from torch import eye, ones, zeros
-from torch.distributions import MultivariateNormal, Uniform
-
 from sbi.diagnostics import check_sbc, get_nltp, run_sbc
 from sbi.inference import SNLE, SNPE, simulate_for_sbi
 from sbi.simulators import linear_gaussian
 from sbi.utils import BoxUniform, MultipleIndependent
+from torch import eye, ones, zeros
+from torch.distributions import MultivariateNormal, Uniform
+
 from tests.test_utils import PosteriorPotential, TractablePosterior
 
 
@@ -27,9 +27,9 @@ def test_running_sbc(method, prior, reduce_fn_str, sampler, model="mdn"):
     if prior == "boxuniform":
         prior = BoxUniform(-torch.ones(num_dim), torch.ones(num_dim))
     else:
-        prior = MultipleIndependent([
-            Uniform(-torch.ones(1), torch.ones(1)) for _ in range(num_dim)
-        ])
+        prior = MultipleIndependent(
+            [Uniform(-torch.ones(1), torch.ones(1)) for _ in range(num_dim)]
+        )
 
     num_simulations = 100
     max_num_epochs = 1
@@ -86,9 +86,9 @@ def test_consistent_sbc_results(method, prior, sampler, model="mdn"):
     if prior == "boxuniform":
         prior = BoxUniform(-torch.ones(num_dim), torch.ones(num_dim))
     else:
-        prior = MultipleIndependent([
-            Uniform(-torch.ones(1), torch.ones(1)) for _ in range(num_dim)
-        ])
+        prior = MultipleIndependent(
+            [Uniform(-torch.ones(1), torch.ones(1)) for _ in range(num_dim)]
+        )
 
     num_simulations = 200
     max_num_epochs = 20
@@ -107,14 +107,12 @@ def test_consistent_sbc_results(method, prior, sampler, model="mdn"):
     _ = inferer.append_simulations(theta, x).train(
         training_batch_size=100, max_num_epochs=max_num_epochs
     )
-    if method == SNLE:
-        posterior_kwargs = {
-            "sample_with": "mcmc" if sampler == "mcmc" else "vi",
-            "mcmc_method": "slice_np_vectorized",
-            "mcmc_parameters": {"num_chains": 10, "thin": 5, "warmup_steps": 10},
-        }
-    else:
-        posterior_kwargs = {}
+
+    posterior_kwargs = {
+        "sample_with": "mcmc" if sampler == "mcmc" else "vi",
+        "mcmc_method": "slice_np_vectorized",
+        "mcmc_parameters": {"num_chains": 10, "thin": 5, "warmup_steps": 10},
+    }
 
     posterior = inferer.build_posterior(**posterior_kwargs)
     num_posterior_samples = 250
