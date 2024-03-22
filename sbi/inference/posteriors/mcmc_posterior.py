@@ -47,7 +47,7 @@ class MCMCPosterior(NeuralPosterior):
         theta_transform: Optional[TorchTransform] = None,
         method: str = "slice_np",
         thin: int = 1,
-        warmup_steps: int = 10,
+        warmup_steps: int = 200,
         num_chains: int = 1,
         init_strategy: str = "resample",
         init_strategy_parameters: Optional[Dict[str, Any]] = None,
