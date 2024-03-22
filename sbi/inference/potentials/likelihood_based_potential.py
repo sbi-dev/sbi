@@ -120,9 +120,6 @@ def _log_likelihoods_over_trials(
         log_likelihood_trial_sum: log likelihood for each parameter, summed over all
             batch entries (iid trials) in `x`.
     """
-    # print("x", x.shape)
-    # print("theta", theta.shape)
-
     # Shape of `x` is (iid_dim, *event_shape)
     x = reshape_to_iid_batch_event(x, event_shape=x.shape[1:], leading_is_iid=True)
 
@@ -186,28 +183,37 @@ def mixed_likelihood_estimator_based_potential(
 class MixedLikelihoodBasedPotential(LikelihoodBasedPotential):
     def __init__(
         self,
-        likelihood_estimator: MixedDensityEstimator,  # type: ignore TODO fix pyright
+        likelihood_estimator: MixedDensityEstimator,
         prior: Distribution,
         x_o: Optional[Tensor],
         device: str = "cpu",
     ):
-        # TODO Fix pyright issue by making MixedDensityEstimator a subclass
-        # of DensityEstimator
-        super().__init__(likelihood_estimator, prior, x_o, device)  # type: ignore
+        super().__init__(likelihood_estimator, prior, x_o, device)
 
     def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
+        prior_log_prob = self.prior.log_prob(theta)  # type: ignore
+
+        # Shape of `x` is (iid_dim, *event_shape)
+        theta = reshape_to_iid_batch_event(theta, event_shape=theta.shape[1:])
+        x = reshape_to_iid_batch_event(self.x_o, event_shape=self.x_o.shape[1:], leading_is_iid=True)
+        theta_batch_dim = theta.shape[1]
+        x = x.expand(-1, theta_batch_dim, -1)
+
+        # print("t", theta.shape)
+        # print("x", x.shape)
+
         # Calculate likelihood in one batch.
         with torch.set_grad_enabled(track_gradients):
             # Call the specific log prob method of the mixed likelihood estimator as
             # this optimizes the evaluation of the discrete data part.
-            # TODO: how to fix pyright issues?
-            log_likelihood_trial_batch = self.likelihood_estimator.log_prob_iid(
-                x=self.x_o,
-                context=theta.to(self.device),
+            # TODO: how to fix pyright issues?  # TODO log_prob_iid
+            log_likelihood_trial_batch = self.likelihood_estimator.log_prob(
+                input=x,
+                condition=theta.to(self.device),
             )  # type: ignore
             # Reshape to (x-trials x parameters), sum over trial-log likelihoods.
             log_likelihood_trial_sum = log_likelihood_trial_batch.reshape(
                 self.x_o.shape[0], -1
             ).sum(0)
 
-        return log_likelihood_trial_sum + self.prior.log_prob(theta)  # type: ignore
+        return log_likelihood_trial_sum + prior_log_prob

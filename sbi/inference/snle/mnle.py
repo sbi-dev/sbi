@@ -208,4 +208,4 @@ class MNLE(LikelihoodEstimator):
         """
         theta = reshape_to_iid_batch_event(theta, event_shape=self._theta_shape[1:])
         x = reshape_to_iid_batch_event(x, event_shape=self._x_shape[1:])
-        return -self._neural_net.log_prob(x, context=theta)
+        return -self._neural_net.log_prob(x, condition=theta)
