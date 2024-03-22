@@ -583,6 +583,7 @@ def pairplot(
         warn(
             "**kwargs are deprecated, use fig_kwargs instead. \n \
               Calling the to be deprecated pairplot function",
+            DeprecationWarning,
             stacklevel=2,
         )
         fig, axes = pairplot_dep(
@@ -720,7 +721,8 @@ def marginal_plot(
     if len(kwargs) > 0:
         warn(
             "**kwargs are deprecated, use fig_kwargs instead.\n\
-              calling the to be deprecated marginal_plot funcion",
+              calling the to be deprecated marginal_plot function",
+            DeprecationWarning,
             stacklevel=2,
         )
         fig, axes = marginal_plot_dep(
@@ -1957,7 +1959,11 @@ def get_diag_func(samples, limits, opts, **kwargs):
     Returns the diag_func which returns the 1D marginal plot for the parameter
     indexed by row.
     """
-    warn("get_diag_func will be deprecated, use get_diag_funcs instead", stacklevel=2)
+    warn(
+        "get_diag_func will be deprecated, use get_diag_funcs instead",
+        PendingDeprecationWarning,
+        stacklevel=2,
+    )
 
     def diag_func(row, **kwargs):
         if len(samples) > 0:
@@ -2022,7 +2028,11 @@ def _arrange_plots(
 
     Returns: figure and axis
     """
-    warn("_arrange_plots will be deprecated, use _arrange_grid instead", stacklevel=2)
+    warn(
+        "_arrange_plots will be deprecated, use _arrange_grid instead",
+        PendingDeprecationWarning,
+        stacklevel=2,
+    )
 
     # Prepare points
     if points is None:
@@ -2232,6 +2242,7 @@ def _get_default_opts():
     warn(
         "_get_default_opts will be deprecated, use _get_default_fig_kwargs,\
               get_default_diag_kwargs, get_default_offdiag_kwargs instead",
+        PendingDeprecationWarning,
         stacklevel=2,
     )
     return {

@@ -6,7 +6,7 @@ import pytest
 import torch
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
-from matplotlib.pyplot import subplots
+from matplotlib.pyplot import close, subplots
 from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi.analysis import pairplot, plot_summary, sbc_rank_plot
@@ -29,6 +29,7 @@ def test_pairplot(
     assert isinstance(fig, Figure)
     assert isinstance(axs, np.ndarray)
     assert isinstance(axs[0, 0], Axes)
+    close()
 
 
 @pytest.mark.parametrize("method", (SNPE, SNLE, SNRE))
