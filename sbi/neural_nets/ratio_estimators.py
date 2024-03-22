@@ -42,11 +42,15 @@ class RatioEstimator(nn.Module, ABC):
     def combine_embedded_theta_and_x(
         self, embedded_theta: Tensor, embedded_x: Tensor
     ) -> Tensor:
-        """combine embedded theta and embedded x"""
-        return None
+        r"""Combine embedded theta and embedded x sensibly for the data type.
 
-    @abstractmethod
-    def embed_and_combine_theta_and_x(self, theta: Tensor, x: Tensor) -> Tensor:
+        Args:
+            embedded_theta: theta after embedding
+            embedded_x: x after embedding
+
+        Returns:
+            Single object containing both embedded_theta and embedded_x
+        """
         return None
 
     @abstractmethod
@@ -63,6 +67,10 @@ class RatioEstimator(nn.Module, ABC):
         """
 
         raise NotImplementedError
+
+    def forward(self, *args, **kwargs) -> Tensor:
+        r"""Wraps `unnormalized_log_ratio`"""
+        return self.unnormalized_log_ratio(*args, **kwargs)
 
 
 class TensorRatioEstimator(RatioEstimator):
@@ -87,16 +95,13 @@ class TensorRatioEstimator(RatioEstimator):
 
     @staticmethod
     def combine_embedded_theta_and_x(
-        embedded_theta: Tensor, embedded_x: Tensor
+        embedded_theta: Tensor, embedded_x: Tensor, dim: int = -1
     ) -> Tensor:
-        """concatenate embedded theta and embedded x"""
-        return torch.cat([embedded_theta, embedded_x], dim=-1)
-
-    def embed_and_combine_theta_and_x(self, theta: Tensor, x: Tensor) -> Tensor:
-        return self.combine_embedded_theta_and_x(
-            self.embedding_net_theta(theta), self.embedding_net_x(x)
-        )
+        """Concatenate embedded theta and embedded x"""
+        return torch.cat([embedded_theta, embedded_x], dim=dim)
 
     def unnormalized_log_ratio(self, theta: Tensor, x: Tensor) -> Tensor:
-        z = self.embed_and_combine_theta_and_x(theta, x)
+        z = self.combine_embedded_theta_and_x(
+            self.embedding_net_theta(theta), self.embedding_net_x(x)
+        )
         return self.net(z)
