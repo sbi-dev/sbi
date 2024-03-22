@@ -488,8 +488,10 @@ class MCMCPosterior(NeuralPosterior):
         Returns:
             Tensor of shape (num_samples, shape_of_single_theta).
         """
-
+        # import pdb; pdb.set_trace()
         num_chains, dim_samples = initial_params.shape
+        num_chains = min(num_chains, num_samples)
+        initial_params = initial_params[:num_chains]
 
         if not vectorized:
             SliceSamplerMultiChain = SliceSamplerSerial
@@ -552,6 +554,8 @@ class MCMCPosterior(NeuralPosterior):
         """
         thin = _process_thin_default(thin)
         num_chains = mp.cpu_count() - 1 if num_chains is None else num_chains
+        num_chains = min(num_chains, num_samples)
+        initial_params = initial_params[:num_chains]
         kernels = dict(hmc_pyro=HMC, nuts_pyro=NUTS)
 
         sampler = MCMC(
@@ -606,6 +610,8 @@ class MCMCPosterior(NeuralPosterior):
         """
         thin = _process_thin_default(thin)
         num_chains = mp.cpu_count() - 1 if num_chains is None else num_chains
+        num_chains = min(num_chains, num_samples)
+        initial_params = initial_params[:num_chains]
         steps = dict(slice_pymc="slice", hmc_pymc="hmc", nuts_pymc="nuts")
 
         sampler = PyMCSampler(
