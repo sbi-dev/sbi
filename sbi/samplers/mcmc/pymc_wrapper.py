@@ -163,7 +163,7 @@ class PyMCSampler:
                 mp_ctx=self._mp_ctx,
             )
         self._inference_data = inference_data
-        traces = inference_data.posterior
+        traces = inference_data.posterior  # type: ignore
         samples = getattr(traces, self.param_name).data
         return samples
 
@@ -186,7 +186,7 @@ class PyMCSampler:
         if self._inference_data is None:
             raise ValueError("No samples found from MCMC run.")
         # if not grouped by chain, flatten samples into (all_samples, dim_params)
-        traces = self._inference_data.posterior
+        traces = self._inference_data.posterior  # type: ignore
         samples = getattr(traces, self.param_name).data
         if not group_by_chain:
             samples = samples.reshape(-1, samples.shape[-1])
