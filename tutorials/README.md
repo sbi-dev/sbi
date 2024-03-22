@@ -29,11 +29,11 @@ Once you have familiarised yourself with the methods and identified how to apply
 
 ### Advanced:
 - [Multi-round inference](03_multiround_inference.ipynb)
-- [Sampling algorithms in sbi](11_sampler_interface.ipynb)
-- [Custom density estimators](04_density_estimators.ipynb)
+- [Sampling algorithms in sbi](11_sampler_interface.ipynb) explains how to use MCMC, Rejection sampling, and VI for posterior sampling in sbi after training with SNPE, SNLE, or SNRE.
+- [Custom density estimators](04_density_estimators.ipynb) shows how to specify a custom density estimator for each of the implemented methods.
 - [Learning summary statistics](05_embedding_net.ipynb)
 - [SBI with trial-based data](14_iid_data_and_permutation_invariant_embeddings.ipynb)
-- [Handling invalid simulations](08_restriction_estimator.ipynb)
+- [Handling invalid simulations](08_restriction_estimator.ipynb) explains how to efficiently handle simulations that have NaN or Inf in their output.
 - [Crafting summary statistics](10_crafting_summary_statistics.ipynb)
 
 ### Diagnostics:
@@ -42,8 +42,9 @@ Once you have familiarised yourself with the methods and identified how to apply
 - [Density plots and MCMC diagnostics with ArviZ](15_mcmc_diagnostics_with_arviz.ipynb)
 
 ### Analysis:
-- [Conditional distributions](07_conditional_distributions.ipynb)
-- [Posterior sensitivity analysis](09_sensitivity_analysis.ipynb)
+- [Conditional distributions](07_conditional_distributions.ipynb) demonstrates how to use the posterior distribution to distinguish between variable and finely-tuned parameters and explore potential compensation mechanisms.
+- [Posterior sensitivity analysis](09_sensitivity_analysis.ipynb) shows hhow to perform a sensitivity analysis of a model.
+  
 ### Examples:
 - [Hodgkin-Huxley example](../examples/00_HH_simulator.ipynb)
 - [Decision making model](../examples/01_decision_making_model.ipynb)
