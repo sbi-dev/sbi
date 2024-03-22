@@ -31,8 +31,10 @@ from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
         "slice_pymc",
     ),
 )
+@pytest.mark.parametrize("num_chains", (1, pytest.param(3, marks=pytest.mark.slow)))
 def test_api_posterior_sampler_set(
     sampling_method: str,
+    num_chains: int,
     set_seed,
     num_dim: int = 2,
     num_samples: int = 42,
@@ -42,7 +44,9 @@ def test_api_posterior_sampler_set(
     """Runs SNL and checks that posterior_sampler is correctly set."""
     x_o = zeros((num_trials, num_dim))
     # Test for multiple chains is cheap when vectorized.
-    num_chains = 3 if sampling_method in "slice_np_vectorized" else 1
+
+    if sampling_method == "slice_np_vectorized" and num_chains > 1:
+        pytest.skip("slice_np_vectorized can only be ran with num_chains == 1")
 
     prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
     simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior)
