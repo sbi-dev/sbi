@@ -1,7 +1,6 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 import time
-from abc import ABC, abstractmethod
 from copy import deepcopy
 from typing import Any, Callable, Dict, Optional, Union
 from warnings import warn
@@ -21,13 +20,14 @@ from sbi.inference.posteriors import (
     VIPosterior,
 )
 from sbi.inference.posteriors.base_posterior import NeuralPosterior
-from sbi.inference.potentials import posterior_estimator_based_potential
-from sbi.neural_nets import DensityEstimator, posterior_nn
+from sbi.inference.posteriors.score_posterior import ScorePosterior
+from sbi.inference.potentials.score_based_potential import score_estimator_based_potential
+from sbi.neural_nets.vf_estimators.score_estimator import ScoreEstimator
+from sbi.neural_nets.factory import posterior_score_nn
 from sbi.utils import (
     RestrictedPrior,
     check_estimator_arg,
     handle_invalid_x,
-    nle_nre_apt_msg_on_invalid_x,
     npe_msg_on_invalid_x,
     test_posterior_net_for_multi_d_x,
     validate_theta_and_x,
@@ -37,15 +37,17 @@ from sbi.utils import (
 from sbi.utils.sbiutils import ImproperEmpirical, mask_sims_from_prior
 
 
-class PosteriorEstimator(NeuralInference, ABC):
+class NSPE(NeuralInference):
     def __init__(
         self,
         prior: Optional[Distribution] = None,
-        density_estimator: Union[str, Callable] = "maf",
+        score_estimator: Union[str, Callable] = "mlp",
+        sde_type: str = "vp",
         device: str = "cpu",
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
         show_progress_bars: bool = True,
+        **kwargs: Dict[str, Any],
     ):
         """Base class for Sequential Neural Posterior Estimation methods.
 
@@ -75,14 +77,13 @@ class PosteriorEstimator(NeuralInference, ABC):
         # `_build_neural_net`. It will be called in the first round and receive
         # thetas and xs as inputs, so that they can be used for shape inference and
         # potentially for z-scoring.
-        check_estimator_arg(density_estimator)
-        if isinstance(density_estimator, str):
-            self._build_neural_net = posterior_nn(model=density_estimator)
+        check_estimator_arg(score_estimator)
+        if isinstance(score_estimator, str):
+            self._build_neural_net = posterior_score_nn(sde_type=sde_type, score_net_type=score_estimator, **kwargs)
         else:
-            self._build_neural_net = density_estimator
+            self._build_neural_net = score_estimator
 
         self._proposal_roundwise = []
-        self.use_non_atomic_loss = False
 
     def append_simulations(
         self,
@@ -91,7 +92,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         proposal: Optional[DirectPosterior] = None,
         exclude_invalid_x: Optional[bool] = None,
         data_device: Optional[str] = None,
-    ) -> "PosteriorEstimator":
+    ) -> "NSPE":
         r"""Store parameters and simulation outputs to use them for later training.
 
         Data are stored as entries in lists for each type of variable (parameter/data).
@@ -130,12 +131,9 @@ class PosteriorEstimator(NeuralInference, ABC):
             # self._round = max(self._data_round_index))
             current_round = 0
         else:
-            if not self._data_round_index:
-                # This catches a pretty specific case: if, in the first round, one
-                # passes data that does not come from the prior.
-                current_round = 1
-            else:
-                current_round = max(self._data_round_index) + 1
+            raise NotImplementedError(
+                "Multi-round NSPE is not yet implemented. Please use single-round NSPE."
+            )
 
         if exclude_invalid_x is None:
             exclude_invalid_x = current_round == 0
@@ -156,21 +154,10 @@ class PosteriorEstimator(NeuralInference, ABC):
 
         # Check for problematic z-scoring
         warn_if_zscoring_changes_data(x)
-        if (
-            type(self).__name__ == "SNPE_C"
-            and current_round > 0
-            and not self.use_non_atomic_loss
-        ):
-            nle_nre_apt_msg_on_invalid_x(
-                num_nans,
-                num_infs,
-                exclude_invalid_x,
-                "Multiround SNPE-C (atomic)",
-            )
-        else:
-            npe_msg_on_invalid_x(
-                num_nans, num_infs, exclude_invalid_x, "Single-round NPE"
-            )
+    
+        npe_msg_on_invalid_x(
+            num_nans, num_infs, exclude_invalid_x, "Single-round NPE"
+        )
 
         self._check_proposal(proposal)
 
@@ -206,7 +193,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         training_batch_size: int = 50,
         learning_rate: float = 5e-4,
         validation_fraction: float = 0.1,
-        stop_after_epochs: int = 20,
+        stop_after_epochs: int = 200,
         max_num_epochs: int = 2**31 - 1,
         clip_max_norm: Optional[float] = 5.0,
         calibration_kernel: Optional[Callable] = None,
@@ -216,7 +203,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         retrain_from_scratch: bool = False,
         show_train_summary: bool = False,
         dataloader_kwargs: Optional[dict] = None,
-    ) -> DensityEstimator:
+    ) -> ScoreEstimator:
         r"""Return density estimator that approximates the distribution $p(\theta|x)$.
 
         Args:
@@ -281,13 +268,6 @@ class PosteriorEstimator(NeuralInference, ABC):
 
         # Starting index for the training set (1 = discard round-0 samples).
         start_idx = int(discard_prior_samples and self._round > 0)
-
-        # For non-atomic loss, we can not reuse samples from previous rounds as of now.
-        # SNPE-A can, by construction of the algorithm, only use samples from the last
-        # round. SNPE-A is the only algorithm that has an attribute `_ran_final_round`,
-        # so this is how we check for whether or not we are using SNPE-A.
-        if self.use_non_atomic_loss or hasattr(self, "_ran_final_round"):
-            start_idx = self._round
 
         # Set the proposal to the last proposal that was passed by the user. For
         # atomic SNPE, it does not matter what the proposal is. For non-atomic
@@ -359,7 +339,9 @@ class PosteriorEstimator(NeuralInference, ABC):
                     calibration_kernel,
                     force_first_round_loss=force_first_round_loss,
                 )
+                
                 train_loss = torch.mean(train_losses)
+
                 train_loss_sum += train_losses.sum().item()
 
                 train_loss.backward()
@@ -412,7 +394,7 @@ class PosteriorEstimator(NeuralInference, ABC):
 
         # Update summary.
         self._summary["epochs_trained"].append(self.epoch)
-        self._summary["best_validation_loss"].append(self._best_val_loss)
+        self._summary["best_validation_loss"].append(self._val_loss)
 
         # Update tensorboard and summary dict.
         self._summarize(round_=self._round)
@@ -426,19 +408,16 @@ class PosteriorEstimator(NeuralInference, ABC):
         self._neural_net.zero_grad(set_to_none=True)
 
         return deepcopy(self._neural_net)
+    
+    def _converged(self, epoch: int, stop_after_epochs: int) -> bool:
+        return epoch > stop_after_epochs
 
     def build_posterior(
         self,
-        density_estimator: Optional[DensityEstimator] = None,
+        score_estimator: Optional[ScoreEstimator] = None,
         prior: Optional[Distribution] = None,
-        sample_with: str = "direct",
-        mcmc_method: str = "slice_np",
-        vi_method: str = "rKL",
-        direct_sampling_parameters: Optional[Dict[str, Any]] = None,
-        mcmc_parameters: Optional[Dict[str, Any]] = None,
-        vi_parameters: Optional[Dict[str, Any]] = None,
-        rejection_sampling_parameters: Optional[Dict[str, Any]] = None,
-    ) -> Union[MCMCPosterior, RejectionPosterior, VIPosterior, DirectPosterior]:
+        sample_with: str = "sde",
+    ) -> Union[ScorePosterior, DirectPosterior]:
         r"""Build posterior from the neural density estimator.
 
         For SNPE, the posterior distribution that is returned here implements the
@@ -450,7 +429,7 @@ class PosteriorEstimator(NeuralInference, ABC):
             SNPE), sample from the posterior with MCMC.
 
         Args:
-            density_estimator: The density estimator that the posterior is based on.
+            estimator: The density estimator that the posterior is based on.
                 If `None`, use the latest neural density estimator that was trained.
             prior: Prior distribution.
             sample_with: Method to use for sampling from the posterior. Must be one of
@@ -482,81 +461,41 @@ class PosteriorEstimator(NeuralInference, ABC):
         else:
             utils.check_prior(prior)
 
-        if density_estimator is None:
-            posterior_estimator = self._neural_net
+        if score_estimator is None:
+            score_estimator = self._neural_net
             # If internal net is used device is defined.
             device = self._device
         else:
-            posterior_estimator = density_estimator
+            score_estimator = score_estimator
             # Otherwise, infer it from the device of the net parameters.
-            device = next(density_estimator.parameters()).device.type
+            device = next(score_estimator.parameters()).device.type
 
-        potential_fn, theta_transform = posterior_estimator_based_potential(
-            posterior_estimator=posterior_estimator,
+        potential_fn, theta_transform = score_estimator_based_potential(
+            score_estimator=score_estimator,
             prior=prior,
             x_o=None,
         )
 
-        if sample_with == "direct":
-            self._posterior = DirectPosterior(
-                posterior_estimator=posterior_estimator,  # type: ignore
-                prior=prior,
-                x_shape=self._x_shape,
-                device=device,
-                **direct_sampling_parameters or {},
-            )
-        elif sample_with == "rejection":
-            rejection_sampling_parameters = rejection_sampling_parameters or {}
-            if "proposal" not in rejection_sampling_parameters:
-                raise ValueError(
-                    "You passed `sample_with='rejection' but you did not specify a "
-                    "`proposal` in `rejection_sampling_parameters`. Until sbi "
-                    "v0.22.0, this was interpreted as directly sampling from the "
-                    "posterior. As of sbi v0.23.0, you instead have to use "
-                    "`sample_with='direct'` to do so."
-                )
-            self._posterior = RejectionPosterior(
-                potential_fn=potential_fn,
-                device=device,
-                x_shape=self._x_shape,
-                **rejection_sampling_parameters,
-            )
-        elif sample_with == "mcmc":
-            self._posterior = MCMCPosterior(
-                potential_fn=potential_fn,
-                theta_transform=theta_transform,
-                proposal=prior,
-                method=mcmc_method,
-                device=device,
-                x_shape=self._x_shape,
-                **mcmc_parameters or {},
-            )
-        elif sample_with == "vi":
-            self._posterior = VIPosterior(
-                potential_fn=potential_fn,
-                theta_transform=theta_transform,
-                prior=prior,  # type: ignore
-                vi_method=vi_method,
-                device=device,
-                x_shape=self._x_shape,
-                **vi_parameters or {},
-            )
-        else:
-            raise NotImplementedError
-
+        if sample_with == "ode":
+            raise NotImplementedError("ODE-based sampling is not yet implemented.")
+        elif sample_with == "sde":
+            posterior = ScorePosterior(score_estimator, prior, x_shape=self._x_shape)
+       
+        self._posterior = posterior
         # Store models at end of each round.
         self._model_bank.append(deepcopy(self._posterior))
 
         return deepcopy(self._posterior)
 
-    @abstractmethod
-    def _log_prob_proposal_posterior(
+
+    def _loss_proposal_posterior(
         self,
         theta: Tensor,
         x: Tensor,
         masks: Tensor,
         proposal: Optional[Any],
     ) -> Tensor:
+        
         raise NotImplementedError
 
     def _loss(
@@ -585,7 +524,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         else:
             # Currently only works for `DensityEstimator` objects.
             # Must be extended ones other Estimators are implemented. See #966,
-            loss = -self._log_prob_proposal_posterior(theta, x, masks, proposal)
+            loss = self._loss_proposal_posterior(theta, x, masks, proposal)
 
         return calibration_kernel(x) * loss
 

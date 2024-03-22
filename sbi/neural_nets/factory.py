@@ -2,7 +2,7 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Union
 
 from torch import nn
 
@@ -20,7 +20,7 @@ from sbi.neural_nets.flow import (
 )
 from sbi.neural_nets.mdn import build_mdn
 from sbi.neural_nets.mnle import build_mnle
-
+from sbi.neural_nets.vector_field import build_score_estimator
 
 def classifier_nn(
     model: str,
@@ -290,3 +290,43 @@ def posterior_nn(
         kwargs.pop("num_components")
 
     return build_fn_snpe_a if model == "mdn_snpe_a" else build_fn
+    
+
+def posterior_score_nn(
+    sde_type: str,
+    score_net_type: Union[str, nn.Module] = "mlp",
+    z_score_theta: Optional[str] = "independent",
+    z_score_x: Optional[str] = "independent",
+    hidden_features: int = 50,        
+    embedding_net: nn.Module = nn.Identity(),
+    **kwargs: Any,
+) -> Callable:
+    
+    kwargs = dict(
+        zip(
+            (
+                "z_score_x",
+                "z_score_y",
+                "sde_type",
+                "score_net",
+                "hidden_features",                
+                "embedding_net_y",
+                
+            ),
+            (
+                z_score_theta,
+                z_score_x,
+                sde_type,
+                score_net_type,
+                hidden_features,                
+                embedding_net,
+            ),
+        ),
+        **kwargs,
+    )
+
+    def build_fn(batch_theta, batch_x):
+        return build_score_estimator(batch_x=batch_theta, batch_y=batch_x, **kwargs)
+        
+    return build_fn
+    
