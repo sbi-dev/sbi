@@ -785,9 +785,9 @@ class MCMCPosterior(NeuralPosterior):
                 *samples_shape
             )
 
-            inference_data = az.convert_to_inference_data(
-                {f"{self.param_name}": samples}
-            )
+            inference_data = az.convert_to_inference_data({
+                f"{self.param_name}": samples
+            })
 
         return inference_data
 

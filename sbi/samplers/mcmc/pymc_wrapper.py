@@ -48,8 +48,8 @@ class PyMCPotential(pt.Op):  # type: ignore
                 simulator parameters.
             outputs: A sequence allocated for storing operation outputs. In this
                 case, the sequence will contain one scalar for the computed potential
-                and an array containing the gradient of the potential with respect to the
-                simulator parameters.
+                and an array containing the gradient of the potential with respect
+                to the simulator parameters.
         """
         # unpack and handle inputs
         params = inputs[0]
@@ -87,7 +87,8 @@ class PyMCPotential(pt.Op):  # type: ignore
 
         Returns:
             A list containing the gradient of the output of the whole computational
-                graph with respect to the input of this operation, i.e., the simulator parameters.
+            graph with respect to the input of this operation, i.e.,
+            the simulator parameters.
         """
         # get outputs from forward pass (but doesn't re-compute it, I think...)
         value = self(*inputs)

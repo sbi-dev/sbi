@@ -231,7 +231,9 @@ def test_mcmc_methods_and_inference_diagnostics(
 
     assert hasattr(
         idata, "posterior"
-    ), f"`MCMCPosterior.get_arviz_inference_data()` for method {method} returned invalid InferenceData. Must contain key 'posterior', but found only {list(idata.keys())}"
+    ), (f"`MCMCPosterior.get_arviz_inference_data()` for method {method} "
+        f"returned invalid InferenceData. Must contain key 'posterior', "
+        f"but found only {list(idata.keys())}")
     samples = getattr(idata.posterior, posterior.param_name).data
     samples = samples.reshape(-1, samples.shape[-1])[::2][:num_samples]
     assert (
@@ -240,4 +242,5 @@ def test_mcmc_methods_and_inference_diagnostics(
             num_samples,
             num_dim,
         )
-    ), f"MCMC samples for method {method} have incorrect shape (n_samples, n_dims). Expected {(num_samples, num_dim)}, got {samples.shape}"
+    ), (f"MCMC samples for method {method} have incorrect shape (n_samples, n_dims). "
+        f"Expected {(num_samples, num_dim)}, got {samples.shape}")
