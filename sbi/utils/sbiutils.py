@@ -186,8 +186,9 @@ def standardizing_transform(
         )
     elif backend == "zuko_transform":
         return zuko.transforms.MonotonicAffineTransform(
-            -t_mean / t_std,
-            scale=1 / t_std
+            shift=-t_mean / t_std,
+            scale=(1 / t_std).log(), # zuko computes: scale = exp(scale / (1 + abs(scale / slope)))
+            slope=1e-100 
         )
 
     else:
