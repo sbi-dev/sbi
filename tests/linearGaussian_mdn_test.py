@@ -28,16 +28,10 @@ from sbi.utils.user_input_checks import (
 from tests.test_utils import check_c2st
 
 
-def test_mdn_with_snpe():
-    mdn_inference_with_different_methods(SNPE)
-
-
-@pytest.mark.slow
-def test_mdn_with_snle():
-    mdn_inference_with_different_methods(SNLE)
-
-
-def mdn_inference_with_different_methods(method, mcmc_params_testing: dict):
+@pytest.mark.parametrize(
+    "method", (SNPE, pytest.param(SNLE, marks=[pytest.mark.slow, pytest.mark.mcmc]))
+)
+def test_mdn_inference_with_different_methods(method, mcmc_params_testing: dict):
     num_dim = 2
     x_o = torch.tensor([[1.0, 0.0]])
     num_samples = 500
