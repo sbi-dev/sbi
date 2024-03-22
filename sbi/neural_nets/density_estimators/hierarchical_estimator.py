@@ -43,7 +43,7 @@ class HierarchicalDensityEstimator(DensityEstimator):
 
     def __init__(
         self, local_flow, global_flow, dim_local, condition_shape,
-        embedding_net=torch.nn.Identity()
+        embedding_net: torch.nn.Module = torch.nn.Identity()
     ):
 
         super().__init__()
