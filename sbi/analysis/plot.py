@@ -14,8 +14,8 @@ from matplotlib import cm
 from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.colors import Normalize
-from matplotlib.patches import Rectangle
 from matplotlib.figure import Figure, FigureBase
+from matplotlib.patches import Rectangle
 from scipy.stats import binom, gaussian_kde
 from torch import Tensor
 
