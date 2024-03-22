@@ -2,7 +2,7 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 from functools import partial
-from typing import Any, List, Optional, Sequence, Union
+from typing import List, Optional, Sequence, Union
 from warnings import warn
 
 import torch
@@ -409,35 +409,6 @@ def build_nsf(
     return flow
 
 
-def build_zuko_gmm(
-    batch_x: Tensor,
-    batch_y: Tensor,
-    z_score_x: Optional[str] = "independent",
-    z_score_y: Optional[str] = "independent",
-    hidden_features: Union[Sequence[int], int] = 50,
-    num_transforms: int = 1,
-    embedding_net: nn.Module = nn.Identity(),
-    components: int = 2,
-    **kwargs,
-) -> ZukoFlow:
-    x_numel, y_numel = get_numel(batch_x, batch_y, embedding_net)
-
-    if isinstance(hidden_features, int):
-        hidden_features = [hidden_features]
-
-    flow_built = zuko.flows.GMM(
-        features=x_numel,
-        context=y_numel,
-        hidden_features=hidden_features,
-        components=components,
-        **kwargs,
-    )
-
-    flow = ZukoFlow(flow_built, embedding_net, condition_shape=batch_y[0].shape)
-
-    return flow
-
-
 def build_zuko_nice(
     batch_x: Tensor,
     batch_y: Tensor,
@@ -589,17 +560,13 @@ def build_zuko_naf(
     embedding_net: nn.Module = nn.Identity(),
     randperm: bool = False,
     signal: int = 16,
-    network: Optional[dict[str, Any]] = None,
     **kwargs,
 ) -> ZukoFlow:
-    if network is None:
-        network = {}
-
     which_nf = "NAF"
     additional_kwargs = {
         "randperm": randperm,
         "signal": signal,
-        "network": network,
+        # "network": network,
         **kwargs,
     }
     flow = build_zuko_flow(
@@ -627,17 +594,13 @@ def build_zuko_unaf(
     embedding_net: nn.Module = nn.Identity(),
     randperm: bool = False,
     signal: int = 16,
-    network: Optional[dict[str, Any]] = None,
     **kwargs,
 ) -> ZukoFlow:
-    if network is None:
-        network = {}
-
     which_nf = "UNAF"
     additional_kwargs = {
         "randperm": randperm,
         "signal": signal,
-        "network": network,
+        # "network": network,
         **kwargs,
     }
     flow = build_zuko_flow(
