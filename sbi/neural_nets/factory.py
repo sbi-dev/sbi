@@ -4,7 +4,13 @@
 
 from typing import Any, Callable, Optional
 
+import torch
 from torch import nn
+
+from sbi.neural_nets.density_estimators.hierarchical_estimator import (
+    HierarchicalDensityEstimator,
+    split_hierarchical
+)
 
 from sbi.neural_nets.classifier import (
     build_linear_classifier,
@@ -290,3 +296,47 @@ def posterior_nn(
         kwargs.pop("num_components")
 
     return build_fn_snpe_a if model == "mdn_snpe_a" else build_fn
+
+def hierarchical_nn(
+    build_global_flow: Callable,
+    build_local_flow: Callable,
+    dim_local: int = 1,
+    embedding_net: nn.Module = nn.Identity(),
+) -> Callable:
+    r"""
+    Returns a function that builds a density estimator for learning the posterior.
+
+    This function will usually be used for SNPE. The returned function is to be passed
+    to the inference class when using the flexible interface.
+
+    Args:
+        build_global_flow, build_global_flow: Build function to create the global
+            and local flow.
+        dim_local: Number of dimension of the local parameters in theta.
+        embedding_net: Optional embedding network for simulation outputs $x$. This
+            embedding net allows to learn features from potentially high-dimensional
+            simulation outputs.
+    """
+    def build_hierarchical(batch_theta, batch_condition):
+        assert batch_theta.ndim == 2, "Only working with 1D theta for now."
+        local_theta, global_theta = split_hierarchical(batch_theta, dim_local)
+        local_condition, global_condition = HierarchicalDensityEstimator.embed_condition(
+            embedding_net, batch_condition, batch_condition.shape[1:]
+        )
+
+        global_flow = build_global_flow(
+            batch_x=global_theta, batch_y=global_condition
+        )
+        local_condition = torch.concatenate(
+            (local_condition, global_theta), dim=-1
+        )
+        local_flow = build_local_flow(
+            batch_x=local_theta, batch_y=local_condition
+        )
+
+        return HierarchicalDensityEstimator(
+            local_flow, global_flow, dim_local, batch_condition.shape[1:],
+            embedding_net=embedding_net
+        )
+
+    return build_hierarchical
