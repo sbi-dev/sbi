@@ -27,7 +27,7 @@ class MixedDensityEstimator(DensityEstimator):
         discrete_net: CategoricalMassEstimator,
         continuous_net: NFlowsFlow,
         log_transform_x: bool = False,
-        condition_shape: Optional[torch.Size] = None,
+        condition_shape: Optional[torch.Size] = torch.Size([]),
     ):
         """Initialize class for combining density estimators for MNLE.
 
@@ -39,7 +39,7 @@ class MixedDensityEstimator(DensityEstimator):
                 g.,for reaction times.
         """
         super(MixedDensityEstimator, self).__init__(
-            net=None, condition_shape=condition_shape
+            net=continuous_net, condition_shape=condition_shape
         )
 
         self.discrete_net = discrete_net
