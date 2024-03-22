@@ -59,7 +59,6 @@ class NFlowsFlow(DensityEstimator):
 
         # If no iid samples then squeeze the iid dimension.
         condition = torch.squeeze(condition, dim=0)
-
         log_probs = self.net.log_prob(input, context=condition)
         return log_probs.reshape((input_iid_dim, input_batch_dim))
 

@@ -22,6 +22,7 @@ from sbi.utils import (
     del_entries,
     repeat_rows,
 )
+from sbi.neural_nets.density_estimators.shape_handling import reshape_to_iid_batch_event
 
 
 class SNPE_C(PosteriorEstimator):
@@ -318,7 +319,6 @@ class SNPE_C(PosteriorEstimator):
         Returns:
             Log-probability of the proposal posterior.
         """
-
         batch_size = theta.shape[0]
 
         num_atoms = int(
@@ -343,15 +343,17 @@ class SNPE_C(PosteriorEstimator):
             batch_size * num_atoms, -1
         )
 
-        # Evaluate large batch giving (batch_size * num_atoms) log prob posterior evals.
-        log_prob_posterior = self._neural_net.log_prob(atomic_theta, repeated_x)
-        utils.assert_all_finite(log_prob_posterior, "posterior eval")
-        log_prob_posterior = log_prob_posterior.reshape(batch_size, num_atoms)
-
         # Get (batch_size * num_atoms) log prob prior evals.
         log_prob_prior = self._prior.log_prob(atomic_theta)
         log_prob_prior = log_prob_prior.reshape(batch_size, num_atoms)
         utils.assert_all_finite(log_prob_prior, "prior eval")
+
+        # Evaluate large batch giving (batch_size * num_atoms) log prob posterior evals.
+        atomic_theta = reshape_to_iid_batch_event(atomic_theta, atomic_theta.shape[1:])
+        repeated_x = reshape_to_iid_batch_event(repeated_x, self._x_shape[1:])
+        log_prob_posterior = self._neural_net.log_prob(atomic_theta, repeated_x)
+        utils.assert_all_finite(log_prob_posterior, "posterior eval")
+        log_prob_posterior = log_prob_posterior.reshape(batch_size, num_atoms)
 
         # Compute unnormalized proposal posterior.
         unnormalized_log_prob = log_prob_posterior - log_prob_prior
@@ -364,7 +366,10 @@ class SNPE_C(PosteriorEstimator):
 
         # XXX This evaluates the posterior on _all_ prior samples
         if self._use_combined_loss:
+            theta = reshape_to_iid_batch_event(theta, theta.shape[1:])
+            x = reshape_to_iid_batch_event(x, self._x_shape[1:])
             log_prob_posterior_non_atomic = self._neural_net.log_prob(theta, x)
+            log_prob_posterior_non_atomic = log_prob_posterior_non_atomic.squeeze()
             masks = masks.reshape(-1)
             log_prob_proposal_posterior = (
                 masks * log_prob_posterior_non_atomic + log_prob_proposal_posterior

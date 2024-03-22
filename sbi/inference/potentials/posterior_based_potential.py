@@ -98,19 +98,17 @@ class PosteriorBasedPotential(BasePotential):
                 the potential or manually set self._x_o."
             )
         
-        print("x_o", self.x_o.shape)
-
         theta = ensure_theta_batched(torch.as_tensor(theta))
-        theta = reshape_to_iid_batch_event(theta, event_shape=theta.shape[1:], leading_is_iid=True)
-        x = reshape_to_iid_batch_event(self.x_o, event_shape=self.x_o.shape[1:])
 
-        theta, x = theta.to(self.device), x.to(self.device)
+        theta, x = theta.to(self.device), self.x_o.to(self.device)
 
         with torch.set_grad_enabled(track_gradients):
-            posterior_log_prob = self.posterior_estimator.log_prob(theta, condition=x)
-
             # Force probability to be zero outside prior support.
             in_prior_support = within_support(self.prior, theta)
+
+            x = reshape_to_iid_batch_event(x, event_shape=x.shape[1:])
+            theta = reshape_to_iid_batch_event(theta, event_shape=theta.shape[1:], leading_is_iid=True)
+            posterior_log_prob = self.posterior_estimator.log_prob(theta, condition=x).squeeze()
 
             posterior_log_prob = torch.where(
                 in_prior_support,
