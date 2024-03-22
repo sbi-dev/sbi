@@ -64,6 +64,7 @@ class RatioEstimator(nn.Module, ABC):
 
         Returns:
             Sample-wise unnormalized log ratios.
+            Just like log_prob, the last dimension should be squeezed.
         """
 
         raise NotImplementedError
@@ -104,4 +105,4 @@ class TensorRatioEstimator(RatioEstimator):
         z = self.combine_embedded_theta_and_x(
             self.embedding_net_theta(theta), self.embedding_net_x(x)
         )
-        return self.net(z)
+        return self.net(z).squeeze(-1)
