@@ -1,4 +1,4 @@
-from typing import Any, Dict, List
+from typing import Any, Callable, Dict, List, Optional
 
 import numpy as np
 import torch
@@ -192,7 +192,10 @@ class LC2ST:
             self.trained_clfs is not None
         ), "No trained classifiers found. Run `train_data` first."
         return self._scores(
-            P_eval, x_eval, self.trained_clfs, return_probas=return_probas
+            P_eval=P_eval,
+            x_eval=x_eval,
+            trained_clfs=self.trained_clfs,
+            return_probas=return_probas,
         )
 
     def statistic_data(
@@ -211,7 +214,7 @@ class LC2ST:
         Returns:
             L-C2ST statistic at `x_eval`
         """
-        return self.scores_data(P_eval, x_eval).mean()
+        return self.scores_data(P_eval=P_eval, x_eval=x_eval).mean()
 
     def p_value(
         self,
@@ -231,9 +234,9 @@ class LC2ST:
         Returns:
             p-value for L-C2ST at `x_eval`
         """
-        stat_data = self.statistic_data(P_eval, x_eval)
+        stat_data = self.statistic_data(P_eval=P_eval, x_eval=x_eval)
         stats_null = self.statistics_null(
-            P_eval, x_eval, return_probas=False, verbosity=0, **kwargs
+            P_eval=P_eval, x_eval=x_eval, return_probas=False, verbosity=0, **kwargs
         )
         return (stat_data < stats_null).mean()
 
@@ -258,7 +261,7 @@ class LC2ST:
         Returns:
             True if the null hypothesis is rejected, False otherwise.
         """
-        return self.p_value(P_eval, x_eval, **kwargs) < alpha
+        return self.p_value(P_eval=P_eval, x_eval=x_eval, **kwargs) < alpha
 
     def train_null(
         self,
@@ -389,7 +392,9 @@ class LC2ST:
 
             # evaluate
             clf_t = self.trained_clfs_null[t]
-            proba, score = self._scores(P_eval_t, x_eval, clf_t, return_probas=True)
+            proba, score = self._scores(
+                P_eval=P_eval_t, x_eval=x_eval, trained_clfs=clf_t, return_probas=True
+            )
             probas_null.append(proba)
             stats_null.append(score.mean())
 
@@ -399,6 +404,183 @@ class LC2ST:
             return probas_null, stats_null
         else:
             return stats_null
+
+
+class LC2ST_NF(LC2ST):
+    def __init__(
+        self,
+        thetas: Tensor,
+        xs: Tensor,
+        posterior_samples: Tensor,
+        flow_inverse_transform: Callable[[Tensor, Tensor], Tensor],
+        flow_base_dist: torch.distributions.Distribution,
+        n_eval: int = 10_000,
+        trained_clfs_null: Optional[Dict[str, List[Any]]] = None,
+        **kwargs,
+    ) -> None:
+        """
+        L-C2ST for normalizing flows.
+
+        Args:
+            thetas: Samples from the prior.
+                Shape (n_samples, dim_theta)
+            xs: Corresponding simulated data.
+                Shape (n_samples, dim_x)
+            posterior_samples: Samples from the estiamted posterior.
+                Shape (n_samples, dim_theta)
+            flow_inverse_transform: Inverse transform of the normalizing flow.
+                Takes thetas and xs as input and returns noise.
+            flow_base_dist: Base distribution of the normalizing flow.
+            n_eval: Number of samples to evaluate the L-C2ST.
+            trained_clfs_null: pre-trained classifiers under the null.
+            kwargs: Additional arguments for the LC2ST class.
+        """
+        inverse_thetas = flow_inverse_transform(thetas, xs).detach()
+        inverse_posterior_samples = flow_inverse_transform(
+            posterior_samples, xs
+        ).detach()
+
+        super().__init__(inverse_thetas, xs, inverse_posterior_samples, **kwargs)
+
+        self.flow_inverse_transform = flow_inverse_transform
+        self.null_distribution = flow_base_dist
+        self.P_eval = flow_base_dist.sample((n_eval,))
+        self.trained_clfs_null = trained_clfs_null
+
+    def _scores(
+        self,
+        x_eval: Tensor,
+        trained_clfs: List[Any],
+        return_probas: bool = False,
+        **kwargs,
+    ) -> np.ndarray:
+        """Compute the L-C2ST scores for the observed data.
+
+        Args:
+            x_eval: Observation.
+                Shape (,dim_x)
+            trained_clfs: Trained classifiers.
+            return_probas: Whether to return the predicted probabilities of being in P.
+                Defaults to False.
+
+        Returns: one of
+            scores: L-C2ST scores at `x_eval`.
+            (probas, scores): Predicted probabilities and L-C2ST scores at `x_eval`.
+        """
+        return super()._scores(
+            P_eval=self.P_eval,
+            x_eval=x_eval,
+            trained_clfs=trained_clfs,
+            return_probas=return_probas,
+        )
+
+    def scores_data(self, x_eval: Tensor, return_probas: bool = False, **kwargs):
+        return super().scores_data(
+            P_eval=self.P_eval, x_eval=x_eval, return_probas=return_probas
+        )
+
+    def statistic_data(
+        self,
+        x_eval: Tensor,
+        **kwargs,
+    ) -> float:
+        """Computes the L-C2ST statistic for the observed data.
+
+        Args:
+            x_eval: Observation.
+                Shape (, dim_x)
+
+        Returns:
+            L-C2ST statistic at `x_eval`
+        """
+        return super().statistic_data(P_eval=self.P_eval, x_eval=x_eval)
+
+    def p_value(
+        self,
+        x_eval: Tensor,
+        **kwargs,
+    ):
+        """Computes the p-value for L-C2ST.
+
+        Args:
+            x_eval: Observation.
+                Shape (, dim_x)
+
+        Returns:
+            p-value for L-C2ST at `x_eval`
+        """
+        return super().p_value(P_eval=self.P_eval, x_eval=x_eval)
+
+    def reject(
+        self,
+        x_eval: Tensor,
+        alpha: float = 0.05,
+        **kwargs,
+    ):
+        """Computes the test result for L-C2ST at a given significance level.
+
+        Args:
+            x_eval: Observation.
+                Shape (, dim_x)
+            alpha: Significance level.
+                Defaults to 0.05.
+
+        Returns:
+            True if the null hypothesis is rejected, False otherwise.
+        """
+        return super().reject(P_eval=self.P_eval, x_eval=x_eval, alpha=alpha)
+
+    def train_null(
+        self,
+        n_trials: int = 100,
+        verbosity: int = 1,
+    ):
+        """Compute the L-C2ST scores under the null hypothesis (H0).
+        Saves the trained classifiers for the null distribution.
+
+        Args:
+            n_trials: Number of trials for the permutation test.
+                Defaults to 100.
+            permutation: Whether to use the permutation method for (H0).
+                Defaults to True.
+            verbosity: Verbosity level, defaults to 1.
+        """
+        if self.trained_clfs_null is not None:
+            raise ValueError(
+                "Classifiers have already been trained under the null \
+                    and can be used to evaluate any new estimator."
+            )
+        return super().train_null(
+            n_trials=n_trials, permutation=False, verbosity=verbosity
+        )
+
+    def statistics_null(
+        self,
+        x_eval: Tensor,
+        n_trials: int = 100,
+        return_probas: bool = False,
+        verbosity: int = 0,
+        **kwargs,
+    ):
+        """Compute the L-C2ST scores under the null hypothesis (H0).
+        Saves the trained classifiers for the null distribution.
+
+        Args:
+            x_eval: Observation.
+                Shape (, dim_x)
+            n_trials: Number of trials for the permutation test.
+                Defaults to 100.
+            return_probas: Whether to return the predicted probabilities of being in P.
+                Defaults to False.
+            verbosity: Verbosity level, defaults to 1.
+        """
+        return super().statistics_null(
+            P_eval=self.P_eval,
+            x_eval=x_eval,
+            n_trials=n_trials,
+            return_probas=return_probas,
+            verbosity=verbosity,
+        )
 
 
 def train_lc2st(P: Tensor, Q: Tensor, x_P: Tensor, x_Q: Tensor, clf: Any) -> Any:
