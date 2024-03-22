@@ -106,7 +106,6 @@ class ZukoFlowMatchingEstimator(DensityEstimator):
         return x
 
     def loss(self, theta: torch.Tensor, x: torch.Tensor, **kwargs) -> torch.Tensor:
-        theta_ = theta
         theta, x = self.maybe_z_score(theta, x)
 
         # randomly sample the time steps to compare the vector field at different time steps
