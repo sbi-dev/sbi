@@ -18,7 +18,6 @@ from sbi.inference import (
     MCMCPosterior,
     RejectionPosterior,
     VIPosterior,
-    prepare_for_sbi,
     ratio_estimator_based_potential,
     simulate_for_sbi,
 )
@@ -29,6 +28,11 @@ from sbi.simulators.linear_gaussian import (
     samples_true_posterior_linear_gaussian_mvn_prior_different_dims,
     samples_true_posterior_linear_gaussian_uniform_prior,
     true_posterior_linear_gaussian_mvn_prior,
+)
+from sbi.utils.user_input_checks import (
+    check_sbi_inputs,
+    process_prior,
+    process_simulator,
 )
 from tests.test_utils import (
     check_c2st,
@@ -57,7 +61,9 @@ def test_api_snre_multiple_trials_and_rounds_map(
     num_simulations = 100
     prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
 
-    simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior)
+    prior, _, prior_returns_numpy = process_prior(prior)
+    simulator = process_simulator(diagonal_linear_gaussian, prior, prior_returns_numpy)
+    check_sbi_inputs(simulator, prior)
     inference = snre_method(prior=prior, classifier="mlp", show_progress_bars=False)
 
     proposals = [prior]
@@ -106,12 +112,15 @@ def test_c2st_sre_on_linearGaussian(snre_method: RatioEstimator):
     prior_cov = eye(theta_dim)
     prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
 
-    simulator, prior = prepare_for_sbi(
+    prior, _, prior_returns_numpy = process_prior(prior)
+    simulator = process_simulator(
         lambda theta: linear_gaussian(
             theta, likelihood_shift, likelihood_cov, num_discarded_dims=discard_dims
         ),
         prior,
+        prior_returns_numpy,
     )
+    check_sbi_inputs(simulator, prior)
     inference = snre_method(classifier="resnet", show_progress_bars=False)
 
     theta, x = simulate_for_sbi(
@@ -182,7 +191,9 @@ def test_c2st_snre_variants_on_linearGaussian_with_multiple_trials(
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    simulator, prior = prepare_for_sbi(simulator, prior)
+    prior, _, prior_returns_numpy = process_prior(prior)
+    simulator = process_simulator(simulator, prior, prior_returns_numpy)
+    check_sbi_inputs(simulator, prior)
     kwargs = dict(
         classifier="resnet",
         show_progress_bars=False,
@@ -280,9 +291,13 @@ def test_c2st_multi_round_snr_on_linearGaussian_vi(
     )
     target_samples = gt_posterior.sample((num_samples,))
 
-    simulator, prior = prepare_for_sbi(
-        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov), prior
+    prior, _, prior_returns_numpy = process_prior(prior)
+    simulator = process_simulator(
+        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov),
+        prior,
+        prior_returns_numpy,
     )
+    check_sbi_inputs(simulator, prior)
     inference = snre_method(show_progress_bars=False)
 
     theta, x = simulate_for_sbi(
@@ -378,7 +393,9 @@ def test_api_sre_sampling_methods(sampling_method: str, prior_str: str):
     else:
         prior = utils.BoxUniform(-ones(num_dim), ones(num_dim))
 
-    simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior)
+    prior, _, prior_returns_numpy = process_prior(prior)
+    simulator = process_simulator(diagonal_linear_gaussian, prior, prior_returns_numpy)
+    check_sbi_inputs(simulator, prior)
     inference = SNRE_B(classifier="resnet", show_progress_bars=False)
 
     theta, x = simulate_for_sbi(

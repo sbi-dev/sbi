@@ -21,7 +21,6 @@ from sbi.inference import (
     MCMCPosterior,
     RejectionPosterior,
     posterior_estimator_based_potential,
-    prepare_for_sbi,
     simulate_for_sbi,
 )
 from sbi.neural_nets import posterior_nn
@@ -32,6 +31,11 @@ from sbi.simulators.linear_gaussian import (
     true_posterior_linear_gaussian_mvn_prior,
 )
 from sbi.utils import RestrictedPrior, get_density_thresholder
+from sbi.utils.user_input_checks import (
+    check_sbi_inputs,
+    process_prior,
+    process_simulator,
+)
 
 from .sbiutils_test import conditional_of_mvn
 from .test_utils import (
@@ -76,10 +80,13 @@ def test_c2st_snpe_on_linearGaussian(snpe_method, num_dim: int, prior_str: str):
             num_samples=num_samples,
         )
 
-    simulator, prior = prepare_for_sbi(
+    prior, _, prior_returns_numpy = process_prior(prior)
+    simulator = process_simulator(
         lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov),
         prior,
+        prior_returns_numpy,
     )
+    check_sbi_inputs(simulator, prior)
 
     inference = snpe_method(prior, show_progress_bars=False)
 
@@ -174,10 +181,13 @@ def test_density_estimators_on_linearGaussian(density_estimator):
     )
     target_samples = gt_posterior.sample((num_samples,))
 
-    simulator, prior = prepare_for_sbi(
+    prior, _, prior_returns_numpy = process_prior(prior)
+    simulator = process_simulator(
         lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov),
         prior,
+        prior_returns_numpy,
     )
+    check_sbi_inputs(simulator, prior)
 
     inference = SNPE_C(prior, density_estimator=density_estimator)
 
@@ -224,7 +234,8 @@ def test_c2st_snpe_on_linearGaussian_different_dims(density_estimator="maf"):
         num_samples=num_samples,
     )
 
-    simulator, prior = prepare_for_sbi(
+    prior, _, prior_returns_numpy = process_prior(prior)
+    simulator = process_simulator(
         lambda theta: linear_gaussian(
             theta,
             likelihood_shift,
@@ -232,7 +243,10 @@ def test_c2st_snpe_on_linearGaussian_different_dims(density_estimator="maf"):
             num_discarded_dims=discard_dims,
         ),
         prior,
+        prior_returns_numpy,
     )
+    check_sbi_inputs(simulator, prior)
+
     # Test whether prior can be `None`.
     inference = SNPE_C(
         prior=None,
@@ -312,10 +326,14 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
     else:
         density_estimator = "maf"
 
-    simulator, prior = prepare_for_sbi(
+    prior, _, prior_returns_numpy = process_prior(prior)
+    simulator = process_simulator(
         lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov),
         prior,
+        prior_returns_numpy,
     )
+    check_sbi_inputs(simulator, prior)
+
     creation_args = dict(
         prior=prior,
         density_estimator=density_estimator,
@@ -421,10 +439,14 @@ def test_api_snpe_c_posterior_correction(sample_with, mcmc_method, prior_str):
     else:
         prior = utils.BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
 
-    simulator, prior = prepare_for_sbi(
+    prior, _, prior_returns_numpy = process_prior(prior)
+    simulator = process_simulator(
         lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov),
         prior,
+        prior_returns_numpy,
     )
+    check_sbi_inputs(simulator, prior)
+
     inference = SNPE_C(prior, show_progress_bars=False)
 
     theta, x = simulate_for_sbi(simulator, prior, 1000)
@@ -482,10 +504,14 @@ def test_api_force_first_round_loss(
     likelihood_cov = 0.3 * eye(num_dim)
     prior = utils.BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
 
-    simulator, prior = prepare_for_sbi(
+    prior, _, prior_returns_numpy = process_prior(prior)
+    simulator = process_simulator(
         lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov),
         prior,
+        prior_returns_numpy,
     )
+    check_sbi_inputs(simulator, prior)
+
     inference = SNPE_C(prior, show_progress_bars=False)
 
     proposal = prior
@@ -537,7 +563,9 @@ def test_sample_conditional():
     # Test whether SNPE works properly with structured z-scoring.
     net = posterior_nn("maf", z_score_x="structured", hidden_features=20)
 
-    simulator, prior = prepare_for_sbi(simulator, prior)
+    prior, _, prior_returns_numpy = process_prior(prior)
+    simulator = process_simulator(simulator, prior, prior_returns_numpy)
+    check_sbi_inputs(simulator, prior)
 
     inference = SNPE_C(prior, density_estimator=net, show_progress_bars=False)
 
@@ -665,7 +693,9 @@ def test_mdn_conditional_density(num_dim: int = 3, cond_dim: int = 1):
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    simulator, prior = prepare_for_sbi(simulator, prior)
+    prior, _, prior_returns_numpy = process_prior(prior)
+    simulator = process_simulator(simulator, prior, prior_returns_numpy)
+    check_sbi_inputs(simulator, prior)
     inference = SNPE_C(density_estimator="mdn", show_progress_bars=False)
 
     theta, x = simulate_for_sbi(
@@ -702,10 +732,13 @@ def test_example_posterior(snpe_method: type):
 
     extra_kwargs = dict(final_round=True) if snpe_method == SNPE_A else dict()
 
-    simulator, prior = prepare_for_sbi(
+    prior, _, prior_returns_numpy = process_prior(prior)
+    simulator = process_simulator(
         lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov),
         prior,
+        prior_returns_numpy,
     )
+    check_sbi_inputs(simulator, prior)
     inference = snpe_method(prior, show_progress_bars=False)
 
     theta, x = simulate_for_sbi(
