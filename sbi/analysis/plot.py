@@ -35,11 +35,13 @@ def rgb2hex(RGB):
         "0{0:x}".format(v) if v < 16 else "{0:x}".format(v) for v in RGB
     ])
 
+
 def to_list(x, len):
     """If x is not a list, make it a list of length `len`."""
     if not isinstance(x, list):
         x = [x for _ in range(len)]
     return x
+
 
 def _update(d, u):
     """update dictionary with user input, see: https://stackoverflow.com/a/3233356"""
@@ -53,10 +55,14 @@ def _update(d, u):
             d[k] = v
     return d
 
+
 # Plotting functions
 def plt_hist_1d(ax, samples, limits, kwargs):
     """Plot 1D histogram."""
-    if "bins" not in kwargs['mpl_kwargs'].keys() or kwargs['mpl_kwargs']["bins"] is None:
+    if (
+        "bins" not in kwargs['mpl_kwargs'].keys()
+        or kwargs['mpl_kwargs']["bins"] is None
+    ):
         if kwargs["bin_heuristic"] == "Freedman-Diaconis":
             # The Freedman-Diaconis heuristic
             binsize = 2 * iqr(samples) * len(samples) ** (-1 / 3)
@@ -69,6 +75,7 @@ def plt_hist_1d(ax, samples, limits, kwargs):
         )
     ax.hist(samples, **kwargs['mpl_kwargs'])
 
+
 def plt_kde_1d(ax, samples, limits, kwargs):
     """ "1D Kernel Density Estimation."""
     density = gaussian_kde(samples, bw_method=kwargs["bw_method"])
@@ -76,14 +83,19 @@ def plt_kde_1d(ax, samples, limits, kwargs):
     ys = density(xs)
     ax.plot(xs, ys, **kwargs['mpl_kwargs'])
 
+
 def plt_scatter_1d(ax, samples, limits, kwargs):
     """Scatter plot 1D."""
     for single_sample in samples:
         ax.axvline(single_sample, **kwargs['mpl_kwargs'])
 
+
 def plt_hist_2d(ax, samples_col, samples_row, limits_col, limits_row, kwargs):
     """Plot 2D histogram."""
-    if "bins" not in kwargs['np_hist_kwargs'].keys() or kwargs['np_hist_kwargs']["bins"] is None:
+    if (
+        "bins" not in kwargs['np_hist_kwargs'].keys()
+        or kwargs['np_hist_kwargs']["bins"] is None
+    ):
         if kwargs["bin_heuristic"] == "Freedman-Diaconis":
             # The Freedman-Diaconis heuristic applied to each direction
             binsize_col = 2 * iqr(samples_col) * len(samples_col) ** (-1 / 3)
@@ -111,6 +123,7 @@ def plt_hist_2d(ax, samples_col, samples_row, limits_col, limits_row, kwargs):
         ),
         **kwargs['mpl_kwargs'],
     )
+
 
 def plt_kde_2d(ax, samples_col, samples_row, limits_col, limits_row, kwargs):
     """2D Kernel Density Estimation."""
@@ -184,6 +197,7 @@ def plt_contour_2d(ax, samples_col, samples_row, limits_col, limits_row, kwargs)
         **kwargs['mpl_kwargs'],
     )
 
+
 def plt_scatter_2d(ax, samples_col, samples_row, limits_col, limits_row, kwargs):
     """Scatter plot 2D."""
     ax.scatter(
@@ -192,6 +206,7 @@ def plt_scatter_2d(ax, samples_col, samples_row, limits_col, limits_row, kwargs)
         **kwargs['mpl_kwargs'],
     )
 
+
 def plt_plot_2d(ax, samples_col, samples_row, limits_col, limits_row, kwargs):
     """Plot 2D trajectory"""
     ax.plot(
@@ -199,6 +214,7 @@ def plt_plot_2d(ax, samples_col, samples_row, limits_col, limits_row, kwargs):
         samples_row,
         **kwargs['mpl_kwargs'],
     )
+
 
 def get_diag_funcs(diag_list):
     """make a list of the functions for the diagonal plots."""
