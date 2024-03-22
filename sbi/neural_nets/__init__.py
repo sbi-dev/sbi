@@ -1,4 +1,4 @@
-from sbi.neural_nets.classifier import (
+from sbi.neural_nets.critic import (
     build_linear_critic,
     build_mlp_critic,
     build_resnet_critic,

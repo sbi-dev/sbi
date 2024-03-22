@@ -21,7 +21,7 @@ def build_z_scored_embedding_nets(
     embedding_net_x: nn.Module = nn.Identity(),
     embedding_net_y: nn.Module = nn.Identity(),
 ) -> tuple[nn.Module, nn.Module]:
-    """Builds input layer for critics that optionally z-scores.
+    """Builds input layer for critics that optionally z-score.
 
     Args:
         batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
