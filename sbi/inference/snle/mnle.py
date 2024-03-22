@@ -16,6 +16,7 @@ from sbi.sbi_types import TensorboardSummaryWriter, TorchModule
 from sbi.utils import check_prior, del_entries
 from sbi.neural_nets.density_estimators.shape_handling import reshape_to_iid_batch_event
 
+
 class MNLE(LikelihoodEstimator):
     def __init__(
         self,

@@ -106,9 +106,7 @@ class DirectPosterior(NeuralPosterior):
 
         # TODO: should we force that x_shape is passed?
         x_shape = self._x_shape[1:] if self._x_shape is not None else x.shape
-        x = reshape_to_iid_batch_event(
-            x, event_shape=x_shape, leading_is_iid=False
-        )
+        x = reshape_to_iid_batch_event(x, event_shape=x_shape, leading_is_iid=False)
 
         max_sampling_batch_size = (
             self.max_sampling_batch_size
@@ -122,7 +120,7 @@ class DirectPosterior(NeuralPosterior):
                 f"`sample_with` is no longer supported. You have to rerun "
                 f"`.build_posterior(sample_with={sample_with}).`"
             )
-        
+
         samples = accept_reject_sample(
             proposal=self.posterior_estimator,
             accept_reject_fn=lambda theta: within_support(self.prior, theta),
@@ -170,14 +168,18 @@ class DirectPosterior(NeuralPosterior):
         x = self._x_else_default_x(x)
         theta = ensure_theta_batched(torch.as_tensor(theta))
         x_de = reshape_to_iid_batch_event(x, self._x_shape[1:])
-        theta_de = reshape_to_iid_batch_event(theta, theta.shape[1:], leading_is_iid=True)
+        theta_de = reshape_to_iid_batch_event(
+            theta, theta.shape[1:], leading_is_iid=True
+        )
 
         # TODO Train exited here, entered after sampling?
         self.posterior_estimator.eval()
 
         with torch.set_grad_enabled(track_gradients):
             # Evaluate on device, move back to cpu for comparison with prior.
-            unnorm_log_prob = self.posterior_estimator.log_prob(theta_de, condition=x_de)
+            unnorm_log_prob = self.posterior_estimator.log_prob(
+                theta_de, condition=x_de
+            )
             unnorm_log_prob = unnorm_log_prob.squeeze(dim=1)
 
             # Force probability to be zero outside prior support.
@@ -235,7 +237,9 @@ class DirectPosterior(NeuralPosterior):
                 show_progress_bars=show_progress_bars,
                 sample_for_correction_factor=True,
                 max_sampling_batch_size=rejection_sampling_batch_size,
-                proposal_sampling_kwargs={"condition": reshape_to_iid_batch_event(x, self._x_shape[1:])},
+                proposal_sampling_kwargs={
+                    "condition": reshape_to_iid_batch_event(x, self._x_shape[1:])
+                },
             )[1]
 
         # Check if the provided x matches the default x (short-circuit on identity).

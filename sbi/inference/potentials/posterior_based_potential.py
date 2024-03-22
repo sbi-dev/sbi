@@ -15,6 +15,7 @@ from sbi.utils.sbiutils import within_support
 from sbi.utils.torchutils import ensure_theta_batched
 from sbi.neural_nets.density_estimators.shape_handling import reshape_to_iid_batch_event
 
+
 def posterior_estimator_based_potential(
     posterior_estimator: DensityEstimator,
     prior: Distribution,
@@ -97,7 +98,7 @@ class PosteriorBasedPotential(BasePotential):
                 "No observed data x_o is available. Please reinitialize \
                 the potential or manually set self._x_o."
             )
-        
+
         theta = ensure_theta_batched(torch.as_tensor(theta))
 
         theta, x = theta.to(self.device), self.x_o.to(self.device)
@@ -107,8 +108,12 @@ class PosteriorBasedPotential(BasePotential):
             in_prior_support = within_support(self.prior, theta)
 
             x = reshape_to_iid_batch_event(x, event_shape=x.shape[1:])
-            theta = reshape_to_iid_batch_event(theta, event_shape=theta.shape[1:], leading_is_iid=True)
-            posterior_log_prob = self.posterior_estimator.log_prob(theta, condition=x).squeeze()
+            theta = reshape_to_iid_batch_event(
+                theta, event_shape=theta.shape[1:], leading_is_iid=True
+            )
+            posterior_log_prob = self.posterior_estimator.log_prob(
+                theta, condition=x
+            ).squeeze()
 
             posterior_log_prob = torch.where(
                 in_prior_support,
