@@ -14,12 +14,12 @@ from pyknos.nflows.transforms.splines import (
     rational_quadratic,  # pyright: ignore[reportAttributeAccessIssue]
 )
 from torch import Tensor, nn, relu, tanh, tensor, uint8
-from zuko.flows import LazyTransform
 
 from sbi.neural_nets.density_estimators import NFlowsFlow, ZukoFlow
 from sbi.utils.sbiutils import (
     standardizing_net,
     standardizing_transform,
+    standardizing_transform_zuko,
     z_score_parser,
 )
 from sbi.utils.torchutils import create_alternating_binary_mask
@@ -501,15 +501,12 @@ def build_zuko_maf(
             residual=residual,
         )
 
-    transforms: Union[Sequence[LazyTransform], LazyTransform]
-    transforms = maf.transform.transforms  # pyright: ignore[reportAssignmentType]
+    transforms = maf.transform
     z_score_x_bool, structured_x = z_score_parser(z_score_x)
     if z_score_x_bool:
-        # transforms = transforms
         transforms = (
-            *transforms,
-            # Ideally `standardizing_transform` would return a `LazyTransform` instead of ` AffineTransform | Unconditional`, maybe all three are compatible
-            standardizing_transform(batch_x, structured_x, backend="zuko"),  # pyright: ignore[reportAssignmentType]
+            transforms,
+            standardizing_transform_zuko(batch_x, structured_x),
         )
 
     z_score_y_bool, structured_y = z_score_parser(z_score_y)

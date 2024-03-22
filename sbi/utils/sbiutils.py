@@ -141,8 +141,7 @@ def standardizing_transform(
     batch_t: Tensor,
     structured_dims: bool = False,
     min_std: float = 1e-14,
-    backend: str = "nflows",
-) -> Union[transforms.AffineTransform, zuko.flows.LazyTransform]:
+) -> transforms.AffineTransform:
     """Builds standardizing transform
 
     Args:
@@ -158,7 +157,44 @@ def standardizing_transform(
     Returns:
         Affine transform for z-scoring
     """
+    t_mean, t_std = z_standardization(batch_t, structured_dims, min_std)
+    return transforms.AffineTransform(shift=-t_mean / t_std, scale=1 / t_std)
 
+
+def standardizing_transform_zuko(
+    batch_t: Tensor,
+    structured_dims: bool = False,
+    min_std: float = 1e-14,
+) -> zuko.flows.LazyTransform:
+    """Builds standardizing transform
+
+    Args:
+        batch_t: Batched tensor from which mean and std deviation (across
+            first dimension) are computed.
+        structured_dim: Whether data dimensions are structured (e.g., time-series,
+            images), which requires computing mean and std per sample first before
+            aggregating over samples for a single standardization mean and std for the
+            batch, or independent (default), which z-scores dimensions independently.
+        min_std:  Minimum value of the standard deviation to use when z-scoring to
+            avoid division by zero.
+
+    Returns:
+        Affine transform for z-scoring
+    """
+    t_mean, t_std = z_standardization(batch_t, structured_dims, min_std)
+    return UnconditionalLazyTransform(
+        zuko.transforms.MonotonicAffineTransform,
+        shift=-t_mean / t_std,
+        scale=1 / t_std,
+        buffer=True,
+    )
+
+
+def z_standardization(
+    batch_t: Tensor,
+    structured_dims: bool = False,
+    min_std: float = 1e-14,
+) -> [Tensor, Tensor]:
     is_valid_t, *_ = handle_invalid_x(batch_t, True)
 
     if structured_dims:
@@ -176,18 +212,7 @@ def standardizing_transform(
         t_std = torch.std(batch_t[is_valid_t], dim=0)
         t_std[t_std < min_std] = min_std
 
-    if backend == "nflows":
-        return transforms.AffineTransform(shift=-t_mean / t_std, scale=1 / t_std)
-    elif backend == "zuko":
-        return UnconditionalLazyTransform(
-            zuko.transforms.MonotonicAffineTransform,
-            shift=-t_mean / t_std,
-            scale=1 / t_std,
-            buffer=True,
-        )
-
-    else:
-        raise ValueError("Invalid backend. Use 'nflows' or 'zuko'.")
+    return t_mean, t_std
 
 
 class Standardize(nn.Module):
