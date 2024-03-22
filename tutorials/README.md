@@ -43,7 +43,7 @@ Once you have familiarised yourself with the methods and identified how to apply
 
 ### Analysis:
 - [Conditional distributions](07_conditional_distributions.ipynb) demonstrates how to use the posterior distribution to distinguish between variable and finely-tuned parameters and explore potential compensation mechanisms.
-- [Posterior sensitivity analysis](09_sensitivity_analysis.ipynb) shows hhow to perform a sensitivity analysis of a model.
+- [Posterior sensitivity analysis](09_sensitivity_analysis.ipynb) shows how to perform a sensitivity analysis of a model.
   
 ### Examples:
 - [Hodgkin-Huxley example](../examples/00_HH_simulator.ipynb)
