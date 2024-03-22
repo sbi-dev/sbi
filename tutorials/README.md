@@ -12,7 +12,7 @@ Before going through the tutorial notebooks, make sure to read through the **Ove
 
 - [Getting started](00_getting_started_flexible.ipynb) introduces the `sbi` package and its core functionality.
 - [Inferring parameters for multiple observations](01_gaussian_amortized.ipynb) introduces the concept of amortization, i.e., that we do not need to retrain our inference procedure for different observations.
-- [The example for a scientific simulator from neuroscience (Hodgkin-Huxley)](../examples/00_HH_simulator.ipynb), show cases `sbi` applied to a scientific use cases building on the previous two examples.
+- [The example for a scientific simulator from neuroscience (Hodgkin-Huxley)](../examples/00_HH_simulator.ipynb), shows how `sbi` can be applied to scientific use cases building on the previous two examples.
 - [Inferring parameters for a single observation ](03_multiround_inference.ipynb) introduces the concept of multi round inference for a single observation to be more sampling efficient.
 
 [All implemented methods](16_implemented_methods.ipynb) provides an overview of the implemented inference methods and how to call them.
