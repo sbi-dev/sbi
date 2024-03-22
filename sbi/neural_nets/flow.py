@@ -780,7 +780,7 @@ def build_zuko_flow(
         neural_net = zuko.flows.Flow(
             transform,
             flow_built.base,
-        )  # ignore[reportArgumentType]
+        )  # pyright: ignore[reportArgumentType]
     else:
         transforms = flow_built.transform.transforms
 
