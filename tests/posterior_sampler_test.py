@@ -13,11 +13,15 @@ from sbi.inference import (
     SNL,
     MCMCPosterior,
     likelihood_estimator_based_potential,
-    prepare_for_sbi,
     simulate_for_sbi,
 )
 from sbi.samplers.mcmc import SliceSamplerSerial, SliceSamplerVectorized
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
+from sbi.utils.user_input_checks import (
+    check_sbi_inputs,
+    process_prior,
+    process_simulator,
+)
 
 
 @pytest.mark.parametrize(
@@ -47,7 +51,9 @@ def test_api_posterior_sampler_set(sampling_method: str, set_seed):
     num_chains = 3 if sampling_method in "slice_np_vectorized" else 1
 
     prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
-    simulator, prior = prepare_for_sbi(diagonal_linear_gaussian, prior)
+    prior, _, prior_returns_numpy = process_prior(prior)
+    simulator = process_simulator(diagonal_linear_gaussian, prior, prior_returns_numpy)
+    check_sbi_inputs(simulator, prior)
     inference = SNL(prior, show_progress_bars=False)
 
     theta, x = simulate_for_sbi(

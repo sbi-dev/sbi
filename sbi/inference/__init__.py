@@ -25,7 +25,6 @@ from sbi.inference.snpe.snpe_a import SNPE_A
 from sbi.inference.snpe.snpe_b import SNPE_B
 from sbi.inference.snpe.snpe_c import SNPE_C  # noqa: F401
 from sbi.inference.snre import BNRE, SNRE, SNRE_A, SNRE_B, SNRE_C  # noqa: F401
-from sbi.utils.user_input_checks import prepare_for_sbi
 
 SNL = SNLE = SNLE_A
 _snle_family = ["SNL"]
