@@ -22,15 +22,14 @@ class LC2ST:
         z_score: bool = False,
         clf_class: BaseEstimator = None,
         clf_kwargs: Dict[str, Any] = None,
+        n_trials_null: int = 100,
+        permutation: bool = True,
     ) -> None:
         """
         L-C2ST: Local Classifier Two-Sample Test
         -----------------------------------------
         Implementation based on the official code from [1] and the exisiting C2ST
         metric [2], using scikit-learn classifiers.
-
-        TODO: Explain the method.
-        TODO: Add version for normalizing flows.
 
         Args:
             thetas: Samples from the prior.
@@ -51,6 +50,10 @@ class LC2ST:
                 Defaults to None.
             clf_kwargs: Custom kwargs for the sklearn classifier.
                 Defaults to None.
+            n_trials_null: Number of trials to estimate the null distribution.
+                Defaults to 100.
+            permutation: Whether to use the permutation method for (H0).
+                Defaults to True.
 
         References:
         [1] : https://arxiv.org/abs/2306.03580, https://github.com/JuliaLinhart/lc2st
@@ -61,12 +64,20 @@ class LC2ST:
             thetas.shape[0] == xs.shape[0] == posterior_samples.shape[0]
         ), "Number of samples must match"
 
+        # set data and hyper-parameters for classification
         self.P = posterior_samples
         self.x_P = xs
         self.Q = thetas
         self.x_Q = xs
         self.seed = seed
         self.n_folds = n_folds
+
+        # z-score normalization parameters
+        self.z_score = z_score
+        self.P_mean = torch.mean(self.P, dim=0)
+        self.P_std = torch.std(self.P, dim=0)
+        self.x_P_mean = torch.mean(self.x_P, dim=0)
+        self.x_P_std = torch.std(self.x_P, dim=0)
 
         # initialize classifier
         if "mlp" in classifier.lower():
@@ -83,26 +94,24 @@ class LC2ST:
         elif "rf" in classifier.lower():
             self.clf_class = RandomForestClassifier
             self.clf_kwargs = {}
-        else:
+        elif "custom":
             if clf_class is None:
                 raise ValueError(
                     "Please provide a valid sklearn classifier class and kwargs."
                 )
             self.clf_class = clf_class
             self.clf_kwargs = clf_kwargs
+        else:
+            raise NotImplementedError
 
-        # initialize, will be set after training
+        # initialize classifiers, will be set after training
         self.trained_clfs = None
         self.trained_clfs_null = None
 
-        # z-score normalization parameters
-        self.z_score = z_score
-        self.P_mean = torch.mean(self.P, dim=0)
-        self.P_std = torch.std(self.P, dim=0)
-        self.x_P_mean = torch.mean(self.x_P, dim=0)
-        self.x_P_std = torch.std(self.x_P, dim=0)
-
-        # TODO: case of normalizing flows
+        # parameters for the null hypothesis testing
+        self.n_trials_null = n_trials_null
+        self.permutation = permutation
+        # can be specified if known and independent of x (see `LC2ST-NF`)
         self.null_distribution = None
 
     def _train(self, P, Q, x_P, x_Q, verbosity: int = 0) -> List[Any]:
@@ -220,7 +229,6 @@ class LC2ST:
         self,
         P_eval: Tensor,
         x_eval: Tensor,
-        **kwargs,
     ):
         """Computes the p-value for L-C2ST.
 
@@ -229,14 +237,13 @@ class LC2ST:
                 Shape (n_samples, dim_theta)
             x_eval: Observation.
                 Shape (, dim_x)
-            kwargs: Additional arguments for `compute_stats_null` (n_trials, etc.)
 
         Returns:
             p-value for L-C2ST at `x_eval`
         """
         stat_data = self.statistic_data(P_eval=P_eval, x_eval=x_eval)
         stats_null = self.statistics_null(
-            P_eval=P_eval, x_eval=x_eval, return_probas=False, verbosity=0, **kwargs
+            P_eval=P_eval, x_eval=x_eval, return_probas=False, verbosity=0
         )
         return (stat_data < stats_null).mean()
 
@@ -245,7 +252,6 @@ class LC2ST:
         P_eval: Tensor,
         x_eval: Tensor,
         alpha: float = 0.05,
-        **kwargs,
     ):
         """Computes the test result for L-C2ST at a given significance level.
 
@@ -256,17 +262,14 @@ class LC2ST:
                 Shape (, dim_x)
             alpha: Significance level.
                 Defaults to 0.05.
-            kwargs: Additional arguments for `compute_stats_null` (n_trials, etc.)
 
         Returns:
             True if the null hypothesis is rejected, False otherwise.
         """
-        return self.p_value(P_eval=P_eval, x_eval=x_eval, **kwargs) < alpha
+        return self.p_value(P_eval=P_eval, x_eval=x_eval) < alpha
 
     def train_null(
         self,
-        n_trials: int = 100,
-        permutation: bool = True,
         verbosity: int = 1,
     ):
         """Compute the L-C2ST scores under the null hypothesis (H0).
@@ -277,10 +280,6 @@ class LC2ST:
                 Shape (n_samples, dim_theta)
             x_eval: Observation.
                 Shape (, dim_x)
-            n_trials: Number of trials for the permutation test.
-                Defaults to 100.
-            permutation: Whether to use the permutation method for (H0).
-                Defaults to True.
             return_probas: Whether to return the predicted probabilities of being in P.
                 Defaults to False.
             verbosity: Verbosity level, defaults to 1.
@@ -292,12 +291,12 @@ class LC2ST:
 
         trained_clfs_null = {}
         for t in tqdm(
-            range(n_trials),
-            desc=f"Training the classifiers under (H0) - permutation = {permutation}",
+            range(self.n_trials_null),
+            desc=f"Training the classifiers under H0, permutation = {self.permutation}",
             disable=verbosity < 1,
         ):
             # prepare data
-            if permutation:
+            if self.permutation:
                 joint_P = torch.cat([self.P, self.x_P], dim=1)
                 joint_Q = torch.cat([self.Q, self.x_Q], dim=1)
                 # permute data (same as permuting the labels)
@@ -335,8 +334,6 @@ class LC2ST:
         self,
         P_eval: Tensor,
         x_eval: Tensor,
-        n_trials: int = 100,
-        permutation: bool = True,
         return_probas: bool = False,
         verbosity: int = 0,
     ):
@@ -348,10 +345,6 @@ class LC2ST:
                 Shape (n_samples, dim_theta)
             x_eval: Observation.
                 Shape (, dim_x)
-            n_trials: Number of trials for the permutation test.
-                Defaults to 100.
-            permutation: Whether to use the permutation method for (H0).
-                Defaults to True.
             return_probas: Whether to return the predicted probabilities of being in P.
                 Defaults to False.
             verbosity: Verbosity level, defaults to 1.
@@ -367,17 +360,17 @@ class LC2ST:
             )
         else:
             assert (
-                len(self.trained_clfs_null) == n_trials
+                len(self.trained_clfs_null) == self.n_trials_null
             ), " You need one classifier per trial."
 
         probas_null, stats_null = [], []
         for t in tqdm(
-            range(n_trials),
-            desc=f"Computing T under (H0) - permutation = {permutation}",
+            range(self.n_trials_null),
+            desc=f"Computing T under (H0) - permutation = {self.permutation}",
             disable=verbosity < 1,
         ):
             # prepare data
-            if permutation:
+            if self.permutation:
                 P_eval_t = P_eval
             else:
                 assert (
@@ -444,6 +437,7 @@ class LC2ST_NF(LC2ST):
 
         self.flow_inverse_transform = flow_inverse_transform
         self.null_distribution = flow_base_dist
+        self.permutation = False
         self.P_eval = flow_base_dist.sample((n_eval,))
         self.trained_clfs_null = trained_clfs_null
 
@@ -532,17 +526,12 @@ class LC2ST_NF(LC2ST):
 
     def train_null(
         self,
-        n_trials: int = 100,
         verbosity: int = 1,
     ):
         """Compute the L-C2ST scores under the null hypothesis (H0).
         Saves the trained classifiers for the null distribution.
 
         Args:
-            n_trials: Number of trials for the permutation test.
-                Defaults to 100.
-            permutation: Whether to use the permutation method for (H0).
-                Defaults to True.
             verbosity: Verbosity level, defaults to 1.
         """
         if self.trained_clfs_null is not None:
@@ -550,14 +539,11 @@ class LC2ST_NF(LC2ST):
                 "Classifiers have already been trained under the null \
                     and can be used to evaluate any new estimator."
             )
-        return super().train_null(
-            n_trials=n_trials, permutation=False, verbosity=verbosity
-        )
+        return super().train_null(verbosity=verbosity)
 
     def statistics_null(
         self,
         x_eval: Tensor,
-        n_trials: int = 100,
         return_probas: bool = False,
         verbosity: int = 0,
         **kwargs,
@@ -568,8 +554,6 @@ class LC2ST_NF(LC2ST):
         Args:
             x_eval: Observation.
                 Shape (, dim_x)
-            n_trials: Number of trials for the permutation test.
-                Defaults to 100.
             return_probas: Whether to return the predicted probabilities of being in P.
                 Defaults to False.
             verbosity: Verbosity level, defaults to 1.
@@ -577,7 +561,6 @@ class LC2ST_NF(LC2ST):
         return super().statistics_null(
             P_eval=self.P_eval,
             x_eval=x_eval,
-            n_trials=n_trials,
             return_probas=return_probas,
             verbosity=verbosity,
         )
