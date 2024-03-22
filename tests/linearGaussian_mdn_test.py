@@ -66,7 +66,7 @@ def mdn_inference_with_different_methods(method):
     theta, x = simulate_for_sbi(simulator, prior, num_simulations)
     estimator = inference.append_simulations(theta, x).train()
     if method == SNPE:
-        posterior = DirectPosterior(posterior_estimator=estimator, prior=prior)
+        posterior = DirectPosterior(posterior_estimator=estimator, prior=prior, x_shape=inference._x_shape)
     else:
         potential_fn, theta_transform = likelihood_estimator_based_potential(
             likelihood_estimator=estimator, prior=prior, x_o=x_o
@@ -115,7 +115,7 @@ def test_mdn_with_1D_uniform_prior():
 
     theta, x = simulate_for_sbi(simulator, prior, 100)
     posterior_estimator = inference.append_simulations(theta, x).train()
-    posterior = DirectPosterior(posterior_estimator=posterior_estimator, prior=prior)
+    posterior = DirectPosterior(posterior_estimator=posterior_estimator, prior=prior, x_shape=inference._x_shape)
     samples = posterior.sample((num_samples,), x=x_o)
     log_probs = posterior.log_prob(samples, x=x_o)
 
