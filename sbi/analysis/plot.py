@@ -2,8 +2,8 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 import collections
-from logging import warn
-from typing import Any, Dict, List, Optional, Tuple, Union
+from warnings import warn
+from typing import Any, Dict, List, Optional, Tuple, Union, TypeVar
 
 import matplotlib as mpl
 import numpy as np
@@ -14,7 +14,6 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure, FigureBase
 from scipy.stats import binom, gaussian_kde, iqr
 from torch import Tensor
-
 from sbi.analysis import eval_conditional_density
 
 try:
@@ -22,6 +21,7 @@ try:
 except AttributeError:
     collectionsAbc = collections
 
+T=TypeVar('T')
 
 def hex2rgb(hex):
     """Pass 16 to the integer function for change of base"""
@@ -36,23 +36,23 @@ def rgb2hex(RGB):
     ])
 
 
-def to_list(x, len):
+def to_list(x:Optional[Union[T,List[Optional[T]]]], len:int) -> List[Optional[T]]:
     """If x is not a list, make it a list of length `len`."""
     if not isinstance(x, list):
-        x = [x for _ in range(len)]
+        return [x for _ in range(len)]
     return x
 
-
 def _update(d, u):
-    """update dictionary with user input, see: https://stackoverflow.com/a/3233356"""
-    for k, v in six.iteritems(u):
-        dv = d.get(k, {})
-        if not isinstance(dv, collectionsAbc.Mapping):  # type: ignore
-            d[k] = v
-        elif isinstance(v, collectionsAbc.Mapping):  # type: ignore
-            d[k] = _update(dv, v)
-        else:
-            d[k] = v
+    if u is not None:
+        """update dictionary with user input, see: https://stackoverflow.com/a/3233356"""
+        for k, v in six.iteritems(u):
+            dv = d.get(k, {})
+            if not isinstance(dv, collectionsAbc.Mapping):  # type: ignore
+                d[k] = v
+            elif isinstance(v, collectionsAbc.Mapping):  # type: ignore
+                d[k] = _update(dv, v)
+            else:
+                d[k] = v
     return d
 
 
@@ -524,17 +524,17 @@ def pairplot(
     upper: Optional[Union[List[str], str]] = "hist",
     lower: Optional[Union[List[str], str]] = None,
     diag: Optional[Union[List[str], str]] = "hist",
-    figsize: Tuple = (10, 10),
+    figsize:Tuple = (10, 10),
     labels: Optional[List[str]] = None,
     ticks: Optional[Union[List, torch.Tensor]] = None,
     offdiag: Optional[Union[List[str], str]] = None,
-    diag_kwargs: Optional[Dict] = None,
-    upper_kwargs: Optional[Dict] = None,
-    lower_kwargs: Optional[Dict] = None,
-    fig_kwargs: Optional[Dict] = None,
-    fig=None,
-    axes=None,
-    **kwargs,
+    diag_kwargs: Optional[Union[List[Dict],Dict]] =None,
+    upper_kwargs: Optional[Union[List[Dict],Dict]] =None,
+    lower_kwargs: Optional[Union[List[Dict],Dict]] =None,
+    fig_kwargs: Optional[Union[List[Dict],Dict]] =None,
+    fig: Optional[FigureBase]=None,
+    axes: Optional[Axes]=None,
+    **kwargs: Optional[Any],
 ):
     """
     Plot samples in a 2D grid showing marginals and pairwise marginals.
@@ -576,14 +576,6 @@ def pairplot(
     """
 
     # Backwards compatibility
-    if fig_kwargs is None:
-        fig_kwargs = {}
-    if lower_kwargs is None:
-        lower_kwargs = {}
-    if upper_kwargs is None:
-        upper_kwargs = {}
-    if diag_kwargs is None:
-        diag_kwargs = {}
     if len(kwargs) > 0:
         warn(
             "**kwargs are deprecated, use fig_kwargs instead. \n \
@@ -624,33 +616,33 @@ def pairplot(
         upper = offdiag
 
     # Prepare diag
-    diag = to_list(diag, len(samples))
-    diag_kwargs = to_list(diag_kwargs, len(samples))
-    diag_func = get_diag_funcs(diag)
+    diag_list= to_list(diag, len(samples))
+    diag_kwargs_list = to_list(diag_kwargs, len(samples))
+    diag_func = get_diag_funcs(diag_list)
     diag_kwargs_filled = []
-    for i, (diag_i, diag_kwargs_i) in enumerate(zip(diag, diag_kwargs)):
+    for i, (diag_i, diag_kwargs_i) in enumerate(zip(diag_list, diag_kwargs_list)):
         diag_kwarg_filled_i = _get_default_diag_kwargs(diag_i, i)
         # update the defaults dictionary with user provided values
         diag_kwarg_filled_i = _update(diag_kwarg_filled_i, diag_kwargs_i)
         diag_kwargs_filled.append(diag_kwarg_filled_i)
 
     # Prepare upper
-    upper = to_list(upper, len(samples))
-    upper_kwargs = to_list(upper_kwargs, len(samples))
-    upper_func = get_offdiag_funcs(upper)
+    upper_list = to_list(upper, len(samples))
+    upper_kwargs_list = to_list(upper_kwargs, len(samples))
+    upper_func = get_offdiag_funcs(upper_list)
     upper_kwargs_filled = []
-    for i, (upper_i, upper_kwargs_i) in enumerate(zip(upper, upper_kwargs)):
+    for i, (upper_i, upper_kwargs_i) in enumerate(zip(upper_list, upper_kwargs_list)):
         upper_kwarg_filled_i = _get_default_offdiag_kwargs(upper_i, i)
         # update the defaults dictionary with user provided values
         upper_kwarg_filled_i = _update(upper_kwarg_filled_i, upper_kwargs_i)
         upper_kwargs_filled.append(upper_kwarg_filled_i)
 
     # Prepare lower
-    lower = to_list(lower, len(samples))
-    lower_kwargs = to_list(lower_kwargs, len(samples))
-    lower_func = get_offdiag_funcs(lower)
+    lower_list = to_list(lower, len(samples))
+    lower_kwargs_list = to_list(lower_kwargs, len(samples))
+    lower_func = get_offdiag_funcs(lower_list)
     lower_kwargs_filled = []
-    for i, (lower_i, lower_kwargs_i) in enumerate(zip(lower, lower_kwargs)):
+    for i, (lower_i, lower_kwargs_i) in enumerate(zip(lower_list, lower_kwargs_list)):
         lower_kwarg_filled_i = _get_default_offdiag_kwargs(lower_i, i)
         # update the defaults dictionary with user provided values
         lower_kwarg_filled_i = _update(lower_kwarg_filled_i, lower_kwargs_i)
@@ -684,14 +676,14 @@ def marginal_plot(
     limits: Optional[Union[List, torch.Tensor]] = None,
     subset: Optional[List[int]] = None,
     diag: Optional[Union[List[str], str]] = "hist",
-    figsize: Tuple = (10, 2),
+    figsize: Optional[Tuple] = (10, 2),
     labels: Optional[List[str]] = None,
     ticks: Optional[Union[List, torch.Tensor]] = None,
-    diag_kwargs: Optional[Dict] = None,
-    fig_kwargs: Optional[Dict] = None,
-    fig=None,
-    axes=None,
-    **kwargs,
+    diag_kwargs: Optional[Union[List[Dict],Dict]] =None,
+    fig_kwargs: Optional[Union[List[Dict],Dict]] =None,
+    fig: Optional[FigureBase]=None,
+    axes: Optional[Axes]=None,
+    **kwargs: Optional[Any],
 ):
     """
     Plot samples in a row showing 1D marginals of selected dimensions.
@@ -722,10 +714,6 @@ def marginal_plot(
     """
 
     # backwards compatibility
-    if fig_kwargs is None:
-        fig_kwargs = {}
-    if diag_kwargs is None:
-        diag_kwargs = {}
     if len(kwargs) > 0:
         warn(
             "**kwargs are deprecated, use fig_kwargs instead.\n\
@@ -750,11 +738,11 @@ def marginal_plot(
     samples, dim, limits = prepare_for_plot(samples, limits)
 
     # prepare kwargs and functions of the subplots
-    diag = to_list(diag, len(samples))
-    diag_kwargs = to_list(diag_kwargs, len(samples))
-    diag_func = get_diag_funcs(diag)
+    diag_list = to_list(diag, len(samples))
+    diag_kwargs_list = to_list(diag_kwargs, len(samples))
+    diag_func = get_diag_funcs(diag_list)
     diag_kwargs_filled = []
-    for i, (diag_i, diag_kwargs_i) in enumerate(zip(diag, diag_kwargs)):
+    for i, (diag_i, diag_kwargs_i) in enumerate(zip(diag_list, diag_kwargs_list)):
         diag_kwarg_filled_i = _get_default_diag_kwargs(diag_i, i)
         diag_kwarg_filled_i = _update(diag_kwarg_filled_i, diag_kwargs_i)
         diag_kwargs_filled.append(diag_kwarg_filled_i)
@@ -1726,13 +1714,13 @@ def pairplot_dep(
     subset: Optional[List[int]] = None,
     offdiag: Optional[Union[List[str], str]] = "hist",
     diag: Optional[Union[List[str], str]] = "hist",
-    figsize: Tuple = (10, 10),
+    figsize: Optional[Tuple] = (10, 10),
     labels: Optional[List[str]] = None,
     ticks: Optional[Union[List, torch.Tensor]] = None,
     upper: Optional[Union[List[str], str]] = None,
-    fig=None,
-    axes=None,
-    **kwargs,
+    fig: Optional[FigureBase]=None,
+    axes: Optional[Axes]=None,
+    **kwargs: Optional[Any],
 ):
     """
     Plot samples in a 2D grid showing marginals and pairwise marginals.
@@ -1905,13 +1893,13 @@ def marginal_plot_dep(
     ] = None,
     limits: Optional[Union[List, torch.Tensor]] = None,
     subset: Optional[List[int]] = None,
-    diag: Optional[str] = "hist",
-    figsize: Tuple = (10, 10),
+    diag: Optional[Union[List[str], str]] = "hist",
+    figsize: Optional[Tuple] = (10, 10),
     labels: Optional[List[str]] = None,
     ticks: Optional[Union[List, torch.Tensor]] = None,
-    fig=None,
-    axes=None,
-    **kwargs,
+    fig: Optional[FigureBase]=None,
+    axes: Optional[Axes]=None,
+    **kwargs: Optional[Any],
 ):
     """
     Plot samples in a row showing 1D marginals of selected dimensions.
