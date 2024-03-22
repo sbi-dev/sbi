@@ -5,13 +5,13 @@ from __future__ import annotations
 
 import pytest
 import torch
+from torch import eye, ones, zeros
+from torch.distributions import MultivariateNormal, Uniform
+
 from sbi.diagnostics import check_sbc, get_nltp, run_sbc
 from sbi.inference import SNLE, SNPE, simulate_for_sbi
 from sbi.simulators import linear_gaussian
 from sbi.utils import BoxUniform, MultipleIndependent
-from torch import eye, ones, zeros
-from torch.distributions import MultivariateNormal, Uniform
-
 from tests.test_utils import PosteriorPotential, TractablePosterior
 
 
