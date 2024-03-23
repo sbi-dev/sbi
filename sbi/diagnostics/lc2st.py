@@ -252,7 +252,7 @@ class LC2ST:
         Returns:
             L-C2ST statistic at `x_eval`.
         """
-        scores, probas = self.scores_data(
+        probas, scores = self.scores_data(
             P_eval=P_eval, x_eval=x_eval, return_probas=True
         )
         if return_probas:
