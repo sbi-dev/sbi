@@ -1,50 +1,51 @@
+from typing import List, Union
+
 import numpy as np
-import pandas as pd
 
 
-def PP_vals(RV_samples, alphas):
-    """Compute the PP-values: empirical c.d.f. of a random variable (RV).
+def PP_vals(samples: np.ndarray, alphas: Union[List, np.ndarray]) -> np.ndarray:
+    """Computes the PP-values: empirical c.d.f. of a random variable.
     Used for Probability - Probabiity (P-P) plots.
 
     Args:
-        RV_samples (np.array): samples from the random variable.
-        alphas (list, np.array): alpha values to evaluate the c.d.f.
+        samples: samples from the random variable, of shape (n_samples, dim).
+        alphas: alpha values to evaluate the c.d.f, of shape (n_alphas,).
 
     Returns:
-        pp_vals (list): empirical c.d.f. values for each alpha.
+        pp_vals: empirical c.d.f. values for each alpha, of shape (n_alphas,).
     """
-    pp_vals = [np.mean(RV_samples <= alpha) for alpha in alphas]
-    return pp_vals
+    pp_vals = [(samples <= alpha).mean() for alpha in alphas]
+    return np.array(pp_vals)
 
 
-# for L-C2ST diagnostics
-def compute_dfs_with_probas_marginals(probas, P_eval):
-    """Compute dataframes with predicted class probabilities for each
-    (1d and 2d) marginal sample of the density estimator.
-    Used in `sbi/analysis/plots/pairplot_with_proba_intensity`.
+def get_probas_per_marginal(probas: np.ndarray, samples: np.ndarray) -> dict:
+    """Associates the given probabilities with each marginal dimension
+    of the samples.
+    Used for customized pairplots of the `samples` with `probas`
+    as weights for the colormap.
 
     Args:
-        probas (np.array): predicted class probabilities on test data.
-        P_eval (torch.Tensor): corresponding sample from the density estimator
-            (test data directly or transformed test data in the case of a
-            normalizing flow density estimator).
+        probas: weights to associate with the samples, of shape (n_samples,).
+        samples: samples to extract the marginals, of shape (n_samples, dim).
 
     Returns:
-        dfs (dict of pd.DataFrames): dict of dataframes if predicted probabilities
-        for each marginal dimension (keys).
+        dicts: dictionary with keys as the marginal dimensions and values as
+            dictionaries with items:
+            - "s" (resp. "s_1", "s_2"): 1D (resp. 2D) marginal samples.
+            - "probas": weights associated with the samples.
     """
-    dim = P_eval.shape[-1]
-    dfs = {}
+    dim = samples.shape[-1]
+    dicts = {}
     for i in range(dim):
-        P_i = P_eval[:, i].numpy().reshape(-1, 1)
-        df = pd.DataFrame({"probas": probas})
-        df["z"] = P_i[:, 0]
-        dfs[f"{i}"] = df
+        samples_i = samples[:, i].reshape(-1, 1)
+        dict_i = {"probas": probas}
+        dict_i["s"] = samples_i[:, 0]
+        dicts[f"{i}"] = dict_i
 
         for j in range(i + 1, dim):
-            P_ij = P_eval[:, [i, j]].numpy()
-            df = pd.DataFrame({"probas": probas})
-            df["z_1"] = P_ij[:, 0]
-            df["z_2"] = P_ij[:, 1]
-            dfs[f"{i}_{j}"] = df
-    return dfs
+            samples_ij = samples[:, [i, j]]
+            dict_ij = {"probas": probas}
+            dict_ij["s_1"] = samples_ij[:, 0]
+            dict_ij["s_2"] = samples_ij[:, 1]
+            dicts[f"{i}_{j}"] = dict_ij
+    return dicts

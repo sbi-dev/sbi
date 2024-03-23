@@ -31,6 +31,16 @@ class LC2ST:
         Implementation based on the official code from [1] and the exisiting C2ST
         metric [2], using scikit-learn classifiers.
 
+        Trains a classifier to distinguish between samples from two joint distributions
+        [P, x_P] and [Q, x_Q] and evaluates the L-C2ST statistic at a given observation
+        `x_eval`. The L-C2ST statistic is the mean squared error between the predicted
+        probabilities of being in P (class 0) and a Dirac at 0.5, which corresponds to
+        the chance level of the classifier unable to distinguish between P and Q.
+
+        To evaluate the test, the classifier is trained over multiple trials under the
+        null hypothesis. If the null distribution is not known, it is estimated using
+        the permutation method, i.e. by training the classifier on the permuted data.
+
         Args:
             thetas: Samples from the prior, of shape (sample_size, dim).
             xs: Corresponding simulated data, of shape (sample_size, dim_x).
@@ -444,7 +454,8 @@ class LC2ST_NF(LC2ST):
             - the null distribution is the base distribution of the normalizing flow.
             - no `P_eval` is passed to the evaluation functions (e.g. `_scores`),
                 as the base distribution is known, samples are drawn at initialization.
-            - no permutation method is used, as the null distribution is known.
+            - no permutation method is used, as the null distribution is known,
+                samples are drawn during `train_null`.
             - the classifiers can be pre-trained under the null and `trained_clfs_null`
                 passed as an argument at initialization. They do not depend on the
                 observed data (i.e. `posterior_samples` and `xs`).
