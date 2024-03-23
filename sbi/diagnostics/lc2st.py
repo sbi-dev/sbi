@@ -531,6 +531,7 @@ class LC2ST_NF(LC2ST):
     def statistic_data(
         self,
         x_eval: Tensor,
+        return_probas: bool = False,
         **kwargs: Any,
     ) -> Union[float, Tuple[np.ndarray, float]]:
         """Computes the L-C2ST statistic for the observed data.
@@ -538,11 +539,14 @@ class LC2ST_NF(LC2ST):
         Args:
             x_eval: Observation, of shape (, dim_x).
             kwargs: Additional arguments used in the parent class.
+            return_probas: Whether to return the predicted probabilities of being in P,
 
         Returns:
             L-C2ST statistic at `x_eval`.
         """
-        return super().statistic_data(P_eval=self.P_eval, x_eval=x_eval)
+        return super().statistic_data(
+            P_eval=self.P_eval, x_eval=x_eval, return_probas=return_probas
+        )
 
     def p_value(
         self,
