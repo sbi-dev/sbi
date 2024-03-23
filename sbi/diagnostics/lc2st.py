@@ -1,4 +1,4 @@
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import torch
@@ -20,8 +20,8 @@ class LC2ST:
         n_folds: int = 1,
         classifier: str = "mlp",
         z_score: bool = False,
-        clf_class: BaseEstimator = None,
-        clf_kwargs: Dict[str, Any] = None,
+        clf_class: Optional[Any] = None,
+        clf_kwargs: Optional[Dict[str, Any]] = None,
         n_trials_null: int = 100,
         permutation: bool = True,
     ) -> None:
@@ -32,28 +32,23 @@ class LC2ST:
         metric [2], using scikit-learn classifiers.
 
         Args:
-            thetas: Samples from the prior.
-                Shape (n_samples, dim_theta)
-            xs: Corresponding simulated data.
-                Shape (n_samples, dim_x)
-            posterior_samples: Samples from the estiamted posterior.
-                Shape (n_samples, dim_theta)
-            seed: Seed for the sklearn classifier and the KFold cross validation.
-                Defaults to 1.
-            n_folds: Number of folds for the cross-validation.
-                Defaults to 1 (no cross-validation).
-            z_score: Whether to z-score to normalize the data.
-                Defaults to False.
-            classifier: Classification architecture to use.
-                Possible values: "rf" or "mlp", defaults to "mlp".
-            clf_class: Custom sklearn classifier class.
-                Defaults to None.
-            clf_kwargs: Custom kwargs for the sklearn classifier.
-                Defaults to None.
-            n_trials_null: Number of trials to estimate the null distribution.
-                Defaults to 100.
-            permutation: Whether to use the permutation method for (H0).
-                Defaults to True.
+            thetas: Samples from the prior, of shape (sample_size, dim).
+            xs: Corresponding simulated data, of shape (sample_size, dim_x).
+            posterior_samples: Samples from the estiamted posterior,
+                of shape (sample_size, dim)
+            seed: Seed for the sklearn classifier and the KFold cross validation,
+                defaults to 1.
+            n_folds: Number of folds for the cross-validation,
+                defaults to 1 (no cross-validation).
+            z_score: Whether to z-score to normalize the data, defaults to False.
+            classifier: Classification architecture to use,
+                possible values: "rf" or "mlp", defaults to "mlp".
+            clf_class: Custom sklearn classifier class, defaults to None.
+            clf_kwargs: Custom kwargs for the sklearn classifier, defaults to None.
+            n_trials_null: Number of trials to estimate the null distribution,
+                defaults to 100.
+            permutation: Whether to use the permutation method for the null hypothesis,
+                defaults to True.
 
         References:
         [1] : https://arxiv.org/abs/2306.03580, https://github.com/JuliaLinhart/lc2st
@@ -64,13 +59,11 @@ class LC2ST:
             thetas.shape[0] == xs.shape[0] == posterior_samples.shape[0]
         ), "Number of samples must match"
 
-        # set data and hyper-parameters for classification
+        # set observed data for classification
         self.P = posterior_samples
         self.x_P = xs
         self.Q = thetas
         self.x_Q = xs
-        self.seed = seed
-        self.n_folds = n_folds
 
         # z-score normalization parameters
         self.z_score = z_score
@@ -78,6 +71,10 @@ class LC2ST:
         self.P_std = torch.std(self.P, dim=0)
         self.x_P_mean = torch.mean(self.x_P, dim=0)
         self.x_P_std = torch.std(self.x_P, dim=0)
+
+        # set parameters for classifier training
+        self.seed = seed
+        self.n_folds = n_folds
 
         # initialize classifier
         if "mlp" in classifier.lower():
@@ -114,8 +111,21 @@ class LC2ST:
         # can be specified if known and independent of x (see `LC2ST-NF`)
         self.null_distribution = None
 
-    def _train(self, P, Q, x_P, x_Q, verbosity: int = 0) -> List[Any]:
-        """Returns the classifiers trained on observed data."""
+    def _train(
+        self, P: Tensor, Q: Tensor, x_P: Tensor, x_Q: Tensor, verbosity: int = 0
+    ) -> List[Any]:
+        """Returns the classifiers trained on observed data.
+
+        Args:
+            P: Samples from P, of shape (sample_size, dim).
+            Q: Samples from Q, of shape (sample_size, dim).
+            x_P: Observations corresponding to P, of shape (sample_size, dim_x).
+            x_Q: Observations corresponding to Q, of shape (sample_size, dim_x).
+            verbosity: Verbosity level, defaults to 0.
+
+        Returns:
+            List of trained classifiers for each cv fold.
+        """
 
         # prepare data
 
@@ -126,7 +136,7 @@ class LC2ST:
             x_Q = (x_Q - self.x_P_mean) / self.x_P_std
 
         # initialize classifier
-        clf = self.clf_class(**self.clf_kwargs)
+        clf = self.clf_class(**self.clf_kwargs or {})
 
         # cross-validation
         if self.n_folds > 1:
@@ -157,17 +167,16 @@ class LC2ST:
         x_eval: Tensor,
         trained_clfs: List[Any],
         return_probas: bool = False,
-    ) -> np.ndarray:
-        """Compute the L-C2ST scores for the observed data.
+    ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
+        """Compute the L-C2ST scores given the trained classifiers.
 
         Args:
-            P_eval: Samples from P conditioned on the observation `x_eval`.
-                Shape (n_samples, dim_theta)
-            x_eval: Observation.
-                Shape (,dim_x)
+            P_eval: Samples from P conditioned on the observation `x_eval`,
+                of shape (sample_size, dim).
+            x_eval: Observation, of shape (,dim_x).
             trained_clfs: Trained classifiers.
-            return_probas: Whether to return the predicted probabilities of being in P.
-                Defaults to False.
+            return_probas: Whether to return the predicted probabilities of being in P,
+                defaults to False.
 
         Returns: one of
             scores: L-C2ST scores at `x_eval`.
@@ -192,11 +201,29 @@ class LC2ST:
         else:
             return scores
 
-    def train_data(self):
+    def train_data(self) -> None:
+        """Train the classifiers on the observed data.
+        Saves the trained classifiers.
+        """
         trained_clfs = self._train(self.P, self.Q, self.x_P, self.x_Q)
         self.trained_clfs = trained_clfs
 
-    def scores_data(self, P_eval: Tensor, x_eval: Tensor, return_probas: bool = False):
+    def scores_data(
+        self, P_eval: Tensor, x_eval: Tensor, return_probas: bool = False
+    ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
+        """Compute the L-C2ST scores for the observed data.
+
+        Args:
+            P_eval: Samples from P conditioned on the observation `x_eval`,
+                of shape (sample_size, dim).
+            x_eval: Observation, of shape (,dim_x).
+            return_probas: Whether to return the predicted probabilities of being in P,
+                defaults to False.
+
+        Returns: one of
+            scores: L-C2ST scores at `x_eval`.
+            (probas, scores): Predicted probabilities and L-C2ST scores at `x_eval`.
+        """
         assert (
             self.trained_clfs is not None
         ), "No trained classifiers found. Run `train_data` first."
@@ -211,39 +238,48 @@ class LC2ST:
         self,
         P_eval: Tensor,
         x_eval: Tensor,
-    ) -> float:
+        return_probas: bool = False,
+    ) -> Union[float, Tuple[np.ndarray, float]]:
         """Computes the L-C2ST statistic for the observed data.
 
         Args:
-            P_eval: Samples from P (class 0) conditioned on the observation `x_eval`.
-                Shape (n_samples, dim_theta)
-            x_eval: Observation.
-                Shape (, dim_x)
+            P_eval: Samples from P conditioned on the observation `x_eval`,
+                of shape (sample_size, dim).
+            x_eval: Observation, of shape (, dim_x)
+            return_probas: Whether to return the predicted probabilities of being in P,
+                defaults to False.
 
         Returns:
-            L-C2ST statistic at `x_eval`
+            L-C2ST statistic at `x_eval`.
         """
-        return self.scores_data(P_eval=P_eval, x_eval=x_eval).mean()
+        scores, probas = self.scores_data(
+            P_eval=P_eval, x_eval=x_eval, return_probas=True
+        )
+        if return_probas:
+            return probas, scores.mean()
+        else:
+            return scores.mean()
 
     def p_value(
         self,
         P_eval: Tensor,
         x_eval: Tensor,
-    ):
+    ) -> float:
         """Computes the p-value for L-C2ST.
 
         Args:
-            P_eval: Samples from P (class 0) conditioned on the observation `x_eval`.
-                Shape (n_samples, dim_theta)
-            x_eval: Observation.
-                Shape (, dim_x)
+            P_eval: Samples from P conditioned on the observation `x_eval`,
+                of dhape (sample_size, dim).
+            x_eval: Observation, of shape (, dim_x).
 
         Returns:
-            p-value for L-C2ST at `x_eval`
+            p-value for L-C2ST at `x_eval`.
         """
-        stat_data = self.statistic_data(P_eval=P_eval, x_eval=x_eval)
-        stats_null = self.statistics_null(
-            P_eval=P_eval, x_eval=x_eval, return_probas=False, verbosity=0
+        _, stat_data = self.statistic_data(
+            P_eval=P_eval, x_eval=x_eval, return_probas=True
+        )
+        _, stats_null = self.statistics_null(
+            P_eval=P_eval, x_eval=x_eval, return_probas=True, verbosity=0
         )
         return (stat_data < stats_null).mean()
 
@@ -252,41 +288,29 @@ class LC2ST:
         P_eval: Tensor,
         x_eval: Tensor,
         alpha: float = 0.05,
-    ):
+    ) -> bool:
         """Computes the test result for L-C2ST at a given significance level.
 
         Args:
-            P_eval: Samples from P (class 0) conditioned on the observation `x_eval`.
-                Shape (n_samples, dim_theta)
-            x_eval: Observation.
-                Shape (, dim_x)
-            alpha: Significance level.
-                Defaults to 0.05.
+            P_eval: Samples from P conditioned on the observation `x_eval`,
+                of shape (sample_size, dim).
+            x_eval: Observation, of shape (, dim_x).
+            alpha: Significance level, defaults to 0.05.
 
         Returns:
-            True if the null hypothesis is rejected, False otherwise.
+            The L-C2ST result: True if rejected, False otherwise.
         """
         return self.p_value(P_eval=P_eval, x_eval=x_eval) < alpha
 
     def train_null(
         self,
         verbosity: int = 1,
-    ):
+    ) -> None:
         """Compute the L-C2ST scores under the null hypothesis (H0).
-        Saves the trained classifiers for the null distribution.
+        Saves the trained classifiers for each null trial.
 
         Args:
-            P_eval: Samples from P (class 0) conditioned on the observation `x_eval`.
-                Shape (n_samples, dim_theta)
-            x_eval: Observation.
-                Shape (, dim_x)
-            return_probas: Whether to return the predicted probabilities of being in P.
-                Defaults to False.
             verbosity: Verbosity level, defaults to 1.
-
-        Returns: one of
-            scores: L-C2ST scores under (H0).
-            (probas, scores): Predicted probabilities and L-C2ST scores under (H0).
         """
 
         trained_clfs_null = {}
@@ -336,17 +360,15 @@ class LC2ST:
         x_eval: Tensor,
         return_probas: bool = False,
         verbosity: int = 0,
-    ):
-        """Compute the L-C2ST scores under the null hypothesis (H0).
-        Saves the trained classifiers for the null distribution.
+    ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
+        """Compute the L-C2ST scores under the null hypothesis.
 
         Args:
-            P_eval: Samples from P (class 0) conditioned on the observation `x_eval`.
-                Shape (n_samples, dim_theta)
-            x_eval: Observation.
-                Shape (, dim_x)
-            return_probas: Whether to return the predicted probabilities of being in P.
-                Defaults to False.
+            P_eval: Samples from P conditioned on the observation `x_eval`,
+                of shape (sample_size, dim).
+            x_eval: Observation, of shape (, dim_x).
+            return_probas: Whether to return the predicted probabilities of being in P,
+                defaults to False.
             verbosity: Verbosity level, defaults to 1.
 
         Returns: one of
@@ -409,53 +431,69 @@ class LC2ST_NF(LC2ST):
         flow_base_dist: torch.distributions.Distribution,
         n_eval: int = 10_000,
         trained_clfs_null: Optional[Dict[str, List[Any]]] = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         """
         L-C2ST for normalizing flows.
 
+        LC2ST_NF is a subclass of LC2ST that performs the test in the space of the
+        base distribution of a normalizing flow. It uses the inverse transform of the
+        normalizing flow to map the samples from the prior and the posterior to the
+        base distribution space. Important features are:
+
+            - the null distribution is the base distribution of the normalizing flow.
+            - no `P_eval` is passed to the evaluation functions (e.g. `_scores`),
+                as the base distribution is known, samples are drawn at initialization.
+            - no permutation method is used, as the null distribution is known.
+            - the classifiers can be pre-trained under the null and `trained_clfs_null`
+                passed as an argument at initialization. They do not depend on the
+                observed data (i.e. `posterior_samples` and `xs`).
+
         Args:
-            thetas: Samples from the prior.
-                Shape (n_samples, dim_theta)
-            xs: Corresponding simulated data.
-                Shape (n_samples, dim_x)
-            posterior_samples: Samples from the estiamted posterior.
-                Shape (n_samples, dim_theta)
+            thetas: Samples from the prior, of shape (sample_size, dim).
+            xs: Corresponding simulated data, of shape (sample_size, dim_x).
+            posterior_samples: Samples from the estiamted posterior,
+                of shape (sample_size, dim).
             flow_inverse_transform: Inverse transform of the normalizing flow.
                 Takes thetas and xs as input and returns noise.
             flow_base_dist: Base distribution of the normalizing flow.
             n_eval: Number of samples to evaluate the L-C2ST.
-            trained_clfs_null: pre-trained classifiers under the null.
+            trained_clfs_null: Pre-trained classifiers under the null.
             kwargs: Additional arguments for the LC2ST class.
         """
+        # Aplly the inverse transform to the thetas and the posterior samples
+        self.flow_inverse_transform = flow_inverse_transform
         inverse_thetas = flow_inverse_transform(thetas, xs).detach()
         inverse_posterior_samples = flow_inverse_transform(
             posterior_samples, xs
         ).detach()
 
+        # Initialize the LC2ST class with the inverse transformed samples
         super().__init__(inverse_thetas, xs, inverse_posterior_samples, **kwargs)
 
-        self.flow_inverse_transform = flow_inverse_transform
+        # Set the parameters for the null hypothesis testing
         self.null_distribution = flow_base_dist
         self.permutation = False
-        self.P_eval = flow_base_dist.sample((n_eval,))
         self.trained_clfs_null = trained_clfs_null
+
+        # Draw samples from the base distribution for evaluation
+        self.P_eval = flow_base_dist.sample(torch.Size([n_eval]))
 
     def _scores(
         self,
         x_eval: Tensor,
         trained_clfs: List[Any],
         return_probas: bool = False,
-        **kwargs,
-    ) -> np.ndarray:
-        """Compute the L-C2ST scores for the observed data.
+        **kwargs: Any,
+    ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
+        """Compute the L-C2ST scores given the trained classifiers.
 
         Args:
-            x_eval: Observation.
-                Shape (,dim_x)
+            x_eval: Observation, of shape (,dim_x).
             trained_clfs: Trained classifiers.
-            return_probas: Whether to return the predicted probabilities of being in P.
-                Defaults to False.
+            return_probas: Whether to return the predicted probabilities of being in P,
+                defaults to False.
+            kwargs: Additional arguments used in the parent class.
 
         Returns: one of
             scores: L-C2ST scores at `x_eval`.
@@ -468,7 +506,24 @@ class LC2ST_NF(LC2ST):
             return_probas=return_probas,
         )
 
-    def scores_data(self, x_eval: Tensor, return_probas: bool = False, **kwargs):
+    def scores_data(
+        self,
+        x_eval: Tensor,
+        return_probas: bool = False,
+        **kwargs: Any,
+    ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
+        """Compute the L-C2ST scores for the observed data.
+
+        Args:
+            x_eval: Observation, of shape (,dim_x).
+            return_probas: Whether to return the predicted probabilities of being in P,
+                defaults to False.
+            kwargs: Additional arguments used in the parent class.
+
+        Returns: one of
+            scores: L-C2ST scores at `x_eval`.
+            (probas, scores): Predicted probabilities and L-C2ST scores at `x_eval`.
+        """
         return super().scores_data(
             P_eval=self.P_eval, x_eval=x_eval, return_probas=return_probas
         )
@@ -476,32 +531,32 @@ class LC2ST_NF(LC2ST):
     def statistic_data(
         self,
         x_eval: Tensor,
-        **kwargs,
-    ) -> float:
+        **kwargs: Any,
+    ) -> Union[float, Tuple[np.ndarray, float]]:
         """Computes the L-C2ST statistic for the observed data.
 
         Args:
-            x_eval: Observation.
-                Shape (, dim_x)
+            x_eval: Observation, of shape (, dim_x).
+            kwargs: Additional arguments used in the parent class.
 
         Returns:
-            L-C2ST statistic at `x_eval`
+            L-C2ST statistic at `x_eval`.
         """
         return super().statistic_data(P_eval=self.P_eval, x_eval=x_eval)
 
     def p_value(
         self,
         x_eval: Tensor,
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> float:
         """Computes the p-value for L-C2ST.
 
         Args:
-            x_eval: Observation.
-                Shape (, dim_x)
+            x_eval: Observation, of shape (, dim_x).
+            kwargs: Additional arguments used in the parent class.
 
         Returns:
-            p-value for L-C2ST at `x_eval`
+            p-value for L-C2ST at `x_eval`.
         """
         return super().p_value(P_eval=self.P_eval, x_eval=x_eval)
 
@@ -509,26 +564,25 @@ class LC2ST_NF(LC2ST):
         self,
         x_eval: Tensor,
         alpha: float = 0.05,
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> bool:
         """Computes the test result for L-C2ST at a given significance level.
 
         Args:
-            x_eval: Observation.
-                Shape (, dim_x)
-            alpha: Significance level.
-                Defaults to 0.05.
+            x_eval: Observation, of shape (, dim_x).
+            alpha: Significance level, defaults to 0.05.
+            kwargs: Additional arguments used in the parent class.
 
         Returns:
-            True if the null hypothesis is rejected, False otherwise.
+            L-C2ST result: True if rejected, False otherwise.
         """
         return super().reject(P_eval=self.P_eval, x_eval=x_eval, alpha=alpha)
 
     def train_null(
         self,
         verbosity: int = 1,
-    ):
-        """Compute the L-C2ST scores under the null hypothesis (H0).
+    ) -> None:
+        """Compute the L-C2ST scores under the null hypothesis.
         Saves the trained classifiers for the null distribution.
 
         Args:
@@ -546,10 +600,9 @@ class LC2ST_NF(LC2ST):
         x_eval: Tensor,
         return_probas: bool = False,
         verbosity: int = 0,
-        **kwargs,
-    ):
-        """Compute the L-C2ST scores under the null hypothesis (H0).
-        Saves the trained classifiers for the null distribution.
+        **kwargs: Any,
+    ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
+        """Compute the L-C2ST scores under the null hypothesis.
 
         Args:
             x_eval: Observation.
@@ -557,6 +610,7 @@ class LC2ST_NF(LC2ST):
             return_probas: Whether to return the predicted probabilities of being in P.
                 Defaults to False.
             verbosity: Verbosity level, defaults to 1.
+            kwargs: Additional arguments used in the parent class.
         """
         return super().statistics_null(
             P_eval=self.P_eval,
@@ -566,7 +620,21 @@ class LC2ST_NF(LC2ST):
         )
 
 
-def train_lc2st(P: Tensor, Q: Tensor, x_P: Tensor, x_Q: Tensor, clf: Any) -> Any:
+def train_lc2st(
+    P: Tensor, Q: Tensor, x_P: Tensor, x_Q: Tensor, clf: BaseEstimator
+) -> Any:
+    """Trains the classifier on the joint data for the L-C2ST.
+
+    Args:
+        P: Samples from P, of shape (sample_size, dim).
+        Q: Samples from Q, of shape (sample_size, dim).
+        x_P: Observations corresponding to P, of shape (sample_size, dim_x).
+        x_Q: Observations corresponding to Q, of shape (sample_size, dim_x).
+        clf: Classifier to train.
+
+    Returns:
+        Trained classifier.
+    """
     # cpu and numpy
     P = P.cpu().numpy()
     Q = Q.cpu().numpy()
@@ -587,22 +655,35 @@ def train_lc2st(P: Tensor, Q: Tensor, x_P: Tensor, x_Q: Tensor, clf: Any) -> Any
 
     # train classifier
     clf_ = clone(clf)
-    clf_.fit(data, target)
+    clf_.fit(data, target)  # type: ignore
 
     return clf_
 
 
 def eval_lc2st(
-    P: Tensor, observation: Tensor, clf: Any, return_proba: bool = False
-) -> Tensor:
+    P: Tensor, x_eval: Tensor, clf: BaseEstimator, return_proba: bool = False
+) -> Union[float, Tuple[np.ndarray, float]]:
+    """Evaluates the classifier returned by `train_lc2st` for one observation
+    `x_eval` and over the samples `P`.
+
+    Args:
+        P: Samples from P, of shape (sample_size, dim).
+        x_eval: Observation, of shape (, dim_x).
+        clf: Trained classifier.
+        return_proba: Whether to return the predicted probabilities of being in P,
+            defaults to False.
+
+    Returns:
+        L-C2ST score at `x_eval`.
+    """
     # concatenate to get joint data
     joint_P = np.concatenate(
-        [P.cpu().numpy(), observation.repeat(len(P), 1).cpu().numpy()], axis=1
+        [P.cpu().numpy(), x_eval.repeat(len(P), 1).cpu().numpy()], axis=1
     )
 
     # evaluate classifier
     # probability of being in P (class 0)
-    proba = clf.predict_proba(joint_P)[:, 0]
+    proba = clf.predict_proba(joint_P)[:, 0]  # type: ignore
     # mean squared error between proba and dirac at 0.5
     score = ((proba - [0.5] * len(proba)) ** 2).mean()
 
@@ -612,20 +693,23 @@ def eval_lc2st(
         return score
 
 
-def permute_data(P, Q, seed=1):
-    """Permute the concatenated data [P,Q] to create null-hyp samples.
+def permute_data(P: Tensor, Q: Tensor, seed: int = 1) -> Tuple[Tensor, Tensor]:
+    """Permutes the concatenated data [P,Q] to create null samples.
 
     Args:
-        P (torch.Tensor): data of shape (n_samples, dim)
-        Q (torch.Tensor): data of shape (n_samples, dim)
-        seed (int, optional): random seed. Defaults to 42.
+        P: samples form P, of shape (sample_size, dim).
+        Q: samples from Q, of shape (sample_size, dim).
+        seed: random seed, defaults to 1.
+
+    Returns:
+        Permuted data [P,Q]
     """
     # set seed
     torch.manual_seed(seed)
     # check inputs
     assert P.shape[0] == Q.shape[0]
 
-    n_samples = P.shape[0]
+    sample_size = P.shape[0]
     X = torch.cat([P, Q], dim=0)
-    X_perm = X[torch.randperm(n_samples * 2)]
-    return X_perm[:n_samples], X_perm[n_samples:]
+    X_perm = X[torch.randperm(sample_size * 2)]
+    return X_perm[:sample_size], X_perm[sample_size:]
