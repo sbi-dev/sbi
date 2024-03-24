@@ -148,7 +148,7 @@ def standardizing_transform(
     structured_dims: bool = False,
     min_std: float = 1e-14,
 ) -> transforms.AffineTransform:
-    """Builds standardizing transform
+    """Builds standardizing transform for nflows
 
     Args:
         batch_t: Batched tensor from which mean and std deviation (across
@@ -172,7 +172,7 @@ def standardizing_transform_zuko(
     structured_dims: bool = False,
     min_std: float = 1e-14,
 ) -> zuko.flows.LazyTransform:
-    """Builds standardizing transform
+    """Builds standardizing transform for Zuko flows
 
     Args:
         batch_t: Batched tensor from which mean and std deviation (across
@@ -201,6 +201,21 @@ def z_standardization(
     structured_dims: bool = False,
     min_std: float = 1e-14,
 ) -> [Tensor, Tensor]:
+    """Computes mean and standard deviation for z-scoring
+
+    Args:
+        batch_t: Batched tensor from which mean and std deviation (across
+            first dimension) are computed.
+        structured_dim: Whether data dimensions are structured (e.g., time-series,
+            images), which requires computing mean and std per sample first before
+            aggregating over samples for a single standardization mean and std for the
+            batch, or independent (default), which z-scores dimensions independently.
+        min_std:  Minimum value of the standard deviation to use when z-scoring to
+            avoid division by zero.
+
+    Returns:
+        Mean and standard deviation for z-scoring
+    """
     is_valid_t, *_ = handle_invalid_x(batch_t, True)
 
     if structured_dims:
@@ -218,6 +233,7 @@ def z_standardization(
         t_std = torch.std(batch_t[is_valid_t], dim=0)
         t_std[t_std < min_std] = min_std
 
+    # Return mean and std for z-scoring.
     return t_mean, t_std
 
 
