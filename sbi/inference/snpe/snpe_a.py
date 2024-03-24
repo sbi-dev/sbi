@@ -408,12 +408,13 @@ class SNPE_A_MDN(DensityEstimator):
         if isinstance(proposal, (utils.BoxUniform, MultivariateNormal)):
             self._apply_correction = False
         else:
+            default_x = proposal.default_x.unsqueeze(0)  # add iid dimension.
             self._apply_correction = True
             (
                 logits_pp,
                 m_pp,
                 prec_pp,
-            ) = proposal.posterior_estimator._posthoc_correction(proposal.default_x)  # type: ignore
+            ) = proposal.posterior_estimator._posthoc_correction(default_x)  # type: ignore
             self._logits_pp, self._m_pp, self._prec_pp = (
                 logits_pp.detach(),
                 m_pp.detach(),
@@ -544,11 +545,17 @@ class SNPE_A_MDN(DensityEstimator):
         estimator and the proposal.
 
         Args:
-            x: Conditioning context for posterior.
+            x: Conditioning context for posterior, shape
+                `(iid_dim, batch_dim, *event_shape)`.
 
         Returns:
             Mixture components of the posterior.
         """
+        # Remove the batch dimension of `x` (SNPE-A always has a single `x`).
+        x = x.squeeze(dim=1)
+
+        # Remove the iid dimension of `x`.
+        x = x.squeeze(dim=0)
 
         # Evaluate the density estimator.
         embedded_x = self._neural_net.net._embedding_net(x)
@@ -606,6 +613,13 @@ class SNPE_A_MDN(DensityEstimator):
         Returns: (Component weight, mean, precision matrix, covariance matrix) of each
             Gaussian of the approximate posterior.
         """
+
+        print("logits_pp", logits_pp.shape)
+        print("means_pp", means_pp.shape)
+        print("precisions_pp", precisions_pp.shape)
+        print("logits_d", logits_d.shape)
+        print("means_d", means_d.shape)
+        print("precisions_d", precisions_d.shape)
 
         precisions_post, covariances_post = self._precisions_posterior(
             precisions_pp, precisions_d
