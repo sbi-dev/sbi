@@ -18,7 +18,7 @@ from sbi.inference.snpe.snpe_base import PosteriorEstimator
 from sbi.neural_nets.density_estimators.base import DensityEstimator
 from sbi.sbi_types import TensorboardSummaryWriter, TorchModule
 from sbi.utils import torchutils
-
+from sbi.utils.torchutils import atleast_2d
 
 class SNPE_A(PosteriorEstimator):
     def __init__(
@@ -408,13 +408,17 @@ class SNPE_A_MDN(DensityEstimator):
         if isinstance(proposal, (utils.BoxUniform, MultivariateNormal)):
             self._apply_correction = False
         else:
-            default_x = proposal.default_x.unsqueeze(0)  # add iid dimension.
+            # Add iid dimension.
+            print("\n-=======================Going for the init")
+            default_x = proposal.default_x.unsqueeze(0)  # type: ignore
             self._apply_correction = True
             (
                 logits_pp,
                 m_pp,
                 prec_pp,
-            ) = proposal.posterior_estimator._posthoc_correction(default_x)  # type: ignore
+            ) = proposal.posterior_estimator._posthoc_correction(default_x)
+            print("BEFEFEFEFEFEFEFEFEFE")
+            print("after first run", logits_pp.shape)
             self._logits_pp, self._m_pp, self._prec_pp = (
                 logits_pp.detach(),
                 m_pp.detach(),
@@ -562,6 +566,7 @@ class SNPE_A_MDN(DensityEstimator):
         dist = self._neural_net.net._distribution  # defined to avoid black formatting.
         logits_d, m_d, prec_d, _, _ = dist.get_mixture_components(embedded_x)
         norm_logits_d = logits_d - torch.logsumexp(logits_d, dim=-1, keepdim=True)
+        norm_logits_d = atleast_2d(norm_logits_d)
 
         # The following if case is needed because, in the constructor, we call
         # `_posthoc_correction` regardless of whether the `proposal` itself had a
@@ -579,6 +584,7 @@ class SNPE_A_MDN(DensityEstimator):
         logits_p, m_p, prec_p, cov_p = self._proposal_posterior_transformation(
             logits_pp, m_pp, prec_pp, norm_logits_d, m_d, prec_d
         )
+        logits_p = atleast_2d(logits_p)
         return logits_p, m_p, prec_p
 
     def _proposal_posterior_transformation(
