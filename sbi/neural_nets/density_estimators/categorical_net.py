@@ -77,8 +77,7 @@ class CategoricalNet(nn.Module):
         for layer in self.hidden_layers:
             context = self.activation(layer(context))
 
-        o = self.output_layer(context)
-        return self.softmax(o)
+        return self.softmax(self.output_layer(context))
 
     def log_prob(self, input: Tensor, context: Tensor) -> Tensor:
         """Return categorical log probability of categories input, given context.

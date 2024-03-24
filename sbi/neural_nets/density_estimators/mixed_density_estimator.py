@@ -125,9 +125,11 @@ class MixedDensityEstimator(DensityEstimator):
         condition_repeated = condition.repeat((1, repeats, 1))
         condition_reshaped = torch.cat((condition_repeated, disc_input_repeated), dim=2)
 
-        cont_input_reshaped = cont_input.reshape(
-            (1, cont_input.shape[0] * cont_input.shape[1], -1)
-        )
+        cont_input_reshaped = cont_input.reshape((
+            1,
+            cont_input.shape[0] * cont_input.shape[1],
+            -1,
+        ))
         cont_log_prob = self.continuous_net.log_prob(
             # Transform to log-space if needed.
             torch.log(cont_input_reshaped)
@@ -138,7 +140,7 @@ class MixedDensityEstimator(DensityEstimator):
         cont_log_prob = cont_log_prob.reshape(disc_log_prob.shape)
 
         # Combine into joint lp.
-        log_probs_combined = (disc_log_prob + cont_log_prob)
+        log_probs_combined = disc_log_prob + cont_log_prob
 
         # Maybe add log abs det jacobian of RTs: log(1/x) = - log(x)
         if self.log_transform_input:

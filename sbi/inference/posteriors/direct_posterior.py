@@ -104,8 +104,7 @@ class DirectPosterior(NeuralPosterior):
         num_samples = torch.Size(sample_shape).numel()
         x = self._x_else_default_x(x)
 
-        # TODO: should we force that x_shape is passed?
-        x_shape = self._x_shape[1:] if self._x_shape is not None else x.shape
+        x_shape = self._x_shape[1:] if self._x_shape is not None else x.shape[1:]
         x = reshape_to_iid_batch_event(x, event_shape=x_shape, leading_is_iid=False)
 
         max_sampling_batch_size = (
@@ -166,8 +165,10 @@ class DirectPosterior(NeuralPosterior):
             support of the prior, -∞ (corresponding to 0 probability) outside.
         """
         x = self._x_else_default_x(x)
+        x_shape = self._x_shape[1:] if self._x_shape is not None else x.shape[1:]
+
         theta = ensure_theta_batched(torch.as_tensor(theta))
-        x_de = reshape_to_iid_batch_event(x, self._x_shape[1:])
+        x_de = reshape_to_iid_batch_event(x, x_shape)
         theta_de = reshape_to_iid_batch_event(
             theta, theta.shape[1:], leading_is_iid=True
         )
@@ -230,6 +231,7 @@ class DirectPosterior(NeuralPosterior):
         """
 
         def acceptance_at(x: Tensor) -> Tensor:
+            x_shape = self._x_shape[1:] if self._x_shape is not None else x.shape[1:]
             return accept_reject_sample(
                 proposal=self.posterior_estimator,
                 accept_reject_fn=lambda theta: within_support(self.prior, theta),
@@ -238,7 +240,7 @@ class DirectPosterior(NeuralPosterior):
                 sample_for_correction_factor=True,
                 max_sampling_batch_size=rejection_sampling_batch_size,
                 proposal_sampling_kwargs={
-                    "condition": reshape_to_iid_batch_event(x, self._x_shape[1:])
+                    "condition": reshape_to_iid_batch_event(x, x_shape)
                 },
             )[1]
 

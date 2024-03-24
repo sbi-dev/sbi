@@ -138,9 +138,6 @@ def _log_likelihoods_over_trials(
         theta, event_shape=theta.shape[1:], leading_is_iid=False
     )
 
-    # print("final_x", x.shape)
-    # print("final_theta", theta.shape)
-
     # Calculate likelihood in one batch.
     with torch.set_grad_enabled(track_gradients):
         log_likelihood_trial_batch = estimator.log_prob(x, condition=theta)
@@ -195,12 +192,11 @@ class MixedLikelihoodBasedPotential(LikelihoodBasedPotential):
 
         # Shape of `x` is (iid_dim, *event_shape)
         theta = reshape_to_iid_batch_event(theta, event_shape=theta.shape[1:])
-        x = reshape_to_iid_batch_event(self.x_o, event_shape=self.x_o.shape[1:], leading_is_iid=True)
+        x = reshape_to_iid_batch_event(
+            self.x_o, event_shape=self.x_o.shape[1:], leading_is_iid=True
+        )
         theta_batch_dim = theta.shape[1]
         x = x.expand(-1, theta_batch_dim, -1)
-
-        # print("t", theta.shape)
-        # print("x", x.shape)
 
         # Calculate likelihood in one batch.
         with torch.set_grad_enabled(track_gradients):

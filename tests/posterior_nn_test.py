@@ -52,7 +52,7 @@ def test_log_prob_with_different_x(snpe_method: type, x_o_batch_dim: bool):
         raise NotImplementedError
 
     posterior = DirectPosterior(
-        posterior_estimator=posterior_estimator, prior=prior, x_shape=inference._x_shape
+        posterior_estimator=posterior_estimator, prior=prior
     ).set_default_x(x_o)
     samples = posterior.sample((10,))
     _ = posterior.log_prob(samples)

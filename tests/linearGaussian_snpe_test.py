@@ -97,9 +97,7 @@ def test_c2st_snpe_on_linearGaussian(snpe_method, num_dim: int, prior_str: str):
         training_batch_size=100
     )
     posterior = DirectPosterior(
-        prior=prior,
-        posterior_estimator=posterior_estimator,
-        x_shape=inference._x_shape,
+        prior=prior, posterior_estimator=posterior_estimator
     ).set_default_x(x_o)
     samples = posterior.sample((num_samples,))
 
@@ -200,9 +198,7 @@ def test_density_estimators_on_linearGaussian(density_estimator):
         training_batch_size=100
     )
     posterior = DirectPosterior(
-        prior=prior,
-        posterior_estimator=posterior_estimator,
-        x_shape=inference._x_shape,
+        prior=prior, posterior_estimator=posterior_estimator
     ).set_default_x(x_o)
     samples = posterior.sample((num_samples,))
 
@@ -271,9 +267,7 @@ def test_c2st_snpe_on_linearGaussian_different_dims(density_estimator="maf"):
         resume_training=True, force_first_round_loss=True
     )
     posterior = DirectPosterior(
-        prior=prior,
-        posterior_estimator=posterior_estimator,
-        x_shape=inference._x_shape,
+        prior=prior, posterior_estimator=posterior_estimator
     ).set_default_x(x_o)
     samples = posterior.sample((num_samples,))
 
@@ -351,9 +345,7 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
         theta, x = simulate_for_sbi(simulator, prior, 500, simulation_batch_size=10)
         posterior_estimator = inference.append_simulations(theta, x).train()
         posterior1 = DirectPosterior(
-            prior=prior,
-            posterior_estimator=posterior_estimator,
-            x_shape=inference._x_shape,
+            prior=prior, posterior_estimator=posterior_estimator
         ).set_default_x(x_o)
         theta, x = simulate_for_sbi(
             simulator, posterior1, 1000, simulation_batch_size=10
@@ -362,18 +354,14 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
             theta, x, proposal=posterior1
         ).train()
         posterior = DirectPosterior(
-            prior=prior,
-            posterior_estimator=posterior_estimator,
-            x_shape=inference._x_shape,
+            prior=prior, posterior_estimator=posterior_estimator
         ).set_default_x(x_o)
     elif method_str == "snpe_c":
         inference = SNPE_C(**creation_args)
         theta, x = simulate_for_sbi(simulator, prior, 900, simulation_batch_size=50)
         posterior_estimator = inference.append_simulations(theta, x).train()
         posterior1 = DirectPosterior(
-            prior=prior,
-            posterior_estimator=posterior_estimator,
-            x_shape=inference._x_shape,
+            prior=prior, posterior_estimator=posterior_estimator
         ).set_default_x(x_o)
         theta = posterior1.sample((1000,))
         x = simulator(theta)
@@ -400,9 +388,7 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
         theta, x = simulate_for_sbi(simulator, prior, 900, simulation_batch_size=50)
         posterior_estimator = inference.append_simulations(theta, x).train()
         posterior1 = DirectPosterior(
-            prior=prior,
-            posterior_estimator=posterior_estimator,
-            x_shape=inference._x_shape,
+            prior=prior, posterior_estimator=posterior_estimator
         ).set_default_x(x_o)
         accept_reject_fn = get_density_thresholder(posterior1, quantile=1e-4)
         proposal = RestrictedPrior(
@@ -592,9 +578,7 @@ def test_sample_conditional():
     )
 
     posterior = DirectPosterior(
-        prior=prior,
-        posterior_estimator=posterior_estimator,
-        x_shape=inference._x_shape,
+        prior=prior, posterior_estimator=posterior_estimator
     ).set_default_x(x_o)
     samples = posterior.sample((50,))
 
@@ -770,9 +754,7 @@ def test_example_posterior(snpe_method: type):
     if snpe_method == SNPE_A:
         posterior_estimator = inference.correct_for_proposal()
     posterior = DirectPosterior(
-        prior=prior,
-        posterior_estimator=posterior_estimator,
-        x_shape=inference._x_shape,
+        prior=prior, posterior_estimator=posterior_estimator
     ).set_default_x(x_o)
     assert posterior is not None
 

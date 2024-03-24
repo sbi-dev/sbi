@@ -20,6 +20,7 @@ from sbi.sbi_types import TensorboardSummaryWriter, TorchModule
 from sbi.utils import torchutils
 from sbi.utils.torchutils import atleast_2d
 
+
 class SNPE_A(PosteriorEstimator):
     def __init__(
         self,
@@ -409,7 +410,6 @@ class SNPE_A_MDN(DensityEstimator):
             self._apply_correction = False
         else:
             # Add iid dimension.
-            print("\n-=======================Going for the init")
             default_x = proposal.default_x.unsqueeze(0)  # type: ignore
             self._apply_correction = True
             (
@@ -417,8 +417,6 @@ class SNPE_A_MDN(DensityEstimator):
                 m_pp,
                 prec_pp,
             ) = proposal.posterior_estimator._posthoc_correction(default_x)
-            print("BEFEFEFEFEFEFEFEFEFE")
-            print("after first run", logits_pp.shape)
             self._logits_pp, self._m_pp, self._prec_pp = (
                 logits_pp.detach(),
                 m_pp.detach(),
@@ -619,14 +617,6 @@ class SNPE_A_MDN(DensityEstimator):
         Returns: (Component weight, mean, precision matrix, covariance matrix) of each
             Gaussian of the approximate posterior.
         """
-
-        print("logits_pp", logits_pp.shape)
-        print("means_pp", means_pp.shape)
-        print("precisions_pp", precisions_pp.shape)
-        print("logits_d", logits_d.shape)
-        print("means_d", means_d.shape)
-        print("precisions_d", precisions_d.shape)
-
         precisions_post, covariances_post = self._precisions_posterior(
             precisions_pp, precisions_d
         )

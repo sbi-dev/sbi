@@ -165,7 +165,7 @@ def test_inference_with_restriction_estimator():
 
     # Build posterior.
     posterior = DirectPosterior(
-        prior=prior, posterior_estimator=posterior_estimator, x_shape=inference._x_shape
+        prior=prior, posterior_estimator=posterior_estimator
     ).set_default_x(x_o)
 
     samples = posterior.sample((num_samples,))
