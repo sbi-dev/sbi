@@ -15,7 +15,13 @@ import zuko
 from pyro.distributions import Empirical
 from torch import Tensor, ones, optim, zeros
 from torch import nn as nn
-from torch.distributions import Distribution, Independent, biject_to, constraints
+from torch.distributions import (
+    AffineTransform,
+    Distribution,
+    Independent,
+    biject_to,
+    constraints,
+)
 
 from sbi import utils as utils
 from sbi.sbi_types import TorchTransform
@@ -183,8 +189,8 @@ def standardizing_transform_zuko(
     """
     t_mean, t_std = z_standardization(batch_t, structured_dims, min_std)
     return UnconditionalLazyTransform(
-        zuko.transforms.MonotonicAffineTransform,
-        shift=-t_mean / t_std,
+        AffineTransform,
+        loc=-t_mean / t_std,
         scale=1 / t_std,
         buffer=True,
     )
