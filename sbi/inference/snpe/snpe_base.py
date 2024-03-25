@@ -318,9 +318,8 @@ class PosteriorEstimator(NeuralInference, ABC):
                 x[self.train_indices].to("cpu"),
             )
             self._x_shape = x_shape_from_simulation(x.to("cpu"))
-            self._theta_shape = theta[0].unsqueeze(0).shape
 
-            theta = reshape_to_iid_batch_event(theta.to("cpu"), self._theta_shape[1:])
+            theta = reshape_to_iid_batch_event(theta.to("cpu"), theta.shape[1:])
             x = reshape_to_iid_batch_event(x.to("cpu"), self._x_shape[1:])
             test_posterior_net_for_multi_d_x(self._neural_net, theta, x)
 
@@ -580,7 +579,7 @@ class PosteriorEstimator(NeuralInference, ABC):
                 distribution different from the prior.
         """
         if self._round == 0 or force_first_round_loss:
-            theta = reshape_to_iid_batch_event(theta, event_shape=self._theta_shape[1:])
+            theta = reshape_to_iid_batch_event(theta, event_shape=theta.shape[1:])
             x = reshape_to_iid_batch_event(x, event_shape=self._x_shape[1:])
             # Use posterior log prob (without proposal correction) for first round.
             loss = self._neural_net.loss(theta, x)

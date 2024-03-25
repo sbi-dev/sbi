@@ -176,10 +176,10 @@ def test_correctness_of_density_estimator_loss(
             torch.randn_like(building_thetas), torch.randn_like(building_xs)
         )
     elif density_estimator_name == "mixed":
-        building_thetas[:, :-1] += 4.0  # Make continuous dims positive for log-tf.
+        building_thetas[:, :-1] += 5.0  # Make continuous dims positive for log-tf.
         density_estimator = build_mnle(
             building_thetas, building_xs
-        )  # TODO rename to build_mixed
+        )
     elif density_estimator_name == "discrete":
         density_estimator = build_categoricalmassestimator(building_thetas, building_xs)
     else:

@@ -104,6 +104,9 @@ class DirectPosterior(NeuralPosterior):
         num_samples = torch.Size(sample_shape).numel()
         x = self._x_else_default_x(x)
 
+        # [1:] because we remove batch dimension for `reshape_to_iid_batch_event`.
+        # This will break if `x_shape` is `None` and if `x` is passed without
+        # batch dimension.
         x_shape = self._x_shape[1:] if self._x_shape is not None else x.shape[1:]
         x = reshape_to_iid_batch_event(x, event_shape=x_shape, leading_is_iid=False)
 
@@ -165,13 +168,15 @@ class DirectPosterior(NeuralPosterior):
             support of the prior, -∞ (corresponding to 0 probability) outside.
         """
         x = self._x_else_default_x(x)
+
+        # [1:] to remove batch dimension for `reshape_to_iid_batch_event`.
         x_shape = self._x_shape[1:] if self._x_shape is not None else x.shape[1:]
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
-        x_de = reshape_to_iid_batch_event(x, x_shape)
         theta_de = reshape_to_iid_batch_event(
             theta, theta.shape[1:], leading_is_iid=True
         )
+        x_de = reshape_to_iid_batch_event(x, x_shape)
 
         # TODO Train exited here, entered after sampling?
         self.posterior_estimator.eval()
@@ -181,6 +186,8 @@ class DirectPosterior(NeuralPosterior):
             unnorm_log_prob = self.posterior_estimator.log_prob(
                 theta_de, condition=x_de
             )
+            # `log_prob` supports only a single observation (i.e. `batchsize==1`).
+            # We now remove this additional dimension.
             unnorm_log_prob = unnorm_log_prob.squeeze(dim=1)
 
             # Force probability to be zero outside prior support.
@@ -231,6 +238,7 @@ class DirectPosterior(NeuralPosterior):
         """
 
         def acceptance_at(x: Tensor) -> Tensor:
+            # [1:] to remove batch-dimension for `reshape_to_iid_batch_event`.
             x_shape = self._x_shape[1:] if self._x_shape is not None else x.shape[1:]
             return accept_reject_sample(
                 proposal=self.posterior_estimator,

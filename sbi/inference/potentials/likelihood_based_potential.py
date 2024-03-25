@@ -120,10 +120,12 @@ def _log_likelihoods_over_trials(
         log_likelihood_trial_sum: log likelihood for each parameter, summed over all
             batch entries (iid trials) in `x`.
     """
-    # Shape of `x` is (iid_dim, *event_shape)
+    # Shape of `x` is (iid_dim, *event_shape).
     x = reshape_to_iid_batch_event(x, event_shape=x.shape[1:], leading_is_iid=True)
 
-    # Match the number of `x` to the number of conditions (`theta`).
+    # Match the number of `x` to the number of conditions (`theta`). This is important
+    # if the potential is simulataneously evaluated at multiple `theta` (e.g.
+    # multi-chain MCMC).
     theta_batch_size = theta.shape[0]
     x = x.expand(-1, theta_batch_size, -1)
 
@@ -196,6 +198,9 @@ class MixedLikelihoodBasedPotential(LikelihoodBasedPotential):
             self.x_o, event_shape=self.x_o.shape[1:], leading_is_iid=True
         )
         theta_batch_dim = theta.shape[1]
+        # Match the number of `x` to the number of conditions (`theta`). This is 
+        # importantif the potential is simulataneously evaluated at multiple `theta` 
+        # (e.g. multi-chain MCMC).
         x = x.expand(-1, theta_batch_dim, -1)
 
         # Calculate likelihood in one batch.

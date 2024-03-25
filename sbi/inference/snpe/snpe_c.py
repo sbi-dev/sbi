@@ -369,7 +369,9 @@ class SNPE_C(PosteriorEstimator):
             theta = reshape_to_iid_batch_event(theta, theta.shape[1:])
             x = reshape_to_iid_batch_event(x, self._x_shape[1:])
             log_prob_posterior_non_atomic = self._neural_net.log_prob(theta, x)
-            log_prob_posterior_non_atomic = log_prob_posterior_non_atomic.squeeze()
+            # squeeze to remove iid dimension, which is always one during the loss
+            # evaluation of `SNPE_C` (because we have one theta vector per x vector).
+            log_prob_posterior_non_atomic = log_prob_posterior_non_atomic.squeeze(dim=0)
             masks = masks.reshape(-1)
             log_prob_proposal_posterior = (
                 masks * log_prob_posterior_non_atomic + log_prob_proposal_posterior

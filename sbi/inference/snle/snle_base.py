@@ -174,7 +174,6 @@ class LikelihoodEstimator(NeuralInference, ABC):
                 x[self.train_indices].to("cpu"),
             )
             self._x_shape = x_shape_from_simulation(x.to("cpu"))
-            self._theta_shape = theta[0].unsqueeze(0).shape  # TODO: can theta be 2D?
             del theta, x
             assert (
                 len(self._x_shape) < 3
@@ -369,7 +368,7 @@ class LikelihoodEstimator(NeuralInference, ABC):
             Negative log prob.
         """
         theta = reshape_to_iid_batch_event(
-            theta, event_shape=self._theta_shape[1:], leading_is_iid=False
+            theta, event_shape=theta.shape[1:], leading_is_iid=False
         )
         x = reshape_to_iid_batch_event(
             x, event_shape=self._x_shape[1:], leading_is_iid=False

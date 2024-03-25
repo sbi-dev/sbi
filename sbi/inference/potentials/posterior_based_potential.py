@@ -111,9 +111,11 @@ class PosteriorBasedPotential(BasePotential):
             theta = reshape_to_iid_batch_event(
                 theta, event_shape=theta.shape[1:], leading_is_iid=True
             )
+            # We assume that a single `x` is passed (i.e. batchsize==1), so we squeeze
+            # the batch dimension of the log-prob with `.squeeze(dim=1)`.
             posterior_log_prob = self.posterior_estimator.log_prob(
                 theta, condition=x
-            ).squeeze()
+            ).squeeze(dim=1)
 
             posterior_log_prob = torch.where(
                 in_prior_support,

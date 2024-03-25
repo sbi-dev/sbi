@@ -9,7 +9,7 @@ from torch import Tensor, nn, unique
 
 from sbi.neural_nets.density_estimators import MixedDensityEstimator
 from sbi.neural_nets.density_estimators.mixed_density_estimator import _separate_input
-from sbi.neural_nets.discrete import build_categoricalmassestimator
+from sbi.neural_nets.categorial import build_categoricalmassestimator
 from sbi.neural_nets.flow import build_nsf
 from sbi.utils.sbiutils import standardizing_net
 from sbi.utils.user_input_checks import check_data_device
