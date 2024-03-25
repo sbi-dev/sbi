@@ -354,7 +354,10 @@ def test_bernoulli_latent_model(jit, mcmc_params_testing: dict):
         model, max_plate_nesting=1, jit_compile=jit, ignore_jit_warnings=True
     )
     mcmc = MCMC(
-        slice_kernel, num_samples=600, warmup_steps=mcmc_params_testing["warmup_steps"], num_chains=1
+        slice_kernel,
+        num_samples=600,
+        warmup_steps=mcmc_params_testing["warmup_steps"],
+        num_chains=1,
     )
     mcmc.run(data)
     samples = mcmc.get_samples()
