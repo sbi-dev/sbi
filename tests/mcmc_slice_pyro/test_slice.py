@@ -198,14 +198,9 @@ def test_logistic_regression(jit, num_chains, mcmc_params_testing: dict):
         return y
 
     slice_kernel = Slice(model, jit_compile=jit, ignore_jit_warnings=True)
-    mcmc = MCMC(
-        slice_kernel,
-        num_samples=500,
-        warmup_steps=mcmc_params_testing["warmup_steps"],
-        num_chains=num_chains,
-        mp_context="fork",
-        available_cpu=1,
-    )
+    mcmc_params_testing["num_chains"] = num_chains
+    mcmc_params_testing.pop("thin")  # thinning is not supported
+    mcmc = MCMC(slice_kernel, num_samples=500, available_cpu=1, **mcmc_params_testing)
     mcmc.run(data)
     samples = mcmc.get_samples()
     assert_equal(rmse(true_coefs, samples["beta"].mean(0)).item(), 0.0, prec=0.1)
@@ -359,7 +354,7 @@ def test_bernoulli_latent_model(jit, mcmc_params_testing: dict):
         model, max_plate_nesting=1, jit_compile=jit, ignore_jit_warnings=True
     )
     mcmc = MCMC(
-        slice_kernel, num_samples=600, warmup_steps=mcmc_params_testing["warmup_steps"]
+        slice_kernel, num_samples=600, warmup_steps=mcmc_params_testing["warmup_steps"], num_chains=1
     )
     mcmc.run(data)
     samples = mcmc.get_samples()

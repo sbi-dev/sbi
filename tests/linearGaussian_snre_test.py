@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-from copy import deepcopy
-
 import pytest
 from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
@@ -364,9 +362,8 @@ def test_api_sre_sampling_methods(
     x_o = zeros((num_trials, num_dim))
     # Test for multiple chains is cheap when vectorized.
 
-    mcmc_parameters = deepcopy(mcmc_params_testing)
-    if sampling_method != "slice_np_vectorized":
-        mcmc_parameters["num_chains"] = 1
+    if sampling_method in ("slice_np", "slice"):
+        mcmc_params_testing["num_chains"] = 1
 
     if sampling_method == "rejection":
         sample_with = "rejection"
@@ -409,7 +406,7 @@ def test_api_sre_sampling_methods(
             proposal=prior,
             theta_transform=theta_transform,
             method=sampling_method,
-            **mcmc_parameters,
+            **mcmc_params_testing,
         )
     elif sample_with == "importance":
         posterior = ImportanceSamplingPosterior(

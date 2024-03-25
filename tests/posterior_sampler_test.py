@@ -22,13 +22,7 @@ from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
 @pytest.mark.mcmc
 @pytest.mark.parametrize(
     "sampling_method",
-    (
-        "slice_np",
-        "slice_np_vectorized",
-        "slice",
-        "nuts",
-        "hmc"
-    ),
+    ("slice_np", "slice_np_vectorized", "slice", "nuts", "hmc"),
 )
 def test_api_posterior_sampler_set(
     sampling_method: str, set_seed, mcmc_params_testing: dict

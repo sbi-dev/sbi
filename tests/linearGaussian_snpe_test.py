@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-from copy import deepcopy
-
 import numpy as np
 import pytest
 import torch
@@ -407,9 +405,8 @@ def test_api_snpe_c_posterior_correction(
     num_dim = 2
     x_o = zeros(1, num_dim)
 
-    mcmc_params = deepcopy(mcmc_params_testing)
-    if mcmc_method != "slice_np_vectorized":
-        mcmc_params["num_chains"] = 1
+    if mcmc_method in ("slice_np", "slice"):
+        mcmc_params_testing["num_chains"] = 1
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(num_dim)
@@ -438,7 +435,7 @@ def test_api_snpe_c_posterior_correction(
             theta_transform=theta_transform,
             proposal=prior,
             method=mcmc_method,
-            **mcmc_params,
+            **mcmc_params_testing,
         )
     elif sample_with == "rejection":
         posterior = RejectionPosterior(
