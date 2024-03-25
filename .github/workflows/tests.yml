@@ -4,6 +4,7 @@ on:
   push:
     branches:
     - main
+    - benchmark_slow_tests
   pull_request:
   workflow_dispatch:
 
@@ -57,7 +58,7 @@ jobs:
     - name: Test with pytest
       run: |
         pip install pytest-cov
-        pytest -n auto -m "not slow and not gpu" tests/ --cov=sbi --cov-report=xml
+        pytest -m "not gpu" tests/ --cov=sbi --cov-report=xml
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4-beta
