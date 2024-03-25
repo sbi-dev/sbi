@@ -21,7 +21,7 @@ from sbi.neural_nets import (
     likelihood_nn,
 )
 from sbi.neural_nets.mnle import MixedDensityEstimator
-from sbi.neural_nets.discrete import build_categoricalmassestimator
+from sbi.neural_nets.categorial import build_categoricalmassestimator
 
 
 @pytest.mark.parametrize(
@@ -71,75 +71,46 @@ def test_shape_handling_utility_for_density_estimator(
 @pytest.mark.parametrize("density_estimator_name", ("maf", "zuko_maf"))
 @pytest.mark.parametrize("input_iid_dim", (1, 2))
 @pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
-@pytest.mark.parametrize("condition_iid_dim", (1, 3))
 @pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
 @pytest.mark.parametrize("batch_dim", (1, 10))
 def test_density_estimator_loss_shapes(
     density_estimator_name,
     input_iid_dim,
     input_event_shape,
-    condition_iid_dim,
     condition_event_shape,
     batch_dim,
 ):
     """Test whether `loss` of DensityEstimators follow the shape convention."""
-    output_dim = 5
-    embedding_net = FCEmbedding(
-        input_dim=condition_event_shape[0], output_dim=output_dim
-    )
-    embedding_net = PermutationInvariantEmbedding(
-        embedding_net,
-        trial_net_output_dim=output_dim,
+    density_estimator, inputs, conditions = _build_density_estimator_and_tensors(
+        density_estimator_name,
+        input_event_shape,
+        condition_event_shape,
+        batch_dim,
+        input_iid_dim,
     )
 
-    density_estimator = posterior_nn(
-        density_estimator_name, embedding_net=embedding_net
-    )
-    building_thetas = torch.randn((100, *input_event_shape))
-    building_xs = torch.randn((100, condition_iid_dim, *condition_event_shape))
-    density_estimator = density_estimator(building_thetas, building_xs)
-
-    inputs = torch.randn((input_iid_dim, batch_dim, *input_event_shape))
-    condition = torch.randn((1, batch_dim, condition_iid_dim, *condition_event_shape))
-    losses = density_estimator.loss(inputs, condition=condition)
+    losses = density_estimator.loss(inputs, condition=conditions)
     assert losses.shape == (input_iid_dim, batch_dim)
 
 
 @pytest.mark.parametrize("density_estimator_name", ("maf", "zuko_maf"))
-@pytest.mark.parametrize("input_iid_dim", (1, 2))
+@pytest.mark.parametrize("sample_shape", ((1,), (2, 3)))
 @pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
-@pytest.mark.parametrize("condition_iid_dim", (1, 3))
 @pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
 @pytest.mark.parametrize("batch_dim", (1, 10))
 def test_density_estimator_sample_shapes(
     density_estimator_name,
-    input_iid_dim,
+    sample_shape,
     input_event_shape,
-    condition_iid_dim,
     condition_event_shape,
     batch_dim,
 ):
     """Test whether `loss` of DensityEstimators follow the shape convention."""
-    output_dim = 5
-    embedding_net = FCEmbedding(
-        input_dim=condition_event_shape[0], output_dim=output_dim
+    density_estimator, _, conditions = _build_density_estimator_and_tensors(
+        density_estimator_name, input_event_shape, condition_event_shape, batch_dim
     )
-    embedding_net = PermutationInvariantEmbedding(
-        embedding_net,
-        trial_net_output_dim=output_dim,
-    )
-
-    density_estimator = posterior_nn(
-        density_estimator_name, embedding_net=embedding_net
-    )
-    building_thetas = torch.randn((100, *input_event_shape))
-    building_xs = torch.randn((100, condition_iid_dim, *condition_event_shape))
-    density_estimator = density_estimator(building_thetas, building_xs)
-
-    inputs = torch.randn((input_iid_dim, batch_dim, *input_event_shape))
-    condition = torch.randn((1, batch_dim, condition_iid_dim, *condition_event_shape))
-    losses = density_estimator.loss(inputs, condition=condition)
-    assert losses.shape == (input_iid_dim, batch_dim)
+    samples = density_estimator.sample(sample_shape, condition=conditions)
+    assert samples.shape == (*sample_shape, batch_dim, *input_event_shape)
 
 
 @pytest.mark.parametrize(
@@ -155,6 +126,27 @@ def test_correctness_of_density_estimator_loss(
     batch_dim,
 ):
     """Test whether identical inputs lead to identical loss values."""
+    input_iid_dim = 2
+    density_estimator, inputs, condition = (
+        _build_density_estimator_and_tensors(
+            density_estimator_name,
+            input_event_shape,
+            condition_event_shape,
+            batch_dim,
+            input_iid_dim,
+        )
+    )
+    losses = density_estimator.loss(inputs, condition=condition)
+    assert torch.allclose(losses[0, :], losses[1, :])
+
+
+def _build_density_estimator_and_tensors(
+    density_estimator_name: str,
+    input_event_shape: Tuple[int],
+    condition_event_shape: Tuple[int],
+    batch_dim: int,
+    input_iid_dim: int = 1,
+):
     if density_estimator_name == "discrete":
         input_event_shape = (1,)
     elif density_estimator_name == "mixed":
@@ -177,20 +169,16 @@ def test_correctness_of_density_estimator_loss(
         )
     elif density_estimator_name == "mixed":
         building_thetas[:, :-1] += 5.0  # Make continuous dims positive for log-tf.
-        density_estimator = build_mnle(
-            building_thetas, building_xs
-        )
+        density_estimator = build_mnle(building_thetas, building_xs)
     elif density_estimator_name == "discrete":
         density_estimator = build_categoricalmassestimator(building_thetas, building_xs)
     else:
         raise ValueError
 
-    building_thetas = building_thetas[:batch_dim]
-    building_xs = building_xs[:batch_dim]
+    inputs = building_thetas[:batch_dim]
+    condition = building_xs[:batch_dim]
 
-    input_iid_dim = 2
-    inputs = building_thetas.unsqueeze(0)
+    inputs = inputs.unsqueeze(0)
     inputs = inputs.expand(input_iid_dim, -1, -1)
-    condition = building_xs.unsqueeze(0)
-    losses = density_estimator.loss(inputs, condition=condition)
-    assert torch.allclose(losses[0, :], losses[1, :])
+    condition = condition.unsqueeze(0)
+    return density_estimator, inputs, condition

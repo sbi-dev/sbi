@@ -90,6 +90,7 @@ class ZukoFlow(DensityEstimator):
         Returns:
             Samples of shape `(*sample_shape, condition_batch_dim)`.
         """
+        assert condition.shape[0] == 1
         condition = condition.transpose(1, 0)
         condition = torch.squeeze(condition, dim=1)
 

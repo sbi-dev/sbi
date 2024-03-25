@@ -86,6 +86,7 @@ class NFlowsFlow(DensityEstimator):
         Returns:
             Samples of shape `(*sample_shape, condition_batch_dim)`.
         """
+        assert condition.shape[0] == 1
         condition_batch_dim = condition.shape[1]
         num_samples = torch.Size(sample_shape).numel()
 
