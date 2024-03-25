@@ -73,7 +73,7 @@ class MCMCPosterior(NeuralPosterior):
                 The samplers `hmc_pymc`, `nuts_pymc` or `slice_pymc` sample with PyMC.
             thin: The thinning factor for the chain.
             warmup_steps: The initial number of samples to discard.
-            num_chains: The number of chains.
+            num_chains: The number of chains. Should generally be at most `num_workers - 1`.
             init_strategy: The initialisation strategy for chains; `proposal` will draw
                 init locations from `proposal`, whereas `sir` will use Sequential-
                 Importance-Resampling (SIR). SIR initially samples
