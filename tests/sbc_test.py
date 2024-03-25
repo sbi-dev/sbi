@@ -86,7 +86,7 @@ def test_consistent_sbc_results(method, model="mdn"):
 
     num_simulations = 1000
     max_num_epochs = 20
-    num_sbc_runs = 4
+    num_sbc_runs = 100
 
     likelihood_shift = -1.0 * ones(num_dim)
     likelihood_cov = 0.3 * eye(num_dim)
