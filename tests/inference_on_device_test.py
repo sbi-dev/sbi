@@ -153,14 +153,7 @@ def test_training_and_mcmc_on_device(
             posterior = inferer.build_posterior(
                 sample_with="mcmc",
                 mcmc_method=sampling_method,
-                mcmc_parameters=dict(
-                    thin=mcmc_params_testing["thin"]
-                    if sampling_method == "slice_np_vectorized"
-                    else 1,
-                    num_chains=mcmc_params_testing["num_chains"]
-                    if sampling_method == "slice_np_vectorized"
-                    else 1,
-                ),
+                mcmc_parameters=mcmc_params_testing,
             )
         elif sampling_method in ["rejection", "direct"]:
             # all other cases: rejection, direct

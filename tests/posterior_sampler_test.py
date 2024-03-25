@@ -27,7 +27,7 @@ from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
         "slice_np_vectorized",
         "slice",
         "nuts",
-        "hmc",
+        "hmc"
     ),
 )
 def test_api_posterior_sampler_set(

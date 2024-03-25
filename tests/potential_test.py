@@ -44,6 +44,7 @@ def test_callable_potential(sampling_method, mcmc_params_testing: dict):
         )
         approx_samples = approx_density.sample((1024,), oversampling_factor=1024, x=x_o)
     elif sampling_method == MCMCPosterior:
+        mcmc_params_testing["num_chains"] = 10
         approx_density = sampling_method(potential_fn=potential, proposal=proposal)
         approx_samples = approx_density.sample(
             (1024,), x=x_o, method="slice_np_vectorized", **mcmc_params_testing
