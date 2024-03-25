@@ -10,7 +10,7 @@ from matplotlib.pyplot import subplots
 from torch.utils.tensorboard.writer import SummaryWriter
 
 from sbi.analysis import pairplot, plot_summary, sbc_rank_plot
-from sbi.inference import SNLE, SNPE, SNRE, prepare_for_sbi, simulate_for_sbi
+from sbi.inference import SNLE, SNPE, SNRE, simulate_for_sbi
 from sbi.utils import BoxUniform
 
 
@@ -34,10 +34,8 @@ def test_plot_summary(method, tmp_path):
 
     summary_writer = SummaryWriter(tmp_path)
 
-    def linear_gaussian(theta):
+    def simulator(theta):
         return theta + 1.0 + torch.randn_like(theta) * 0.1
-
-    simulator, prior = prepare_for_sbi(linear_gaussian, prior)
 
     inference = method(prior=prior, summary_writer=summary_writer)
     theta, x = simulate_for_sbi(simulator, proposal=prior, num_simulations=6)

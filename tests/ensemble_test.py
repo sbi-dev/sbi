@@ -7,7 +7,7 @@ import pytest
 from torch import eye, ones, zeros
 from torch.distributions import MultivariateNormal
 
-from sbi.inference import SNLE_A, SNPE_C, SNRE_A, prepare_for_sbi
+from sbi.inference import SNLE_A, SNPE_C, SNRE_A
 from sbi.inference.posteriors import EnsemblePosterior
 from sbi.simulators.linear_gaussian import (
     linear_gaussian,
@@ -28,10 +28,9 @@ def test_import_before_deprecation():
         prior_mean = zeros(2)
         prior_cov = eye(2)
         prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
-        simulator, prior = prepare_for_sbi(
-            lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov),
-            prior,
-        )
+
+        def simulator(theta):
+            return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
         theta = prior.sample((num_simulations,))
         x = simulator(theta)
@@ -78,9 +77,8 @@ def test_c2st_posterior_ensemble_on_linearGaussian(inference_method, num_trials)
     )
     target_samples = gt_posterior.sample((num_samples,))
 
-    simulator, prior = prepare_for_sbi(
-        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov), prior
-    )
+    def simulator(theta):
+        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     # train ensemble components
     posteriors = []

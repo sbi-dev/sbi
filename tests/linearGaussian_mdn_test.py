@@ -14,7 +14,6 @@ from sbi.inference import (
     DirectPosterior,
     MCMCPosterior,
     likelihood_estimator_based_potential,
-    prepare_for_sbi,
     simulate_for_sbi,
 )
 from sbi.simulators.linear_gaussian import (
@@ -54,7 +53,6 @@ def mdn_inference_with_different_methods(method):
     def simulator(theta: Tensor) -> Tensor:
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    simulator, prior = prepare_for_sbi(simulator, prior)
     inference = method(density_estimator="mdn")
 
     theta, x = simulate_for_sbi(simulator, prior, num_simulations)
@@ -102,7 +100,6 @@ def test_mdn_with_1D_uniform_prior():
     def simulator(theta: Tensor) -> Tensor:
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    simulator, prior = prepare_for_sbi(simulator, prior)
     inference = SNPE(density_estimator="mdn")
 
     theta, x = simulate_for_sbi(simulator, prior, 100)
