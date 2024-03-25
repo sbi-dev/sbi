@@ -11,6 +11,7 @@ from sbi.inference.potentials.posterior_based_potential import (
     posterior_estimator_based_potential,
 )
 from sbi.neural_nets.density_estimators.base import DensityEstimator
+from sbi.neural_nets.density_estimators.shape_handling import reshape_to_batch_event, reshape_to_iid_batch_event
 from sbi.samplers.rejection.rejection import accept_reject_sample
 from sbi.sbi_types import Shape
 from sbi.utils import check_prior, within_support
@@ -101,17 +102,13 @@ class DirectPosterior(NeuralPosterior):
         """
 
         num_samples = torch.Size(sample_shape).numel()
-        condition_shape = self.posterior_estimator._condition_shape
         x = self._x_else_default_x(x)
 
-        try:
-            x = x.reshape(*condition_shape)
-        except RuntimeError as err:
-            raise ValueError(
-                f"Expected a single `x` which should broadcastable to shape \
-                  {condition_shape}, but got {x.shape}. For batched eval \
-                  see issue #990"
-            ) from err
+        # [1:] because we remove batch dimension for `reshape_to_batch_event`.
+        # Note: This line will break if `x_shape` is `None` and if `x` is passed without
+        # batch dimension.
+        x_shape = self._x_shape[1:] if self._x_shape is not None else x.shape[1:]
+        x = reshape_to_batch_event(x, event_shape=x_shape)
 
         max_sampling_batch_size = (
             self.max_sampling_batch_size
@@ -171,24 +168,27 @@ class DirectPosterior(NeuralPosterior):
             support of the prior, -∞ (corresponding to 0 probability) outside.
         """
         x = self._x_else_default_x(x)
-        condition_shape = self.posterior_estimator._condition_shape
-        try:
-            x = x.reshape(*condition_shape)
-        except RuntimeError as err:
-            raise ValueError(
-                f"Expected a single `x` which should broadcastable to shape \
-                  {condition_shape}, but got {x.shape}. For batched eval \
-                  see issue #990"
-            ) from err
+
+        # [1:] to remove batch dimension for `reshape_to_iid_batch_event`.
+        x_shape = self._x_shape[1:] if self._x_shape is not None else x.shape[1:]
+
+        theta = ensure_theta_batched(torch.as_tensor(theta))
+        theta_de = reshape_to_iid_batch_event(
+            theta, theta.shape[1:], leading_is_iid=True
+        )
+        x_de = reshape_to_batch_event(x, x_shape)
 
         # TODO Train exited here, entered after sampling?
         self.posterior_estimator.eval()
 
-        theta = ensure_theta_batched(torch.as_tensor(theta))
-
         with torch.set_grad_enabled(track_gradients):
             # Evaluate on device, move back to cpu for comparison with prior.
-            unnorm_log_prob = self.posterior_estimator.log_prob(theta, condition=x)
+            unnorm_log_prob = self.posterior_estimator.log_prob(
+                theta_de, condition=x_de
+            )
+            # `log_prob` supports only a single observation (i.e. `batchsize==1`).
+            # We now remove this additional dimension.
+            unnorm_log_prob = unnorm_log_prob.squeeze(dim=1)
 
             # Force probability to be zero outside prior support.
             in_prior_support = within_support(self.prior, theta)
@@ -238,6 +238,8 @@ class DirectPosterior(NeuralPosterior):
         """
 
         def acceptance_at(x: Tensor) -> Tensor:
+            # [1:] to remove batch-dimension for `reshape_to_batch_event`.
+            x_shape = self._x_shape[1:] if self._x_shape is not None else x.shape[1:]
             return accept_reject_sample(
                 proposal=self.posterior_estimator,
                 accept_reject_fn=lambda theta: within_support(self.prior, theta),
@@ -245,7 +247,9 @@ class DirectPosterior(NeuralPosterior):
                 show_progress_bars=show_progress_bars,
                 sample_for_correction_factor=True,
                 max_sampling_batch_size=rejection_sampling_batch_size,
-                proposal_sampling_kwargs={"condition": x},
+                proposal_sampling_kwargs={
+                    "condition": reshape_to_batch_event(x, x_shape)
+                },
             )[1]
 
         # Check if the provided x matches the default x (short-circuit on identity).

@@ -748,17 +748,16 @@ def validate_theta_and_x(
     return theta, x
 
 
-def test_posterior_net_for_multi_d_x(net: flows.Flow, theta: Tensor, x: Tensor) -> None:
+def test_posterior_net_for_multi_d_x(net: "DensityEstimator", theta: Tensor, x: Tensor) -> None:
     """Test log prob method of the net.
 
     This is done to make sure the net can handle multidimensional inputs via an
     embedding net. If not, it usually fails with a RuntimeError. Here we catch the
     error, append a debug hint and raise it again.
     """
-
     try:
         # torch.nn.functional needs at least two inputs here.
-        net.log_prob(theta[:2], x[:2])
+        net.log_prob(theta[:, :2], condition=x[:2])
     except RuntimeError as rte:
         ndims = x.ndim
         if ndims > 2:

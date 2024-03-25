@@ -12,6 +12,7 @@ from sbi.neural_nets.density_estimators import DensityEstimator
 from sbi.neural_nets.mnle import MixedDensityEstimator
 from sbi.sbi_types import TorchTransform
 from sbi.utils import mcmc_transform
+from sbi.neural_nets.density_estimators.shape_handling import reshape_to_batch_event, reshape_to_iid_batch_event
 
 
 def likelihood_estimator_based_potential(
@@ -119,19 +120,28 @@ def _log_likelihoods_over_trials(
         log_likelihood_trial_sum: log likelihood for each parameter, summed over all
             batch entries (iid trials) in `x`.
     """
-    # unsqueeze to ensure that the x-batch dimension is the first dimension for the
-    # broadcasting of the density estimator.
-    x = torch.as_tensor(x).reshape(-1, x.shape[-1]).unsqueeze(1)
+    # Shape of `x` is (iid_dim, *event_shape).
+    x = reshape_to_iid_batch_event(x, event_shape=x.shape[1:], leading_is_iid=True)
+
+    # Match the number of `x` to the number of conditions (`theta`). This is important
+    # if the potential is simulataneously evaluated at multiple `theta` (e.g.
+    # multi-chain MCMC).
+    theta_batch_size = theta.shape[0]
+    x = x.expand(-1, theta_batch_size, -1)
+
     assert (
         next(estimator.parameters()).device == x.device and x.device == theta.device
     ), f"""device mismatch: estimator, x, theta: \
         {next(estimator.parameters()).device}, {x.device},
         {theta.device}."""
 
+    # Shape of `theta` is (batch_dim, *event_shape).
+    theta = reshape_to_batch_event(theta, event_shape=theta.shape[1:])
+
     # Calculate likelihood in one batch.
     with torch.set_grad_enabled(track_gradients):
         log_likelihood_trial_batch = estimator.log_prob(x, condition=theta)
-        # Reshape to (-1, theta_batch_size), sum over trial-log likelihoods.
+        # Sum over trial-log likelihoods.
         log_likelihood_trial_sum = log_likelihood_trial_batch.sum(0)
 
     return log_likelihood_trial_sum
@@ -170,28 +180,39 @@ def mixed_likelihood_estimator_based_potential(
 class MixedLikelihoodBasedPotential(LikelihoodBasedPotential):
     def __init__(
         self,
-        likelihood_estimator: MixedDensityEstimator,  # type: ignore TODO fix pyright
+        likelihood_estimator: MixedDensityEstimator,
         prior: Distribution,
         x_o: Optional[Tensor],
         device: str = "cpu",
     ):
-        # TODO Fix pyright issue by making MixedDensityEstimator a subclass
-        # of DensityEstimator
-        super().__init__(likelihood_estimator, prior, x_o, device)  # type: ignore
+        super().__init__(likelihood_estimator, prior, x_o, device)
 
     def __call__(self, theta: Tensor, track_gradients: bool = True) -> Tensor:
+        prior_log_prob = self.prior.log_prob(theta)  # type: ignore
+
+        # Shape of `x` is (iid_dim, *event_shape)
+        theta = reshape_to_batch_event(theta, event_shape=theta.shape[1:])
+        x = reshape_to_iid_batch_event(
+            self.x_o, event_shape=self.x_o.shape[1:], leading_is_iid=True
+        )
+        theta_batch_dim = theta.shape[1]
+        # Match the number of `x` to the number of conditions (`theta`). This is
+        # importantif the potential is simulataneously evaluated at multiple `theta`
+        # (e.g. multi-chain MCMC).
+        x = x.expand(-1, theta_batch_dim, -1)
+
         # Calculate likelihood in one batch.
         with torch.set_grad_enabled(track_gradients):
             # Call the specific log prob method of the mixed likelihood estimator as
             # this optimizes the evaluation of the discrete data part.
-            # TODO: how to fix pyright issues?
-            log_likelihood_trial_batch = self.likelihood_estimator.log_prob_iid(
-                x=self.x_o,
-                context=theta.to(self.device),
+            # TODO: how to fix pyright issues?  # TODO log_prob_iid
+            log_likelihood_trial_batch = self.likelihood_estimator.log_prob(
+                input=x,
+                condition=theta.to(self.device),
             )  # type: ignore
             # Reshape to (x-trials x parameters), sum over trial-log likelihoods.
             log_likelihood_trial_sum = log_likelihood_trial_batch.reshape(
                 self.x_o.shape[0], -1
             ).sum(0)
 
-        return log_likelihood_trial_sum + self.prior.log_prob(theta)  # type: ignore
+        return log_likelihood_trial_sum + prior_log_prob

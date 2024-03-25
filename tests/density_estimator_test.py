@@ -10,216 +10,11 @@ import torch
 from torch import eye, zeros
 from torch.distributions import MultivariateNormal
 
-from sbi.neural_nets.density_estimators import NFlowsFlow, ZukoFlow
 from sbi.neural_nets.density_estimators.shape_handling import reshape_to_iid_batch_event
-from sbi.neural_nets.flow import build_nsf, build_zuko_maf
-
-
-@pytest.mark.parametrize("density_estimator", (NFlowsFlow, ZukoFlow))
-@pytest.mark.parametrize("input_dims", (1, 2))
-@pytest.mark.parametrize(
-    "condition_shape", ((1,), (2,), (1, 1), (2, 2), (1, 1, 1), (2, 2, 2))
-)
-def test_api_density_estimator(density_estimator, input_dims, condition_shape):
-    r"""Checks whether we can evaluate and sample from density estimators correctly.
-
-    Args:
-        density_estimator: DensityEstimator subclass.
-        input_dim: Dimensionality of the input.
-        context_shape: Dimensionality of the context.
-    """
-
-    nsamples = 10
-    nsamples_test = 5
-
-    input_mvn = MultivariateNormal(
-        loc=zeros(input_dims), covariance_matrix=eye(input_dims)
-    )
-    batch_input = input_mvn.sample((nsamples,))
-    context_mvn = MultivariateNormal(
-        loc=zeros(*condition_shape), covariance_matrix=eye(condition_shape[-1])
-    )
-    batch_context = context_mvn.sample((nsamples,))
-
-    class EmbeddingNet(torch.nn.Module):
-        def forward(self, x):
-            for _ in range(len(condition_shape) - 1):
-                x = torch.sum(x, dim=-1)
-            return x
-
-    if density_estimator == NFlowsFlow:
-        estimator = build_nsf(
-            batch_input,
-            batch_context,
-            hidden_features=10,
-            num_transforms=2,
-            embedding_net=EmbeddingNet(),
-        )
-    elif density_estimator == ZukoFlow:
-        estimator = build_zuko_maf(
-            batch_input,
-            batch_context,
-            hidden_features=10,
-            num_transforms=2,
-            embedding_net=EmbeddingNet(),
-        )
-
-    # Loss is only required to work for batched inputs and contexts
-    loss = estimator.loss(batch_input, batch_context)
-    assert loss.shape == (
-        nsamples,
-    ), f"Loss shape is not correct. It is of shape {loss.shape}, but should \
-        be {(nsamples,)}"
-
-    # Sample and log_prob should work for batched and unbatched contexts
-
-    # Unbatched context
-    samples = estimator.sample((nsamples_test,), batch_context[0])
-    assert samples.shape == (
-        nsamples_test,
-        input_dims,
-    ), f"Samples shape is not correct. It is of shape {samples.shape}, but should \
-        be {(nsamples_test, input_dims)}"
-    log_probs = estimator.log_prob(samples, batch_context[0])
-    assert log_probs.shape == (
-        nsamples_test,
-    ), f"log_prob shape is not correct. It is of shape {log_probs.shape}, but should \
-        be {(nsamples_test,)}"
-
-    samples = estimator.sample((1, nsamples_test), batch_context[0])
-    assert samples.shape == (
-        1,
-        nsamples_test,
-        input_dims,
-    ), f"Samples shape is not correct. It is of shape {samples.shape}, but should \
-        be {(1, nsamples_test, input_dims)}"
-    log_probs = estimator.log_prob(samples, batch_context[0])
-    assert log_probs.shape == (
-        1,
-        nsamples_test,
-    ), f"log_prob shape is not correct. It is of shape {log_probs.shape}, but should \
-        be {(1, nsamples_test)}"
-
-    samples = estimator.sample((2, nsamples_test), batch_context[0])
-    assert samples.shape == (
-        2,
-        nsamples_test,
-        input_dims,
-    ), f"Samples shape is not correct. It is of shape {samples.shape}, but should \
-        be {(batch_context.shape[0], nsamples_test, input_dims)}"
-    log_probs = estimator.log_prob(samples, batch_context[0])
-    assert log_probs.shape == (
-        2,
-        nsamples_test,
-    ), f"log_prob shape is not correct. It is of shape {log_probs.shape}, but should \
-        be {(batch_context.shape[0], nsamples_test)}"
-
-    # Batched context
-    samples = estimator.sample((nsamples_test,), batch_context)
-    assert samples.shape == (
-        batch_context.shape[0],
-        nsamples_test,
-        input_dims,
-    ), f"Samples shape is not correct. It is of shape {samples.shape}, but should \
-        be {(batch_context.shape[0], nsamples_test, input_dims)}"
-    try:
-        log_probs = estimator.log_prob(samples, batch_context)
-    except RuntimeError:
-        # Shapes (10,) and (5,) are not broadcastable, so we expect a ValueError
-        pass
-    except Exception as err:
-        raise AssertionError(
-            f"Expected RuntimeError as shapes {batch_context.shape} \
-                             and {samples.shape} are not broadcastable, but got a \
-                             different/no error."
-        ) from err
-
-    samples = estimator.sample((nsamples_test,), batch_context[0].unsqueeze(0))
-    assert samples.shape == (
-        1,
-        nsamples_test,
-        input_dims,
-    ), f"Samples shape is not correct. It is of shape {samples.shape}, but should be \
-        {(batch_context.shape[0], nsamples_test, input_dims)}"
-    log_probs = estimator.log_prob(samples, batch_context[0].unsqueeze(0))
-    assert log_probs.shape == (
-        1,
-        nsamples_test,
-    ), f"log_prob shape is not correct. It is of shape {log_probs.shape}, but should \
-        be {(batch_context.shape[0], nsamples_test)}"
-
-    # Both batched
-    samples = estimator.sample((2, nsamples_test), batch_context.unsqueeze(0))
-    assert samples.shape == (
-        1,
-        batch_context.shape[0],
-        2,
-        nsamples_test,
-        input_dims,
-    ), f"Samples shape is not correct. It is of shape {samples.shape}, but should \
-        be {(1, batch_context.shape[0], 2, nsamples_test, input_dims)}"
-    try:
-        log_probs = estimator.log_prob(samples, batch_context.unsqueeze(0))
-    except RuntimeError:
-        # Shapes (10,) and (5,) are not broadcastable, so we expect a ValueError
-        pass
-    except Exception as err:
-        raise AssertionError(
-            f"Expected RuntimeError as shapes {batch_context.shape} \
-                            and {samples.shape} are not broadcastable, but got a \
-                            different/no error."
-        ) from err
-
-    # Sample and log_prob work for batched and unbatched contexts
-    samples, log_probs = estimator.sample_and_log_prob(
-        (nsamples_test,), batch_context[0]
-    )
-    assert samples.shape == (
-        nsamples_test,
-        input_dims,
-    ), f"Samples shape is not correct. It is of shape {samples.shape}, but should \
-        be {(nsamples_test, input_dims)}"
-    assert log_probs.shape == (
-        nsamples_test,
-    ), f"log_prob shape is not correct. It is of shape {log_probs.shape}, but should \
-        be {(nsamples_test,)}"
-
-    samples, log_probs = estimator.sample_and_log_prob((nsamples_test,), batch_context)
-
-    assert samples.shape == (
-        batch_context.shape[0],
-        nsamples_test,
-        input_dims,
-    ), f"Samples shape is not correct. It is of shape {samples.shape}, but should \
-        be {(batch_context.shape[0], nsamples_test, input_dims)}"
-    assert log_probs.shape == (
-        batch_context.shape[0],
-        nsamples_test,
-    ), f"log_prob shape is not correct. It is of shape {log_probs.shape}, but should \
-        be {(batch_context.shape[0], nsamples_test)}"
-
-    samples, log_probs = estimator.sample_and_log_prob(
-        (
-            2,
-            nsamples_test,
-        ),
-        batch_context.unsqueeze(0),
-    )
-    assert samples.shape == (
-        1,
-        batch_context.shape[0],
-        2,
-        nsamples_test,
-        input_dims,
-    ), f"Samples shape is not correct. It is of shape {samples.shape}, but should \
-        be {(1, batch_context.shape[0], 2, nsamples_test, input_dims)}"
-    assert log_probs.shape == (
-        1,
-        batch_context.shape[0],
-        2,
-        nsamples_test,
-    ), f"log_prob shape is not correct. It is of shape {log_probs.shape}, but should \
-        be {(1, batch_context.shape[0], 2, nsamples_test)}"
+from sbi.neural_nets.flow import build_zuko_maf, build_maf
+from sbi.neural_nets.mdn import build_mdn
+from sbi.neural_nets import build_mnle
+from sbi.neural_nets.categorial import build_categoricalmassestimator
 
 
 @pytest.mark.parametrize(
@@ -232,7 +27,7 @@ def test_api_density_estimator(density_estimator, input_dims, condition_shape):
         ((2, 3), (1, 2, 3), (3,), False),
         ((2, 3), (2, 1, 3), (3,), True),
         ((1, 2, 3), (1, 2, 3), (3,), True),
-        ((1, 2, 3), (1, 2, 3), (3,), False),
+        ((1, 2, 3), (2, 1, 3), (3,), False),
         ((3, 5), (1, 1, 3, 5), (3, 5), False),
         ((3, 5), (1, 1, 3, 5), (3, 5), True),
         ((1, 3, 5), (1, 1, 3, 5), (3, 5), False),
@@ -240,7 +35,7 @@ def test_api_density_estimator(density_estimator, input_dims, condition_shape):
         ((2, 3, 5), (1, 2, 3, 5), (3, 5), False),
         ((2, 3, 5), (2, 1, 3, 5), (3, 5), True),
         ((1, 2, 3, 5), (1, 2, 3, 5), (3, 5), True),
-        ((1, 2, 3, 5), (1, 2, 3, 5), (3, 5), False),
+        ((1, 2, 3, 5), (2, 1, 3, 5), (3, 5), False),
         pytest.param((1, 2, 3, 5), (1, 2, 3, 5), (5), False, marks=pytest.mark.xfail),
         pytest.param((1, 2, 3, 5), (1, 2, 3, 5), (3), False, marks=pytest.mark.xfail),
         pytest.param((1, 2, 3), (1, 2, 3), (1, 5), False, marks=pytest.mark.xfail),
@@ -264,3 +59,131 @@ def test_shape_handling_utility_for_density_estimator(
         f"Shapes of Output ({output.shape}) and target shape ({target_shape}) do not "
         f"match."
     )
+
+
+@pytest.mark.parametrize(
+    "density_estimator_name", ("mdn", "maf", "zuko_maf", "categorical", "mixed")
+)
+@pytest.mark.parametrize("input_iid_dim", (1, 2))
+@pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
+@pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
+@pytest.mark.parametrize("batch_dim", (1, 10))
+def test_density_estimator_loss_shapes(
+    density_estimator_name,
+    input_iid_dim,
+    input_event_shape,
+    condition_event_shape,
+    batch_dim,
+):
+    """Test whether `loss` of DensityEstimators follow the shape convention."""
+    density_estimator, inputs, conditions = _build_density_estimator_and_tensors(
+        density_estimator_name,
+        input_event_shape,
+        condition_event_shape,
+        batch_dim,
+        input_iid_dim,
+    )
+
+    losses = density_estimator.loss(inputs, condition=conditions)
+    assert losses.shape == (input_iid_dim, batch_dim)
+
+
+@pytest.mark.parametrize(
+    "density_estimator_name", ("mdn", "maf", "zuko_maf", "categorical", "mixed")
+)
+@pytest.mark.parametrize("sample_shape", ((1,), (2, 3)))
+@pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
+@pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
+@pytest.mark.parametrize("batch_dim", (1, 10))
+def test_density_estimator_sample_shapes(
+    density_estimator_name,
+    sample_shape,
+    input_event_shape,
+    condition_event_shape,
+    batch_dim,
+):
+    """Test whether `loss` of DensityEstimators follow the shape convention."""
+    density_estimator, _, conditions = _build_density_estimator_and_tensors(
+        density_estimator_name, input_event_shape, condition_event_shape, batch_dim
+    )
+    samples = density_estimator.sample(sample_shape, condition=conditions)
+    if density_estimator_name == "categorical":
+        # Our categorical is always 1D and does not return `input_event_shape`.
+        input_event_shape = ()
+    elif density_estimator_name == "mixed":
+        input_event_shape = (input_event_shape[0] + 1,)
+    assert samples.shape == (*sample_shape, batch_dim, *input_event_shape)
+
+
+@pytest.mark.parametrize(
+    "density_estimator_name", ("mdn", "maf", "zuko_maf", "categorical", "mixed")
+)
+@pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
+@pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
+@pytest.mark.parametrize("batch_dim", (1, 10))
+def test_correctness_of_density_estimator_loss(
+    density_estimator_name,
+    input_event_shape,
+    condition_event_shape,
+    batch_dim,
+):
+    """Test whether identical inputs lead to identical loss values."""
+    input_iid_dim = 2
+    density_estimator, inputs, condition = _build_density_estimator_and_tensors(
+        density_estimator_name,
+        input_event_shape,
+        condition_event_shape,
+        batch_dim,
+        input_iid_dim,
+    )
+    losses = density_estimator.loss(inputs, condition=condition)
+    assert torch.allclose(losses[0, :], losses[1, :])
+
+
+def _build_density_estimator_and_tensors(
+    density_estimator_name: str,
+    input_event_shape: Tuple[int],
+    condition_event_shape: Tuple[int],
+    batch_dim: int,
+    input_iid_dim: int = 1,
+):
+    """Helper function for all tests that deal with shapes of density estimators."""
+    if density_estimator_name == "categorical":
+        input_event_shape = (1,)
+    elif density_estimator_name == "mixed":
+        input_event_shape = (
+            input_event_shape[0] + 1,
+        )  # 1 does not make sense for mixed.
+
+    # Use discrete thetas such that categorical density esitmators can also use them.
+    building_thetas = torch.randint(
+        0, 4, (1000, *input_event_shape), dtype=torch.float32
+    )
+    building_xs = torch.randn((1000, *condition_event_shape))
+    if density_estimator_name == "mdn":
+        density_estimator = build_mdn(
+            torch.randn_like(building_thetas), torch.randn_like(building_xs)
+        )
+    elif density_estimator_name == "maf":
+        density_estimator = build_maf(
+            torch.randn_like(building_thetas), torch.randn_like(building_xs)
+        )
+    elif density_estimator_name == "zuko_maf":
+        density_estimator = build_zuko_maf(
+            torch.randn_like(building_thetas), torch.randn_like(building_xs)
+        )
+    elif density_estimator_name == "mixed":
+        building_thetas[:, :-1] += 5.0  # Make continuous dims positive for log-tf.
+        density_estimator = build_mnle(building_thetas, building_xs)
+    elif density_estimator_name == "categorical":
+        density_estimator = build_categoricalmassestimator(building_thetas, building_xs)
+    else:
+        raise ValueError
+
+    inputs = building_thetas[:batch_dim]
+    condition = building_xs[:batch_dim]
+
+    inputs = inputs.unsqueeze(0)
+    inputs = inputs.expand(input_iid_dim, -1, -1)
+    condition = condition
+    return density_estimator, inputs, condition

@@ -13,6 +13,7 @@ from sbi.sbi_types import TorchTransform
 from sbi.utils import mcmc_transform
 from sbi.utils.sbiutils import within_support
 from sbi.utils.torchutils import ensure_theta_batched
+from sbi.neural_nets.density_estimators.shape_handling import reshape_to_batch_event, reshape_to_iid_batch_event
 
 
 def posterior_estimator_based_potential(
@@ -99,13 +100,22 @@ class PosteriorBasedPotential(BasePotential):
             )
 
         theta = ensure_theta_batched(torch.as_tensor(theta))
+
         theta, x = theta.to(self.device), self.x_o.to(self.device)
 
         with torch.set_grad_enabled(track_gradients):
-            posterior_log_prob = self.posterior_estimator.log_prob(theta, condition=x)
-
             # Force probability to be zero outside prior support.
             in_prior_support = within_support(self.prior, theta)
+
+            x = reshape_to_batch_event(x, event_shape=x.shape[1:])
+            theta = reshape_to_iid_batch_event(
+                theta, event_shape=theta.shape[1:], leading_is_iid=True
+            )
+            # We assume that a single `x` is passed (i.e. batchsize==1), so we squeeze
+            # the batch dimension of the log-prob with `.squeeze(dim=1)`.
+            posterior_log_prob = self.posterior_estimator.log_prob(
+                theta, condition=x
+            ).squeeze(dim=1)
 
             posterior_log_prob = torch.where(
                 in_prior_support,

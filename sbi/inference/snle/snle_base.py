@@ -17,6 +17,7 @@ from sbi.inference.posteriors import MCMCPosterior, RejectionPosterior, VIPoster
 from sbi.inference.potentials import likelihood_estimator_based_potential
 from sbi.neural_nets import DensityEstimator, likelihood_nn
 from sbi.utils import check_estimator_arg, check_prior, x_shape_from_simulation
+from sbi.neural_nets.density_estimators.shape_handling import reshape_to_batch_event, reshape_to_iid_batch_event
 
 
 class LikelihoodEstimator(NeuralInference, ABC):
@@ -366,4 +367,10 @@ class LikelihoodEstimator(NeuralInference, ABC):
         Returns:
             Negative log prob.
         """
+        theta = reshape_to_batch_event(
+            theta, event_shape=theta.shape[1:]
+        )
+        x = reshape_to_iid_batch_event(
+            x, event_shape=self._x_shape[1:], leading_is_iid=False
+        )
         return self._neural_net.loss(x, condition=theta)
