@@ -17,11 +17,6 @@ from sbi.inference import (
 )
 from sbi.samplers.mcmc import SliceSamplerSerial, SliceSamplerVectorized
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
-from sbi.utils.user_input_checks import (
-    check_sbi_inputs,
-    process_prior,
-    process_simulator,
-)
 
 
 @pytest.mark.mcmc
@@ -53,9 +48,8 @@ def test_api_posterior_sampler_set(
     # Test for multiple chains is cheap when vectorized.
 
     prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
-    prior, _, prior_returns_numpy = process_prior(prior)
-    simulator = process_simulator(diagonal_linear_gaussian, prior, prior_returns_numpy)
-    check_sbi_inputs(simulator, prior)
+    simulator = diagonal_linear_gaussian
+
     inference = SNL(prior, show_progress_bars=False)
 
     theta, x = simulate_for_sbi(

@@ -12,11 +12,6 @@ from torch.utils.tensorboard.writer import SummaryWriter
 from sbi.analysis import pairplot, plot_summary, sbc_rank_plot
 from sbi.inference import SNLE, SNPE, SNRE, simulate_for_sbi
 from sbi.utils import BoxUniform
-from sbi.utils.user_input_checks import (
-    check_sbi_inputs,
-    process_prior,
-    process_simulator,
-)
 
 
 @pytest.mark.parametrize("samples", (torch.randn(100, 2), [torch.randn(100, 2)] * 2))
@@ -39,12 +34,8 @@ def test_plot_summary(method, tmp_path):
 
     summary_writer = SummaryWriter(tmp_path)
 
-    def linear_gaussian(theta):
+    def simulator(theta):
         return theta + 1.0 + torch.randn_like(theta) * 0.1
-
-    prior, _, prior_returns_numpy = process_prior(prior)
-    simulator = process_simulator(linear_gaussian, prior, prior_returns_numpy)
-    check_sbi_inputs(simulator, prior)
 
     inference = method(prior=prior, summary_writer=summary_writer)
     theta, x = simulate_for_sbi(simulator, proposal=prior, num_simulations=6)
