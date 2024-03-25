@@ -1,7 +1,7 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 
 import numpy as np
 import torch
@@ -262,82 +262,87 @@ def unbiased_mmd_squared_hypothesis_test(x, y, alpha=0.05):
     return mmd_square_unbiased, threshold
 
 
-def posterior_shrinkage(prior_samples, post_samples):
+def posterior_shrinkage(
+    prior_samples: Union[Tensor, np.ndarray], post_samples: Union[Tensor, np.ndarray]
+) -> Tensor:
     """
     Calculate the posterior shrinkage, quantifying how much
     the posterior distribution contracts from the initial
     prior distribution.
+    References:
+    https://arxiv.org/abs/1803.08393
 
     Parameters
     ----------
-    prior_samples : array-like or torch.Tensor
+    prior_samples : array_like or torch.Tensor [n_samples, n_params]
         Samples from the prior distribution.
-    post_samples : array-like or torch.Tensor
+    post_samples : array-like or torch.Tensor [n_samples, n_params]
         Samples from the posterior distribution.
 
     Returns
     -------
-    shrinkage : float or array-like
+    shrinkage : torch.Tensor [n_params]
         The posterior shrinkage.
     """
 
     if len(prior_samples) == 0 or len(post_samples) == 0:
         raise ValueError("Input samples are empty")
 
-    if isinstance(prior_samples, torch.Tensor):
-        prior_samples = prior_samples.cpu().numpy()
-    if isinstance(post_samples, torch.Tensor):
-        post_samples = post_samples.cpu().numpy()
+    if not isinstance(prior_samples, torch.Tensor):
+        prior_samples = torch.tensor(prior_samples, dtype=torch.float32)
+    if not isinstance(post_samples, torch.Tensor):
+        post_samples = torch.tensor(post_samples, dtype=torch.float32)
 
     if prior_samples.ndim == 1:
         prior_samples = prior_samples[:, None]
     if post_samples.ndim == 1:
         post_samples = post_samples[:, None]
 
-    prior_std = np.std(prior_samples, axis=0)
-    post_std = np.std(post_samples, axis=0)
+    prior_std = torch.std(prior_samples, dim=0)
+    post_std = torch.std(post_samples, dim=0)
 
     return 1 - (post_std / prior_std) ** 2
 
 
-def posterior_zscore(true_theta, post_samples):
+def posterior_zscore(
+    true_theta: Union[Tensor, np.array, float], post_samples: Union[Tensor, np.array]
+):
     """
     Calculate the posterior z-score, quantifying how much the posterior
     distribution of a parameter encompasses its true value.
+    References:
+    https://arxiv.org/abs/1803.08393
 
     Parameters
     ----------
-    true_theta : array-like or torch.Tensor
+    true_theta : float, array-like or torch.Tensor [n_params]
         The true value of the parameters.
-    post_samples : array-like or torch.Tensor
+    post_samples : array-like or torch.Tensor [n_samples, n_params]
         Samples from the posterior distributions.
 
     Returns
     -------
-    z : array-like
+    z : Tensor [n_params]
         The z-score of the posterior distributions.
-
-    References:
-    https://arxiv.org/abs/1803.08393
     """
 
     if len(post_samples) == 0:
         raise ValueError("Input samples are empty")
 
-    if isinstance(true_theta, torch.Tensor):
-        true_theta = true_theta.cpu().numpy()
-    if isinstance(post_samples, torch.Tensor):
-        post_samples = post_samples.cpu().numpy()
+    if not isinstance(true_theta, torch.Tensor):
+        true_theta = torch.tensor(true_theta, dtype=torch.float32)
+    if not isinstance(post_samples, torch.Tensor):
+        post_samples = torch.tensor(post_samples, dtype=torch.float32)
 
     true_theta = np.atleast_1d(true_theta)
     if post_samples.ndim == 1:
         post_samples = post_samples[:, None]
 
     assert len(true_theta) == post_samples.shape[1]
-    post_mean = np.mean(post_samples, axis=0)
-    post_std = np.std(post_samples, axis=0)
+    post_mean = torch.mean(post_samples, dim=0)
+    post_std = torch.std(post_samples, dim=0)
 
-    return np.abs((post_mean - true_theta) / post_std)
+    return torch.abs((post_mean - true_theta) / post_std)
 
 
 def _test():
