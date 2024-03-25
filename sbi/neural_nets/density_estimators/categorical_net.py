@@ -65,7 +65,7 @@ class CategoricalNet(nn.Module):
         Returns:
             Tensor: batch of predicted categorical probabilities.
         """
-        assert context.dim() == 2, "context needs to have a batch dimension."
+        assert context.dim() == 2, f"context needs to have a batch dimension but its shape is {context.shape}."
         assert (
             context.shape[1] == self.num_input
         ), f"context dimensions must match num_input {self.num_input}"
@@ -107,16 +107,13 @@ class CategoricalNet(nn.Module):
 
         # Predict Categorical ps and sample.
         ps = self.forward(context)
-        return (
-            Categorical(probs=ps)
-            .sample(sample_shape=sample_shape)
-            .reshape(sample_shape[0], -1)
-        )
+        return Categorical(probs=ps).sample(sample_shape=sample_shape)
 
 
 class CategoricalMassEstimator(DensityEstimator):
-    """Class to perform conditional density (mass) estimation
-    for a categorical RV.
+    """Conditional density (mass) estimation for a categorical RV.
+
+    The event_shape of this class is `()`.
     """
 
     def __init__(self, net: CategoricalNet) -> None:
@@ -150,6 +147,21 @@ class CategoricalMassEstimator(DensityEstimator):
         ))
 
     def sample(self, sample_shape: torch.Size, condition: Tensor, **kwargs) -> Tensor:
+        """Return samples from the conditional categorical distribution.
+        
+        Args:
+            sample_shape: Shape of samples.
+            condition: Conditions. Of shape 
+                `(iid_dim_condition, batch_dim_condition, *event_shape_condition)`.
+
+        Returns:
+            Samples of shape (*sample_shape, batch_dim_condition). Note that the 
+            `CategoricalMassEstimator` is defined to have `event_shape=()` and
+            therefore `.sample()` does not return a trailing dimension for 
+            `event_shape`.
+        """
+        assert condition.shape[0] == 1
+        condition = torch.squeeze(condition, dim=0)
         return self.net.sample(sample_shape, condition, **kwargs)
 
     def loss(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
