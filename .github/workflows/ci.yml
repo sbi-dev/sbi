@@ -67,7 +67,7 @@ jobs:
       run: |
         pyright sbi
 
-    - name:  Run the fast CPU tests without coverage
+    - name: Run the fast CPU tests without coverage
       run: |
         pytest -v -x -n auto -m "not slow and not gpu"  tests/
 

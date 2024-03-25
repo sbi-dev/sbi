@@ -58,7 +58,7 @@ jobs:
       run: |
         pyright sbi
 
-    - name:  Run the fast and the slow CPU tests with coverage
+    - name: Run the fast and the slow CPU tests with coverage
       run: |
         pytest -v -x -n auto -m "not gpu" --cov=sbi --cov-report=xml tests/
 
