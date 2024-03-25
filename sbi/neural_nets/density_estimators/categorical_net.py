@@ -65,7 +65,9 @@ class CategoricalNet(nn.Module):
         Returns:
             Tensor: batch of predicted categorical probabilities.
         """
-        assert context.dim() == 2, f"context needs to have a batch dimension but its shape is {context.shape}."
+        assert (
+            context.dim() == 2
+        ), f"context needs to have a batch dimension but its shape is {context.shape}."
         assert (
             context.shape[1] == self.num_input
         ), f"context dimensions must match num_input {self.num_input}"
@@ -91,6 +93,8 @@ class CategoricalNet(nn.Module):
         """
         # Predict categorical ps and evaluate.
         ps = self.forward(context)
+        # Squeeze dim=1 because `Categorical` has `event_shape=()` but our data usually
+        # has an event_shape of `(1,)`.
         return Categorical(probs=ps).log_prob(input.squeeze(dim=1))
 
     def sample(self, sample_shape: torch.Size, context: Tensor) -> Tensor:
@@ -148,16 +152,16 @@ class CategoricalMassEstimator(DensityEstimator):
 
     def sample(self, sample_shape: torch.Size, condition: Tensor, **kwargs) -> Tensor:
         """Return samples from the conditional categorical distribution.
-        
+
         Args:
             sample_shape: Shape of samples.
-            condition: Conditions. Of shape 
+            condition: Conditions. Of shape
                 `(iid_dim_condition, batch_dim_condition, *event_shape_condition)`.
 
         Returns:
-            Samples of shape (*sample_shape, batch_dim_condition). Note that the 
+            Samples of shape (*sample_shape, batch_dim_condition). Note that the
             `CategoricalMassEstimator` is defined to have `event_shape=()` and
-            therefore `.sample()` does not return a trailing dimension for 
+            therefore `.sample()` does not return a trailing dimension for
             `event_shape`.
         """
         assert condition.shape[0] == 1

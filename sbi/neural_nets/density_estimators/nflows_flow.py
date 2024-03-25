@@ -40,6 +40,7 @@ class NFlowsFlow(DensityEstimator):
         Returns:
             Sample-wise log probabilities, shape `(input_iid_dim, input_batch_dim)`.
         """
+        assert condition.shape[0] == 1
         input_iid_dim = input.shape[0]
         input_batch_dim = input.shape[1]
         condition_batch_dim = condition.shape[1]
@@ -57,8 +58,10 @@ class NFlowsFlow(DensityEstimator):
         ones_for_event_dims = (1,) * condition_event_dims  # Tuple of 1s, e.g. (1, 1, 1)
         condition = condition.repeat(1, input_iid_dim, *ones_for_event_dims)
 
-        # If no iid samples then squeeze the iid dimension.
+        # Remove the superfluous iid dimension of `condition` (see assert above, it
+        # must always be 1).
         condition = torch.squeeze(condition, dim=0)
+
         log_probs = self.net.log_prob(input, context=condition)
         return log_probs.reshape((input_iid_dim, input_batch_dim))
 
@@ -73,7 +76,6 @@ class NFlowsFlow(DensityEstimator):
         Returns:
             Negative log_probability of shape `(input_iid_dim, condition_batch_dim)`.
         """
-
         return -self.log_prob(input, condition)
 
     def sample(self, sample_shape: Shape, condition: Tensor) -> Tensor:
@@ -90,7 +92,10 @@ class NFlowsFlow(DensityEstimator):
         condition_batch_dim = condition.shape[1]
         num_samples = torch.Size(sample_shape).numel()
 
+        # Remove the superfluous iid dimension of `condition` (see assert above, it
+        # must always be 1).
         condition = torch.squeeze(condition, dim=0)
+
         samples = self.net.sample(num_samples, context=condition)
 
         return samples.reshape((
@@ -112,9 +117,12 @@ class NFlowsFlow(DensityEstimator):
             Samples of shape `(*sample_shape, condition_batch_dim, *input_event_shape)`
             and associated log probs of shape `(*sample_shape, condition_batch_dim)`.
         """
+        assert condition.shape[0] == 1
         condition_batch_dim = condition.shape[1]
         num_samples = torch.Size(sample_shape).numel()
 
+        # Remove the superfluous iid dimension of `condition` (see assert above, it
+        # must always be 1).
         condition = condition.squeeze(dim=0)
         samples, log_probs = self.net.sample_and_log_prob(
             num_samples, context=condition

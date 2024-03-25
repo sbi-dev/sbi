@@ -198,8 +198,8 @@ class MixedLikelihoodBasedPotential(LikelihoodBasedPotential):
             self.x_o, event_shape=self.x_o.shape[1:], leading_is_iid=True
         )
         theta_batch_dim = theta.shape[1]
-        # Match the number of `x` to the number of conditions (`theta`). This is 
-        # importantif the potential is simulataneously evaluated at multiple `theta` 
+        # Match the number of `x` to the number of conditions (`theta`). This is
+        # importantif the potential is simulataneously evaluated at multiple `theta`
         # (e.g. multi-chain MCMC).
         x = x.expand(-1, theta_batch_dim, -1)
 

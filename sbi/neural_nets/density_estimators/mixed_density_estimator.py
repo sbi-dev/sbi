@@ -58,40 +58,48 @@ class MixedDensityEstimator(DensityEstimator):
         """Return sample from mixed data distribution.
 
         Args:
-            condition: parameters for which to generate samples.
-            sample_shape number of samples to generate.
+            sample_shape: Shape of samples to generate.
+            condition: Condition of shape `(iid_dim, batch_dim, *event_shape_condition)`
 
         Returns:
-            Tensor: samples with shape (num_samples, num_data_dimensions)
+            Samples of shape `(*sample_shape, batch_dim, event_dim_input)`
         """
-        assert (
-            condition.shape[0] == 1
-        ), "Samples can be generated for a single condition only."
+        assert condition.shape[0] == 1
+
+        num_samples = torch.Size(sample_shape).numel()
+        batch_dim = condition.shape[1]
+        condition_event_dim = condition.dim() - 2
 
         with torch.set_grad_enabled(track_gradients):
             # Sample discrete data given parameters.
             discrete_input = self.discrete_net.sample(
                 sample_shape=sample_shape,
                 condition=condition,
-            ).reshape(sample_shape[0], -1)
+            )
+            # Trailing `1` because `Categorical` has event_shape `()`.
+            discrete_input = discrete_input.reshape(1, num_samples * batch_dim, 1)
+
+            ones_for_event_dims = (1,) * condition_event_dim
+            repeated_condition = condition.repeat(1, num_samples, *ones_for_event_dims)
 
             # Sample continuous data condition on parameters and discrete data.
             # Pass num_samples=1 because the choices in the condition contains
             # num_samples elements already.
             continuous_input = self.continuous_net.sample(
+                sample_shape=(1,),
                 # repeat the single condition to match number of sampled choices.
                 # sample_shape[0] is the iid dimension.
-                condition=torch.cat(
-                    (condition.repeat(sample_shape[0], 1), discrete_input), dim=1
-                ),
-                sample_shape=sample_shape,
-            ).reshape(sample_shape[0], -1)
+                condition=torch.cat((repeated_condition, discrete_input), dim=2),
+            )
 
             # In case input was log-transformed, move them to linear space.
             if self.log_transform_input:
                 continuous_input = continuous_input.exp()
 
-        return torch.cat((continuous_input, discrete_input), dim=1)
+            joined_input = torch.cat((continuous_input, discrete_input), dim=2)
+
+            # `continuous_input` is of shape `(batch_dim * numel(sample_shape))`.
+            return joined_input.reshape(*sample_shape, batch_dim, -1)
 
     def log_prob(self, input: Tensor, condition: Tensor) -> Tensor:
         """Return log-probability of samples under the learned MNLE.

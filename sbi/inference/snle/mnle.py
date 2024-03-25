@@ -206,6 +206,6 @@ class MNLE(LikelihoodEstimator):
         Returns:
             Negative log prob.
         """
-        theta = reshape_to_iid_batch_event(theta, event_shape=self._theta_shape[1:])
+        theta = reshape_to_iid_batch_event(theta, event_shape=theta.shape[1:])
         x = reshape_to_iid_batch_event(x, event_shape=self._x_shape[1:])
         return -self._neural_net.log_prob(x, condition=theta)

@@ -12,6 +12,7 @@ from torch.distributions import MultivariateNormal
 
 from sbi.neural_nets.density_estimators.shape_handling import reshape_to_iid_batch_event
 from sbi.neural_nets.flow import build_zuko_maf, build_maf
+from sbi.neural_nets.mdn import build_mdn
 from sbi.neural_nets import build_mnle
 from sbi.neural_nets.categorial import build_categoricalmassestimator
 
@@ -61,7 +62,7 @@ def test_shape_handling_utility_for_density_estimator(
 
 
 @pytest.mark.parametrize(
-    "density_estimator_name", ("maf", "zuko_maf", "categorical", "mixed")
+    "density_estimator_name", ("mdn", "maf", "zuko_maf", "categorical", "mixed")
 )
 @pytest.mark.parametrize("input_iid_dim", (1, 2))
 @pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
@@ -87,7 +88,9 @@ def test_density_estimator_loss_shapes(
     assert losses.shape == (input_iid_dim, batch_dim)
 
 
-@pytest.mark.parametrize("density_estimator_name", ("maf", "zuko_maf", "categorical", "mixed"))
+@pytest.mark.parametrize(
+    "density_estimator_name", ("mdn", "maf", "zuko_maf", "categorical", "mixed")
+)
 @pytest.mark.parametrize("sample_shape", ((1,), (2, 3)))
 @pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
 @pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
@@ -107,11 +110,13 @@ def test_density_estimator_sample_shapes(
     if density_estimator_name == "categorical":
         # Our categorical is always 1D and does not return `input_event_shape`.
         input_event_shape = ()
+    elif density_estimator_name == "mixed":
+        input_event_shape = (input_event_shape[0] + 1,)
     assert samples.shape == (*sample_shape, batch_dim, *input_event_shape)
 
 
 @pytest.mark.parametrize(
-    "density_estimator_name", ("maf", "zuko_maf", "categorical", "mixed")
+    "density_estimator_name", ("mdn", "maf", "zuko_maf", "categorical", "mixed")
 )
 @pytest.mark.parametrize("input_event_shape", ((1,), (4,)))
 @pytest.mark.parametrize("condition_event_shape", ((1,), (7,)))
@@ -142,6 +147,7 @@ def _build_density_estimator_and_tensors(
     batch_dim: int,
     input_iid_dim: int = 1,
 ):
+    """Helper function for all tests that deal with shapes of density estimators."""
     if density_estimator_name == "categorical":
         input_event_shape = (1,)
     elif density_estimator_name == "mixed":
@@ -154,7 +160,11 @@ def _build_density_estimator_and_tensors(
         0, 4, (1000, *input_event_shape), dtype=torch.float32
     )
     building_xs = torch.randn((1000, *condition_event_shape))
-    if density_estimator_name == "maf":
+    if density_estimator_name == "mdn":
+        density_estimator = build_mdn(
+            torch.randn_like(building_thetas), torch.randn_like(building_xs)
+        )
+    elif density_estimator_name == "maf":
         density_estimator = build_maf(
             torch.randn_like(building_thetas), torch.randn_like(building_xs)
         )
