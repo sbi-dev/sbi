@@ -5,13 +5,12 @@ import torch
 from torch import Tensor
 
 
-class RMSELoss(torch.nn.Module):
-    def __init__(self, reduction="sum"):
-        super().__init__()
-        self.mse = torch.nn.MSELoss(reduction=reduction)
+def l2(x, y, axis=-1):
+    return torch.sqrt(torch.sum((x - y) ** 2, axis=axis))
 
-    def forward(self, yhat: Tensor, y: Tensor):
-        return torch.sqrt(self.mse(yhat, y))
+
+def l1(x, y, axis=-1):
+    return torch.sum(torch.abs(x - y), axis=axis)
 
 
 class TARP:
@@ -66,36 +65,46 @@ class TARP:
             Expected coverage probability (``ecp``) and credibility values (``alpha``)
 
         """
-        # DRP assumes that the predicted thetas are sampled from the posterior num_samples times
-        theta = theta.detach()
+        # DRP assumes that the predicted thetas are sampled from the "true" PDF num_samples times
+        theta = (
+            theta.detach() if not len(theta.shape) == 2 else theta.detach().unsqueeze(0)
+        )
         samples = samples.detach()
 
-        num_samples = samples.shape[0]
-        num_sims = samples.shape[1]
-        num_dims = samples.shape[2]
+        num_samples = samples.shape[0]  # samples per simulation
+        num_sims = samples.shape[-2]
+        num_dims = samples.shape[-1]
 
         if self.n_bins is None:
             self.n_bins = num_sims // 10
 
-        if theta.shape[0] != num_sims:
+        if theta.shape[-2] != num_sims:
             raise ValueError("theta must have the same number of rows as samples")
-        if theta.shape[1] != num_dims:
+        if theta.shape[-1] != num_dims:
             raise ValueError("theta must have the same number of columns as samples")
-        theta = theta.unsqueeze(0)  # add new axis in front
 
         if self.do_norm:
-            lo = torch.min(theta, dim=1, keepdims=True)  # min along num_sims
-            hi = torch.max(theta, dim=1, keepdims=True)  # max along num_sims
+            lo = torch.min(theta, dim=-2, keepdims=True)  # min along num_sims
+            hi = torch.max(theta, dim=-2, keepdims=True)  # max along num_sims
             samples = (samples - lo) / (hi - lo + 1e-10)
             theta = (theta - lo) / (hi - lo + 1e-10)
 
         assert len(theta.shape) == len(samples.shape)
 
         if not isinstance(self.references, Tensor):
-            refpdf = torch.distributions.Uniform(low=0, high=1)
-            self.references = refpdf.sample((1, num_sims, num_dims))
+            # obtain min/max per dimension of theta
+            lo = (
+                torch.min(theta, dim=-2).values.min(axis=0).values
+            )  # should be 0 if normalized
+            hi = (
+                torch.max(theta, dim=-2).values.max(axis=0).values
+            )  # should be 1 if normalized
+
+            refpdf = torch.distributions.Uniform(low=lo, high=hi)
+            self.references = refpdf.sample((1, num_sims))
         else:
             if len(self.references.shape) == 2:
+                # add singleton dimension in front
                 self.references = self.references.unsqueeze(0)
 
             if len(self.references.shape) == 3 and self.references.shape[0] != 1:
@@ -113,12 +122,14 @@ class TARP:
                     f"references must have the same number of dimensions as samples or theta, received {self.references.shape[-1]} != {num_dims}"
                 )
 
-        assert len(self.references.shape) == len(samples.shape)
+        assert len(self.references.shape) == len(
+            samples.shape
+        ), f"references {self.references.shape} != samples {samples.shape}"
 
         if self.metric_name.lower() in ["l2", "euclidean"]:
-            distance = RMSELoss(reduction="sum")
+            distance = l2
         elif self.metric_name.lower() in ["l1", "manhattan"]:
-            distance = torch.nn.L1Loss(reduction="sum")
+            distance = l1
         else:
             raise ValueError(
                 f"metric must be either 'euclidean' or 'manhattan', received {metric}"
@@ -127,7 +138,7 @@ class TARP:
         sample_dists = distance(self.references.expand(num_samples, -1, -1), samples)
         theta_dists = distance(self.references, theta)
 
-        # compute coverage
+        # compute coverage, f in algorithm 2
         coverage_values = torch.sum(sample_dists < theta_dists, axis=0) / num_samples
         hist, bin_edges = torch.histogram(
             coverage_values, density=True, bins=self.n_bins
