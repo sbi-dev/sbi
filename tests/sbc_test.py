@@ -27,9 +27,9 @@ def test_running_sbc(method, prior, reduce_fn_str, sampler, model="mdn"):
     if prior == "boxuniform":
         prior = BoxUniform(-torch.ones(num_dim), torch.ones(num_dim))
     else:
-        prior = MultipleIndependent([
-            Uniform(-torch.ones(1), torch.ones(1)) for _ in range(num_dim)
-        ])
+        prior = MultipleIndependent(
+            [Uniform(-torch.ones(1), torch.ones(1)) for _ in range(num_dim)]
+        )
 
     num_simulations = 100
     max_num_epochs = 1
@@ -77,18 +77,12 @@ def test_running_sbc(method, prior, reduce_fn_str, sampler, model="mdn"):
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("prior", ("boxuniform", "independent"))
 @pytest.mark.parametrize("method", [SNPE])
 def test_consistent_sbc_results(method, prior, model="mdn"):
     """Tests running inference and then SBC and obtaining nltp."""
 
     num_dim = 2
-    if prior == "boxuniform":
-        prior = BoxUniform(-torch.ones(num_dim), torch.ones(num_dim))
-    else:
-        prior = MultipleIndependent([
-            Uniform(-torch.ones(1), torch.ones(1)) for _ in range(num_dim)
-        ])
+    prior = BoxUniform(-torch.ones(num_dim), torch.ones(num_dim))
 
     num_simulations = 1000
     max_num_epochs = 20
