@@ -1,6 +1,11 @@
 name: Continuous Integration
 
-on: [push, pull_request, workflow_dispatch]
+on:
+  push:
+  pull_request:
+    branches:
+    - master
+  workflow_dispatch:
 
 defaults:
   run:
