@@ -338,7 +338,7 @@ def posterior_zscore(
     if post_samples.ndim == 1:
         post_samples = post_samples[:, None]
 
-    assert len(true_theta) == post_samples.shape[1]
+    assert true_theta.shape[0] == post_samples.shape[1]
     post_mean = torch.mean(post_samples, dim=0)
     post_std = torch.std(post_samples, dim=0)
 
