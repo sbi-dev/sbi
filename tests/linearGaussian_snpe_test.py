@@ -395,7 +395,7 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
     ),
 )
 def test_api_snpe_c_posterior_correction(
-    sample_with, mcmc_method, prior_str, mcmc_params_testing: dict
+    sample_with, mcmc_method, prior_str, mcmc_params_fast: dict
 ):
     """Test that leakage correction applied to sampling works, with both MCMC and
     rejection.
@@ -404,9 +404,6 @@ def test_api_snpe_c_posterior_correction(
 
     num_dim = 2
     x_o = zeros(1, num_dim)
-
-    if mcmc_method in ("slice_np", "slice"):
-        mcmc_params_testing["num_chains"] = 1
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(num_dim)
@@ -435,7 +432,7 @@ def test_api_snpe_c_posterior_correction(
             theta_transform=theta_transform,
             proposal=prior,
             method=mcmc_method,
-            **mcmc_params_testing,
+            **mcmc_params_fast,
         )
     elif sample_with == "rejection":
         posterior = RejectionPosterior(
@@ -495,7 +492,7 @@ def test_api_force_first_round_loss(
 
 @pytest.mark.slow
 @pytest.mark.mcmc
-def test_sample_conditional(mcmc_params_testing: dict):
+def test_sample_conditional(mcmc_params_accurate: dict):
     """
     Test whether sampling from the conditional gives the same results as evaluating.
 
@@ -564,7 +561,7 @@ def test_sample_conditional(mcmc_params_testing: dict):
         theta_transform=restricted_tf,
         proposal=restricted_prior,
         method="slice_np_vectorized",
-        **mcmc_params_testing,
+        **mcmc_params_accurate,
     )
     mcmc_posterior.set_default_x(x_o)  # TODO: This test has a bug? Needed to add this
     cond_samples = mcmc_posterior.sample((num_conditional_samples,))

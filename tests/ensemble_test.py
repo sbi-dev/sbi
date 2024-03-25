@@ -55,7 +55,7 @@ def test_import_before_deprecation():
     ),
 )
 def test_c2st_posterior_ensemble_on_linearGaussian(
-    inference_method, num_trials, mcmc_params_testing: dict
+    inference_method, num_trials, mcmc_params_accurate: dict
 ):
     """Test whether EnsemblePosterior infers well a simple example with available
     ground truth.
@@ -65,7 +65,7 @@ def test_c2st_posterior_ensemble_on_linearGaussian(
     ensemble_size = 2
     x_o = zeros(num_trials, num_dim)
     num_samples = 500
-    num_simulations = 2000 if inference_method == SNRE_A else 1500
+    num_simulations = 2000
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(num_dim)
@@ -103,7 +103,7 @@ def test_c2st_posterior_ensemble_on_linearGaussian(
         samples = posterior.sample(
             (num_samples,),
             method="slice_np_vectorized",
-            **mcmc_params_testing,
+            **mcmc_params_accurate,
         )
     else:
         samples = posterior.sample((num_samples,))

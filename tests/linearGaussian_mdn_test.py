@@ -26,7 +26,7 @@ from tests.test_utils import check_c2st
 @pytest.mark.parametrize(
     "method", (SNPE, pytest.param(SNLE, marks=[pytest.mark.slow, pytest.mark.mcmc]))
 )
-def test_mdn_inference_with_different_methods(method, mcmc_params_testing: dict):
+def test_mdn_inference_with_different_methods(method, mcmc_params_accurate: dict):
     num_dim = 2
     x_o = torch.tensor([[1.0, 0.0]])
     num_samples = 500
@@ -62,7 +62,7 @@ def test_mdn_inference_with_different_methods(method, mcmc_params_testing: dict)
             theta_transform=theta_transform,
             proposal=prior,
             method="slice_np_vectorized",
-            **mcmc_params_testing,
+            **mcmc_params_accurate,
         )
 
     samples = posterior.sample((num_samples,), x=x_o)

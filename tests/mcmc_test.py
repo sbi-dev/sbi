@@ -78,7 +78,7 @@ def test_c2st_slice_np_on_Gaussian(num_dim: int):
 @pytest.mark.parametrize("slice_sampler", (SliceSamplerVectorized, SliceSamplerSerial))
 @pytest.mark.parametrize("num_workers", (1, 2))
 def test_c2st_slice_np_vectorized_parallelized_on_Gaussian(
-    num_dim: int, slice_sampler, num_workers: int, mcmc_params_testing: dict
+    num_dim: int, slice_sampler, num_workers: int, mcmc_params_accurate: dict
 ):
     """Test MCMC on Gaussian, comparing to ground truth target via c2st.
 
@@ -87,13 +87,13 @@ def test_c2st_slice_np_vectorized_parallelized_on_Gaussian(
 
     """
     num_samples = 500
-    warmup = mcmc_params_testing["warmup_steps"]
+    warmup = mcmc_params_accurate["warmup_steps"]
     num_chains = (
-        mcmc_params_testing["num_chains"]
+        mcmc_params_accurate["num_chains"]
         if slice_sampler is SliceSamplerVectorized
         else 1
     )
-    thin = mcmc_params_testing["thin"]
+    thin = mcmc_params_accurate["thin"]
 
     likelihood_shift = -1.0 * ones(num_dim)
     likelihood_cov = 0.3 * eye(num_dim)
@@ -146,7 +146,7 @@ def test_c2st_slice_np_vectorized_parallelized_on_Gaussian(
         "slice_np_vectorized",
     ),
 )
-def test_getting_inference_diagnostics(method, mcmc_params_testing: dict):
+def test_getting_inference_diagnostics(method, mcmc_params_fast: dict):
     num_simulations = 100
     num_samples = 10
     num_dim = 2
@@ -177,7 +177,7 @@ def test_getting_inference_diagnostics(method, mcmc_params_testing: dict):
         proposal=prior,
         potential_fn=potential_fn,
         theta_transform=theta_transform,
-        **mcmc_params_testing,
+        **mcmc_params_fast,
     )
     posterior.sample(
         sample_shape=(num_samples,),

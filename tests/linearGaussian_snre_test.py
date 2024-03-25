@@ -42,7 +42,7 @@ from tests.test_utils import (
 def test_api_snre_multiple_trials_and_rounds_map(
     num_dim: int,
     snre_method: RatioEstimator,
-    mcmc_params_testing: dict,
+    mcmc_params_fast: dict,
     num_rounds: int = 2,
     num_samples: int = 12,
     num_simulations: int = 100,
@@ -68,7 +68,7 @@ def test_api_snre_multiple_trials_and_rounds_map(
             x_o = zeros((num_trials, num_dim))
             posterior = inference.build_posterior(
                 mcmc_method="slice_np_vectorized",
-                mcmc_parameters=mcmc_params_testing,
+                mcmc_parameters=mcmc_params_fast,
             ).set_default_x(x_o)
             posterior.sample(sample_shape=(num_samples,))
         proposals.append(posterior)
@@ -78,7 +78,7 @@ def test_api_snre_multiple_trials_and_rounds_map(
 @pytest.mark.mcmc
 @pytest.mark.parametrize("snre_method", (SNRE_B, SNRE_C))
 def test_c2st_sre_on_linearGaussian(
-    snre_method: RatioEstimator, mcmc_params_testing: dict
+    snre_method: RatioEstimator, mcmc_params_accurate: dict
 ):
     """Test whether SRE infers well a simple example with available ground truth.
 
@@ -132,7 +132,7 @@ def test_c2st_sre_on_linearGaussian(
         theta_transform=theta_transform,
         proposal=prior,
         method="slice_np_vectorized",
-        **mcmc_params_testing,
+        **mcmc_params_accurate,
     )
     samples = posterior.sample((num_samples,))
 
@@ -149,7 +149,7 @@ def test_c2st_snre_variants_on_linearGaussian_with_multiple_trials(
     snre_method: RatioEstimator,
     prior_str: str,
     num_trials: int,
-    mcmc_params_testing: dict,
+    mcmc_params_accurate: dict,
 ):
     """Test C2ST and MAP accuracy of SNRE variants on linear gaussian.
 
@@ -160,7 +160,7 @@ def test_c2st_snre_variants_on_linearGaussian_with_multiple_trials(
     """
 
     num_dim = 2
-    num_simulations = 1500
+    num_simulations = 1750
     num_samples = 500
     x_o = zeros(num_trials, num_dim)
 
@@ -202,7 +202,7 @@ def test_c2st_snre_variants_on_linearGaussian_with_multiple_trials(
         theta_transform=theta_transform,
         proposal=prior,
         method="slice_np_vectorized",
-        **mcmc_params_testing,
+        **mcmc_params_accurate,
     )
     samples = posterior.sample(sample_shape=(num_samples,))
 
@@ -346,7 +346,7 @@ def test_c2st_multi_round_snr_on_linearGaussian_vi(
     ),
 )
 def test_api_sre_sampling_methods(
-    sampling_method: str, prior_str: str, mcmc_params_testing: dict
+    sampling_method: str, prior_str: str, mcmc_params_fast: dict
 ):
     """Test leakage correction both for MCMC and rejection sampling.
 
@@ -361,9 +361,6 @@ def test_api_sre_sampling_methods(
     num_simulations = 100
     x_o = zeros((num_trials, num_dim))
     # Test for multiple chains is cheap when vectorized.
-
-    if sampling_method in ("slice_np", "slice"):
-        mcmc_params_testing["num_chains"] = 1
 
     if sampling_method == "rejection":
         sample_with = "rejection"
@@ -406,7 +403,7 @@ def test_api_sre_sampling_methods(
             proposal=prior,
             theta_transform=theta_transform,
             method=sampling_method,
-            **mcmc_params_testing,
+            **mcmc_params_fast,
         )
     elif sample_with == "importance":
         posterior = ImportanceSamplingPosterior(

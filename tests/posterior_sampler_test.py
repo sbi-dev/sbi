@@ -25,7 +25,7 @@ from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
     ("slice_np", "slice_np_vectorized", "slice", "nuts", "hmc"),
 )
 def test_api_posterior_sampler_set(
-    sampling_method: str, set_seed, mcmc_params_testing: dict
+    sampling_method: str, set_seed, mcmc_params_fast: dict
 ):
     """Runs SNL and checks that posterior_sampler is correctly set.
 
@@ -59,11 +59,11 @@ def test_api_posterior_sampler_set(
 
     assert posterior.posterior_sampler is None
     posterior.sample(
-        sample_shape=(num_samples, mcmc_params_testing["num_chains"]),
+        sample_shape=(num_samples, mcmc_params_fast["num_chains"]),
         x=x_o,
         mcmc_parameters={
             "init_strategy": "prior",
-            **mcmc_params_testing,
+            **mcmc_params_fast,
         },
     )
 

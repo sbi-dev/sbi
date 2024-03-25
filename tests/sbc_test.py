@@ -26,7 +26,7 @@ from tests.test_utils import PosteriorPotential, TractablePosterior
     ),
 )
 def test_running_sbc(
-    method, prior, reduce_fn_str, sampler, mcmc_params_testing: dict, model="mdn"
+    method, prior, reduce_fn_str, sampler, mcmc_params_accurate: dict, model="mdn"
 ):
     """Tests running inference and then SBC and obtaining nltp."""
 
@@ -59,7 +59,7 @@ def test_running_sbc(
         posterior_kwargs = {
             "sample_with": "mcmc" if sampler == "mcmc" else "vi",
             "mcmc_method": "slice_np_vectorized",
-            "mcmc_parameters": mcmc_params_testing,
+            "mcmc_parameters": mcmc_params_accurate,
         }
     else:
         posterior_kwargs = {}

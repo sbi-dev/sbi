@@ -77,7 +77,7 @@ def test_training_and_mcmc_on_device(
     training_device,
     prior_device,
     prior_type,
-    mcmc_params_testing: dict,
+    mcmc_params_fast: dict,
 ):
     """Test training on devices.
 
@@ -153,7 +153,7 @@ def test_training_and_mcmc_on_device(
             posterior = inferer.build_posterior(
                 sample_with="mcmc",
                 mcmc_method=sampling_method,
-                mcmc_parameters=mcmc_params_testing,
+                mcmc_parameters=mcmc_params_fast,
             )
         elif sampling_method in ["rejection", "direct"]:
             # all other cases: rejection, direct
@@ -334,7 +334,7 @@ def test_embedding_nets_integration_training_device(
     embedding_net_device: str,
     data_device: str,
     training_device: str,
-    mcmc_params_testing: dict,
+    mcmc_params_fast: dict,
 ) -> None:
     """Test embedding nets integration with different devices, priors and methods."""
     # add other methods
@@ -440,7 +440,7 @@ def test_embedding_nets_integration_training_device(
                 if inference_method == SNPE_A
                 else dict(
                     mcmc_method="slice_np_vectorized",
-                    mcmc_parameters=mcmc_params_testing,
+                    mcmc_parameters=mcmc_params_fast,
                 )
             ),
         )
