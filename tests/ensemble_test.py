@@ -13,11 +13,6 @@ from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     true_posterior_linear_gaussian_mvn_prior,
 )
-from sbi.utils.user_input_checks import (
-    check_sbi_inputs,
-    process_prior,
-    process_simulator,
-)
 from tests.test_utils import check_c2st, get_dkl_gaussian_prior
 
 
@@ -34,13 +29,8 @@ def test_import_before_deprecation():
         prior_cov = eye(2)
         prior = MultivariateNormal(loc=prior_mean, covariance_matrix=prior_cov)
 
-        prior, _, prior_returns_numpy = process_prior(prior)
-        simulator = process_simulator(
-            lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov),
-            prior,
-            prior_returns_numpy,
-        )
-        check_sbi_inputs(simulator, prior)
+        def simulator(theta):
+            return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
         theta = prior.sample((num_simulations,))
         x = simulator(theta)
@@ -87,13 +77,8 @@ def test_c2st_posterior_ensemble_on_linearGaussian(inference_method, num_trials)
     )
     target_samples = gt_posterior.sample((num_samples,))
 
-    prior, _, prior_returns_numpy = process_prior(prior)
-    simulator = process_simulator(
-        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov),
-        prior,
-        prior_returns_numpy,
-    )
-    check_sbi_inputs(simulator, prior)
+    def simulator(theta):
+        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     # train ensemble components
     posteriors = []

@@ -27,9 +27,7 @@ from sbi.simulators.linear_gaussian import (
     true_posterior_linear_gaussian_mvn_prior,
 )
 from sbi.utils.user_input_checks import (
-    check_sbi_inputs,
     process_prior,
-    process_simulator,
 )
 from tests.test_utils import check_c2st
 
@@ -152,9 +150,8 @@ def test_getting_inference_diagnostics(method):
         Uniform(low=-ones(1), high=ones(1)),
     ]
 
-    prior, _, prior_returns_numpy = process_prior(prior)
-    simulator = process_simulator(diagonal_linear_gaussian, prior, prior_returns_numpy)
-    check_sbi_inputs(simulator, prior)
+    prior, _, _ = process_prior(prior)
+    simulator = diagonal_linear_gaussian
     density_estimator = likelihood_nn("maf", num_transforms=3)
     inference = SNLE(density_estimator=density_estimator, show_progress_bars=False)
 

@@ -20,11 +20,6 @@ from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     true_posterior_linear_gaussian_mvn_prior,
 )
-from sbi.utils.user_input_checks import (
-    check_sbi_inputs,
-    process_prior,
-    process_simulator,
-)
 from tests.test_utils import check_c2st
 
 
@@ -58,9 +53,6 @@ def mdn_inference_with_different_methods(method):
     def simulator(theta: Tensor) -> Tensor:
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    prior, _, prior_returns_numpy = process_prior(prior)
-    simulator = process_simulator(simulator, prior, prior_returns_numpy)
-    check_sbi_inputs(simulator, prior)
     inference = method(density_estimator="mdn")
 
     theta, x = simulate_for_sbi(simulator, prior, num_simulations)
@@ -108,9 +100,6 @@ def test_mdn_with_1D_uniform_prior():
     def simulator(theta: Tensor) -> Tensor:
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    prior, _, prior_returns_numpy = process_prior(prior)
-    simulator = process_simulator(simulator, prior, prior_returns_numpy)
-    check_sbi_inputs(simulator, prior)
     inference = SNPE(density_estimator="mdn")
 
     theta, x = simulate_for_sbi(simulator, prior, 100)
