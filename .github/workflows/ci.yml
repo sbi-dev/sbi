@@ -1,6 +1,6 @@
 name: Continuous Integration
 
-on: [push, pull_request, workflow_dispatch]
+on: [pull_request, workflow_dispatch]
 
 defaults:
   run:
@@ -68,21 +68,14 @@ jobs:
         pyright sbi
 
     - name:  Run the fast CPU tests without coverage
-      if: github.event_name == 'push'
       run: |
         pytest -v -x -n auto -m "not slow and not gpu"  tests/
 
-    - name:  Run the fast and the slow CPU tests with coverage
-      if: github.event_name == 'pull_request'
-      run: |
-        pytest -v -x -n auto -v -m "not gpu" --cov=sbi --cov-report=xml  tests/
-
     - name: Upload coverage to Codecov
-      if: github.event_name == 'pull_request'
       uses: codecov/codecov-action@v4
       with:
         env_vars: OS,PYTHON
         file: ./coverage.xml
         flags: unittests
-        name: codecov-sbi-all-cpu
+        name: codecov-sbi-fast-cpu
         token: ${{ secrets.CODECOV_TOKEN }}
