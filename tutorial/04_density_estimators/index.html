@@ -18,7 +18,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.5.9">
+      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.5.14">
     
     
       
@@ -26,7 +26,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.f2e4d321.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.10ba22f1.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
@@ -987,7 +987,7 @@
             
   
   <span class="md-ellipsis">
-    Contributing
+    API Reference
   </span>
   
 
@@ -996,6 +996,153 @@
         
         <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            API Reference
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/inference/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Inference
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/models/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Neural Networks
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/posteriors/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Posteriors
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/potentials/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Potentials
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/analysis/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Analysis
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Contributing
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
             <span class="md-nav__icon md-icon"></span>
             Contributing
           </label>
@@ -1046,26 +1193,6 @@
           </ul>
         </nav>
       
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../reference/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    API Reference
-  </span>
-  
-
-      </a>
     </li>
   
 
@@ -1185,7 +1312,13 @@
 <p><code>sbi</code> allows to specify a custom density estimator for each of the implemented methods. For all options, check the API reference <a href="https://sbi-dev.github.io/sbi/reference/#models">here</a>.</p>
 <h2 id="changing-the-type-of-density-estimator">Changing the type of density estimator<a class="headerlink" href="#changing-the-type-of-density-estimator" title="Permanent link">&para;</a></h2>
 <p>One option is to use one of set of preconfigured density estimators by passing a string in the <code>density_estimator</code> keyword argument to the inference object (<code>SNPE</code> or <code>SNLE</code>), e.g., &ldquo;maf&rdquo; to use a Masked Autoregressive Flow, of &ldquo;nsf&rdquo; to use a Neural Spline Flow with default hyperparameters.</p>
-<div class="highlight"><pre><span></span><code><span class="n">inference</span> <span class="o">=</span> <span class="n">SNPE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="s2">&quot;maf&quot;</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">torch</span>
+
+<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">SNPE</span><span class="p">,</span> <span class="n">SNRE</span>
+<span class="kn">from</span> <span class="nn">sbi.utils</span> <span class="kn">import</span> <span class="n">BoxUniform</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="n">prior</span> <span class="o">=</span> <span class="n">BoxUniform</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">2</span><span class="p">),</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">2</span><span class="p">))</span>
+<span class="n">inference</span> <span class="o">=</span> <span class="n">SNPE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">density_estimator</span><span class="o">=</span><span class="s2">&quot;maf&quot;</span><span class="p">)</span>
 </code></pre></div>
 <p>In the case of <code>SNRE</code>, the argument is called <code>classifier</code>:</p>
 <div class="highlight"><pre><span></span><code><span class="n">inference</span> <span class="o">=</span> <span class="n">SNRE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span> <span class="n">classifier</span><span class="o">=</span><span class="s2">&quot;resnet&quot;</span><span class="p">)</span>
@@ -1193,9 +1326,8 @@
 <h2 id="changing-hyperparameters-of-density-estimators">Changing hyperparameters of density estimators<a class="headerlink" href="#changing-hyperparameters-of-density-estimators" title="Permanent link">&para;</a></h2>
 <p>Alternatively, you can use a set of utils functions to configure a density estimator yourself, e.g., use a MAF with hyperparameters chosen for your problem at hand.</p>
 <p>Here, because we want to use SN*P*E, we specifiy a neural network targeting the <em>posterior</em> (using the utils function <code>posterior_nn</code>). In this example, we will create a neural spline flow (<code>'nsf'</code>) with <code>60</code> hidden units and <code>3</code> transform layers:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.utils.get_nn_models</span> <span class="kn">import</span> <span class="p">(</span>
-    <span class="n">posterior_nn</span><span class="p">,</span>
-<span class="p">)</span>  <span class="c1"># For SNLE: likelihood_nn(). For SNRE: classifier_nn()</span>
+<div class="highlight"><pre><span></span><code><span class="c1"># For SNLE: likelihood_nn(). For SNRE: classifier_nn()</span>
+<span class="kn">from</span> <span class="nn">sbi.neural_nets</span> <span class="kn">import</span> <span class="n">posterior_nn</span>
 
 <span class="n">density_estimator_build_fun</span> <span class="o">=</span> <span class="n">posterior_nn</span><span class="p">(</span>
     <span class="n">model</span><span class="o">=</span><span class="s2">&quot;nsf&quot;</span><span class="p">,</span> <span class="n">hidden_features</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span> <span class="n">num_transforms</span><span class="o">=</span><span class="mi">3</span>
@@ -1204,8 +1336,15 @@
 </code></pre></div>
 <p>It is also possible to pass an <code>embedding_net</code> to <code>posterior_nn()</code> which learn summary statistics from high-dimensional simulation outputs. You can find a more detailed tutorial on this <a href="https://sbi-dev.github.io/sbi/tutorial/05_embedding_net/">here</a>.</p>
 <h2 id="building-new-density-estimators-from-scratch">Building new density estimators from scratch<a class="headerlink" href="#building-new-density-estimators-from-scratch" title="Permanent link">&para;</a></h2>
-<p>Finally, it is also possible to implement your own density estimator from scratch, e.g., including embedding nets to preprocess data, or to a density estimator architecture of your choice. </p>
-<p>For this, the <code>density_estimator</code> argument needs to be a function that takes <code>theta</code> and <code>x</code> batches as arguments to then construct the density estimator after the first set of simulations was generated. Our utils functions in <code>sbi/utils/get_nn_models.py</code> return such a function. </p>
+<p>Finally, it is also possible to implement your own density estimator from scratch, e.g., including embedding nets to preprocess data, or to a density estimator architecture of your choice.</p>
+<p>For this, the <code>density_estimator</code> argument needs to be a function that takes <code>theta</code> and <code>x</code> batches as arguments to then construct the density estimator after the first set of simulations was generated. Our factory functions in <code>sbi/neural_nets/factory.py</code> return such a function.</p>
+<p>The returned <code>density_estimator</code> object needs to be a subclass of <a href="https://sbi-dev.github.io/sbi/reference/#sbi.neural_nets.density_estimators.DensityEstimator"><code>DensityEstimator</code></a>, which requires to implement three methods:</p>
+<ul>
+<li><code>log_prob(input, condition, **kwargs)</code>: Return the log probabilities of the inputs given a condition or multiple i.e. batched conditions.</li>
+<li><code>loss(input, condition, **kwargs)</code>: Return the loss for training the density estimator.</li>
+<li><code>sample(sample_shape, condition, **kwargs)</code>: Return samples from the density estimator.</li>
+</ul>
+<p>See more information on the <a href="https://sbi-dev.github.io/sbi/reference/#sbi.neural_nets.density_estimators.DensityEstimator">Reference API page</a></p>
 
 
 
@@ -1270,7 +1409,7 @@
     <script id="__config" type="application/json">{"base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.b8dbb3d2.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.8fd75fb4.min.js"></script>
+      <script src="../../assets/javascripts/bundle.bd41221c.min.js"></script>
       
         <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-MML-AM_CHTML"></script>
       

@@ -18,7 +18,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.5.9">
+      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.5.14">
     
     
       
@@ -26,7 +26,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.f2e4d321.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.10ba22f1.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
@@ -931,13 +931,13 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#inference" class="md-nav__link">
+  <a href="#running-inference" class="md-nav__link">
     <span class="md-ellipsis">
-      Inference
+      Running inference
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Inference">
+    <nav class="md-nav" aria-label="Running inference">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -1038,7 +1038,7 @@
             
   
   <span class="md-ellipsis">
-    Contributing
+    API Reference
   </span>
   
 
@@ -1047,6 +1047,153 @@
         
         <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            API Reference
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/inference/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Inference
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/models/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Neural Networks
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/posteriors/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Posteriors
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/potentials/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Potentials
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/analysis/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Analysis
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Contributing
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
             <span class="md-nav__icon md-icon"></span>
             Contributing
           </label>
@@ -1097,26 +1244,6 @@
           </ul>
         </nav>
       
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../reference/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    API Reference
-  </span>
-  
-
-      </a>
     </li>
   
 
@@ -1224,13 +1351,13 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#inference" class="md-nav__link">
+  <a href="#running-inference" class="md-nav__link">
     <span class="md-ellipsis">
-      Inference
+      Running inference
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Inference">
+    <nav class="md-nav" aria-label="Running inference">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -1284,58 +1411,74 @@
 
 
 <h1 id="inference-on-hodgkin-huxley-model-tutorial">Inference on Hodgkin-Huxley model: tutorial<a class="headerlink" href="#inference-on-hodgkin-huxley-model-tutorial" title="Permanent link">&para;</a></h1>
-<p>In this tutorial, we use <code>sbi</code> to do inference on a <a href="https://en.wikipedia.org/wiki/Hodgkin%E2%80%93Huxley_model">Hodgkin-Huxley model</a> from neuroscience (Hodgkin and Huxley, 1952). We will learn two parameters (<span class="arithmatex">\(\bar g_{Na}\)</span>,<span class="arithmatex">\(\bar g_K\)</span>) based on a current-clamp recording, that we generate synthetically (in practice, this would be an experimental observation).</p>
+<p>In this tutorial, we use <code>sbi</code> to do inference on a <a href="https://en.wikipedia.org/wiki/Hodgkin%E2%80%93Huxley_model">Hodgkin-Huxley
+model</a> from
+neuroscience (Hodgkin and Huxley, 1952). </p>
+<p>We want to infer the posterior distribution of two parameters (<span class="arithmatex">\(\bar
+g_{Na}\)</span>,<span class="arithmatex">\(\bar g_K\)</span>) based on a current-clamp recording, that we generate
+synthetically (in practice, this would be an experimental observation).</p>
 <p>Note, you find the original version of this notebook at <a href="https://github.com/sbi-dev/sbi/blob/main/examples/00_HH_simulator.ipynb">https://github.com/sbi-dev/sbi/blob/main/examples/00_HH_simulator.ipynb</a> in the <code>sbi</code> repository.</p>
 <p>First we are going to import basic packages.</p>
-<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
-<span class="kn">import</span> <span class="nn">torch</span>
-
-<span class="c1"># visualization</span>
+<div class="highlight"><pre><span></span><code><span class="c1"># visualization</span>
 <span class="kn">import</span> <span class="nn">matplotlib</span> <span class="k">as</span> <span class="nn">mpl</span>
 <span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">torch</span>
+
+<span class="kn">from</span> <span class="nn">sbi</span> <span class="kn">import</span> <span class="n">analysis</span> <span class="k">as</span> <span class="n">analysis</span>
 
 <span class="c1"># sbi</span>
 <span class="kn">from</span> <span class="nn">sbi</span> <span class="kn">import</span> <span class="n">utils</span> <span class="k">as</span> <span class="n">utils</span>
-<span class="kn">from</span> <span class="nn">sbi</span> <span class="kn">import</span> <span class="n">analysis</span> <span class="k">as</span> <span class="n">analysis</span>
-<span class="kn">from</span> <span class="nn">sbi.inference.base</span> <span class="kn">import</span> <span class="n">infer</span>
+<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">SNPE</span><span class="p">,</span> <span class="n">simulate_for_sbi</span>
+<span class="kn">from</span> <span class="nn">sbi.utils.user_input_checks</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">check_sbi_inputs</span><span class="p">,</span>
+    <span class="n">process_prior</span><span class="p">,</span>
+    <span class="n">process_simulator</span><span class="p">,</span>
+<span class="p">)</span>
 </code></pre></div>
 <div class="highlight"><pre><span></span><code><span class="c1"># remove top and right axis from plots</span>
 <span class="n">mpl</span><span class="o">.</span><span class="n">rcParams</span><span class="p">[</span><span class="s2">&quot;axes.spines.right&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
 <span class="n">mpl</span><span class="o">.</span><span class="n">rcParams</span><span class="p">[</span><span class="s2">&quot;axes.spines.top&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
 </code></pre></div>
 <h2 id="different-required-components">Different required components<a class="headerlink" href="#different-required-components" title="Permanent link">&para;</a></h2>
-<p>Before running inference, let us define the different required components:</p>
-<ol>
-<li>observed data</li>
-<li>prior over model parameters</li>
-<li>simulator</li>
-</ol>
+<p>Before running inference, let us define the different required components:
+1. observational data  - <em>the observations</em> in this case a simulated volatge trace (or summary statistics thereof) 
+1. a candidate (mechanistic) model - <em>the simulator</em> in this case the <a href="https://en.wikipedia.org/wiki/Hodgkin%E2%80%93Huxley_model">Hodgkin-Huxley
+model</a>
+1. the - <em>prior</em> over the model parameters in this case over (<span class="arithmatex">\(\bar
+g_{Na}\)</span>,<span class="arithmatex">\(\bar g_K\)</span>)</p>
+<blockquote>
+<p>Note: that you do not need to fully understand the details of the HH-model and model specific jargon to get an intuition for how SBI works in this scientific use case. </p>
+</blockquote>
 <h2 id="1-observed-data">1. Observed data<a class="headerlink" href="#1-observed-data" title="Permanent link">&para;</a></h2>
 <p>Let us assume we current-clamped a neuron and recorded the following voltage trace:</p>
 <p><img src="https://raw.githubusercontent.com/mackelab/delfi/master/docs/docs/tutorials/observed_voltage_trace.png" width="480">
 <br></p>
 <p>In fact, this voltage trace was not measured experimentally but synthetically generated by simulating a Hodgkin-Huxley model with particular parameters (<span class="arithmatex">\(\bar g_{Na}\)</span>,<span class="arithmatex">\(\bar g_K\)</span>). We will come back to this point later in the tutorial.</p>
 <h2 id="2-simulator">2. Simulator<a class="headerlink" href="#2-simulator" title="Permanent link">&para;</a></h2>
-<p>We would like to infer the posterior over the two parameters (<span class="arithmatex">\(\bar g_{Na}\)</span>,<span class="arithmatex">\(\bar g_K\)</span>) of a Hodgkin-Huxley model, given the observed electrophysiological recording above. The model has channel kinetics as in <a href="https://link.springer.com/article/10.1007/s00422-008-0263-8">Pospischil et al. 2008</a>, and is defined by the following set of differential equations (parameters of interest highlighted in orange):</p>
+<p>We would like to infer the posterior over the two parameters (<span class="arithmatex">\(\color{orange}\bar g_{Na}\)</span>,<span class="arithmatex">\(\color{orange}\bar g_K\)</span>) of a Hodgkin-Huxley model, given the observed electrophysiological recording above. The model has channel kinetics as in <a href="https://link.springer.com/article/10.1007/s00422-008-0263-8">Pospischil et al. 2008</a>, and is defined by the following set of differential equations (parameters of interest highlighted in orange):</p>
 <div class="arithmatex">\[
 \scriptsize
 \begin{align}
-C_m\frac{dV}{dt}&amp;=g_1\left(E_1-V\right)+
-                    \color{orange}{\bar{g}_{Na}}m^3h\left(E_{Na}-V\right)+
-                    \color{orange}{\bar{g}_{K}}n^4\left(E_K-V\right)+
+\color{black}
+C_m\frac{dV}{dt}&amp; \color{black} =g_1\left(E_1-V\right)+
+                    \color{orange}{\bar{g}_{Na}}\color{black}m^3h\left(E_{Na}-V\right)+
+                    \color{orange}{\bar{g}_{K}}\color{black}n^4\left(E_K-V\right)+
                     \bar{g}_Mp\left(E_K-V\right)+
-                    I_{inj}+
+                    I_{inj}+\color{black}
                     \sigma\eta\left(t\right)\\
-\frac{dq}{dt}&amp;=\frac{q_\infty\left(V\right)-q}{\tau_q\left(V\right)},\;q\in\{m,h,n,p\}
+\color{black}
+\frac{dq}{dt}&amp;\color{black}=\frac{q_\infty\left(V\right)-q}{\tau_q\left(V\right)},\;q\in\{m,h,n,p\}
 \end{align}
 \]</div>
 <p>Above, <span class="arithmatex">\(V\)</span> represents the membrane potential, <span class="arithmatex">\(C_m\)</span> is the membrane capacitance, <span class="arithmatex">\(g_{\text{l}}\)</span> is the leak conductance, <span class="arithmatex">\(E_{\text{l}}\)</span> is the membrane reversal potential, <span class="arithmatex">\(\bar{g}_c\)</span> is the density of channels of type <span class="arithmatex">\(c\)</span> (<span class="arithmatex">\(\text{Na}^+\)</span>, <span class="arithmatex">\(\text{K}^+\)</span>, M), <span class="arithmatex">\(E_c\)</span> is the reversal potential of <span class="arithmatex">\(c\)</span>, (<span class="arithmatex">\(m\)</span>, <span class="arithmatex">\(h\)</span>, <span class="arithmatex">\(n\)</span>, <span class="arithmatex">\(p\)</span>) are the respective channel gating kinetic variables, and <span class="arithmatex">\(\sigma \eta(t)\)</span> is the intrinsic neural noise. The right hand side of the voltage dynamics is composed of a leak current, a voltage-dependent <span class="arithmatex">\(\text{Na}^+\)</span> current, a delayed-rectifier <span class="arithmatex">\(\text{K}^+\)</span> current, a slow voltage-dependent <span class="arithmatex">\(\text{K}^+\)</span> current responsible for spike-frequency adaptation, and an injected current <span class="arithmatex">\(I_{\text{inj}}\)</span>. Channel gating variables <span class="arithmatex">\(q\)</span> have dynamics fully characterized by the neuron membrane potential <span class="arithmatex">\(V\)</span>, given the respective steady-state <span class="arithmatex">\(q_{\infty}(V)\)</span> and time constant <span class="arithmatex">\(\tau_{q}(V)\)</span> (details in Pospischil et al. 2008).</p>
 <p>The input current <span class="arithmatex">\(I_{\text{inj}}\)</span> is defined as</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">HH_helper_functions</span> <span class="kn">import</span> <span class="n">syn_current</span>
 
-<span class="n">I</span><span class="p">,</span> <span class="n">t_on</span><span class="p">,</span> <span class="n">t_off</span><span class="p">,</span> <span class="n">dt</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">A_soma</span> <span class="o">=</span> <span class="n">syn_current</span><span class="p">()</span>
+<span class="c1"># current, onset time of stimulation, offset time of stimulation, time step, time, area of some</span>
+<span class="n">I_inj</span><span class="p">,</span> <span class="n">t_on</span><span class="p">,</span> <span class="n">t_off</span><span class="p">,</span> <span class="n">dt</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">A_soma</span> <span class="o">=</span> <span class="n">syn_current</span><span class="p">()</span>
 </code></pre></div>
-<p>The Hodgkin-Huxley simulator is given by:</p>
+<p>The Hodgkin-Huxley simulator takes the parameters as input together with other arguments such as the initial voltage state, the integration timestep, time and injected current:</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">HH_helper_functions</span> <span class="kn">import</span> <span class="n">HHsimulator</span>
 </code></pre></div>
 <p>Putting the input current and the simulator together:</p>
@@ -1344,23 +1487,23 @@ C_m\frac{dV}{dt}&amp;=g_1\left(E_1-V\right)+
     <span class="n">params</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">params</span><span class="p">)</span>
 
     <span class="c1"># input current, time step</span>
-    <span class="n">I</span><span class="p">,</span> <span class="n">t_on</span><span class="p">,</span> <span class="n">t_off</span><span class="p">,</span> <span class="n">dt</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">A_soma</span> <span class="o">=</span> <span class="n">syn_current</span><span class="p">()</span>
+    <span class="n">I_inj</span><span class="p">,</span> <span class="n">t_on</span><span class="p">,</span> <span class="n">t_off</span><span class="p">,</span> <span class="n">dt</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">A_soma</span> <span class="o">=</span> <span class="n">syn_current</span><span class="p">()</span>
 
-    <span class="n">t</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">I</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">dt</span>
+    <span class="n">t</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">I_inj</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">dt</span>
 
-    <span class="c1"># initial voltage</span>
-    <span class="n">V0</span> <span class="o">=</span> <span class="o">-</span><span class="mi">70</span>
+    <span class="c1"># initial voltage V0</span>
+    <span class="n">initial_voltage</span> <span class="o">=</span> <span class="o">-</span><span class="mi">70</span>
 
-    <span class="n">states</span> <span class="o">=</span> <span class="n">HHsimulator</span><span class="p">(</span><span class="n">V0</span><span class="p">,</span> <span class="n">params</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">),</span> <span class="n">dt</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">I</span><span class="p">)</span>
+    <span class="n">voltage_trace</span> <span class="o">=</span> <span class="n">HHsimulator</span><span class="p">(</span><span class="n">initial_voltage</span><span class="p">,</span> <span class="n">params</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">),</span> <span class="n">dt</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">I_inj</span><span class="p">)</span>
 
-    <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">states</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">),</span> <span class="n">time</span><span class="o">=</span><span class="n">t</span><span class="p">,</span> <span class="n">dt</span><span class="o">=</span><span class="n">dt</span><span class="p">,</span> <span class="n">I</span><span class="o">=</span><span class="n">I</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">))</span>
+    <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">voltage_trace</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">),</span> <span class="n">time</span><span class="o">=</span><span class="n">t</span><span class="p">,</span> <span class="n">dt</span><span class="o">=</span><span class="n">dt</span><span class="p">,</span> <span class="n">I_inj</span><span class="o">=</span><span class="n">I_inj</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">))</span>
 </code></pre></div>
 <p>To get an idea of the output of the Hodgkin-Huxley model, let us generate some voltage traces for different parameters (<span class="arithmatex">\(\bar g_{Na}\)</span>,<span class="arithmatex">\(\bar g_K\)</span>), given the input current <span class="arithmatex">\(I_{\text{inj}}\)</span>:</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># three sets of (g_Na, g_K)</span>
 <span class="n">params</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">50.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">4.0</span><span class="p">,</span> <span class="mf">1.5</span><span class="p">],</span> <span class="p">[</span><span class="mf">20.0</span><span class="p">,</span> <span class="mf">15.0</span><span class="p">]])</span>
 
 <span class="n">num_samples</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">params</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">])</span>
-<span class="n">sim_samples</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">num_samples</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">I</span><span class="p">)))</span>
+<span class="n">sim_samples</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">num_samples</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">I_inj</span><span class="p">)))</span>
 <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_samples</span><span class="p">):</span>
     <span class="n">sim_samples</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">run_HH_model</span><span class="p">(</span><span class="n">params</span><span class="o">=</span><span class="n">params</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="p">:])[</span><span class="s2">&quot;data&quot;</span><span class="p">]</span>
 </code></pre></div>
@@ -1373,28 +1516,33 @@ C_m\frac{dV}{dt}&amp;=g_1\left(E_1-V\right)+
 <span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
 <span class="n">gs</span> <span class="o">=</span> <span class="n">mpl</span><span class="o">.</span><span class="n">gridspec</span><span class="o">.</span><span class="n">GridSpec</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">height_ratios</span><span class="o">=</span><span class="p">[</span><span class="mi">4</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
 <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="n">gs</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+<span class="c1"># plot the three voltage traces for different parameter sets</span>
 <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_samples</span><span class="p">):</span>
     <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">sim_samples</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="p">:],</span> <span class="n">color</span><span class="o">=</span><span class="n">col1</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">lw</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s2">&quot;voltage (mV)&quot;</span><span class="p">)</span>
 <span class="n">ax</span><span class="o">.</span><span class="n">set_xticks</span><span class="p">([])</span>
 <span class="n">ax</span><span class="o">.</span><span class="n">set_yticks</span><span class="p">([</span><span class="o">-</span><span class="mi">80</span><span class="p">,</span> <span class="o">-</span><span class="mi">20</span><span class="p">,</span> <span class="mi">40</span><span class="p">])</span>
 
+<span class="c1"># plot the injected current </span>
 <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="n">gs</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
-<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">I</span> <span class="o">*</span> <span class="n">A_soma</span> <span class="o">*</span> <span class="mf">1e3</span><span class="p">,</span> <span class="s2">&quot;k&quot;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">I_inj</span> <span class="o">*</span> <span class="n">A_soma</span> <span class="o">*</span> <span class="mf">1e3</span><span class="p">,</span> <span class="s2">&quot;k&quot;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s2">&quot;time (ms)&quot;</span><span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s2">&quot;input (nA)&quot;</span><span class="p">)</span>
 
 <span class="n">ax</span><span class="o">.</span><span class="n">set_xticks</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="nb">max</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="o">/</span> <span class="mi">2</span><span class="p">,</span> <span class="nb">max</span><span class="p">(</span><span class="n">t</span><span class="p">)])</span>
-<span class="n">ax</span><span class="o">.</span><span class="n">set_yticks</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mf">1.1</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">I</span> <span class="o">*</span> <span class="n">A_soma</span> <span class="o">*</span> <span class="mf">1e3</span><span class="p">)])</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_yticks</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mf">1.1</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">I_inj</span> <span class="o">*</span> <span class="n">A_soma</span> <span class="o">*</span> <span class="mf">1e3</span><span class="p">)])</span>
 <span class="n">ax</span><span class="o">.</span><span class="n">yaxis</span><span class="o">.</span><span class="n">set_major_formatter</span><span class="p">(</span><span class="n">mpl</span><span class="o">.</span><span class="n">ticker</span><span class="o">.</span><span class="n">FormatStrFormatter</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%.2f</span><span class="s2">&quot;</span><span class="p">))</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 </code></pre></div>
 <p><img alt="png" src="../00_HH_simulator_files/00_HH_simulator_19_0.png" /></p>
 <p>As can be seen, the voltage traces can be quite diverse for different parameter values.</p>
-<p>Often, we are not interested in matching the exact trace, but only in matching certain features thereof. In this example of the Hodgkin-Huxley model, the summary features are the number of spikes, the mean resting potential, the standard deviation of the resting potential, and the first four voltage moments: mean, standard deviation, skewness and kurtosis. Using the function <code>calculate_summary_statistics()</code> imported below, we obtain these statistics from the output of the Hodgkin Huxley simulator. </p>
+<p>Often, we are not interested in matching the exact trace, but only in matching certain features thereof. In this example of the Hodgkin-Huxley model, the summary features are the number of spikes, the mean resting potential, the standard deviation of the resting potential, and the first four voltage moments: mean, standard deviation, skewness and kurtosis. Using the function <code>calculate_summary_statistics()</code> imported below, we obtain these statistics from the output of the Hodgkin Huxley simulator.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">HH_helper_functions</span> <span class="kn">import</span> <span class="n">calculate_summary_statistics</span>
 </code></pre></div>
-<p>Lastly, we define a function that performs all of the above steps at once. The function <code>simulation_wrapper</code> takes in conductance values, runs the Hodgkin Huxley model and then returns the summary statistics.</p>
+<blockquote>
+<p>Note: the summary features depend on the simulator and observations under investigation. Check out our tutorials on crafting summary statistics. </p>
+</blockquote>
+<p>Lastly, we define a function that performs all of the above steps at once, to have one object we pass to the inference method as our simulator. The function <code>simulation_wrapper</code> takes in the parameters, runs the Hodgkin Huxley model and then returns the summary statistics.</p>
 <div class="highlight"><pre><span></span><code><span class="k">def</span> <span class="nf">simulation_wrapper</span><span class="p">(</span><span class="n">params</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Returns summary statistics from conductance values in `params`.</span>
@@ -1405,29 +1553,52 @@ C_m\frac{dV}{dt}&amp;=g_1\left(E_1-V\right)+
     <span class="n">summstats</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">as_tensor</span><span class="p">(</span><span class="n">calculate_summary_statistics</span><span class="p">(</span><span class="n">obs</span><span class="p">))</span>
     <span class="k">return</span> <span class="n">summstats</span>
 </code></pre></div>
-<p><code>sbi</code> takes any function as simulator. Thus, <code>sbi</code> also has the flexibility to use simulators that utilize external packages, e.g., Brian (<a href="http://briansimulator.org/">http://briansimulator.org/</a>), nest (<a href="https://www.nest-simulator.org/">https://www.nest-simulator.org/</a>), or NEURON (<a href="https://neuron.yale.edu/neuron/">https://neuron.yale.edu/neuron/</a>). External simulators do not even need to be Python-based as long as they store simulation outputs in a format that can be read from Python. All that is necessary is to wrap your external simulator of choice into a Python callable that takes a parameter set and outputs a set of summary statistics we want to fit the parameters to.</p>
+<blockquote>
+<p>Note: <code>sbi</code> takes any function as simulator. Thus, <code>sbi</code> also has the flexibility to use simulators that utilize external packages, e.g., Brian (<a href="http://briansimulator.org/">http://briansimulator.org/</a>), nest (<a href="https://www.nest-simulator.org/">https://www.nest-simulator.org/</a>), or NEURON (<a href="https://neuron.yale.edu/neuron/">https://neuron.yale.edu/neuron/</a>). External simulators do not even need to be Python-based as long as they store simulation outputs in a format that can be read from Python. All that is necessary is to wrap your external simulator of choice into a Python callable that takes a parameter set and outputs a set of summary statistics we want to fit the parameters to.</p>
+</blockquote>
 <h2 id="3-prior-over-model-parameters">3. Prior over model parameters<a class="headerlink" href="#3-prior-over-model-parameters" title="Permanent link">&para;</a></h2>
 <p>Now that we have the simulator, we need to define a function with the prior over the model parameters (<span class="arithmatex">\(\bar g_{Na}\)</span>,<span class="arithmatex">\(\bar g_K\)</span>), which in this case is chosen to be a Uniform distribution:</p>
+<blockquote>
+<p>Note: This is where you would incorporate prior knowlegde about the parameters you want to infer, e.g., ranges known from literature. </p>
+</blockquote>
 <div class="highlight"><pre><span></span><code><span class="n">prior_min</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">1e-4</span><span class="p">]</span>
 <span class="n">prior_max</span> <span class="o">=</span> <span class="p">[</span><span class="mf">80.0</span><span class="p">,</span> <span class="mf">15.0</span><span class="p">]</span>
 <span class="n">prior</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">torchutils</span><span class="o">.</span><span class="n">BoxUniform</span><span class="p">(</span>
     <span class="n">low</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">as_tensor</span><span class="p">(</span><span class="n">prior_min</span><span class="p">),</span> <span class="n">high</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">as_tensor</span><span class="p">(</span><span class="n">prior_max</span><span class="p">)</span>
 <span class="p">)</span>
+
+<span class="c1"># Check prior, simulator, consistency</span>
+<span class="n">prior</span><span class="p">,</span> <span class="n">num_parameters</span><span class="p">,</span> <span class="n">prior_returns_numpy</span> <span class="o">=</span> <span class="n">process_prior</span><span class="p">(</span><span class="n">prior</span><span class="p">)</span>
+<span class="n">simulation_wrapper</span> <span class="o">=</span> <span class="n">process_simulator</span><span class="p">(</span><span class="n">simulation_wrapper</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">prior_returns_numpy</span><span class="p">)</span>
+<span class="n">check_sbi_inputs</span><span class="p">(</span><span class="n">simulation_wrapper</span><span class="p">,</span> <span class="n">prior</span><span class="p">)</span>
 </code></pre></div>
-<h2 id="inference">Inference<a class="headerlink" href="#inference" title="Permanent link">&para;</a></h2>
-<p>Now that we have all the required components, we can run inference with SNPE to identify parameters whose activity matches this trace.</p>
-<div class="highlight"><pre><span></span><code><span class="n">posterior</span> <span class="o">=</span> <span class="n">infer</span><span class="p">(</span>
-    <span class="n">simulation_wrapper</span><span class="p">,</span> <span class="n">prior</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;SNPE&quot;</span><span class="p">,</span> <span class="n">num_simulations</span><span class="o">=</span><span class="mi">300</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="mi">4</span>
-<span class="p">)</span>
+<h2 id="running-inference">Running inference<a class="headerlink" href="#running-inference" title="Permanent link">&para;</a></h2>
+<p>Now that we have all the required components, we can run inference with <code>SNPE</code> to identify parameters whose activity matches this trace.</p>
+<blockquote>
+<p>Note, that here we perform Neural Posterior Estimation (NPE). Single round sequential NPE which we call via SNPE corresponds to NPE. </p>
+<p>Note that this might take a few minutes.</p>
+</blockquote>
+<div class="highlight"><pre><span></span><code><span class="c1"># Create inference object. Here, NPE is used.</span>
+<span class="n">inference</span> <span class="o">=</span> <span class="n">SNPE</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">)</span>
+
+<span class="c1"># generate simulations and pass to the inference object</span>
+<span class="n">theta</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="n">simulate_for_sbi</span><span class="p">(</span><span class="n">simulation_wrapper</span><span class="p">,</span> <span class="n">proposal</span><span class="o">=</span><span class="n">prior</span><span class="p">,</span>
+                             <span class="n">num_simulations</span><span class="o">=</span><span class="mi">300</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
+<span class="n">inference</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
+
+<span class="c1"># train the density estimator and build the posterior</span>
+<span class="n">density_estimator</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+<span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">(</span><span class="n">density_estimator</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>HBox(children=(FloatProgress(value=0.0, description=&#39;Running 300 simulations in 300 batches.&#39;, max=300.0, styl…
+<div class="codehilite"><pre><span></span><code>Running 300 simulations in 300 batches.:   0%|          | 0/300 [00:00&lt;?, ?it/s]
 
 
-
-Neural network successfully converged after 233 epochs.
+ Neural network successfully converged after 296 epochs.
 </code></pre></div>
 
-<p>Note <code>sbi</code> can parallelize your simulator. If you experience problems with parallelization, try setting <code>num_workers=1</code> and please give us an error report as a <a href="https://github.com/mackelab/sbi/issues">GitHub issue</a>.</p>
+<blockquote>
+<p>Note: <code>sbi</code> can parallelize your simulator. If you experience problems with parallelization, try setting <code>num_workers=1</code> and please give us an error report as a <a href="https://github.com/mackelab/sbi/issues">GitHub issue</a>.</p>
+</blockquote>
 <h3 id="coming-back-to-the-observed-data">Coming back to the observed data<a class="headerlink" href="#coming-back-to-the-observed-data" title="Permanent link">&para;</a></h3>
 <p>As mentioned at the beginning of the tutorial, the observed data are generated by the Hodgkin-Huxley model with a set of known parameters (<span class="arithmatex">\(\bar g_{Na}\)</span>,<span class="arithmatex">\(\bar g_K\)</span>). To illustrate how to compute the summary statistics of the observed data, let us regenerate the observed data:</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># true parameters and respective labels</span>
@@ -1437,7 +1608,7 @@ Neural network successfully converged after 233 epochs.
 <div class="highlight"><pre><span></span><code><span class="n">observation_trace</span> <span class="o">=</span> <span class="n">run_HH_model</span><span class="p">(</span><span class="n">true_params</span><span class="p">)</span>
 <span class="n">observation_summary_statistics</span> <span class="o">=</span> <span class="n">calculate_summary_statistics</span><span class="p">(</span><span class="n">observation_trace</span><span class="p">)</span>
 </code></pre></div>
-<p>As we already shown above, the observed voltage traces look as follows:</p>
+<p>As we have already shown above, the observed voltage traces look as follows:</p>
 <div class="highlight"><pre><span></span><code><span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
 <span class="n">gs</span> <span class="o">=</span> <span class="n">mpl</span><span class="o">.</span><span class="n">gridspec</span><span class="o">.</span><span class="n">GridSpec</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">height_ratios</span><span class="o">=</span><span class="p">[</span><span class="mi">4</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
 <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="n">gs</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
@@ -1447,20 +1618,20 @@ Neural network successfully converged after 233 epochs.
 <span class="n">plt</span><span class="o">.</span><span class="n">setp</span><span class="p">(</span><span class="n">ax</span><span class="p">,</span> <span class="n">xticks</span><span class="o">=</span><span class="p">[],</span> <span class="n">yticks</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mi">80</span><span class="p">,</span> <span class="o">-</span><span class="mi">20</span><span class="p">,</span> <span class="mi">40</span><span class="p">])</span>
 
 <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="n">gs</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
-<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">observation_trace</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">],</span> <span class="n">I</span> <span class="o">*</span> <span class="n">A_soma</span> <span class="o">*</span> <span class="mf">1e3</span><span class="p">,</span> <span class="s2">&quot;k&quot;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">observation_trace</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">],</span> <span class="n">I_inj</span> <span class="o">*</span> <span class="n">A_soma</span> <span class="o">*</span> <span class="mf">1e3</span><span class="p">,</span> <span class="s2">&quot;k&quot;</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s2">&quot;time (ms)&quot;</span><span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s2">&quot;input (nA)&quot;</span><span class="p">)</span>
 
 <span class="n">ax</span><span class="o">.</span><span class="n">set_xticks</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="nb">max</span><span class="p">(</span><span class="n">observation_trace</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">])</span> <span class="o">/</span> <span class="mi">2</span><span class="p">,</span> <span class="nb">max</span><span class="p">(</span><span class="n">observation_trace</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">])])</span>
-<span class="n">ax</span><span class="o">.</span><span class="n">set_yticks</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mf">1.1</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">I</span> <span class="o">*</span> <span class="n">A_soma</span> <span class="o">*</span> <span class="mf">1e3</span><span class="p">)])</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_yticks</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mf">1.1</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">I_inj</span> <span class="o">*</span> <span class="n">A_soma</span> <span class="o">*</span> <span class="mf">1e3</span><span class="p">)])</span>
 <span class="n">ax</span><span class="o">.</span><span class="n">yaxis</span><span class="o">.</span><span class="n">set_major_formatter</span><span class="p">(</span><span class="n">mpl</span><span class="o">.</span><span class="n">ticker</span><span class="o">.</span><span class="n">FormatStrFormatter</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%.2f</span><span class="s2">&quot;</span><span class="p">))</span>
 </code></pre></div>
-<p><img alt="png" src="../00_HH_simulator_files/00_HH_simulator_35_0.png" /></p>
+<p><img alt="png" src="../00_HH_simulator_files/00_HH_simulator_38_0.png" /></p>
 <h2 id="analysis-of-the-posterior-given-the-observed-data">Analysis of the posterior given the observed data<a class="headerlink" href="#analysis-of-the-posterior-given-the-observed-data" title="Permanent link">&para;</a></h2>
-<p>After running the inference algorithm, let us inspect the inferred posterior distribution over the parameters (<span class="arithmatex">\(\bar g_{Na}\)</span>,<span class="arithmatex">\(\bar g_K\)</span>), given the observed trace. To do so, we first draw samples (i.e. consistent parameter sets) from the posterior:</p>
+<p>After running the inference algorithm, let us inspect the inferred posterior distribution over the parameters (<span class="arithmatex">\(\bar g_{Na}\)</span>,<span class="arithmatex">\(\bar g_K\)</span>), given the observed trace. To do so, we first draw samples (i.e. consistent parameter sets <span class="arithmatex">\(\bar g_{Na}^{samples}\)</span>,<span class="arithmatex">\(\bar g_K^{samples}\)</span>) from the posterior:</p>
 <div class="highlight"><pre><span></span><code><span class="n">samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">observation_summary_statistics</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>HBox(children=(FloatProgress(value=0.0, description=&#39;Drawing 10000 posterior samples&#39;, max=10000.0, style=Prog…
+<div class="codehilite"><pre><span></span><code>Drawing 10000 posterior samples:   0%|          | 0/10000 [00:00&lt;?, ?it/s]
 </code></pre></div>
 
 <div class="highlight"><pre><span></span><code><span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">pairplot</span><span class="p">(</span>
@@ -1471,14 +1642,15 @@ Neural network successfully converged after 233 epochs.
     <span class="n">points</span><span class="o">=</span><span class="n">true_params</span><span class="p">,</span>
     <span class="n">points_offdiag</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;markersize&quot;</span><span class="p">:</span> <span class="mi">6</span><span class="p">},</span>
     <span class="n">points_colors</span><span class="o">=</span><span class="s2">&quot;r&quot;</span><span class="p">,</span>
+    <span class="n">labels</span><span class="o">=</span><span class="n">labels_params</span><span class="p">,</span>
 <span class="p">);</span>
 </code></pre></div>
-<p><img alt="png" src="../00_HH_simulator_files/00_HH_simulator_38_0.png" /></p>
+<p><img alt="png" src="../00_HH_simulator_files/00_HH_simulator_41_0.png" /></p>
 <p>As can be seen, the inferred posterior contains the ground-truth parameters (red) in a high-probability region. Now, let us sample parameters from the posterior distribution, simulate the Hodgkin-Huxley model for this parameter set and compare the simulations with the observed data:</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># Draw a sample from the posterior and convert to numpy for plotting.</span>
 <span class="n">posterior_sample</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">1</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">observation_summary_statistics</span><span class="p">)</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>HBox(children=(FloatProgress(value=0.0, description=&#39;Drawing 1 posterior samples&#39;, max=1.0, style=ProgressStyl…
+<div class="codehilite"><pre><span></span><code>Drawing 1 posterior samples:   0%|          | 0/1 [00:00&lt;?, ?it/s]
 </code></pre></div>
 
 <div class="highlight"><pre><span></span><code><span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
@@ -1502,7 +1674,7 @@ Neural network successfully converged after 233 epochs.
 <span class="n">ax</span><span class="o">.</span><span class="n">set_xticks</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">60</span><span class="p">,</span> <span class="mi">120</span><span class="p">])</span>
 <span class="n">ax</span><span class="o">.</span><span class="n">set_yticks</span><span class="p">([</span><span class="o">-</span><span class="mi">80</span><span class="p">,</span> <span class="o">-</span><span class="mi">20</span><span class="p">,</span> <span class="mi">40</span><span class="p">]);</span>
 </code></pre></div>
-<p><img alt="png" src="../00_HH_simulator_files/00_HH_simulator_41_0.png" /></p>
+<p><img alt="png" src="../00_HH_simulator_files/00_HH_simulator_44_0.png" /></p>
 <p>As can be seen, the sample from the inferred posterior leads to simulations that closely resemble the observed data, confirming that <code>SNPE</code> did a good job at capturing the observed data in this simple case.</p>
 <h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
 <p>A. L. Hodgkin and A. F. Huxley. A quantitative description of membrane current and its application to conduction and excitation in nerve. The Journal of Physiology, 117(4):500–544, 1952.</p>
@@ -1571,7 +1743,7 @@ Neural network successfully converged after 233 epochs.
     <script id="__config" type="application/json">{"base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.b8dbb3d2.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.8fd75fb4.min.js"></script>
+      <script src="../../assets/javascripts/bundle.bd41221c.min.js"></script>
       
         <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-MML-AM_CHTML"></script>
       

@@ -18,7 +18,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.5.9">
+      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.5.14">
     
     
       
@@ -26,7 +26,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.f2e4d321.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.10ba22f1.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
@@ -987,7 +987,7 @@
             
   
   <span class="md-ellipsis">
-    Contributing
+    API Reference
   </span>
   
 
@@ -996,6 +996,153 @@
         
         <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            API Reference
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/inference/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Inference
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/models/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Neural Networks
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/posteriors/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Posteriors
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/potentials/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Potentials
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/analysis/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Analysis
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Contributing
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
             <span class="md-nav__icon md-icon"></span>
             Contributing
           </label>
@@ -1046,26 +1193,6 @@
           </ul>
         </nav>
       
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../reference/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    API Reference
-  </span>
-  
-
-      </a>
     </li>
   
 
@@ -1182,7 +1309,7 @@
 
 
 <h1 id="efficient-handling-of-invalid-simulation-outputs">Efficient handling of invalid simulation outputs<a class="headerlink" href="#efficient-handling-of-invalid-simulation-outputs" title="Permanent link">&para;</a></h1>
-<p>For many simulators, the output of the simulator can be ill-defined or it can have non-sensical values. For example, in neuroscience models, if a specific parameter set does not produce a spike, features such as the spike shape can not be computed. When using <code>sbi</code>, such simulations that have <code>NaN</code> or <code>inf</code> in their output are discarded during neural network training. This can lead to inefficetive use of simulation budget: we carry out many simulations, but a potentially large fraction of them is discarded. </p>
+<p>For many simulators, the output of the simulator can be ill-defined or it can have non-sensical values. For example, in neuroscience models, if a specific parameter set does not produce a spike, features such as the spike shape can not be computed. When using <code>sbi</code>, such simulations that have <code>NaN</code> or <code>inf</code> in their output are discarded during neural network training. This can lead to inefficetive use of simulation budget: we carry out many simulations, but a potentially large fraction of them is discarded.</p>
 <p>In this tutorial, we show how we can use <code>sbi</code> to learn regions in parameter space that produce <code>valid</code> simulation outputs, and thereby improve the sampling efficiency. The key idea of the method is to use a classifier to distinguish parameters that lead to <code>valid</code> simulations from regions that lead to <code>invalid</code> simulations. After we have obtained the region in parameter space that produes <code>valid</code> simulation outputs, we train the deep neural density estimator used in <code>SNPE</code>. The method was originally proposed in <a href="https://arxiv.org/abs/1711.01861">Lueckmann, Goncalves et al. 2017</a> and later used in <a href="https://www.biorxiv.org/content/10.1101/2021.07.30.454484v3.abstract">Deistler et al. 2021</a>.</p>
 <h2 id="main-syntax">Main syntax<a class="headerlink" href="#main-syntax" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">SNPE</span>
@@ -1207,10 +1334,11 @@
 <span class="n">posterior</span> <span class="o">=</span> <span class="n">inference</span><span class="o">.</span><span class="n">build_posterior</span><span class="p">()</span>
 </code></pre></div>
 <h2 id="further-explanation-in-a-toy-example">Further explanation in a toy example<a class="headerlink" href="#further-explanation-in-a-toy-example" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">SNPE</span><span class="p">,</span> <span class="n">simulate_for_sbi</span>
-<span class="kn">from</span> <span class="nn">sbi.utils</span> <span class="kn">import</span> <span class="n">RestrictionEstimator</span><span class="p">,</span> <span class="n">BoxUniform</span>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">torch</span>
+
 <span class="kn">from</span> <span class="nn">sbi.analysis</span> <span class="kn">import</span> <span class="n">pairplot</span>
-<span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">from</span> <span class="nn">sbi.inference</span> <span class="kn">import</span> <span class="n">SNPE</span><span class="p">,</span> <span class="n">simulate_for_sbi</span>
+<span class="kn">from</span> <span class="nn">sbi.utils</span> <span class="kn">import</span> <span class="n">BoxUniform</span><span class="p">,</span> <span class="n">RestrictionEstimator</span>
 
 <span class="n">_</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
 </code></pre></div>
@@ -1230,23 +1358,23 @@
 <div class="codehilite"><pre><span></span><code>Running 1000 simulations.:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
 
 
-Simulation outputs:  tensor([[ 0.0411, -0.5656],
-        [ 0.0096, -1.0841],
-        [ 1.2937,  0.9448],
+Simulation outputs:  tensor([[ 0.0538, -0.1295],
+        [ 0.7811, -0.1608],
+        [ 0.8663,  0.3622],
         ...,
         [    nan,     nan],
         [    nan,     nan],
-        [ 2.7940,  0.6461]])
+        [ 1.7638,  0.1825]])
 </code></pre></div>
 
 <p>The simulations that contain <code>NaN</code> are wasted, and we want to learn to &ldquo;restrict&rdquo; the prior such that it produces only <code>valid</code> simulation outputs. To do so, we set up the <code>RestrictionEstimator</code>:</p>
 <div class="highlight"><pre><span></span><code><span class="n">restriction_estimator</span> <span class="o">=</span> <span class="n">RestrictionEstimator</span><span class="p">(</span><span class="n">prior</span><span class="o">=</span><span class="n">prior</span><span class="p">)</span>
 </code></pre></div>
-<p>The <code>RestrictionEstimator</code> trains a classifier to distinguish parameters that lead to <code>valid</code> simulation outputs from parameters that lead to <code>invalid</code> simulation outputs </p>
+<p>The <code>RestrictionEstimator</code> trains a classifier to distinguish parameters that lead to <code>valid</code> simulation outputs from parameters that lead to <code>invalid</code> simulation outputs</p>
 <div class="highlight"><pre><span></span><code><span class="n">restriction_estimator</span><span class="o">.</span><span class="n">append_simulations</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
 <span class="n">classifier</span> <span class="o">=</span> <span class="n">restriction_estimator</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>Training neural network. Epochs trained:  35
+<div class="codehilite"><pre><span></span><code>Training neural network. Epochs trained:  46
 </code></pre></div>
 
 <p>We can inspect the <code>restricted_prior</code>, i.e. the parameters that the classifier believes will lead to <code>valid</code> simulation outputs, with:</p>
@@ -1254,7 +1382,9 @@ Simulation outputs:  tensor([[ 0.0411, -0.5656],
 <span class="n">samples</span> <span class="o">=</span> <span class="n">restricted_prior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10_000</span><span class="p">,))</span>
 <span class="n">_</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span><span class="n">samples</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">]],</span> <span class="n">fig_size</span><span class="o">=</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>The classifier rejected 51.6% of all samples. You will get a speed-up of 106.5%.
+<div class="codehilite"><pre><span></span><code>The `RestrictedPrior` rejected 51.3%
+                of prior samples. You will get a speed-up of
+                105.2%.
 </code></pre></div>
 
 <p><img alt="png" src="../08_restriction_estimator_files/08_restriction_estimator_16_1.png" /></p>
@@ -1262,20 +1392,22 @@ Simulation outputs:  tensor([[ 0.0411, -0.5656],
 <div class="highlight"><pre><span></span><code><span class="n">new_theta</span><span class="p">,</span> <span class="n">new_x</span> <span class="o">=</span> <span class="n">simulate_for_sbi</span><span class="p">(</span><span class="n">simulator</span><span class="p">,</span> <span class="n">restricted_prior</span><span class="p">,</span> <span class="mi">1000</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Simulation outputs: &quot;</span><span class="p">,</span> <span class="n">new_x</span><span class="p">)</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>The classifier rejected 50.9% of all samples. You will get a speed-up of 103.6%.
+<div class="codehilite"><pre><span></span><code>The `RestrictedPrior` rejected 50.2%
+                of prior samples. You will get a speed-up of
+                100.8%.
 
 
 
 Running 1000 simulations.:   0%|          | 0/1000 [00:00&lt;?, ?it/s]
 
 
-Simulation outputs:  tensor([[ 0.6834, -0.2415],
-        [ 1.3459,  1.5373],
-        [ 2.1092,  1.9180],
+Simulation outputs:  tensor([[ 1.0285,  1.2620],
+        [ 1.5197,  1.1854],
+        [ 0.6391,  2.6417],
         ...,
-        [ 0.8845,  0.4036],
-        [ 1.9111,  1.2526],
-        [ 0.8320,  2.3755]])
+        [ 1.3871, -0.8298],
+        [ 0.9003, -1.7289],
+        [ 0.7951,  0.2624]])
 </code></pre></div>
 
 <p>We can now use <strong>all</strong> simulations and run <code>SNPE</code> as always:</p>
@@ -1295,10 +1427,10 @@ Simulation outputs:  tensor([[ 0.6834, -0.2415],
 <span class="n">posterior_samples</span> <span class="o">=</span> <span class="n">posterior</span><span class="o">.</span><span class="n">sample</span><span class="p">((</span><span class="mi">10_000</span><span class="p">,),</span> <span class="n">x</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">2</span><span class="p">))</span>
 <span class="n">_</span> <span class="o">=</span> <span class="n">pairplot</span><span class="p">(</span><span class="n">posterior_samples</span><span class="p">,</span> <span class="n">limits</span><span class="o">=</span><span class="p">[[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">]],</span> <span class="n">fig_size</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
 </code></pre></div>
-<div class="codehilite"><pre><span></span><code>WARNING:root:Found 523 NaN simulations and 0 Inf simulations. They will be excluded from training.
+<div class="codehilite"><pre><span></span><code>WARNING:root:Found 524 NaN simulations and 0 Inf simulations. They will be excluded from training.
 
 
- Neural network successfully converged after 118 epochs.
+ Neural network successfully converged after 107 epochs.
 
 
 Drawing 10000 posterior samples:   0%|          | 0/10000 [00:00&lt;?, ?it/s]
@@ -1307,8 +1439,8 @@ Drawing 10000 posterior samples:   0%|          | 0/10000 [00:00&lt;?, ?it/s]
 <p><img alt="png" src="../08_restriction_estimator_files/08_restriction_estimator_20_3.png" /></p>
 <h2 id="further-options-for-tuning-the-algorithm">Further options for tuning the algorithm<a class="headerlink" href="#further-options-for-tuning-the-algorithm" title="Permanent link">&para;</a></h2>
 <ul>
-<li>the whole procedure can be repeated many times (see the loop shown in &ldquo;Main syntax&rdquo; in this tutorial)  </li>
-<li>the classifier is trained to be relatively conservative, i.e. it will try to be very sure that a specific parameter set can indeed not produce <code>valid</code> simulation outputs. If you are ok with the restricted prior potentially ignoring a small fraction of parameter sets that might have produced <code>valid</code> data, you can use <code>restriction_estimator.restrict_prior(allowed_false_negatives=...)</code>. The argument <code>allowed_false_negatives</code> sets the fraction of potentially ignored parameter sets. A higher value will lead to more <code>valid</code> simulations.  </li>
+<li>the whole procedure can be repeated many times (see the loop shown in &ldquo;Main syntax&rdquo; in this tutorial)</li>
+<li>the classifier is trained to be relatively conservative, i.e. it will try to be very sure that a specific parameter set can indeed not produce <code>valid</code> simulation outputs. If you are ok with the restricted prior potentially ignoring a small fraction of parameter sets that might have produced <code>valid</code> data, you can use <code>restriction_estimator.restrict_prior(allowed_false_negatives=...)</code>. The argument <code>allowed_false_negatives</code> sets the fraction of potentially ignored parameter sets. A higher value will lead to more <code>valid</code> simulations.</li>
 <li>By default, the algorithm considers simulations that have at least one <code>NaN</code> of <code>inf</code> as <code>invalid</code>. You can specify custom criterions with <code>RestrictionEstimator(decision_criterion=...)</code></li>
 </ul>
 
@@ -1375,7 +1507,7 @@ Drawing 10000 posterior samples:   0%|          | 0/10000 [00:00&lt;?, ?it/s]
     <script id="__config" type="application/json">{"base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.b8dbb3d2.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.8fd75fb4.min.js"></script>
+      <script src="../../assets/javascripts/bundle.bd41221c.min.js"></script>
       
         <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-MML-AM_CHTML"></script>
       
