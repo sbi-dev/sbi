@@ -185,5 +185,5 @@ def _build_density_estimator_and_tensors(
 
     inputs = inputs.unsqueeze(0)
     inputs = inputs.expand(input_iid_dim, -1, -1)
-    condition = condition.unsqueeze(0)
+    condition = condition
     return density_estimator, inputs, condition

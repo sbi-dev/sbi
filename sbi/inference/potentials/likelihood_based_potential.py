@@ -12,7 +12,7 @@ from sbi.neural_nets.density_estimators import DensityEstimator
 from sbi.neural_nets.mnle import MixedDensityEstimator
 from sbi.sbi_types import TorchTransform
 from sbi.utils import mcmc_transform
-from sbi.neural_nets.density_estimators.shape_handling import reshape_to_iid_batch_event
+from sbi.neural_nets.density_estimators.shape_handling import reshape_to_batch_event, reshape_to_iid_batch_event
 
 
 def likelihood_estimator_based_potential(
@@ -136,9 +136,7 @@ def _log_likelihoods_over_trials(
         {theta.device}."""
 
     # Shape of `theta` is (batch_dim, *event_shape).
-    theta = reshape_to_iid_batch_event(
-        theta, event_shape=theta.shape[1:], leading_is_iid=False
-    )
+    theta = reshape_to_batch_event(theta, event_shape=theta.shape[1:])
 
     # Calculate likelihood in one batch.
     with torch.set_grad_enabled(track_gradients):
@@ -193,7 +191,7 @@ class MixedLikelihoodBasedPotential(LikelihoodBasedPotential):
         prior_log_prob = self.prior.log_prob(theta)  # type: ignore
 
         # Shape of `x` is (iid_dim, *event_shape)
-        theta = reshape_to_iid_batch_event(theta, event_shape=theta.shape[1:])
+        theta = reshape_to_batch_event(theta, event_shape=theta.shape[1:])
         x = reshape_to_iid_batch_event(
             self.x_o, event_shape=self.x_o.shape[1:], leading_is_iid=True
         )

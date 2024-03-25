@@ -410,7 +410,7 @@ class SNPE_A_MDN(DensityEstimator):
             self._apply_correction = False
         else:
             # Add iid dimension.
-            default_x = proposal.default_x.unsqueeze(0)  # type: ignore
+            default_x = proposal.default_x  # type: ignore
             self._apply_correction = True
             (
                 logits_pp,
@@ -548,15 +548,12 @@ class SNPE_A_MDN(DensityEstimator):
 
         Args:
             x: Conditioning context for posterior, shape
-                `(iid_dim, batch_dim, *event_shape)`.
+                `(batch_dim, *event_shape)`.
 
         Returns:
             Mixture components of the posterior.
         """
         # Remove the batch dimension of `x` (SNPE-A always has a single `x`).
-        x = x.squeeze(dim=1)
-
-        # Remove the iid dimension of `x`.
         x = x.squeeze(dim=0)
 
         # Evaluate the density estimator.

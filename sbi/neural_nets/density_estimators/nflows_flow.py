@@ -40,11 +40,10 @@ class NFlowsFlow(DensityEstimator):
         Returns:
             Sample-wise log probabilities, shape `(input_iid_dim, input_batch_dim)`.
         """
-        assert condition.shape[0] == 1
         input_iid_dim = input.shape[0]
         input_batch_dim = input.shape[1]
-        condition_batch_dim = condition.shape[1]
-        condition_event_dims = len(condition.shape[2:])
+        condition_batch_dim = condition.shape[0]
+        condition_event_dims = len(condition.shape[1:])
 
         assert condition_batch_dim == input_batch_dim, (
             f"Batch shape of condition {condition_batch_dim} and input "
@@ -56,11 +55,7 @@ class NFlowsFlow(DensityEstimator):
 
         # Repeat the condition to match `input_batch_dim * input_iid_dim`.
         ones_for_event_dims = (1,) * condition_event_dims  # Tuple of 1s, e.g. (1, 1, 1)
-        condition = condition.repeat(1, input_iid_dim, *ones_for_event_dims)
-
-        # Remove the superfluous iid dimension of `condition` (see assert above, it
-        # must always be 1).
-        condition = torch.squeeze(condition, dim=0)
+        condition = condition.repeat(input_iid_dim, *ones_for_event_dims)
 
         log_probs = self.net.log_prob(input, context=condition)
         return log_probs.reshape((input_iid_dim, input_batch_dim))
@@ -88,13 +83,8 @@ class NFlowsFlow(DensityEstimator):
         Returns:
             Samples of shape `(*sample_shape, condition_batch_dim)`.
         """
-        assert condition.shape[0] == 1
-        condition_batch_dim = condition.shape[1]
+        condition_batch_dim = condition.shape[0]
         num_samples = torch.Size(sample_shape).numel()
-
-        # Remove the superfluous iid dimension of `condition` (see assert above, it
-        # must always be 1).
-        condition = torch.squeeze(condition, dim=0)
 
         samples = self.net.sample(num_samples, context=condition)
 
@@ -117,13 +107,9 @@ class NFlowsFlow(DensityEstimator):
             Samples of shape `(*sample_shape, condition_batch_dim, *input_event_shape)`
             and associated log probs of shape `(*sample_shape, condition_batch_dim)`.
         """
-        assert condition.shape[0] == 1
-        condition_batch_dim = condition.shape[1]
+        condition_batch_dim = condition.shape[0]
         num_samples = torch.Size(sample_shape).numel()
 
-        # Remove the superfluous iid dimension of `condition` (see assert above, it
-        # must always be 1).
-        condition = condition.squeeze(dim=0)
         samples, log_probs = self.net.sample_and_log_prob(
             num_samples, context=condition
         )

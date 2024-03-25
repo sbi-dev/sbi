@@ -11,7 +11,7 @@ from sbi.inference.potentials.posterior_based_potential import (
     posterior_estimator_based_potential,
 )
 from sbi.neural_nets.density_estimators.base import DensityEstimator
-from sbi.neural_nets.density_estimators.shape_handling import reshape_to_iid_batch_event
+from sbi.neural_nets.density_estimators.shape_handling import reshape_to_batch_event, reshape_to_iid_batch_event
 from sbi.samplers.rejection.rejection import accept_reject_sample
 from sbi.sbi_types import Shape
 from sbi.utils import check_prior, within_support
@@ -104,11 +104,11 @@ class DirectPosterior(NeuralPosterior):
         num_samples = torch.Size(sample_shape).numel()
         x = self._x_else_default_x(x)
 
-        # [1:] because we remove batch dimension for `reshape_to_iid_batch_event`.
-        # This will break if `x_shape` is `None` and if `x` is passed without
+        # [1:] because we remove batch dimension for `reshape_to_batch_event`.
+        # Note: This line will break if `x_shape` is `None` and if `x` is passed without
         # batch dimension.
         x_shape = self._x_shape[1:] if self._x_shape is not None else x.shape[1:]
-        x = reshape_to_iid_batch_event(x, event_shape=x_shape, leading_is_iid=False)
+        x = reshape_to_batch_event(x, event_shape=x_shape)
 
         max_sampling_batch_size = (
             self.max_sampling_batch_size
@@ -176,7 +176,7 @@ class DirectPosterior(NeuralPosterior):
         theta_de = reshape_to_iid_batch_event(
             theta, theta.shape[1:], leading_is_iid=True
         )
-        x_de = reshape_to_iid_batch_event(x, x_shape)
+        x_de = reshape_to_batch_event(x, x_shape)
 
         # TODO Train exited here, entered after sampling?
         self.posterior_estimator.eval()
@@ -238,7 +238,7 @@ class DirectPosterior(NeuralPosterior):
         """
 
         def acceptance_at(x: Tensor) -> Tensor:
-            # [1:] to remove batch-dimension for `reshape_to_iid_batch_event`.
+            # [1:] to remove batch-dimension for `reshape_to_batch_event`.
             x_shape = self._x_shape[1:] if self._x_shape is not None else x.shape[1:]
             return accept_reject_sample(
                 proposal=self.posterior_estimator,
@@ -248,7 +248,7 @@ class DirectPosterior(NeuralPosterior):
                 sample_for_correction_factor=True,
                 max_sampling_batch_size=rejection_sampling_batch_size,
                 proposal_sampling_kwargs={
-                    "condition": reshape_to_iid_batch_event(x, x_shape)
+                    "condition": reshape_to_batch_event(x, x_shape)
                 },
             )[1]
 

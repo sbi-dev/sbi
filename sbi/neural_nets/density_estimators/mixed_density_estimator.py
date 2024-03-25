@@ -59,16 +59,14 @@ class MixedDensityEstimator(DensityEstimator):
 
         Args:
             sample_shape: Shape of samples to generate.
-            condition: Condition of shape `(iid_dim, batch_dim, *event_shape_condition)`
+            condition: Condition of shape `(batch_dim, *event_shape_condition)`
 
         Returns:
             Samples of shape `(*sample_shape, batch_dim, event_dim_input)`
         """
-        assert condition.shape[0] == 1
-
         num_samples = torch.Size(sample_shape).numel()
-        batch_dim = condition.shape[1]
-        condition_event_dim = condition.dim() - 2
+        batch_dim = condition.shape[0]
+        condition_event_dim = condition.dim() - 1
 
         with torch.set_grad_enabled(track_gradients):
             # Sample discrete data given parameters.
@@ -77,26 +75,26 @@ class MixedDensityEstimator(DensityEstimator):
                 condition=condition,
             )
             # Trailing `1` because `Categorical` has event_shape `()`.
-            discrete_input = discrete_input.reshape(1, num_samples * batch_dim, 1)
+            discrete_input = discrete_input.reshape(num_samples * batch_dim, 1)
 
             ones_for_event_dims = (1,) * condition_event_dim
-            repeated_condition = condition.repeat(1, num_samples, *ones_for_event_dims)
+            repeated_condition = condition.repeat(num_samples, *ones_for_event_dims)
 
             # Sample continuous data condition on parameters and discrete data.
             # Pass num_samples=1 because the choices in the condition contains
             # num_samples elements already.
             continuous_input = self.continuous_net.sample(
-                sample_shape=(1,),
+                sample_shape=(),
                 # repeat the single condition to match number of sampled choices.
                 # sample_shape[0] is the iid dimension.
-                condition=torch.cat((repeated_condition, discrete_input), dim=2),
+                condition=torch.cat((repeated_condition, discrete_input), dim=1),
             )
 
             # In case input was log-transformed, move them to linear space.
             if self.log_transform_input:
                 continuous_input = continuous_input.exp()
 
-            joined_input = torch.cat((continuous_input, discrete_input), dim=2)
+            joined_input = torch.cat((continuous_input, discrete_input), dim=1)
 
             # `continuous_input` is of shape `(batch_dim * numel(sample_shape))`.
             return joined_input.reshape(*sample_shape, batch_dim, -1)
@@ -129,9 +127,9 @@ class MixedDensityEstimator(DensityEstimator):
 
         # Pass parameters and discrete input as condition.
         repeats = disc_input.shape[0]
-        disc_input_repeated = disc_input.reshape((1, repeats * disc_input.shape[1], -1))
-        condition_repeated = condition.repeat((1, repeats, 1))
-        condition_reshaped = torch.cat((condition_repeated, disc_input_repeated), dim=2)
+        disc_input_repeated = disc_input.reshape((repeats * disc_input.shape[1], -1))
+        condition_repeated = condition.repeat((repeats, 1))
+        condition_reshaped = torch.cat((condition_repeated, disc_input_repeated), dim=1)
 
         cont_input_reshaped = cont_input.reshape((
             1,

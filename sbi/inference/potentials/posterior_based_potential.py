@@ -13,7 +13,7 @@ from sbi.sbi_types import TorchTransform
 from sbi.utils import mcmc_transform
 from sbi.utils.sbiutils import within_support
 from sbi.utils.torchutils import ensure_theta_batched
-from sbi.neural_nets.density_estimators.shape_handling import reshape_to_iid_batch_event
+from sbi.neural_nets.density_estimators.shape_handling import reshape_to_batch_event, reshape_to_iid_batch_event
 
 
 def posterior_estimator_based_potential(
@@ -107,7 +107,7 @@ class PosteriorBasedPotential(BasePotential):
             # Force probability to be zero outside prior support.
             in_prior_support = within_support(self.prior, theta)
 
-            x = reshape_to_iid_batch_event(x, event_shape=x.shape[1:])
+            x = reshape_to_batch_event(x, event_shape=x.shape[1:])
             theta = reshape_to_iid_batch_event(
                 theta, event_shape=theta.shape[1:], leading_is_iid=True
             )

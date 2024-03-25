@@ -49,21 +49,15 @@ class ZukoFlow(DensityEstimator):
         Returns:
             Sample-wise log probabilities, shape `(input_iid_dim, input_batch_dim)`.
         """
-        assert condition.shape[0] == 1
-
         input_batch_dim = input.shape[1]
-        condition_batch_dim = condition.shape[1]
+        condition_batch_dim = condition.shape[0]
 
         assert condition_batch_dim == input_batch_dim, (
             f"Batch shape of condition {condition_batch_dim} and input "
             f"{input_batch_dim} do not match."
         )
 
-        # Remove the superfluous iid dimension of `condition` (see assert above, it
-        # must always be 1).
-        condition = torch.squeeze(condition, dim=0)
         emb_cond = self._embedding_net(condition)
-
         distributions = self.net(emb_cond)
         log_probs = distributions.log_prob(input)
 
@@ -93,11 +87,6 @@ class ZukoFlow(DensityEstimator):
         Returns:
             Samples of shape `(*sample_shape, condition_batch_dim)`.
         """
-        assert condition.shape[0] == 1
-        # Remove the superfluous iid dimension of `condition` (see assert above, it
-        # must always be 1).
-        condition = torch.squeeze(condition, dim=0)
-
         emb_cond = self._embedding_net(condition)
         dists = self.net(emb_cond)
         return dists.sample(sample_shape)
@@ -115,9 +104,6 @@ class ZukoFlow(DensityEstimator):
             Samples of shape `(*sample_shape, condition_batch_dim, *input_event_shape)`
             and associated log probs of shape `(*sample_shape, condition_batch_dim)`.
         """
-        # Remove the superfluous iid dimension of `condition` (see assert above, it
-        # must always be 1).
-        condition = torch.squeeze(condition, dim=0)
         emb_cond = self._embedding_net(condition)
         dists = self.net(emb_cond)
         samples, log_probs = dists.rsample_and_log_prob(sample_shape)

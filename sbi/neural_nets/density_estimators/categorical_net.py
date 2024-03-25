@@ -128,8 +128,8 @@ class CategoricalMassEstimator(DensityEstimator):
     def log_prob(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:
         input_iid_dim = input.shape[0]
         input_batch_dim = input.shape[1]
-        condition_batch_dim = condition.shape[1]
-        condition_event_dims = len(condition.shape[2:])
+        condition_batch_dim = condition.shape[0]
+        condition_event_dims = len(condition.shape[1:])
 
         assert condition_batch_dim == input_batch_dim, (
             f"Batch shape of condition {condition_batch_dim} and input "
@@ -141,10 +141,8 @@ class CategoricalMassEstimator(DensityEstimator):
 
         # Repeat the condition to match `input_batch_dim * input_iid_dim`.
         ones_for_event_dims = (1,) * condition_event_dims  # Tuple of 1s, e.g. (1, 1, 1)
-        condition = condition.repeat(1, input_iid_dim, *ones_for_event_dims)
+        condition = condition.repeat(input_iid_dim, *ones_for_event_dims)
 
-        # If no iid samples then squeeze the iid dimension.
-        condition = torch.squeeze(condition, dim=0)
         return self.net.log_prob(input, condition, **kwargs).reshape((
             input_iid_dim,
             input_batch_dim,
@@ -164,8 +162,6 @@ class CategoricalMassEstimator(DensityEstimator):
             therefore `.sample()` does not return a trailing dimension for
             `event_shape`.
         """
-        assert condition.shape[0] == 1
-        condition = torch.squeeze(condition, dim=0)
         return self.net.sample(sample_shape, condition, **kwargs)
 
     def loss(self, input: Tensor, condition: Tensor, **kwargs) -> Tensor:

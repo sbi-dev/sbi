@@ -22,7 +22,7 @@ from sbi.utils import (
     del_entries,
     repeat_rows,
 )
-from sbi.neural_nets.density_estimators.shape_handling import reshape_to_iid_batch_event
+from sbi.neural_nets.density_estimators.shape_handling import reshape_to_batch_event, reshape_to_iid_batch_event
 
 
 class SNPE_C(PosteriorEstimator):
@@ -350,7 +350,7 @@ class SNPE_C(PosteriorEstimator):
 
         # Evaluate large batch giving (batch_size * num_atoms) log prob posterior evals.
         atomic_theta = reshape_to_iid_batch_event(atomic_theta, atomic_theta.shape[1:])
-        repeated_x = reshape_to_iid_batch_event(repeated_x, self._x_shape[1:])
+        repeated_x = reshape_to_batch_event(repeated_x, self._x_shape[1:])
         log_prob_posterior = self._neural_net.log_prob(atomic_theta, repeated_x)
         utils.assert_all_finite(log_prob_posterior, "posterior eval")
         log_prob_posterior = log_prob_posterior.reshape(batch_size, num_atoms)
@@ -367,7 +367,7 @@ class SNPE_C(PosteriorEstimator):
         # XXX This evaluates the posterior on _all_ prior samples
         if self._use_combined_loss:
             theta = reshape_to_iid_batch_event(theta, theta.shape[1:])
-            x = reshape_to_iid_batch_event(x, self._x_shape[1:])
+            x = reshape_to_batch_event(x, self._x_shape[1:])
             log_prob_posterior_non_atomic = self._neural_net.log_prob(theta, x)
             # squeeze to remove iid dimension, which is always one during the loss
             # evaluation of `SNPE_C` (because we have one theta vector per x vector).
