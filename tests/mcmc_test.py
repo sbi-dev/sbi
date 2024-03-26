@@ -32,6 +32,7 @@ from sbi.utils.user_input_checks import (
 from tests.test_utils import check_c2st
 
 
+@pytest.mark.mcmc
 @pytest.mark.parametrize("num_dim", (1, 2))
 def test_c2st_slice_np_on_Gaussian(num_dim: int):
     """Test MCMC on Gaussian, comparing to ground truth target via c2st.
@@ -72,11 +73,12 @@ def test_c2st_slice_np_on_Gaussian(num_dim: int):
     check_c2st(samples, target_samples, alg="slice_np")
 
 
+@pytest.mark.mcmc
 @pytest.mark.parametrize("num_dim", (1, 2))
 @pytest.mark.parametrize("slice_sampler", (SliceSamplerVectorized, SliceSamplerSerial))
 @pytest.mark.parametrize("num_workers", (1, 2))
 def test_c2st_slice_np_vectorized_parallelized_on_Gaussian(
-    num_dim: int, slice_sampler, num_workers: int
+    num_dim: int, slice_sampler, num_workers: int, mcmc_params_accurate: dict
 ):
     """Test MCMC on Gaussian, comparing to ground truth target via c2st.
 
@@ -85,9 +87,13 @@ def test_c2st_slice_np_vectorized_parallelized_on_Gaussian(
 
     """
     num_samples = 500
-    warmup = 50
-    num_chains = 10 if slice_sampler is SliceSamplerVectorized else 1
-    thin = 2
+    warmup = mcmc_params_accurate["warmup_steps"]
+    num_chains = (
+        mcmc_params_accurate["num_chains"]
+        if slice_sampler is SliceSamplerVectorized
+        else 1
+    )
+    thin = mcmc_params_accurate["thin"]
 
     likelihood_shift = -1.0 * ones(num_dim)
     likelihood_cov = 0.3 * eye(num_dim)
@@ -129,6 +135,7 @@ def test_c2st_slice_np_vectorized_parallelized_on_Gaussian(
     check_c2st(samples, target_samples, alg=alg)
 
 
+@pytest.mark.mcmc
 @pytest.mark.parametrize(
     "method",
     (
@@ -139,7 +146,7 @@ def test_c2st_slice_np_vectorized_parallelized_on_Gaussian(
         "slice_np_vectorized",
     ),
 )
-def test_getting_inference_diagnostics(method):
+def test_getting_inference_diagnostics(method, mcmc_params_fast: dict):
     num_simulations = 100
     num_samples = 10
     num_dim = 2
@@ -170,9 +177,7 @@ def test_getting_inference_diagnostics(method):
         proposal=prior,
         potential_fn=potential_fn,
         theta_transform=theta_transform,
-        thin=2,
-        warmup_steps=10,
-        num_chains=1,
+        **mcmc_params_fast,
     )
     posterior.sample(
         sample_shape=(num_samples,),

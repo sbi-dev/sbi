@@ -48,13 +48,15 @@ def test_import_before_deprecation():
     (
         (SNPE_C, 1),
         pytest.param(SNPE_C, 5, marks=pytest.mark.xfail),
-        (SNLE_A, 1),
-        (SNLE_A, 5),
-        (SNRE_A, 1),
-        (SNRE_A, 5),
+        pytest.param(SNLE_A, 1, marks=pytest.mark.mcmc),
+        pytest.param(SNLE_A, 5, marks=pytest.mark.mcmc),
+        pytest.param(SNRE_A, 1, marks=pytest.mark.mcmc),
+        pytest.param(SNRE_A, 5, marks=pytest.mark.mcmc),
     ),
 )
-def test_c2st_posterior_ensemble_on_linearGaussian(inference_method, num_trials):
+def test_c2st_posterior_ensemble_on_linearGaussian(
+    inference_method, num_trials, mcmc_params_accurate: dict
+):
     """Test whether EnsemblePosterior infers well a simple example with available
     ground truth.
     """
@@ -63,7 +65,7 @@ def test_c2st_posterior_ensemble_on_linearGaussian(inference_method, num_trials)
     ensemble_size = 2
     x_o = zeros(num_trials, num_dim)
     num_samples = 500
-    num_simulations = 2000 if inference_method == SNRE_A else 1500
+    num_simulations = 2000
 
     # likelihood_mean will be likelihood_shift+theta
     likelihood_shift = -1.0 * ones(num_dim)
@@ -100,10 +102,8 @@ def test_c2st_posterior_ensemble_on_linearGaussian(inference_method, num_trials)
     if isinstance(inferer, (SNLE_A, SNRE_A)):
         samples = posterior.sample(
             (num_samples,),
-            num_chains=20,
             method="slice_np_vectorized",
-            thin=5,
-            warmup_steps=50,
+            **mcmc_params_accurate,
         )
     else:
         samples = posterior.sample((num_samples,))

@@ -29,3 +29,15 @@ def pytest_collection_modifyitems(config, items):
         for item in items:
             if "gpu" in item.keywords:
                 item.add_marker(skip_gpu)
+
+
+@pytest.fixture(scope="function")
+def mcmc_params_accurate() -> dict:
+    """Fixture for MCMC parameters for functional tests."""
+    return dict(num_chains=20, thin=2, warmup_steps=50)
+
+
+@pytest.fixture(scope="function")
+def mcmc_params_fast() -> dict:
+    """Fixture for MCMC parameters for fast tests."""
+    return dict(num_chains=1, thin=1, warmup_steps=10)
