@@ -150,7 +150,8 @@ class MixedDensityEstimator(DensityEstimator):
         inference. The speed up is achieved by exploiting the fact that there are only
         finite number of possible categories in the discrete part of the dat: one can
         just calculate the log probs for each possible category (given the current batch
-        of context) and then copy those log probs into the entire batch of iid categories.
+        of context) and then copy those log probs into the entire batch of iid
+        categories.
         For example, for the drift-diffusion model, there are only two choices, but
         often 100s or 1000 trials. With this method a evaluation over trials then passes
         a batch of `2 (one per choice) * num_contexts` into the NN, whereas the normal
@@ -175,7 +176,8 @@ class MixedDensityEstimator(DensityEstimator):
         net_device = next(self.discrete_net.parameters()).device
         assert (
             net_device == x.device and x.device == context.device
-        ), f"device mismatch: net, x, context: {net_device}, {x.device}, {context.device}."
+        ), f"device mismatch: net, x, context: \
+            {net_device}, {x.device}, {context.device}."
 
         x_cont_repeated, x_disc_repeated = _separate_x(x_repeated)
         x_cont, x_disc = _separate_x(x)
