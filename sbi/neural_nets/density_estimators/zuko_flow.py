@@ -6,6 +6,7 @@ from zuko.flows import Flow
 
 from sbi.neural_nets.density_estimators.base import DensityEstimator
 from sbi.sbi_types import Shape
+from sbi.utils.user_input_checks import check_condition_shape
 
 
 class ZukoFlow(DensityEstimator):
@@ -24,9 +25,9 @@ class ZukoFlow(DensityEstimator):
             flow: Flow object.
             condition_shape: Shape of the condition.
         """
-
-        # assert len(condition_shape) == 1, "Zuko Flows require 1D conditions."
-        super().__init__(net=net, condition_shape=condition_shape)
+        super().__init__()
+        self.net = net
+        self._condition_shape = condition_shape
         self._embedding_net = embedding_net
 
     @property
@@ -63,7 +64,7 @@ class ZukoFlow(DensityEstimator):
             - (batch_size1, input_size) + (batch_size2,1, *condition_shape)
                                                   -> (batch_size2,batch_size1)
         """
-        self._check_condition_shape(condition)
+        check_condition_shape(condition, self._condition_shape)
         condition_dims = len(self._condition_shape)
 
         # PyTorch's automatic broadcasting
@@ -79,19 +80,6 @@ class ZukoFlow(DensityEstimator):
         log_probs = dists.log_prob(input)
 
         return log_probs
-
-    def loss(self, input: Tensor, condition: Tensor) -> Tensor:
-        r"""Return the loss for training the density estimator.
-
-        Args:
-            input: Inputs to evaluate the loss on of shape (batch_size, input_size).
-            condition: Conditions of shape (batch_size, *condition_shape).
-
-        Returns:
-            Negative log_probability (batch_size,)
-        """
-
-        return -self.log_prob(input, condition)
 
     def sample(self, sample_shape: Shape, condition: Tensor) -> Tensor:
         r"""Return samples from the density estimator.
@@ -110,7 +98,7 @@ class ZukoFlow(DensityEstimator):
             - (*batch_shape, *condition_shape)
                                         -> (*batch_shape, *sample_shape, input_size)
         """
-        self._check_condition_shape(condition)
+        check_condition_shape(condition, self._condition_shape)
 
         condition_dims = len(self._condition_shape)
         batch_shape = condition.shape[:-condition_dims] if condition_dims > 0 else ()
@@ -134,7 +122,7 @@ class ZukoFlow(DensityEstimator):
         Returns:
             Samples and associated log probabilities.
         """
-        self._check_condition_shape(condition)
+        check_condition_shape(condition, self._condition_shape)
 
         condition_dims = len(self._condition_shape)
         batch_shape = condition.shape[:-condition_dims] if condition_dims > 0 else ()
