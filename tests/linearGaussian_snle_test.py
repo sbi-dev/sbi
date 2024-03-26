@@ -484,8 +484,6 @@ def test_api_snl_sampling_methods(
             or "nuts" in sampling_method
             or "hmc" in sampling_method
         ):
-            if sampling_method != "slice_np_vectorized":
-                mcmc_params_fast["num_chains"] = 1
             posterior = MCMCPosterior(
                 potential_fn,
                 proposal=prior,
