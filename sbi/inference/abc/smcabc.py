@@ -21,13 +21,14 @@ class SMCABC(ABCBASE):
         simulator: Callable,
         prior: Distribution,
         distance: Union[str, Callable] = "l2",
+        requires_iid_data: Optional[None] = None,
+        distance_kwargs: Optional[Dict] = None,
         num_workers: int = 1,
         simulation_batch_size: int = 1,
+        distance_batch_size: int = -1,
         show_progress_bars: bool = True,
         kernel: Optional[str] = "gaussian",
         algorithm_variant: str = "C",
-        allow_iid: Optional[None] = None,
-        distance_kwargs: Optional[Dict] = None,
     ):
         r"""Sequential Monte Carlo Approximate Bayesian Computation.
 
@@ -53,32 +54,37 @@ class SMCABC(ABCBASE):
                 object with `.log_prob()`and `.sample()` (for example, a PyTorch
                 distribution) can be used.
             distance: Distance function to compare observed and simulated data. Can be
-                a custom function or one of `l1`, `l2`, `mse`.
+                a custom callable function or one of `l1`, `l2`, `mse`,
+                `mmd`, `wasserstein`.
+            requires_iid_data: Whether to allow conditioning on iid sampled data or not.
+                Typically, this information is inferred by the choice of the distance,
+                but in case a custom distance is used, this information is pivotal.
+            distance_kwargs: Configurations parameters for the distances. In particular
+                useful for the MMD and Wasserstein distance.
             num_workers: Number of parallel workers to use for simulations.
             simulation_batch_size: Number of parameter sets that the simulator
                 maps to data x at once. If None, we simulate all parameter sets at the
                 same time. If >= 1, the simulator has to process data of shape
                 (simulation_batch_size, parameter_dimension).
+            distance_batch_size: Number of simulations that the distance function
+                evaluates against the reference observations at once. If -1, we evaluate
+                all simulations at the same time.
             show_progress_bars: Whether to show a progressbar during simulation and
                 sampling.
             kernel: Perturbation kernel.
             algorithm_variant: Indicating the choice of algorithm variant, A, B, or C.
-            allow_iid: Whether to allow conditioning on iid sampled data or not. Typically,
-                this information is inferred by the choice of the distance, but in case a
-                custom distance is used, this information is pivotal.
-            distance_kwargs: Configurations parameters for the distances. In particular
-                useful for the MMD and Wasserstein distance.
         """
 
         super().__init__(
             simulator=simulator,
             prior=prior,
             distance=distance,
+            requires_iid_data=requires_iid_data,
+            distance_kwargs=distance_kwargs,
             num_workers=num_workers,
             simulation_batch_size=simulation_batch_size,
+            distance_batch_size=distance_batch_size,
             show_progress_bars=show_progress_bars,
-            allow_iid=allow_iid,
-            distance_kwargs=distance_kwargs,
         )
 
         kernels = ("gaussian", "uniform")
@@ -166,6 +172,10 @@ class SMCABC(ABCBASE):
                 particles.
             return_summary: Whether to return a dictionary with all accepted particles,
                 weights, etc. at the end.
+            num_iid_samples: Number of simulations per parameter. Choose
+                `num_iid_samples>1`, if you have chosen a statistical distance that
+                evaluates sets of simulations against a set of reference observations
+                instead of a single data-point comparison.
 
         Returns:
             theta (if kde False): accepted parameters of the last population.
@@ -182,11 +192,11 @@ class SMCABC(ABCBASE):
             kde_kwargs = {}
         assert isinstance(epsilon_decay, float) and epsilon_decay > 0.0
         assert not (
-            self.allow_iid and lra
+            self.distance.requires_iid_data and lra
         ), "Currently there is no support to run inference "
         "on multiple observations together with lra."
         assert not (
-            self.allow_iid and sass
+            self.distance.requires_iid_data and sass
         ), "Currently there is no support to run inference "
         "on multiple observations together with sass."
 
@@ -351,8 +361,8 @@ class SMCABC(ABCBASE):
         ), "number of initial round simulations must be greater than population size"
 
         assert (
-            x_o.shape[0] == 1
-        ) or self.allow_iid, "Your data contains more than one data-point, "
+            (x_o.shape[0] == 1) or self.distance.requires_iid_data
+        ), "Your data contains more than one data-point, "
         "but the choice of your distance does not allow multiple conditioning "
         "observations."
 
@@ -367,12 +377,14 @@ class SMCABC(ABCBASE):
         ))  # Dim(num_initial_pop, num_iid_samples, -1)
 
         # Infer x shape to test and set x_o.
-        if not self.allow_iid:
+        if not self.distance.requires_iid_data:
             x = x.squeeze(1)
             self.x_shape = x[0].unsqueeze(0).shape
         else:
             self.x_shape = x[0].shape
-        self.x_o = process_x(x_o, self.x_shape, allow_iid_x=self.allow_iid)
+        self.x_o = process_x(
+            x_o, self.x_shape, allow_iid_x=self.distance.requires_iid_data
+        )
 
         distances = self.distance(self.x_o, x)
         sortidx = torch.argsort(distances)
@@ -431,12 +443,12 @@ class SMCABC(ABCBASE):
                 num_iid_samples,
                 -1,
             ))  # Dim(num_initial_pop, num_iid_samples, -1)
-            if not self.allow_iid:
+            if not self.distance.requires_iid_data:
                 x_candidates = x_candidates.squeeze(1)
 
             dists = self.distance(self.x_o, x_candidates)
             is_accepted = dists <= epsilon
-            num_accepted_batch = is_accepted.sum().item()
+            num_accepted_batch = int(is_accepted.sum().item())
 
             if num_accepted_batch > 0:
                 new_particles.append(particle_candidates[is_accepted])

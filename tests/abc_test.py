@@ -143,12 +143,6 @@ def test_smcabc_inference_on_linear_gaussian(
         num_iid_samples=num_iid_samples,
     )
 
-    # if isinstance(phat, KDEWrapper):
-    #     b = phat.sample((num_samples,))
-    # elif isinstance(phat, Tensor):
-    #     b = phat
-    # else:
-    #     raise TypeError
     check_c2st(
         phat.sample((num_samples,)) if kde else phat,
         target_samples,
@@ -228,14 +222,16 @@ def test_mc_abc_iid_inference(distance, num_iid_samples, distance_kwargs):
 
 @pytest.mark.slow
 @pytest.mark.parametrize(
-    "distance, num_iid_samples, distance_kwargs",
+    "distance, num_iid_samples, distance_kwargs, distance_batch_size",
     (
-        ["l2", 1, None],
-        ["mmd", 20, {"scale": 1.0}],
-        ["wasserstein", 10, {"epsilon": 1.0, "tol": 1e-6, "max_iter": 1000}],
+        ["l2", 1, None, -1],
+        ["mmd", 20, {"scale": 1.0}, -1],
+        ["wasserstein", 10, {"epsilon": 1.0, "tol": 1e-6, "max_iter": 1000}, 1000],
     ),
 )
-def test_smcabc_iid_inference(distance, num_iid_samples, distance_kwargs):
+def test_smcabc_iid_inference(
+    distance, num_iid_samples, distance_kwargs, distance_batch_size
+):
     test_smcabc_inference_on_linear_gaussian(
         num_dim=2,
         prior_type="gaussian",

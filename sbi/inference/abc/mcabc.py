@@ -18,11 +18,12 @@ class MCABC(ABCBASE):
         simulator: Callable,
         prior,
         distance: Union[str, Callable] = "l2",
+        requires_iid_data: Optional[None] = None,
+        distance_kwargs: Optional[Dict] = None,
         num_workers: int = 1,
         simulation_batch_size: int = 1,
+        distance_batch_size: int = -1,
         show_progress_bars: bool = True,
-        allow_iid: Optional[None] = None,
-        distance_kwargs: Optional[Dict] = None,
     ):
         r"""Monte-Carlo Approximate Bayesian Computation (Rejection ABC) [1].
 
@@ -40,30 +41,33 @@ class MCABC(ABCBASE):
                 object with `.log_prob()`and `.sample()` (for example, a PyTorch
                 distribution) can be used.
             distance: Distance function to compare observed and simulated data. Can be
-                a custom function or one of `l1`, `l2`, `mse`.
+                a custom callable function or one of `l1`, `l2`, `mse`,
+                `mmd`, `wasserstein`.
+            requires_iid_data: Whether to allow conditioning on iid sampled data or not.
+                Typically, this information is inferred by the choice of the distance,
+                but in case a custom distance is used, this information is pivotal.
+            distance_kwargs: Configurations parameters for the distances. In particular
+                useful for the MMD and Wasserstein distance.
             num_workers: Number of parallel workers to use for simulations.
             simulation_batch_size: Number of parameter sets that the simulator
                 maps to data x at once. If None, we simulate all parameter sets at the
                 same time. If >= 1, the simulator has to process data of shape
                 (simulation_batch_size, parameter_dimension).
-            show_progress_bars: Whether to show a progressbar during simulation and
-                sampling.
-            allow_iid: Whether to allow conditioning on iid sampled data or not. Typically,
-                this information is inferred by the choice of the distance, but in case a
-                custom distance is used, this information is pivotal.
-            distance_kwargs: Configurations parameters for the distances. In particular
-                useful for the MMD and Wasserstein distance.
+            distance_batch_size: Number of simulations that the distance function
+                evaluates against the reference observations at once. If -1, we evaluate
+                all simulations at the same time.
         """
 
         super().__init__(
             simulator=simulator,
             prior=prior,
             distance=distance,
+            requires_iid_data=requires_iid_data,
+            distance_kwargs=distance_kwargs,
             num_workers=num_workers,
             simulation_batch_size=simulation_batch_size,
+            distance_batch_size=distance_batch_size,
             show_progress_bars=show_progress_bars,
-            allow_iid=allow_iid,
-            distance_kwargs=distance_kwargs,
         )
 
     def __call__(
@@ -108,6 +112,10 @@ class MCABC(ABCBASE):
                 more details
             return_summary: Whether to return the distances and data corresponding to
                 the accepted parameters.
+            num_iid_samples: Number of simulations per parameter. Choose
+                `num_iid_samples>1`, if you have chosen a statistical distance that
+                evaluates sets of simulations against a set of reference observations
+                instead of a single data-point comparison.
 
         Returns:
             theta (if kde False): accepted parameters
@@ -159,7 +167,7 @@ class MCABC(ABCBASE):
         ))  # Dim(num_initial_pop, num_iid_samples, -1)
 
         # Infer x shape to test and set x_o.
-        if not self.allow_iid:
+        if not self.distance.requires_iid_data:
             x = x.squeeze(1)
             self.x_shape = x[0].unsqueeze(0).shape
             self.x_o = process_x(x_o, self.x_shape)
