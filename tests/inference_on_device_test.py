@@ -91,9 +91,11 @@ def test_training_and_mcmc_on_device(
 
     num_dim = 2
     num_samples = 10
-    num_simulations = 100
-    max_num_epochs = 2
+    max_num_epochs = 10
     num_rounds = 2  # test proposal sampling in round 2.
+    num_simulations_per_round = [200, num_samples]
+    # use more warmup steps to avoid Infs during MCMC in round two.
+    mcmc_params_fast["warmup_steps"] = 20
 
     x_o = zeros(1, num_dim).to(data_device)
     likelihood_shift = -1.0 * ones(num_dim).to(prior_device)
@@ -140,7 +142,7 @@ def test_training_and_mcmc_on_device(
     proposals = [prior]
 
     for _ in range(num_rounds):
-        theta = proposals[-1].sample((num_simulations,))
+        theta = proposals[-1].sample((num_simulations_per_round[_],))
         x = simulator(theta).to(data_device)
         theta = theta.to(data_device)
 
