@@ -23,16 +23,10 @@ from sbi.simulators.linear_gaussian import (
 from tests.test_utils import check_c2st
 
 
-def test_mdn_with_snpe():
-    mdn_inference_with_different_methods(SNPE)
-
-
-@pytest.mark.slow
-def test_mdn_with_snle():
-    mdn_inference_with_different_methods(SNLE)
-
-
-def mdn_inference_with_different_methods(method):
+@pytest.mark.parametrize(
+    "method", (SNPE, pytest.param(SNLE, marks=[pytest.mark.slow, pytest.mark.mcmc]))
+)
+def test_mdn_inference_with_different_methods(method, mcmc_params_accurate: dict):
     num_dim = 2
     x_o = torch.tensor([[1.0, 0.0]])
     num_samples = 500
@@ -68,9 +62,7 @@ def mdn_inference_with_different_methods(method):
             theta_transform=theta_transform,
             proposal=prior,
             method="slice_np_vectorized",
-            num_chains=20,
-            warmup_steps=50,
-            thin=5,
+            **mcmc_params_accurate,
         )
 
     samples = posterior.sample((num_samples,), x=x_o)

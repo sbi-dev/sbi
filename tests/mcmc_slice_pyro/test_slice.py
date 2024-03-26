@@ -137,6 +137,7 @@ def jit_idfn(param):
     return "JIT={}".format(param)
 
 
+@pytest.mark.mcmc
 @pytest.mark.parametrize(
     T._fields,
     TEST_CASES,
@@ -181,9 +182,10 @@ def test_slice_conjugate_gaussian(
         assert_equal(rmse(latent_std, expected_std).item(), 0.0, prec=std_tol)
 
 
+@pytest.mark.mcmc
 @pytest.mark.parametrize("jit", [False, mark_jit(True)], ids=jit_idfn)
 @pytest.mark.parametrize("num_chains", [1, 2])
-def test_logistic_regression(jit, num_chains):
+def test_logistic_regression(jit, num_chains, mcmc_params_fast: dict):
     dim = 3
     data = torch.randn(2000, dim)
     true_coefs = torch.arange(1.0, dim + 1.0)
@@ -196,20 +198,16 @@ def test_logistic_regression(jit, num_chains):
         return y
 
     slice_kernel = Slice(model, jit_compile=jit, ignore_jit_warnings=True)
-    mcmc = MCMC(
-        slice_kernel,
-        num_samples=500,
-        warmup_steps=100,
-        num_chains=num_chains,
-        mp_context="fork",
-        available_cpu=1,
-    )
+    mcmc_params_fast["num_chains"] = num_chains
+    mcmc_params_fast.pop("thin")  # thinning is not supported
+    mcmc = MCMC(slice_kernel, num_samples=500, available_cpu=1, **mcmc_params_fast)
     mcmc.run(data)
     samples = mcmc.get_samples()
     assert_equal(rmse(true_coefs, samples["beta"].mean(0)).item(), 0.0, prec=0.1)
 
 
-def test_beta_bernoulli():
+@pytest.mark.mcmc
+def test_beta_bernoulli(mcmc_params_fast: dict):
     def model(data):
         alpha = torch.tensor([1.1, 1.1])
         beta = torch.tensor([1.1, 1.1])
@@ -220,14 +218,17 @@ def test_beta_bernoulli():
     true_probs = torch.tensor([0.9, 0.1])
     data = dist.Bernoulli(true_probs).sample(sample_shape=(torch.Size((1200,))))
     slice_kernel = Slice(model)
-    mcmc = MCMC(slice_kernel, num_samples=400, warmup_steps=200)
+    mcmc = MCMC(
+        slice_kernel, num_samples=400, warmup_steps=mcmc_params_fast["warmup_steps"]
+    )
     mcmc.run(data)
     samples = mcmc.get_samples()
     assert_equal(samples["p_latent"].mean(0), true_probs, prec=0.02)
 
 
+@pytest.mark.mcmc
 @pytest.mark.parametrize("jit", [False, mark_jit(True)], ids=jit_idfn)
-def test_gamma_normal(jit):
+def test_gamma_normal(jit, mcmc_params_fast: dict):
     def model(data):
         rate = torch.tensor([1.0, 1.0])
         concentration = torch.tensor([1.0, 1.0])
@@ -238,14 +239,17 @@ def test_gamma_normal(jit):
     true_std = torch.tensor([0.5, 2])
     data = dist.Normal(3, true_std).sample(sample_shape=(torch.Size((2000,))))
     slice_kernel = Slice(model, jit_compile=jit, ignore_jit_warnings=True)
-    mcmc = MCMC(slice_kernel, num_samples=200, warmup_steps=100)
+    mcmc = MCMC(
+        slice_kernel, num_samples=200, warmup_steps=mcmc_params_fast["warmup_steps"]
+    )
     mcmc.run(data)
     samples = mcmc.get_samples()
     assert_equal(samples["p_latent"].mean(0), true_std, prec=0.05)
 
 
+@pytest.mark.mcmc
 @pytest.mark.parametrize("jit", [False, mark_jit(True)], ids=jit_idfn)
-def test_dirichlet_categorical(jit):
+def test_dirichlet_categorical(jit, mcmc_params_fast: dict):
     def model(data):
         concentration = torch.tensor([1.0, 1.0, 1.0])
         p_latent = pyro.sample("p_latent", dist.Dirichlet(concentration))
@@ -255,16 +259,19 @@ def test_dirichlet_categorical(jit):
     true_probs = torch.tensor([0.1, 0.6, 0.3])
     data = dist.Categorical(true_probs).sample(sample_shape=(torch.Size((2000,))))
     slice_kernel = Slice(model, jit_compile=jit, ignore_jit_warnings=True)
-    mcmc = MCMC(slice_kernel, num_samples=200, warmup_steps=100)
+    mcmc = MCMC(
+        slice_kernel, num_samples=200, warmup_steps=mcmc_params_fast["warmup_steps"]
+    )
     mcmc.run(data)
     samples = mcmc.get_samples()
     posterior = samples["p_latent"]
     assert_equal(posterior.mean(0), true_probs, prec=0.02)
 
 
+@pytest.mark.mcmc
 @pytest.mark.parametrize("jit", [False, mark_jit(True)], ids=jit_idfn)
 @pytest.mark.skip(reason="Slice sampling not implemented for multiple sites yet.")
-def test_gamma_beta(jit):
+def test_gamma_beta(jit, mcmc_params_fast: dict):
     def model(data):
         alpha_prior = pyro.sample("alpha", dist.Gamma(concentration=1.0, rate=1.0))
         beta_prior = pyro.sample("beta", dist.Gamma(concentration=1.0, rate=1.0))
@@ -280,16 +287,19 @@ def test_gamma_beta(jit):
         torch.Size((5000,))
     )
     slice_kernel = Slice(model, jit_compile=jit, ignore_jit_warnings=True)
-    mcmc = MCMC(slice_kernel, num_samples=500, warmup_steps=200)
+    mcmc = MCMC(
+        slice_kernel, num_samples=500, warmup_steps=mcmc_params_fast["warmup_steps"]
+    )
     mcmc.run(data)
     samples = mcmc.get_samples()
     assert_equal(samples["alpha"].mean(0), true_alpha, prec=0.08)
     assert_equal(samples["beta"].mean(0), true_beta, prec=0.05)
 
 
+@pytest.mark.mcmc
 @pytest.mark.parametrize("jit", [False, mark_jit(True)], ids=jit_idfn)
 @pytest.mark.skip(reason="Slice sampling not implemented for multiple sites yet.")
-def test_gaussian_mixture_model(jit):
+def test_gaussian_mixture_model(jit, mcmc_params_fast: dict):
     K, N = 3, 1000
 
     def gmm(data):
@@ -312,7 +322,9 @@ def test_gaussian_mixture_model(jit):
     slice_kernel = Slice(
         gmm, max_plate_nesting=1, jit_compile=jit, ignore_jit_warnings=True
     )
-    mcmc = MCMC(slice_kernel, num_samples=300, warmup_steps=100)
+    mcmc = MCMC(
+        slice_kernel, num_samples=300, warmup_steps=mcmc_params_fast["warmup_steps"]
+    )
     mcmc.run(data)
     samples = mcmc.get_samples()
     assert_equal(samples["phi"].mean(0).sort()[0], true_mix_proportions, prec=0.05)
@@ -321,9 +333,10 @@ def test_gaussian_mixture_model(jit):
     )
 
 
+@pytest.mark.mcmc
 @pytest.mark.parametrize("jit", [False, mark_jit(True)], ids=jit_idfn)
 @pytest.mark.skip(reason="Slice sampling not implemented for multiple sites yet.")
-def test_bernoulli_latent_model(jit):
+def test_bernoulli_latent_model(jit, mcmc_params_fast: dict):
     @poutine.broadcast
     def model(data):
         y_prob = pyro.sample("y_prob", dist.Beta(1.0, 1.0))
@@ -340,15 +353,21 @@ def test_bernoulli_latent_model(jit):
     slice_kernel = Slice(
         model, max_plate_nesting=1, jit_compile=jit, ignore_jit_warnings=True
     )
-    mcmc = MCMC(slice_kernel, num_samples=600, warmup_steps=200)
+    mcmc = MCMC(
+        slice_kernel,
+        num_samples=600,
+        warmup_steps=mcmc_params_fast["warmup_steps"],
+        num_chains=1,
+    )
     mcmc.run(data)
     samples = mcmc.get_samples()
     assert_equal(samples["y_prob"].mean(0), y_prob, prec=0.05)
 
 
+@pytest.mark.mcmc
 @pytest.mark.parametrize("num_steps", [2, 3, 30])
 @pytest.mark.skip(reason="Slice sampling not implemented for multiple sites yet.")
-def test_gaussian_hmm(num_steps):
+def test_gaussian_hmm(num_steps, mcmc_params_fast: dict):
     dim = 4
 
     def model(data):
@@ -406,13 +425,16 @@ def test_gaussian_hmm(num_steps):
     )
     if num_steps == 30:
         slice_kernel.initial_trace = _get_initial_trace()
-    mcmc = MCMC(slice_kernel, num_samples=5, warmup_steps=5)
+    mcmc = MCMC(
+        slice_kernel, num_samples=5, warmup_steps=mcmc_params_fast["warmup_steps"]
+    )
     mcmc.run(data)
 
 
+@pytest.mark.mcmc
 @pytest.mark.parametrize("hyperpriors", [False, True])
 @pytest.mark.skip(reason="Slice sampling not implemented for multiple sites yet.")
-def test_beta_binomial(hyperpriors):
+def test_beta_binomial(hyperpriors, mcmc_params_fast: dict):
     def model(data):
         with pyro.plate("plate_0", data.shape[-1]):
             alpha = (
@@ -444,16 +466,21 @@ def test_beta_binomial(hyperpriors):
     hmc_kernel = Slice(
         collapse_conjugate(model), jit_compile=True, ignore_jit_warnings=True
     )
-    mcmc = MCMC(hmc_kernel, num_samples=num_samples, warmup_steps=50)
+    mcmc = MCMC(
+        hmc_kernel,
+        num_samples=num_samples,
+        warmup_steps=mcmc_params_fast["warmup_steps"],
+    )
     mcmc.run(data)
     samples = mcmc.get_samples()
     posterior = posterior_replay(model, samples, data, num_samples=num_samples)
     assert_equal(posterior["probs"].mean(0), true_probs, prec=0.05)
 
 
+@pytest.mark.mcmc
 @pytest.mark.parametrize("hyperpriors", [False, True])
 @pytest.mark.skip(reason="Slice sampling not implemented for multiple sites yet.")
-def test_gamma_poisson(hyperpriors):
+def test_gamma_poisson(hyperpriors, mcmc_params_fast: dict):
     def model(data):
         with pyro.plate("latent_dim", data.shape[1]):
             alpha = (
@@ -477,7 +504,11 @@ def test_gamma_poisson(hyperpriors):
     slice_kernel = Slice(
         collapse_conjugate(model), jit_compile=True, ignore_jit_warnings=True
     )
-    mcmc = MCMC(slice_kernel, num_samples=num_samples, warmup_steps=50)
+    mcmc = MCMC(
+        slice_kernel,
+        num_samples=num_samples,
+        warmup_steps=mcmc_params_fast["warmup_steps"],
+    )
     mcmc.run(data)
     samples = mcmc.get_samples()
     posterior = posterior_replay(model, samples, data, num_samples=num_samples)
