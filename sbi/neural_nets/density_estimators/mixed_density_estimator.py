@@ -144,38 +144,40 @@ class MixedDensityEstimator(DensityEstimator):
         return self.log_prob(x, context)
 
     def log_prob_iid(self, x: Tensor, context: Tensor) -> Tensor:
-        """Return log prob given a batch of iid x and a different batch of context.
+        """Return log prob given a batch of iid x and a different batch of
+        context.
 
-        This is different from `.log_prob()` to enable speed ups in evaluation during
-        inference. The speed up is achieved by exploiting the fact that there are only
-        finite number of possible categories in the discrete part of the dat: one can
-        just calculate the log probs for each possible category (given the current batch
-        of context) and then copy those log probs into the entire batch of iid categories.
-        For example, for the drift-diffusion model, there are only two choices, but
-        often 100s or 1000 trials. With this method a evaluation over trials then passes
-        a batch of `2 (one per choice) * num_contexts` into the NN, whereas the normal
-        `.log_prob()` would pass `1000 * num_contexts`.
+        This is different from `.log_prob()` to enable speed ups in evaluation
+        during inference. The speed up is achieved by exploiting the fact that
+        there are only finite number of possible categories in the discrete
+        part of the dat: one can just calculate the log probs for each possible
+        category (given the current batch of context) and then copy those log
+        probs into the entire batch of iid categories.  For example, for the
+        drift-diffusion model, there are only two choices, but often 100s or
+        1000 trials. With this method a evaluation over trials then passes a
+        batch of `2 (one per choice) * num_contexts` into the NN, whereas the
+        normal `.log_prob()` would pass `1000 * num_contexts`.
 
         Args:
-            x: batch of iid data, data observed given the same underlying parameters or
-                experimental conditions.
-            context: batch of parameters to be evaluated, i.e., each batch entry will be
-                evaluated for the entire batch of iid x.
+            x: batch of iid data, data observed given the same underlying
+                parameters or experimental conditions.
+            context: batch of parameters to be evaluated, i.e., each batch
+                entry will be evaluated for the entire batch of iid x.
 
         Returns:
-            Tensor: log probs with shape (num_trials, num_parameters), i.e., the log
-                prob for each context for each trial.
+            Tensor: log probs with shape (num_trials, num_parameters), i.e.,
+                the log prob for each context for each trial.
         """
 
         context = atleast_2d(context)
         x = atleast_2d(x)
         batch_size = context.shape[0]
         num_trials = x.shape[0]
-        context_repeated, x_repeated = match_theta_and_x_batch_shapes(context, x)
+        context_repeated, x_repeated = match_theta_and_x_batch_shapes(context, x)  # noqa
         net_device = next(self.discrete_net.parameters()).device
         assert (
             net_device == x.device and x.device == context.device
-        ), f"device mismatch: net, x, context: {net_device}, {x.device}, {context.device}."
+        ), f"device mismatch: net, x, context: {net_device}, {x.device}, {context.device}."  # noqa
 
         x_cont_repeated, x_disc_repeated = _separate_x(x_repeated)
         x_cont, x_disc = _separate_x(x)
@@ -185,7 +187,7 @@ class MixedDensityEstimator(DensityEstimator):
             torch.arange(self.discrete_net.num_categories - 1), batch_size, dim=0
         )
         # repeat parameters for categories
-        repeated_context = context.repeat(self.discrete_net.num_categories - 1, 1)
+        repeated_context = context.repeat(self.discrete_net.num_categories - 1, 1)  # noqa
         log_prob_per_cat = torch.zeros(self.discrete_net.num_categories, batch_size).to(
             net_device
         )
@@ -201,9 +203,9 @@ class MixedDensityEstimator(DensityEstimator):
             x_disc.type_as(torch.zeros(1, dtype=torch.long)).squeeze()
         ].reshape(-1)
 
-        # Get repeat discrete data and context to match in batch shape for flow eval.
+        # Get repeat discrete data and context to match in batch shape for flow eval. # noqa
         log_probs_cont = self.continuous_net.log_prob(
-            torch.log(x_cont_repeated) if self.log_transform_x else x_cont_repeated,
+            torch.log(x_cont_repeated) if self.log_transform_x else x_cont_repeated,  # noqa
             condition=torch.cat((context_repeated, x_disc_repeated), dim=1),
         )
 
