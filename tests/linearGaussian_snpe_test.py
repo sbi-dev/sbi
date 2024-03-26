@@ -31,11 +31,6 @@ from sbi.simulators.linear_gaussian import (
     true_posterior_linear_gaussian_mvn_prior,
 )
 from sbi.utils import RestrictedPrior, get_density_thresholder
-from sbi.utils.user_input_checks import (
-    check_sbi_inputs,
-    process_prior,
-    process_simulator,
-)
 
 from .sbiutils_test import conditional_of_mvn
 from .test_utils import (
@@ -80,13 +75,8 @@ def test_c2st_snpe_on_linearGaussian(snpe_method, num_dim: int, prior_str: str):
             num_samples=num_samples,
         )
 
-    prior, _, prior_returns_numpy = process_prior(prior)
-    simulator = process_simulator(
-        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov),
-        prior,
-        prior_returns_numpy,
-    )
-    check_sbi_inputs(simulator, prior)
+    def simulator(theta):
+        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     inference = snpe_method(prior, show_progress_bars=False)
 
@@ -181,13 +171,8 @@ def test_density_estimators_on_linearGaussian(density_estimator):
     )
     target_samples = gt_posterior.sample((num_samples,))
 
-    prior, _, prior_returns_numpy = process_prior(prior)
-    simulator = process_simulator(
-        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov),
-        prior,
-        prior_returns_numpy,
-    )
-    check_sbi_inputs(simulator, prior)
+    def simulator(theta):
+        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     inference = SNPE_C(prior, density_estimator=density_estimator)
 
@@ -234,18 +219,13 @@ def test_c2st_snpe_on_linearGaussian_different_dims(density_estimator="maf"):
         num_samples=num_samples,
     )
 
-    prior, _, prior_returns_numpy = process_prior(prior)
-    simulator = process_simulator(
-        lambda theta: linear_gaussian(
+    def simulator(theta):
+        return linear_gaussian(
             theta,
             likelihood_shift,
             likelihood_cov,
             num_discarded_dims=discard_dims,
-        ),
-        prior,
-        prior_returns_numpy,
-    )
-    check_sbi_inputs(simulator, prior)
+        )
 
     # Test whether prior can be `None`.
     inference = SNPE_C(
@@ -326,13 +306,8 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
     else:
         density_estimator = "maf"
 
-    prior, _, prior_returns_numpy = process_prior(prior)
-    simulator = process_simulator(
-        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov),
-        prior,
-        prior_returns_numpy,
-    )
-    check_sbi_inputs(simulator, prior)
+    def simulator(theta):
+        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     creation_args = dict(
         prior=prior,
@@ -413,13 +388,15 @@ def test_c2st_multi_round_snpe_on_linearGaussian(method_str: str):
 @pytest.mark.parametrize(
     "sample_with, mcmc_method, prior_str",
     (
-        ("mcmc", "slice_np", "gaussian"),
-        ("mcmc", "slice", "gaussian"),
-        ("mcmc", "slice_np_vectorized", "gaussian"),
+        pytest.param("mcmc", "slice_np", "gaussian", marks=pytest.mark.mcmc),
+        pytest.param("mcmc", "slice", "gaussian", marks=pytest.mark.mcmc),
+        pytest.param("mcmc", "slice_np_vectorized", "gaussian", marks=pytest.mark.mcmc),
         ("rejection", "rejection", "uniform"),
     ),
 )
-def test_api_snpe_c_posterior_correction(sample_with, mcmc_method, prior_str):
+def test_api_snpe_c_posterior_correction(
+    sample_with, mcmc_method, prior_str, mcmc_params_fast: dict
+):
     """Test that leakage correction applied to sampling works, with both MCMC and
     rejection.
 
@@ -439,13 +416,8 @@ def test_api_snpe_c_posterior_correction(sample_with, mcmc_method, prior_str):
     else:
         prior = utils.BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
 
-    prior, _, prior_returns_numpy = process_prior(prior)
-    simulator = process_simulator(
-        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov),
-        prior,
-        prior_returns_numpy,
-    )
-    check_sbi_inputs(simulator, prior)
+    def simulator(theta):
+        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     inference = SNPE_C(prior, show_progress_bars=False)
 
@@ -460,9 +432,7 @@ def test_api_snpe_c_posterior_correction(sample_with, mcmc_method, prior_str):
             theta_transform=theta_transform,
             proposal=prior,
             method=mcmc_method,
-            num_chains=10 if mcmc_method == "slice_np_vectorized" else 1,
-            warmup_steps=10,
-            thin=1,
+            **mcmc_params_fast,
         )
     elif sample_with == "rejection":
         posterior = RejectionPosterior(
@@ -504,13 +474,8 @@ def test_api_force_first_round_loss(
     likelihood_cov = 0.3 * eye(num_dim)
     prior = utils.BoxUniform(-2.0 * ones(num_dim), 2.0 * ones(num_dim))
 
-    prior, _, prior_returns_numpy = process_prior(prior)
-    simulator = process_simulator(
-        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov),
-        prior,
-        prior_returns_numpy,
-    )
-    check_sbi_inputs(simulator, prior)
+    def simulator(theta):
+        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
     inference = SNPE_C(prior, show_progress_bars=False)
 
@@ -526,7 +491,8 @@ def test_api_force_first_round_loss(
 
 
 @pytest.mark.slow
-def test_sample_conditional():
+@pytest.mark.mcmc
+def test_sample_conditional(mcmc_params_accurate: dict):
     """
     Test whether sampling from the conditional gives the same results as evaluating.
 
@@ -543,10 +509,6 @@ def test_sample_conditional():
     num_simulations = 6000
     num_conditional_samples = 500
 
-    mcmc_parameters = dict(
-        method="slice_np_vectorized", num_chains=20, warmup_steps=50, thin=5
-    )
-
     x_o = zeros(1, num_dim)
 
     likelihood_shift = -1.0 * ones(num_dim)
@@ -562,10 +524,6 @@ def test_sample_conditional():
 
     # Test whether SNPE works properly with structured z-scoring.
     net = posterior_nn("maf", z_score_x="structured", hidden_features=20)
-
-    prior, _, prior_returns_numpy = process_prior(prior)
-    simulator = process_simulator(simulator, prior, prior_returns_numpy)
-    check_sbi_inputs(simulator, prior)
 
     inference = SNPE_C(prior, density_estimator=net, show_progress_bars=False)
 
@@ -602,7 +560,8 @@ def test_sample_conditional():
         potential_fn=conditioned_potential_fn,
         theta_transform=restricted_tf,
         proposal=restricted_prior,
-        **mcmc_parameters,
+        method="slice_np_vectorized",
+        **mcmc_params_accurate,
     )
     mcmc_posterior.set_default_x(x_o)  # TODO: This test has a bug? Needed to add this
     cond_samples = mcmc_posterior.sample((num_conditional_samples,))
@@ -693,9 +652,6 @@ def test_mdn_conditional_density(num_dim: int = 3, cond_dim: int = 1):
     def simulator(theta):
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    prior, _, prior_returns_numpy = process_prior(prior)
-    simulator = process_simulator(simulator, prior, prior_returns_numpy)
-    check_sbi_inputs(simulator, prior)
     inference = SNPE_C(density_estimator="mdn", show_progress_bars=False)
 
     theta, x = simulate_for_sbi(
@@ -732,13 +688,9 @@ def test_example_posterior(snpe_method: type):
 
     extra_kwargs = dict(final_round=True) if snpe_method == SNPE_A else dict()
 
-    prior, _, prior_returns_numpy = process_prior(prior)
-    simulator = process_simulator(
-        lambda theta: linear_gaussian(theta, likelihood_shift, likelihood_cov),
-        prior,
-        prior_returns_numpy,
-    )
-    check_sbi_inputs(simulator, prior)
+    def simulator(theta):
+        return linear_gaussian(theta, likelihood_shift, likelihood_cov)
+
     inference = snpe_method(prior, show_progress_bars=False)
 
     theta, x = simulate_for_sbi(

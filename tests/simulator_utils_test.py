@@ -10,11 +10,6 @@ from torch import ones, zeros
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
 from sbi.simulators.simutils import simulate_in_batches
 from sbi.utils.torchutils import BoxUniform
-from sbi.utils.user_input_checks import (
-    check_sbi_inputs,
-    process_prior,
-    process_simulator,
-)
 
 
 @pytest.mark.parametrize("num_sims", (0, 10))
@@ -32,9 +27,6 @@ def test_simulate_in_batches(
 ):
     """Test combinations of num_sims and simulation_batch_size."""
 
-    prior, _, prior_returns_numpy = process_prior(prior)
-    simulator = process_simulator(simulator, prior, prior_returns_numpy)
-    check_sbi_inputs(simulator, prior)
     theta = prior.sample((num_sims,))
     # run twice to check seeding.
     x1 = simulate_in_batches(simulator, theta, batch_size, seed=seed)
