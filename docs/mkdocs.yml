@@ -14,7 +14,7 @@ nav:
         - Multi-round inference: tutorial/03_multiround_inference.md
         - Sampling algorithms in sbi: tutorial/11_sampler_interface.md
         - Custom density estimators: tutorial/04_density_estimators.md
-        - Learning summary statistics: tutorial/05_embedding_net.md
+        - Embedding nets for observations: tutorial/05_embedding_net.md
         - SBI with trial-based data: tutorial/14_iid_data_and_permutation_invariant_embeddings.md
         - Handling invalid simulations: tutorial/08_restriction_estimator.md
         - Crafting summary statistics: tutorial/10_crafting_summary_statistics.md

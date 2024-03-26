@@ -164,8 +164,8 @@ class MixedDensityEstimator(DensityEstimator):
                 evaluated for the entire batch of iid x.
 
         Returns:
-            Tensor: log probs with shape (num_trials, num_parameters), i.e., the log
-                prob for each context for each trial.
+            log probs with shape (num_trials, num_parameters), i.e., the log prob for
+            each context for each trial.
         """
 
         context = atleast_2d(context)

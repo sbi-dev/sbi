@@ -24,7 +24,6 @@ a[title="Edit this page"] {
   font-size: 16px
 }
 
-
 /* Indentation. */
 div.doc-contents:not(.first), div.doc-function div.doc-contents {
   padding-left: 25px;
