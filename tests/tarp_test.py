@@ -27,6 +27,27 @@ def onsamples():
     return theta, samples
 
 
+@pytest.fixture
+def undersamples():
+    # taken from the paper page 7, section 4.1 Gaussian Toy Model correct case
+
+    nsamples = 100  # samples per simulation
+    nsims = 100
+    ndims = 5
+
+    base_mean = Uniform(-5, 5)
+    base_log_var = Uniform(-5, -1)
+    thmu = base_mean.sample((nsims, ndims))
+    thsigma = 0.5 * exp(base_log_var.sample((nsims, ndims)))
+
+    theta_pdf = Normal(loc=thmu, scale=thsigma)
+
+    samples = theta_pdf.sample((nsamples,))
+    theta = theta_pdf.sample((1,))
+
+    return theta, samples
+
+
 # @pytest.fixture
 # def offsamples():
 #     base_pdf = mvn(zeros(3), eye(3))
@@ -43,6 +64,19 @@ def test_onsamples(onsamples):
 
     assert theta.shape == (100, 5) or theta.shape == (1, 100, 5)
     assert samples.shape == (100, 100, 5)
+
+
+def test_onsamples_and_under(onsamples, undersamples):
+
+    theta, samples = onsamples
+    utheta, usamples = undersamples
+
+    std_samples = samples.std(axis=0)
+    std_usamples = usamples.std(axis=0)
+
+    assert (std_usamples < std_samples).any()
+    cnt = (std_usamples < std_samples).sum()
+    print(cnt, std_usamples.shape[0] * std_usamples.shape[1])
 
 
 def test_distances(onsamples):
@@ -92,8 +126,48 @@ def test_tarp_correct(onsamples):
 
     theta, samples = onsamples
 
-    tarp_ = TARP(num_alpha_bins=30)
+    tarp = TARP(num_alpha_bins=30)
+    ecp, alpha = tarp.run(samples, theta)
 
+    assert allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
+
+    tarp = TARP(num_alpha_bins=30, metric="l1")
+    ecp, alpha = tarp.run(samples, theta)
+
+    assert allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
+
+
+def test_tarp_correct_using_norm(onsamples):
+
+    theta, samples = onsamples
+
+    tarp = TARP(num_alpha_bins=30, norm=True)
+    ecp, alpha = tarp.run(samples, theta)
+
+    assert allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
+
+    tarp_ = TARP(num_alpha_bins=30, norm=True, metric="l1")
     ecp, alpha = tarp_.run(samples, theta)
 
     assert allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
+
+
+def test_tarp_detect_underdispersed(undersamples):
+
+    theta, samples = undersamples
+
+    tarp = TARP(num_alpha_bins=30, norm=True)
+    ecp, alpha = tarp.run(samples, theta)
+
+    print(ecp)
+    print(alpha)
+    print((ecp - alpha).abs().max())
+    assert not allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
+
+    tarp_ = TARP(num_alpha_bins=30, norm=True, metric="l1")
+    ecp, alpha = tarp_.run(samples, theta)
+
+    print(ecp)
+    print(alpha)
+    print((ecp - alpha).abs().max())
+    assert not allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
