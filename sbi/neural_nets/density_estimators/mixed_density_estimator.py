@@ -158,21 +158,21 @@ class MixedDensityEstimator(DensityEstimator):
         `.log_prob()` would pass `1000 * num_contexts`.
 
         Args:
-            x: batch of iid data, data observed given the same underlying
-                parameters or experimental conditions.
-            context: batch of parameters to be evaluated, i.e., each batch
-                entry will be evaluated for the entire batch of iid x.
+            x: batch of iid data, data observed given the same underlying parameters or
+                experimental conditions.
+            context: batch of parameters to be evaluated, i.e., each batch entry will be
+                evaluated for the entire batch of iid x.
 
         Returns:
-            Tensor: log probs with shape (num_trials, num_parameters), i.e.,
-                the log prob for each context for each trial.
+            log probs with shape (num_trials, num_parameters), i.e., the log prob for
+            each context for each trial.
         """
 
         context = atleast_2d(context)
         x = atleast_2d(x)
         batch_size = context.shape[0]
         num_trials = x.shape[0]
-        context_repeated, x_repeated = match_theta_and_x_batch_shapes(context, x)  # noqa
+        context_repeated, x_repeated = match_theta_and_x_batch_shapes(context, x)
         net_device = next(self.discrete_net.parameters()).device
         assert (
             net_device == x.device and x.device == context.device
@@ -187,7 +187,7 @@ class MixedDensityEstimator(DensityEstimator):
             torch.arange(self.discrete_net.num_categories - 1), batch_size, dim=0
         )
         # repeat parameters for categories
-        repeated_context = context.repeat(self.discrete_net.num_categories - 1, 1)  # noqa
+        repeated_context = context.repeat(self.discrete_net.num_categories - 1, 1)
         log_prob_per_cat = torch.zeros(self.discrete_net.num_categories, batch_size).to(
             net_device
         )
@@ -203,9 +203,9 @@ class MixedDensityEstimator(DensityEstimator):
             x_disc.type_as(torch.zeros(1, dtype=torch.long)).squeeze()
         ].reshape(-1)
 
-        # Get repeat discrete data and context to match in batch shape for flow eval. # noqa
+        # Get repeat discrete data and context to match in batch shape for flow eval.
         log_probs_cont = self.continuous_net.log_prob(
-            torch.log(x_cont_repeated) if self.log_transform_x else x_cont_repeated,  # noqa
+            torch.log(x_cont_repeated) if self.log_transform_x else x_cont_repeated,
             condition=torch.cat((context_repeated, x_disc_repeated), dim=1),
         )
 
