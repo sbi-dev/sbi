@@ -84,8 +84,8 @@ class TARP:
             raise ValueError("theta must have the same number of columns as samples")
 
         if self.do_norm:
-            lo = torch.min(theta, dim=-2, keepdims=True)  # min along num_sims
-            hi = torch.max(theta, dim=-2, keepdims=True)  # max along num_sims
+            lo = torch.min(theta, dim=-2, keepdims=True).values  # min along num_sims
+            hi = torch.max(theta, dim=-2, keepdims=True).values  # max along num_sims
             samples = (samples - lo) / (hi - lo + 1e-10)
             theta = (theta - lo) / (hi - lo + 1e-10)
 
