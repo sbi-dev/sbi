@@ -2,7 +2,7 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 from functools import partial
-from typing import List, Optional, Sequence, Union
+from typing import List, Optional, Sequence, Tuple, Union
 from warnings import warn
 
 import torch
@@ -11,19 +11,46 @@ from pyknos.nflows import distributions as distributions_
 from pyknos.nflows import flows, transforms
 from pyknos.nflows.nn import nets
 from pyknos.nflows.transforms.splines import (
-    rational_quadratic,  # pyright: ignore[reportAttributeAccessIssue]
+    rational_quadratic,
 )
 from torch import Tensor, nn, relu, tanh, tensor, uint8
-from zuko.flows import LazyTransform
 
 from sbi.neural_nets.density_estimators import NFlowsFlow, ZukoFlow
 from sbi.utils.sbiutils import (
     standardizing_net,
     standardizing_transform,
+    standardizing_transform_zuko,
     z_score_parser,
 )
 from sbi.utils.torchutils import create_alternating_binary_mask
 from sbi.utils.user_input_checks import check_data_device, check_embedding_net_device
+
+
+def get_numel(batch_x: Tensor, batch_y: Tensor, embedding_net) -> Tuple[Tensor, Tensor]:
+    """
+    Get the number of elements in the input and output space.
+
+    Args:
+        batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
+        batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
+        embedding_net: Optional embedding network for y.
+
+    Returns:
+        Tuple of the number of elements in the input and output space.
+
+    """
+    x_numel = batch_x[0].numel()
+    # Infer the output dimensionality of the embedding_net by making a forward pass.
+    check_data_device(batch_x, batch_y)
+    check_embedding_net_device(embedding_net=embedding_net, datum=batch_y)
+    y_numel = embedding_net(batch_y[:1]).numel()
+    if x_numel == 1:
+        warn(
+            "In one-dimensional output space, this flow is limited to Gaussians",
+            stacklevel=2,
+        )
+
+    return x_numel, y_numel
 
 
 def build_made(
@@ -58,18 +85,7 @@ def build_made(
     Returns:
         Neural network.
     """
-    x_numel = batch_x[0].numel()
-    # Infer the output dimensionality of the embedding_net by making a forward pass.
-    check_data_device(batch_x, batch_y)
-    check_embedding_net_device(embedding_net=embedding_net, datum=batch_y)
-    embedding_net.eval()
-    y_numel = embedding_net(batch_y[:1]).numel()
-
-    if x_numel == 1:
-        warn(
-            "In one-dimensional output space, this flow is limited to Gaussians",
-            stacklevel=2,
-        )
+    x_numel, y_numel = get_numel(batch_x, batch_y, embedding_net)
 
     transform = transforms.IdentityTransform()
 
@@ -142,18 +158,7 @@ def build_maf(
     Returns:
         Neural network.
     """
-    x_numel = batch_x[0].numel()
-    # Infer the output dimensionality of the embedding_net by making a forward pass.
-    check_data_device(batch_x, batch_y)
-    check_embedding_net_device(embedding_net=embedding_net, datum=batch_y)
-    embedding_net.eval()
-    y_numel = embedding_net(batch_y[:1]).numel()
-
-    if x_numel == 1:
-        warn(
-            "In one-dimensional output space, this flow is limited to Gaussians",
-            stacklevel=2,
-        )
+    x_numel, y_numel = get_numel(batch_x, batch_y, embedding_net)
 
     transform_list = []
     for _ in range(num_transforms):
@@ -185,7 +190,7 @@ def build_maf(
             standardizing_net(batch_y, structured_y), embedding_net
         )
 
-    # Combine transforms.
+    # Combine transforms
     transform = transforms.CompositeTransform(transform_list)
 
     distribution = get_base_dist(x_numel, **kwargs)
@@ -251,18 +256,7 @@ def build_maf_rqs(
     Returns:
         Neural network.
     """
-    x_numel = batch_x[0].numel()
-    # Infer the output dimensionality of the embedding_net by making a forward pass.
-    check_data_device(batch_x, batch_y)
-    check_embedding_net_device(embedding_net=embedding_net, datum=batch_y)
-    embedding_net.eval()
-    y_numel = embedding_net(batch_y[:1]).numel()
-
-    if x_numel == 1:
-        warn(
-            "In one-dimensional output space, this flow is limited to Gaussians",
-            stacklevel=2,
-        )
+    x_numel, y_numel = get_numel(batch_x, batch_y, embedding_net)
 
     transform_list = []
     for _ in range(num_transforms):
@@ -355,12 +349,7 @@ def build_nsf(
     Returns:
         Neural network.
     """
-    x_numel = batch_x[0].numel()
-    # Infer the output dimensionality of the embedding_net by making a forward pass.
-    check_data_device(batch_x, batch_y)
-    check_embedding_net_device(embedding_net=embedding_net, datum=batch_y)
-    embedding_net.eval()
-    y_numel = embedding_net(batch_y[:1]).numel()
+    x_numel, y_numel = get_numel(batch_x, batch_y, embedding_net)
 
     # Define mask function to alternate between predicted x-dimensions.
     def mask_in_layer(i):
@@ -433,7 +422,7 @@ def build_nsf(
     return flow
 
 
-def build_zuko_maf(
+def build_zuko_nice(
     batch_x: Tensor,
     batch_y: Tensor,
     z_score_x: Optional[str] = "independent",
@@ -441,13 +430,20 @@ def build_zuko_maf(
     hidden_features: Union[Sequence[int], int] = 50,
     num_transforms: int = 5,
     embedding_net: nn.Module = nn.Identity(),
-    residual: bool = True,
-    randperm: bool = False,
+    randmask: bool = False,
     **kwargs,
 ) -> ZukoFlow:
-    """Builds MAF p(x|y).
+    """
+    Build a Non-linear Independent Components Estimation (NICE) flow.
 
-    Args:
+    Affine transformations are used by default, instead of the additive transformations
+    used by Dinh et al. (2014) originally.
+
+    References:
+        | NICE: Non-linear Independent Components Estimation (Dinh et al., 2014)
+        | https://arxiv.org/abs/1410.8516
+
+    Arguments:
         batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
         batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
         z_score_x: Whether to z-score xs passing into the network, can be one of:
@@ -458,69 +454,650 @@ def build_zuko_maf(
             sample is, for example, a time series or an image.
         z_score_y: Whether to z-score ys passing into the network, same options as
             z_score_x.
-        hidden_features: Number of hidden features.
-        num_transforms: Number of transforms.
-        embedding_net: Optional embedding network for y.
-        residual: whether to use residual blocks in the coupling layer.
+        hidden_features: The number of hidden features in the flow. Defaults to 50.
+        num_transforms: The number of transformations in the flow. Defaults to 5.
+        embedding_net: The embedding network to use. Defaults to nn.Identity().
+        randmask: Whether to use random masks in the flow. Defaults to False.
+        **kwargs: Additional keyword arguments to pass to the flow constructor.
+    """
+    which_nf = "NICE"
+    additional_kwargs = {"randmask": randmask, **kwargs}
+    flow = build_zuko_flow(
+        which_nf,
+        batch_x,
+        batch_y,
+        z_score_x,
+        z_score_y,
+        hidden_features,
+        num_transforms,
+        embedding_net,
+        **additional_kwargs,
+    )
+
+    return flow
+
+
+def build_zuko_maf(
+    batch_x: Tensor,
+    batch_y: Tensor,
+    z_score_x: Optional[str] = "independent",
+    z_score_y: Optional[str] = "independent",
+    hidden_features: Union[Sequence[int], int] = 50,
+    num_transforms: int = 5,
+    embedding_net: nn.Module = nn.Identity(),
+    randperm: bool = False,
+    **kwargs,
+) -> ZukoFlow:
+    """
+    Build a Masked Autoregressive Flow (MAF).
+
+    References:
+        | Masked Autoregressive Flow for Density Estimation (Papamakarios et al., 2017)
+        | https://arxiv.org/abs/1705.07057
+
+    Arguments:
+        batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
+        batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
+        z_score_x: Whether to z-score xs passing into the network, can be one of:
+            - `none`, or None: do not z-score.
+            - `independent`: z-score each dimension independently.
+            - `structured`: treat dimensions as related, therefore compute mean and std
+            over the entire batch, instead of per-dimension. Should be used when each
+            sample is, for example, a time series or an image.
+        z_score_y: Whether to z-score ys passing into the network, same options as
+            z_score_x.
+        hidden_features: The number of hidden features in the flow. Defaults to 50.
+        num_transforms: The number of transformations in the flow. Defaults to 5.
+        embedding_net: The embedding network to use. Defaults to nn.Identity().
+        randperm: Whether to use random permutations in the flow. Defaults to False.
+        **kwargs: Additional keyword arguments to pass to the flow constructor.
+    """
+    which_nf = "MAF"
+    additional_kwargs = {"randperm": randperm, **kwargs}
+    flow = build_zuko_flow(
+        which_nf,
+        batch_x,
+        batch_y,
+        z_score_x,
+        z_score_y,
+        hidden_features,
+        num_transforms,
+        embedding_net,
+        **additional_kwargs,
+    )
+
+    return flow
+
+
+def build_zuko_nsf(
+    batch_x: Tensor,
+    batch_y: Tensor,
+    z_score_x: Optional[str] = "independent",
+    z_score_y: Optional[str] = "independent",
+    hidden_features: Union[Sequence[int], int] = 50,
+    num_transforms: int = 5,
+    embedding_net: nn.Module = nn.Identity(),
+    num_bins: int = 8,
+    **kwargs,
+) -> ZukoFlow:
+    """
+    Build a Neural Spline Flow (NSF) with monotonic rational-quadratic spline
+    transformations.
+
+    By default, transformations are fully autoregressive. Coupling transformations
+    can be obtained by setting :py:`passes=2`.
+
+    Warning:
+        Spline transformations are defined over the domain :math:`[-5, 5]`. Any feature
+        outside of this domain is not transformed. It is recommended to standardize
+        features (zero mean, unit variance) before training.
+
+    References:
+        | Neural Spline Flows (Durkan et al., 2019)
+        | https://arxiv.org/abs/1906.04032
+
+    Arguments:
+        batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
+        batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
+        z_score_x: Whether to z-score xs passing into the network, can be one of:
+            - `none`, or None: do not z-score.
+            - `independent`: z-score each dimension independently.
+            - `structured`: treat dimensions as related, therefore compute mean and std
+            over the entire batch, instead of per-dimension. Should be used when each
+            sample is, for example, a time series or an image.
+        z_score_y: Whether to z-score ys passing into the network, same options as
+            z_score_x.
+        hidden_features: The number of hidden features in the flow. Defaults to 50.
+        num_transforms: The number of transformations in the flow. Defaults to 5.
+        embedding_net: The embedding network to use. Defaults to nn.Identity().
+        num_bins: The number of bins in the spline transformations. Defaults to 8.
+        **kwargs: Additional keyword arguments to pass to the flow constructor.
+    """
+    which_nf = "NSF"
+    additional_kwargs = {"bins": num_bins, **kwargs}
+    flow = build_zuko_flow(
+        which_nf,
+        batch_x,
+        batch_y,
+        z_score_x,
+        z_score_y,
+        hidden_features,
+        num_transforms,
+        embedding_net,
+        **additional_kwargs,
+    )
+
+    return flow
+
+
+def build_zuko_ncsf(
+    batch_x: Tensor,
+    batch_y: Tensor,
+    z_score_x: Optional[str] = "independent",
+    z_score_y: Optional[str] = "independent",
+    hidden_features: Union[Sequence[int], int] = 50,
+    num_transforms: int = 5,
+    embedding_net: nn.Module = nn.Identity(),
+    num_bins: int = 8,
+    **kwargs,
+) -> ZukoFlow:
+    r"""
+    Build a Neural Circular Spline Flow (NCSF).
+
+    Circular spline transformations are obtained by composing circular domain shifts
+    with regular spline transformations. Features are assumed to lie in the half-open
+    interval :math:`[-\pi, \pi[`.
+
+    References:
+        | Normalizing Flows on Tori and Spheres (Rezende et al., 2020)
+        | https://arxiv.org/abs/2002.02428
+
+    Arguments:
+        batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
+        batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
+        z_score_x: Whether to z-score xs passing into the network, can be one of:
+            - `none`, or None: do not z-score.
+            - `independent`: z-score each dimension independently.
+            - `structured`: treat dimensions as related, therefore compute mean and std
+            over the entire batch, instead of per-dimension. Should be used when each
+            sample is, for example, a time series or an image.
+        z_score_y: Whether to z-score ys passing into the network, same options as
+            z_score_x.
+        hidden_features: The number of hidden features in the flow. Defaults to 50.
+        num_transforms: The number of transformations in the flow. Defaults to 5.
+        embedding_net: The embedding network to use. Defaults to nn.Identity().
+        num_bins: The number of bins in the spline transformations. Defaults to 8.
+        **kwargs: Additional keyword arguments to pass to the flow constructor.
+    """
+    which_nf = "NCSF"
+    additional_kwargs = {"bins": num_bins, **kwargs}
+    flow = build_zuko_flow(
+        which_nf,
+        batch_x,
+        batch_y,
+        z_score_x,
+        z_score_y,
+        hidden_features,
+        num_transforms,
+        embedding_net,
+        **additional_kwargs,
+    )
+
+    return flow
+
+
+def build_zuko_sospf(
+    batch_x: Tensor,
+    batch_y: Tensor,
+    z_score_x: Optional[str] = "independent",
+    z_score_y: Optional[str] = "independent",
+    hidden_features: Union[Sequence[int], int] = 50,
+    num_transforms: int = 5,
+    embedding_net: nn.Module = nn.Identity(),
+    degree: int = 4,
+    polynomials: int = 3,
+    **kwargs,
+) -> ZukoFlow:
+    """
+    Build a Sum-of-Squares Polynomial Flow (SOSPF).
+
+    References:
+        | Sum-of-Squares Polynomial Flow (Jaini et al., 2019)
+        | https://arxiv.org/abs/1905.02325
+
+    Arguments:
+        batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
+        batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
+        z_score_x: Whether to z-score xs passing into the network, can be one of:
+            - `none`, or None: do not z-score.
+            - `independent`: z-score each dimension independently.
+            - `structured`: treat dimensions as related, therefore compute mean and std
+            over the entire batch, instead of per-dimension. Should be used when each
+            sample is, for example, a time series or an image.
+        z_score_y: Whether to z-score ys passing into the network, same options as
+            z_score_x.
+        hidden_features: The number of hidden features in the flow. Defaults to 50.
+        num_transforms: The number of transformations in the flow. Defaults to 5.
+        embedding_net: The embedding network to use. Defaults to nn.Identity().
+        degree: The degree of the polynomials. Defaults to 4.
+        polynomials: The number of polynomials. Defaults to 3.
+        **kwargs: Additional keyword arguments to pass to the flow constructor.
+    """
+    which_nf = "SOSPF"
+    additional_kwargs = {"degree": degree, "polynomials": polynomials, **kwargs}
+    flow = build_zuko_flow(
+        which_nf,
+        batch_x,
+        batch_y,
+        z_score_x,
+        z_score_y,
+        hidden_features,
+        num_transforms,
+        embedding_net,
+        **additional_kwargs,
+    )
+
+    return flow
+
+
+def build_zuko_naf(
+    batch_x: Tensor,
+    batch_y: Tensor,
+    z_score_x: Optional[str] = "independent",
+    z_score_y: Optional[str] = "independent",
+    hidden_features: Union[Sequence[int], int] = 50,
+    num_transforms: int = 5,
+    embedding_net: nn.Module = nn.Identity(),
+    randperm: bool = False,
+    signal: int = 16,
+    **kwargs,
+) -> ZukoFlow:
+    """
+    Build a Neural Autoregressive Flow (NAF).
+
+    Warning:
+        Invertibility is only guaranteed for features within the interval :math:`[-10,
+        10]`. It is recommended to standardize features (zero mean, unit variance)
+        before training.
+
+    References:
+        | Neural Autoregressive Flows (Huang et al., 2018)
+        | https://arxiv.org/abs/1804.00779
+
+    Arguments:
+        batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
+        batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
+        z_score_x: Whether to z-score xs passing into the network, can be one of:
+            - `none`, or None: do not z-score.
+            - `independent`: z-score each dimension independently.
+            - `structured`: treat dimensions as related, therefore compute mean and std
+            over the entire batch, instead of per-dimension. Should be used when each
+            sample is, for example, a time series or an image.
+        z_score_y: Whether to z-score ys passing into the network, same options as
+            z_score_x.
+        hidden_features: The number of hidden features in the flow. Defaults to 50.
+        num_transforms: The number of transformations in the flow. Defaults to 5.
+        embedding_net: The embedding network to use. Defaults to nn.Identity().
         randperm: Whether features are randomly permuted between transformations or not.
-        kwargs: Additional arguments that are passed by the build function but are not
-            relevant for maf and are therefore ignored.
+            If :py:`False`, features are in ascending (descending) order for even
+            (odd) transformations.
+        signal: The number of signal features of the monotonic network.
+        **kwargs: Additional keyword arguments to pass to the flow constructor.
+    """
+    which_nf = "NAF"
+    additional_kwargs = {
+        "randperm": randperm,
+        "signal": signal,
+        # "network": network,
+        **kwargs,
+    }
+    flow = build_zuko_flow(
+        which_nf,
+        batch_x,
+        batch_y,
+        z_score_x,
+        z_score_y,
+        hidden_features,
+        num_transforms,
+        embedding_net,
+        **additional_kwargs,
+    )
+
+    return flow
+
+
+def build_zuko_unaf(
+    batch_x: Tensor,
+    batch_y: Tensor,
+    z_score_x: Optional[str] = "independent",
+    z_score_y: Optional[str] = "independent",
+    hidden_features: Union[Sequence[int], int] = 50,
+    num_transforms: int = 5,
+    embedding_net: nn.Module = nn.Identity(),
+    randperm: bool = False,
+    signal: int = 16,
+    **kwargs,
+) -> ZukoFlow:
+    """
+    Build an Unconstrained Neural Autoregressive Flow (UNAF).
+
+    Warning:
+        Invertibility is only guaranteed for features within the interval :math:`[-10,
+        10]`. It is recommended to standardize features (zero mean, unit variance)
+        before training.
+
+    References:
+        | Unconstrained Monotonic Neural Networks (Wehenkel et al., 2019)
+        | https://arxiv.org/abs/1908.05164
+
+    Arguments:
+        batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
+        batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
+        z_score_x: Whether to z-score xs passing into the network, can be one of:
+            - `none`, or None: do not z-score.
+            - `independent`: z-score each dimension independently.
+            - `structured`: treat dimensions as related, therefore compute mean and std
+            over the entire batch, instead of per-dimension. Should be used when each
+            sample is, for example, a time series or an image.
+        z_score_y: Whether to z-score ys passing into the network, same options as
+            z_score_x.
+        hidden_features: The number of hidden features in the flow. Defaults to 50.
+        num_transforms: The number of transformations in the flow. Defaults to 5.
+        embedding_net: The embedding network to use. Defaults to nn.Identity().
+        randperm: Whether features are randomly permuted between transformations or not.
+            If :py:`False`, features are in ascending (descending) order for even
+            (odd) transformations.
+        signal: The number of signal features of the monotonic network.
+        **kwargs: Additional keyword arguments to pass to the flow constructor.
+    """
+    which_nf = "UNAF"
+    additional_kwargs = {
+        "randperm": randperm,
+        "signal": signal,
+        # "network": network,
+        **kwargs,
+    }
+    flow = build_zuko_flow(
+        which_nf,
+        batch_x,
+        batch_y,
+        z_score_x,
+        z_score_y,
+        hidden_features,
+        num_transforms,
+        embedding_net,
+        **additional_kwargs,
+    )
+
+    return flow
+
+
+def build_zuko_cnf(
+    batch_x: Tensor,
+    batch_y: Tensor,
+    z_score_x: Optional[str] = "independent",
+    z_score_y: Optional[str] = "independent",
+    hidden_features: Union[Sequence[int], int] = 50,
+    num_transforms: int = 5,
+    embedding_net: nn.Module = nn.Identity(),
+    **kwargs,
+) -> ZukoFlow:
+    """
+    Build a Continuous Normalizing Flow (CNF) with a free-form Jacobian transformation.
+
+    References:
+        | Neural Ordinary Differential Equations (Chen el al., 2018)
+        | https://arxiv.org/abs/1806.07366
+
+        | FFJORD: Free-form Continuous Dynamics for Scalable Reversible
+        | Generative Models (Grathwohl et al., 2018)
+        | https://arxiv.org/abs/1810.01367
+
+    Arguments:
+        batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
+        batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
+        z_score_x: Whether to z-score xs passing into the network, can be one of:
+            - `none`, or None: do not z-score.
+            - `independent`: z-score each dimension independently.
+            - `structured`: treat dimensions as related, therefore compute mean and std
+            over the entire batch, instead of per-dimension. Should be used when each
+            sample is, for example, a time series or an image.
+        z_score_y: Whether to z-score ys passing into the network, same options as
+            z_score_x.
+        hidden_features: The number of hidden features in the flow. Defaults to 50.
+        num_transforms: The number of transformations in the flow. Defaults to 5.
+        embedding_net: The embedding network to use. Defaults to nn.Identity().
+        **kwargs: Additional keyword arguments to pass to the flow constructor.
+    """
+    which_nf = "CNF"
+    additional_kwargs = {**kwargs}
+    flow = build_zuko_flow(
+        which_nf,
+        batch_x,
+        batch_y,
+        z_score_x,
+        z_score_y,
+        hidden_features,
+        num_transforms,
+        embedding_net,
+        **additional_kwargs,
+    )
+
+    return flow
+
+
+def build_zuko_gf(
+    batch_x: Tensor,
+    batch_y: Tensor,
+    z_score_x: Optional[str] = "independent",
+    z_score_y: Optional[str] = "independent",
+    hidden_features: Union[Sequence[int], int] = 50,
+    num_transforms: int = 3,
+    embedding_net: nn.Module = nn.Identity(),
+    components: int = 8,
+    **kwargs,
+) -> ZukoFlow:
+    """
+    Build a Gaussianization Flow (GF).
+
+    Warning:
+        Invertibility is only guaranteed for features within the interval :math:`[-10,
+        10]`. It is recommended to standardize features (zero mean, unit variance)
+        before training.
+
+    References:
+        | Gaussianization Flows (Meng et al., 2020)
+        | https://arxiv.org/abs/2003.01941
+
+    Arguments:
+        batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
+        batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
+        z_score_x: Whether to z-score xs passing into the network, can be one of:
+            - `none`, or None: do not z-score.
+            - `independent`: z-score each dimension independently.
+            - `structured`: treat dimensions as related, therefore compute mean and std
+            over the entire batch, instead of per-dimension. Should be used when each
+            sample is, for example, a time series or an image.
+        z_score_y: Whether to z-score ys passing into the network, same options as
+            z_score_x.
+        hidden_features: The number of hidden features in the flow. Defaults to 50.
+        num_transforms: The number of transformations in the flow. Defaults to 5.
+        embedding_net: The embedding network to use. Defaults to nn.Identity().
+        components: The number of components in the Gaussian mixture model.
+        **kwargs: Additional keyword arguments to pass to the flow constructor.
+    """
+    which_nf = "GF"
+    additional_kwargs = {"components": components, **kwargs}
+    flow = build_zuko_flow(
+        which_nf,
+        batch_x,
+        batch_y,
+        z_score_x,
+        z_score_y,
+        hidden_features,
+        num_transforms,
+        embedding_net,
+        **additional_kwargs,
+    )
+
+    return flow
+
+
+def build_zuko_bpf(
+    batch_x: Tensor,
+    batch_y: Tensor,
+    z_score_x: Optional[str] = "independent",
+    z_score_y: Optional[str] = "independent",
+    hidden_features: Union[Sequence[int], int] = 50,
+    num_transforms: int = 3,
+    embedding_net: nn.Module = nn.Identity(),
+    degree: int = 16,
+    linear: bool = False,
+    **kwargs,
+) -> ZukoFlow:
+    """
+    Build a Bernstein polynomial flow (BPF).
+
+    Warning:
+        Invertibility is only guaranteed for features within the interval :math:`[-10,
+        10]`. It is recommended to standardize features (zero mean, unit variance)
+        before training.
+
+    References:
+        | Short-Term Density Forecasting of Low-Voltage Load using
+        | Bernstein-Polynomial Normalizing Flows (Arpogaus et al., 2022)
+        | https://arxiv.org/abs/2204.13939
+
+    Arguments:
+        batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
+        batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
+        z_score_x: Whether to z-score xs passing into the network, can be one of:
+            - `none`, or None: do not z-score.
+            - `independent`: z-score each dimension independently.
+            - `structured`: treat dimensions as related, therefore compute mean and std
+            over the entire batch, instead of per-dimension. Should be used when each
+            sample is, for example, a time series or an image.
+        z_score_y: Whether to z-score ys passing into the network, same options as
+            z_score_x.
+        hidden_features: The number of hidden features in the flow. Defaults to 50.
+        num_transforms: The number of transformations in the flow. Defaults to 5.
+        embedding_net: The embedding network to use. Defaults to nn.Identity().
+        degree: The degree :math:`M` of the Bernstein polynomial.
+        linear: Whether to use a linear or sigmoid mapping to :math:`[0, 1]`.
+        **kwargs: Additional keyword arguments to pass to the flow constructor.
+    """
+    which_nf = "BPF"
+    additional_kwargs = {"degree": degree, "linear": linear, **kwargs}
+    flow = build_zuko_flow(
+        which_nf,
+        batch_x,
+        batch_y,
+        z_score_x,
+        z_score_y,
+        hidden_features,
+        num_transforms,
+        embedding_net,
+        **additional_kwargs,
+    )
+
+    return flow
+
+
+def build_zuko_flow(
+    which_nf: str,
+    batch_x: Tensor,
+    batch_y: Tensor,
+    z_score_x: Optional[str] = "independent",
+    z_score_y: Optional[str] = "independent",
+    hidden_features: Union[Sequence[int], int] = 50,
+    num_transforms: int = 5,
+    embedding_net: nn.Module = nn.Identity(),
+    **kwargs,
+) -> ZukoFlow:
+    """
+    Fundamental building blocks to build a Zuko normalizing flow model.
+
+    Args:
+        which_nf (str): The type of normalizing flow to build.
+        batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
+        batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
+        z_score_x: Whether to z-score xs passing into the network, can be one of:
+            - `none`, or None: do not z-score.
+            - `independent`: z-score each dimension independently.
+            - `structured`: treat dimensions as related, therefore compute mean and std
+            over the entire batch, instead of per-dimension. Should be used when each
+            sample is, for example, a time series or an image.
+        z_score_y: Whether to z-score ys passing into the network, same options as
+            z_score_x.
+        hidden_features: The number of hidden features in the flow. Defaults to 50.
+        num_transforms: The number of transformations in the flow. Defaults to 5.
+        embedding_net: The embedding network to use. Defaults to nn.Identity().
+        **kwargs: Additional keyword arguments to pass to the flow constructor.
 
     Returns:
-        Neural network.
+        ZukoFlow: The constructed Zuko normalizing flow model.
     """
-    x_numel = batch_x[0].numel()
-    # Infer the output dimensionality of the embedding_net by making a forward pass.
-    check_data_device(batch_x, batch_y)
-    check_embedding_net_device(embedding_net=embedding_net, datum=batch_y)
-    embedding_net.eval()
-    y_numel = embedding_net(batch_y[:1]).numel()
-    if x_numel == 1:
-        warn(
-            "In one-dimensional output space, this flow is limited to Gaussians",
-            stacklevel=1,
-        )
+
+    x_numel, y_numel = get_numel(batch_x, batch_y, embedding_net)
 
     if isinstance(hidden_features, int):
         hidden_features = [hidden_features] * num_transforms
 
-    if x_numel == 1:
-        maf = zuko.flows.MAF(
-            features=x_numel,
-            context=y_numel,
-            hidden_features=hidden_features,
-            transforms=num_transforms,
+    build_nf = getattr(zuko.flows, which_nf)
+
+    if which_nf == "CNF":
+        flow_built = build_nf(
+            features=x_numel, context=y_numel, hidden_features=hidden_features, **kwargs
         )
     else:
-        maf = zuko.flows.MAF(
+        flow_built = build_nf(
             features=x_numel,
             context=y_numel,
             hidden_features=hidden_features,
             transforms=num_transforms,
-            randperm=randperm,
-            residual=residual,
+            **kwargs,
         )
 
-    transforms: Union[Sequence[LazyTransform], LazyTransform]
-    transforms = maf.transform.transforms  # pyright: ignore[reportAssignmentType]
-    z_score_x_bool, structured_x = z_score_parser(z_score_x)
-    if z_score_x_bool:
-        # transforms = transforms
-        transforms = (
-            *transforms,
-            # Ideally `standardizing_transform` would return a `LazyTransform` instead of ` AffineTransform | Unconditional`, maybe all three are compatible
-            standardizing_transform(batch_x, structured_x, backend="zuko"),  # pyright: ignore[reportAssignmentType]
-        )
+    # Continuous normalizing flows (CNF) only have one transform,
+    # so we need to handle them slightly differently.
+    if which_nf == "CNF":
+        transform = flow_built.transform
 
-    z_score_y_bool, structured_y = z_score_parser(z_score_y)
-    if z_score_y_bool:
-        # Prepend standardizing transform to y-embedding.
-        embedding_net = nn.Sequential(
-            standardizing_net(batch_y, structured_y), embedding_net
-        )
+        z_score_x_bool, structured_x = z_score_parser(z_score_x)
+        if z_score_x_bool:
+            transform = (
+                transform,
+                standardizing_transform_zuko(batch_x, structured_x, backend="zuko"),
+            )
 
-    # Combine transforms.
-    neural_net = zuko.flows.Flow(transforms, maf.base)
+        z_score_y_bool, structured_y = z_score_parser(z_score_y)
+        if z_score_y_bool:
+            # Prepend standardizing transform to y-embedding.
+            embedding_net = nn.Sequential(
+                standardizing_transform_zuko(batch_y, structured_y), embedding_net
+            )
+
+        # Combine transforms.
+        neural_net = zuko.flows.Flow(transform, flow_built.base)
+    else:
+        transforms = flow_built.transform.transforms
+
+        z_score_x_bool, structured_x = z_score_parser(z_score_x)
+        if z_score_x_bool:
+            transforms = (
+                *transforms,
+                standardizing_transform_zuko(batch_x, structured_x),
+            )
+
+        z_score_y_bool, structured_y = z_score_parser(z_score_y)
+        if z_score_y_bool:
+            # Prepend standardizing transform to y-embedding.
+            embedding_net = nn.Sequential(
+                standardizing_net(batch_y, structured_y), embedding_net
+            )
+
+        # Combine transforms.
+        neural_net = zuko.flows.Flow(transforms, flow_built.base)
 
     flow = ZukoFlow(neural_net, embedding_net, condition_shape=batch_y[0].shape)
 

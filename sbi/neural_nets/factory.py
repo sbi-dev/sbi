@@ -16,7 +16,16 @@ from sbi.neural_nets.flow import (
     build_maf,
     build_maf_rqs,
     build_nsf,
+    build_zuko_bpf,
+    build_zuko_cnf,
+    build_zuko_gf,
     build_zuko_maf,
+    build_zuko_naf,
+    build_zuko_ncsf,
+    build_zuko_nice,
+    build_zuko_nsf,
+    build_zuko_sospf,
+    build_zuko_unaf,
 )
 from sbi.neural_nets.mdn import build_mdn
 from sbi.neural_nets.mnle import build_mnle
@@ -174,8 +183,26 @@ def likelihood_nn(
             return build_nsf(batch_x=batch_x, batch_y=batch_theta, **kwargs)
         elif model == "mnle":
             return build_mnle(batch_x=batch_x, batch_y=batch_theta, **kwargs)
+        elif model == "zuko_nice":
+            return build_zuko_nice(batch_x=batch_x, batch_y=batch_theta, **kwargs)
         elif model == "zuko_maf":
             return build_zuko_maf(batch_x=batch_x, batch_y=batch_theta, **kwargs)
+        elif model == "zuko_nsf":
+            return build_zuko_nsf(batch_x=batch_x, batch_y=batch_theta, **kwargs)
+        elif model == "zuko_ncsf":
+            return build_zuko_ncsf(batch_x=batch_x, batch_y=batch_theta, **kwargs)
+        elif model == "zuko_sospf":
+            return build_zuko_sospf(batch_x=batch_x, batch_y=batch_theta, **kwargs)
+        elif model == "zuko_naf":
+            return build_zuko_naf(batch_x=batch_x, batch_y=batch_theta, **kwargs)
+        elif model == "zuko_unaf":
+            return build_zuko_unaf(batch_x=batch_x, batch_y=batch_theta, **kwargs)
+        elif model == "zuko_cnf":
+            return build_zuko_cnf(batch_x=batch_x, batch_y=batch_theta, **kwargs)
+        elif model == "zuko_gf":
+            return build_zuko_gf(batch_x=batch_x, batch_y=batch_theta, **kwargs)
+        elif model == "zuko_bpf":
+            return build_zuko_bpf(batch_x=batch_x, batch_y=batch_theta, **kwargs)
         else:
             raise NotImplementedError
 
@@ -266,6 +293,9 @@ def posterior_nn(
 
     def build_fn(batch_theta, batch_x):
         if model == "mdn":
+            # The naming might be a bit confusing.
+            # batch_x are the latent variables, batch_y the conditioned variables.
+            # batch_theta are the parameters and batch_x the observable variables.
             return build_mdn(batch_x=batch_theta, batch_y=batch_x, **kwargs)
         elif model == "made":
             return build_made(batch_x=batch_theta, batch_y=batch_x, **kwargs)
@@ -275,8 +305,28 @@ def posterior_nn(
             return build_maf_rqs(batch_x=batch_theta, batch_y=batch_x, **kwargs)
         elif model == "nsf":
             return build_nsf(batch_x=batch_theta, batch_y=batch_x, **kwargs)
+        elif model == "mnle":
+            return build_mnle(batch_x=batch_theta, batch_y=batch_x, **kwargs)
+        elif model == "zuko_nice":
+            return build_zuko_nice(batch_x=batch_theta, batch_y=batch_x, **kwargs)
         elif model == "zuko_maf":
             return build_zuko_maf(batch_x=batch_theta, batch_y=batch_x, **kwargs)
+        elif model == "zuko_nsf":
+            return build_zuko_nsf(batch_x=batch_theta, batch_y=batch_x, **kwargs)
+        elif model == "zuko_ncsf":
+            return build_zuko_ncsf(batch_x=batch_theta, batch_y=batch_x, **kwargs)
+        elif model == "zuko_sospf":
+            return build_zuko_sospf(batch_x=batch_theta, batch_y=batch_x, **kwargs)
+        elif model == "zuko_naf":
+            return build_zuko_naf(batch_x=batch_theta, batch_y=batch_x, **kwargs)
+        elif model == "zuko_unaf":
+            return build_zuko_unaf(batch_x=batch_theta, batch_y=batch_x, **kwargs)
+        elif model == "zuko_cnf":
+            return build_zuko_cnf(batch_x=batch_theta, batch_y=batch_x, **kwargs)
+        elif model == "zuko_gf":
+            return build_zuko_gf(batch_x=batch_theta, batch_y=batch_x, **kwargs)
+        elif model == "zuko_bpf":
+            return build_zuko_bpf(batch_x=batch_theta, batch_y=batch_x, **kwargs)
         else:
             raise NotImplementedError
 
