@@ -62,6 +62,7 @@ dev = [
     "ruff>=0.3.3",
     # Test
     "pytest",
+    "pytest-cov",
     "pytest-xdist",
     "torchtestcase",
 ]
