@@ -17,6 +17,7 @@ from torch import Tensor, nn, relu, tanh, tensor, uint8
 
 from sbi.neural_nets.density_estimators import NFlowsFlow, ZukoFlow
 from sbi.utils.sbiutils import (
+    standardizing_transform_zuko,
     standardizing_net,
     standardizing_transform,
     z_score_parser,
