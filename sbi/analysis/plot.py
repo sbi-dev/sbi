@@ -67,16 +67,16 @@ def plt_hist_1d(
     kwargs: Dict,
 ) -> None:
     """Plot 1D histogram."""
-    if (
-        "bins" not in kwargs['mpl_kwargs'].keys()
-        or kwargs['mpl_kwargs']["bins"] is None
-    ):
+    if "bins" not in kwargs['mpl_kwargs'] or kwargs['mpl_kwargs']["bins"] is None:
         if kwargs["bin_heuristic"] == "Freedman-Diaconis":
             # The Freedman-Diaconis heuristic
             binsize = 2 * iqr(samples) * len(samples) ** (-1 / 3)
             kwargs['mpl_kwargs']["bins"] = np.arange(
                 limits[0], limits[1] + binsize, binsize
             )
+        else:
+            # TODO: add more bin heuristics
+            pass
     if isinstance(kwargs['mpl_kwargs']["bins"], int):
         kwargs['mpl_kwargs']["bins"] = np.linspace(
             limits[0], limits[1], kwargs['mpl_kwargs']["bins"]
@@ -118,7 +118,7 @@ def plt_hist_2d(
 ):
     """Plot 2D histogram."""
     if (
-        "bins" not in kwargs['np_hist_kwargs'].keys()
+        "bins" not in kwargs['np_hist_kwargs']
         or kwargs['np_hist_kwargs']["bins"] is None
     ):
         if kwargs["bin_heuristic"] == "Freedman-Diaconis":
@@ -128,7 +128,9 @@ def plt_hist_2d(
             binsize_row = 2 * iqr(samples_row) * len(samples_row) ** (-1 / 3)
             n_bins_row = int((limits_row[1] - limits_row[0]) / binsize_row)
             kwargs['np_hist_kwargs']["bins"] = [n_bins_col, n_bins_row]
-
+        else:
+            # TODO: add more bin heuristics
+            pass
     hist, xedges, yedges = np.histogram2d(
         samples_col,
         samples_row,
@@ -1194,12 +1196,12 @@ def _arrange_grid(
     marginals or a pairplot setting.
 
     Args:
-        diag_funcs: List of plotting function that will be executed for the diagonal elements of
-            the plot (or the columns of a row of 1D marginals).
-        upper_funcs: List of plotting function that will be executed for the upper-diagonal
-            elements of the plot. None if we are in a 1D setting.
-        lower_funcs: List of plotting function that will be executed for the lower-diagonal
-            elements of the plot. None if we are in a 1D setting.
+        diag_funcs: List of plotting function that will be executed for the diagonal
+            elements of the plot (or the columns of a row of 1D marginals).
+        upper_funcs: List of plotting function that will be executed for the
+            upper-diagonal elements of the plot. None if we are in a 1D setting.
+        lower_funcs: List of plotting function that will be executed for the
+            lower-diagonal elements of the plot. None if we are in a 1D setting.
         diag_kwargs: Additional arguments to adjust the diagonal plot,
             see the source code in `_get_default_diag_kwarg()`
         upper_kwargs: Additional arguments to adjust the upper diagonal plot,
