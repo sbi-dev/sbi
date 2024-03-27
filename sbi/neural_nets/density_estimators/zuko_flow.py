@@ -1,7 +1,6 @@
 from typing import Tuple
 
 import torch
-import zuko
 from torch import Tensor, nn
 from zuko.flows.core import Flow
 
@@ -144,14 +143,7 @@ class ZukoFlow(DensityEstimator):
         emb_cond = self._embedding_net(condition)
         dists = self.net(emb_cond)
 
-        if isinstance(self.net, zuko.flows.GMM):
-            samples = self.sample(sample_shape, condition)
-            condition = condition.unsqueeze(-len(self._condition_shape))
-            log_probs = self.log_prob(samples, condition)
-        else:
-            samples, log_probs = dists.rsample_and_log_prob(sample_shape)
-        # zuko.sample_and_log_prob() returns (*sample_shape, *batch_shape, ...).
-
+        samples, log_probs = dists.rsample_and_log_prob(sample_shape)
         samples = samples.reshape(*batch_shape, *sample_shape, -1)
         log_probs = log_probs.reshape(*batch_shape, *sample_shape)
 
