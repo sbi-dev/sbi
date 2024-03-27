@@ -2,7 +2,7 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 from functools import partial
-from typing import List, Optional, Sequence, Union
+from typing import List, Optional, Sequence, Tuple, Union
 from warnings import warn
 
 import torch
@@ -25,7 +25,19 @@ from sbi.utils.torchutils import create_alternating_binary_mask
 from sbi.utils.user_input_checks import check_data_device, check_embedding_net_device
 
 
-def get_numel(batch_x, batch_y, embedding_net):
+def get_numel(batch_x: Tensor, batch_y: Tensor, embedding_net) -> Tuple[Tensor, Tensor]:
+    """
+    Get the number of elements in the input and output space.
+
+    Args:
+        batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
+        batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
+        embedding_net: Optional embedding network for y.
+
+    Returns:
+        Tuple of the number of elements in the input and output space.
+
+    """
     x_numel = batch_x[0].numel()
     # Infer the output dimensionality of the embedding_net by making a forward pass.
     check_data_device(batch_x, batch_y)
