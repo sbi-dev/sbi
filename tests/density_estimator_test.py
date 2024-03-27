@@ -29,6 +29,16 @@ from sbi.neural_nets.flow import (
 
 
 def get_batch_input(nsamples: int, input_dims: int) -> torch.Tensor:
+    r"""Generate a batch of input samples from a multivariate normal distribution.
+
+    Args:
+        nsamples (int): The number of samples to generate.
+        input_dims (int): The dimensionality of the input samples.
+
+    Returns:
+        torch.Tensor: A tensor of shape (nsamples, input_dims)
+        containing the generated samples.
+    """
     input_mvn = MultivariateNormal(
         loc=zeros(input_dims), covariance_matrix=eye(input_dims)
     )
@@ -36,6 +46,15 @@ def get_batch_input(nsamples: int, input_dims: int) -> torch.Tensor:
 
 
 def get_batch_context(nsamples: int, condition_shape: tuple[int, ...]) -> torch.Tensor:
+    r"""Generate a batch of context samples from a multivariate normal distribution.
+
+    Args:
+        nsamples (int): The number of context samples to generate.
+        condition_shape (tuple[int, ...]): The shape of the condition for each sample.
+
+    Returns:
+        torch.Tensor: A tensor containing the generated context samples.
+    """
     context_mvn = MultivariateNormal(
         loc=zeros(*condition_shape), covariance_matrix=eye(condition_shape[-1])
     )
