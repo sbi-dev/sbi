@@ -9,7 +9,7 @@ import torch
 from sklearn.neural_network import MLPClassifier
 from torch.distributions import MultivariateNormal as tmvn
 
-from sbi.utils.metrics import c2st, c2st_scores
+from sbi.utils.metrics import c2st, c2st_scores, posterior_shrinkage, posterior_zscore
 
 ## c2st related:
 ## for a study about c2st see https://github.com/psteinb/c2st/
@@ -128,3 +128,45 @@ def test_c2st_scores(dist_sigma, c2st_lowerbound, c2st_upperbound):
     assert obs2_c2st.mean() <= c2st_upperbound
 
     assert np.allclose(obs2_c2st, obs_c2st, atol=0.05)
+
+
+def test_posterior_shrinkage():
+    prior_samples = np.array([2])
+    post_samples = np.array([3])
+    assert torch.isnan(posterior_shrinkage(prior_samples, post_samples)[0])
+
+    prior_samples = np.array([[1, 2], [2, 3]])
+    post_samples = np.array([[2, 3], [3, 4]])
+    expected_shrinkage = torch.tensor([0.0, 0.0])
+    assert torch.allclose(
+        posterior_shrinkage(prior_samples, post_samples), expected_shrinkage
+    )
+
+    prior_samples = torch.tensor([[1.0, 2.0], [2.0, 3.0]])
+    post_samples = torch.tensor([[2.0, 3.0], [3.0, 4.0]])
+    expected_shrinkage = torch.tensor([0.0, 0.0])
+    assert torch.allclose(
+        posterior_shrinkage(prior_samples, post_samples), expected_shrinkage
+    )
+
+    prior_samples = np.array([])
+    post_samples = np.array([])
+    with pytest.raises(ValueError):
+        posterior_shrinkage(prior_samples, post_samples)
+
+
+def test_posterior_zscore():
+    true_theta = np.array([2, 3])
+    post_samples = np.array([[1, 2], [2, 3], [3, 4]])
+    expected_zscore = torch.tensor([0.0, 0.0])
+    assert torch.allclose(posterior_zscore(true_theta, post_samples), expected_zscore)
+
+    true_theta = torch.tensor([2.0, 3.0])
+    post_samples = torch.tensor([[1.0, 2.0], [2.0, 3.0], [3.0, 4.0]])
+    expected_zscore = torch.tensor([0.0, 0.0])
+    assert torch.allclose(posterior_zscore(true_theta, post_samples), expected_zscore)
+
+    true_theta = np.array([])
+    post_samples = np.array([])
+    with pytest.raises(ValueError):
+        posterior_zscore(true_theta, post_samples)
