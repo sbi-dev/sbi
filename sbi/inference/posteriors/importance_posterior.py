@@ -253,7 +253,7 @@ class ImportanceSamplingPosterior(NeuralPosterior):
             self.potential_fn,
             proposal=self.proposal,
             num_samples=num_samples,
-            oversampling_factor=oversampling_factor,
+            num_candidate_samples=oversampling_factor,
             show_progress_bars=show_progress_bars,
             max_sampling_batch_size=max_sampling_batch_size,
             device=self._device,
