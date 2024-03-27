@@ -25,6 +25,55 @@ class NFlowsFlow(DensityEstimator):
         r"""Return the embedding network."""
         return self.net._embedding_net
 
+    def inverse_transform(self, input: Tensor, condition: Tensor) -> Tensor:
+        r"""Return the inverse flow-transform of the inputs given a condition.
+
+        The inverse transform is the transformation that maps the inputs back to the
+        base distribution (noise) space.
+
+        Args:
+            input: Inputs to evaluate the inverse transform on of shape
+                    (*batch_shape1, input_size).
+            condition: Conditions of shape (*batch_shape2, *condition_shape).
+
+        Raises:
+            RuntimeError: If batch_shape1 and batch_shape2 are not broadcastable.
+
+        Returns:
+            noise: Transformed inputs.
+
+        Note:
+            This function should support PyTorch's automatic broadcasting. This means
+            the function should behave as follows for different input and condition
+            shapes:
+            - (input_size,) + (batch_size,*condition_shape) -> (batch_size,)
+            - (batch_size, input_size) + (*condition_shape) -> (batch_size,)
+            - (batch_size, input_size) + (batch_size, *condition_shape) -> (batch_size,)
+            - (batch_size1, input_size) + (batch_size2, *condition_shape)
+                                                  -> RuntimeError i.e. not broadcastable
+            - (batch_size1,1, input_size) + (batch_size2, *condition_shape)
+                                                  -> (batch_size1,batch_size2)
+            - (batch_size1, input_size) + (batch_size2,1, *condition_shape)
+                                                  -> (batch_size2,batch_size1)
+        """
+        self._check_condition_shape(condition)
+        condition_dims = len(self._condition_shape)
+
+        # PyTorch's automatic broadcasting
+        batch_shape_in = input.shape[:-1]
+        batch_shape_cond = condition.shape[:-condition_dims]
+        batch_shape = torch.broadcast_shapes(batch_shape_in, batch_shape_cond)
+        # Expand the input and condition to the same batch shape
+        input = input.expand(batch_shape + (input.shape[-1],))
+        condition = condition.expand(batch_shape + self._condition_shape)
+        # Flatten required by nflows, but now both have the same batch shape
+        input = input.reshape(-1, input.shape[-1])
+        condition = condition.reshape(-1, *self._condition_shape)
+
+        noise, _ = self.net._transorm(input, context=condition)
+        noise = noise.reshape(batch_shape)
+        return noise
+
     def log_prob(self, input: Tensor, condition: Tensor) -> Tensor:
         r"""Return the log probabilities of the inputs given a condition or multiple
         i.e. batched conditions.
