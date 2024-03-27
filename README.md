@@ -110,7 +110,7 @@ M. Durkan's `lfi`. `sbi` runs as a community project. See also [credits](https:/
 
 ## License
 
-[Affero General Public License v3 (AGPLv3)](https://www.gnu.org/licenses/)
+[Apache License Version 2.0 (Apache-2.0)](https://www.apache.org/licenses/LICENSE-2.0)
 
 ## Citation
 
