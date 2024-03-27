@@ -2,7 +2,7 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 import collections
-from typing import Any, Dict, List, Optional, Tuple, TypeVar, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar, Union
 from warnings import warn
 
 import matplotlib as mpl
@@ -25,12 +25,12 @@ except AttributeError:
 T = TypeVar('T')
 
 
-def hex2rgb(hex):
+def hex2rgb(hex: str) -> List[int]:
     """Pass 16 to the integer function for change of base"""
     return [int(hex[i : i + 2], 16) for i in range(1, 6, 2)]
 
 
-def rgb2hex(RGB):
+def rgb2hex(RGB: List[int]) -> str:
     """Components need to be integers for hex to make sense"""
     RGB = [int(x) for x in RGB]
     return "#" + "".join([
@@ -45,7 +45,7 @@ def to_list(x: Optional[Union[T, List[Optional[T]]]], len: int) -> List[Optional
     return x
 
 
-def _update(d, u):
+def _update(d: Dict, u: Optional[Dict]) -> Dict:
     if u is not None:
         """update dictionary with user input, see: https://stackoverflow.com/a/3233356"""
         for k, v in six.iteritems(u):
@@ -60,7 +60,12 @@ def _update(d, u):
 
 
 # Plotting functions
-def plt_hist_1d(ax, samples, limits, kwargs):
+def plt_hist_1d(
+    ax: Axes,
+    samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
+    limits: Union[List, torch.Tensor],
+    kwargs: Dict,
+) -> None:
     """Plot 1D histogram."""
     if (
         "bins" not in kwargs['mpl_kwargs'].keys()
@@ -79,7 +84,12 @@ def plt_hist_1d(ax, samples, limits, kwargs):
     ax.hist(samples, **kwargs['mpl_kwargs'])
 
 
-def plt_kde_1d(ax, samples, limits, kwargs):
+def plt_kde_1d(
+    ax: Axes,
+    samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
+    limits: Union[List, torch.Tensor],
+    kwargs: Dict,
+) -> None:
     """ "1D Kernel Density Estimation."""
     density = gaussian_kde(samples, bw_method=kwargs["bw_method"])
     xs = np.linspace(limits[0], limits[1], kwargs["bins"])
@@ -87,13 +97,25 @@ def plt_kde_1d(ax, samples, limits, kwargs):
     ax.plot(xs, ys, **kwargs['mpl_kwargs'])
 
 
-def plt_scatter_1d(ax, samples, limits, kwargs):
+def plt_scatter_1d(
+    ax: Axes,
+    samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
+    limits: Union[List, torch.Tensor],
+    kwargs: Dict,
+) -> None:
     """Scatter plot 1D."""
     for single_sample in samples:
         ax.axvline(single_sample, **kwargs['mpl_kwargs'])
 
 
-def plt_hist_2d(ax, samples_col, samples_row, limits_col, limits_row, kwargs):
+def plt_hist_2d(
+    ax: Axes,
+    samples_col: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
+    samples_row: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
+    limits_col: Union[List, torch.Tensor],
+    limits_row: Union[List, torch.Tensor],
+    kwargs: Dict,
+):
     """Plot 2D histogram."""
     if (
         "bins" not in kwargs['np_hist_kwargs'].keys()
@@ -128,7 +150,14 @@ def plt_hist_2d(ax, samples_col, samples_row, limits_col, limits_row, kwargs):
     )
 
 
-def plt_kde_2d(ax, samples_col, samples_row, limits_col, limits_row, kwargs):
+def plt_kde_2d(
+    ax: Axes,
+    samples_col: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
+    samples_row: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
+    limits_col: Union[List, torch.Tensor],
+    limits_row: Union[List, torch.Tensor],
+    kwargs: Dict,
+) -> None:
     """2D Kernel Density Estimation."""
     density = gaussian_kde(
         np.array([samples_col, samples_row]),
@@ -161,7 +190,14 @@ def plt_kde_2d(ax, samples_col, samples_row, limits_col, limits_row, kwargs):
     )
 
 
-def plt_contour_2d(ax, samples_col, samples_row, limits_col, limits_row, kwargs):
+def plt_contour_2d(
+    ax: Axes,
+    samples_col: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
+    samples_row: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
+    limits_col: Union[List, torch.Tensor],
+    limits_row: Union[List, torch.Tensor],
+    kwargs: Dict,
+) -> None:
     """2D Contour based on Kernel Density Estimation."""
     density = gaussian_kde(
         np.array([samples_col, samples_row]),
@@ -201,7 +237,14 @@ def plt_contour_2d(ax, samples_col, samples_row, limits_col, limits_row, kwargs)
     )
 
 
-def plt_scatter_2d(ax, samples_col, samples_row, limits_col, limits_row, kwargs):
+def plt_scatter_2d(
+    ax: Axes,
+    samples_col: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
+    samples_row: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
+    limits_col: Union[List, torch.Tensor],
+    limits_row: Union[List, torch.Tensor],
+    kwargs: Dict,
+) -> None:
     """Scatter plot 2D."""
     ax.scatter(
         samples_col,
@@ -210,7 +253,14 @@ def plt_scatter_2d(ax, samples_col, samples_row, limits_col, limits_row, kwargs)
     )
 
 
-def plt_plot_2d(ax, samples_col, samples_row, limits_col, limits_row, kwargs):
+def plt_plot_2d(
+    ax: Axes,
+    samples_col: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
+    samples_row: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
+    limits_col: Union[List, torch.Tensor],
+    limits_row: Union[List, torch.Tensor],
+    kwargs: Dict,
+) -> None:
     """Plot 2D trajectory"""
     ax.plot(
         samples_col,
@@ -219,7 +269,22 @@ def plt_plot_2d(ax, samples_col, samples_row, limits_col, limits_row, kwargs):
     )
 
 
-def get_diag_funcs(diag_list):
+def get_diag_funcs(
+    diag_list: List[str],
+) -> List[
+    Union[
+        Callable[
+            [
+                Axes,
+                Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
+                Union[List, torch.Tensor],
+                Dict,
+            ],
+            None,
+        ],
+        None,
+    ]
+]:
     """make a list of the functions for the diagonal plots."""
     diag_funcs = []
     for diag in diag_list:
@@ -235,7 +300,22 @@ def get_diag_funcs(diag_list):
     return diag_funcs
 
 
-def get_offdiag_funcs(off_diag_list):
+def get_offdiag_funcs(
+    off_diag_list: List[str],
+) -> List[
+    Union[
+        Callable[
+            [
+                Axes,
+                Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
+                Union[List, torch.Tensor],
+                Dict,
+            ],
+            None,
+        ],
+        None,
+    ]
+]:
     """make a list of the functions for the off-diagonal plots."""
     offdiag_funcs = []
     for offdiag in off_diag_list:
@@ -255,8 +335,18 @@ def get_offdiag_funcs(off_diag_list):
 
 
 def _format_subplot(
-    ax, current, limits, ticks, labels_dim, fig_kwargs, row, col, dim, flat, excl_lower
-):
+    ax: Axes,
+    current: str,
+    limits: Union[List, torch.Tensor],
+    ticks: List[List],
+    labels_dim: List[str],
+    fig_kwargs: Dict,
+    row: int,
+    col: int,
+    dim: int,
+    flat: bool,
+    excl_lower: bool,
+) -> None:
     """
     Format subplot according to fig_kwargs and other arguments
     Args:
@@ -334,7 +424,14 @@ def _format_subplot(
         ))
 
 
-def _format_axis(ax, xhide=True, yhide=True, xlabel="", ylabel="", tickformatter=None):
+def _format_axis(
+    ax: Axes,
+    xhide: bool = True,
+    yhide: bool = True,
+    xlabel: str = "",
+    ylabel: str = "",
+    tickformatter=None,
+) -> Axes:
     """Format axis spines and ticks."""
     for loc in ["right", "top", "left", "bottom"]:
         ax.spines[loc].set_visible(False)
@@ -363,7 +460,10 @@ def _format_axis(ax, xhide=True, yhide=True, xlabel="", ylabel="", tickformatter
     return ax
 
 
-def probs2contours(probs, levels):
+def probs2contours(
+    probs: Union[List, torch.Tensor, np.array],
+    levels: Union[List, torch.Tensor, np.array],
+) -> np.array:
     """Takes an array of probabilities and produces an array of contours at specified
     percentile levels.
     Args:
@@ -425,7 +525,10 @@ def ensure_numpy(t: Union[np.ndarray, torch.Tensor]) -> np.ndarray:
         return t
 
 
-def prepare_for_plot(samples, limits):
+def prepare_for_plot(
+    samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
+    limits: Optional[Union[List, torch.Tensor, np.array]],
+) -> Tuple[List[np.array], int, torch.Tensor]:
     """
     Ensures correct formatting for samples and limits, and returns dimension
     of the samples.
@@ -538,7 +641,7 @@ def pairplot(
     fig: Optional[FigureBase] = None,
     axes: Optional[Axes] = None,
     **kwargs: Optional[Any],
-):
+) -> Tuple[FigureBase, Axes]:
     """
     Plot samples in a 2D grid showing marginals and pairwise marginals.
 
@@ -688,7 +791,7 @@ def marginal_plot(
     fig: Optional[FigureBase] = None,
     axes: Optional[Axes] = None,
     **kwargs: Optional[Any],
-):
+) -> Tuple[FigureBase, Axes]:
     """
     Plot samples in a row showing 1D marginals of selected dimensions.
 
@@ -777,7 +880,7 @@ def marginal_plot(
     )
 
 
-def _get_default_offdiag_kwargs(offdiag, i=0):
+def _get_default_offdiag_kwargs(offdiag: str, i: int = 0) -> Dict:
     """Get default offdiag kwargs."""
 
     if offdiag == "kde" or offdiag == "kde2d":
@@ -824,7 +927,7 @@ def _get_default_offdiag_kwargs(offdiag, i=0):
     return offdiag_kwargs
 
 
-def _get_default_diag_kwargs(diag, i=0):
+def _get_default_diag_kwargs(diag: str, i: int = 0) -> Dict:
     """Get default diag kwargs."""
     if diag == "kde":
         diag_kwargs = {
@@ -855,7 +958,7 @@ def _get_default_diag_kwargs(diag, i=0):
     return diag_kwargs
 
 
-def _get_default_fig_kwargs():
+def _get_default_fig_kwargs() -> Dict:
     """Get default figure kwargs."""
     return {
         "legend": None,
@@ -1069,46 +1172,56 @@ def conditional_pairplot(
 
 
 def _arrange_grid(
-    diag_funcs,
-    upper_funcs,
-    lower_funcs,
-    diag_kwargs,
-    upper_kwargs,
-    lower_kwargs,
-    samples,
-    points,
-    limits,
-    subset,
-    figsize,
-    labels,
-    ticks,
-    fig,
-    axes,
-    fig_kwargs,
-):
+    diag_funcs: List[Union[Callable, None]],
+    upper_funcs: List[Union[Callable, None]],
+    lower_funcs: List[Union[Callable, None]],
+    diag_kwargs: List[Dict],
+    upper_kwargs: List[Dict],
+    lower_kwargs: List[Dict],
+    samples: List[np.ndarray],
+    points: List[np.ndarray],
+    limits: torch.Tensor,
+    subset: Optional[List[int]],
+    figsize: Optional[Tuple],
+    labels: Optional[List[str]],
+    ticks: Optional[Union[List, torch.Tensor]],
+    fig: Optional[FigureBase],
+    axes: Optional[Axes],
+    fig_kwargs: Dict,
+) -> Tuple[FigureBase, Axes]:
     """
     Arranges the plots for any function that plots parameters either in a row of 1D
     marginals or a pairplot setting.
 
     Args:
-        diag_func: Plotting function that will be executed for the diagonal elements of
-            the plot (or the columns of a row of 1D marginals). It will be passed the
-            current `row` (i.e. which parameter that is to be plotted) and the `limits`
-            for all dimensions.
-        offdiag_func: Plotting function that will be executed for the upper-diagonal
-            elements of the plot. It will be passed the current `row` and `col` (i.e.
-            which parameters are to be plotted and the `limits` for all dimensions. None
-            if we are in a 1D setting.
-        dim: The dimensionality of the density.
-        limits: Limits for each parameter.
-        points: Additional points to be scatter-plotted.
-        opts: Dictionary built by the functions that call `_arrange_plots`. Must
-            contain at least `labels`, `subset`, `figsize`, `subplots`,
-            `fig_subplots_adjust`, `title`, `title_format`, ..
+        diag_funcs: List of plotting function that will be executed for the diagonal elements of
+            the plot (or the columns of a row of 1D marginals).
+        upper_funcs: List of plotting function that will be executed for the upper-diagonal
+            elements of the plot. None if we are in a 1D setting.
+        lower_funcs: List of plotting function that will be executed for the lower-diagonal
+            elements of the plot. None if we are in a 1D setting.
+        diag_kwargs: Additional arguments to adjust the diagonal plot,
+            see the source code in `_get_default_diag_kwarg()`
+        upper_kwargs: Additional arguments to adjust the upper diagonal plot,
+            see the source code in `_get_default_offdiag_kwarg()`
+        lower_kwargs: Additional arguments to adjust the lower diagonal plot,
+            see the source code in `_get_default_offdiag_kwarg()`
+        samples: List of samples given to the plotting functions
+        points: List of additional points to scatter.
+        limits: Limits for each dimension / axis.
+        subset: List containing the dimensions to plot. E.g. subset=[1,3] will plot
+            plot only the 1st and 3rd dimension
+        figsize: Size of the entire figure.
+        labels: List of strings specifying the names of the parameters.
+        ticks: Position of the ticks.
         fig: matplotlib figure to plot on.
         axes: matplotlib axes corresponding to fig.
+        fig_kwargs: Additional arguments to adjust the overall figure,
+            see the source code in `_get_default_fig_kwargs()`
 
-    Returns: figure and axis
+    Returns:
+        Fig: matplotlib figure
+        Axes: matplotlib axes
     """
     dim = samples[0].shape[1]
     # Prepare points
@@ -1167,7 +1280,8 @@ def _arrange_grid(
             rows,
             cols,
         ), f"Passed axes must match subplot shape: {rows, cols}."
-
+    fig: FigureBase = fig
+    axes: Axes = axes
     # Cast to ndarray in case of 1D subplots.
     axes = np.array(axes).reshape(rows, cols)
 
@@ -1206,7 +1320,8 @@ def _arrange_grid(
                 else:
                     for sample_ind, sample in enumerate(samples):
                         if diag_funcs[sample_ind] is not None:
-                            diag_funcs[sample_ind](
+                            diag_f: Callable = diag_funcs[sample_ind]
+                            diag_f(
                                 ax, sample[:, row], limits[row], diag_kwargs[sample_ind]
                             )
 
@@ -1232,7 +1347,8 @@ def _arrange_grid(
                 else:
                     for sample_ind, sample in enumerate(samples):
                         if upper_funcs[sample_ind] is not None:
-                            upper_funcs[sample_ind](
+                            upper_f: Callable = upper_funcs[sample_ind]
+                            upper_f(
                                 ax,
                                 sample[:, col],
                                 sample[:, row],
@@ -1255,7 +1371,8 @@ def _arrange_grid(
                 else:
                     for sample_ind, sample in enumerate(samples):
                         if lower_funcs[sample_ind] is not None:
-                            lower_funcs[sample_ind](
+                            lower_f: Callable = lower_funcs[sample_ind]
+                            lower_f(
                                 ax,
                                 sample[:, row],
                                 sample[:, col],
