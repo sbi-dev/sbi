@@ -11,15 +11,15 @@ from pyknos.nflows import distributions as distributions_
 from pyknos.nflows import flows, transforms
 from pyknos.nflows.nn import nets
 from pyknos.nflows.transforms.splines import (
-    rational_quadratic,  # pyright: ignore[reportAttributeAccessIssue]
+    rational_quadratic,
 )
 from torch import Tensor, nn, relu, tanh, tensor, uint8
 
 from sbi.neural_nets.density_estimators import NFlowsFlow, ZukoFlow
 from sbi.utils.sbiutils import (
-    standardizing_transform_zuko,
     standardizing_net,
     standardizing_transform,
+    standardizing_transform_zuko,
     z_score_parser,
 )
 from sbi.utils.torchutils import create_alternating_binary_mask
@@ -1067,18 +1067,18 @@ def build_zuko_flow(
         if z_score_x_bool:
             transform = (
                 transform,
-                standardizing_transform_zuko(batch_x, structured_x)
+                standardizing_transform_zuko(batch_x, structured_x, backend="zuko"),
             )
 
         z_score_y_bool, structured_y = z_score_parser(z_score_y)
         if z_score_y_bool:
             # Prepend standardizing transform to y-embedding.
             embedding_net = nn.Sequential(
-                standardizing_net(batch_y, structured_y), embedding_net
+                standardizing_transform_zuko(batch_y, structured_y), embedding_net
             )
 
         # Combine transforms.
-        neural_net = zuko.flows.Flow(transform, flow_built.base)  # pyright: ignore[reportArgumentType]
+        neural_net = zuko.flows.Flow(transform, flow_built.base)
     else:
         transforms = flow_built.transform.transforms
 
@@ -1097,7 +1097,7 @@ def build_zuko_flow(
             )
 
         # Combine transforms.
-        neural_net = zuko.flows.Flow(transforms, flow_built.base)  # pyright: ignore[reportArgumentType]
+        neural_net = zuko.flows.Flow(transforms, flow_built.base)
 
     flow = ZukoFlow(neural_net, embedding_net, condition_shape=batch_y[0].shape)
 
