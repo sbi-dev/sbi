@@ -2,7 +2,7 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 import collections
-from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 from warnings import warn
 
 import matplotlib as mpl
@@ -22,8 +22,6 @@ try:
 except AttributeError:
     collectionsAbc = collections
 
-T = TypeVar('T')
-
 
 def hex2rgb(hex: str) -> List[int]:
     """Pass 16 to the integer function for change of base"""
@@ -38,8 +36,19 @@ def rgb2hex(RGB: List[int]) -> str:
     ])
 
 
-def to_list(x: Optional[Union[T, List[Optional[T]]]], len: int) -> List[Optional[T]]:
-    """If x is not a list, make it a list of length `len`."""
+def to_list_string(
+    x: Optional[Union[str, List[Optional[str]]]], len: int
+) -> List[Optional[str]]:
+    """If x is not a list, make it a list of strings of length `len`."""
+    if not isinstance(x, list):
+        return [x for _ in range(len)]
+    return x
+
+
+def to_list_kwargs(
+    x: Optional[Union[Dict, List[Optional[Dict]]]], len: int
+) -> List[Optional[Dict]]:
+    """If x is not a list, make it a list of dicts of length `len`."""
     if not isinstance(x, list):
         return [x for _ in range(len)]
     return x
@@ -62,8 +71,8 @@ def _update(d: Dict, u: Optional[Dict]) -> Dict:
 # Plotting functions
 def plt_hist_1d(
     ax: Axes,
-    samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
-    limits: Union[List, torch.Tensor],
+    samples: np.ndarray,
+    limits: torch.Tensor,
     kwargs: Dict,
 ) -> None:
     """Plot 1D histogram."""
@@ -86,8 +95,8 @@ def plt_hist_1d(
 
 def plt_kde_1d(
     ax: Axes,
-    samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
-    limits: Union[List, torch.Tensor],
+    samples: np.ndarray,
+    limits: torch.Tensor,
     kwargs: Dict,
 ) -> None:
     """ "1D Kernel Density Estimation."""
@@ -99,8 +108,8 @@ def plt_kde_1d(
 
 def plt_scatter_1d(
     ax: Axes,
-    samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
-    limits: Union[List, torch.Tensor],
+    samples: np.ndarray,
+    limits: torch.Tensor,
     kwargs: Dict,
 ) -> None:
     """Scatter plot 1D."""
@@ -110,10 +119,10 @@ def plt_scatter_1d(
 
 def plt_hist_2d(
     ax: Axes,
-    samples_col: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
-    samples_row: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
-    limits_col: Union[List, torch.Tensor],
-    limits_row: Union[List, torch.Tensor],
+    samples_col: np.ndarray,
+    samples_row: np.ndarray,
+    limits_col: torch.Tensor,
+    limits_row: torch.Tensor,
     kwargs: Dict,
 ):
     """Plot 2D histogram."""
@@ -154,10 +163,10 @@ def plt_hist_2d(
 
 def plt_kde_2d(
     ax: Axes,
-    samples_col: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
-    samples_row: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
-    limits_col: Union[List, torch.Tensor],
-    limits_row: Union[List, torch.Tensor],
+    samples_col: np.ndarray,
+    samples_row: np.ndarray,
+    limits_col: torch.Tensor,
+    limits_row: torch.Tensor,
     kwargs: Dict,
 ) -> None:
     """2D Kernel Density Estimation."""
@@ -194,10 +203,10 @@ def plt_kde_2d(
 
 def plt_contour_2d(
     ax: Axes,
-    samples_col: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
-    samples_row: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
-    limits_col: Union[List, torch.Tensor],
-    limits_row: Union[List, torch.Tensor],
+    samples_col: np.ndarray,
+    samples_row: np.ndarray,
+    limits_col: torch.Tensor,
+    limits_row: torch.Tensor,
     kwargs: Dict,
 ) -> None:
     """2D Contour based on Kernel Density Estimation."""
@@ -241,10 +250,10 @@ def plt_contour_2d(
 
 def plt_scatter_2d(
     ax: Axes,
-    samples_col: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
-    samples_row: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
-    limits_col: Union[List, torch.Tensor],
-    limits_row: Union[List, torch.Tensor],
+    samples_col: np.ndarray,
+    samples_row: np.ndarray,
+    limits_col: torch.Tensor,
+    limits_row: torch.Tensor,
     kwargs: Dict,
 ) -> None:
     """Scatter plot 2D."""
@@ -257,10 +266,10 @@ def plt_scatter_2d(
 
 def plt_plot_2d(
     ax: Axes,
-    samples_col: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
-    samples_row: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
-    limits_col: Union[List, torch.Tensor],
-    limits_row: Union[List, torch.Tensor],
+    samples_col: np.ndarray,
+    samples_row: np.ndarray,
+    limits_col: torch.Tensor,
+    limits_row: torch.Tensor,
     kwargs: Dict,
 ) -> None:
     """Plot 2D trajectory"""
@@ -272,14 +281,14 @@ def plt_plot_2d(
 
 
 def get_diag_funcs(
-    diag_list: List[str],
+    diag_list: List[Optional[str]],
 ) -> List[
     Union[
         Callable[
             [
                 Axes,
-                Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
-                Union[List, torch.Tensor],
+                np.ndarray,
+                torch.Tensor,
                 Dict,
             ],
             None,
@@ -303,14 +312,14 @@ def get_diag_funcs(
 
 
 def get_offdiag_funcs(
-    off_diag_list: List[str],
+    off_diag_list: List[Optional[str]],
 ) -> List[
     Union[
         Callable[
             [
                 Axes,
-                Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
-                Union[List, torch.Tensor],
+                np.ndarray,
+                torch.Tensor,
                 Dict,
             ],
             None,
@@ -384,9 +393,9 @@ def _format_subplot(
 
     # Ticks
     if ticks is not None:
-        ax.set_xticks((ticks[col][0], ticks[col][1]))
+        ax.set_xticks((ticks[col][0], ticks[col][1]))  # pyright: ignore[reportCallIssue]
         if current != "diag":
-            ax.set_yticks((ticks[row][0], ticks[row][1]))
+            ax.set_yticks((ticks[row][0], ticks[row][1]))  # pyright: ignore[reportCallIssue]
 
     # make square
     if fig_kwargs["square_subplots"]:
@@ -420,7 +429,7 @@ def _format_subplot(
         else:
             _format_axis(ax, xhide=True, yhide=True)
     if fig_kwargs["tick_labels"] is not None:
-        ax.set_xticklabels((
+        ax.set_xticklabels((  # pyright: ignore[reportCallIssue]
             str(fig_kwargs["tick_labels"][col][0]),
             str(fig_kwargs["tick_labels"][col][1]),
         ))
@@ -451,7 +460,7 @@ def _format_axis(
         ax.xaxis.set_tick_params(labelbottom=True)
         if tickformatter is not None:
             ax.xaxis.set_major_formatter(tickformatter)
-        ax.spines["bottom"].set_visible(True)
+        ax.spines["bottom"].set_visible(True)  # pyright: ignore[reportCallIssue]
     if not yhide:
         ax.set_ylabel(ylabel)
         ax.yaxis.set_ticks_position("left")
@@ -463,9 +472,9 @@ def _format_axis(
 
 
 def probs2contours(
-    probs: Union[List, torch.Tensor, np.array],
-    levels: Union[List, torch.Tensor, np.array],
-) -> np.array:
+    probs: np.ndarray,
+    levels: Union[List, torch.Tensor, np.ndarray],
+) -> np.ndarray:
     """Takes an array of probabilities and produces an array of contours at specified
     percentile levels.
     Args:
@@ -529,8 +538,8 @@ def ensure_numpy(t: Union[np.ndarray, torch.Tensor]) -> np.ndarray:
 
 def prepare_for_plot(
     samples: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
-    limits: Optional[Union[List, torch.Tensor, np.array]],
-) -> Tuple[List[np.array], int, torch.Tensor]:
+    limits: Optional[Union[List, torch.Tensor, np.ndarray]],
+) -> Tuple[List[np.ndarray], int, torch.Tensor]:
     """
     Ensures correct formatting for samples and limits, and returns dimension
     of the samples.
@@ -541,8 +550,7 @@ def prepare_for_plot(
         samples = ensure_numpy(samples)
         samples = [samples]
     else:
-        for i, _ in enumerate(samples):
-            samples[i] = ensure_numpy(samples[i])
+        samples = [ensure_numpy(sample) for sample in samples]
 
     # Dimensionality of the problem.
     dim = samples[0].shape[1]
@@ -629,17 +637,17 @@ def pairplot(
     ] = None,
     limits: Optional[Union[List, torch.Tensor]] = None,
     subset: Optional[List[int]] = None,
-    upper: Optional[Union[List[str], str]] = "hist",
-    lower: Optional[Union[List[str], str]] = None,
-    diag: Optional[Union[List[str], str]] = "hist",
+    upper: Optional[Union[List[Optional[str]], str]] = "hist",
+    lower: Optional[Union[List[Optional[str]], str]] = None,
+    diag: Optional[Union[List[Optional[str]], str]] = "hist",
     figsize: Tuple = (10, 10),
     labels: Optional[List[str]] = None,
     ticks: Optional[Union[List, torch.Tensor]] = None,
-    offdiag: Optional[Union[List[str], str]] = None,
-    diag_kwargs: Optional[Union[List[Dict], Dict]] = None,
-    upper_kwargs: Optional[Union[List[Dict], Dict]] = None,
-    lower_kwargs: Optional[Union[List[Dict], Dict]] = None,
-    fig_kwargs: Optional[Union[List[Dict], Dict]] = None,
+    offdiag: Optional[Union[List[Optional[str]], str]] = None,
+    diag_kwargs: Optional[Union[List[Optional[Dict]], Dict]] = None,
+    upper_kwargs: Optional[Union[List[Optional[Dict]], Dict]] = None,
+    lower_kwargs: Optional[Union[List[Optional[Dict]], Dict]] = None,
+    fig_kwargs: Optional[Dict] = None,
     fig: Optional[FigureBase] = None,
     axes: Optional[Axes] = None,
     **kwargs: Optional[Any],
@@ -725,8 +733,8 @@ def pairplot(
         upper = offdiag
 
     # Prepare diag
-    diag_list = to_list(diag, len(samples))
-    diag_kwargs_list = to_list(diag_kwargs, len(samples))
+    diag_list = to_list_string(diag, len(samples))
+    diag_kwargs_list = to_list_kwargs(diag_kwargs, len(samples))
     diag_func = get_diag_funcs(diag_list)
     diag_kwargs_filled = []
     for i, (diag_i, diag_kwargs_i) in enumerate(zip(diag_list, diag_kwargs_list)):
@@ -736,8 +744,8 @@ def pairplot(
         diag_kwargs_filled.append(diag_kwarg_filled_i)
 
     # Prepare upper
-    upper_list = to_list(upper, len(samples))
-    upper_kwargs_list = to_list(upper_kwargs, len(samples))
+    upper_list = to_list_string(upper, len(samples))
+    upper_kwargs_list = to_list_kwargs(upper_kwargs, len(samples))
     upper_func = get_offdiag_funcs(upper_list)
     upper_kwargs_filled = []
     for i, (upper_i, upper_kwargs_i) in enumerate(zip(upper_list, upper_kwargs_list)):
@@ -747,8 +755,8 @@ def pairplot(
         upper_kwargs_filled.append(upper_kwarg_filled_i)
 
     # Prepare lower
-    lower_list = to_list(lower, len(samples))
-    lower_kwargs_list = to_list(lower_kwargs, len(samples))
+    lower_list = to_list_string(lower, len(samples))
+    lower_kwargs_list = to_list_kwargs(lower_kwargs, len(samples))
     lower_func = get_offdiag_funcs(lower_list)
     lower_kwargs_filled = []
     for i, (lower_i, lower_kwargs_i) in enumerate(zip(lower_list, lower_kwargs_list)):
@@ -784,12 +792,12 @@ def marginal_plot(
     ] = None,
     limits: Optional[Union[List, torch.Tensor]] = None,
     subset: Optional[List[int]] = None,
-    diag: Optional[Union[List[str], str]] = "hist",
+    diag: Optional[Union[List[Optional[str]], str]] = "hist",
     figsize: Optional[Tuple] = (10, 2),
     labels: Optional[List[str]] = None,
     ticks: Optional[Union[List, torch.Tensor]] = None,
-    diag_kwargs: Optional[Union[List[Dict], Dict]] = None,
-    fig_kwargs: Optional[Union[List[Dict], Dict]] = None,
+    diag_kwargs: Optional[Union[List[Optional[Dict]], Dict]] = None,
+    fig_kwargs: Optional[Dict] = None,
     fig: Optional[FigureBase] = None,
     axes: Optional[Axes] = None,
     **kwargs: Optional[Any],
@@ -848,8 +856,8 @@ def marginal_plot(
     samples, dim, limits = prepare_for_plot(samples, limits)
 
     # prepare kwargs and functions of the subplots
-    diag_list = to_list(diag, len(samples))
-    diag_kwargs_list = to_list(diag_kwargs, len(samples))
+    diag_list = to_list_string(diag, len(samples))
+    diag_kwargs_list = to_list_kwargs(diag_kwargs, len(samples))
     diag_func = get_diag_funcs(diag_list)
     diag_kwargs_filled = []
     for i, (diag_i, diag_kwargs_i) in enumerate(zip(diag_list, diag_kwargs_list)):
@@ -882,7 +890,7 @@ def marginal_plot(
     )
 
 
-def _get_default_offdiag_kwargs(offdiag: str, i: int = 0) -> Dict:
+def _get_default_offdiag_kwargs(offdiag: Optional[str], i: int = 0) -> Dict:
     """Get default offdiag kwargs."""
 
     if offdiag == "kde" or offdiag == "kde2d":
@@ -929,7 +937,7 @@ def _get_default_offdiag_kwargs(offdiag: str, i: int = 0) -> Dict:
     return offdiag_kwargs
 
 
-def _get_default_diag_kwargs(diag: str, i: int = 0) -> Dict:
+def _get_default_diag_kwargs(diag: Optional[str], i: int = 0) -> Dict:
     """Get default diag kwargs."""
     if diag == "kde":
         diag_kwargs = {
@@ -1174,14 +1182,16 @@ def conditional_pairplot(
 
 
 def _arrange_grid(
-    diag_funcs: List[Union[Callable, None]],
-    upper_funcs: List[Union[Callable, None]],
-    lower_funcs: List[Union[Callable, None]],
-    diag_kwargs: List[Dict],
-    upper_kwargs: List[Dict],
-    lower_kwargs: List[Dict],
+    diag_funcs: List[Optional[Callable]],
+    upper_funcs: List[Optional[Callable]],
+    lower_funcs: List[Optional[Callable]],
+    diag_kwargs: List[Optional[Dict]],
+    upper_kwargs: List[Optional[Dict]],
+    lower_kwargs: List[Optional[Dict]],
     samples: List[np.ndarray],
-    points: List[np.ndarray],
+    points: Optional[
+        Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor]
+    ],
     limits: torch.Tensor,
     subset: Optional[List[int]],
     figsize: Optional[Tuple],
@@ -1282,8 +1292,8 @@ def _arrange_grid(
             rows,
             cols,
         ), f"Passed axes must match subplot shape: {rows, cols}."
-    fig: FigureBase = fig
-    axes: Axes = axes
+    # fig: FigureBase = fig
+    # axes: Axes = axes
     # Cast to ndarray in case of 1D subplots.
     axes = np.array(axes).reshape(rows, cols)
 
@@ -1393,14 +1403,14 @@ def _arrange_grid(
     # Add dots if we subset
     if len(subset) < dim:
         if flat:
-            ax = axes[0, len(subset) - 1]
+            ax = axes[0, len(subset) - 1]  # pyright: ignore[reportIndexIssue]
             x0, x1 = ax.get_xlim()
             y0, y1 = ax.get_ylim()
             text_kwargs = {"fontsize": plt.rcParams["font.size"] * 2.0}  # pyright: ignore[reportOptionalOperand]
             ax.text(x1 + (x1 - x0) / 8.0, (y0 + y1) / 2.0, "...", **text_kwargs)
         else:
             for row in range(len(subset)):
-                ax = axes[row, len(subset) - 1]
+                ax = axes[row, len(subset) - 1]  # pyright: ignore[reportIndexIssue]
                 x0, x1 = ax.get_xlim()
                 y0, y1 = ax.get_ylim()
                 text_kwargs = {"fontsize": plt.rcParams["font.size"] * 2.0}  # pyright: ignore[reportOptionalOperand]
@@ -1836,16 +1846,16 @@ def pairplot_dep(
     ] = None,
     limits: Optional[Union[List, torch.Tensor]] = None,
     subset: Optional[List[int]] = None,
-    offdiag: Optional[Union[List[str], str]] = "hist",
-    diag: Optional[Union[List[str], str]] = "hist",
+    offdiag: Optional[Union[List[Optional[str]], str]] = "hist",
+    diag: Optional[Union[List[Optional[str]], str]] = "hist",
     figsize: Optional[Tuple] = (10, 10),
     labels: Optional[List[str]] = None,
     ticks: Optional[Union[List, torch.Tensor]] = None,
-    upper: Optional[Union[List[str], str]] = None,
+    upper: Optional[Union[List[Optional[str]], str]] = None,
     fig: Optional[FigureBase] = None,
     axes: Optional[Axes] = None,
     **kwargs: Optional[Any],
-):
+) -> Tuple[FigureBase, Axes]:
     """
     Plot samples in a 2D grid showing marginals and pairwise marginals.
 
@@ -2017,14 +2027,14 @@ def marginal_plot_dep(
     ] = None,
     limits: Optional[Union[List, torch.Tensor]] = None,
     subset: Optional[List[int]] = None,
-    diag: Optional[Union[List[str], str]] = "hist",
+    diag: Optional[Union[List[Optional[str]], str]] = "hist",
     figsize: Optional[Tuple] = (10, 10),
     labels: Optional[List[str]] = None,
     ticks: Optional[Union[List, torch.Tensor]] = None,
     fig: Optional[FigureBase] = None,
     axes: Optional[Axes] = None,
     **kwargs: Optional[Any],
-):
+) -> Tuple[FigureBase, Axes]:
     """
     Plot samples in a row showing 1D marginals of selected dimensions.
 
