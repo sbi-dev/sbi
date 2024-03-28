@@ -349,7 +349,7 @@ def _format_subplot(
     ax: Axes,
     current: str,
     limits: Union[List, torch.Tensor],
-    ticks: List[List],
+    ticks: Optional[Union[List, torch.Tensor]],
     labels_dim: List[str],
     fig_kwargs: Dict,
     row: int,
@@ -1286,16 +1286,12 @@ def _arrange_grid(
 
     # Create fig and axes if they were not passed.
     if fig is None or axes is None:
-        fig, axes = plt.subplots(rows, cols, figsize=figsize, **fig_kwargs["subplots"])
+        fig, axes = plt.subplots(rows, cols, figsize=figsize, **fig_kwargs["subplots"])  # pyright: ignore reportAssignmenttype
     else:
-        assert axes.shape == (
+        assert axes.shape == (  # pyright: ignore reportAttributeAccessIssue
             rows,
             cols,
         ), f"Passed axes must match subplot shape: {rows, cols}."
-    # fig: FigureBase = fig
-    # axes: Axes = axes
-    # Cast to ndarray in case of 1D subplots.
-    axes = np.array(axes).reshape(rows, cols)
 
     # Style figure
     fig.subplots_adjust(**fig_kwargs["fig_subplots_adjust"])
@@ -1310,8 +1306,10 @@ def _arrange_grid(
                 current = "upper"
             else:
                 current = "lower"
-
-            ax = axes[row_idx, col_idx]
+            if flat:
+                ax = axes[col_idx]  # pyright: ignore reportIndexIssue
+            else:
+                ax = axes[row_idx, col_idx]  # pyright: ignore reportIndexIssue
             # Diagonals
             _format_subplot(
                 ax,
@@ -1331,8 +1329,8 @@ def _arrange_grid(
                     ax.axis("off")
                 else:
                     for sample_ind, sample in enumerate(samples):
-                        if diag_funcs[sample_ind] is not None:
-                            diag_f: Callable = diag_funcs[sample_ind]
+                        diag_f = diag_funcs[sample_ind]
+                        if callable(diag_f):  # is callable:
                             diag_f(
                                 ax, sample[:, row], limits[row], diag_kwargs[sample_ind]
                             )
@@ -1358,8 +1356,8 @@ def _arrange_grid(
                     ax.axis("off")
                 else:
                     for sample_ind, sample in enumerate(samples):
-                        if upper_funcs[sample_ind] is not None:
-                            upper_f: Callable = upper_funcs[sample_ind]
+                        upper_f = upper_funcs[sample_ind]
+                        if callable(upper_f):
                             upper_f(
                                 ax,
                                 sample[:, col],
@@ -1382,8 +1380,8 @@ def _arrange_grid(
                     ax.axis("off")
                 else:
                     for sample_ind, sample in enumerate(samples):
-                        if lower_funcs[sample_ind] is not None:
-                            lower_f: Callable = lower_funcs[sample_ind]
+                        lower_f = lower_funcs[sample_ind]
+                        if callable(lower_f):
                             lower_f(
                                 ax,
                                 sample[:, row],
@@ -1403,14 +1401,14 @@ def _arrange_grid(
     # Add dots if we subset
     if len(subset) < dim:
         if flat:
-            ax = axes[0, len(subset) - 1]  # pyright: ignore[reportIndexIssue]
+            ax = axes[len(subset) - 1]  # pyright: ignore[reportIndexIssue, reportOptionalSubscript]
             x0, x1 = ax.get_xlim()
             y0, y1 = ax.get_ylim()
             text_kwargs = {"fontsize": plt.rcParams["font.size"] * 2.0}  # pyright: ignore[reportOptionalOperand]
             ax.text(x1 + (x1 - x0) / 8.0, (y0 + y1) / 2.0, "...", **text_kwargs)
         else:
             for row in range(len(subset)):
-                ax = axes[row, len(subset) - 1]  # pyright: ignore[reportIndexIssue]
+                ax = axes[row, len(subset) - 1]  # pyright: ignore[reportIndexIssue, reportOptionalSubscript]
                 x0, x1 = ax.get_xlim()
                 y0, y1 = ax.get_ylim()
                 text_kwargs = {"fontsize": plt.rcParams["font.size"] * 2.0}  # pyright: ignore[reportOptionalOperand]
@@ -1424,7 +1422,7 @@ def _arrange_grid(
                         **text_kwargs,
                     )
 
-    return fig, axes
+    return fig, axes  # pyright: ignore[reportReturnType]
 
 
 def sbc_rank_plot(
