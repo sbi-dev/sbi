@@ -1306,10 +1306,9 @@ def _arrange_grid(
                 current = "upper"
             else:
                 current = "lower"
-            if flat:
-                ax = axes[col_idx]  # pyright: ignore reportIndexIssue
-            else:
-                ax = axes[row_idx, col_idx]  # pyright: ignore reportIndexIssue
+
+            ax = axes[col_idx] if flat else axes[row_idx, col_idx]  # pyright: ignore reportIndexIssue
+
             # Diagonals
             _format_subplot(
                 ax,
