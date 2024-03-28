@@ -20,24 +20,13 @@ from sbi.simulators.linear_gaussian import (
     linear_gaussian,
     true_posterior_linear_gaussian_mvn_prior,
 )
-from sbi.utils.user_input_checks import (
-    check_sbi_inputs,
-    process_prior,
-    process_simulator,
-)
 from tests.test_utils import check_c2st
 
 
-def test_mdn_with_snpe():
-    mdn_inference_with_different_methods(SNPE)
-
-
-@pytest.mark.slow
-def test_mdn_with_snle():
-    mdn_inference_with_different_methods(SNLE)
-
-
-def mdn_inference_with_different_methods(method):
+@pytest.mark.parametrize(
+    "method", (SNPE, pytest.param(SNLE, marks=[pytest.mark.slow, pytest.mark.mcmc]))
+)
+def test_mdn_inference_with_different_methods(method, mcmc_params_accurate: dict):
     num_dim = 2
     x_o = torch.tensor([[1.0, 0.0]])
     num_samples = 500
@@ -58,9 +47,6 @@ def mdn_inference_with_different_methods(method):
     def simulator(theta: Tensor) -> Tensor:
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    prior, _, prior_returns_numpy = process_prior(prior)
-    simulator = process_simulator(simulator, prior, prior_returns_numpy)
-    check_sbi_inputs(simulator, prior)
     inference = method(density_estimator="mdn")
 
     theta, x = simulate_for_sbi(simulator, prior, num_simulations)
@@ -76,9 +62,7 @@ def mdn_inference_with_different_methods(method):
             theta_transform=theta_transform,
             proposal=prior,
             method="slice_np_vectorized",
-            num_chains=20,
-            warmup_steps=50,
-            thin=5,
+            **mcmc_params_accurate,
         )
 
     samples = posterior.sample((num_samples,), x=x_o)
@@ -108,9 +92,6 @@ def test_mdn_with_1D_uniform_prior():
     def simulator(theta: Tensor) -> Tensor:
         return linear_gaussian(theta, likelihood_shift, likelihood_cov)
 
-    prior, _, prior_returns_numpy = process_prior(prior)
-    simulator = process_simulator(simulator, prior, prior_returns_numpy)
-    check_sbi_inputs(simulator, prior)
     inference = SNPE(density_estimator="mdn")
 
     theta, x = simulate_for_sbi(simulator, prior, 100)

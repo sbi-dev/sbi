@@ -15,11 +15,18 @@ import zuko
 from pyro.distributions import Empirical
 from torch import Tensor, ones, optim, zeros
 from torch import nn as nn
-from torch.distributions import Distribution, Independent, biject_to, constraints
+from torch.distributions import (
+    AffineTransform,
+    Distribution,
+    Independent,
+    biject_to,
+    constraints,
+)
 
 from sbi import utils as utils
 from sbi.sbi_types import TorchTransform
 from sbi.utils.torchutils import atleast_2d
+from sbi.utils.zukoutils import UnconditionalLazyTransform
 
 
 def warn_if_zscoring_changes_data(x: Tensor, duplicate_tolerance: float = 0.1) -> None:
@@ -140,9 +147,8 @@ def standardizing_transform(
     batch_t: Tensor,
     structured_dims: bool = False,
     min_std: float = 1e-14,
-    backend: str = "nflows",
-) -> Union[transforms.AffineTransform, zuko.flows.Unconditional]:
-    """Builds standardizing transform
+) -> transforms.AffineTransform:
+    """Builds standardizing transform for nflows
 
     Args:
         batch_t: Batched tensor from which mean and std deviation (across
@@ -157,7 +163,59 @@ def standardizing_transform(
     Returns:
         Affine transform for z-scoring
     """
+    t_mean, t_std = z_standardization(batch_t, structured_dims, min_std)
+    return transforms.AffineTransform(shift=-t_mean / t_std, scale=1 / t_std)
 
+
+def standardizing_transform_zuko(
+    batch_t: Tensor,
+    structured_dims: bool = False,
+    min_std: float = 1e-14,
+) -> zuko.flows.LazyTransform:
+    """Builds standardizing transform for Zuko flows
+
+    Args:
+        batch_t: Batched tensor from which mean and std deviation (across
+            first dimension) are computed.
+        structured_dim: Whether data dimensions are structured (e.g., time-series,
+            images), which requires computing mean and std per sample first before
+            aggregating over samples for a single standardization mean and std for the
+            batch, or independent (default), which z-scores dimensions independently.
+        min_std:  Minimum value of the standard deviation to use when z-scoring to
+            avoid division by zero.
+
+    Returns:
+        Affine transform for z-scoring
+    """
+    t_mean, t_std = z_standardization(batch_t, structured_dims, min_std)
+    return UnconditionalLazyTransform(
+        AffineTransform,
+        loc=-t_mean / t_std,
+        scale=1 / t_std,
+        buffer=True,
+    )
+
+
+def z_standardization(
+    batch_t: Tensor,
+    structured_dims: bool = False,
+    min_std: float = 1e-14,
+) -> [Tensor, Tensor]:
+    """Computes mean and standard deviation for z-scoring
+
+    Args:
+        batch_t: Batched tensor from which mean and std deviation (across
+            first dimension) are computed.
+        structured_dim: Whether data dimensions are structured (e.g., time-series,
+            images), which requires computing mean and std per sample first before
+            aggregating over samples for a single standardization mean and std for the
+            batch, or independent (default), which z-scores dimensions independently.
+        min_std:  Minimum value of the standard deviation to use when z-scoring to
+            avoid division by zero.
+
+    Returns:
+        Mean and standard deviation for z-scoring
+    """
     is_valid_t, *_ = handle_invalid_x(batch_t, True)
 
     if structured_dims:
@@ -175,18 +233,8 @@ def standardizing_transform(
         t_std = torch.std(batch_t[is_valid_t], dim=0)
         t_std[t_std < min_std] = min_std
 
-    if backend == "nflows":
-        return transforms.AffineTransform(shift=-t_mean / t_std, scale=1 / t_std)
-    elif backend == "zuko":
-        return zuko.flows.Unconditional(
-            zuko.transforms.MonotonicAffineTransform,
-            shift=-t_mean / t_std,
-            scale=1 / t_std,
-            buffer=True,
-        )
-
-    else:
-        raise ValueError("Invalid backend. Use 'nflows' or 'zuko'.")
+    # Return mean and std for z-scoring.
+    return t_mean, t_std
 
 
 class Standardize(nn.Module):

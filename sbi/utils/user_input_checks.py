@@ -610,8 +610,8 @@ def process_x(
 def prepare_for_sbi(simulator: Callable, prior) -> Tuple[Callable, Distribution]:
     """Prepare simulator and prior for usage in sbi.
 
-    NOTE: This method is deprecated as of sbi version v0.23.0. and will be removed in a future release.
-    Please use `process_prior` and `process_simulator` in the future.
+    NOTE: This method is deprecated as of sbi version v0.23.0. and will be removed in a
+    future release. Please use `process_prior` and `process_simulator` in the future.
     This is a wrapper around `process_prior` and `process_simulator` which can be
     used in isolation as well.
 
@@ -633,7 +633,8 @@ def prepare_for_sbi(simulator: Callable, prior) -> Tuple[Callable, Distribution]
     """
 
     warnings.warn(
-        "This method is deprecated as of sbi version v0.23.0. and will be removed in a future release."
+        "This method is deprecated as of sbi version v0.23.0. and will be removed in a \
+        future release."
         "Please use `process_prior` and `process_simulator` in the future.",
         DeprecationWarning,
         stacklevel=2,

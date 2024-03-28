@@ -18,9 +18,14 @@ from sbi.inference import (
 
 @pytest.mark.parametrize(
     "sampling_method",
-    [ImportanceSamplingPosterior, MCMCPosterior, RejectionPosterior, VIPosterior],
+    [
+        ImportanceSamplingPosterior,
+        pytest.param(MCMCPosterior, marks=pytest.mark.mcmc),
+        RejectionPosterior,
+        VIPosterior,
+    ],
 )
-def test_callable_potential(sampling_method):
+def test_callable_potential(sampling_method, mcmc_params_accurate: dict):
     """Test whether callable potentials can be used to sample from a Gaussian."""
     dim = 2
     mean = 2.5
@@ -41,7 +46,7 @@ def test_callable_potential(sampling_method):
     elif sampling_method == MCMCPosterior:
         approx_density = sampling_method(potential_fn=potential, proposal=proposal)
         approx_samples = approx_density.sample(
-            (1024,), x=x_o, num_chains=100, method="slice_np_vectorized"
+            (1024,), x=x_o, method="slice_np_vectorized", **mcmc_params_accurate
         )
     elif sampling_method == VIPosterior:
         approx_density = sampling_method(
