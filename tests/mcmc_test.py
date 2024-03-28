@@ -26,11 +26,7 @@ from sbi.simulators.linear_gaussian import (
     diagonal_linear_gaussian,
     true_posterior_linear_gaussian_mvn_prior,
 )
-from sbi.utils.user_input_checks import (
-    check_sbi_inputs,
-    process_prior,
-    process_simulator,
-)
+from sbi.utils.user_input_checks import process_prior
 from tests.test_utils import check_c2st
 
 
@@ -132,6 +128,7 @@ def test_c2st_slice_np_vectorized_parallelized_on_Gaussian(
     }[slice_sampler]
 
     check_c2st(samples, target_samples, alg=alg)
+
 
 @pytest.mark.mcmc
 @pytest.mark.slow

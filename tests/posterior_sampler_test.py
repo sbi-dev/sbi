@@ -36,15 +36,15 @@ def test_api_posterior_sampler_set(
     sampling_method: str,
     num_chains: int,
     set_seed,
+    mcmc_params_fast: dict,
     num_dim: int = 2,
     num_samples: int = 42,
     num_trials: int = 2,
     num_simulations: int = 10,
-    mcmc_params_fast: dict,
 ):
     """Runs SNL and checks that posterior_sampler is correctly set."""
     x_o = zeros((num_trials, num_dim))
-    # Test for multiple chains is cheap when vectorized.
+    mcmc_params_fast["num_chains"] = num_chains
 
     prior = MultivariateNormal(loc=zeros(num_dim), covariance_matrix=eye(num_dim))
     simulator = diagonal_linear_gaussian
@@ -64,12 +64,9 @@ def test_api_posterior_sampler_set(
 
     assert posterior.posterior_sampler is None
     samples = posterior.sample(
-        sample_shape=(num_samples, mcmc_params_fast["num_chains"]),
+        sample_shape=(num_samples, num_chains),
         x=x_o,
-        mcmc_parameters={
-            "init_strategy": "prior",
-            **mcmc_params_fast
-        },
+        mcmc_parameters={"init_strategy": "prior", **mcmc_params_fast},
     )
     assert isinstance(samples, Tensor)
     assert samples.shape == (num_samples, num_chains, num_dim)
