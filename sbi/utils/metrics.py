@@ -186,7 +186,7 @@ def c2st_scores(
     return scores
 
 
-def unbiased_mmd_squared(x, y, scale: Optional[float] = None):
+def unbiased_mmd_squared(x: Tensor, y: Tensor, scale: Optional[float] = None):
     """Unbiased approximation of the squared maximum-mean discrepancy (MMD) [1].
     The sample-based MMD relies on kernel evaluations between x_i and y_i. This
     implementation only features a Gaussian kernel with lengthscale `scale`.
@@ -239,7 +239,7 @@ def unbiased_mmd_squared(x, y, scale: Optional[float] = None):
     return mmd_square
 
 
-def biased_mmd(x, y, scale: Optional[float] = None):
+def biased_mmd(x: Tensor, y: Tensor, scale: Optional[float] = None):
     """Biased approximation of the squared maximum-mean discrepancy (MMD) [1].
     The sample-based MMD relies on kernel evaluations between x_i and y_i. This
     implementation only features a Gaussian kernel with lengthscale `scale`.
@@ -283,7 +283,7 @@ def biased_mmd(x, y, scale: Optional[float] = None):
     return torch.sqrt(mmd_square)
 
 
-def biased_mmd_hypothesis_test(x, y, alpha=0.05):
+def biased_mmd_hypothesis_test(x: Tensor, y: Tensor, alpha=0.05):
     assert x.shape[0] == y.shape[0]
     mmd_biased = biased_mmd(x, y).item()
     threshold = np.sqrt(2 / x.shape[0]) * (1 + np.sqrt(-2 * np.log(alpha)))
@@ -291,7 +291,7 @@ def biased_mmd_hypothesis_test(x, y, alpha=0.05):
     return mmd_biased, threshold
 
 
-def unbiased_mmd_squared_hypothesis_test(x, y, alpha=0.05):
+def unbiased_mmd_squared_hypothesis_test(x: Tensor, y: Tensor, alpha=0.05):
     assert x.shape[0] == y.shape[0]
     mmd_square_unbiased = unbiased_mmd_squared(x, y).item()
     threshold = (4 / np.sqrt(x.shape[0])) * np.sqrt(-np.log(alpha))
@@ -299,7 +299,9 @@ def unbiased_mmd_squared_hypothesis_test(x, y, alpha=0.05):
     return mmd_square_unbiased, threshold
 
 
-def wasserstein_2_squared(x, y, epsilon=1e-3, max_iter=1000, tol=1e-9):
+def wasserstein_2_squared(
+    x: Tensor, y: Tensor, epsilon: float = 1e-3, max_iter: int = 1000, tol: float = 1e-9
+):
     """Approximate the squared 2-Wasserstein distance
     using entropic regularized optimal transport [1]. In the limit,
     'epsilon' to 0, we recover the squared Wasserstein-2 distance is recovered.
@@ -349,7 +351,12 @@ def wasserstein_2_squared(x, y, epsilon=1e-3, max_iter=1000, tol=1e-9):
 
 
 def regularized_ot_dual(
-    a, b, cost, epsilon: float = 1e-3, max_iter: int = 1000, tol=1e-9
+    a: Tensor,
+    b: Tensor,
+    cost: Tensor,
+    epsilon: float = 1e-3,
+    max_iter: int = 1000,
+    tol=1e-9,
 ):
     """Implementation of regularized optimal transport based on
     the dual formulation of the regularized optimal transport problem.

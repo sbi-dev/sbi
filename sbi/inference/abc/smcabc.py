@@ -360,11 +360,11 @@ class SMCABC(ABCBASE):
             num_particles <= num_initial_pop
         ), "number of initial round simulations must be greater than population size"
 
-        assert (
-            (x_o.shape[0] == 1) or self.distance.requires_iid_data
-        ), "Your data contains more than one data-point, "
-        "but the choice of your distance does not allow multiple conditioning "
-        "observations."
+        assert (x_o.shape[0] == 1) or self.distance.requires_iid_data, (
+            "Your data contain iid data-points, but the choice of "
+            "your distance does not allow multiple conditioning "
+            "observations."
+        )
 
         theta = self.prior.sample((num_initial_pop,))
 

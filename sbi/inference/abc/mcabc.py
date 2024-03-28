@@ -157,7 +157,6 @@ class MCABC(ABCBASE):
 
         # Simulate and calculate distances.
         theta = self.prior.sample((num_simulations,))
-        # theta_repeat = theta.repeat((num_iid_samples, 1))
         theta_repeat = theta.repeat_interleave(num_iid_samples, dim=0)
         x = simulator(theta_repeat)
         x = x.reshape((
