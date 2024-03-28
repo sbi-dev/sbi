@@ -73,7 +73,8 @@ class MCMCPosterior(NeuralPosterior):
                 The samplers `hmc_pymc`, `nuts_pymc` or `slice_pymc` sample with PyMC.
             thin: The thinning factor for the chain.
             warmup_steps: The initial number of samples to discard.
-            num_chains: The number of chains. Should generally be at most `num_workers - 1`.
+            num_chains: The number of chains. Should generally be at most
+                `num_workers - 1`.
             init_strategy: The initialisation strategy for chains; `proposal` will draw
                 init locations from `proposal`, whereas `sir` will use Sequential-
                 Importance-Resampling (SIR). SIR initially samples
@@ -84,9 +85,9 @@ class MCMCPosterior(NeuralPosterior):
                 uses `exp(potential_fn)` as weights.
             init_strategy_parameters: Dictionary of keyword arguments passed to the
                 init strategy, e.g., for `init_strategy=sir` this could be
-                `num_candidate_samples`, i.e., the number of candidates to to find init
+                `num_candidate_samples`, i.e., the number of candidates to find init
                 locations (internal default is `1000`), or `device`.
-            init_strategy_num_candidates: Number of candidates to to find init
+            init_strategy_num_candidates: Number of candidates to find init
                  locations in `init_strategy=sir` (deprecated, use
                  init_strategy_parameters instead).
             num_workers: number of cpu cores used to parallelize mcmc
