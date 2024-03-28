@@ -11,12 +11,18 @@ import torch
 from sklearn.neural_network import MLPClassifier
 from torch.distributions import MultivariateNormal as tmvn
 
-from sbi.utils.metrics import c2st, c2st_scores, wasserstein_2_squared
+from sbi.utils.metrics import (
+    biased_mmd_hypothesis_test,
+    c2st,
+    c2st_scores,
+    unbiased_mmd_squared_hypothesis_test,
+    wasserstein_2_squared,
+)
 
 ## c2st related:
 ## for a study about c2st see https://github.com/psteinb/c2st/
 
-TESTCASECONFIG = [
+C2ST_TESTCASECONFIG = [
     (
         # both samples are identical, the mean accuracy should be around 0.5
         0.0,  # dist_sigma
@@ -41,7 +47,7 @@ TESTCASECONFIG = [
 
 @pytest.mark.parametrize(
     "dist_sigma, c2st_lowerbound, c2st_upperbound,",
-    TESTCASECONFIG,
+    C2ST_TESTCASECONFIG,
 )
 def test_c2st_with_different_distributions(
     dist_sigma, c2st_lowerbound, c2st_upperbound
@@ -67,7 +73,7 @@ def test_c2st_with_different_distributions(
 @pytest.mark.slow
 @pytest.mark.parametrize(
     "dist_sigma, c2st_lowerbound, c2st_upperbound,",
-    TESTCASECONFIG,
+    C2ST_TESTCASECONFIG,
 )
 def test_c2st_with_different_distributions_mlp(
     dist_sigma, c2st_lowerbound, c2st_upperbound
@@ -93,7 +99,7 @@ def test_c2st_with_different_distributions_mlp(
 @pytest.mark.slow
 @pytest.mark.parametrize(
     "dist_sigma, c2st_lowerbound, c2st_upperbound,",
-    TESTCASECONFIG,
+    C2ST_TESTCASECONFIG,
 )
 def test_c2st_scores(dist_sigma, c2st_lowerbound, c2st_upperbound):
     ndim = 10
@@ -162,3 +168,26 @@ def test_wasserstein_2_distance(sigma):
     )
     exponent2 = 0 if estimate == 0 else int(math.floor(math.log10(abs(estimate))))
     assert exponent1 == exponent2
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize(
+    "test", (unbiased_mmd_squared_hypothesis_test, biased_mmd_hypothesis_test)
+)
+@pytest.mark.parametrize("sigma", (0.0, 5.0))
+def test_mmd_squared_distance(test, sigma):
+    ndim = 10
+    nsamples = 1024
+    ref_sigma = 0.0
+    refdist = tmvn(loc=ref_sigma * torch.ones(ndim), covariance_matrix=torch.eye(ndim))
+    X = refdist.sample((nsamples,))
+
+    otherdist = tmvn(loc=sigma + torch.zeros(ndim), covariance_matrix=torch.eye(ndim))
+    Y = otherdist.sample((nsamples,))
+
+    estimate, threshold = test(X, Y, alpha=0.05)
+
+    if sigma == ref_sigma:
+        assert estimate < threshold, "Rejecting 0-hypothesis even though q=p."
+    else:
+        assert estimate > threshold, "Accepting 0-hypothesis even though q!=p."

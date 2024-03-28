@@ -187,9 +187,27 @@ def c2st_scores(
 
 
 def unbiased_mmd_squared(x, y, scale: Optional[float] = None):
+    """Unbiased approximation of the squared maximum-mean discrepancy (MMD) [1].
+    The sample-based MMD relies on kernel evaluations between x_i and y_i. This
+    implementation only features a Gaussian kernel with lengthscale `scale`.
+
+    Args:
+        x: Data of shape (m, d)
+        y: Data of shape (n, d)
+        scale: Lengthscale of the exponential kernel. If not specified,
+            the lengthscale is chosen based on a median heuristic.
+
+    Return:
+        A single scalar for the squared MMD.
+
+    References:
+        [1] Gretton, A., et al. (2012). A kernel two-sample test.
+    """
     nx, ny = x.shape[0], y.shape[0]
-    assert nx != 1 and ny != 1, "The unbiased MMD estimator is not defined "
-    "for empirical distributions of size 1."
+    assert nx != 1 and ny != 1, (
+        "The unbiased MMD estimator is not defined "
+        "for empirical distributions of size 1."
+    )
 
     def f(a, b, diag=False):
         if diag:
@@ -221,7 +239,23 @@ def unbiased_mmd_squared(x, y, scale: Optional[float] = None):
     return mmd_square
 
 
-def biased_mmd(x, y):
+def biased_mmd(x, y, scale: Optional[float] = None):
+    """Biased approximation of the squared maximum-mean discrepancy (MMD) [1].
+    The sample-based MMD relies on kernel evaluations between x_i and y_i. This
+    implementation only features a Gaussian kernel with lengthscale `scale`.
+
+    Args:
+        x: Data of shape (m, d)
+        y: Data of shape (n, d)
+        scale: Lengthscale of the exponential kernel. If not specified,
+            the lengthscale is chosen based on a median heuristic.
+
+    Return:
+        A single scalar for the squared MMD.
+
+    References:
+        [1] Gretton, A., et al. (2012). A kernel two-sample test.
+    """
     nx, ny = x.shape[0], y.shape[0]
 
     def f(a, b):
@@ -231,8 +265,8 @@ def biased_mmd(x, y):
     xy = f(x, y)
     yy = f(y, y)
 
-    scale = torch.median(torch.sqrt(torch.cat((xx, xy, yy))))
-    c = -0.5 / (scale**2)
+    s = torch.median(torch.sqrt(torch.cat((xx, xy, yy)))) if scale is None else scale
+    c = -0.5 / (s**2)
 
     k = lambda a: torch.sum(torch.exp(c * a))
 
@@ -267,7 +301,7 @@ def unbiased_mmd_squared_hypothesis_test(x, y, alpha=0.05):
 
 def wasserstein_2_squared(x, y, epsilon=1e-3, max_iter=1000, tol=1e-9):
     """Approximate the squared 2-Wasserstein distance
-    using entropic regularized optimal transport. In the limit,
+    using entropic regularized optimal transport [1]. In the limit,
     'epsilon' to 0, we recover the squared Wasserstein-2 distance is recovered.
 
     Args:
@@ -276,8 +310,13 @@ def wasserstein_2_squared(x, y, epsilon=1e-3, max_iter=1000, tol=1e-9):
         epsilon: Entropic regularization term
         max_iter: Maximum number of iteration for which the Sinkhorn iterations run
         tol: Tolerance required for Sinkhorn to converge
+
     Return:
-        A single scalar for the squared 2-Wasserstein distance
+        The squared 2-Wasserstein distance of shape (B, ) or ()
+
+    References:
+        [1] Peyré, G., & Cuturi, M. (2019). Computational optimal transport:
+            With applications to data science.
     """
     assert (
         x.ndim == y.ndim
