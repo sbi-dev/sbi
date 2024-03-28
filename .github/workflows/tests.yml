@@ -58,4 +58,4 @@ jobs:
     - name: Test with pytest
       run: |
         pip install pytest-cov
-        pytest tests/multiprocessing_test.py
+        pytest -n auto -m "not gpu" tests/ --cov=sbi --cov-report=xml
