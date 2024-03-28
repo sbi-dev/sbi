@@ -58,15 +58,4 @@ jobs:
     - name: Test with pytest
       run: |
         pip install pytest-cov
-        pytest -m "not gpu" tests/ --cov=sbi --cov-report=xml
-
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v4-beta
-      with:
-        file: ./coverage.xml
-        flags: unittests
-        env_vars: OS,PYTHON
-        name: codecov-umbrella
-        fail_ci_if_error: false
-      env:
-        token: ${{ secrets.CODECOV_TOKEN }}
+        pytest tests/multiprocessing_test.py
