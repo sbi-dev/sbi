@@ -69,8 +69,8 @@ class MCMCPosterior(NeuralPosterior):
                 numpy implementation of slice sampling. `slice_np_vectorized` is
                 identical to `slice_np`, but if `num_chains>1`, the chains are
                 vectorized for `slice_np_vectorized` whereas they are run sequentially
-                for `slice_np`. The samplers `hmc_pyro` or `nuts_pyro` sample with Pyro.
-                The samplers `hmc_pymc`, `nuts_pymc` or `slice_pymc` sample with PyMC.
+                for `slice_np`. The samplers ending on `_pyro` are using Pyro, and
+                likewise the samplers ending on `_pymc` are using PyMC.
             thin: The thinning factor for the chain.
             warmup_steps: The initial number of samples to discard.
             num_chains: The number of chains. Should generally be at most
@@ -542,7 +542,9 @@ class MCMCPosterior(NeuralPosterior):
             potential_function: A callable **class**. A class, but not a function,
                 is picklable for Pyro MCMC to use it across chains in parallel,
                 even when the potential function requires evaluating a neural network.
-            mcmc_method: Either `"hmc_pyro"` or `"nuts_pyro"`.
+            initial_params: Initial parameters for MCMC chain.
+            mcmc_method: Pyro MCMC method to use, either `"hmc_pyro"` or
+                `"nuts_pyro"` (default).
             thin: Thinning (subsampling) factor, setting 1 disables thinning.
             warmup_steps: Initial number of samples to discard.
             num_chains: Whether to sample in parallel. If None, use all but one CPU.
@@ -596,7 +598,9 @@ class MCMCPosterior(NeuralPosterior):
             potential_function: A callable **class**. A class, but not a function,
                 is picklable for PyMC MCMC to use it across chains in parallel,
                 even when the potential function requires evaluating a neural network.
-            mcmc_method: One of `"hmc_pymc"`, `"nuts_pymc"` or `"slice_pymc"`.
+            initial_params: Initial parameters for MCMC chain.
+            mcmc_method: mcmc_method: Pyro MCMC method to use, either `"hmc_pymc"` or
+                `"slice_pymc"`, or `"nuts_pymc"` (default).
             thin: Thinning (subsampling) factor, setting 1 disables thinning.
             warmup_steps: Initial number of samples to discard.
             num_chains: Whether to sample in parallel. If None, use all but one CPU.
