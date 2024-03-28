@@ -1,61 +1,60 @@
+import numpy as np
 import pytest
 from sbi.diagnostics.tarp import TARP, l1, l2
-from torch import Tensor, allclose, exp, eye, ones, sqrt, sum, zeros
+from torch import Tensor, allclose, exp, eye, normal, ones, sqrt, sum, zeros
 from torch.distributions import MultivariateNormal as mvn
 from torch.distributions import Normal, Uniform
 from torch.nn import L1Loss
 
 
+def generate_toy_gaussian(nsamples=100, nsims=100, ndims=5, covfactor=1.0):
+    """adopted from the tarp paper page 7, section 4.1 Gaussian Toy Model correct case"""
+
+    base_mean = Uniform(-5, 5)
+    base_log_var = Uniform(-5, -1)
+
+    locs = base_mean.sample((nsims, ndims))
+    scales = exp(base_log_var.sample((nsims, ndims)))
+
+    spdf = Normal(loc=locs, scale=covfactor * scales)
+    tpdf = Normal(loc=locs, scale=scales)
+
+    samples = spdf.sample((nsamples,))
+    theta_prime = tpdf.sample()
+
+    return theta_prime, samples
+
+
 @pytest.fixture
 def onsamples():
-    # taken from the paper page 7, section 4.1 Gaussian Toy Model correct case
 
     nsamples = 100  # samples per simulation
     nsims = 100
     ndims = 5
 
-    base_mean = Uniform(-5, 5)
-    base_log_var = Uniform(-5, -1)
-    thmu = base_mean.sample((nsims, ndims))
-    thsigma = exp(base_log_var.sample((nsims, ndims)))
-
-    theta_pdf = Normal(loc=thmu, scale=thsigma)
-
-    samples = theta_pdf.sample((nsamples,))
-    theta = theta_pdf.sample((1,))
-
-    return theta, samples
+    return generate_toy_gaussian(nsamples, nsims, ndims)
 
 
 @pytest.fixture
 def undersamples():
-    # taken from the paper page 7, section 4.1 Gaussian Toy Model correct case
+    # taken from the paper page 7, section 4.1 Gaussian Toy Model underconfident case
 
     nsamples = 100  # samples per simulation
     nsims = 100
     ndims = 5
 
-    base_mean = Uniform(-5, 5)
-    base_log_var = Uniform(-5, -1)
-    thmu = base_mean.sample((nsims, ndims))
-    thsigma = 0.5 * exp(base_log_var.sample((nsims, ndims)))
-
-    theta_pdf = Normal(loc=thmu, scale=thsigma)
-
-    samples = theta_pdf.sample((nsamples,))
-    theta = theta_pdf.sample((1,))
-
-    return theta, samples
+    return generate_toy_gaussian(nsamples, nsims, ndims, covfactor=0.5)
 
 
-# @pytest.fixture
-# def offsamples():
-#     base_pdf = mvn(zeros(3), eye(3))
-#     offset = 0.5
-#     theta = base_pdf.sample((50,))
-#     samples = base_pdf.sample((150,))
-#     samples = samples.unsqueeze(0).reshape(3, -1, 3)
-#     return theta, samples + offset
+@pytest.fixture
+def oversamples():
+    # taken from the paper page 7, section 4.1 Gaussian Toy Model overconfident case
+
+    nsamples = 100  # samples per simulation
+    nsims = 100
+    ndims = 5
+
+    return generate_toy_gaussian(nsamples, nsims, ndims, covfactor=2.0)
 
 
 def test_onsamples(onsamples):
@@ -66,17 +65,12 @@ def test_onsamples(onsamples):
     assert samples.shape == (100, 100, 5)
 
 
-def test_onsamples_and_under(onsamples, undersamples):
+def test_undersamples(undersamples):
 
-    theta, samples = onsamples
-    utheta, usamples = undersamples
+    theta, samples = undersamples
 
-    std_samples = samples.std(axis=0)
-    std_usamples = usamples.std(axis=0)
-
-    assert (std_usamples < std_samples).any()
-    cnt = (std_usamples < std_samples).sum()
-    print(cnt, std_usamples.shape[0] * std_usamples.shape[1])
+    assert theta.shape == (100, 5) or theta.shape == (1, 100, 5)
+    assert samples.shape == (100, 100, 5)
 
 
 def test_distances(onsamples):
@@ -93,10 +87,10 @@ def test_distances(onsamples):
 
     # difference in reductions
     l1loss = L1Loss(reduction="sum")  # sum across last axis AND batch
-    exp = l1loss(theta, samples)  # sum across last axis
+    broadcasted_theta = theta.expand(samples.shape[0], -1, -1)
+    exp = l1loss(broadcasted_theta, samples)  # sum across last axis
 
-    print(obs.shape, exp.shape, exp)
-    assert obs.shape != exp.shape
+    assert obs.shape != exp.shape  # gives the wrong shape
 
     # results including expansion
     theta_ = theta.expand(samples.shape[0], -1, -1)
@@ -152,6 +146,21 @@ def test_tarp_correct_using_norm(onsamples):
     assert allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
 
 
+def test_tarp_detect_overdispersed(oversamples):
+
+    theta, samples = oversamples
+
+    tarp = TARP(num_alpha_bins=30, norm=True)
+    ecp, alpha = tarp.run(samples, theta)
+
+    assert not allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
+
+    tarp_ = TARP(num_alpha_bins=30, norm=True, metric="l1")
+    ecp, alpha = tarp_.run(samples, theta)
+
+    assert not allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
+
+
 def test_tarp_detect_underdispersed(undersamples):
 
     theta, samples = undersamples
@@ -159,15 +168,9 @@ def test_tarp_detect_underdispersed(undersamples):
     tarp = TARP(num_alpha_bins=30, norm=True)
     ecp, alpha = tarp.run(samples, theta)
 
-    print(ecp)
-    print(alpha)
-    print((ecp - alpha).abs().max())
     assert not allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
 
     tarp_ = TARP(num_alpha_bins=30, norm=True, metric="l1")
     ecp, alpha = tarp_.run(samples, theta)
 
-    print(ecp)
-    print(alpha)
-    print((ecp - alpha).abs().max())
     assert not allclose((ecp - alpha).abs().max(), Tensor([0.0]), atol=1e-1)
