@@ -1,5 +1,6 @@
 """Sequential Monte Carlo Approximate Bayesian Computation."""
 
+import math
 from typing import Any, Callable, Dict, Optional, Tuple, Union
 
 import numpy as np
@@ -390,9 +391,9 @@ class SMCABC(ABCBASE):
         sortidx = torch.argsort(distances)
         particles = theta[sortidx][:num_particles]
         # Take last accepted distance as epsilon.
-        initial_epsilon = distances[sortidx][num_particles - 1]
+        initial_epsilon = distances[sortidx][num_particles - 1].item()
 
-        if not torch.isfinite(initial_epsilon):
+        if not math.isfinite(initial_epsilon):
             initial_epsilon = 1e8
 
         return (
