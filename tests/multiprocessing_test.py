@@ -55,5 +55,5 @@ def test_benchmarking_parallel_simulation(sim_batch_size, num_workers):
     )
     toc_joblib = time.time() - tic
 
-    # Allow joblib to be 10 percent slower due to overhead.
+    # Allow joblib to be 50 percent slower due to overhead.
     assert toc_joblib <= toc_sp * 1.5
