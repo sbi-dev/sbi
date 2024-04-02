@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-# Get number of cores on machine
 import time
 import warnings
 
