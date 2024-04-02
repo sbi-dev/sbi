@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+# Get number of cores on machine
+import multiprocessing
 import time
 import warnings
 
@@ -11,6 +13,8 @@ import torch
 
 from sbi.simulators.linear_gaussian import diagonal_linear_gaussian
 from sbi.simulators.simutils import simulate_in_batches
+
+num_cores = multiprocessing.cpu_count()
 
 warnings.simplefilter(action="ignore", category=FutureWarning)
 
@@ -26,7 +30,7 @@ def slow_linear_gaussian(theta):
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("num_workers", [10, -2])
+@pytest.mark.parametrize("num_workers", [num_cores, -2])
 @pytest.mark.parametrize("sim_batch_size", ((1, 10, 100)))
 def test_benchmarking_parallel_simulation(sim_batch_size, num_workers):
     """Test whether joblib is faster than serial processing."""
