@@ -18,6 +18,7 @@ def test_analysis_modules(device: str) -> None:
     Args:
         device: Which device to run the inference on.
     """
+
     num_dim = 3
     device = process_device(device)
     prior = BoxUniform(
