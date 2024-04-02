@@ -2,7 +2,7 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 from logging import warning
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 
 import numpy as np
 import torch
@@ -429,6 +429,88 @@ def regularized_ot_dual(
         coupling = coupling.squeeze(0)
 
     return coupling
+
+
+def posterior_shrinkage(
+    prior_samples: Union[Tensor, np.ndarray], post_samples: Union[Tensor, np.ndarray]
+) -> Tensor:
+    """
+    Calculate the posterior shrinkage, quantifying how much
+    the posterior distribution contracts from the initial
+    prior distribution.
+    References:
+    https://arxiv.org/abs/1803.08393
+
+    Parameters
+    ----------
+    prior_samples : array_like or torch.Tensor [n_samples, n_params]
+        Samples from the prior distribution.
+    post_samples : array-like or torch.Tensor [n_samples, n_params]
+        Samples from the posterior distribution.
+
+    Returns
+    -------
+    shrinkage : torch.Tensor [n_params]
+        The posterior shrinkage.
+    """
+
+    if len(prior_samples) == 0 or len(post_samples) == 0:
+        raise ValueError("Input samples are empty")
+
+    if not isinstance(prior_samples, torch.Tensor):
+        prior_samples = torch.tensor(prior_samples, dtype=torch.float32)
+    if not isinstance(post_samples, torch.Tensor):
+        post_samples = torch.tensor(post_samples, dtype=torch.float32)
+
+    if prior_samples.ndim == 1:
+        prior_samples = prior_samples[:, None]
+    if post_samples.ndim == 1:
+        post_samples = post_samples[:, None]
+
+    prior_std = torch.std(prior_samples, dim=0)
+    post_std = torch.std(post_samples, dim=0)
+
+    return 1 - (post_std / prior_std) ** 2
+
+
+def posterior_zscore(
+    true_theta: Union[Tensor, np.array, float], post_samples: Union[Tensor, np.array]
+):
+    """
+    Calculate the posterior z-score, quantifying how much the posterior
+    distribution of a parameter encompasses its true value.
+    References:
+    https://arxiv.org/abs/1803.08393
+
+    Parameters
+    ----------
+    true_theta : float, array-like or torch.Tensor [n_params]
+        The true value of the parameters.
+    post_samples : array-like or torch.Tensor [n_samples, n_params]
+        Samples from the posterior distributions.
+
+    Returns
+    -------
+    z : Tensor [n_params]
+        The z-score of the posterior distributions.
+    """
+
+    if len(post_samples) == 0:
+        raise ValueError("Input samples are empty")
+
+    if not isinstance(true_theta, torch.Tensor):
+        true_theta = torch.tensor(true_theta, dtype=torch.float32)
+    if not isinstance(post_samples, torch.Tensor):
+        post_samples = torch.tensor(post_samples, dtype=torch.float32)
+
+    true_theta = np.atleast_1d(true_theta)
+    if post_samples.ndim == 1:
+        post_samples = post_samples[:, None]
+
+    post_mean = torch.mean(post_samples, dim=0)
+    post_std = torch.std(post_samples, dim=0)
+
+    return torch.abs((post_mean - true_theta) / post_std)
 
 
 def _test():

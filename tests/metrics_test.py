@@ -15,6 +15,8 @@ from sbi.utils.metrics import (
     biased_mmd_hypothesis_test,
     c2st,
     c2st_scores,
+    posterior_shrinkage,
+    posterior_zscore,
     unbiased_mmd_squared_hypothesis_test,
     wasserstein_2_squared,
 )
@@ -191,3 +193,45 @@ def test_mmd_squared_distance(test, sigma):
         assert estimate < threshold, "Rejecting 0-hypothesis even though q=p."
     else:
         assert estimate > threshold, "Accepting 0-hypothesis even though q!=p."
+
+
+def test_posterior_shrinkage():
+    prior_samples = np.array([2])
+    post_samples = np.array([3])
+    assert torch.isnan(posterior_shrinkage(prior_samples, post_samples)[0])
+
+    prior_samples = np.array([[1, 2], [2, 3]])
+    post_samples = np.array([[2, 3], [3, 4]])
+    expected_shrinkage = torch.tensor([0.0, 0.0])
+    assert torch.allclose(
+        posterior_shrinkage(prior_samples, post_samples), expected_shrinkage
+    )
+
+    prior_samples = torch.tensor([[1.0, 2.0], [2.0, 3.0]])
+    post_samples = torch.tensor([[2.0, 3.0], [3.0, 4.0]])
+    expected_shrinkage = torch.tensor([0.0, 0.0])
+    assert torch.allclose(
+        posterior_shrinkage(prior_samples, post_samples), expected_shrinkage
+    )
+
+    prior_samples = np.array([])
+    post_samples = np.array([])
+    with pytest.raises(ValueError):
+        posterior_shrinkage(prior_samples, post_samples)
+
+
+def test_posterior_zscore():
+    true_theta = np.array([2, 3])
+    post_samples = np.array([[1, 2], [2, 3], [3, 4]])
+    expected_zscore = torch.tensor([0.0, 0.0])
+    assert torch.allclose(posterior_zscore(true_theta, post_samples), expected_zscore)
+
+    true_theta = torch.tensor([2.0, 3.0])
+    post_samples = torch.tensor([[1.0, 2.0], [2.0, 3.0], [3.0, 4.0]])
+    expected_zscore = torch.tensor([0.0, 0.0])
+    assert torch.allclose(posterior_zscore(true_theta, post_samples), expected_zscore)
+
+    true_theta = np.array([])
+    post_samples = np.array([])
+    with pytest.raises(ValueError):
+        posterior_zscore(true_theta, post_samples)
