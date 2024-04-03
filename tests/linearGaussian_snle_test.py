@@ -460,50 +460,46 @@ def test_api_snl_sampling_methods(
     else:
         prior = BoxUniform(-1.0 * ones(num_dim), ones(num_dim))
 
-    # Why do we have this if-case? Only the `MCMCPosterior` uses the `init_strategy`.
-    # Thus, we would not like to run, e.g., VI with all init_strategies, but only once
-    # (namely with `init_strategy=proposal`).
-    if sample_with == "mcmc" or init_strategy == "proposal":
-        simulator = diagonal_linear_gaussian
+    simulator = diagonal_linear_gaussian
 
-        inference = SNLE(show_progress_bars=False)
+    inference = SNLE(show_progress_bars=False)
 
-        theta, x = simulate_for_sbi(
-            simulator, prior, num_simulations, simulation_batch_size=1000
+    theta, x = simulate_for_sbi(
+        simulator, prior, num_simulations, simulation_batch_size=1000
+    )
+    likelihood_estimator = inference.append_simulations(theta, x).train(
+        max_num_epochs=5
+    )
+    potential_fn, theta_transform = likelihood_estimator_based_potential(
+        prior=prior, likelihood_estimator=likelihood_estimator, x_o=x_o
+    )
+    if sample_with == "rejection":
+        posterior = RejectionPosterior(potential_fn=potential_fn, proposal=prior)
+    elif (
+        "slice" in sampling_method
+        or "nuts" in sampling_method
+        or "hmc" in sampling_method
+    ):
+        posterior = MCMCPosterior(
+            potential_fn,
+            proposal=prior,
+            theta_transform=theta_transform,
+            method=sampling_method,
+            init_strategy=init_strategy,
+            **mcmc_params_fast,
         )
-        likelihood_estimator = inference.append_simulations(theta, x).train(
-            max_num_epochs=5
+    elif sample_with == "importance":
+        posterior = ImportanceSamplingPosterior(
+            potential_fn,
+            proposal=prior,
+            theta_transform=theta_transform,
         )
-        potential_fn, theta_transform = likelihood_estimator_based_potential(
-            prior=prior, likelihood_estimator=likelihood_estimator, x_o=x_o
+    else:
+        posterior = VIPosterior(
+            potential_fn,
+            theta_transform=theta_transform,
+            vi_method=sampling_method,
         )
-        if sample_with == "rejection":
-            posterior = RejectionPosterior(potential_fn=potential_fn, proposal=prior)
-        elif (
-            "slice" in sampling_method
-            or "nuts" in sampling_method
-            or "hmc" in sampling_method
-        ):
-            posterior = MCMCPosterior(
-                potential_fn,
-                proposal=prior,
-                theta_transform=theta_transform,
-                method=sampling_method,
-                init_strategy=init_strategy,
-                **mcmc_params_fast,
-            )
-        elif sample_with == "importance":
-            posterior = ImportanceSamplingPosterior(
-                potential_fn,
-                proposal=prior,
-                theta_transform=theta_transform,
-            )
-        else:
-            posterior = VIPosterior(
-                potential_fn,
-                theta_transform=theta_transform,
-                vi_method=sampling_method,
-            )
-            posterior.train(max_num_iters=10)
+        posterior.train(max_num_iters=10)
 
-        posterior.sample(sample_shape=(num_samples,))
+    posterior.sample(sample_shape=(num_samples,))
