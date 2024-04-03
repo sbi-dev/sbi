@@ -1087,20 +1087,10 @@ def build_zuko_flow(
             **kwargs,
         )
 
-<<<<<<< HEAD
-    transforms = maf.transform
-    z_score_x_bool, structured_x = z_score_parser(z_score_x)
-    if z_score_x_bool:
-        transforms = (
-            transforms,
-            standardizing_transform_zuko(batch_x, structured_x),
-        )
-=======
     # Continuous normalizing flows (CNF) only have one transform,
     # so we need to handle them slightly differently.
     if which_nf == "CNF":
         transform = flow_built.transform
->>>>>>> bf65102c (Zuko density estimators (#1088))
 
         z_score_x_bool, structured_x = z_score_parser(z_score_x)
         if z_score_x_bool:
