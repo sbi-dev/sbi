@@ -151,7 +151,7 @@ def test_c2st_and_map_snl_on_linearGaussian_different(
 
     """
     num_samples = 500
-    num_simulations = 5000
+    num_simulations = 3000
     trials_to_test = [1]
 
     # likelihood_mean will be likelihood_shift+theta
@@ -173,7 +173,7 @@ def test_c2st_and_map_snl_on_linearGaussian_different(
     inference = SNLE(density_estimator=density_estimator, show_progress_bars=False)
 
     theta, x = simulate_for_sbi(
-        simulator, prior, num_simulations, simulation_batch_size=10000
+        simulator, prior, num_simulations, simulation_batch_size=num_simulations
     )
     likelihood_estimator = inference.append_simulations(theta, x).train()
 
@@ -213,7 +213,7 @@ def test_c2st_and_map_snl_on_linearGaussian_different(
         check_c2st(
             samples,
             target_samples,
-            alg=f"snle_a-{prior_str}-prior-{num_trials}-trials",
+            alg=f"snle_a-{prior_str}-prior-{model_str}-{num_trials}-trials",
         )
 
         map_ = posterior.map(
