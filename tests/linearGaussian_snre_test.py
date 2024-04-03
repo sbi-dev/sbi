@@ -419,4 +419,4 @@ def test_api_sre_sampling_methods(
         )
         posterior.train(max_num_iters=10)
 
-    posterior.sample(sample_shape=(num_samples,))
+    posterior.sample(sample_shape=(num_samples,), show_progress_bars=False)
