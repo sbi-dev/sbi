@@ -17,7 +17,6 @@ from sbi.neural_nets.flow import (
     build_maf_rqs,
     build_nsf,
     build_zuko_bpf,
-    build_zuko_cnf,
     build_zuko_gf,
     build_zuko_maf,
     build_zuko_naf,
@@ -29,6 +28,24 @@ from sbi.neural_nets.flow import (
 )
 from sbi.neural_nets.mdn import build_mdn
 from sbi.neural_nets.mnle import build_mnle
+
+model_builders = {
+    "mdn": build_mdn,
+    "made": build_made,
+    "maf": build_maf,
+    "maf_rqs": build_maf_rqs,
+    "nsf": build_nsf,
+    "mnle": build_mnle,
+    "zuko_nice": build_zuko_nice,
+    "zuko_maf": build_zuko_maf,
+    "zuko_nsf": build_zuko_nsf,
+    "zuko_ncsf": build_zuko_ncsf,
+    "zuko_sospf": build_zuko_sospf,
+    "zuko_naf": build_zuko_naf,
+    "zuko_unaf": build_zuko_unaf,
+    "zuko_gf": build_zuko_gf,
+    "zuko_bpf": build_zuko_bpf,
+}
 
 
 def classifier_nn(
@@ -197,8 +214,6 @@ def likelihood_nn(
             return build_zuko_naf(batch_x=batch_x, batch_y=batch_theta, **kwargs)
         elif model == "zuko_unaf":
             return build_zuko_unaf(batch_x=batch_x, batch_y=batch_theta, **kwargs)
-        elif model == "zuko_cnf":
-            return build_zuko_cnf(batch_x=batch_x, batch_y=batch_theta, **kwargs)
         elif model == "zuko_gf":
             return build_zuko_gf(batch_x=batch_x, batch_y=batch_theta, **kwargs)
         elif model == "zuko_bpf":
@@ -321,8 +336,6 @@ def posterior_nn(
             return build_zuko_naf(batch_x=batch_theta, batch_y=batch_x, **kwargs)
         elif model == "zuko_unaf":
             return build_zuko_unaf(batch_x=batch_theta, batch_y=batch_x, **kwargs)
-        elif model == "zuko_cnf":
-            return build_zuko_cnf(batch_x=batch_theta, batch_y=batch_x, **kwargs)
         elif model == "zuko_gf":
             return build_zuko_gf(batch_x=batch_theta, batch_y=batch_x, **kwargs)
         elif model == "zuko_bpf":
