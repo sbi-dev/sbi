@@ -53,6 +53,7 @@ class MCMCPosterior(NeuralPosterior):
         init_strategy_parameters: Optional[Dict[str, Any]] = None,
         init_strategy_num_candidates: Optional[int] = None,
         num_workers: int = 1,
+        mp_context: str = "spawn",
         device: Optional[str] = None,
         x_shape: Optional[torch.Size] = None,
     ):
@@ -91,6 +92,10 @@ class MCMCPosterior(NeuralPosterior):
                  locations in `init_strategy=sir` (deprecated, use
                  init_strategy_parameters instead).
             num_workers: number of cpu cores used to parallelize mcmc
+            mp_context: Multiprocessing start method, either `"fork"` or `"spawn"`
+                (default), used by Pyro and PyMC samplers. `"fork"` can be significantly
+                faster than `"spawn"` but is only supported on POSIX-based systems
+                (e.g. Linux and macOS, not Windows).
             device: Training device, e.g., "cpu", "cuda" or "cuda:0". If None,
                 `potential_fn.device` is used.
             x_shape: Shape of a single simulator output. If passed, it is used to check
@@ -123,6 +128,7 @@ class MCMCPosterior(NeuralPosterior):
         self.init_strategy = init_strategy
         self.init_strategy_parameters = init_strategy_parameters or {}
         self.num_workers = num_workers
+        self.mp_context = mp_context
         self._posterior_sampler = None
         # Hardcode parameter name to reduce clutter kwargs.
         self.param_name = "theta"
@@ -216,6 +222,7 @@ class MCMCPosterior(NeuralPosterior):
         mcmc_method: Optional[str] = None,
         sample_with: Optional[str] = None,
         num_workers: Optional[int] = None,
+        mp_context: Optional[str] = None,
         show_progress_bars: bool = True,
     ) -> Tensor:
         r"""Return samples from posterior distribution $p(\theta|x)$ with MCMC.
@@ -247,6 +254,7 @@ class MCMCPosterior(NeuralPosterior):
         num_chains = self.num_chains if num_chains is None else num_chains
         init_strategy = self.init_strategy if init_strategy is None else init_strategy
         num_workers = self.num_workers if num_workers is None else num_workers
+        mp_context = self.mp_context if mp_context is None else mp_context
         init_strategy_parameters = (
             self.init_strategy_parameters
             if init_strategy_parameters is None
@@ -326,6 +334,7 @@ class MCMCPosterior(NeuralPosterior):
                     warmup_steps=warmup_steps,  # type: ignore
                     num_chains=num_chains,
                     show_progress_bars=show_progress_bars,
+                    mp_context=mp_context,
                 )
             elif method in ("hmc_pymc", "nuts_pymc", "slice_pymc"):
                 transformed_samples = self._pymc_mcmc(
@@ -337,6 +346,7 @@ class MCMCPosterior(NeuralPosterior):
                     warmup_steps=warmup_steps,  # type: ignore
                     num_chains=num_chains,
                     show_progress_bars=show_progress_bars,
+                    mp_context=mp_context,
                 )
             else:
                 raise NameError(f"The sampling method {method} is not implemented!")
@@ -534,6 +544,7 @@ class MCMCPosterior(NeuralPosterior):
         warmup_steps: int = 200,
         num_chains: Optional[int] = 1,
         show_progress_bars: bool = True,
+        mp_context: str = "spawn",
     ) -> Tensor:
         r"""Return samples obtained using Pyro's HMC or NUTS sampler.
 
@@ -563,7 +574,7 @@ class MCMCPosterior(NeuralPosterior):
             warmup_steps=warmup_steps,
             initial_params={self.param_name: initial_params},
             num_chains=num_chains,
-            mp_context="spawn",
+            mp_context=mp_context,
             disable_progbar=not show_progress_bars,
             transforms={},
         )
@@ -590,6 +601,7 @@ class MCMCPosterior(NeuralPosterior):
         warmup_steps: int = 200,
         num_chains: Optional[int] = 1,
         show_progress_bars: bool = True,
+        mp_context: str = "spawn",
     ) -> Tensor:
         r"""Return samples obtained using PyMC's HMC, NUTS or slice samplers.
 
@@ -620,7 +632,7 @@ class MCMCPosterior(NeuralPosterior):
             draws=ceil((thin * num_samples) / num_chains),
             tune=warmup_steps,
             chains=num_chains,
-            mp_ctx="spawn",
+            mp_ctx=mp_context,
             progressbar=show_progress_bars,
             param_name=self.param_name,
             device=self._device,

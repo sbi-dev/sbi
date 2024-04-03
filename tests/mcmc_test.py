@@ -135,7 +135,11 @@ def test_c2st_slice_np_vectorized_parallelized_on_Gaussian(
 @pytest.mark.parametrize("step", ("nuts", "hmc", "slice"))
 @pytest.mark.parametrize("num_chains", (1, 3))
 def test_c2st_pymc_sampler_on_Gaussian(
-    step: str, num_chains: int, num_dim: int = 2, num_samples: int = 1000, warmup: int = 100
+    step: str,
+    num_chains: int,
+    num_dim: int = 2,
+    num_samples: int = 1000,
+    warmup: int = 100,
 ):
     """Test PyMC on Gaussian, comparing to ground truth target via c2st."""
     likelihood_shift = -1.0 * ones(num_dim)
