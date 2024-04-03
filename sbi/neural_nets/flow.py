@@ -1060,7 +1060,7 @@ def build_zuko_flow(
 
     # Continuous normalizing flows (CNF) only have one transform,
     # so we need to handle them slightly differently.
-    if which_nf == "CNF":
+   if which_nf == "CNF":
         transform = flow_built.transform
 
         z_score_x_bool, structured_x = z_score_parser(z_score_x)

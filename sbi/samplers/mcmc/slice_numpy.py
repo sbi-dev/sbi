@@ -10,6 +10,8 @@ import numpy as np
 import torch
 from joblib import Parallel, delayed
 from matplotlib import pyplot as plt
+from matplotlib.axes import Axes
+from matplotlib.figure import FigureBase
 from tqdm.auto import tqdm, trange
 
 from sbi.simulators.simutils import tqdm_joblib
@@ -134,8 +136,8 @@ class SliceSampler(MCMCSampler):
 
         # show trace plot
         if show_info:
-            fig: plt.FigureBase
-            ax: plt.Axes
+            fig: FigureBase
+            ax: Axes
             fig, ax = plt.subplots(1, 1)  # pyright: ignore[reportAssignmentType]
             ax.plot(L_trace)
             ax.set_ylabel("log probability")

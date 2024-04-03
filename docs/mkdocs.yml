@@ -14,7 +14,7 @@ nav:
         - Multi-round inference: tutorial/03_multiround_inference.md
         - Sampling algorithms in sbi: tutorial/11_sampler_interface.md
         - Custom density estimators: tutorial/04_density_estimators.md
-        - Learning summary statistics: tutorial/05_embedding_net.md
+        - Embedding nets for observations: tutorial/05_embedding_net.md
         - SBI with trial-based data: tutorial/14_iid_data_and_permutation_invariant_embeddings.md
         - Handling invalid simulations: tutorial/08_restriction_estimator.md
         - Crafting summary statistics: tutorial/10_crafting_summary_statistics.md
@@ -28,10 +28,15 @@ nav:
       - Examples:
         - Hodgkin-Huxley example: examples/00_HH_simulator.md
         - Decision making model: examples/01_decision_making_model.md
+  - API Reference:
+    - Inference: reference/inference.md
+    - Neural Networks: reference/models.md
+    - Posteriors: reference/posteriors.md
+    - Potentials: reference/potentials.md
+    - Analysis: reference/analysis.md
   - Contributing:
-    - Guide: contribute.md
+    - How to contribute: contribute.md
     - Code of Conduct: code_of_conduct.md
-  - API Reference: reference.md
   - FAQ: faq.md
   - Credits: credits.md
 
@@ -39,12 +44,17 @@ repo_name: 'sbi-dev/sbi'
 repo_url: http://github.com/sbi-dev/sbi
 
 theme:
-  name: 'material'
+  name: material
+  features:
+    - content.code.copy
   palette:
     primary: 'indigo'
     accent: 'indigo'
   logo: 'static/logo.svg'
   collapse_navigation: False
+  icon:
+    admonition:
+      note: octicons/tag-16
 
 extra:
   social:
@@ -86,9 +96,13 @@ plugins:
       default_handler: python
       handlers:
         python:
-          rendering:
+          options:
             show_source: true
-            heading_level: 3
+            heading_level: 2
+            show_root_toc_entry: true
+            show_symbol_type_toc: true
+            show_root_full_path: false
+            show_root_heading: true
 
 watch:
   - ../sbi
