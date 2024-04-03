@@ -9,6 +9,7 @@ def importance_sample(
     potential_fn,
     proposal,
     num_samples: int = 1,
+    show_progress_bars: bool = False,
 ) -> Tuple[Tensor, Tensor]:
     """Returns samples from proposal and log(importance weights).
 
@@ -20,7 +21,11 @@ def importance_sample(
     Returns:
         Samples and logarithm of importance weights.
     """
-    samples = proposal.sample((num_samples,))
+    # Use progress bars when available (e.g., for multi-round proposals)
+    try:
+        samples = proposal.sample((num_samples,), show_progress_bar=show_progress_bars)
+    except TypeError:
+        samples = proposal.sample((num_samples,))
 
     potential_logprobs = potential_fn(samples)
     proposal_logprobs = proposal.log_prob(samples)
