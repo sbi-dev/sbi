@@ -3,7 +3,6 @@
 
 from functools import partial
 from typing import List, Optional, Sequence, Tuple, Union
-from typing import List, Optional, Sequence, Tuple, Union
 from warnings import warn
 
 import torch
@@ -12,7 +11,6 @@ from pyknos.nflows import distributions as distributions_
 from pyknos.nflows import flows, transforms
 from pyknos.nflows.nn import nets
 from pyknos.nflows.transforms.splines import (
-    rational_quadratic,
     rational_quadratic,
 )
 from torch import Tensor, nn, relu, tanh, tensor, uint8
@@ -26,33 +24,6 @@ from sbi.utils.sbiutils import (
 )
 from sbi.utils.torchutils import create_alternating_binary_mask
 from sbi.utils.user_input_checks import check_data_device, check_embedding_net_device
-
-
-def get_numel(batch_x: Tensor, batch_y: Tensor, embedding_net) -> Tuple[Tensor, Tensor]:
-    """
-    Get the number of elements in the input and output space.
-
-    Args:
-        batch_x: Batch of xs, used to infer dimensionality and (optional) z-scoring.
-        batch_y: Batch of ys, used to infer dimensionality and (optional) z-scoring.
-        embedding_net: Optional embedding network for y.
-
-    Returns:
-        Tuple of the number of elements in the input and output space.
-
-    """
-    x_numel = batch_x[0].numel()
-    # Infer the output dimensionality of the embedding_net by making a forward pass.
-    check_data_device(batch_x, batch_y)
-    check_embedding_net_device(embedding_net=embedding_net, datum=batch_y)
-    y_numel = embedding_net(batch_y[:1]).numel()
-    if x_numel == 1:
-        warn(
-            "In one-dimensional output space, this flow is limited to Gaussians",
-            stacklevel=2,
-        )
-
-    return x_numel, y_numel
 
 
 def get_numel(batch_x: Tensor, batch_y: Tensor, embedding_net) -> Tuple[Tensor, Tensor]:
