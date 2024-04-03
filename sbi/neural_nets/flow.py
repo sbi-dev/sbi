@@ -26,7 +26,7 @@ from sbi.utils.torchutils import create_alternating_binary_mask
 from sbi.utils.user_input_checks import check_data_device, check_embedding_net_device
 
 
-def get_numel(batch_x: Tensor, batch_y: Tensor, embedding_net) -> Tuple[Tensor, Tensor]:
+def get_numel(batch_x: Tensor, batch_y: Tensor, embedding_net) -> Tuple[int, int]:
     """
     Get the number of elements in the input and output space.
 
@@ -1067,7 +1067,7 @@ def build_zuko_flow(
         if z_score_x_bool:
             transform = (
                 transform,
-                standardizing_transform_zuko(batch_x, structured_x, backend="zuko"),
+                standardizing_transform_zuko(batch_x, structured_x),
             )
 
         z_score_y_bool, structured_y = z_score_parser(z_score_y)
