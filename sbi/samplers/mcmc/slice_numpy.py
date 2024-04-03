@@ -28,7 +28,7 @@ class MCMCSampler:
         Args:
             x: initial state
             lp_f: Function that returns the log prob.
-            thin: Thinning (subsampling) factor, setting 1 disables thinning.
+            thin: Thinning (subsampling) factor, default 1 (no thinning).
             verbose: Whether to show progress bars (False).
         """
 
@@ -237,7 +237,7 @@ class SliceSamplerSerial:
             log_prob_fn: Log prob function.
             init_params: Initial parameters.
             num_chains: Number of MCMC chains to run in parallel
-            thin: Thinning (subsampling) factor, setting 1 disables thinning.
+            thin: Thinning (subsampling) factor, default 1 (no thinning).
             tuning: Number of tuning steps for brackets.
             verbose: Show/hide additional info such as progress bars.
             init_width: Inital width of brackets.
@@ -369,7 +369,7 @@ class SliceSamplerVectorized:
             log_prob_fn: Log prob function.
             init_params: Initial parameters.
             num_chains: Number of MCMC chains to run in parallel
-            thin: Thinning (subsampling) factor, setting 1 disables thinning.
+            thin: Thinning (subsampling) factor, default 1 (no thinning).
             tuning: Number of tuning steps for brackets.
             verbose: Show/hide additional info such as progress bars.
             init_width: Inital width of brackets.
