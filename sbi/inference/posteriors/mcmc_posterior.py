@@ -71,7 +71,7 @@ class MCMCPosterior(NeuralPosterior):
                 vectorized for `slice_np_vectorized` whereas they are run sequentially
                 for `slice_np`. The samplers ending on `_pyro` are using Pyro, and
                 likewise the samplers ending on `_pymc` are using PyMC.
-            thin: The thinning factor for the chain.
+            thin: The thinning factor for the chain, default 1 (no thinning).
             warmup_steps: The initial number of samples to discard.
             num_chains: The number of chains. Should generally be at most
                 `num_workers - 1`.
@@ -477,7 +477,7 @@ class MCMCPosterior(NeuralPosterior):
             num_samples: Desired number of samples.
             potential_function: A callable **class**.
             initial_params: Initial parameters for MCMC chain.
-            thin: Thinning (subsampling) factor, setting 1 disables thinning.
+            thin: Thinning (subsampling) factor, default 1 (no thinning).
             warmup_steps: Initial number of samples to discard.
             vectorized: Whether to use a vectorized implementation of the
                 `SliceSampler`.
@@ -545,7 +545,7 @@ class MCMCPosterior(NeuralPosterior):
             initial_params: Initial parameters for MCMC chain.
             mcmc_method: Pyro MCMC method to use, either `"hmc_pyro"` or
                 `"nuts_pyro"` (default).
-            thin: Thinning (subsampling) factor, setting 1 disables thinning.
+            thin: Thinning (subsampling) factor, default 1 (no thinning).
             warmup_steps: Initial number of samples to discard.
             num_chains: Whether to sample in parallel. If None, use all but one CPU.
             show_progress_bars: Whether to show a progressbar during sampling.
@@ -601,7 +601,7 @@ class MCMCPosterior(NeuralPosterior):
             initial_params: Initial parameters for MCMC chain.
             mcmc_method: mcmc_method: Pyro MCMC method to use, either `"hmc_pymc"` or
                 `"slice_pymc"`, or `"nuts_pymc"` (default).
-            thin: Thinning (subsampling) factor, setting 1 disables thinning.
+            thin: Thinning (subsampling) factor, default 1 (no thinning).
             warmup_steps: Initial number of samples to discard.
             num_chains: Whether to sample in parallel. If None, use all but one CPU.
             show_progress_bars: Whether to show a progressbar during sampling.
