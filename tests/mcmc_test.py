@@ -236,7 +236,9 @@ def test_getting_inference_diagnostics(method, mcmc_params_fast: dict):
         f"but found only {list(idata.keys())}"
     )
     samples = getattr(idata.posterior, posterior.param_name).data
-    samples = samples.reshape(-1, samples.shape[-1])[::2][:num_samples]
+    samples = samples.reshape(-1, samples.shape[-1])[:: mcmc_params_fast["thin"]][
+        :num_samples
+    ]
     assert samples.shape == (
         num_samples,
         num_dim,
