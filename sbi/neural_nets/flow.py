@@ -10,9 +10,7 @@ import zuko
 from pyknos.nflows import distributions as distributions_
 from pyknos.nflows import flows, transforms
 from pyknos.nflows.nn import nets
-from pyknos.nflows.transforms.splines import (
-    rational_quadratic,
-)
+from pyknos.nflows.transforms.splines import rational_quadratic_spline
 from torch import Tensor, nn, relu, tanh, tensor, uint8
 
 from sbi.neural_nets.density_estimators import NFlowsFlow, ZukoFlow
@@ -214,9 +212,9 @@ def build_maf_rqs(
     tail_bound: float = 3.0,
     dropout_probability: float = 0.0,
     use_batch_norm: bool = False,
-    min_bin_width: float = rational_quadratic.DEFAULT_MIN_BIN_WIDTH,
-    min_bin_height: float = rational_quadratic.DEFAULT_MIN_BIN_HEIGHT,
-    min_derivative: float = rational_quadratic.DEFAULT_MIN_DERIVATIVE,
+    min_bin_width: float = rational_quadratic_spline.DEFAULT_MIN_BIN_WIDTH,
+    min_bin_height: float = rational_quadratic_spline.DEFAULT_MIN_BIN_HEIGHT,
+    min_derivative: float = rational_quadratic_spline.DEFAULT_MIN_DERIVATIVE,
     **kwargs,
 ) -> NFlowsFlow:
     """Builds MAF p(x|y), where the diffeomorphisms are rational-quadratic
