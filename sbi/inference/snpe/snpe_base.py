@@ -1,5 +1,6 @@
 # This file is part of sbi, a toolkit for simulation-based inference. sbi is licensed
-# under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
+# under the Apache License Version 2.0, see <https://www.apache.org/licenses/>
+
 import time
 from abc import ABC, abstractmethod
 from copy import deepcopy
