@@ -478,8 +478,7 @@ def probs2contours(
     """Takes an array of probabilities and produces an array of contours at specified
     percentile levels.
     Args:
-        probs : array
-            Probability array. doesn't have to sum to 1, but it is assumed it contains
+        probs: Probability array. doesn't have to sum to 1, but it is assumed it contains
             all the mass
         levels : list
             Percentile levels, have to be in [0.0, 1.0]. Specifies contour levels that
