@@ -99,7 +99,7 @@ def plt_kde_1d(
     limits: torch.Tensor,
     kwargs: Dict,
 ) -> None:
-    """ "1D Kernel Density Estimation."""
+    """Run 1D kernel density estimation on samples and plot it on a given axes."""
     density = gaussian_kde(samples, bw_method=kwargs["bw_method"])
     xs = np.linspace(limits[0], limits[1], kwargs["bins"])
     ys = density(xs)
