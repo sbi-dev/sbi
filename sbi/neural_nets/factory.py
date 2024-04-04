@@ -280,7 +280,7 @@ def posterior_nn(
 
     def build_fn(batch_theta, batch_x):
         if model not in model_builders:
-            raise NotImplementedError
+            raise NotImplementedError(f"Model {model} in not implemented")
 
         # The naming might be a bit confusing.
         # batch_x are the latent variables, batch_y the conditioned variables.
