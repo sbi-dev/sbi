@@ -667,7 +667,14 @@ class MCMCPosterior(NeuralPosterior):
             track_gradients = False
             pyro = False
         else:
-            raise NotImplementedError
+            if "hmc" in method or "nuts" in method:
+                warn(
+                    """The kwargs "hmc" and "nuts" are deprecated. Use "hmc_pyro",
+                    "nuts_pyro", "hmc_pymc", or "nuts_pymc" instead.""",
+                    DeprecationWarning,
+                    stacklevel=2,
+                )
+            raise NotImplementedError(f"MCMC method {method} is not implemented.")
 
         prepared_potential = partial(
             transformed_potential,
