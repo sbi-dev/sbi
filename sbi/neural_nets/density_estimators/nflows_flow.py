@@ -6,6 +6,7 @@ from torch import Tensor, nn
 
 from sbi.neural_nets.density_estimators.base import DensityEstimator
 from sbi.sbi_types import Shape
+from sbi.utils.user_input_checks import check_condition_shape
 
 
 class NFlowsFlow(DensityEstimator):
@@ -16,9 +17,9 @@ class NFlowsFlow(DensityEstimator):
     """
 
     def __init__(self, net: Flow, condition_shape: torch.Size) -> None:
-        super().__init__(net, condition_shape)
-        # TODO: Remove as soon as DensityEstimator becomes abstract
-        self.net: Flow
+        super().__init__()
+        self.net = net
+        self._condition_shape = condition_shape
 
     @property
     def embedding_net(self) -> nn.Module:
@@ -103,7 +104,7 @@ class NFlowsFlow(DensityEstimator):
             - (batch_size1, input_size) + (batch_size2,1, *condition_shape)
                                                   -> (batch_size2,batch_size1)
         """
-        self._check_condition_shape(condition)
+        check_condition_shape(condition, self._condition_shape)
         condition_dims = len(self._condition_shape)
 
         # PyTorch's automatic broadcasting
@@ -151,10 +152,10 @@ class NFlowsFlow(DensityEstimator):
             - (*batch_shape, *condition_shape)
                                         -> (*batch_shape, *sample_shape, input_size)
         """
-        self._check_condition_shape(condition)
+        check_condition_shape(condition, self._condition_shape)
+        condition_dims = len(self._condition_shape)
 
         num_samples = torch.Size(sample_shape).numel()
-        condition_dims = len(self._condition_shape)
 
         if len(condition.shape) == condition_dims:
             # nflows.sample() expects conditions to be batched.
@@ -187,10 +188,10 @@ class NFlowsFlow(DensityEstimator):
         Returns:
             Samples and associated log probabilities.
         """
-        self._check_condition_shape(condition)
+        check_condition_shape(condition, self._condition_shape)
+        condition_dims = len(self._condition_shape)
 
         num_samples = torch.Size(sample_shape).numel()
-        condition_dims = len(self._condition_shape)
 
         if len(condition.shape) == condition_dims:
             # nflows.sample() expects conditions to be batched.
